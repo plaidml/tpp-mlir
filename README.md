@@ -7,7 +7,7 @@ standalone `opt`-like tool to operate on that dialect.
 
 This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
 ```sh
-mdir build && cd build
+mkdir build && cd build
 cmake -G Ninja .. -DCMAKE_LINKER=lld -DMLIR_DIR=$PREFIX/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=$BUILD_DIR/bin/llvm-lit
 cmake --build . --target check-standalone
 ```
