@@ -33,7 +33,7 @@ set(LIBS
 
         MLIRStandalone
         )
-add_llvm_tool(standalone-opt standalone-opt.cpp)
+add_llvm_executable(standalone-opt standalone-opt.cpp)
 
 # Manually expand the target library, since our MLIR libraries
 # aren't plugged into the LLVM dependency tracking. If we don't
