@@ -19,10 +19,6 @@ cmake --build . --target mlir-doc
 **Note**: Make sure to pass `-DLLVM_INSTALL_UTILS=ON` when building LLVM with
 CMake so that it installs `FileCheck` to the chosen installation prefix.
 
-----------
+## License
 
-[![CC0](http://i.creativecommons.org/p/zero/1.0/88x31.png)]("http://creativecommons.org/publicdomain/zero/1.0/")
-
-To the extent possible under law,
-[Jean-Michel Gorius](https://jmgorius.gitlab.io/) has waived all copyright and
-related or neighboring rights to this MLIR dialect template.
+This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the LICENSE.txt file for more details.
