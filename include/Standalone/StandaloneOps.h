@@ -1,5 +1,5 @@
-#ifndef INCLUDE_STANDALONE_STANDALONEOPS_H
-#define INCLUDE_STANDALONE_STANDALONEOPS_H
+#ifndef STANDALONE_STANDALONEOPS_H
+#define STANDALONE_STANDALONEOPS_H
 
 namespace mlir {
 namespace standalone {
@@ -10,4 +10,4 @@ namespace standalone {
 } // namespace standalone
 } // namespace mlir
 
-#endif // INCLUDE_STANDALONE_STANDALONEOPS_H
+#endif // STANDALONE_STANDALONEOPS_H
