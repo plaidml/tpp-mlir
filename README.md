@@ -13,3 +13,11 @@ cmake --build . --target check-standalone
 ```
 **Note**: Make sure to pass `-DLLVM_INSTALL_UTILS=ON` when building LLVM with
 CMake so that it installs `FileCheck` to the chosen installation prefix.
+
+----------
+
+[![CC0](http://i.creativecommons.org/p/zero/1.0/88x31.png)]("http://creativecommons.org/publicdomain/zero/1.0/")
+
+To the extent possible under law,
+[Jean-Michel Gorius](https://jmgorius.gitlab.io/) has waived all copyright and
+related or neighboring rights to this MLIR dialect template.
