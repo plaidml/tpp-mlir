@@ -1,1 +1,3 @@
-add_mlir_dialect(StandaloneOps Standalone StandaloneOps)
+add_mlir_dialect(StandaloneOps Standalone)
+add_mlir_doc(StandaloneDialect -gen-dialect-doc StandaloneDialect Standalone/)
+add_mlir_doc(StandaloneOps -gen-op-doc StandaloneOps Standalone/)

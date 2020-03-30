@@ -1,6 +1,6 @@
 #ifndef STANDALONE_OPS
 #define STANDALONE_OPS
 
-include "StandaloneBase.td"
+include "StandaloneDialect.td"
 
 #endif // STANDALONE_OPS
