@@ -14,12 +14,7 @@
 namespace mlir {
 namespace standalone {
 
-class StandaloneDialect : public Dialect {
-public:
-  explicit StandaloneDialect(MLIRContext *context);
-
-  static StringRef getDialectNamespace() { return "standalone"; }
-};
+#include "Standalone/StandaloneOpsDialect.h.inc"
 
 } // namespace standalone
 } // namespace mlir
