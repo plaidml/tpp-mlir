@@ -8,8 +8,7 @@
 
 #include "Standalone/StandaloneOps.h"
 #include "Standalone/StandaloneDialect.h"
-
-using namespace mlir;
+#include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
 namespace standalone {

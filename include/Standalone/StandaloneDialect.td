@@ -16,7 +16,7 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 def Standalone_Dialect : Dialect {
-    let name = "Standalone";
+    let name = "standalone";
     let summary = "A standalone out-of-tree MLIR dialect.";
     let description = [{
         This dialect is an example of an out-of-tree MLIR dialect designed to
