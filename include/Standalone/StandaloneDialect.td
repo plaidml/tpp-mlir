@@ -31,7 +31,6 @@ def Standalone_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 class Standalone_Op<string mnemonic, list<OpTrait> traits = []> :
-        Op<Standalone_Dialect, mnemonic, traits> {
-}
+        Op<Standalone_Dialect, mnemonic, traits>;
 
 #endif // STANDALONE_DIALECT
