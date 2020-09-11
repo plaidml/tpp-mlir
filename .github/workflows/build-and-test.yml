@@ -56,11 +56,11 @@ jobs:
           mkdir $GITHUB_WORKSPACE/mlir-standalone-template/sanitizer-build
           cd $GITHUB_WORKSPACE/mlir-standalone-template/sanitizer-build
           cmake $GITHUB_WORKSPACE/mlir-standalone-template -DCMAKE_BUILD_TYPE=Debug -DUSE_SANITIZER='Address;Undefined' ${{ env.CMAKE_FLAGS }}
-          cmake --build . --target check-x86-opt -- -j$(nproc)
+          cmake --build . --target check-standalone-opt -- -j$(nproc)
       - name: Release build
         run: |
           mkdir $GITHUB_WORKSPACE/mlir-standalone-template/build
           cd $GITHUB_WORKSPACE/mlir-standalone-template/build
           cmake $GITHUB_WORKSPACE/mlir-standalone-template -DCMAKE_BUILD_TYPE=Release ${{ env.CMAKE_FLAGS }}
-          cmake --build . --target check-x86-opt -- -j$(nproc)
+          cmake --build . --target check-standalone-opt -- -j$(nproc)
 
