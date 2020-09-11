@@ -21,5 +21,5 @@ StandaloneDialect::StandaloneDialect(mlir::MLIRContext *context)
   addOperations<
 #define GET_OP_LIST
 #include "Standalone/StandaloneOps.cpp.inc"
-  >();
+      >();
 }
