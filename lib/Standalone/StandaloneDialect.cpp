@@ -6,19 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/StandaloneDialect.h"
-#include "Standalone/StandaloneOps.h"
+#include "Standalone/TppDialect.h"
+#include "Standalone/TppOps.h"
 
 using namespace mlir;
-using namespace mlir::standalone;
+using namespace mlir::tpp;
 
 //===----------------------------------------------------------------------===//
 // Standalone dialect.
 //===----------------------------------------------------------------------===//
 
-void StandaloneDialect::initialize() {
+void TppDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "Standalone/StandaloneOps.cpp.inc"
+#include "Standalone/TppOps.cpp.inc"
       >();
 }

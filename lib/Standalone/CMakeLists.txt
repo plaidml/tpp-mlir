@@ -6,7 +6,7 @@ add_mlir_dialect_library(MLIRStandalone
         ${PROJECT_SOURCE_DIR}/include/Standalone
 
         DEPENDS
-        MLIRStandaloneOpsIncGen
+        MLIRTppOpsIncGen
 
 	LINK_LIBS PUBLIC
 	MLIRIR

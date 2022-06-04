@@ -11,6 +11,6 @@
 
 #include "mlir/IR/Dialect.h"
 
-#include "Standalone/StandaloneOpsDialect.h.inc"
+#include "Standalone/TppOpsDialect.h.inc"
 
 #endif // STANDALONE_STANDALONEDIALECT_H
