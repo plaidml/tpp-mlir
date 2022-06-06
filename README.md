@@ -26,12 +26,10 @@ This dialect template is made available under the Apache License 2.0 with LLVM E
 
 ## Note:
 
-Each TPP with a descriptor. The descriptor is used to match linalg.generic.
-TODO: how to carry information on the operations?
-
 - check: getSubMap
 - check: getSliceMap
 
+```
 #trait1 = {
   indexing_maps = [
     affine_map<(i, j) -> (i, j)>,  // input a
@@ -42,6 +40,7 @@ TODO: how to carry information on the operations?
 }
 
 tpp.add ins(%arg0: tensor<2x2xf32>, %arg1: tensor<2x2xf32>) out(tensor<2x2xf32) #trait1
+```
 
 How to match something like:
 
