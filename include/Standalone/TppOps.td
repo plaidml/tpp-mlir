@@ -16,6 +16,10 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // MemRef with any element type and rank 2.
 def TppMemRef : MemRefRankOf<[AnyType], [2]>;
 
+//===----------------------------------------------------------------------===//
+// AddOp
+//===----------------------------------------------------------------------===//
+
 def Tpp_AddOp : Tpp_Op<"add", []> {
     let summary = "Element-wise addition.";
     let description = [{
@@ -50,6 +54,10 @@ def Tpp_AddOp : Tpp_Op<"add", []> {
     }];
 }
 
+//===----------------------------------------------------------------------===//
+// IdentityOp
+//===----------------------------------------------------------------------===//
+
 def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   let summary = "Copies input to output.";
   let description = [{
@@ -80,6 +88,10 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// ReluOp
+//===----------------------------------------------------------------------===//
+
 def Tpp_ReluOp : Tpp_Op<"relu", []> {
   let summary = "Applies a Rectified Linear Unit function.";
   let description = [{
@@ -109,6 +121,10 @@ def Tpp_ReluOp : Tpp_Op<"relu", []> {
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
 
 def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
   let summary = "Performs matrix multiplication of two input.";
