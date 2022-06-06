@@ -13,7 +13,7 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 //===----------------------------------------------------------------------===//
-// Standalone dialect.
+// Tpp dialect.
 //===----------------------------------------------------------------------===//
 
 void TppDialect::initialize() {
