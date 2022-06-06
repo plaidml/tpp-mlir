@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/TppDialect.h"
 #include "Standalone/TppOps.h"
+#include "Standalone/TppDialect.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
