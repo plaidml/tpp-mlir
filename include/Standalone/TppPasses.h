@@ -19,7 +19,7 @@ class FuncOp;
 
 namespace tpp {
 
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
 
 } // end namespace tpp
 } // end namespace mlir

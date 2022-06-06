@@ -1,4 +1,4 @@
-//===- LinalgConvertToTpp.cpp ------------------------------------*- C++-*-===//
+//===- LinalgMapToTpp.cpp ----------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,12 +17,12 @@ using namespace mlir::tpp;
 #define GEN_PASS_CLASSES
 #include "Standalone/TppPasses.h.inc"
 
-#define DEBUG_TYPE "linalg-convert-to-tpp"
+#define DEBUG_TYPE "linalg-map-to-tpp"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 namespace {
 
-struct ConvertToTpp : public LinalgConvertToTppBase<ConvertToTpp> {
+struct MapToTpp : public LinalgMapToTppBase<MapToTpp> {
   void runOnOperation() override {
     return;
   }
@@ -31,6 +31,6 @@ struct ConvertToTpp : public LinalgConvertToTppBase<ConvertToTpp> {
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass() {
-  return std::make_unique<ConvertToTpp>();
+mlir::tpp::createMapLinalgToTppPass() {
+  return std::make_unique<MapToTpp>();
 }

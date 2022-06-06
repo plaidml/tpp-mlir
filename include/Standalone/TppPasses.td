@@ -11,9 +11,9 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgConvertToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
-  let summary = "Convert linalg to tpp";
-  let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
+def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
+  let summary = "Map linalg to tpp";
+  let constructor = "mlir::tpp::createMapLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
