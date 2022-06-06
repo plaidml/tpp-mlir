@@ -40,6 +40,7 @@ func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 // CHECK-LABEL: func.func @add
 func.func @add(%arg1: tensor<256x256xf32>, %arg2: tensor<256x256xf32>) -> tensor<256x256xf32> {
   %0 = linalg.init_tensor [256, 256] : tensor<256x256xf32>
+  // CHECK: tpp.add
   %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel"]} ins(%arg1, %arg2: tensor<256x256xf32>, tensor<256x256xf32>) outs(%0 : tensor<256x256xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
     %2 = arith.addf %arg3, %arg4 : f32
