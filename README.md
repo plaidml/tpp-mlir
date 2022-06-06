@@ -22,3 +22,38 @@ CMake so that it installs `FileCheck` to the chosen installation prefix.
 ## License
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
+
+
+## Note:
+
+Each TPP with a descriptor. The descriptor is used to match linalg.generic.
+TODO: how to carry information on the operations?
+
+- check: getSubMap
+- check: getSliceMap
+
+#trait1 = {
+  indexing_maps = [
+    affine_map<(i, j) -> (i, j)>,  // input a
+    affine_map<(i, j) -> (i, j)>   // input b
+    affine_map<(i, j) -> (i, j)>   // output c
+  ],
+  iterator_types = ["parallel", "parallel"],
+}
+
+tpp.add ins(%arg0: tensor<2x2xf32>, %arg1: tensor<2x2xf32>) out(tensor<2x2xf32) #trait1
+
+How to match something like:
+
+```
+func.func @add_d(%arga: tensor<32xf32, #DV>, %argb: f32, %argx: tensor<32xf32>) -> tensor<32xf32> {
+  %0 = linalg.generic #trait1
+     ins(%arga: tensor<32xf32, #DV>)
+    outs(%argx: tensor<32xf32>) {
+      ^bb(%a: f32, %x: f32):
+        %0 = arith.addf %a, %argb : f32
+        linalg.yield %0 : f32
+  } -> tensor<32xf32>
+  return %0 : tensor<32xf32>
+}
+```

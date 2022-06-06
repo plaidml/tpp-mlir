@@ -9,6 +9,7 @@
 #include "Standalone/MathxOps.h"
 #include "Standalone/TppOps.h"
 #include "Standalone/TppPasses.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -71,31 +72,37 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 
   // Return true if the operation can maps to a tpp unary operation. The generic
-  // must have two operands, no result and the operands type are expected to be
-  // 2-dimensional memref with static shape.
-  bool canMapToTppUnary(linalg::GenericOp linalgOp) const {
-    if (linalgOp->getNumResults() != 0)
+  // must have 'numOperands' operands, 'numResults' result and the operands type
+  // are expected to be 2-dimensional memref with static shape.
+  bool canMapToTppImpl(linalg::GenericOp linalgOp, unsigned numResults,
+                       unsigned numOperands) const {
+    if (linalgOp->getNumResults() != numResults)
       return false;
 
-    if (linalgOp->getNumOperands() != 2)
+    if (linalgOp->getNumOperands() != numOperands)
       return false;
 
-    MemRefType inputType =
-        linalgOp->getOperand(0).getType().dyn_cast_or_null<MemRefType>();
-    if (inputType && inputType.hasStaticShape() &&
-        inputType.getShape().size() != 2)
-      return false;
-    MemRefType outputType =
-        linalgOp->getOperand(1).getType().dyn_cast_or_null<MemRefType>();
-    if (outputType && outputType.hasStaticShape() &&
-        outputType.getShape().size() != 2)
-      return false;
+    for (unsigned idx = 0; idx < numOperands; idx++) {
+      if (MemRefType operandType = linalgOp->getOperand(idx)
+                                       .getType()
+                                       .dyn_cast_or_null<MemRefType>())
+        if (!operandType.hasStaticShape() || operandType.getShape().size() != 2)
+          return false;
+    }
     return true;
+  }
+
+  bool canMapToTppUnary(linalg::GenericOp linalgOp) const {
+    return canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 2);
+  }
+
+  bool canMapToTppBinary(linalg::GenericOp linalgOp) const {
+    return canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 3);
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (isElementWise(linalgOp) {
+    if (isElementWise(linalgOp)) {
       if (hasOnlyYieldOp(linalgOp.getRegion()) && canMapToTppUnary(linalgOp)) {
         rewriter.replaceOpWithNewOp<tpp::IdentityOp>(
             linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
@@ -105,6 +112,13 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           canMapToTppUnary(linalgOp)) {
         rewriter.replaceOpWithNewOp<tpp::ReluOp>(
             linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
+        return success();
+      }
+      if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
+          canMapToTppBinary(linalgOp)) {
+        rewriter.replaceOpWithNewOp<tpp::AddOp>(
+            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1),
+            linalgOp->getOperand(2));
         return success();
       }
     }
