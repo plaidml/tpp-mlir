@@ -95,18 +95,18 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (isElementWise(linalgOp) && hasOnlyYieldOp(linalgOp.getRegion()) &&
-        canMapToTppUnary(linalgOp)) {
-      rewriter.replaceOpWithNewOp<tpp::IdentityOp>(
-          linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
-      return success();
-    }
-    if (isElementWise(linalgOp) &&
-        hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
-        canMapToTppUnary(linalgOp)) {
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(
-          linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
-      return success();
+    if (isElementWise(linalgOp) {
+      if (hasOnlyYieldOp(linalgOp.getRegion()) && canMapToTppUnary(linalgOp)) {
+        rewriter.replaceOpWithNewOp<tpp::IdentityOp>(
+            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
+        return success();
+      }
+      if (hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
+          canMapToTppUnary(linalgOp)) {
+        rewriter.replaceOpWithNewOp<tpp::ReluOp>(
+            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
+        return success();
+      }
     }
     return failure();
   }
