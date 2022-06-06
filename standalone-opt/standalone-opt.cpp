@@ -19,6 +19,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "Standalone/MathxDialect.h"
+#include "Standalone/MathxOpsDialect.cpp.inc"
 #include "Standalone/TppDialect.h"
 #include "Standalone/TppOpsDialect.cpp.inc"
 
@@ -28,6 +30,7 @@ int main(int argc, char **argv) {
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();
+  registry.insert<mlir::mathx::MathxDialect>();
   // registry.insert<mlir::func::FuncDialect>();
   // registry.insert<mlir::arith::ArithmeticDialect>();
   // Add the following to include *all* MLIR Core dialects, or selectively
