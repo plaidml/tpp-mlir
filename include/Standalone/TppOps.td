@@ -44,9 +44,7 @@ def Tpp_AddOp : Tpp_Op<"add", []> {
     }];
 
     let arguments = (ins TppMemRef:$lhs, TppMemRef:$rhs, 
-                         TppMemRef:$output,
-                         AffineMapArrayAttr:$indexing_maps,
-                         ArrayAttr:$iterator_types);
+                         TppMemRef:$output);
 
     let assemblyFormat = [{
         `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` 
@@ -79,9 +77,7 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$input, TppMemRef:$output,
-                       AffineMapArrayAttr:$indexing_maps,
-                       ArrayAttr:$iterator_types);
+  let arguments = (ins TppMemRef:$input, TppMemRef:$output);
 
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
@@ -113,9 +109,7 @@ def Tpp_ReluOp : Tpp_Op<"relu", []> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$input, TppMemRef:$output,
-                       AffineMapArrayAttr:$indexing_maps,
-                       ArrayAttr:$iterator_types);
+  let arguments = (ins TppMemRef:$input, TppMemRef:$output);
 
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
@@ -148,9 +142,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$matrixA, TppMemRef:$matrixB, TppMemRef:$matrixC,
-                       AffineMapArrayAttr:$indexing_maps,
-                       ArrayAttr:$iterator_types);
+  let arguments = (ins TppMemRef:$matrixA, TppMemRef:$matrixB, TppMemRef:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
