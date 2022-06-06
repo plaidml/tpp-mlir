@@ -20,6 +20,14 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
                                             iterator_types = ["parallel", "parallel"]
                                             }
 
+  // CHECK: tpp.relu
+  tpp.relu ins(%arg0: memref<2x2xf32>) 
+           out(%arg2: memref<2x2xf32>) {
+                                        indexing_maps = [affine_map<(i, j) -> (i, j)>,
+                                                             affine_map<(i, j) -> (i, j)>],
+                                        iterator_types = ["parallel", "parallel"]
+                                       }
+
   // CHECK: tpp.matmul
   tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>)
              out(%arg2: memref<2x2xf32>) {

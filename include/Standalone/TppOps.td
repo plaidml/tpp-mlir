@@ -80,6 +80,36 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   }];
 }
 
+def Tpp_ReluOp : Tpp_Op<"relu", []> {
+  let summary = "Applies a Rectified Linear Unit function.";
+  let description = [{
+    The `tpp.relu` applies a Rectified Linear Unit function.
+    
+    Example:
+
+    ```mlir
+      
+    trait = {
+      indexing_maps = [
+        affine_map<(i, j) -> (i, j)> // input
+        affine_map<(i, j) -> (i, j)> // output
+      ],
+      iterator_types = ["parallel", "parallel"]
+    }
+    tpp.relu ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
+
+    ```
+  }];
+
+  let arguments = (ins TppMemRef:$input, TppMemRef:$output,
+                       AffineMapArrayAttr:$indexing_maps,
+                       ArrayAttr:$iterator_types);
+
+  let assemblyFormat = [{
+      `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
+  }];
+}
+
 def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
   let summary = "Performs matrix multiplication of two input.";
   let description = [{
