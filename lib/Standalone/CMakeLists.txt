@@ -1,4 +1,4 @@
-add_mlir_dialect_library(MLIRStandalone
+add_mlir_dialect_library(MLIRTppDialect
         TppDialect.cpp
         TppOps.cpp
 
