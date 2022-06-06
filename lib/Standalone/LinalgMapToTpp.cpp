@@ -10,6 +10,7 @@
 #include "Standalone/TppPasses.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -22,8 +23,25 @@ using namespace mlir::tpp;
 
 namespace {
 
+struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    linalgOp->dump();
+    return failure();
+  }
+};
+
+void populateLinalgToTppPatterns(RewritePatternSet &patterns) {
+  patterns.add<MapGenericOpToTpp>(patterns.getContext());
+}
+
 struct MapToTpp : public LinalgMapToTppBase<MapToTpp> {
   void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    populateLinalgToTppPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
 };

@@ -23,10 +23,11 @@
 #include "Standalone/MathxOpsDialect.cpp.inc"
 #include "Standalone/TppDialect.h"
 #include "Standalone/TppOpsDialect.cpp.inc"
+#include "Standalone/TppPasses.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
-  // TODO: Register standalone passes here.
+  registerTppPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();
