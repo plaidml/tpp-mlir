@@ -93,7 +93,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       if (MemRefType operandType = linalgOp->getOperand(idx)
                                        .getType()
                                        .dyn_cast_or_null<MemRefType>())
-        if (!operandType.hasStaticShape() || operandType.getShape().size() != 2)
+        if (!operandType.hasStaticShape() || operandType.getShape().size() > 2)
           return false;
     }
     return true;
