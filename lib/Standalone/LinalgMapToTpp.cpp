@@ -49,6 +49,12 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   // Return true if: 1) the region has a single block. 2) The block has two
   // operations only (linalg.YieldOp and OP). 3) The operation result types are
   // int or float.
+  // TODO: For now we assume the region to have only two operations: The YieldOp
+  // and the 'OP', meaning that the entire linalg.generic will map to a single
+  // tpp operation. If we do element-wise fusion at the linalg level this
+  // assumption does not hold anymore as now a linalg.generic can map to n tpp
+  // operations. If we support 1:n matching what should we do if the entire
+  // linalg.op cannot be replace by tpp operations?
   template <typename OP>
   bool hasOnlyScalarElementwiseOp(Region &region) const {
     if (!region.hasOneBlock())
@@ -71,7 +77,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return std::distance(region.front().begin(), region.front().end()) == 1;
   }
 
-  // Return true if the operation can maps to a tpp unary operation. The generic
+  // Return true if the operation can maps to a tpp operation. The generic
   // must have 'numOperands' operands, 'numResults' result and the operands type
   // are expected to be 2-dimensional memref with static shape.
   bool canMapToTppImpl(linalg::GenericOp linalgOp, unsigned numResults,
