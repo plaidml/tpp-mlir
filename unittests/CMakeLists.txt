@@ -5,7 +5,8 @@ function(add_tpp_unittest name)
 endfunction()
 
 add_tpp_unittest(TppUnitTests 
-  smoke.cpp 
+  Smoke.cpp
+  HeatMap.cpp 
   )
 
 target_link_libraries(TppUnitTests

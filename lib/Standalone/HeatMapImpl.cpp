@@ -12,8 +12,9 @@
 #include <cassert>
 #include <map>
 
-using namespace mlir;
-using namespace mlir::tpp::x86;
+namespace mlir {
+namespace tpp {
+namespace x86 {
 
 extern uint64_t kHeatmapSize;
 extern uint16_t kHeatmapKeys[][3];
@@ -41,7 +42,7 @@ struct Heatmap {
 
 static Heatmap heatmap;
 
-KernelCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
+KernelCost lookupHeatMap(llvm::ArrayRef<int64_t> ranges) {
   assert(ranges.size() == 3 && "heatmapCost expects a 3D tile");
 
   auto tile = Tile{ranges[0], ranges[1], ranges[2]};
@@ -73,3 +74,7 @@ KernelCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
 
   return KernelCost{0.0, 0};
 }
+
+} // end namespace x86
+} // end namespace tpp
+} // namespace mlir
