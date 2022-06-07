@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -106,6 +107,47 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 3);
   }
 
+  // Return true if the linalg.generic maps to a tpp.gemm.
+  bool isTPPGemm(linalg::GenericOp linalgOp) const {
+    // structural and access pattern.
+    ArrayAttr iteratorTypes = linalgOp.iterator_types();
+    if (iteratorTypes.size() != 3)
+      return false;
+    if (!(isParallelIterator(iteratorTypes[0]) &&
+          isParallelIterator(iteratorTypes[1]) &&
+          isReductionIterator(iteratorTypes[2])))
+      return false;
+    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    AffineExpr i, j, k;
+    bindDims(linalgOp.getContext(), i, j, k);
+    if (linalgOp.getIndexingMaps() != infer({{i, k}, {k, j}, {i, j}}))
+      return false;
+    // operations and operands.
+    Region &region = linalgOp.getRegion();
+    if (!region.hasOneBlock() ||
+        !canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 3))
+      return false;
+    using mlir::matchers::m_Any;
+    using mlir::matchers::m_Val;
+    Block &block = region.front();
+    linalg::YieldOp yield = cast<linalg::YieldOp>(block.getTerminator());
+    if (yield.getNumOperands() != 1)
+      return false;
+    if (block.getNumArguments() != 3)
+      return false;
+    Operation *maybeAdd = yield.getOperands()[0].getDefiningOp();
+    auto mFloat =
+        m_Op<arith::AddFOp>(m_Val(block.getArgument(2)),
+                            m_Op<arith::MulFOp>(m_Val(block.getArgument(0)),
+                                                m_Val(block.getArgument(1))));
+    auto mInteger =
+        m_Op<arith::AddIOp>(m_Val(block.getArgument(2)),
+                            m_Op<arith::MulIOp>(m_Val(block.getArgument(0)),
+                                                m_Val(block.getArgument(1))));
+    return (mFloat.match(maybeAdd) || mInteger.match(maybeAdd));
+  }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (isElementWise(linalgOp)) {
@@ -127,6 +169,12 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
             linalgOp->getOperand(2));
         return success();
       }
+    }
+    if (isTPPGemm(linalgOp)) {
+      rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
+          linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1),
+          linalgOp->getOperand(2));
+      return success();
     }
     return failure();
   }
