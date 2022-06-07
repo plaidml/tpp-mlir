@@ -37,6 +37,17 @@ set(LLVM_LIT_ARGS "-sv" CACHE STRING "lit default options")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 include(sanitizers)
 
+# Unit test
+message(STATUS ${LLVM_MAIN_INCLUDE_DIR}/../)
+set(LLVM_MAIN_SRC_DIR ${LLVM_MAIN_INCLUDE_DIR}/../)
+message(STATUS "Using LLVM: ${LLVM_MAIN_SRC_DIR}")
+add_custom_target(StandaloneUnitTests)
+if (EXISTS ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include/gtest/gtest.h)
+  add_subdirectory(unittests)
+else()
+  message(WARNING "gtest not found, unittests will not be available")
+endif()
+
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
