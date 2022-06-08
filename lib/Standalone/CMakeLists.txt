@@ -7,6 +7,7 @@ add_mlir_dialect_library(MLIRStandalone
        
         # Passes. 
         LinalgMapToTpp.cpp
+        LinalgConvertToTpp.cpp
 
         # Heatmap.
         HeatMap.cpp
