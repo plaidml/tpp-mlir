@@ -88,3 +88,19 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<
   } -> tensor<1x512xf32> 
   return %1 : tensor<1x512xf32>
 }
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: func.func @identity
+func.func @identity(%arg1: tensor<32x32x32x32xf32>) -> tensor<32x32x32x32xf32> {
+  %0 = linalg.init_tensor [32, 32, 32, 32] : tensor<32x32x32x32xf32>
+  // CHECK: library_call = "tpp.identity"
+  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<32x32x32x32xf32>) outs(%0 : tensor<32x32x32x32xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      linalg.yield %arg2 : f32
+  } -> tensor<32x32x32x32xf32> 
+  return %1 : tensor<32x32x32x32xf32>
+}

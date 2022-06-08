@@ -102,7 +102,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       if (ShapedType operandType = linalgOp->getOperand(idx)
                                        .getType()
                                        .dyn_cast_or_null<ShapedType>())
-        if (!operandType.hasStaticShape() || operandType.getShape().size() > 2)
+        if (!operandType.hasStaticShape())
           return false;
     }
     return true;
