@@ -79,20 +79,29 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 
   // Return true if the operation can maps to a tpp operation. The generic
-  // must have 'numOperands' operands, 'numResults' result and the operands type
-  // are expected to be 2-dimensional memref with static shape.
+  // must have 'numOperands' operands, 'numResults' result at buffer level
+  // while 'numOperands' operands, 'numResults' + 1 result at tensor level.
+  // In both cases, the operands type are expected to be 2-dimensional shaped
+  // type. Why this?
+  // - The mapping to tpp should work both at the tensor and buffer level.
+  // If you consider an element-wise operation, it has the following properties:
+  // a) At buffer level it has 0 results and 2 operands.
+  // b) At tensor level it produces 1 result and takes 2 operands.
   bool canMapToTppImpl(linalg::GenericOp linalgOp, unsigned numResults,
                        unsigned numOperands) const {
-    if (linalgOp->getNumResults() != numResults)
-      return false;
-
-    if (linalgOp->getNumOperands() != numOperands)
-      return false;
+    if (linalgOp.hasBufferSemantics())
+      if ((linalgOp->getNumResults() != numResults) ||
+          (linalgOp->getNumOperands() != numOperands))
+        return false;
+    if (linalgOp.hasTensorSemantics())
+      if ((linalgOp->getNumResults() != numResults + 1) ||
+          (linalgOp->getNumOperands() != numOperands))
+        return false;
 
     for (unsigned idx = 0; idx < numOperands; idx++) {
-      if (MemRefType operandType = linalgOp->getOperand(idx)
+      if (ShapedType operandType = linalgOp->getOperand(idx)
                                        .getType()
-                                       .dyn_cast_or_null<MemRefType>())
+                                       .dyn_cast_or_null<ShapedType>())
         if (!operandType.hasStaticShape() || operandType.getShape().size() > 2)
           return false;
     }
@@ -152,28 +161,30 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (isElementWise(linalgOp)) {
       if (hasOnlyYieldOp(linalgOp.getRegion()) && canMapToTppUnary(linalgOp)) {
-        rewriter.replaceOpWithNewOp<tpp::IdentityOp>(
-            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
+        StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
+        rewriter.updateRootInPlace(
+            linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
         return success();
       }
       if (hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
           canMapToTppUnary(linalgOp)) {
-        rewriter.replaceOpWithNewOp<tpp::ReluOp>(
-            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1));
+        StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
+        rewriter.updateRootInPlace(
+            linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
         return success();
       }
       if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
           canMapToTppBinary(linalgOp)) {
-        rewriter.replaceOpWithNewOp<tpp::AddOp>(
-            linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1),
-            linalgOp->getOperand(2));
+        StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
+        rewriter.updateRootInPlace(
+            linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
         return success();
       }
     }
     if (isTPPGemm(linalgOp)) {
-      rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
-          linalgOp, linalgOp->getOperand(0), linalgOp->getOperand(1),
-          linalgOp->getOperand(2));
+      StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
+      rewriter.updateRootInPlace(
+          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
       return success();
     }
     return failure();
