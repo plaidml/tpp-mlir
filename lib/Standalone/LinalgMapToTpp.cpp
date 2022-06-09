@@ -129,6 +129,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   // Ensure the SIMD dimension to be multiple of 16.
   // TODO: Should happen here? and a bit too specific..
+  // TODO: We need pad 1 on the output.
   //
   // %0 = tensor.pad (%C) : tensor<3x3xf32> to tensor<3xSIMDxf32>
   // %1 = tensor.pad (%B) : tensor<3x3xf32> to tensor<3xSIMDxf32>
@@ -143,12 +144,18 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     Value B = linalgOp->getOperand(1);
     Value A = linalgOp->getOperand(0);
 
+    StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
     ArrayRef<int64_t> shapeC = C.getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeB = B.getType().cast<ShapedType>().getShape();
     assert(shapeC[1] == shapeB[1]);
     int64_t simdDim = shapeC[1];
-    if (simdDim % 16 == 0)
+    llvm::errs() << "SIMD dims: " << simdDim << "\n";
+
+    if (simdDim % 16 == 0) {
+      rewriter.updateRootInPlace(
+          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
       return success();
+    }
     int64_t paddedSimd = 16 * std::ceil((float)simdDim / 16.0);
     SmallVector<int64_t> newShapeC = {shapeC[0], paddedSimd};
     SmallVector<int64_t> newShapeB = {shapeB[0], paddedSimd};
@@ -174,6 +181,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()));
     rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
                                 replacementOp.region().begin());
+    replacementOp.library_callAttr(tppMicroKernelName);
 
     unsigned rank = 2;
     SmallVector<OpFoldResult, 4> offsets, sizes, strides;
@@ -189,9 +197,6 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     Value extract = rewriter.create<tensor::ExtractSliceOp>(
         loc, replacementOp->getResult(0), offsets, sizes, strides);
 
-    // auto m = linalgOp->getParentOfType<ModuleOp>();
-    // m.dump();
-    // assert(0);
     rewriter.replaceOp(linalgOp, extract);
     return success();
   }
@@ -221,13 +226,13 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       }
     }
     if (isTPPGemm(linalgOp)) {
-      if (failed(makeSIMDFriendly(linalgOp, rewriter)))
-        return failure();
-      // StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
-      // rewriter.updateRootInPlace(
-      //     linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName);
-      //     });
-      return success();
+      // if we are at tensor level we make the SIMD dimension multiple of 16.
+      if (linalgOp.hasTensorSemantics())
+        return makeSIMDFriendly(linalgOp, rewriter);
+      // if we have already materialize buffers we simply annotate.
+      StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
+      rewriter.updateRootInPlace(
+          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
     }
     return failure();
   }
