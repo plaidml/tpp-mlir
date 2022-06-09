@@ -29,6 +29,7 @@ namespace {
 
 // TODO: evaluate transform dialect.
 
+// Tiling function to remove all but the zero and first dimension.
 static SmallVector<Value, 4> getTileSizes(OpBuilder &builder,
                                           linalg::LinalgOp linalgOp) {
   SmallVector<Value, 4> tppTiles;
@@ -50,6 +51,7 @@ static MemRefType dropUnitDims(MemRefType inputType, ArrayRef<int64_t> offsets,
   return canonicalizeStridedLayout(rankReducedType.cast<MemRefType>());
 }
 
+// Reduce rank for 'input' by dropping unit dimension.
 static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
                                                  Location loc, Value input) {
   MemRefType inputType = input.getType().cast<MemRefType>();
@@ -66,7 +68,9 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
       loc, resultType, input, subViewOffsets, subViewSizes, subViewStrides);
 }
 
-LogicalResult replaceGenericOpWithTppOp(linalg::GenericOp linalgOp) {
+// Make the generic operation mappable to tpp by preserving
+// the last and first dimension only.
+LogicalResult reshape2D(linalg::GenericOp linalgOp) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
 
@@ -173,7 +177,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
       // TODO: Check logical result.
-      (void)replaceGenericOpWithTppOp(linalgOp);
+      (void)reshape2D(linalgOp);
     });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
