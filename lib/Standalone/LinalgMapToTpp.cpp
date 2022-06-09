@@ -98,6 +98,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           (linalgOp->getNumOperands() != numOperands))
         return false;
 
+    // TODO: Check also result?
     for (unsigned idx = 0; idx < numOperands; idx++) {
       if (ShapedType operandType = linalgOp->getOperand(idx)
                                        .getType()
