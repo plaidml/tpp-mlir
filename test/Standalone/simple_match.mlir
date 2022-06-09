@@ -104,3 +104,20 @@ func.func @identity(%arg1: tensor<32x32x32x32xf32>) -> tensor<32x32x32x32xf32> {
   } -> tensor<32x32x32x32xf32> 
   return %1 : tensor<32x32x32x32xf32>
 }
+
+// -----
+
+#map0 = affine_map<(d0) -> (d0)>
+
+// CHECK-LABEL: func.func @add
+func.func @add(%arga: tensor<32xf32>, %argb: f32) -> tensor<32xf32> {
+  %argx = linalg.init_tensor [32] : tensor<32xf32>
+  // CHECK: library_call = "tpp.add"
+  %1 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel"]} ins(%arga: tensor<32xf32>) outs(%argx: tensor<32xf32>) {
+    ^bb0(%a: f32, %x: f32):
+      %0 = arith.addf %a, %argb : f32
+      linalg.yield %0 : f32
+  } -> tensor<32xf32>
+  return %1: tensor<32xf32>
+}
+

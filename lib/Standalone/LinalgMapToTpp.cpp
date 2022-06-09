@@ -78,45 +78,6 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return std::distance(region.front().begin(), region.front().end()) == 1;
   }
 
-  // Return true if the operation can maps to a tpp operation. The generic
-  // must have 'numOperands' operands, 'numResults' result at buffer level
-  // while 'numOperands' operands, 'numResults' + 1 result at tensor level.
-  // In both cases, the operands type are expected to be 2-dimensional shaped
-  // type. Why this?
-  // - The mapping to tpp should work both at the tensor and buffer level.
-  // If you consider an element-wise operation, it has the following properties:
-  // a) At buffer level it has 0 results and 2 operands.
-  // b) At tensor level it produces 1 result and takes 2 operands.
-  bool canMapToTppImpl(linalg::GenericOp linalgOp, unsigned numResults,
-                       unsigned numOperands) const {
-    if (linalgOp.hasBufferSemantics())
-      if ((linalgOp->getNumResults() != numResults) ||
-          (linalgOp->getNumOperands() != numOperands))
-        return false;
-    if (linalgOp.hasTensorSemantics())
-      if ((linalgOp->getNumResults() != numResults + 1) ||
-          (linalgOp->getNumOperands() != numOperands))
-        return false;
-
-    // TODO: Check also result?
-    for (unsigned idx = 0; idx < numOperands; idx++) {
-      if (ShapedType operandType = linalgOp->getOperand(idx)
-                                       .getType()
-                                       .dyn_cast_or_null<ShapedType>())
-        if (!operandType.hasStaticShape())
-          return false;
-    }
-    return true;
-  }
-
-  bool canMapToTppUnary(linalg::GenericOp linalgOp) const {
-    return canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 2);
-  }
-
-  bool canMapToTppBinary(linalg::GenericOp linalgOp) const {
-    return canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 3);
-  }
-
   // Return true if the linalg.generic maps to a tpp.gemm.
   bool isTPPGemm(linalg::GenericOp linalgOp) const {
     // structural and access pattern.
@@ -135,8 +96,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return false;
     // operations and operands.
     Region &region = linalgOp.getRegion();
-    if (!region.hasOneBlock() ||
-        !canMapToTppImpl(linalgOp, /*numResults*/ 0, /*numOperands*/ 3))
+    if (!region.hasOneBlock() || !hasStaticShape(linalgOp))
       return false;
     using mlir::matchers::m_Any;
     using mlir::matchers::m_Val;
@@ -160,24 +120,30 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return (mFloat.match(maybeAdd) || mInteger.match(maybeAdd));
   }
 
+  // Return true if the operands of the linalg.generic have
+  // static shapes.
+  bool hasStaticShape(linalg::GenericOp linalgOp) const {
+    return linalgOp.hasDynamicShape() != true;
+  }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (isElementWise(linalgOp)) {
-      if (hasOnlyYieldOp(linalgOp.getRegion()) && canMapToTppUnary(linalgOp)) {
+      if (hasOnlyYieldOp(linalgOp.getRegion()) && hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
         rewriter.updateRootInPlace(
             linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
         return success();
       }
       if (hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
-          canMapToTppUnary(linalgOp)) {
+          hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
         rewriter.updateRootInPlace(
             linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
         return success();
       }
       if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
-          canMapToTppBinary(linalgOp)) {
+          hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
         rewriter.updateRootInPlace(
             linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
