@@ -10,6 +10,7 @@ add_mlir_dialect_library(MLIRStandalone
         LinalgConvertToTpp.cpp
         TppEnforcePrecondition.cpp
         TppUtils.cpp
+        TppCompiler.cpp
 
         # Heatmap.
         HeatMap.cpp

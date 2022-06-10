@@ -38,7 +38,16 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
 def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"> {
   let summary = "Enforce preconditions for tpp mapping.";
   let constructor = "mlir::tpp::createTppEnforcePreconditions()";
+  let description = [{
+    Enforce some preconditions to efficiently map on tpp micro-kernels.
+    For tpp.matmul we pad the SIMD dimension to be multiple of 16.
+  }];
   let dependentDialects = ["linalg::LinalgDialect"];
+}
+
+def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
+  let summary = "Build tpp compiler pipeline";
+  let constructor = "mlir::tpp::createTppCompilerPipeline()";
 }
 
 #endif // STANDALONE_DIALECT_TPP_PASSES

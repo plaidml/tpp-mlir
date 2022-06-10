@@ -13,6 +13,8 @@
 
 namespace mlir {
 
+class ModuleOp;
+
 namespace func {
 class FuncOp;
 } // end namespace func
@@ -22,6 +24,7 @@ namespace tpp {
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppEnforcePreconditions();
+std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
 
 } // end namespace tpp
 } // end namespace mlir
