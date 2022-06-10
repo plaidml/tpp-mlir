@@ -6,5 +6,6 @@ build/
 .idea/
 cmake-build-debug/
 cmake-build-release/
-
+lib/.DS_Store
+lib/Standalone/.DS_Store
 compile_commands.json
