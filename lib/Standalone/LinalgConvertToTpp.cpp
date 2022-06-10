@@ -8,6 +8,7 @@
 
 #include "Standalone/TppOps.h"
 #include "Standalone/TppPasses.h"
+#include "Standalone/TppUtils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -102,13 +103,6 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  bool isTppCallPrefix(std::string stringAttrAsStr) const {
-    std::string delimiter = ".";
-    std::string prefix =
-        stringAttrAsStr.substr(0, stringAttrAsStr.find(delimiter));
-    return prefix.compare("tpp") == 0;
-  }
-
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
                                ArrayRef<Value> operands,
                                PatternRewriter &rewriter) const {
@@ -143,7 +137,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     if (!linalgOp.library_callAttr() || linalgOp.getNumLoops() != 2 ||
-        !isTppCallPrefix(linalgOp.getLibraryCallName()))
+        !hasTppMark(linalgOp))
       return failure();
 
     if (linalgOp->getNumResults() != 0)

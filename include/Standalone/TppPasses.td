@@ -17,7 +17,7 @@ def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
     Attempt at matching tpp operations at the Linalg level. Operates only on
     linalg.generic. If candidate are found, the linalg.generic is marked with the
     tpp operation detected. We basically write the libaray_call StringAttr in the
-    generic.
+    generic with the name of the tpp operation to call.
   }];
   let constructor = "mlir::tpp::createMapLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
@@ -25,7 +25,19 @@ def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
 
 def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Convert linalg to tpp.";
+  let description = [{
+    Convert marked linalg.generic operation to tpp operations. Before mapping
+    to tpp the conversion makes sure to resize all the tensors to 2d by
+    tiling all but the two innermost dimensions. This pass runs at buffer level
+    as we want to preserve parallel semantics when tiling.
+  }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
+def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"> {
+  let summary = "Enforce preconditions for tpp mapping.";
+  let constructor = "mlir::tpp::createTppEnforcePreconditions()";
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
