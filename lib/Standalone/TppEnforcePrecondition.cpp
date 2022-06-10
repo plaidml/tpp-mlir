@@ -38,14 +38,22 @@ namespace {
 struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  Attribute getConstantAttr(Type type, int64_t value,
-                            PatternRewriter &rewriter) const {
-    if (auto shapedTy = type.dyn_cast<ShapedType>()) {
-      Type eTy = shapedTy.getElementType();
-      APInt valueInt(eTy.getIntOrFloatBitWidth(), value);
-      return DenseIntElementsAttr::get(shapedTy, valueInt);
+  Attribute getOneAttr(Type type, PatternRewriter &rewriter) const {
+    if (type.isa<FloatType>())
+      return rewriter.getFloatAttr(type, 1.0);
+    if (type.isa<IndexType>())
+      return rewriter.getIndexAttr(1);
+    if (auto integerType = type.dyn_cast<IntegerType>())
+      return rewriter.getIntegerAttr(
+          type, APInt(type.cast<IntegerType>().getWidth(), 1));
+    if (type.isa<RankedTensorType, VectorType>()) {
+      auto vtType = type.cast<ShapedType>();
+      auto element = getOneAttr(vtType.getElementType(), rewriter);
+      if (!element)
+        return {};
+      return DenseElementsAttr::get(vtType, element);
     }
-    return rewriter.getIntegerAttr(type, value);
+    return {};
   }
 
   LogicalResult padSIMDDimension(linalg::GenericOp linalgOp,
@@ -81,7 +89,7 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
         rewriter.getZeroAttr(C.getType().cast<ShapedType>().getElementType()));
     Value padOne = rewriter.create<arith::ConstantOp>(
         loc, B.getType().cast<ShapedType>().getElementType(),
-        getConstantAttr(B.getType(), 1, rewriter));
+        getOneAttr(B.getType(), rewriter));
     Value paddedC = tensor::createPadHighOp(newRankedC, C, padZero,
                                             /*nofold*/ false, loc, rewriter);
     Value paddedB = tensor::createPadHighOp(newRankedB, B, padOne,

@@ -56,7 +56,7 @@ static MemRefType dropUnitDims(MemRefType inputType, ArrayRef<int64_t> offsets,
 static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
                                                  Location loc, Value input) {
   MemRefType inputType = input.getType().cast<MemRefType>();
-  assert(inputType.hasStaticShape());
+  assert(inputType.hasStaticShape() && "expect static shape");
   SmallVector<int64_t> subViewOffsets(inputType.getRank(), 0);
   SmallVector<int64_t> subViewStrides(inputType.getRank(), 1);
   ArrayRef<int64_t> subViewSizes = inputType.getShape();
@@ -67,6 +67,20 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
     return input;
   return builder.create<memref::SubViewOp>(
       loc, resultType, input, subViewOffsets, subViewSizes, subViewStrides);
+}
+
+// Expand rank by adding unit dimensions.
+// Example, memref<3xf32> -> memref<1x3xf32>
+static Value rankExpandUnitDims(OpBuilder &builder, Location loc, Value input) {
+  MemRefType memrefOrig = input.getType().cast<MemRefType>();
+  assert(memrefOrig.getShape().size() == 1 && "expect 1d memref");
+  MemRefType newShape = MemRefType::get({1, memrefOrig.getShape()[0]},
+                                        memrefOrig.getElementType());
+  // TODO: expandShape is the most wired op ever.
+  // How are these reassociations work???????????
+  ArrayAttr rZero = builder.getI64ArrayAttr({0, 1});
+  ArrayAttr r = ArrayAttr::get(builder.getContext(), {rZero});
+  return builder.create<memref::ExpandShapeOp>(loc, newShape, input, r);
 }
 
 // Make the generic operation mappable to tpp by preserving
@@ -147,15 +161,13 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
       ShapedType operandType = operand.getType().cast<ShapedType>();
-      if (operandType.getRank() == 2) {
+      if (operandType.getRank() == 2)
         newOperands.push_back(operand);
-        continue;
-      }
-      if (operandType.getRank() > 2)
+      else if (operandType.getRank() > 2)
         newOperands.push_back(
             rankReducingSubviewDroppingUnitDims(rewriter, loc, operand));
       else
-        assert(0 && "not implemented yet");
+        newOperands.push_back(rankExpandUnitDims(rewriter, loc, operand));
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }
