@@ -12,22 +12,38 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
-
 class ModuleOp;
+} // namespace mlir
 
+namespace mlir {
 namespace func {
 class FuncOp;
-} // end namespace func
+} // namespace func
+} // namespace mlir
 
+namespace mlir {
+namespace vector {
+class VectorDialect;
+} // namespace vector
+} // namespace mlir
+
+namespace mlir {
+namespace linalg {
+class LinalgDialect;
+} // namespace linalg
+} // namespace mlir
+
+namespace mlir {
 namespace tpp {
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppEnforcePreconditions();
 std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
+std::unique_ptr<OperationPass<func::FuncOp>> createTppToVectorPass();
 
-} // end namespace tpp
-} // end namespace mlir
+} // namespace tpp
+} // namespace mlir
 
 #define GEN_PASS_REGISTRATION
 #include "Standalone/TppPasses.h.inc"

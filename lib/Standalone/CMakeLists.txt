@@ -1,18 +1,19 @@
 add_mlir_dialect_library(MLIRStandalone
-        # Ops and dialects.
+        # Ops and dialects
         TppDialect.cpp
         TppOps.cpp
         MathxDialect.cpp
         MathxOps.cpp
        
-        # Passes. 
+        # Passes 
         LinalgMapToTpp.cpp
         LinalgConvertToTpp.cpp
         TppEnforcePrecondition.cpp
         TppUtils.cpp
         TppCompiler.cpp
+        TppConvertToVector.cpp
 
-        # Heatmap.
+        # Heatmap
         HeatMap.cpp
         HeatMapImpl.cpp
 

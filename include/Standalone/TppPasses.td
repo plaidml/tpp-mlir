@@ -45,6 +45,12 @@ def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
+  let summary = "Convert tpp to the vector dialect";
+  let constructor = "mlir::tpp::createTppToVectorPass()";
+  let dependentDialects = ["vector::VectorDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";
