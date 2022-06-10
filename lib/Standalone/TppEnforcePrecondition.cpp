@@ -28,12 +28,13 @@ namespace {
 
 // Ensure the SIMD dimension to be multiple of 16.
 // TODO: Should happen here? and a bit too specific..
-// TODO: We need pad 1 on the output.
 //
+// Example:
 // %0 = tensor.pad (%C) : tensor<3x3xf32> to tensor<3xSIMDxf32>
 // %1 = tensor.pad (%B) : tensor<3x3xf32> to tensor<3xSIMDxf32>
-// %2 = linalg.matmul(%C, %A, %B)
+// %2 = linalg.generic(%C, %A, %B) {library_call = tpp.matmul}
 // %3 = tensor.extract tensor<3xSIMDxf32> to tensor<3x3xf32>
+//
 struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
