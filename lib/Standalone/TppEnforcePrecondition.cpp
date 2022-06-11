@@ -89,7 +89,7 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
         rewriter.getZeroAttr(C.getType().cast<ShapedType>().getElementType()));
     Value padOne = rewriter.create<arith::ConstantOp>(
         loc, B.getType().cast<ShapedType>().getElementType(),
-        getOneAttr(B.getType(), rewriter));
+        getOneAttr(B.getType().cast<ShapedType>().getElementType(), rewriter));
     Value paddedC = tensor::createPadHighOp(newRankedC, C, padZero,
                                             /*nofold*/ false, loc, rewriter);
     Value paddedB = tensor::createPadHighOp(newRankedB, B, padOne,
