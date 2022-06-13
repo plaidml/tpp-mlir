@@ -51,6 +51,12 @@ def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
   let dependentDialects = ["vector::VectorDialect"];
 }
 
+def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
+  let summary = "Convert tpp to loops";
+  let constructor = "mlir::tpp::createTppToLoopsPass()";
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";
