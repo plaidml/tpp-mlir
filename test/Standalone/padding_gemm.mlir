@@ -39,7 +39,7 @@ func.func @gemm(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>, %arg2: tensor<3x
 // CHECK:    ^bb0(%arg3: index, %arg4: index):
 // CHECK:      tensor.yield %cst_0 : f32
 // CHECK:    } : tensor<3x3xf32> to tensor<6x3xf32>
-// CHECK:    %4 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %1 : tensor<6x3xf32>, tensor<3x16xf32>) outs(%2 : tensor<6x16xf32>) {
+// CHECK:    %4 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], library_call = "tpp.matmul"} ins(%3, %1 : tensor<6x3xf32>, tensor<3x16xf32>) outs(%2 : tensor<6x16xf32>) {
 // CHECK:    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
 // CHECK:      %6 = arith.mulf %arg3, %arg4 : f32
 // CHECK:      %7 = arith.addf %arg5, %6 : f32
