@@ -40,7 +40,8 @@ def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"
   let constructor = "mlir::tpp::createTppEnforcePreconditions()";
   let description = [{
     Enforce some preconditions to efficiently map on tpp micro-kernels.
-    For tpp.matmul we pad the SIMD dimension to be multiple of 16.
+    For tpp.matmul we pad the SIMD dimension (N) to be multiple of 16,
+    and the parallel dimension (M) to be multiple of 6.
   }];
   let dependentDialects = ["linalg::LinalgDialect"];
 }
