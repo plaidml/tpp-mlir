@@ -9,11 +9,13 @@ add_mlir_dialect_library(MLIRStandalone
        
         # Passes 
         LinalgMapToTpp.cpp
-        LinalgConvertToTpp.cpp
         TppEnforcePrecondition.cpp
         TppUtils.cpp
         TppCompiler.cpp
+
+        # Conversions
         TppConvertToVector.cpp
+        LinalgConvertToTpp.cpp
 
         ADDITIONAL_HEADER_DIRS
         ${PROJECT_SOURCE_DIR}/include/Standalone
