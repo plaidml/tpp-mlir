@@ -1,7 +1,7 @@
 add_mlir_dialect_library(MLIRStandalone
         # Ops and dialects
-        TppDialect.cpp
-        TppOps.cpp
+        Dialect/Tpp/TppDialect.cpp
+        Dialect/Tpp/TppOps.cpp
         Dialect/Mathx/MathxDialect.cpp
         Dialect/Mathx/MathxOps.cpp
         StdxOps.cpp

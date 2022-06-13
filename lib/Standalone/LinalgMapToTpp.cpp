@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Dialect/Mathx/MathxOps.h"
-#include "Standalone/TppOps.h"
+#include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/TppPasses.h"
 #include "Standalone/TppUtils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"

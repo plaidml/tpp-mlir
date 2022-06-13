@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/TppDialect.h"
-#include "Standalone/TppOps.h"
+#include "Standalone/Dialect/Tpp/TppDialect.h"
+#include "Standalone/Dialect/Tpp/TppOps.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -19,6 +19,6 @@ using namespace mlir::tpp;
 void TppDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "Standalone/TppOps.cpp.inc"
+#include "Standalone/Dialect/Tpp/TppOps.cpp.inc"
       >();
 }
