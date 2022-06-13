@@ -15,10 +15,6 @@ add_mlir_dialect_library(MLIRStandalone
         TppCompiler.cpp
         TppConvertToVector.cpp
 
-        # Heatmap
-        HeatMap.cpp
-        HeatMapImpl.cpp
-
         ADDITIONAL_HEADER_DIRS
         ${PROJECT_SOURCE_DIR}/include/Standalone
 
