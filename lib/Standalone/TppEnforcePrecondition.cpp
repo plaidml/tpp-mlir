@@ -181,7 +181,8 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
         loc, operands.C.getType(), ValueRange{operands.A, operands.B},
         ValueRange{operands.C}, linalgOp.getIndexingMaps(),
         llvm::to_vector<4>(
-            linalgOp.iterator_types().template getAsValueRange<StringAttr>()));
+            linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
+        /*docs*/ "", /*library_call*/ "tpp.matmul");
     rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
                                 replacementOp.region().begin());
 
