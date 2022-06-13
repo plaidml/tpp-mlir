@@ -109,6 +109,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return false;
     // TODO: this low-tech stuff is too manual (see:
     // https://discourse.llvm.org/t/linalg-to-llvm-lowering/4867/7)
+    // Use OpDSL to generate all this.
     Operation *maybeAdd = yield.getOperands()[0].getDefiningOp();
     auto mFloat =
         m_Op<arith::AddFOp>(m_Val(block.getArgument(2)),
