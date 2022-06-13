@@ -55,15 +55,17 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     if (!hasSameShape(addOp.lhs(), addOp.rhs()))
       return failure();
     Location loc = addOp.getLoc();
-    Value dim1 = rewriter.create<arith::ConstantIndexOp>(
-        loc, addOp.lhs().getType().cast<MemRefType>().getShape()[0]);
-    Value dim2 = rewriter.create<arith::ConstantIndexOp>(
-        loc, addOp.rhs().getType().cast<MemRefType>().getShape()[1]);
-    SmallVector<Value> ubs = {dim1, dim2};
+    SmallVector<Value> ubs;
+    size_t rank = addOp.lhs().getType().cast<MemRefType>().getShape().size();
+    for (size_t idx = 0; idx < rank; idx++) {
+      Value dim = rewriter.create<arith::ConstantIndexOp>(
+          loc, addOp.lhs().getType().cast<MemRefType>().getShape()[idx]);
+      ubs.push_back(dim);
+    }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs = {zero, zero};
+    SmallVector<Value> lbs(rank, zero);
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps = {one, one};
+    SmallVector<Value> steps(rank, one);
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
