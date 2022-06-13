@@ -56,18 +56,28 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
     return {};
   }
 
+  struct GemmOperands {
+    Value A = nullptr;
+    Value B = nullptr;
+    Value C = nullptr;
+    GemmOperands() = delete;
+    GemmOperands(Value A, Value B, Value C) : A(A), B(B), C(C){};
+  };
+
   LogicalResult padSIMDDimension(linalg::GenericOp linalgOp,
                                  PatternRewriter &rewriter) const {
     Location loc = linalgOp.getLoc();
-    Value C = linalgOp->getOperand(2);
-    Value B = linalgOp->getOperand(1);
-    Value A = linalgOp->getOperand(0);
+    GemmOperands operands(linalgOp->getOperand(0), linalgOp->getOperand(1),
+                          linalgOp->getOperand(2));
 
-    if ((!C.getType().isa<ShapedType>()) || (!B.getType().isa<ShapedType>()))
+    if ((!operands.C.getType().isa<ShapedType>()) ||
+        (!operands.B.getType().isa<ShapedType>()))
       return failure();
 
-    ArrayRef<int64_t> shapeC = C.getType().cast<ShapedType>().getShape();
-    ArrayRef<int64_t> shapeB = B.getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shapeC =
+        operands.C.getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shapeB =
+        operands.B.getType().cast<ShapedType>().getShape();
     assert(shapeC.size() == 2 && "expect 2d gemm");
     assert(shapeB.size() == 2 && "expect 2d gemm");
     assert(shapeC[1] == shapeB[1] && "expect equal");
@@ -81,23 +91,25 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
     SmallVector<int64_t> newShapeC = {shapeC[0], paddedSimd};
     SmallVector<int64_t> newShapeB = {shapeB[0], paddedSimd};
     RankedTensorType newRankedC = RankedTensorType::get(
-        newShapeC, C.getType().cast<ShapedType>().getElementType());
+        newShapeC, operands.C.getType().cast<ShapedType>().getElementType());
     RankedTensorType newRankedB = RankedTensorType::get(
-        newShapeB, B.getType().cast<ShapedType>().getElementType());
+        newShapeB, operands.B.getType().cast<ShapedType>().getElementType());
     Value padZero = rewriter.create<arith::ConstantOp>(
-        loc, C.getType().cast<ShapedType>().getElementType(),
-        rewriter.getZeroAttr(C.getType().cast<ShapedType>().getElementType()));
+        loc, operands.C.getType().cast<ShapedType>().getElementType(),
+        rewriter.getZeroAttr(
+            operands.C.getType().cast<ShapedType>().getElementType()));
     Value padOne = rewriter.create<arith::ConstantOp>(
-        loc, B.getType().cast<ShapedType>().getElementType(),
-        getOneAttr(B.getType().cast<ShapedType>().getElementType(), rewriter));
-    Value paddedC = tensor::createPadHighOp(newRankedC, C, padZero,
+        loc, operands.B.getType().cast<ShapedType>().getElementType(),
+        getOneAttr(operands.B.getType().cast<ShapedType>().getElementType(),
+                   rewriter));
+    Value paddedC = tensor::createPadHighOp(newRankedC, operands.C, padZero,
                                             /*nofold*/ false, loc, rewriter);
-    Value paddedB = tensor::createPadHighOp(newRankedB, B, padOne,
+    Value paddedB = tensor::createPadHighOp(newRankedB, operands.B, padOne,
                                             /*nofold*/ false, loc, rewriter);
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-        loc, paddedC.getType(), ValueRange{A, paddedB}, ValueRange{paddedC},
-        linalgOp.getIndexingMaps(),
+        loc, paddedC.getType(), ValueRange{operands.A, paddedB},
+        ValueRange{paddedC}, linalgOp.getIndexingMaps(),
         llvm::to_vector<4>(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()));
     rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
