@@ -97,14 +97,22 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
-  // Make sure the matmul is 2d (all its operands).
+  bool isMLIRFloatType(Type t) const {
+    return t.isF16() || t.isF32() || t.isF64();
+  }
+
+  // Make sure the matmul is 2d (all its operands) with floating point operands.
   // TODO: Again no broadcast for now.
-  bool is2DRowMajorMatmul(MatmulOp matmulOp) const {
+  bool is2DRowMajorFloatMatmul(MatmulOp matmulOp) const {
     MemRefType matrixA = matmulOp.matrixA().getType().cast<MemRefType>();
     MemRefType matrixB = matmulOp.matrixB().getType().cast<MemRefType>();
     MemRefType matrixC = matmulOp.matrixC().getType().cast<MemRefType>();
     if ((matrixA.getShape().size() != 2) || (matrixB.getShape().size() != 2) ||
         (matrixC.getShape().size() != 2))
+      return false;
+    if ((!isMLIRFloatType(matrixA.getElementType())) ||
+        (!isMLIRFloatType(matrixB.getElementType())) ||
+        !(isMLIRFloatType(matrixC.getElementType())))
       return false;
     int64_t m = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[0];
     int64_t n = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[1];
@@ -118,7 +126,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!is2DRowMajorMatmul(matmulOp))
+    if (!is2DRowMajorFloatMatmul(matmulOp))
       return failure();
 
     Location loc = matmulOp.getLoc();

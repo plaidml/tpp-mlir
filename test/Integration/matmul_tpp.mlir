@@ -10,6 +10,18 @@
 // RUN: FileCheck %s
 //
 
+// RUN: standalone-opt %s \
+// RUN:   -map-linalg-to-tpp \ 
+// RUN:   -convert-tensor-to-linalg -func-bufferize \ 
+// RUN:   -linalg-bufferize -arith-bufferize -tensor-bufferize \ 
+// RUN:   -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops \
+// RUN:   -sparse-compiler | \
+// RUN: mlir-cpu-runner \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
+// RUN: FileCheck %s
+//
+
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
