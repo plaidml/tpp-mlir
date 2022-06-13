@@ -147,10 +147,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics())
-      return failure();
-
-    if (!linalgOp.library_callAttr() || linalgOp.getNumLoops() != 2 ||
+    if (!linalgOp.hasBufferSemantics() || !linalgOp.library_callAttr() ||
         !hasTppMark(linalgOp))
       return failure();
 
@@ -161,13 +158,16 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
       ShapedType operandType = operand.getType().cast<ShapedType>();
-      if (operandType.getRank() == 2)
+      if (operandType.getRank() == 2) // no need to reshape the operand.
         newOperands.push_back(operand);
-      else if (operandType.getRank() > 2)
+      else if (operandType.getRank() >
+               2) // drop unit dimension to make the memref 2d.
         newOperands.push_back(
             rankReducingSubviewDroppingUnitDims(rewriter, loc, operand));
       else
-        newOperands.push_back(rankExpandUnitDims(rewriter, loc, operand));
+        newOperands.push_back(rankExpandUnitDims(
+            rewriter, loc,
+            operand)); // expand memref with unit dim to make it 2d.
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }

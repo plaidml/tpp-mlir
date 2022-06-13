@@ -78,7 +78,8 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
           b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.output(),
                                     localIvs);
         });
-    return failure();
+    rewriter.eraseOp(addOp);
+    return success();
   }
 };
 
@@ -93,10 +94,78 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 };
 
+struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
+  using OpRewritePattern<MatmulOp>::OpRewritePattern;
+
+  // Make sure the matmul is 2d (all its operands).
+  // TODO: Again no broadcast for now.
+  bool is2DRowMajorMatmul(MatmulOp matmulOp) const {
+    MemRefType matrixA = matmulOp.matrixA().getType().cast<MemRefType>();
+    MemRefType matrixB = matmulOp.matrixB().getType().cast<MemRefType>();
+    MemRefType matrixC = matmulOp.matrixC().getType().cast<MemRefType>();
+    if ((matrixA.getShape().size() != 2) || (matrixB.getShape().size() != 2) ||
+        (matrixC.getShape().size() != 2))
+      return false;
+    int64_t m = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[0];
+    int64_t n = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[1];
+    int64_t k = matmulOp.matrixA().getType().cast<MemRefType>().getShape()[1];
+    llvm::errs() << m << " " << n << " " << k << "\n";
+    if ((matmulOp.matrixA().getType().cast<MemRefType>().getShape()[0] != m) ||
+        (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[1] != n) ||
+        (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[0] != k))
+      return false;
+    return true;
+  }
+
+  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    if (!is2DRowMajorMatmul(matmulOp)) {
+      llvm::errs() << "not row major\n";
+      return failure();
+    }
+    Location loc = matmulOp.getLoc();
+    ArrayRef<int64_t> shapeC =
+        matmulOp.matrixC().getType().cast<MemRefType>().getShape();
+    ArrayRef<int64_t> shapeA =
+        matmulOp.matrixA().getType().cast<MemRefType>().getShape();
+    Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
+    Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
+    Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
+    SmallVector<Value> ubs = {i, j, k};
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> lbs = {zero, zero, zero};
+    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    SmallVector<Value> steps = {one, one, one};
+
+    (void)scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps,
+        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+          assert(localIvs.size() == 3);
+          Value localI = localIvs[2];
+          Value localJ = localIvs[1];
+          Value localK = localIvs[0];
+          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.matrixA(),
+                                                   ValueRange{localI, localJ});
+          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.matrixB(),
+                                                   ValueRange{localK, localJ});
+          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.matrixC(),
+                                                   ValueRange{localI, localJ});
+          Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
+          Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
+          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.matrixC(),
+                                    ValueRange{localI, localJ});
+        });
+
+    rewriter.eraseOp(matmulOp);
+    return success();
+  }
+};
+
 void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
-               ConvertTppIdentityOp>(patterns.getContext());
+               ConvertTppIdentityOp,
+               ConvertTppMatmulOp>(patterns.getContext());
   // clang-format on
 }
 
