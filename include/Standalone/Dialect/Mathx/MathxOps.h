@@ -18,16 +18,10 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 
 //===----------------------------------------------------------------------===//
-// Math Dialect
-//===----------------------------------------------------------------------===//
-
-// #include "mlir/Dialect/Math/IR/MathOpsDialect.h.inc"
-
-//===----------------------------------------------------------------------===//
 // Math Dialect Operations
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "Standalone/MathxOps.h.inc"
+#include "Standalone/Dialect/Mathx/MathxOps.h.inc"
 
 #endif // MLIR_DIALECT_MATH_IR_MATHX_H_

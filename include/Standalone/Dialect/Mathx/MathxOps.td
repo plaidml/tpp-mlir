@@ -9,7 +9,7 @@
 #ifndef MATHX_OPS
 #define MATHX_OPS
 
-include "MathxDialect.td"
+include "Standalone/Dialect/Mathx/MathxDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"

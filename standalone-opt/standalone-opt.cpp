@@ -19,8 +19,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-#include "Standalone/MathxDialect.h"
-#include "Standalone/MathxOpsDialect.cpp.inc"
+#include "Standalone/Dialect/Mathx/MathxDialect.h"
+#include "Standalone/Dialect/Mathx/MathxOpsDialect.cpp.inc"
 #include "Standalone/StdxDialect.h"
 #include "Standalone/StdxOpsDialect.cpp.inc"
 #include "Standalone/TppDialect.h"

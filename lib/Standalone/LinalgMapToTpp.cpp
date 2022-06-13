@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/MathxOps.h"
+#include "Standalone/Dialect/Mathx/MathxOps.h"
 #include "Standalone/TppOps.h"
 #include "Standalone/TppPasses.h"
 #include "Standalone/TppUtils.h"

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/MathxDialect.h"
-#include "Standalone/MathxOps.h"
+#include "Standalone/Dialect/Mathx/MathxDialect.h"
+#include "Standalone/Dialect/Mathx/MathxOps.h"
 
 using namespace mlir;
 using namespace mlir::mathx;
@@ -19,6 +19,6 @@ using namespace mlir::mathx;
 void MathxDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "Standalone/MathxOps.cpp.inc"
+#include "Standalone/Dialect/Mathx/MathxOps.cpp.inc"
       >();
 }

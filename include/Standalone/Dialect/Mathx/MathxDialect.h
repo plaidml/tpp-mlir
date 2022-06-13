@@ -11,6 +11,6 @@
 
 #include "mlir/IR/Dialect.h"
 
-#include "Standalone/MathxOpsDialect.h.inc"
+#include "Standalone/Dialect/Mathx/MathxOpsDialect.h.inc"
 
 #endif // STANDALONE_MATHXDIALECT_H

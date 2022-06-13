@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/MathxOps.h"
-#include "Standalone/MathxDialect.h"
+#include "Standalone/Dialect/Mathx/MathxOps.h"
+#include "Standalone/Dialect/Mathx/MathxDialect.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
@@ -16,7 +16,7 @@ using namespace mlir;
 using namespace mlir::mathx;
 
 #define GET_OP_CLASSES
-#include "Standalone/MathxOps.cpp.inc"
+#include "Standalone/Dialect/Mathx/MathxOps.cpp.inc"
 
 /// Materialize an integer or floating point constant.
 Operation *mathx::MathxDialect::materializeConstant(OpBuilder &builder,
