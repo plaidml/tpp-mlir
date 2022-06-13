@@ -76,8 +76,6 @@ static Value rankExpandUnitDims(OpBuilder &builder, Location loc, Value input) {
   assert(memrefOrig.getShape().size() == 1 && "expect 1d memref");
   MemRefType newShape = MemRefType::get({1, memrefOrig.getShape()[0]},
                                         memrefOrig.getElementType());
-  // TODO: expandShape is the most wired op ever.
-  // How are these reassociations work???????????
   ArrayAttr rZero = builder.getI64ArrayAttr({0, 1});
   ArrayAttr r = ArrayAttr::get(builder.getContext(), {rZero});
   return builder.create<memref::ExpandShapeOp>(loc, newShape, input, r);
