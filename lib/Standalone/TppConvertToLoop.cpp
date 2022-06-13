@@ -109,7 +109,6 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t m = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[0];
     int64_t n = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[1];
     int64_t k = matmulOp.matrixA().getType().cast<MemRefType>().getShape()[1];
-    llvm::errs() << m << " " << n << " " << k << "\n";
     if ((matmulOp.matrixA().getType().cast<MemRefType>().getShape()[0] != m) ||
         (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[1] != n) ||
         (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[0] != k))
@@ -119,10 +118,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!is2DRowMajorMatmul(matmulOp)) {
-      llvm::errs() << "not row major\n";
+    if (!is2DRowMajorMatmul(matmulOp))
       return failure();
-    }
+
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC =
         matmulOp.matrixC().getType().cast<MemRefType>().getShape();
@@ -141,11 +139,11 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           assert(localIvs.size() == 3);
-          Value localI = localIvs[2];
+          Value localI = localIvs[0];
           Value localJ = localIvs[1];
-          Value localK = localIvs[0];
+          Value localK = localIvs[2];
           Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.matrixA(),
-                                                   ValueRange{localI, localJ});
+                                                   ValueRange{localI, localK});
           Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.matrixB(),
                                                    ValueRange{localK, localJ});
           Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.matrixC(),
