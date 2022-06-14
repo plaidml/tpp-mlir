@@ -150,9 +150,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
-  bool isMLIRFloatType(Type t) const {
-    return t.isF16() || t.isF32() || t.isF64();
-  }
+  bool isMLIRFloatType(Type t) const { return t.isa<FloatType>(); }
 
   // Make sure the matmul is 2d (all its operands) with floating point operands.
   // TODO: Again no broadcast for now.
