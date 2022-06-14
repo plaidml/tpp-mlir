@@ -14,7 +14,7 @@ include "/mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 // MemRef with any element type and rank 1 or 2.
-def TppMemRef : MemRefRankOf<[AnyType], [1, 2]>;
+def TppMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
 // AddOp
