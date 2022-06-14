@@ -16,6 +16,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "Standalone/TppOps.h.inc"
+#include "Standalone/Dialect/Tpp/TppOps.h.inc"
 
 #endif // STANDALONE_STANDALONEOPS_H

@@ -155,24 +155,23 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
-      ShapedType operandType = operand.getType().cast<ShapedType>();
-      Value newOperand = nullptr;
-      // no need to reshape.
-      if (operandType.getRank() == 2)
-        newOperand = operand;
-      // reduce rank by dropping unit dimensions.
-      else if (operandType.getRank() > 2)
-        newOperand =
-            rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
-      // expand rank by adding unit dimensions.
-      else
-        newOperand = rankExpandUnitDims(rewriter, loc, operand);
-      // currently we map to tpp only if we make the memref 2d.
-      // later when we support broadcast when can relax this.
-      if ((!newOperand.getType().isa<ShapedType>()) ||
-          (newOperand.getType().cast<ShapedType>().getRank() != 2))
-        return failure();
-      newOperands.push_back(operand);
+      Type operandType = operand.getType();
+      // scalar type.
+      if (!operandType.isa<ShapedType>())
+        newOperands.push_back(operand);
+      // shaped type.
+      else {
+        Value newOperand = operand;
+        // attempt to rank reduce.
+        if (operandType.cast<ShapedType>().getRank() > 2)
+          newOperand =
+              rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
+        // fails if it is not possible to rank reduce.
+        if (!newOperand.getType().isa<ShapedType>() ||
+            newOperand.getType().cast<ShapedType>().getRank() > 2)
+          return failure();
+        newOperands.push_back(newOperand);
+      }
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }
@@ -184,15 +183,36 @@ struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> operands = fillOp->getOperands();
-    rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, operands[0], operands[1]);
+    SmallVector<Value> newOperands;
+    for (Value operand : operands) {
+      Type operandType = operand.getType();
+      // scalar type.
+      if (!operandType.isa<ShapedType>())
+        newOperands.push_back(operand);
+      // shaped type.
+      else {
+        Value newOperand = operand;
+        // attempt to rank reduce.
+        if (operandType.cast<ShapedType>().getRank() > 2)
+          newOperand = rankReducingSubviewDroppingUnitDims(
+              rewriter, fillOp.getLoc(), operand);
+        // fails if it is not possible to rank reduce.
+        if (!newOperand.getType().isa<ShapedType>() ||
+            newOperand.getType().cast<ShapedType>().getRank() > 2)
+          return failure();
+        newOperands.push_back(newOperand);
+      }
+    }
+    rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, newOperands[0],
+                                            newOperands[1]);
     return success();
   }
 };
 
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<ConvertGenericOpToTpp,
-               ConvertLinalgFillToTpp>(patterns.getContext());
+  patterns.add<ConvertGenericOpToTpp/*,
+               ConvertLinalgFillToTpp*/>(patterns.getContext());
   // clang-format on
 }
 
