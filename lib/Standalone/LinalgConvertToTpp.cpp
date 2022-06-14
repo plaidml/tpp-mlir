@@ -156,23 +156,44 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
       ShapedType operandType = operand.getType().cast<ShapedType>();
-      if (operandType.getRank() == 2) // no need to reshape the operand.
-        newOperands.push_back(operand);
-      else if (operandType.getRank() >
-               2) // drop unit dimension to make the memref 2d.
-        newOperands.push_back(
-            rankReducingSubviewDroppingUnitDims(rewriter, loc, operand));
+      Value newOperand = nullptr;
+      // no need to reshape.
+      if (operandType.getRank() == 2)
+        newOperand = operand;
+      // reduce rank by dropping unit dimensions.
+      else if (operandType.getRank() > 2)
+        newOperand =
+            rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
+      // expand rank by adding unit dimensions.
       else
-        newOperands.push_back(rankExpandUnitDims(
-            rewriter, loc,
-            operand)); // expand memref with unit dim to make it 2d.
+        newOperand = rankExpandUnitDims(rewriter, loc, operand);
+      // currently we map to tpp only if we make the memref 2d.
+      // later when we support broadcast when can relax this.
+      if ((!operand.getType().isa<ShapedType>()) ||
+          (operand.getType().cast<ShapedType>().getRank() != 2))
+        return failure();
+      newOperands.push_back(operand);
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }
 };
 
+struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
+  using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands = fillOp->getOperands();
+    rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, operands[0], operands[1]);
+    return success();
+  }
+};
+
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertGenericOpToTpp>(patterns.getContext());
+  // clang-format off
+  patterns.add<ConvertGenericOpToTpp,
+               ConvertLinalgFillToTpp>(patterns.getContext());
+  // clang-format on
 }
 
 // TODO: PatternRwriter does not work well with tiling. I suspect

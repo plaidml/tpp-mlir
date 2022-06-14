@@ -24,13 +24,39 @@ namespace {
 
 // Checks if the shape of the operand is the same.
 static bool hasSameShape(Value lhs, Value rhs) {
-  MemRefType lhsMemRef = lhs.getType().cast<MemRefType>();
-  MemRefType rhsMemRef = rhs.getType().cast<MemRefType>();
+  Type lhsType = lhs.getType();
+  Type rhsType = rhs.getType();
+  if (!lhsType.isa<MemRefType>() || !rhsType.isa<MemRefType>())
+    return false;
+  MemRefType lhsMemRef = lhsType.cast<MemRefType>();
+  MemRefType rhsMemRef = rhsType.cast<MemRefType>();
   if (!lhsMemRef.hasStaticShape() || !rhsMemRef.hasStaticShape())
     return false;
   ArrayRef<int64_t> shapeLhs = lhsMemRef.getShape();
   ArrayRef<int64_t> shapeRhs = rhsMemRef.getShape();
   return shapeLhs == shapeRhs;
+}
+
+// Check if all the operands are float types.
+static bool hasFloatOperands(Value lhs, Value rhs) {
+  Type lhsType = lhs.getType();
+  Type rhsType = rhs.getType();
+
+  bool lhsFloat = false;
+  if (lhsType.isa<ShapedType>() &&
+      lhsType.cast<ShapedType>().getElementType().isa<FloatType>())
+    lhsFloat = true;
+  if (lhsType.isa<FloatType>())
+    lhsFloat = true;
+
+  bool rhsFloat = false;
+  if (rhsType.isa<ShapedType>() &&
+      rhsType.cast<ShapedType>().getElementType().isa<FloatType>())
+    rhsFloat = true;
+  if (rhsType.isa<FloatType>())
+    rhsFloat = true;
+
+  return (rhsFloat && lhsFloat);
 }
 
 //
@@ -44,19 +70,20 @@ static bool hasSameShape(Value lhs, Value rhs) {
 //   %2 = add %0, %1
 //   store %2 to %c
 //
-// TODO: Here we consider the simple case where the operands have the same shape
-// (e.g., %a = memref<2x2xf32> and %b = memref<2x2xf32>). This is not always
-// true because Tpp supports broadcasting dimensions.
+// TODO: Here we consider the simple case where the operands have the same
+// shape (e.g., %a = memref<2x2xf32> and %b = memref<2x2xf32>). This is
+// not always true because Tpp supports broadcasting dimensions.
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSameShape(addOp.lhs(), addOp.rhs()))
+    if (!hasSameShape(addOp.lhs(), addOp.rhs()) ||
+        !hasFloatOperands(addOp.lhs(), addOp.rhs()))
       return failure();
     Location loc = addOp.getLoc();
     SmallVector<Value> ubs;
-    size_t rank = addOp.lhs().getType().cast<MemRefType>().getShape().size();
+    size_t rank = addOp.lhs().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
           loc, addOp.lhs().getType().cast<MemRefType>().getShape()[idx]);
@@ -83,16 +110,61 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
-// Lowers a tpp identity to a memref.copy.
+// Lowers identity op.
+// 1. If the operands have the same shape converts to memref.copy
+// 2. Otherwise, generate loop nest.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
+  bool isScalar(Value val) const { return !val.getType().isa<ShapedType>(); }
+
+  bool is1DMemRef(Value val) const {
+    if (isScalar(val))
+      return false;
+    return val.getType().cast<ShapedType>().getRank() == 1;
+  }
+
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSameShape(identityOp.input(), identityOp.output()))
+    // no floating point operation, exit.
+    if (!hasFloatOperands(identityOp.input(), identityOp.output()))
       return failure();
-    rewriter.replaceOpWithNewOp<memref::CopyOp>(identityOp, identityOp.input(),
-                                                identityOp.output());
+    Location loc = identityOp.getLoc();
+    // operands have same shape, convert to memref.copy.
+    if (hasSameShape(identityOp.input(), identityOp.output())) {
+      rewriter.replaceOpWithNewOp<memref::CopyOp>(
+          identityOp, identityOp.input(), identityOp.output());
+      return success();
+    }
+    // Build loop nests.
+    SmallVector<Value> ubs;
+    size_t rank = identityOp.output().getType().cast<MemRefType>().getRank();
+    for (size_t idx = 0; idx < rank; idx++) {
+      Value dim = rewriter.create<arith::ConstantIndexOp>(
+          loc,
+          identityOp.output().getType().cast<MemRefType>().getShape()[idx]);
+      ubs.push_back(dim);
+    }
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> lbs(rank, zero);
+    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    SmallVector<Value> steps(rank, one);
+    (void)scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps,
+        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+          Value input = identityOp.input();
+          // input is scalar.
+          if (isScalar(input))
+            b.create<memref::StoreOp>(loc, input, identityOp.output(),
+                                      localIvs);
+          // input is a 1d-memref.
+          else if (is1DMemRef(input)) {
+            Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs[1]);
+            b.create<memref::StoreOp>(loc, scalarVal, identityOp.output(),
+                                      localIvs);
+          }
+        });
+    rewriter.eraseOp(identityOp);
     return success();
   }
 };
@@ -102,7 +174,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSameShape(reluOp.input(), reluOp.output()))
+    if (!hasSameShape(reluOp.input(), reluOp.output()) ||
+        !hasFloatOperands(reluOp.input(), reluOp.output()))
       return failure();
     Location loc = reluOp.getLoc();
     SmallVector<Value> ubs;
@@ -117,28 +190,18 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> steps(rank, one);
 
-    Value zeroConstant = nullptr;
     Type elementType =
         reluOp.input().getType().cast<MemRefType>().getElementType();
-    if (elementType.isa<FloatType>())
-      zeroConstant = rewriter.create<arith::ConstantOp>(
-          loc, elementType, rewriter.getFloatAttr(elementType, 0));
-    else if (elementType.isa<IntegerType>())
-      zeroConstant = rewriter.create<arith::ConstantOp>(
-          loc, elementType, rewriter.getIntegerAttr(elementType, 0));
-
-    assert(zeroConstant != nullptr && "expect int or float type");
+    Value zeroConstant = rewriter.create<arith::ConstantOp>(
+        loc, elementType, rewriter.getFloatAttr(elementType, 0));
 
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
               b.create<memref::LoadOp>(loc, reluOp.input(), localIvs);
-          Value scalarRelu = nullptr;
-          if (elementType.isa<FloatType>())
-            scalarRelu = b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
-          else
-            scalarRelu = b.create<arith::MaxSIOp>(loc, zeroConstant, scalarLhs);
+          Value scalarRelu =
+              b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
           b.create<memref::StoreOp>(loc, scalarRelu, reluOp.output(), localIvs);
         });
 
@@ -152,7 +215,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   bool isMLIRFloatType(Type t) const { return t.isa<FloatType>(); }
 
-  // Make sure the matmul is 2d (all its operands) with floating point operands.
+  // Make sure the matmul is 2d (all its operands) with floating point
+  // operands.
   // TODO: Again no broadcast for now.
   bool is2DRowMajorFloatMatmul(MatmulOp matmulOp) const {
     MemRefType matrixA = matmulOp.matrixA().getType().cast<MemRefType>();
