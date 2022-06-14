@@ -83,7 +83,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
-/// Lowers a tpp identity to a memref.copy.
+// Lowers a tpp identity to a memref.copy.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
@@ -93,6 +93,56 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
       return failure();
     rewriter.replaceOpWithNewOp<memref::CopyOp>(identityOp, identityOp.input(),
                                                 identityOp.output());
+    return success();
+  }
+};
+
+struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
+  using OpRewritePattern<ReluOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReluOp reluOp,
+                                PatternRewriter &rewriter) const override {
+    if (!hasSameShape(reluOp.input(), reluOp.output()))
+      return failure();
+    Location loc = reluOp.getLoc();
+    SmallVector<Value> ubs;
+    size_t rank = reluOp.input().getType().cast<MemRefType>().getRank();
+    for (size_t idx = 0; idx < rank; idx++) {
+      Value dim = rewriter.create<arith::ConstantIndexOp>(
+          loc, reluOp.input().getType().cast<MemRefType>().getShape()[idx]);
+      ubs.push_back(dim);
+    }
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> lbs(rank, zero);
+    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    SmallVector<Value> steps(rank, one);
+
+    Value zeroConstant = nullptr;
+    Type elementType =
+        reluOp.input().getType().cast<MemRefType>().getElementType();
+    if (elementType.isa<FloatType>())
+      zeroConstant = rewriter.create<arith::ConstantOp>(
+          loc, elementType, rewriter.getFloatAttr(elementType, 0));
+    else if (elementType.isa<IntegerType>())
+      zeroConstant = rewriter.create<arith::ConstantOp>(
+          loc, elementType, rewriter.getIntegerAttr(elementType, 0));
+
+    assert(zeroConstant != nullptr && "expect int or float type");
+
+    (void)scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps,
+        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+          Value scalarLhs =
+              b.create<memref::LoadOp>(loc, reluOp.input(), localIvs);
+          Value scalarRelu = nullptr;
+          if (elementType.isa<FloatType>())
+            scalarRelu = b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
+          else
+            scalarRelu = b.create<arith::MaxSIOp>(loc, zeroConstant, scalarLhs);
+          b.create<memref::StoreOp>(loc, scalarRelu, reluOp.output(), localIvs);
+        });
+
+    rewriter.eraseOp(reluOp);
     return success();
   }
 };
@@ -174,7 +224,8 @@ void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
-               ConvertTppMatmulOp>(patterns.getContext());
+               ConvertTppMatmulOp,
+               ConvertTppReluOp>(patterns.getContext());
   // clang-format on
 }
 
