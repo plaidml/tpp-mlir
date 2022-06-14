@@ -2,7 +2,7 @@
 // RUN:   -map-linalg-to-tpp -enforce-tpp-preconditions \ 
 // RUN:   -convert-tensor-to-linalg -func-bufferize \ 
 // RUN:   -linalg-bufferize -arith-bufferize -tensor-bufferize \ 
-// RUN:   -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops \
+// RUN:   -convert-linalg-to-tpp -convert-linalg-to-loops -remove-extra-copies -convert-tpp-to-loops \
 // RUN:   -sparse-compiler | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
@@ -14,7 +14,7 @@
 // RUN:   -map-linalg-to-tpp \ 
 // RUN:   -convert-tensor-to-linalg -func-bufferize \ 
 // RUN:   -linalg-bufferize -arith-bufferize -tensor-bufferize \ 
-// RUN:   -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops \
+// RUN:   -convert-linalg-to-tpp -convert-linalg-to-loops -remove-extra-copies -convert-tpp-to-loops \
 // RUN:   -sparse-compiler | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \

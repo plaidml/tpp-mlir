@@ -58,6 +58,17 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
+def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
+  let summary = "Remove extra memref.copy operations";
+  let constructor = "mlir::tpp::createCopyRemovalPass()";
+  let description = [{
+    The extra copies are side-effect of bufferization. We 
+    will remove the pass once we understand how to bufferize
+    properly or the bufferization passes are adjusted.
+  }];
+  let dependentDialects = ["memref::MemRefDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";

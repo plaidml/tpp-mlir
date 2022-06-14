@@ -40,6 +40,12 @@ class SCFDialect;
 } // namespace mlir
 
 namespace mlir {
+namespace memref {
+class MemRefDialect;
+} // namespace memref
+} // namespace mlir
+
+namespace mlir {
 namespace tpp {
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
@@ -48,6 +54,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTppEnforcePreconditions();
 std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppToVectorPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppToLoopsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCopyRemovalPass();
 
 } // namespace tpp
 } // namespace mlir
