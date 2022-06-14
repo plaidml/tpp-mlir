@@ -83,6 +83,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
+/// Lowers a tpp identity to a memref.copy.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
@@ -90,7 +91,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
                                 PatternRewriter &rewriter) const override {
     if (!hasSameShape(identityOp.input(), identityOp.output()))
       return failure();
-    return failure();
+    rewriter.replaceOpWithNewOp<memref::CopyOp>(identityOp, identityOp.input(),
+                                                identityOp.output());
+    return success();
   }
 };
 
