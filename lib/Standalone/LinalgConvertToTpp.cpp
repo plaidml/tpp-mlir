@@ -169,8 +169,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
         newOperand = rankExpandUnitDims(rewriter, loc, operand);
       // currently we map to tpp only if we make the memref 2d.
       // later when we support broadcast when can relax this.
-      if ((!operand.getType().isa<ShapedType>()) ||
-          (operand.getType().cast<ShapedType>().getRank() != 2))
+      if ((!newOperand.getType().isa<ShapedType>()) ||
+          (newOperand.getType().cast<ShapedType>().getRank() != 2))
         return failure();
       newOperands.push_back(operand);
     }
