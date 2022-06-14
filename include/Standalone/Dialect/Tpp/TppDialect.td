@@ -17,11 +17,10 @@ include "mlir/IR/OpBase.td"
 
 def Tpp_Dialect : Dialect {
     let name = "tpp";
-    let summary = "A standalone out-of-tree MLIR tpp dialect.";
+    let summary = "Tensor Processing Primitives dialect.";
     let description = [{
-        This dialect is an example of an out-of-tree MLIR dialect designed to
-        illustrate the basic setup required to develop MLIR-based tools without
-        working inside of the LLVM source tree.
+        This dialect reflects the Tensor Processing Primitives
+        paper: https://arxiv.org/abs/2104.05755.
     }];
     let cppNamespace = "::mlir::tpp";
 }
