@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -37,25 +38,6 @@ namespace {
 //
 struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  // See getZeroAttr
-  Attribute getOneAttr(Type type, PatternRewriter &rewriter) const {
-    if (type.isa<FloatType>())
-      return rewriter.getFloatAttr(type, 1.0);
-    if (type.isa<IndexType>())
-      return rewriter.getIndexAttr(1);
-    if (auto integerType = type.dyn_cast<IntegerType>())
-      return rewriter.getIntegerAttr(
-          type, APInt(type.cast<IntegerType>().getWidth(), 1));
-    if (type.isa<RankedTensorType, VectorType>()) {
-      auto vtType = type.cast<ShapedType>();
-      auto element = getOneAttr(vtType.getElementType(), rewriter);
-      if (!element)
-        return {};
-      return DenseElementsAttr::get(vtType, element);
-    }
-    return {};
-  }
 
   // POD for GEMM operands
   struct GemmOperands {
@@ -90,13 +72,9 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
         loc, operands.C.getType().cast<ShapedType>().getElementType(),
         rewriter.getZeroAttr(
             operands.C.getType().cast<ShapedType>().getElementType()));
-    Value padOne = rewriter.create<arith::ConstantOp>(
-        loc, operands.B.getType().cast<ShapedType>().getElementType(),
-        getOneAttr(operands.B.getType().cast<ShapedType>().getElementType(),
-                   rewriter));
     Value paddedC = tensor::createPadHighOp(newRankedC, operands.C, padZero,
                                             /*nofold*/ false, loc, rewriter);
-    Value paddedB = tensor::createPadHighOp(newRankedB, operands.B, padOne,
+    Value paddedB = tensor::createPadHighOp(newRankedB, operands.B, padZero,
                                             /*nofold*/ false, loc, rewriter);
 
     // update operands.
@@ -128,13 +106,9 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
         loc, operands.C.getType().cast<ShapedType>().getElementType(),
         rewriter.getZeroAttr(
             operands.C.getType().cast<ShapedType>().getElementType()));
-    Value padOne = rewriter.create<arith::ConstantOp>(
-        loc, operands.B.getType().cast<ShapedType>().getElementType(),
-        getOneAttr(operands.B.getType().cast<ShapedType>().getElementType(),
-                   rewriter));
     Value paddedC = tensor::createPadHighOp(newRankedC, operands.C, padZero,
                                             /*nofold*/ false, loc, rewriter);
-    Value paddedA = tensor::createPadHighOp(newRankedA, operands.A, padOne,
+    Value paddedA = tensor::createPadHighOp(newRankedA, operands.A, padZero,
                                             /*nofold*/ false, loc, rewriter);
 
     // update operands.
@@ -216,8 +190,96 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Fold chain of static high pad operations.
+//
+// %0 = tensor.pad %arg2 low[%c0, %c0] high[%c0, %c13] {
+//  ^bb0(%arg3: index, %arg4: index):
+//    tensor.yield %cst : f32
+//  } : tensor<3x3xf32> to tensor<3x16xf32>
+//
+// %2 = tensor.pad %0 low[%c0, %c0] high[%c3, %c0] {
+//  ^bb0(%arg3: index, %arg4: index):
+//    tensor.yield %cst : f32
+//  } : tensor<3x16xf32> to tensor<6x16xf32>
+//
+// into
+//
+// %1 = tensor.pad %arg2 low[%c0, %c0] high[%c3, %c13] {
+// ^bb0(%arg3: index, %arg4: index):
+//   tensor.yield %cst : f32
+// } : tensor<3x3xf32> to tensor<6x16xf32>
+struct FoldChainOfStaticPaddings : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp consumer,
+                                PatternRewriter &rewriter) const override {
+    if (!consumer.hasZeroLowPad() || consumer.nofold() ||
+        !consumer.getConstantPaddingValue() || consumer.hasZeroHighPad())
+      return failure();
+    tensor::PadOp producer = consumer.source().getDefiningOp<tensor::PadOp>();
+    if (!producer || !producer.hasZeroLowPad() || producer.nofold() ||
+        !producer.getConstantPaddingValue() || producer.hasZeroHighPad())
+      return failure();
+    if (producer.getConstantPaddingValue() !=
+        consumer.getConstantPaddingValue())
+      return failure();
+
+    Value paddingVal = producer.getConstantPaddingValue();
+    tensor::PadOp newPadOp = tensor::createPadHighOp(
+        consumer.getResultType(), producer.source(), paddingVal,
+        /*nofold*/ false, consumer.getLoc(), rewriter);
+    rewriter.replaceOp(consumer, newPadOp.getResult());
+    return success();
+  }
+};
+
+/*
+%5 = linalg.init_tensor [132, 256] : tensor<132x256xf32>
+%6 = linalg.fill ins(%cst_0 : f32) outs(%5 : tensor<132x256xf32>) ->
+tensor<132x256xf32> %7 = tensor.insert_slice %arg0 into %6[%c0, %c0] [128, 256]
+[1, 1] : tensor<128x256xf32> into tensor<132x256xf32> use(%7)
+
+Try to rewrite as:
+
+%5 = linalg.init_tensor [132, 256] : tensor<132x256xf32>
+%6 = tensor.insert_slice %arg0 into %5[%c0, %c0] [128, 256] [1, 1] :
+tensor<128x256xf32> into tensor<132x256xf32> %7 = scf.for ( i = 128 to 132 ) {
+  %8 = tensor.insert %paddingValue into %6[i] : tensor<132x256xf32>
+  scf.yield %8 : tensor<132x256xf32>
+}
+use(%7)
+
+*/
+struct GenericHighPadOpPattern : public linalg::GeneralizePadOpPattern {
+  GenericHighPadOpPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : linalg::GeneralizePadOpPattern(context, trySimplifyCopy, benefit) {}
+
+  // Try avoiding inserting 'InsertSlideOp' which lowers to another
+  // copy operation.
+  static LogicalResult trySimplifyCopy(PatternRewriter &rewriter,
+                                       tensor::PadOp padOp, Value dest) {
+    // We consider only high padding.
+    if (!padOp.hasZeroLowPad() || padOp.hasZeroHighPad())
+      return failure();
+
+    // Bail out if the pad value is non-constant and the source
+    // or result shapes are dynamic.
+    RankedTensorType sourceType = padOp.getSourceType();
+    RankedTensorType resultType = padOp.getResultType();
+    if (!sourceType.hasStaticShape() || !resultType.hasStaticShape())
+      return failure();
+    auto padValue = padOp.getConstantPaddingValue();
+    if (!padValue)
+      return failure();
+
+    return failure();
+  }
+};
+
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
-  patterns.add<PadSIMDDimensionForGemm>(patterns.getContext());
+  patterns.add<PadSIMDDimensionForGemm,
+               FoldChainOfStaticPaddings /*, GenericHighPadOpPattern*/>(
+      patterns.getContext());
 }
 
 struct EnforcePreconditionsToTpp
