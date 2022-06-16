@@ -360,13 +360,51 @@ struct RemoveChainExtractInsertSlice
   }
 };
 
+struct RemoveChainInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp consumerSlice,
+                                PatternRewriter &rewriter) const override {
+    Location loc = consumerSlice.getLoc();
+    tensor::InsertSliceOp maybeProducerSlice =
+        consumerSlice.source().getDefiningOp<tensor::InsertSliceOp>();
+    if (!maybeProducerSlice)
+      return failure();
+    tensor::InsertSliceOp producerSlice = maybeProducerSlice;
+
+    // TODO: fails (or handle) if stride and offset are different.
+    // TODO: Take stride information from operation do not recompute them.
+
+    Value source = producerSlice.source();
+    Value dest = consumerSlice.dest();
+    RankedTensorType producerResultType =
+        producerSlice.source().getType().cast<RankedTensorType>();
+    unsigned rank = producerResultType.getRank();
+    SmallVector<OpFoldResult, 4> offsets, sizes, strides;
+    offsets.reserve(rank);
+    sizes.reserve(rank);
+    strides.reserve(rank);
+    for (unsigned r = 0; r < rank; r++) {
+      offsets.push_back(rewriter.getIndexAttr(0));
+      strides.push_back(rewriter.getIndexAttr(1));
+      sizes.push_back(rewriter.getIndexAttr(producerResultType.getShape()[r]));
+    }
+
+    Value inserted = rewriter.create<tensor::InsertSliceOp>(
+        loc, source, dest, offsets, sizes, strides);
+    rewriter.replaceOp(consumerSlice, inserted);
+    return success();
+  }
+};
+
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<PadSIMDDimensionForGemm,
                FoldChainOfStaticPaddings,
                SinkExtractSliceAfterRelu,
                GenericHighPadOpPattern,
-               RemoveChainExtractInsertSlice>(patterns.getContext());
+               RemoveChainExtractInsertSlice,
+               RemoveChainInsertSlice>(patterns.getContext());
   // clang-format on
 }
 
