@@ -82,6 +82,8 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
