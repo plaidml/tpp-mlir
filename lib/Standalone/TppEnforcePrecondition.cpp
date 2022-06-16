@@ -39,7 +39,7 @@ namespace {
 struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  // POD for GEMM operands
+  // POD for GEMM operands.
   struct GemmOperands {
     Value A = nullptr;
     Value B = nullptr;
@@ -233,53 +233,141 @@ struct FoldChainOfStaticPaddings : public OpRewritePattern<tensor::PadOp> {
   }
 };
 
-/*
-%5 = linalg.init_tensor [132, 256] : tensor<132x256xf32>
-%6 = linalg.fill ins(%cst_0 : f32) outs(%5 : tensor<132x256xf32>) ->
-tensor<132x256xf32> %7 = tensor.insert_slice %arg0 into %6[%c0, %c0] [128, 256]
-[1, 1] : tensor<128x256xf32> into tensor<132x256xf32> use(%7)
-
-Try to rewrite as:
-
-%5 = linalg.init_tensor [132, 256] : tensor<132x256xf32>
-%6 = tensor.insert_slice %arg0 into %5[%c0, %c0] [128, 256] [1, 1] :
-tensor<128x256xf32> into tensor<132x256xf32> %7 = scf.for ( i = 128 to 132 ) {
-  %8 = tensor.insert %paddingValue into %6[i] : tensor<132x256xf32>
-  scf.yield %8 : tensor<132x256xf32>
-}
-use(%7)
-
-*/
+// Convert tensor pad to linalg.
 struct GenericHighPadOpPattern : public linalg::GeneralizePadOpPattern {
   GenericHighPadOpPattern(MLIRContext *context, PatternBenefit benefit = 1)
       : linalg::GeneralizePadOpPattern(context, trySimplifyCopy, benefit) {}
 
-  // Try avoiding inserting 'InsertSlideOp' which lowers to another
-  // copy operation.
   static LogicalResult trySimplifyCopy(PatternRewriter &rewriter,
                                        tensor::PadOp padOp, Value dest) {
-    // We consider only high padding.
-    if (!padOp.hasZeroLowPad() || padOp.hasZeroHighPad())
-      return failure();
-
-    // Bail out if the pad value is non-constant and the source
-    // or result shapes are dynamic.
-    RankedTensorType sourceType = padOp.getSourceType();
-    RankedTensorType resultType = padOp.getResultType();
-    if (!sourceType.hasStaticShape() || !resultType.hasStaticShape())
-      return failure();
-    auto padValue = padOp.getConstantPaddingValue();
-    if (!padValue)
-      return failure();
-
     return failure();
   }
 };
 
+// Sink extract slice after tpp.relu.
+//
+// %5 = tensor.extract_slice %4[0, 0] [128, 512] [1, 1]
+//              : tensor<132x512xf32> to tensor<128x512xf32>
+// %6 = linalg.generic {
+//                indexing_maps = [#map1, #map1],
+//                iterator_types = ["parallel", "parallel"],
+//                library_call = "tpp.relu"
+//                     }
+//  ins(%5 : tensor<128x512xf32>) outs(%0 : tensor<128x512xf32>) {
+//    ^bb0(%arg9: f32, %arg10: f32):
+//      %21 = mathx.relu %arg9 : f32
+//      linalg.yield %21 : f32
+//  } -> tensor<128x512xf32>
+//
+// into
+// %5 = linalg.init_tensor [132, 512] : tensor<132x512xf32>
+// %6 = linalg.generic {
+//                indexing_maps = [#map1, #map1],
+//                iterator_types = ["parallel", "parallel"],
+//                library_call = "tpp.relu"
+//                      }
+//  ins(%4 : tensor<132x512xf32>) outs(%5 : tensor<132x512xf32>) {
+//    ^bb0(%arg9: f32, %arg10: f32):
+//      %24 = mathx.relu %arg9 : f32
+//      linalg.yield %24 : f32
+//    } -> tensor<132x512xf32>
+// %7 = tensor.extract_slice %6[0, 0] [128, 512] [1, 1]
+//              : tensor<132x512xf32> to tensor<128x512xf32>
+//
+struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    std::string libraryCall = linalgOp.getLibraryCallName();
+    if (libraryCall.compare("tpp.relu") != 0)
+      return failure();
+    Location loc = linalgOp.getLoc();
+    Value operand = linalgOp.getInputOperand(0)->get();
+    tensor::ExtractSliceOp slice =
+        operand.getDefiningOp<tensor::ExtractSliceOp>();
+    if (!slice || !slice.result().hasOneUse())
+      return failure();
+
+    RankedTensorType sliceOperandType =
+        slice.source().getType().cast<RankedTensorType>();
+
+    Value reluBuffer = rewriter.create<linalg::InitTensorOp>(
+        loc, sliceOperandType.getShape(), sliceOperandType.getElementType());
+
+    linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
+        loc, sliceOperandType, ValueRange{slice.source()},
+        ValueRange{reluBuffer}, linalgOp.getIndexingMaps(),
+        llvm::to_vector<4>(
+            linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
+        /*docs*/ "", /*library_call*/ "tpp.relu");
+    rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
+                                newReluOp.region().begin());
+
+    RankedTensorType sliceResultType =
+        slice.result().getType().cast<RankedTensorType>();
+    unsigned rank = sliceResultType.getRank();
+    SmallVector<OpFoldResult, 4> offsets, sizes, strides;
+    offsets.reserve(rank);
+    sizes.reserve(rank);
+    strides.reserve(rank);
+    for (unsigned r = 0; r < rank; r++) {
+      offsets.push_back(rewriter.getIndexAttr(0));
+      strides.push_back(rewriter.getIndexAttr(1));
+      sizes.push_back(rewriter.getIndexAttr(sliceResultType.getShape()[r]));
+    }
+    Value extract = rewriter.create<tensor::ExtractSliceOp>(
+        loc, newReluOp->getResult(0), offsets, sizes, strides);
+
+    rewriter.replaceOp(linalgOp, extract);
+    return success();
+  }
+};
+
+// %11 = tensor.extract_slice %10[0, 0] [128, 512] [1, 1]
+//   : tensor<132x512xf32> to tensor<128x512xf32>
+// %19 = tensor.insert_slice %11 into %18[%c0, %c0] [128, 512] [1, 1]
+//    : tensor<128x512xf32> into tensor<132x512xf32>
+// use(%19)
+//
+// With
+//
+// Use(%10)
+struct RemoveChainExtractInsertSlice
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSlice,
+                                PatternRewriter &rewriter) const override {
+    Value result = extractSlice.result();
+    if (!result.hasOneUse())
+      return failure();
+    Operation *user = *result.getUsers().begin();
+    if (!isa<tensor::InsertSliceOp>(user))
+      return failure();
+
+    tensor::InsertSliceOp insertSlice = cast<tensor::InsertSliceOp>(user);
+    RankedTensorType sourceType =
+        extractSlice.source().getType().cast<RankedTensorType>();
+    RankedTensorType destType =
+        insertSlice.dest().getType().cast<RankedTensorType>();
+    if (sourceType != destType)
+      return failure();
+
+    insertSlice.replaceAllUsesWith(extractSlice.source());
+    rewriter.replaceOp(extractSlice, extractSlice.source());
+    return success();
+  }
+};
+
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
+  // clang-format off
   patterns.add<PadSIMDDimensionForGemm,
-               FoldChainOfStaticPaddings /*, GenericHighPadOpPattern*/>(
-      patterns.getContext());
+               FoldChainOfStaticPaddings,
+               SinkExtractSliceAfterRelu,
+               GenericHighPadOpPattern,
+               RemoveChainExtractInsertSlice>(patterns.getContext());
+  // clang-format on
 }
 
 struct EnforcePreconditionsToTpp
