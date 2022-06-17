@@ -7,7 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/TppPasses.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -27,6 +33,21 @@ struct TppCompilerPipeline
 
 void TppCompilerPipeline::runOnOperation() {
   OpPassManager pm("builtin.module");
+  pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+  if (enablePreconditions)
+    pm.addNestedPass<func::FuncOp>(createTppEnforcePreconditions());
+  pm.addPass(func::createFuncBufferizePass());
+  pm.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
+  pm.addPass(arith::createConstantBufferizePass());
+  pm.addNestedPass<func::FuncOp>(createTensorBufferizePass());
+  if (enablePreconditions)
+    pm.addNestedPass<func::FuncOp>(
+        createConvertLinalgToTppPass(/*enabledPreconditions*/ true));
+  else
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+  pm.addNestedPass<func::FuncOp>(
+      mlir::bufferization::createFinalizingBufferizePass());
+
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();
   return;

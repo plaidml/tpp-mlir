@@ -33,6 +33,10 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
+  let options = [
+    Option<"enabledPreconditions", "enabled-tpp-preconditions", "bool", "false",
+           "Try to select optimal tile sizes before mapping to tpp.">
+  ];
 }
 
 def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"> {
@@ -72,6 +76,10 @@ def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";
+  let options = [
+    Option<"enablePreconditions", "enable-tpp-preconditions", "bool", "false",
+           "Enable tpp precoditions for optimal mapping">
+  ];
 }
 
 #endif // STANDALONE_DIALECT_TPP_PASSES

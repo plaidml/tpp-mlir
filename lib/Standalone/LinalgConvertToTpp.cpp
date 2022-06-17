@@ -276,13 +276,18 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 // TODO: PatternRwriter does not work well with tiling. I suspect
 // because the builder is not properly propagated. But investigate more.
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
+  ConvertLinalgToTpp() = default;
+  ConvertLinalgToTpp(bool enabledPreconditions) {
+    this->enabledPreconditions = enabledPreconditions;
+  }
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
       if (failed(reshape2D(linalgOp)))
         return signalPassFailure();
     });
-    getOperation().walk(
-        [&](linalg::GenericOp linalgOp) { (void)tileMatmul(linalgOp); });
+    if (enabledPreconditions)
+      getOperation().walk(
+          [&](linalg::GenericOp linalgOp) { (void)tileMatmul(linalgOp); });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
@@ -296,4 +301,9 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertLinalgToTppPass() {
   return std::make_unique<ConvertLinalgToTpp>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createConvertLinalgToTppPass(bool enabledPreconditions) {
+  return std::make_unique<ConvertLinalgToTpp>(enabledPreconditions);
 }
