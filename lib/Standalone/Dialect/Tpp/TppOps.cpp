@@ -17,9 +17,20 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 LogicalResult IdentityOp::verify() {
-  // 1. The input can be a constant, 1d and 2 memref.
-  // 2. The output must no be a constant, but only
-  // a 1d/2d memref.
-  //  TODO: implement me.
-  return success();
+  Type inputType = input().getType();
+  Type outputType = output().getType();
+
+  // input scalar, just return.
+  if (!inputType.isa<ShapedType>())
+    return success();
+
+  // if the input is not a scalar the output rank should be >= of the input
+  // rank.
+  unsigned rankInput = inputType.cast<ShapedType>().getRank();
+  if (!outputType.isa<ShapedType>())
+    return failure();
+  unsigned rankOutput = outputType.cast<ShapedType>().getRank();
+  if (rankOutput >= rankInput)
+    return success();
+  return failure();
 }
