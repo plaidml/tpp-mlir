@@ -112,6 +112,37 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
   return success();
 }
 
+// Given an operand 'operand' returns the updated operand to be used when
+// building a TPP operation.  Scalar or shaped type with rank <= 2 are ok,
+// while shaped type with rank > 2 are rank reduced by dropping unit
+// dimensions.  Note that the rank-reduce may fail thus the caller needs to
+// check if the returned operand is valid using 'checkOperandForTpp'.
+Value getOperandForTpp(Value operand, PatternRewriter &rewriter, Location loc) {
+  Type operandType = operand.getType();
+  // Scalar value.
+  if (!operandType.isa<ShapedType>())
+    return operand;
+  // Shaped type.
+  if (operandType.cast<ShapedType>().getRank() <= 2)
+    return operand;
+  // Attempt to rank reduce, it may fail.
+  return rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
+}
+
+// Given an operand 'operand' check if it is a scalar
+// or a shape type with rank <= 2.
+LogicalResult checkOperandForTpp(Value operand) {
+  Type operandType = operand.getType();
+  if (!operandType.isa<ShapedType>())
+    return success();
+  if (operandType.isa<ShapedType>()) {
+    unsigned rank = operandType.cast<ShapedType>().getRank();
+    if (rank <= 2)
+      return success();
+  }
+  return failure();
+}
+
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -155,23 +186,10 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
-      Type operandType = operand.getType();
-      // scalar type.
-      if (!operandType.isa<ShapedType>())
-        newOperands.push_back(operand);
-      // shaped type.
-      else {
-        Value newOperand = operand;
-        // attempt to rank reduce.
-        if (operandType.cast<ShapedType>().getRank() > 2)
-          newOperand =
-              rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
-        // fails if it is not possible to rank reduce.
-        if (!newOperand.getType().isa<ShapedType>() ||
-            newOperand.getType().cast<ShapedType>().getRank() > 2)
-          return failure();
-        newOperands.push_back(newOperand);
-      }
+      Value newOperand = getOperandForTpp(operand, rewriter, loc);
+      if (failed(checkOperandForTpp(newOperand)))
+        return failure();
+      newOperands.push_back(newOperand);
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }
@@ -182,26 +200,14 @@ struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
+    Location loc = fillOp.getLoc();
     SmallVector<Value> operands = fillOp->getOperands();
     SmallVector<Value> newOperands;
     for (Value operand : operands) {
-      Type operandType = operand.getType();
-      // scalar type.
-      if (!operandType.isa<ShapedType>())
-        newOperands.push_back(operand);
-      // shaped type.
-      else {
-        Value newOperand = operand;
-        // attempt to rank reduce.
-        if (operandType.cast<ShapedType>().getRank() > 2)
-          newOperand = rankReducingSubviewDroppingUnitDims(
-              rewriter, fillOp.getLoc(), operand);
-        // fails if it is not possible to rank reduce.
-        if (!newOperand.getType().isa<ShapedType>() ||
-            newOperand.getType().cast<ShapedType>().getRank() > 2)
-          return failure();
-        newOperands.push_back(newOperand);
-      }
+      Value newOperand = getOperandForTpp(operand, rewriter, loc);
+      if (failed(checkOperandForTpp(newOperand)))
+        return failure();
+      newOperands.push_back(newOperand);
     }
     rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, newOperands[0],
                                             newOperands[1]);
