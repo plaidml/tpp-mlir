@@ -221,8 +221,8 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
-      // TODO: Check logical result.
-      (void)reshape2D(linalgOp);
+      if (failed(reshape2D(linalgOp)))
+        return signalPassFailure();
     });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
