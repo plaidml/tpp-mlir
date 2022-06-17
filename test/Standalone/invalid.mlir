@@ -18,3 +18,12 @@ func.func @myfunc(%arg0: memref<1x2xf32>, %arg1: memref<2x1xf32>) -> memref<2x1x
   tpp.relu ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x1xf32>)
   return %arg1: memref<2x1xf32>
 }
+
+// -----
+
+func.func @myfunc(%arg0: memref<2x2xf32>, %arg1: memref<1x2xf32>) -> memref<2x2xf32> {
+
+  // expected-error @below {{incompatible shape}}
+  tpp.identity ins(%arg1: memref<1x2xf32>) out(%arg0: memref<2x2xf32>)
+  return %arg0: memref<2x2xf32>
+}

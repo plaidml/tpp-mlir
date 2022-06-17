@@ -33,9 +33,6 @@ namespace {
 //   %2 = add %0, %1
 //   store %2 to %c
 //
-// TODO: Here we consider the simple case where the operands have the same
-// shape (e.g., %a = memref<2x2xf32> and %b = memref<2x2xf32>). This is
-// not always true because Tpp supports broadcasting dimensions.
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
@@ -71,8 +68,6 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
 };
 
 // Lowers identity op.
-// 1. If the operands have the same shape converts to memref.copy
-// 2. Otherwise, generate loop nest.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
@@ -111,6 +106,12 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
           // input is a 1d-memref.
           else if (is1DMemRef(input)) {
             Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs[1]);
+            b.create<memref::StoreOp>(loc, scalarVal, identityOp.output(),
+                                      localIvs);
+          }
+          // input is a 2d-memref.
+          else {
+            Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs);
             b.create<memref::StoreOp>(loc, scalarVal, identityOp.output(),
                                       localIvs);
           }

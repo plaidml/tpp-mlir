@@ -28,11 +28,23 @@ LogicalResult IdentityOp::verify() {
   // rank.
   unsigned rankInput = inputType.cast<ShapedType>().getRank();
   if (!outputType.isa<ShapedType>())
-    return failure();
+    return emitError("expect a shape type for output");
   unsigned rankOutput = outputType.cast<ShapedType>().getRank();
-  if (rankOutput >= rankInput)
+  if (rankOutput < rankInput)
+    return emitError("output rank must be >= of input rank");
+
+  // check if the shape are compatible.
+  ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
+
+  if (rankInput == 1 && rankOutput == 2 && shapeInput[0] == shapeOutput[1])
     return success();
-  return failure();
+
+  assert(rankInput == rankOutput && "expect same rank");
+  for (int idx = rankInput - 1; idx >= 0; idx--)
+    if (shapeInput[idx] != shapeOutput[idx])
+      return emitError("incompatible shape");
+  return success();
 }
 
 // Check that op to be 2d matmul in row-major.

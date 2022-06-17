@@ -150,7 +150,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                ArrayRef<Value> operands,
                                PatternRewriter &rewriter) const {
     std::string libraryCall = linalgOp.getLibraryCallName();
-    // TODO: find better way to express this.
     if (libraryCall.compare("tpp.identity") == 0) {
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);

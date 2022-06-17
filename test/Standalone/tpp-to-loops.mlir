@@ -50,3 +50,19 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   tpp.add ins(%arg0: memref<3x3xf32>, %arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
   return 
 }
+
+// -----
+
+func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
+  // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:     %[[tostore:.*]] = memref.load %arg1[%[[j]]] : memref<3xf32>
+  // CHECK:     memref.store %[[tostore]], %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
+  // CHECK:   }
+  // CHECK: }
+  tpp.identity ins(%arg1: memref<3xf32>) out(%arg0: memref<3x3xf32>)
+  return 
+}
