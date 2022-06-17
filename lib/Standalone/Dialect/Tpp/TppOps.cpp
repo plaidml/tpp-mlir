@@ -35,6 +35,7 @@ LogicalResult IdentityOp::verify() {
   return failure();
 }
 
+// Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
   MemRefType A = matrixA().getType().cast<MemRefType>();
   MemRefType B = matrixB().getType().cast<MemRefType>();
