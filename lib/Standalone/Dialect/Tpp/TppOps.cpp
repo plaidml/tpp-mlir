@@ -34,3 +34,19 @@ LogicalResult IdentityOp::verify() {
     return success();
   return failure();
 }
+
+LogicalResult MatmulOp::verify() {
+  MemRefType A = matrixA().getType().cast<MemRefType>();
+  MemRefType B = matrixB().getType().cast<MemRefType>();
+  MemRefType C = matrixC().getType().cast<MemRefType>();
+  if ((A.getShape().size() != 2) || (B.getShape().size() != 2) ||
+      (C.getShape().size() != 2))
+    return failure();
+  int64_t m = C.getShape()[0];
+  int64_t n = C.getShape()[1];
+  int64_t k = A.getShape()[1];
+  if ((A.getShape()[0] != m) || (B.getShape()[1] != n) ||
+      (B.getShape()[0] != k))
+    return failure();
+  return success();
+}

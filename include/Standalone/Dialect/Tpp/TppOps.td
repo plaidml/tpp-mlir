@@ -20,7 +20,7 @@ def TppMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat]>;
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_Op<"add", []> {
+def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
     let summary = "Element-wise addition.";
     let description = [{
         The `tpp.add` operation performs element-wise addition
@@ -90,7 +90,7 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_ReluOp : Tpp_Op<"relu", []> {
+def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
   let summary = "Applies a Rectified Linear Unit function.";
   let description = [{
     The `tpp.relu` applies a Rectified Linear Unit function.
@@ -150,6 +150,8 @@ def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
+
+  let hasVerifier = 1;
 }
 
 #endif // STANDALONE_OPS

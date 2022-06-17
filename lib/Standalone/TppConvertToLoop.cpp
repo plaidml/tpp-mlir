@@ -22,43 +22,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-// Checks if the shape of the operand is the same.
-static bool hasSameShape(Value lhs, Value rhs) {
-  Type lhsType = lhs.getType();
-  Type rhsType = rhs.getType();
-  if (!lhsType.isa<MemRefType>() || !rhsType.isa<MemRefType>())
-    return false;
-  MemRefType lhsMemRef = lhsType.cast<MemRefType>();
-  MemRefType rhsMemRef = rhsType.cast<MemRefType>();
-  if (!lhsMemRef.hasStaticShape() || !rhsMemRef.hasStaticShape())
-    return false;
-  ArrayRef<int64_t> shapeLhs = lhsMemRef.getShape();
-  ArrayRef<int64_t> shapeRhs = rhsMemRef.getShape();
-  return shapeLhs == shapeRhs;
-}
-
-// Check if all the operands are float types.
-static bool hasFloatOperands(Value lhs, Value rhs) {
-  Type lhsType = lhs.getType();
-  Type rhsType = rhs.getType();
-
-  bool lhsFloat = false;
-  if (lhsType.isa<ShapedType>() &&
-      lhsType.cast<ShapedType>().getElementType().isa<FloatType>())
-    lhsFloat = true;
-  if (lhsType.isa<FloatType>())
-    lhsFloat = true;
-
-  bool rhsFloat = false;
-  if (rhsType.isa<ShapedType>() &&
-      rhsType.cast<ShapedType>().getElementType().isa<FloatType>())
-    rhsFloat = true;
-  if (rhsType.isa<FloatType>())
-    rhsFloat = true;
-
-  return (rhsFloat && lhsFloat);
-}
-
 //
 // tpp.add ins(%a, %b) out(%c)
 //
@@ -78,9 +41,6 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
 
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSameShape(addOp.lhs(), addOp.rhs()) ||
-        !hasFloatOperands(addOp.lhs(), addOp.rhs()))
-      return failure();
     Location loc = addOp.getLoc();
     SmallVector<Value> ubs;
     size_t rank = addOp.lhs().getType().cast<MemRefType>().getRank();
@@ -126,16 +86,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    // no floating point operation, exit.
-    if (!hasFloatOperands(identityOp.input(), identityOp.output()))
-      return failure();
     Location loc = identityOp.getLoc();
-    // operands have same shape, convert to memref.copy.
-    if (hasSameShape(identityOp.input(), identityOp.output())) {
-      rewriter.replaceOpWithNewOp<memref::CopyOp>(
-          identityOp, identityOp.input(), identityOp.output());
-      return success();
-    }
     // Build loop nests.
     SmallVector<Value> ubs;
     size_t rank = identityOp.output().getType().cast<MemRefType>().getRank();
@@ -174,9 +125,6 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasSameShape(reluOp.input(), reluOp.output()) ||
-        !hasFloatOperands(reluOp.input(), reluOp.output()))
-      return failure();
     Location loc = reluOp.getLoc();
     SmallVector<Value> ubs;
     size_t rank = reluOp.input().getType().cast<MemRefType>().getRank();
@@ -213,37 +161,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
-  bool isMLIRFloatType(Type t) const { return t.isa<FloatType>(); }
-
-  // Make sure the matmul is 2d (all its operands) with floating point
-  // operands.
-  // TODO: Again no broadcast for now.
-  bool is2DRowMajorFloatMatmul(MatmulOp matmulOp) const {
-    MemRefType matrixA = matmulOp.matrixA().getType().cast<MemRefType>();
-    MemRefType matrixB = matmulOp.matrixB().getType().cast<MemRefType>();
-    MemRefType matrixC = matmulOp.matrixC().getType().cast<MemRefType>();
-    if ((matrixA.getShape().size() != 2) || (matrixB.getShape().size() != 2) ||
-        (matrixC.getShape().size() != 2))
-      return false;
-    if ((!isMLIRFloatType(matrixA.getElementType())) ||
-        (!isMLIRFloatType(matrixB.getElementType())) ||
-        !(isMLIRFloatType(matrixC.getElementType())))
-      return false;
-    int64_t m = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[0];
-    int64_t n = matmulOp.matrixC().getType().cast<MemRefType>().getShape()[1];
-    int64_t k = matmulOp.matrixA().getType().cast<MemRefType>().getShape()[1];
-    if ((matmulOp.matrixA().getType().cast<MemRefType>().getShape()[0] != m) ||
-        (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[1] != n) ||
-        (matmulOp.matrixB().getType().cast<MemRefType>().getShape()[0] != k))
-      return false;
-    return true;
-  }
-
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!is2DRowMajorFloatMatmul(matmulOp))
-      return failure();
-
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC =
         matmulOp.matrixC().getType().cast<MemRefType>().getShape();
