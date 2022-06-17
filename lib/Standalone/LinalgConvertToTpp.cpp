@@ -194,30 +194,29 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
-  using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
-                                PatternRewriter &rewriter) const override {
-    Location loc = fillOp.getLoc();
-    SmallVector<Value> operands = fillOp->getOperands();
-    SmallVector<Value> newOperands;
-    for (Value operand : operands) {
-      Value newOperand = getOperandForTpp(operand, rewriter, loc);
-      if (failed(checkOperandForTpp(newOperand)))
-        return failure();
-      newOperands.push_back(newOperand);
-    }
-    rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, newOperands[0],
-                                            newOperands[1]);
-    return success();
-  }
-};
+// struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
+//   using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
+//
+//   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+//                                 PatternRewriter &rewriter) const override {
+//     Location loc = fillOp.getLoc();
+//     SmallVector<Value> operands = fillOp->getOperands();
+//     SmallVector<Value> newOperands;
+//     for (Value operand : operands) {
+//       Value newOperand = getOperandForTpp(operand, rewriter, loc);
+//       if (failed(checkOperandForTpp(newOperand)))
+//         return failure();
+//       newOperands.push_back(newOperand);
+//     }
+//     rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, newOperands[0],
+//                                             newOperands[1]);
+//     return success();
+//   }
+// };
 
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<ConvertGenericOpToTpp/*,
-               ConvertLinalgFillToTpp*/>(patterns.getContext());
+  patterns.add<ConvertGenericOpToTpp>(patterns.getContext());
   // clang-format on
 }
 
