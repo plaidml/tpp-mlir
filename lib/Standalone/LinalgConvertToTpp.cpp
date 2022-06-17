@@ -71,15 +71,16 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 
 // Expand rank by adding unit dimensions.
 // Example, memref<3xf32> -> memref<1x3xf32>
-static Value rankExpandUnitDims(OpBuilder &builder, Location loc, Value input) {
-  MemRefType memrefOrig = input.getType().cast<MemRefType>();
-  assert(memrefOrig.getShape().size() == 1 && "expect 1d memref");
-  MemRefType newShape = MemRefType::get({1, memrefOrig.getShape()[0]},
-                                        memrefOrig.getElementType());
-  ArrayAttr rZero = builder.getI64ArrayAttr({0, 1});
-  ArrayAttr r = ArrayAttr::get(builder.getContext(), {rZero});
-  return builder.create<memref::ExpandShapeOp>(loc, newShape, input, r);
-}
+// static Value rankExpandUnitDims(OpBuilder &builder, Location loc, Value
+// input) {
+//  MemRefType memrefOrig = input.getType().cast<MemRefType>();
+//  assert(memrefOrig.getShape().size() == 1 && "expect 1d memref");
+//  MemRefType newShape = MemRefType::get({1, memrefOrig.getShape()[0]},
+//                                        memrefOrig.getElementType());
+//  ArrayAttr rZero = builder.getI64ArrayAttr({0, 1});
+//  ArrayAttr r = ArrayAttr::get(builder.getContext(), {rZero});
+//  return builder.create<memref::ExpandShapeOp>(loc, newShape, input, r);
+//}
 
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
@@ -108,6 +109,58 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
   if (failed(tiledOp))
     return linalgOp->emitError("Failed to tile linalgOp");
 
+  linalgOp->erase();
+  return success();
+}
+
+// Try to select optimal tile sizes.
+static SmallVector<Value, 4>
+getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
+  SmallVector<int64_t> dims = linalgOp.computeStaticLoopSizes();
+  int64_t m = dims[0];
+  int64_t n = dims[1];
+  int64_t k = dims[2];
+
+  int64_t bestTileM = m - (m % 6);
+  int64_t bestTileN = n - (n % 16);
+  if (bestTileN > 64)
+    bestTileN = 64;
+  int64_t bestTileK = k;
+
+  // llvm::errs() << "M: " << m << "\n";
+  // llvm::errs() << "N: " << n << "\n";
+  // llvm::errs() << "K: " << k << "\n";
+  // llvm::errs() << "bestTileM: " << bestTileM << "\n";
+  // llvm::errs() << "bestTileN: " << bestTileN << "\n";
+  // llvm::errs() << "bestTileK: " << bestTileK << "\n";
+
+  SmallVector<Value, 3> tppTiles;
+  Location loc = linalgOp.getLoc();
+  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileM));
+  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileN));
+  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileK));
+  return tppTiles;
+}
+
+// Tile the generic operation (annotated with tpp.matmul) such that
+// we can select the best micro-kernel.
+LogicalResult tileMatmul(linalg::GenericOp linalgOp) {
+  if (!linalgOp.hasBufferSemantics())
+    return linalgOp->emitError("Expect linalgOp with buffer semantics");
+  std::string libraryCall = linalgOp.getLibraryCallName();
+  if (libraryCall.compare("tpp.matmul") != 0)
+    return failure();
+
+  OpBuilder builder(linalgOp);
+  OpBuilder::InsertionGuard guard(builder);
+  linalg::LinalgTilingOptions linalgTilingOptions;
+  linalgTilingOptions.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+      .setTileSizeComputationFunction(getTileSizesForOptimalMapping);
+  IRRewriter rewriter(builder);
+  FailureOr<linalg::TiledLinalgOp> tiledOp =
+      linalg::tileLinalgOp(rewriter, linalgOp, linalgTilingOptions);
+  if (failed(tiledOp))
+    return linalgOp->emitError("Failed to tile linalgOp");
   linalgOp->erase();
   return success();
 }
@@ -228,6 +281,8 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
       if (failed(reshape2D(linalgOp)))
         return signalPassFailure();
     });
+    getOperation().walk(
+        [&](linalg::GenericOp linalgOp) { (void)tileMatmul(linalgOp); });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
