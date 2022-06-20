@@ -50,6 +50,11 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
         `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` 
         `out` `(` $output `:` type($output) `)` attr-dict
     }];
+
+    let extraClassDeclaration = [{
+      MemRefType getLhsType() { return getLhs().getType().cast<MemRefType>(); }
+      MemRefType getRhsType() { return getRhs().getType().cast<MemRefType>(); }
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -82,6 +87,11 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
   }];
+
+  let extraClassDeclaration = [{
+      MemRefType getInputType() { return getInput().getType().cast<MemRefType>(); }
+      MemRefType getOutputType() { return getOutput().getType().cast<MemRefType>(); }
+    }];
 
   let hasVerifier = 1;
 }
@@ -116,6 +126,11 @@ def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
   }];
+
+  let extraClassDeclaration = [{
+      MemRefType getInputType() { return getInput().getType().cast<MemRefType>(); }
+      MemRefType getOutputType() { return getOutput().getType().cast<MemRefType>(); }
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -149,6 +164,10 @@ def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() { return getMatrixC().getType().cast<MemRefType>(); }
   }];
 
   let hasVerifier = 1;
