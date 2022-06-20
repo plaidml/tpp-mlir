@@ -54,9 +54,9 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
     Value vectorAdd = replacementForUnaryTppOp<arith::AddFOp>(
-        addOp.lhs(), addOp.rhs(), addOp.getLoc(), rewriter);
+        addOp.getLhs(), addOp.getRhs(), addOp.getLoc(), rewriter);
     rewriter.create<vector::StoreOp>(addOp.getLoc(), vectorAdd.getType(),
-                                     addOp.output());
+                                     addOp.getOutput());
     rewriter.eraseOp(addOp);
     return success();
   }
@@ -76,16 +76,17 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = identityOp.getLoc();
-    MemRefType inputMemRef = identityOp.input().getType().cast<MemRefType>();
+    MemRefType inputMemRef = identityOp.getInput().getType().cast<MemRefType>();
     VectorType inputVectorType =
         VectorType::get(inputMemRef.getShape(), inputMemRef.getElementType());
     Value vectorLoad = rewriter.create<vector::LoadOp>(loc, inputVectorType,
-                                                       identityOp.input());
-    MemRefType outputMemRef = identityOp.output().getType().cast<MemRefType>();
+                                                       identityOp.getInput());
+    MemRefType outputMemRef =
+        identityOp.getOutput().getType().cast<MemRefType>();
     assert(inputMemRef.getElementType() == outputMemRef.getElementType() &&
            "expect same type");
     rewriter.create<vector::StoreOp>(loc, vectorLoad.getType(),
-                                     identityOp.output());
+                                     identityOp.getOutput());
     rewriter.eraseOp(identityOp);
     return success();
   }

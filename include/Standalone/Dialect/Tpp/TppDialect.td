@@ -23,6 +23,7 @@ def Tpp_Dialect : Dialect {
         paper: https://arxiv.org/abs/2104.05755.
     }];
     let cppNamespace = "::mlir::tpp";
+    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 //===----------------------------------------------------------------------===//

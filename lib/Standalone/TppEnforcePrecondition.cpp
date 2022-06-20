@@ -208,6 +208,7 @@ struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
 // ^bb0(%arg3: index, %arg4: index):
 //   tensor.yield %cst : f32
 // } : tensor<3x3xf32> to tensor<6x16xf32>
+//
 struct FoldChainOfStaticPaddings : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
@@ -333,6 +334,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
 // With
 //
 // Use(%10)
+//
 struct RemoveChainExtractInsertSlice
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;

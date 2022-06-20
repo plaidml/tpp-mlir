@@ -40,10 +40,10 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = addOp.getLoc();
     SmallVector<Value> ubs;
-    size_t rank = addOp.lhs().getType().cast<MemRefType>().getRank();
+    size_t rank = addOp.getLhs().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, addOp.lhs().getType().cast<MemRefType>().getShape()[idx]);
+          loc, addOp.getLhs().getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -54,12 +54,12 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, addOp.lhs(), localIvs);
+              b.create<memref::LoadOp>(loc, addOp.getLhs(), localIvs);
           Value scalarRhs =
-              b.create<memref::LoadOp>(loc, addOp.rhs(), localIvs);
+              b.create<memref::LoadOp>(loc, addOp.getRhs(), localIvs);
           Value addLhsAndRhs =
               b.create<arith::AddFOp>(loc, scalarLhs, scalarRhs);
-          b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.output(),
+          b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(),
                                     localIvs);
         });
     rewriter.eraseOp(addOp);
@@ -84,11 +84,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     Location loc = identityOp.getLoc();
     // Build loop nests.
     SmallVector<Value> ubs;
-    size_t rank = identityOp.output().getType().cast<MemRefType>().getRank();
+    size_t rank = identityOp.getOutput().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
           loc,
-          identityOp.output().getType().cast<MemRefType>().getShape()[idx]);
+          identityOp.getOutput().getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -98,21 +98,21 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value input = identityOp.input();
+          Value input = identityOp.getInput();
           // input is scalar.
           if (isScalar(input))
-            b.create<memref::StoreOp>(loc, input, identityOp.output(),
+            b.create<memref::StoreOp>(loc, input, identityOp.getOutput(),
                                       localIvs);
           // input is a 1d-memref.
           else if (is1DMemRef(input)) {
             Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs[1]);
-            b.create<memref::StoreOp>(loc, scalarVal, identityOp.output(),
+            b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
                                       localIvs);
           }
           // input is a 2d-memref.
           else {
             Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs);
-            b.create<memref::StoreOp>(loc, scalarVal, identityOp.output(),
+            b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
                                       localIvs);
           }
         });
@@ -128,10 +128,10 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
     SmallVector<Value> ubs;
-    size_t rank = reluOp.input().getType().cast<MemRefType>().getRank();
+    size_t rank = reluOp.getInput().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, reluOp.input().getType().cast<MemRefType>().getShape()[idx]);
+          loc, reluOp.getInput().getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -140,7 +140,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     SmallVector<Value> steps(rank, one);
 
     Type elementType =
-        reluOp.input().getType().cast<MemRefType>().getElementType();
+        reluOp.getInput().getType().cast<MemRefType>().getElementType();
     Value zeroConstant = rewriter.create<arith::ConstantOp>(
         loc, elementType, rewriter.getFloatAttr(elementType, 0));
 
@@ -148,10 +148,11 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, reluOp.input(), localIvs);
+              b.create<memref::LoadOp>(loc, reluOp.getInput(), localIvs);
           Value scalarRelu =
               b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
-          b.create<memref::StoreOp>(loc, scalarRelu, reluOp.output(), localIvs);
+          b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(),
+                                    localIvs);
         });
 
     rewriter.eraseOp(reluOp);
@@ -166,9 +167,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC =
-        matmulOp.matrixC().getType().cast<MemRefType>().getShape();
+        matmulOp.getMatrixC().getType().cast<MemRefType>().getShape();
     ArrayRef<int64_t> shapeA =
-        matmulOp.matrixA().getType().cast<MemRefType>().getShape();
+        matmulOp.getMatrixA().getType().cast<MemRefType>().getShape();
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
@@ -185,15 +186,15 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
           Value localI = localIvs[0];
           Value localJ = localIvs[1];
           Value localK = localIvs[2];
-          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.matrixA(),
+          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getMatrixA(),
                                                    ValueRange{localI, localK});
-          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.matrixB(),
+          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getMatrixB(),
                                                    ValueRange{localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.matrixC(),
+          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getMatrixC(),
                                                    ValueRange{localI, localJ});
           Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
           Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
-          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.matrixC(),
+          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.getMatrixC(),
                                     ValueRange{localI, localJ});
         });
 

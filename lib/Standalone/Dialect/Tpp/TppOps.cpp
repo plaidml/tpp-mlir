@@ -17,8 +17,8 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 LogicalResult IdentityOp::verify() {
-  Type inputType = input().getType();
-  Type outputType = output().getType();
+  Type inputType = getInput().getType();
+  Type outputType = getOutput().getType();
 
   // input scalar, just return.
   if (!inputType.isa<ShapedType>())
@@ -49,9 +49,9 @@ LogicalResult IdentityOp::verify() {
 
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
-  MemRefType A = matrixA().getType().cast<MemRefType>();
-  MemRefType B = matrixB().getType().cast<MemRefType>();
-  MemRefType C = matrixC().getType().cast<MemRefType>();
+  MemRefType A = getMatrixA().getType().cast<MemRefType>();
+  MemRefType B = getMatrixB().getType().cast<MemRefType>();
+  MemRefType C = getMatrixC().getType().cast<MemRefType>();
   if ((A.getShape().size() != 2) || (B.getShape().size() != 2) ||
       (C.getShape().size() != 2))
     return failure();
