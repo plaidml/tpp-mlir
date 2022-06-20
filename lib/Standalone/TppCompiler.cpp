@@ -57,6 +57,7 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(
       mlir::bufferization::createFinalizingBufferizePass());
 
+  pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
   pm.addNestedPass<func::FuncOp>(createTppToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
