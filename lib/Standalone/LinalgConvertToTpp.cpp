@@ -114,7 +114,7 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
 }
 
 // Try to select optimal tile sizes.
-static SmallVector<Value, 4>
+static SmallVector<Value, 3>
 getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   SmallVector<int64_t> dims = linalgOp.computeStaticLoopSizes();
   int64_t m = dims[0];
