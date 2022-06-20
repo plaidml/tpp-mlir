@@ -7,6 +7,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/TppPasses.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MathToLibm/MathToLibm.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -17,6 +25,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -47,6 +56,18 @@ void TppCompilerPipeline::runOnOperation() {
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
   pm.addNestedPass<func::FuncOp>(
       mlir::bufferization::createFinalizingBufferizePass());
+
+  pm.addNestedPass<func::FuncOp>(createTppToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+  pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
+  pm.addPass(createConvertVectorToLLVMPass());
+  pm.addPass(createMemRefToLLVMPass());
+  pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
+  pm.addPass(createConvertMathToLibmPass());
+  pm.addPass(createConvertFuncToLLVMPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(createReconcileUnrealizedCastsPass());
 
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();
