@@ -52,13 +52,13 @@ def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"
 
 def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
   let summary = "Convert tpp to the vector dialect";
-  let constructor = "mlir::tpp::createTppToVectorPass()";
+  let constructor = "mlir::tpp::createConvertTppToVectorPass()";
   let dependentDialects = ["vector::VectorDialect"];
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
-  let constructor = "mlir::tpp::createTppToLoopsPass()";
+  let constructor = "mlir::tpp::createConvertTppToLoopsPass()";
   let dependentDialects = ["scf::SCFDialect"];
 }
 

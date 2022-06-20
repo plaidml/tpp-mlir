@@ -53,10 +53,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass(bool);
 std::unique_ptr<OperationPass<func::FuncOp>> createTppEnforcePreconditions();
 std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
-// TODO: this should be: createConvertTppToVectorPass()
-std::unique_ptr<OperationPass<func::FuncOp>> createTppToVectorPass();
-// TODO: this should be: createConvertTppToLoopsPass()
-std::unique_ptr<OperationPass<func::FuncOp>> createTppToLoopsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToVectorPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createCopyRemovalPass();
 
 } // namespace tpp

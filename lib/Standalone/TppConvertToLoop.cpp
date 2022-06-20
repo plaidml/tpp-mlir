@@ -220,6 +220,7 @@ struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createTppToLoopsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createConvertTppToLoopsPass() {
   return std::make_unique<ConvertTppToLoops>();
 }

@@ -110,6 +110,6 @@ struct ConvertTppToVector : public ConvertTppToVectorBase<ConvertTppToVector> {
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTppToVectorPass() {
+mlir::tpp::createConvertTppToVectorPass() {
   return std::make_unique<ConvertTppToVector>();
 }
