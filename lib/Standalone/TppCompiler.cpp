@@ -42,22 +42,32 @@ struct TppCompilerPipeline
 
 void TppCompilerPipeline::runOnOperation() {
   OpPassManager pm("builtin.module");
+  // map-linalg-to-tpp
   pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+  // enforce-tpp-preconditions
   if (enablePreconditions)
     pm.addNestedPass<func::FuncOp>(createTppEnforcePreconditions());
+  // func-bufferize
   pm.addPass(func::createFuncBufferizePass());
+  // linalg-bufferize
   pm.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
+  // arith-bufferize
   pm.addPass(arith::createConstantBufferizePass());
+  // tensor-bufferize
   pm.addNestedPass<func::FuncOp>(createTensorBufferizePass());
+  // convert-linalg-to-tpp
   if (enablePreconditions)
     pm.addNestedPass<func::FuncOp>(
         createConvertLinalgToTppPass(/*enabledPreconditions*/ true));
   else
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+  // finalizing-bufferize
   pm.addNestedPass<func::FuncOp>(
       mlir::bufferization::createFinalizingBufferizePass());
 
+  // remove-extra-copies
   pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
+  // convert-tpp-to-loops
   pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
