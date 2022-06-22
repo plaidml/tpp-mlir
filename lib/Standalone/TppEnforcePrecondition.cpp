@@ -399,6 +399,96 @@ struct RemoveChainInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
   }
 };
 
+// Fold the padding into a tpp.identity only if
+// the padding is for a broadcasting dimension.
+//
+// %0 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+// %1 = linalg.generic {"tpp-identity"} -> tensor<128x512xf32>
+// %2 = linalg.init_tensor [132, 512] : tensor<132x512xf32>
+// %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<132x512xf32>) ->
+// tensor<132x512xf32> %4 = tensor.insert_slice %1 into %3 tensor<128x512xf32>
+// into tensor<132x512xf32>
+//
+// With
+//
+// %0 = linalg.init_tensor [132, 512] : tensor<132x512xf32>
+// %1 = linalg.genric {"tpp.identity"} -> tensor<132x512xf32>
+//
+// We can only play this trick if we assume the padding value to be just
+// "filling" values and only if we do not violate broadcast semantics for
+// tpp.identity (the dimension must be compatible see: 'areCompatibleImpl').
+// Two dimensions are compatible if
+// 1. they are equal
+// 2. one of them is 1
+//
+struct FoldInsertSliceIntoTppIdentity
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  bool areCompatibleImpl(ArrayRef<int64_t> source,
+                         ArrayRef<int64_t> dest) const {
+    int64_t rankSource = source.size();
+    int64_t rankDest = dest.size();
+
+    for (int64_t i = rankSource - 1, j = rankDest - 1; i >= 0 && j >= 0;
+         i--, j--) {
+      int dimSource = source[i];
+      int dimDest = dest[j];
+      if (dimSource == dimDest)
+        continue;
+      if (dimSource == 1 && dimDest > 1)
+        continue;
+      if (dimDest == 1 && dimSource > 1)
+        continue;
+      return false;
+    }
+    return true;
+  }
+
+  bool areCompatible(RankedTensorType source, RankedTensorType dest) const {
+    return areCompatibleImpl(source.getShape(), dest.getShape());
+  }
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = sliceOp.getLoc();
+    linalg::GenericOp maybeTppIdentityOp =
+        sliceOp.source().getDefiningOp<linalg::GenericOp>();
+    if (!maybeTppIdentityOp ||
+        !isMarkedWithTpp(maybeTppIdentityOp, "tpp.identity"))
+      return failure();
+    linalg::GenericOp tppIdentityOp = maybeTppIdentityOp;
+    assert(tppIdentityOp.getNumOperands() == 2 && "expect two operands");
+    linalg::InitTensorOp maybeInitOp =
+        tppIdentityOp.getOperand(1).getDefiningOp<linalg::InitTensorOp>();
+    if (!maybeInitOp || !maybeInitOp.getResult().hasOneUse())
+      return failure();
+
+    RankedTensorType dest = sliceOp.getType();
+    RankedTensorType source =
+        tppIdentityOp.getOperand(0).getType().cast<RankedTensorType>();
+    if (!areCompatible(source, dest))
+      return failure();
+
+    Value init = rewriter.create<linalg::InitTensorOp>(loc, dest.getShape(),
+                                                       dest.getElementType());
+
+    linalg::GenericOp newTppIdentityOp = rewriter.create<linalg::GenericOp>(
+        loc, dest, ValueRange{tppIdentityOp.getOperand(0)}, ValueRange{init},
+        tppIdentityOp.getIndexingMaps(),
+        llvm::to_vector<4>(tppIdentityOp.iterator_types()
+                               .template getAsValueRange<StringAttr>()),
+        /*docs*/ "", /*library_call*/ "tpp.identity");
+    // I think we cannot steal the old region but copy it as per PatternRewriter
+    // limitations.
+    rewriter.cloneRegionBefore(tppIdentityOp.region(),
+                               newTppIdentityOp.region(),
+                               newTppIdentityOp.region().begin());
+    rewriter.replaceOp(sliceOp, newTppIdentityOp.getResult(0));
+    return success();
+  }
+};
+
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<PadSIMDDimensionForGemm,
@@ -406,7 +496,8 @@ void populateTppEnforcePatterns(RewritePatternSet &patterns) {
                SinkExtractSliceAfterRelu,
                GenericHighPadOpPattern,
                RemoveChainExtractInsertSlice,
-               RemoveChainInsertSlice>(patterns.getContext());
+               RemoveChainInsertSlice,
+               FoldInsertSliceIntoTppIdentity>(patterns.getContext());
   // clang-format on
 }
 
