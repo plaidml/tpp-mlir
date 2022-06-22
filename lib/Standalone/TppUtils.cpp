@@ -24,5 +24,12 @@ bool hasTppMark(linalg::LinalgOp linalgOp) {
   return prefix.compare("tpp") == 0;
 }
 
+bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target) {
+  if (!hasTppMark(linalgOp))
+    return false;
+  std::string libraryCall = linalgOp.getLibraryCallName();
+  return libraryCall.compare(target) == 0;
+}
+
 } // end namespace tpp
 } // end namespace mlir

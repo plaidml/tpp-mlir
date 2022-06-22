@@ -25,6 +25,9 @@ bool hasStaticShape(linalg::LinalgOp linalgOp);
 // and the operation can be mapped to a tpp operation.
 bool hasTppMark(linalg::LinalgOp linalgOp);
 
+// Return true if the linalg operation is marked with 'target'.
+bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target);
+
 } // namespace tpp
 } // namespace mlir
 
