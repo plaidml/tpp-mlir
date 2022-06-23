@@ -399,6 +399,7 @@ struct RemoveChainInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
   }
 };
 
+// TODO: Check padding to be foldable.
 // Fold the padding into a tpp.identity only if
 // the padding is for a broadcasting dimension.
 //
