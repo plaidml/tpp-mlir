@@ -37,8 +37,11 @@ set(LLVM_LIT_ARGS "-sv" CACHE STRING "lit default options")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 include(sanitizers)
 
+# libxsmm
+include(xsmm)
+message (STATUS ${XSMM_INCLUDE_DIRS})
+
 # Unit test
-message(STATUS ${LLVM_MAIN_INCLUDE_DIR}/../)
 set(LLVM_MAIN_SRC_DIR ${LLVM_MAIN_INCLUDE_DIR}/../)
 message(STATUS "Using LLVM: ${LLVM_MAIN_SRC_DIR}")
 add_custom_target(StandaloneUnitTests)
@@ -52,3 +55,4 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(standalone-opt)
+add_subdirectory(standalone-rt)

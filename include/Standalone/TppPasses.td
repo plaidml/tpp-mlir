@@ -53,13 +53,28 @@ def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"
 def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
   let summary = "Convert tpp to the vector dialect";
   let constructor = "mlir::tpp::createConvertTppToVectorPass()";
+  let description = [{
+    Convert tpp operations to the vector dialect.
+  }];
   let dependentDialects = ["vector::VectorDialect"];
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
   let constructor = "mlir::tpp::createConvertTppToLoopsPass()";
+  let description = [{
+    Convert tpp operations to SCF loops.
+  }];
   let dependentDialects = ["scf::SCFDialect"];
+}
+
+def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "ModuleOp"> {
+  let summary = "Convert tpp to libXSMM";
+  let constructor = "mlir::tpp::createConvertTppToXsmmPass()";
+  let description = [{
+    Convert tpp operations to libXSMM function calls.
+  }];
+  let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
 
 def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
@@ -78,7 +93,9 @@ def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let constructor = "mlir::tpp::createTppCompilerPipeline()";
   let options = [
     Option<"enablePreconditions", "enable-tpp-preconditions", "bool", "false",
-           "Enable tpp precoditions for optimal mapping">
+           "Enable tpp precoditions for optimal mapping">,
+    Option<"enableXsmmConversion", "enable-xsmm-conversion", "bool", "false",
+           "Enable xsmm conversion">
   ];
 }
 

@@ -12,13 +12,20 @@
 // RUN: FileCheck %s
 //
 
+// RUN: standalone-opt %s -tpp-compiler="enable-xsmm-conversion" | \
+// RUN: mlir-cpu-runner \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext | \
+// RUN: FileCheck %s
+//
+
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
  func.func @matmultpp(%A: tensor<4x8xf64>, 
-          %B: tensor<8x4xf64>, %C: tensor<4x4xf64> {linalg.inplaceable = true}) -> tensor<4x4xf64> {
+          %B: tensor<8x4xf64>, %C: tensor<4x4xf64>) -> tensor<4x4xf64> {
     %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
                          iterator_types = ["parallel", "parallel", "reduction"]} 
     ins(%A, %B: tensor<4x8xf64>, tensor<8x4xf64>) outs(%C: tensor<4x4xf64>) {

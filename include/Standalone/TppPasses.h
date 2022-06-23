@@ -56,6 +56,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToVectorPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createCopyRemovalPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTppToXsmmPass();
 
 } // namespace tpp
 } // namespace mlir
