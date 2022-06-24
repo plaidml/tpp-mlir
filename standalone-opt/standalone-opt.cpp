@@ -21,10 +21,10 @@
 
 #include "Standalone/Dialect/Mathx/MathxDialect.h"
 #include "Standalone/Dialect/Mathx/MathxOpsDialect.cpp.inc"
+#include "Standalone/Dialect/Stdx/StdxDialect.h"
+#include "Standalone/Dialect/Stdx/StdxOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Tpp/TppDialect.h"
 #include "Standalone/Dialect/Tpp/TppOpsDialect.cpp.inc"
-#include "Standalone/StdxDialect.h"
-#include "Standalone/StdxOpsDialect.cpp.inc"
 #include "Standalone/TppPasses.h"
 
 int main(int argc, char **argv) {

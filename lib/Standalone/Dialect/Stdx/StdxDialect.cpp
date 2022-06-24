@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/StdxDialect.h"
-#include "Standalone/StdxOps.h"
+#include "Standalone/Dialect/Stdx/StdxDialect.h"
+#include "Standalone/Dialect/Stdx/StdxOps.h"
 
 using namespace mlir;
 using namespace mlir::stdx;
@@ -19,6 +19,6 @@ using namespace mlir::stdx;
 void StdxDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "Standalone/StdxOps.cpp.inc"
+#include "Standalone/Dialect/Stdx/StdxOps.cpp.inc"
       >();
 }

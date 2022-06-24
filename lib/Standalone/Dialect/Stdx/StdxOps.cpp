@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/StdxOps.h"
-#include "Standalone/StdxDialect.h"
+#include "Standalone/Dialect/Stdx/StdxOps.h"
+#include "Standalone/Dialect/Stdx/StdxDialect.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 

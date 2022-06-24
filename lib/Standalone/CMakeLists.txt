@@ -4,8 +4,8 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/Tpp/TppOps.cpp
         Dialect/Mathx/MathxDialect.cpp
         Dialect/Mathx/MathxOps.cpp
-        StdxOps.cpp
-        StdxDialect.cpp
+        Dialect/Stdx/StdxOps.cpp
+        Dialect/Stdx/StdxDialect.cpp
        
         # Passes 
         LinalgMapToTpp.cpp
