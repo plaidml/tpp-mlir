@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STDX_OPS
-#define STDX_OPS
+#ifndef STANDALONE_STDX_OPS
+#define STANDALONE_STDX_OPS
 
 include "StdxDialect.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
@@ -47,4 +47,4 @@ def YieldOp : Stdx_Op<"yield", [HasParent<"ClosureOp">, NoSideEffect,
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
-#endif // STDX_OPS
+#endif // STANDALONE_STDX_OPS

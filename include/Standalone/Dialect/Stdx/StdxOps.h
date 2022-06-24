@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STDX_STANDALONEOPS_H
-#define STDX_STANDALONEOPS_H
+#ifndef STDX_STANDALONE_OPS_H
+#define STDX_STANDALONE_OPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -19,4 +19,4 @@
 #define GET_OP_CLASSES
 #include "Standalone/StdxOps.h.inc"
 
-#endif // STDX_STANDALONEOPS_H
+#endif // STDX_STANDALONE_OPS_H

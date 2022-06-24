@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STDX_STANDALONEDIALECT_H
-#define STDX_STANDALONEDIALECT_H
-
-#include "mlir/IR/Dialect.h"
+#ifndef STDX_STANDALONE_DIALECT_H
+#define STDX_STANDALONE_DIALECT_H
 
 #include "Standalone/StdxOpsDialect.h.inc"
+#include "mlir/IR/Dialect.h"
 
-#endif // STDX_STANDALONEDIALECT_H
+#endif // STDX_STANDALONE_DIALECT_H

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STDX_DIALECT
-#define STDX_DIALECT
+#ifndef STANDALONE_STDX_DIALECT
+#define STANDALONE_STDX_DIALECT
 
 include "mlir/IR/OpBase.td"
 
@@ -33,4 +33,4 @@ def Stdx_Dialect : Dialect {
 class Stdx_Op<string mnemonic, list<Trait> traits = []> :
         Op<Stdx_Dialect, mnemonic, traits>;
 
-#endif // STDX_DIALECT
+#endif // STANDALONE_STDX_DIALECT
