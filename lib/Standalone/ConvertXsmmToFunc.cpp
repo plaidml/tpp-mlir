@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
-#include "Standalone/TppPasses.h"
+#include "Standalone/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir;
 using namespace mlir::xsmm;
 
 #define GEN_PASS_CLASSES
-#include "Standalone/TppPasses.h.inc"
+#include "Standalone/Passes.h.inc"
 
 namespace {} // namespace

@@ -27,9 +27,7 @@ add_mlir_dialect_library(MLIRStandalone
         ${PROJECT_SOURCE_DIR}/include/Standalone
 
         DEPENDS
-        MLIRTppOpsIncGen
-        MLIRMathxOpsIncGen
-        MLIRTppPassIncGen
+        TppCompilerPassIncGen
 
 	LINK_LIBS PUBLIC
 	MLIRIR

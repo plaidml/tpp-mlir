@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Standalone/TppPasses.h"
+#include "Standalone/Passes.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MathToLibm/MathToLibm.h"
@@ -31,7 +31,7 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
-#include "Standalone/TppPasses.h.inc"
+#include "Standalone/Passes.h.inc"
 
 namespace {
 

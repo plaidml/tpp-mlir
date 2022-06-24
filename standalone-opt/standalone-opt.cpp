@@ -27,11 +27,11 @@
 #include "Standalone/Dialect/Tpp/TppOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Xsmm/XsmmDialect.h"
 #include "Standalone/Dialect/Xsmm/XsmmOpsDialect.cpp.inc"
-#include "Standalone/TppPasses.h"
+#include "Standalone/Passes.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
-  registerTppPasses();
+  registerTppCompilerPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();

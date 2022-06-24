@@ -11,7 +11,7 @@
 
 // clang-format off
 #include "mlir/IR/Dialect.h"
-#include "Standalone/StdxOpsDialect.h.inc"
+#include "Standalone/Dialect/Stdx/StdxOpsDialect.h.inc"
 // clang-format on
 
 #endif // STDX_STANDALONE_DIALECT_H

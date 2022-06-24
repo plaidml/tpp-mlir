@@ -60,4 +60,4 @@ void ClosureOp::print(OpAsmPrinter &p) {
 Region &ClosureOp::getLoopBody() { return body(); }
 
 #define GET_OP_CLASSES
-#include "Standalone/StdxOps.cpp.inc"
+#include "Standalone/Dialect/Stdx/StdxOps.cpp.inc"

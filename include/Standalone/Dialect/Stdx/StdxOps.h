@@ -17,6 +17,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "Standalone/StdxOps.h.inc"
+#include "Standalone/Dialect/Stdx/StdxOps.h.inc"
 
 #endif // STDX_STANDALONE_OPS_H

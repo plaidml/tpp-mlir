@@ -62,6 +62,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertTppToXsmmPass();
 } // namespace mlir
 
 #define GEN_PASS_REGISTRATION
-#include "Standalone/TppPasses.h.inc"
+#include "Standalone/Passes.h.inc"
 
 #endif // TPP_PASSES_H

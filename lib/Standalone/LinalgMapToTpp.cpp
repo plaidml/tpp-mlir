@@ -9,7 +9,7 @@
 #include "Standalone/Dialect/Mathx/MathxOps.h"
 #include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/Dialect/Tpp/TppUtils.h"
-#include "Standalone/TppPasses.h"
+#include "Standalone/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,7 +21,7 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
-#include "Standalone/TppPasses.h.inc"
+#include "Standalone/Passes.h.inc"
 
 #define DEBUG_TYPE "linalg-map-to-tpp"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
