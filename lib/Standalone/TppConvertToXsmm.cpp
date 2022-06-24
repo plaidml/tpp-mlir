@@ -102,8 +102,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   SmallVector<Type, 4> extractDispatchOperandTypes(MatmulOp matmulOp) const {
     Type integer32 = IntegerType::get(matmulOp.getContext(), 32);
-    return {integer32 /*lda*/, integer32 /*ldb*/, integer32 /*ldc*/,
-            integer32 /*m*/,   integer32 /*n*/,   integer32 /*k*/};
+    return {integer32 /*m*/,   integer32 /*n*/,   integer32 /*k*/,
+            integer32 /*lda*/, integer32 /*ldb*/, integer32 /*ldc*/};
   }
 
   FlatSymbolRefAttr
@@ -207,6 +207,8 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format on
 }
 
+// TODO: remove code duplication
+// TODO: make xsmm a dialect (i.e., have an op to init the library).
 struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());

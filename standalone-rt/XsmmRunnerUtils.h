@@ -18,9 +18,9 @@
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_gemm_invoke(int64_t id, UnrankedMemRefType<double> *A,
-                              UnrankedMemRefType<double> *B,
-                              UnrankedMemRefType<double> *C);
+_mlir_ciface_xsmm_gemm_invoke(int64_t id, UnrankedMemRefType<float> *A,
+                              UnrankedMemRefType<float> *B,
+                              UnrankedMemRefType<float> *C);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_gemm_dispatch(
     int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k);
