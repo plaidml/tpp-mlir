@@ -2,24 +2,27 @@ add_mlir_dialect_library(MLIRStandalone
         # Ops and dialects
         Dialect/Tpp/TppDialect.cpp
         Dialect/Tpp/TppOps.cpp
+        Dialect/Tpp/TppUtils.cpp
         Dialect/Mathx/MathxDialect.cpp
         Dialect/Mathx/MathxOps.cpp
         Dialect/Stdx/StdxOps.cpp
         Dialect/Stdx/StdxDialect.cpp
+        Dialect/Xsmm/XsmmOps.cpp
+        Dialect/Xsmm/XsmmDialect.cpp
        
         # Passes 
         LinalgMapToTpp.cpp
         TppEnforcePrecondition.cpp
-        TppUtils.cpp
         TppCompiler.cpp
         CopyRemoval.cpp
 
         # Conversions
-        TppConvertToVector.cpp
-        LinalgConvertToTpp.cpp
-        TppConvertToLoop.cpp  
-        TppConvertToXsmm.cpp
-
+        ConvertTppToVector.cpp  
+        ConvertLinalgToTpp.cpp  
+        ConvertTppToLoops.cpp    
+        ConvertTppToXsmm.cpp    
+        ConvertXsmmToFunc.cpp   
+    
         ADDITIONAL_HEADER_DIRS
         ${PROJECT_SOURCE_DIR}/include/Standalone
 

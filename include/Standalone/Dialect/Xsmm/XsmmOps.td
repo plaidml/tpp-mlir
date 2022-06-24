@@ -22,9 +22,62 @@ def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat]>;
 def Xsmm_TernaryCallOp : Xsmm_Op<"ternary_call", 
         [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "ternary call operation.";
+  
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+   
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let hasVerifier = 1; 
+}
+
+//===----------------------------------------------------------------------===//
+// BinaryCallOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_BinaryCallOp : Xsmm_Op<"binary_call", 
+        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+  let summary = "binary call operation.";
+  
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+   
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let hasVerifier = 1; 
+}
+
+//===----------------------------------------------------------------------===//
+// UnaryCallOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_UnaryCallOp : Xsmm_Op<"unary_call", 
+        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+  let summary = "unary call operation.";
+  
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+   
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }]; 
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// VoidCallOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_VoidCallOp : Xsmm_Op<"void_call",
+        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+  let summary = "void call operation.";
+
+  let arguments = (ins FlatSymbolRefAttr:$callee);
+
+  let assemblyFormat = [{
+    $callee attr-dict
   }];
 }
 

@@ -8,8 +8,8 @@
 
 #include "Standalone/Dialect/Mathx/MathxOps.h"
 #include "Standalone/Dialect/Tpp/TppOps.h"
+#include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/TppPasses.h"
-#include "Standalone/TppUtils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
