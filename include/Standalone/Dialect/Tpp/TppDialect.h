@@ -9,7 +9,9 @@
 #ifndef TPP_STANDALONE_DIALECT_H
 #define TPP_STANDALONE_DIALECT_H
 
-#include "Standalone/Dialect/Tpp/TppOpsDialect.h.inc"
+// clang-format off
 #include "mlir/IR/Dialect.h"
+#include "Standalone/Dialect/Tpp/TppOpsDialect.h.inc"
+// clang-format on
 
 #endif // TPP_STANDALONE_DIALECT_H

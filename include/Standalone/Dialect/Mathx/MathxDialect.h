@@ -7,9 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #ifndef MATHX_STANDALONE_DIALECT_H
-#define MATHXSTANDALONE_DIALECT_H
+#define MATHX_STANDALONE_DIALECT_H
+
+// clang-format off
+// XXX: Dialect should be included before *.inc
+#include "mlir/IR/Dialect.h"
 
 #include "Standalone/Dialect/Mathx/MathxOpsDialect.h.inc"
-#include "mlir/IR/Dialect.h"
+// clang-format on
 
 #endif // MATHX_STANDALONE_DIALECT_H
