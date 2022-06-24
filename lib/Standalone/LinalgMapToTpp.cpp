@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -29,24 +30,6 @@ namespace {
 
 struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  bool hasOnlyProjectedPermutations(linalg::GenericOp linalgOp) const {
-    return llvm::all_of(linalgOp.getIndexingMaps(), [](AffineMap m) {
-      return m.isProjectedPermutation(/*allowZeroInResults=*/true);
-    });
-  }
-
-  // Return true if the operation is an element-wise linalg op.
-  bool isElementWise(linalg::GenericOp linalgOp) const {
-    if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
-      return false;
-    if (!hasOnlyProjectedPermutations(linalgOp))
-      return false;
-    for (OpOperand *operand : linalgOp.getOutputOperands())
-      if (!linalgOp.getTiedIndexingMap(operand).isPermutation())
-        return false;
-    return true;
-  }
 
   // Return true if: 1) the region has a single block. 2) The block has two
   // operations only (linalg.YieldOp and OP). 3) The operation result types are
@@ -124,7 +107,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (isElementWise(linalgOp)) {
+    if (linalg::isElementwise(linalgOp)) {
       if (hasOnlyYieldOp(linalgOp.getRegion()) && hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
         rewriter.updateRootInPlace(
