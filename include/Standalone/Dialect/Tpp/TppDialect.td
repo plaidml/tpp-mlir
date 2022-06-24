@@ -1,4 +1,4 @@
-//===- StandaloneDialect.td - Standalone dialect -----------*- tablegen -*-===//
+//===- TppDialect.td - Tpp dialect ------------------------*- tablegen -*--===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STANDALONE_DIALECT
-#define STANDALONE_DIALECT
+#ifndef STANDALONE_TPP_DIALECT
+#define STANDALONE_TPP_DIALECT
 
 include "mlir/IR/OpBase.td"
 
@@ -33,4 +33,4 @@ def Tpp_Dialect : Dialect {
 class Tpp_Op<string mnemonic, list<Trait> traits = []> :
         Op<Tpp_Dialect, mnemonic, traits>;
 
-#endif // STANDALONE_TPP
+#endif // STANDALONE_TPP_DIALECT

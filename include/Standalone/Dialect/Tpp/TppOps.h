@@ -1,4 +1,4 @@
-//===- StandaloneOps.h - Standalone dialect ops -----------------*- C++ -*-===//
+//===- TppOps.h - Tpp dialect ops -------------------------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STANDALONE_STANDALONEOPS_H
-#define STANDALONE_STANDALONEOPS_H
+#ifndef TPP_STANDALONE_OPS_H
+#define TPP_STANDALONE_OPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -18,4 +18,4 @@
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/Tpp/TppOps.h.inc"
 
-#endif // STANDALONE_STANDALONEOPS_H
+#endif // TPP_STANDALONE_OPS_H

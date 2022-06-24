@@ -1,4 +1,4 @@
-//===- StandaloneDialect.h - Standalone dialect -----------------*- C++ -*-===//
+//===- TppDialect.h - Tpp dialect -------------------------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STANDALONE_STANDALONEDIALECT_H
-#define STANDALONE_STANDALONEDIALECT_H
-
-#include "mlir/IR/Dialect.h"
+#ifndef TPP_STANDALONE_DIALECT_H
+#define TPP_STANDALONE_DIALECT_H
 
 #include "Standalone/Dialect/Tpp/TppOpsDialect.h.inc"
+#include "mlir/IR/Dialect.h"
 
-#endif // STANDALONE_STANDALONEDIALECT_H
+#endif // TPP_STANDALONE_DIALECT_H
