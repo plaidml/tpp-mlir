@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Standalone/Dialect/Mathx/MathxOps.h"
 #include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -33,17 +34,34 @@ namespace {
 //   %2 = add %0, %1
 //   store %2 to %c
 //
+// or
+//
+// arith.addf(%a, %b)
+//
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
+
+  bool isScalarOp(AddOp addOp) const {
+    return !addOp.getLhs().getType().isa<ShapedType>();
+  }
 
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = addOp.getLoc();
+    // handle scalar case.
+    if (isScalarOp(addOp)) {
+      Value scalarAdd =
+          rewriter.create<arith::AddFOp>(loc, addOp.getLhs(), addOp.getRhs());
+      addOp.getOutput().replaceAllUsesWith(scalarAdd);
+      rewriter.eraseOp(addOp);
+      return success();
+    }
+    // handle memref case.
     SmallVector<Value> ubs;
-    size_t rank = addOp.getLhsType().getRank();
+    size_t rank = addOp.getLhs().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, addOp.getLhsType().getShape()[idx]);
+          loc, addOp.getLhs().getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -79,15 +97,27 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     return val.getType().cast<ShapedType>().getRank() == 1;
   }
 
+  bool isScalarOp(IdentityOp identityOp) const {
+    return (isScalar(identityOp.getInput()) &&
+            isScalar(identityOp.getOutput()));
+  }
+
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = identityOp.getLoc();
-    // Build loop nests.
+    // Handle scalar.
+    if (isScalarOp(identityOp)) {
+      identityOp.getOutput().replaceAllUsesWith(identityOp.getInput());
+      rewriter.eraseOp(identityOp);
+      return success();
+    }
+    // Handle memref.
     SmallVector<Value> ubs;
-    size_t rank = identityOp.getOutputType().getRank();
+    size_t rank = identityOp.getOutput().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, identityOp.getOutputType().getShape()[idx]);
+          loc,
+          identityOp.getOutput().getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -120,14 +150,27 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 };
 
+// Convert relu to loops.
 struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   using OpRewritePattern<ReluOp>::OpRewritePattern;
+
+  bool isScalarOp(ReluOp reluOp) const {
+    return !reluOp.getInput().getType().isa<ShapedType>();
+  }
 
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
+    // handle scalar case.
+    if (isScalarOp(reluOp)) {
+      Value scalarRelu = rewriter.create<mathx::ReluOp>(loc, reluOp.getInput());
+      reluOp.getOutput().replaceAllUsesWith(scalarRelu);
+      rewriter.eraseOp(reluOp);
+      return success();
+    }
+    // handle memref case.
     SmallVector<Value> ubs;
-    size_t rank = reluOp.getInputType().getRank();
+    size_t rank = reluOp.getInput().getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
           loc, reluOp.getInput().getType().cast<MemRefType>().getShape()[idx]);
@@ -138,7 +181,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> steps(rank, one);
 
-    Type elementType = reluOp.getInputType().getElementType();
+    Type elementType =
+        reluOp.getInput().getType().cast<MemRefType>().getElementType();
     Value zeroConstant = rewriter.create<arith::ConstantOp>(
         loc, elementType, rewriter.getFloatAttr(elementType, 0));
 
@@ -158,6 +202,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   }
 };
 
+// Convert matmul to loops.
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 

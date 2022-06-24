@@ -13,7 +13,7 @@ include "TppDialect.td"
 include "/mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-// MemRef with any element type and rank 1 or 2.
+// MemRef with any element type and rank 1 or 2. Or anyfloat type (i.e., f32).
 def TppMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
@@ -42,18 +42,13 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
         `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` 
         `out` `(` $output `:` type($output) `)` attr-dict
     }];
-
-    let extraClassDeclaration = [{
-      MemRefType getLhsType() { return getLhs().getType().cast<MemRefType>(); }
-      MemRefType getRhsType() { return getRhs().getType().cast<MemRefType>(); }
-    }];
 }
 
 //===----------------------------------------------------------------------===//
 // IdentityOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_IdentityOp : Tpp_Op<"identity", []> {
+def Tpp_IdentityOp : Tpp_Op<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
     The `tpp.identity` copies input to output. It performs datatype conversion.
@@ -63,6 +58,7 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
     ```mlir
  
     tpp.identity ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
+    tpp.identity ins(%1: f32) out(%2: memref<2x2xf32>)
 
     ```
   }];
@@ -70,13 +66,9 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
   let arguments = (ins TppMemRef:$input, TppMemRef:$output);
 
   let assemblyFormat = [{
-      `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
+      `ins` `(` $input `:` type($input) `)` 
+      `out` `(` $output `:` type($output) `)` attr-dict
   }];
-
-  let extraClassDeclaration = [{
-      MemRefType getInputType() { return getInput().getType().cast<MemRefType>(); }
-      MemRefType getOutputType() { return getOutput().getType().cast<MemRefType>(); }
-    }];
 
   let hasVerifier = 1;
 }
@@ -89,6 +81,7 @@ def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
   let summary = "Applies a Rectified Linear Unit function.";
   let description = [{
     The `tpp.relu` applies a Rectified Linear Unit function.
+    Operands have the same type (i.e., memref or f32).
     
     Example:
 
@@ -102,20 +95,16 @@ def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
   let arguments = (ins TppMemRef:$input, TppMemRef:$output);
 
   let assemblyFormat = [{
-      `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` attr-dict
+      `ins` `(` $input `:` type($input) `)` 
+      `out` `(` $output `:` type($output) `)` attr-dict
   }];
-
-  let extraClassDeclaration = [{
-      MemRefType getInputType() { return getInput().getType().cast<MemRefType>(); }
-      MemRefType getOutputType() { return getOutput().getType().cast<MemRefType>(); }
-    }];
 }
 
 //===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
+def Tpp_MatmulOp : Tpp_Op<"matmul"> {
   let summary = "Performs matrix multiplication of two input.";
   let description = [{
     The `tpp.matmul` mirrors `linalg.matmul`.

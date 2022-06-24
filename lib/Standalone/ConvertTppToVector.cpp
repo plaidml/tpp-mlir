@@ -75,13 +75,15 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
+    return failure(); // TODO: this is broken (do not handle scalar).
     Location loc = identityOp.getLoc();
-    MemRefType inputMemRef = identityOp.getInputType();
+    MemRefType inputMemRef = identityOp.getInput().getType().cast<MemRefType>();
     VectorType inputVectorType =
         VectorType::get(inputMemRef.getShape(), inputMemRef.getElementType());
     Value vectorLoad = rewriter.create<vector::LoadOp>(loc, inputVectorType,
                                                        identityOp.getInput());
-    MemRefType outputMemRef = identityOp.getOutputType();
+    MemRefType outputMemRef =
+        identityOp.getOutput().getType().cast<MemRefType>();
     assert(inputMemRef.getElementType() == outputMemRef.getElementType() &&
            "expect same type");
     rewriter.create<vector::StoreOp>(loc, vectorLoad.getType(),
