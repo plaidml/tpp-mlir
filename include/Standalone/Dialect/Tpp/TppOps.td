@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STANDALONE_OPS
-#define STANDALONE_OPS
+#ifndef STANDALONE_TPP_OPS
+#define STANDALONE_TPP_OPS
 
 include "TppDialect.td"
 include "/mlir/Interfaces/InferTypeOpInterface.td"
@@ -29,15 +29,7 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
         Example:
 
         ```mlir
-          
-        trait = {
-          indexing_maps = [
-            affine_map<(i, j) -> (i, j)> // lhs
-            affine_map<(i, j) -> (i, j)> // rhs
-            affine_map<(i, j) -> (i, j)> // output
-          ],
-          iterator_types = ["parallel", "parallel"]
-        }
+ 
         tpp.add ins(%1, %2: memref<2x2xf32>, memref<2x2xf32>) out(%3: memref<2x2xf32>)
         
         ```
@@ -69,14 +61,7 @@ def Tpp_IdentityOp : Tpp_Op<"identity", []> {
     Example:
 
     ```mlir
-      
-    trait = {
-      indexing_maps = [
-        affine_map<(i, j) -> (i, j)> // input
-        affine_map<(i, j) -> (i, j)> // output
-      ],
-      iterator_types = ["parallel", "parallel"]
-    }
+ 
     tpp.identity ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
 
     ```
@@ -108,14 +93,7 @@ def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
     Example:
 
     ```mlir
-      
-    trait = {
-      indexing_maps = [
-        affine_map<(i, j) -> (i, j)> // input
-        affine_map<(i, j) -> (i, j)> // output
-      ],
-      iterator_types = ["parallel", "parallel"]
-    }
+ 
     tpp.relu ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
 
     ```
@@ -145,15 +123,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
     Example:
 
     ```mlir
-  
-    trait = {
-      indexing_maps = [
-        affine_map<(i, j, k) -> (i, j)> // C
-        affine_map<(i, j, k) -> (i, k)> // A
-        affine_map<(i, j, k) -> (k, j)> // B
-      ],
-      iterator_types = ["parallel", "parallel", "reduction"]
-    }
+ 
     tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) out(%3: memref<2x2xf32>)
 
     ```
@@ -174,4 +144,4 @@ def Tpp_MatmulOp : Tpp_Op<"matmul", []> {
   let hasVerifier = 1;
 }
 
-#endif // STANDALONE_OPS
+#endif // STANDALONE_TPP_OPS
