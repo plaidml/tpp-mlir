@@ -39,6 +39,16 @@ CMake so that it installs `FileCheck` to the chosen installation prefix.
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
 
+## Problems
+
+1. **Expect some tests to fail**
+
+2. **LIBXSMM compilation fails**
+
+To fix it: go in `tpp-sandbox/build/_deps/xsmm-src/include/libxsmm_config.h`
+and comment out `include "libxsmm_version.h"` line 12
+
+then you are good to go.
 
 ## Note:
 
