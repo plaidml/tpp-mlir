@@ -21,7 +21,7 @@ using namespace mlir::tpp;
 #include "Standalone/Passes.h.inc"
 
 namespace {
-
+#if 0
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
@@ -206,21 +206,22 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTppMatmulOp>(patterns.getContext());
   // clang-format on
 }
+#endif
 
 // TODO: remove code duplication
 // TODO: make xsmm a dialect (i.e., have an op to init the library).
 struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateTppToXsmmPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    // RewritePatternSet patterns(&getContext());
+    // populateTppToXsmmPatterns(patterns);
+    //(void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
 };
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertTppToXsmmPass() {
   return std::make_unique<ConvertTppToXsmm>();
 }

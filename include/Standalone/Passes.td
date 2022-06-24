@@ -68,13 +68,22 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "ModuleOp"> {
-  let summary = "Convert tpp to libXSMM";
+def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
+  let summary = "Convert tpp to xsmm";
   let constructor = "mlir::tpp::createConvertTppToXsmmPass()";
   let description = [{
     Convert tpp operations to libXSMM function calls.
   }];
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
+}
+
+def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {  
+  let summary = "Convert xsmm to func";
+  let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
+  let description = [{
+    Convert xsmm operations to libXSMM function calls.
+  }];
+  let dependentDialects = ["func::FuncDialect"];
 }
 
 def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
