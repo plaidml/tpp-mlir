@@ -67,13 +67,13 @@ void TppCompilerPipeline::runOnOperation() {
 
   // remove-extra-copies
   pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
-  // convert-tpp-to-loops
 
-  if (enableXsmmConversion)
-    pm.addPass(createConvertTppToXsmmPass());
-  else
+  if (enableXsmmConversion) // convert-tpp-to-xsmm
+    pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+  else // convert-tpp-to-loops
     pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
 
+  pm.addPass(createConvertXsmmToFuncPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
