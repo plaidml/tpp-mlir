@@ -1,4 +1,4 @@
-//===- Math.h - Math dialect --------------------------------------*- C++-*-==//
+//===- MathOps.h - Math Ops ---------------------------------------*- C++-*-==//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_DIALECT_MATH_IR_MATHX_H_
-#define MLIR_DIALECT_MATH_IR_MATHX_H_
+#ifndef MATHX_STANDALONE_OPS_H
+#define MATHX_STANDALONE_OPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -24,4 +24,4 @@
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/Mathx/MathxOps.h.inc"
 
-#endif // MLIR_DIALECT_MATH_IR_MATHX_H_
+#endif // MATHX_STANDALONE_OPS_H

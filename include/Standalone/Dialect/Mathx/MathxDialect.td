@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef MATHX_BASE
-#define MATHX_BASE
+#ifndef STANDALONE_MATHX_DIALECT
+#define STANDALONE_MATHX_DIALECT
 
 include "mlir/IR/OpBase.td"
 
@@ -35,4 +35,4 @@ def Mathx_Dialect : Dialect {
   let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
-#endif // MATHX_BASE
+#endif // STANDALONE_MATHX_DIALECT

@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef STANDALONE_MATHXDIALECT_H
-#define STANDALONE_MATHXDIALECT_H
-
-#include "mlir/IR/Dialect.h"
+#ifndef MATHX_STANDALONE_DIALECT_H
+#define MATHXSTANDALONE_DIALECT_H
 
 #include "Standalone/Dialect/Mathx/MathxOpsDialect.h.inc"
+#include "mlir/IR/Dialect.h"
 
-#endif // STANDALONE_MATHXDIALECT_H
+#endif // MATHX_STANDALONE_DIALECT_H

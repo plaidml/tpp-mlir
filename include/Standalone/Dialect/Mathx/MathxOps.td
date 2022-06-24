@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MATHX_OPS
-#define MATHX_OPS
+#ifndef STANDALONE_MATHX_OPS
+#define STANDALONE_MATHX_OPS
 
 include "Standalone/Dialect/Mathx/MathxDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -52,4 +52,4 @@ def Mathx_ReluOp : Mathx_FloatUnaryOp<"relu"> {
   }];
 }
 
-#endif // MATHX_OPS
+#endif // STANDALONE_MATHX_OPS
