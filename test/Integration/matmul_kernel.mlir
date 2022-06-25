@@ -1,3 +1,4 @@
+// RUN: standalone-opt %s | FileCheck %s
 // TODO: echo $(pwd)
 // TODO: export C_INCLUDE_PATH=/Users/lchelini/llvm-project-orig/build/lib/clang/15.0.0/include
 // TODO: clang -v -O3 -emit-llvm -S /Users/lchelini/tpp-sandbox/test/Integration/matmul_c_driver.c 
@@ -5,11 +6,13 @@
 // TODO: standalone-opt %s -tpp-compiler | mlir-translate -mlir-to-llvmir -o matmul_kernel.ll
 // TODO: llc matmul_kernel.ll
 // TODO: clang -O3 matmul_c_driver.s matmul_kernel.s
+// XFAILS: *
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
+// CHECK-LABEL: func.func @matmul
 func.func @matmul(%A: tensor<6x9xf32>, %B: tensor<9x12xf32>,
                   %C: tensor<6x12xf32>) -> tensor<6x12xf32> {
   %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
