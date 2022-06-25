@@ -10,6 +10,7 @@
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -19,6 +20,41 @@ using namespace mlir::xsmm;
 #include "Standalone/Passes.h.inc"
 
 namespace {
+
+static SmallVector<Type, 4> extractInvokeOperandTypes(OperandRange operands) {
+  SmallVector<Type, 4> result;
+  result.reserve(operands.size());
+
+  for (Value operand : operands) {
+    Type operandType = operand.getType();
+    if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
+      UnrankedMemRefType unrankedMemref = UnrankedMemRefType::get(
+          memrefType.getElementType(), memrefType.getMemorySpace());
+      result.push_back(unrankedMemref);
+    } else
+      result.push_back(operandType);
+  }
+  return result;
+}
+
+static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
+                                               ValueRange operands) {
+  SmallVector<Value, 4> res;
+  res.reserve(operands.size());
+  for (auto op : operands) {
+    auto memrefType = op.getType().dyn_cast<MemRefType>();
+    if (!memrefType) {
+      res.push_back(op);
+      continue;
+    }
+    MemRefType rankedMemref = op.getType().dyn_cast<MemRefType>();
+    UnrankedMemRefType unrankedMemref = UnrankedMemRefType::get(
+        rankedMemref.getElementType(), rankedMemref.getMemorySpace());
+    Value cast = b.create<memref::CastOp>(loc, unrankedMemref, op);
+    res.push_back(cast);
+  }
+  return res;
+}
 
 // TODO: rename TernaryCallOp -> TernaryOp
 // TODO: Interface for TernaryCallOp, BinaryCallOp and UnaryCallOp.
@@ -35,7 +71,8 @@ struct ConvertTernaryXsmmCallOp : public OpRewritePattern<TernaryCallOp> {
     if (module.lookupSymbol(fnName.getAttr()))
       return failure();
 
-    auto libFnType = rewriter.getFunctionType(callOp.getOperandTypes(), {});
+    auto libFnType = rewriter.getFunctionType(
+        extractInvokeOperandTypes(callOp.getOperands()), {});
     {
       OpBuilder::InsertionGuard guard(rewriter);
       // Insert before module terminator.
@@ -51,8 +88,9 @@ struct ConvertTernaryXsmmCallOp : public OpRewritePattern<TernaryCallOp> {
       funcOp.setPrivate();
     }
 
-    rewriter.create<func::CallOp>(loc, fnName.getValue(), TypeRange(),
-                                  callOp.getOperands());
+    rewriter.create<func::CallOp>(
+        loc, fnName.getValue(), TypeRange(),
+        getMemRefOperands(rewriter, loc, callOp.getOperands()));
     rewriter.eraseOp(callOp);
     return success();
   }
