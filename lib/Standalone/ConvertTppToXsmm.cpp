@@ -45,6 +45,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t ldc = m;
     SmallVector<Value, 6> dispatchOperands;
     IntegerType integer = IntegerType::get(rewriter.getContext(), 32);
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
         loc, integer, getIntAttr(rewriter, integer, m)));
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
@@ -58,7 +59,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
         loc, integer, getIntAttr(rewriter, integer, ldc)));
     Value dispatched = rewriter.create<xsmm::DispatchOp>(
-        loc, integer, attrDispatch, dispatchOperands);
+        loc, integer64, attrDispatch, dispatchOperands);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -75,21 +76,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
-  SmallVector<Value, 4> getDispatchOperands(IdentityOp identityOp,
-                                            PatternRewriter &rewriter) const {
-    return {};
-  }
-
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    /*
-        FlatSymbolRefAttr attrDispatch =
-            FlatSymbolRefAttr::get(identityOp.getContext(),
-       "xsmm_add_dispatch"); SmallVector<Value, 4> dispatchOperands =
-            getDispatchOperands(identityOp, rewriter);
-        rewriter.create<xsmm::DispatchOp>(identityOp.getLoc(), attrDispatch,
-                                          dispatchOperands);
-    */
     FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_add_invoke");
     rewriter.replaceOpWithNewOp<xsmm::BinaryCallOp>(identityOp, attrInvoke,

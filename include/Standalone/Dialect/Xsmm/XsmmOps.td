@@ -12,7 +12,7 @@
 include "XsmmDialect.td"
 include "mlir/Interfaces/CallInterfaces.td"
 
-def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I32]>;
+def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
 
 //===----------------------------------------------------------------------===//
 // TernaryCallOp
@@ -24,7 +24,7 @@ def Xsmm_TernaryCallOp : Xsmm_Op<"ternary_call",
   let description = [{
     Ternary call operation. The symbol carries information about the name of
     the LIBXSMM function to invoke. Additionally, the call takes four operands. The
-    first is an I32 type and must result from a dispatch operation (it represents
+    first is an I64 type and must result from a dispatch operation (it represents
     the function pointer to use during invocation). The other operands are of Float
     types and represent the operands to use for computation. For example, a matmul
     as the following signature: I32, memref<MxNxf32>, memref<MxKxf32>,
@@ -111,7 +111,7 @@ def Xsmm_DispatchOp : Xsmm_Op<"dispatch",
   }];
   
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32>:$inputs);
-  let results = (outs I32:$results);
+  let results = (outs I64:$results);
 
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
