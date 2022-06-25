@@ -19,3 +19,15 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   tpp.identity ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
   return 
 }
+
+// -----
+
+// CHECK-LABEL: @matmul_to_xsmm(
+// CHECK-SAME: %[[arg_zero:.*]]: memref<3x3xf32>, %[[arg_one:.*]]: memref<3x3xf32>, %[[arg_two:.*]]: memref<3x3xf32>)
+func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  // CHECK: %[[cst:.*]] = arith.constant 3 : i32
+  // CHECK: %[[dispatch:.*]] = xsmm.dispatch @xsmm_matmul_dispatch
+  // CHECK: xsmm.ternary_call @xsmm_matmul_invoke(%[[dispatch]], %[[arg_zero]], %[[arg_one]], %[[arg_two]]) : (i32, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
+  return 
+}

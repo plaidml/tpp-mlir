@@ -60,7 +60,7 @@ OperandRange DispatchOp::getArgOperands() {
 }
 
 LogicalResult TernaryCallOp::verify() {
-  if (getArgOperands().size() != 3)
+  if (getArgOperands().size() != 4)
     return emitError() << "Expect three operands";
   return success();
 }

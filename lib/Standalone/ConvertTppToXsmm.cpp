@@ -26,12 +26,48 @@ namespace {
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
+  Attribute getIntAttr(Builder &builder, IntegerType tp, int64_t val) const {
+    return builder.getIntegerAttr(tp, APInt(tp.getWidth(), val));
+  }
+
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    FlatSymbolRefAttr attr =
+    Location loc = matmulOp.getLoc();
+    FlatSymbolRefAttr attrDispatch =
+        FlatSymbolRefAttr::get(matmulOp.getContext(), "xsmm_matmul_dispatch");
+    MemRefType memrefC = matmulOp.getMatrixCType();
+    MemRefType memrefA = matmulOp.getMatrixAType();
+    int64_t m = memrefC.getShape()[0];
+    int64_t n = memrefC.getShape()[1];
+    int64_t k = memrefA.getShape()[1];
+    int64_t lda = m;
+    int64_t ldb = k;
+    int64_t ldc = m;
+    SmallVector<Value, 6> dispatchOperands;
+    IntegerType integer = IntegerType::get(rewriter.getContext(), 32);
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, m)));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, n)));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, k)));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, lda)));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, ldb)));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer, getIntAttr(rewriter, integer, ldc)));
+    Value dispatched = rewriter.create<xsmm::DispatchOp>(
+        loc, integer, attrDispatch, dispatchOperands);
+
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(matmulOp->getOperands().begin(),
+                          matmulOp->getOperands().end());
+    FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(matmulOp.getContext(), "xsmm_matmul_invoke");
-    rewriter.replaceOpWithNewOp<xsmm::TernaryCallOp>(matmulOp, attr,
-                                                     matmulOp->getOperands());
+    rewriter.replaceOpWithNewOp<xsmm::TernaryCallOp>(matmulOp, attrInvoke,
+                                                     invokeOperands);
     return success();
   }
 };
@@ -39,11 +75,24 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
+  SmallVector<Value, 4> getDispatchOperands(IdentityOp identityOp,
+                                            PatternRewriter &rewriter) const {
+    return {};
+  }
+
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    FlatSymbolRefAttr attr =
+    /*
+        FlatSymbolRefAttr attrDispatch =
+            FlatSymbolRefAttr::get(identityOp.getContext(),
+       "xsmm_add_dispatch"); SmallVector<Value, 4> dispatchOperands =
+            getDispatchOperands(identityOp, rewriter);
+        rewriter.create<xsmm::DispatchOp>(identityOp.getLoc(), attrDispatch,
+                                          dispatchOperands);
+    */
+    FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_add_invoke");
-    rewriter.replaceOpWithNewOp<xsmm::BinaryCallOp>(identityOp, attr,
+    rewriter.replaceOpWithNewOp<xsmm::BinaryCallOp>(identityOp, attrInvoke,
                                                     identityOp->getOperands());
     return success();
   }
