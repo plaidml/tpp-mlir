@@ -47,6 +47,10 @@ def Xsmm_TernaryCallOp : Xsmm_Op<"ternary_call",
 def Xsmm_BinaryCallOp : Xsmm_Op<"binary_call", 
         [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "binary call operation.";
+  let description = [{
+    Binary call operation. See description for Xsmm_TernaryCallOp. The only
+    difference is the number of operands for the computation is restricted to two. 
+  }];
   
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
    
@@ -64,7 +68,11 @@ def Xsmm_BinaryCallOp : Xsmm_Op<"binary_call",
 def Xsmm_UnaryCallOp : Xsmm_Op<"unary_call", 
         [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "unary call operation.";
-  
+  let description = [{
+    Binary call operation. See description for Xsmm_TernaryCallOp. The only
+    difference is the number of operands for the computation is restricted to one.
+  }]; 
+ 
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
@@ -96,6 +104,11 @@ def Xsmm_VoidCallOp : Xsmm_Op<"void_call",
 def Xsmm_DispatchOp : Xsmm_Op<"dispatch",
         [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "dispatch call operation.";
+  let description = [{
+    The symbol carries information about the name of the LIBXSMM function to
+    dispatch; additional I32 operands are passed based on the operation to
+    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc.
+  }];
   
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32>:$inputs);
   let results = (outs I32:$results);
