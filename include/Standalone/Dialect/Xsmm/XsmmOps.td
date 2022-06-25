@@ -115,11 +115,7 @@ def Xsmm_DispatchOp : Xsmm_Op<"dispatch",
 
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
-  }];
-
-  let extraClassDeclaration = [{
-    TypeRange getOperandsTypes() { return TypeRange(getInputs()); }
-  }];
+  }]; 
 }
 
 #endif // STANDALONE_XSMM_OPS
