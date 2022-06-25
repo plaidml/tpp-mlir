@@ -18,11 +18,11 @@
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_gemm_invoke(int64_t id, UnrankedMemRefType<float> *A,
-                              UnrankedMemRefType<float> *B,
-                              UnrankedMemRefType<float> *C);
+_mlir_ciface_xsmm_matmul_invoke(int64_t id, UnrankedMemRefType<float> *A,
+                                UnrankedMemRefType<float> *B,
+                                UnrankedMemRefType<float> *C);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_gemm_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_matmul_dispatch(
     int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k);
 
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H

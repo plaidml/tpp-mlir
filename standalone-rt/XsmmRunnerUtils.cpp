@@ -15,22 +15,22 @@
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
-extern "C" void _mlir_ciface_xsmm_gemm_invoke(int64_t funcAddr,
-                                              UnrankedMemRefType<float> *A,
-                                              UnrankedMemRefType<float> *B,
-                                              UnrankedMemRefType<float> *C) {
-  /*
-    std::cout << "matrix A: \n";
-    printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
-    std::cout << "\n";
-    std::cout << "matrix B: \n";
-    printMemRefMetaData(std::cout, DynamicMemRefType<float>(*B));
-    std::cout << "\n";
-    std::cout << "matrix C: \n";
-    printMemRefMetaData(std::cout, DynamicMemRefType<float>(*C));
-    std::cout << "\n";
-    std::cout << "funcAddr: " << funcAddr << "\n";
-  */
+extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
+                                                UnrankedMemRefType<float> *A,
+                                                UnrankedMemRefType<float> *B,
+                                                UnrankedMemRefType<float> *C) {
+
+  std::cout << "matrix A: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
+  std::cout << "\n";
+  std::cout << "matrix B: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*B));
+  std::cout << "\n";
+  std::cout << "matrix C: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*C));
+  std::cout << "\n";
+  std::cout << "funcAddr: " << funcAddr << "\n";
+
   DynamicMemRefType<float> matrixA = DynamicMemRefType<float>(*A);
   DynamicMemRefType<float> matrixB = DynamicMemRefType<float>(*B);
   DynamicMemRefType<float> matrixC = DynamicMemRefType<float>(*C);
@@ -45,17 +45,16 @@ extern "C" void _mlir_ciface_xsmm_gemm_invoke(int64_t funcAddr,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_gemm_dispatch(int32_t m, int32_t n,
-                                                   int32_t k, int32_t lda,
-                                                   int32_t ldb, int32_t ldc) {
-  /*
-    std::cout << "lda: " << lda << "\n";
-    std::cout << "ldb: " << ldb << "\n";
-    std::cout << "ldc: " << ldc << "\n";
-    std::cout << "m: " << m << "\n";
-    std::cout << "n: " << n << "\n";
-    std::cout << "k: " << k << "\n";
-  */
+extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
+                                                     int32_t k, int32_t lda,
+                                                     int32_t ldb, int32_t ldc) {
+  std::cout << "lda: " << lda << "\n";
+  std::cout << "ldb: " << ldb << "\n";
+  std::cout << "ldc: " << ldc << "\n";
+  std::cout << "m: " << m << "\n";
+  std::cout << "n: " << n << "\n";
+  std::cout << "k: " << k << "\n";
+
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;

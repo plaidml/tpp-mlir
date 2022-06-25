@@ -12,11 +12,11 @@
 // RUN: FileCheck %s
 //
 
-// RUN: standalone-opt %s -tpp-compiler="enable-xsmm-conversion" | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
+// TODO: standalone-opt %s -tpp-compiler="enable-xsmm-conversion" | \
+// TODO: mlir-cpu-runner \
+// TODO:  -e entry -entry-point-result=void  \
+// TODO: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext | \
+// TODO: FileCheck %s
 //
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>

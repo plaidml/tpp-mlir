@@ -21,12 +21,40 @@ using namespace mlir::xsmm;
 namespace {
 
 // TODO: rename TernaryCallOp -> TernaryOp
+// TODO: Interface for TernaryCallOp, BinaryCallOp and UnaryCallOp.
+// to avoid code duplication.
 struct ConvertTernaryXsmmCallOp : public OpRewritePattern<TernaryCallOp> {
   using OpRewritePattern<TernaryCallOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TernaryCallOp callOp,
                                 PatternRewriter &rewriter) const override {
-    return failure();
+    Location loc = callOp.getLoc();
+    FlatSymbolRefAttr fnName =
+        SymbolRefAttr::get(rewriter.getContext(), callOp.getCallee());
+    ModuleOp module = callOp->getParentOfType<ModuleOp>();
+    if (module.lookupSymbol(fnName.getAttr()))
+      return failure();
+
+    auto libFnType = rewriter.getFunctionType(callOp.getOperandTypes(), {});
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      // Insert before module terminator.
+      rewriter.setInsertionPoint(module.getBody(),
+                                 std::prev(module.getBody()->end()));
+      func::FuncOp funcOp =
+          rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
+      // Insert a function attribute that will trigger the emission of the
+      // corresponding `_mlir_ciface_xxx` interface so that external libraries
+      // see a normalized ABI.
+      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                      UnitAttr::get(callOp->getContext()));
+      funcOp.setPrivate();
+    }
+
+    rewriter.create<func::CallOp>(loc, fnName.getValue(), TypeRange(),
+                                  callOp.getOperands());
+    rewriter.eraseOp(callOp);
+    return success();
   }
 };
 
@@ -45,19 +73,24 @@ struct ConvertDispatchCallOp : public OpRewritePattern<DispatchOp> {
     auto libFnType =
         rewriter.getFunctionType(dispatchOp.getOperandTypes(),
                                  IntegerType::get(rewriter.getContext(), 64));
-    OpBuilder::InsertionGuard guard(rewriter);
-    // Insert before module terminator.
-    rewriter.setInsertionPoint(module.getBody(),
-                               std::prev(module.getBody()->end()));
-    func::FuncOp funcOp =
-        rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    // Insert a function attribute that will trigger the emission of the
-    // corresponding `_mlir_ciface_xxx` interface so that external libraries see
-    // a normalized ABI.
-    funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                    UnitAttr::get(dispatchOp->getContext()));
-    funcOp.setPrivate();
-    rewriter.replaceOp(dispatchOp, funcOp->getResult(0));
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      // Insert before module terminator.
+      rewriter.setInsertionPoint(module.getBody(),
+                                 std::prev(module.getBody()->end()));
+      func::FuncOp funcOp =
+          rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
+      // Insert a function attribute that will trigger the emission of the
+      // corresponding `_mlir_ciface_xxx` interface so that external libraries
+      // see a normalized ABI.
+      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                      UnitAttr::get(dispatchOp->getContext()));
+      funcOp.setPrivate();
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(
+        dispatchOp, fnName.getValue(),
+        IntegerType::get(rewriter.getContext(), 64), dispatchOp.getOperands());
     return success();
   }
 };
