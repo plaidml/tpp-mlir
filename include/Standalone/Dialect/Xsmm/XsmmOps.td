@@ -81,4 +81,20 @@ def Xsmm_VoidCallOp : Xsmm_Op<"void_call",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// DispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_DispatchOp : Xsmm_Op<"dispatch",
+        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+  let summary = "dispatch call operation.";
+  
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32>:$inputs);
+  let results = (outs I32:$results);
+
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+}
+
 #endif // STANDALONE_XSMM_OPS

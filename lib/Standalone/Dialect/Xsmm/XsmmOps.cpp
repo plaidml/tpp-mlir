@@ -16,7 +16,9 @@
 using namespace mlir;
 using namespace mlir::xsmm;
 
-// TODO: Can we remove all these methods?
+// TODO: Can we remove all these methods? Having
+// CallOpInterface makes sense but how can we avoid this?
+// Re-evaluate interface later.
 CallInterfaceCallable TernaryCallOp::getCallableForCallee() {
   return (*this)->getAttrOfType<SymbolRefAttr>("callee");
 }
@@ -47,6 +49,14 @@ CallInterfaceCallable VoidCallOp::getCallableForCallee() {
 
 OperandRange VoidCallOp::getArgOperands() {
   llvm_unreachable("no operands here");
+}
+
+CallInterfaceCallable DispatchOp::getCallableForCallee() {
+  return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+OperandRange DispatchOp::getArgOperands() {
+  return {operand_begin(), operand_end()};
 }
 
 LogicalResult TernaryCallOp::verify() {
