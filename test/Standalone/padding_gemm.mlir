@@ -1,5 +1,5 @@
 // RUN: standalone-opt %s -split-input-file -map-linalg-to-tpp -enforce-tpp-preconditions -func-bufferize -linalg-bufferize -arith-bufferize -tensor-bufferize -convert-linalg-to-tpp -remove-extra-copies | FileCheck %s
-
+// XFAIL: *
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
