@@ -53,6 +53,10 @@ int main(int argc, char **argv) {
   init_matrix(&b);
 
   if (verbose) {
+    puts("A:");
+    vec_f2d_dump(&a);
+    puts("");
+
     puts("B:");
     vec_f2d_dump(&b);
     puts("");

@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Reset
-Color_Off='\033[0m'       # Text Reset
+BASE=$(pwd)
 
-# Regular Colors
-Black='\033[0;30m'        # Black
-Red='\033[0;31m'          # Red
-Green='\033[0;32m'        # Green
-Yellow='\033[0;33m'       # Yellow
-Blue='\033[0;34m'         # Blue
-Purple='\033[0;35m'       # Purple
-Cyan='\033[0;36m'         # Cyan
-White='\033[0;37m'        # White
+# This assume you built the sandbox as described in the readme.
+LIB_PATH=$BASE/../../build/lib
+BIN_PATH=$BASE/../../build/bin
+
+# make standalone-opt (TPP compiler) available.
+export PATH=${BIN_PATH}:$PATH
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
 
 if ! command -v standalone-opt &> /dev/null
 then
@@ -37,38 +37,46 @@ then
   exit
 fi
 
-# Clang
+# Clang.
 which clang
 
-# Assembler
+# Assembler.
 which llc
 
-# LLVM MLIR IR to LLVM IR
+# LLVM MLIR IR to LLVM IR.
 which mlir-translate
 
-# TPP compiler
+# TPP compiler.
 which standalone-opt
 
-# Compiler driver 
+# Compile driver. 
 clang -O3 -emit-llvm -S matmul_driver.c
 llc matmul_driver.ll
 
-# Fire tpp compiler
-standalone-opt matmul_kernel.mlir -tpp-compiler | mlir-translate -mlir-to-llvmir -o matmul_kernel.ll
+# Fire tpp compiler.
+standalone-opt matmul_kernel.mlir -tpp-compiler="enable-tpp-preconditions enable-xsmm-conversion" | mlir-translate -mlir-to-llvmir -o matmul_kernel.ll
 llc matmul_kernel.ll
 
-# Merge them
-clang -O3 matmul_driver.s matmul_kernel.s -o matmul
+# Merge them.
+unamestr=$(uname)
+if [[ "$unamestr" == 'Darwin' ]]; then
+  export DYLD_LIBRARY_PATH=$LIB_PATH
+else
+  export LD_LIBRARY_PATH=$LIB_PATH
+fi
 
-# Execute and check result
+clang -O3 matmul_driver.s matmul_kernel.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul
+
+# Execute and check result.
 ./matmul > result.txt 2>&1
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
 
 if cat result.txt | grep "Result is correct" &> /dev/null ; then
   printf "${GREEN} OK ${NC} \n"
 else
   printf "${RED} Oh NO ${NC} \n";
 fi
+
+rm matmul
+rm *.s
+rm *.ll
+rm result.txt
