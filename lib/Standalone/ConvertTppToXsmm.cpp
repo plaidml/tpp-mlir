@@ -78,8 +78,17 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
+    Location loc = identityOp.getLoc();
     FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_identity_invoke");
+    // no conversion if identity is a scalar operation.
+    Type outputType = identityOp.getOutput().getType();
+    if (!outputType.isa<ShapedType>())
+      return failure();
+    // MemRefType outputMemRef = outputType.cast<MemRefType>();
+    // int64_t m = outputMemRef.getShape()[0];
+    // int64_t n = outputMemRef.getShape()[1];
+
     rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(identityOp, attrInvoke,
                                                identityOp->getOperands());
     return success();
