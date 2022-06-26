@@ -134,11 +134,16 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   // llvm::errs() << "bestTileN: " << bestTileN << "\n";
   // llvm::errs() << "bestTileK: " << bestTileK << "\n";
 
-  SmallVector<Value, 3> tppTiles;
+  // Avoid tiling if the tile size are m, n and k.
   Location loc = linalgOp.getLoc();
-  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileM));
-  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileN));
-  tppTiles.push_back(builder.create<arith::ConstantIndexOp>(loc, bestTileK));
+  SmallVector<Value, 3> tppTiles(
+      3, builder.create<arith::ConstantIndexOp>(loc, 0));
+  if ((m == bestTileM) && (n == bestTileN) && (k == bestTileK))
+    return tppTiles;
+
+  tppTiles[0] = builder.create<arith::ConstantIndexOp>(loc, bestTileM);
+  tppTiles[1] = builder.create<arith::ConstantIndexOp>(loc, bestTileN);
+  tppTiles[2] = builder.create<arith::ConstantIndexOp>(loc, bestTileK);
   return tppTiles;
 }
 
@@ -246,26 +251,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
   }
 };
-
-// struct ConvertLinalgFillToTpp : public OpRewritePattern<linalg::FillOp> {
-//   using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
-//
-//   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
-//                                 PatternRewriter &rewriter) const override {
-//     Location loc = fillOp.getLoc();
-//     SmallVector<Value> operands = fillOp->getOperands();
-//     SmallVector<Value> newOperands;
-//     for (Value operand : operands) {
-//       Value newOperand = getOperandForTpp(operand, rewriter, loc);
-//       if (failed(checkOperandForTpp(newOperand)))
-//         return failure();
-//       newOperands.push_back(newOperand);
-//     }
-//     rewriter.replaceOpWithNewOp<IdentityOp>(fillOp, newOperands[0],
-//                                             newOperands[1]);
-//     return success();
-//   }
-// };
 
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
   // clang-format off
