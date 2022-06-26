@@ -15,12 +15,11 @@ include "mlir/Interfaces/CallInterfaces.td"
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
 
 //===----------------------------------------------------------------------===//
-// TernaryCallOp
+// TernaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TernaryCallOp : Xsmm_Op<"ternary_call", 
-        [DeclareOpInterfaceMethods<CallOpInterface>]> {
-  let summary = "ternary call operation.";
+def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
+  let summary = "ternary operation.";
   let description = [{
     Ternary call operation. The symbol carries information about the name of
     the LIBXSMM function to invoke. Additionally, the call takes four operands. The
@@ -37,18 +36,26 @@ def Xsmm_TernaryCallOp : Xsmm_Op<"ternary_call",
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
 
+  let extraClassDeclaration = [{
+    /// Get the argument operands.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+  }];
+
   let hasVerifier = 1; 
 }
 
 //===----------------------------------------------------------------------===//
-// BinaryCallOp
+// BinaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BinaryCallOp : Xsmm_Op<"binary_call", 
-        [DeclareOpInterfaceMethods<CallOpInterface>]> {
-  let summary = "binary call operation.";
+def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
+  let summary = "binary operation.";
   let description = [{
-    Binary call operation. See description for Xsmm_TernaryCallOp. The only
+    Binary operation. See description for Xsmm_TernaryCallOp. The only
     difference is the number of operands for the computation is restricted to two. 
   }];
   
@@ -62,14 +69,13 @@ def Xsmm_BinaryCallOp : Xsmm_Op<"binary_call",
 }
 
 //===----------------------------------------------------------------------===//
-// UnaryCallOp
+// UnaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_UnaryCallOp : Xsmm_Op<"unary_call", 
-        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
   let summary = "unary call operation.";
   let description = [{
-    Binary call operation. See description for Xsmm_TernaryCallOp. The only
+    Binary operation. See description for Xsmm_TernaryCallOp. The only
     difference is the number of operands for the computation is restricted to one.
   }]; 
  
@@ -83,26 +89,10 @@ def Xsmm_UnaryCallOp : Xsmm_Op<"unary_call",
 }
 
 //===----------------------------------------------------------------------===//
-// VoidCallOp
-//===----------------------------------------------------------------------===//
-
-def Xsmm_VoidCallOp : Xsmm_Op<"void_call",
-        [DeclareOpInterfaceMethods<CallOpInterface>]> {
-  let summary = "void call operation.";
-
-  let arguments = (ins FlatSymbolRefAttr:$callee);
-
-  let assemblyFormat = [{
-    $callee attr-dict
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // DispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_DispatchOp : Xsmm_Op<"dispatch",
-        [DeclareOpInterfaceMethods<CallOpInterface>]> {
+def Xsmm_DispatchOp : Xsmm_Op<"dispatch",[]> {
   let summary = "dispatch call operation.";
   let description = [{
     The symbol carries information about the name of the LIBXSMM function to

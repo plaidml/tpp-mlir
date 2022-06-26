@@ -56,23 +56,22 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-// TODO: rename TernaryCallOp -> TernaryOp
 // TODO: Interface for TernaryCallOp, BinaryCallOp and UnaryCallOp.
 // to avoid code duplication.
-struct ConvertTernaryXsmmCallOp : public OpRewritePattern<TernaryCallOp> {
-  using OpRewritePattern<TernaryCallOp>::OpRewritePattern;
+struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
+  using OpRewritePattern<TernaryOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TernaryCallOp callOp,
+  LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = callOp.getLoc();
+    Location loc = ternaryOp.getLoc();
     FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), callOp.getCallee());
-    ModuleOp module = callOp->getParentOfType<ModuleOp>();
+        SymbolRefAttr::get(rewriter.getContext(), ternaryOp.getCallee());
+    ModuleOp module = ternaryOp->getParentOfType<ModuleOp>();
     if (module.lookupSymbol(fnName.getAttr()))
       return failure();
 
     auto libFnType = rewriter.getFunctionType(
-        extractInvokeOperandTypes(callOp.getOperands()), {});
+        extractInvokeOperandTypes(ternaryOp.getOperands()), {});
     {
       OpBuilder::InsertionGuard guard(rewriter);
       // Insert before module terminator.
@@ -84,14 +83,14 @@ struct ConvertTernaryXsmmCallOp : public OpRewritePattern<TernaryCallOp> {
       // corresponding `_mlir_ciface_xxx` interface so that external libraries
       // see a normalized ABI.
       funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                      UnitAttr::get(callOp->getContext()));
+                      UnitAttr::get(ternaryOp->getContext()));
       funcOp.setPrivate();
     }
 
     rewriter.create<func::CallOp>(
         loc, fnName.getValue(), TypeRange(),
-        getMemRefOperands(rewriter, loc, callOp.getOperands()));
-    rewriter.eraseOp(callOp);
+        getMemRefOperands(rewriter, loc, ternaryOp.getOperands()));
+    rewriter.eraseOp(ternaryOp);
     return success();
   }
 };
@@ -135,7 +134,7 @@ struct ConvertDispatchCallOp : public OpRewritePattern<DispatchOp> {
 
 void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<ConvertTernaryXsmmCallOp,
+  patterns.add<ConvertTernaryXsmmOp,
                ConvertDispatchCallOp>(patterns.getContext());
   // clang-format on
 }

@@ -67,8 +67,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
                           matmulOp->getOperands().end());
     FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(matmulOp.getContext(), "xsmm_matmul_invoke");
-    rewriter.replaceOpWithNewOp<xsmm::TernaryCallOp>(matmulOp, attrInvoke,
-                                                     invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, attrInvoke,
+                                                 invokeOperands);
     return success();
   }
 };
@@ -80,8 +80,8 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
                                 PatternRewriter &rewriter) const override {
     FlatSymbolRefAttr attrInvoke =
         FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_identity_invoke");
-    rewriter.replaceOpWithNewOp<xsmm::UnaryCallOp>(identityOp, attrInvoke,
-                                                   identityOp->getOperands());
+    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(identityOp, attrInvoke,
+                                               identityOp->getOperands());
     return success();
   }
 };
