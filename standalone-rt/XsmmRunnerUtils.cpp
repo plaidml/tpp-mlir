@@ -55,9 +55,6 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
   std::cout << "n: " << n << "\n";
   std::cout << "k: " << k << "\n";
 
-  libxsmm_blasint lda_int = lda;
-  libxsmm_blasint ldb_int = ldb;
-  libxsmm_blasint ldc_int = ldc;
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
@@ -66,13 +63,15 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
   libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
   libxsmm_bitfield l_prefetch_flags = 0;
 
+  // See:
+  // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
   // LIBXSMM col-major change m with n.
   l_shape.m = n_int;
   l_shape.n = m_int;
   l_shape.k = k_int;
-  l_shape.lda = lda_int;
-  l_shape.ldb = ldb_int;
-  l_shape.ldc = ldc_int;
+  l_shape.lda = n_int;
+  l_shape.ldb = k_int;
+  l_shape.ldc = n_int;
   l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
   l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
   l_shape.out_type = LIBXSMM_DATATYPE_F32;
