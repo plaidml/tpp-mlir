@@ -13,8 +13,18 @@ include "TppDialect.td"
 include "/mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-// MemRef with any element type and rank 1 or 2. Or anyfloat type (i.e., f32).
-def TppMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat]>;
+class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
+    Type<And<[MemRefOf<allowedTypes>.predicate, 
+              HasAnyRankOfPred<ranks>, HasStaticShapePred]>,
+         !interleave(!foreach(rank, ranks, rank # "D"), "/") # " " #
+         MemRefOf<allowedTypes>.summary,
+         "::mlir::MemRefType">;
+
+def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
+
+
+// Tpp operands is a scalar float or a static memref with rank 1 or 2.
+def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
 // AddOp
@@ -35,8 +45,8 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
         ```
     }];
 
-    let arguments = (ins TppMemRef:$lhs, TppMemRef:$rhs, 
-                         TppMemRef:$output);
+    let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, 
+                         TppOperand:$output);
 
     let assemblyFormat = [{
         `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` 
@@ -63,7 +73,7 @@ def Tpp_IdentityOp : Tpp_Op<"identity"> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$input, TppMemRef:$output);
+  let arguments = (ins TppOperand:$input, TppOperand:$output);
 
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` 
@@ -92,7 +102,7 @@ def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$input, TppMemRef:$output);
+  let arguments = (ins TppOperand:$input, TppOperand:$output);
 
   let assemblyFormat = [{
       `ins` `(` $input `:` type($input) `)` 
@@ -118,7 +128,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
     ```
   }];
 
-  let arguments = (ins TppMemRef:$matrixA, TppMemRef:$matrixB, TppMemRef:$matrixC);
+  let arguments = (ins TppOperand:$matrixA, TppOperand:$matrixB, TppOperand:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`

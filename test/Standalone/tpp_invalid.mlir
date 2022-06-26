@@ -27,3 +27,11 @@ func.func @myfunc(%arg0: memref<2x2xf32>, %arg1: memref<1x2xf32>) -> memref<2x2x
   tpp.identity ins(%arg1: memref<1x2xf32>) out(%arg0: memref<2x2xf32>)
   return %arg0: memref<2x2xf32>
 }
+
+// -----
+
+func.func @myfunc(%arg0: memref<?x?xf32>, %arg1: memref<2x2xf32>) -> memref<2x2xf32> {
+  // expected-error @below {{'tpp.identity' op operand #0 must be 1D/2D memref of floating-point values or floating-point, but got 'memref<?x?xf32>'}}
+  tpp.identity ins(%arg0: memref<?x?xf32>) out(%arg1: memref<2x2xf32>)
+  return %arg1: memref<2x2xf32>
+}
