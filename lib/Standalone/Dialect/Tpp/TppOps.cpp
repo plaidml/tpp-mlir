@@ -33,17 +33,21 @@ LogicalResult IdentityOp::verify() {
   if (rankOutput < rankInput)
     return emitError("output rank must be >= of input rank");
 
-  // check if the shape are compatible.
+  // check if the shape are broadcast compatible.
   ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
   ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
 
-  if (rankInput == 1 && rankOutput == 2 && shapeInput[0] == shapeOutput[1])
-    return success();
+  for (int64_t i = rankInput - 1, j = rankOutput - 1; i >= 0 && j >= 0;
+       i--, j--) {
+    int64_t inputDim = shapeInput[i];
+    int64_t outputDim = shapeOutput[j];
 
-  assert(rankInput == rankOutput && "expect same rank");
-  for (int idx = rankInput - 1; idx >= 0; idx--)
-    if (shapeInput[idx] != shapeOutput[idx])
-      return emitError("incompatible shape");
+    if (inputDim == outputDim)
+      continue;
+    if (inputDim == 1 && outputDim > 1)
+      continue;
+    return emitError("broadcast incompatible");
+  }
   return success();
 }
 

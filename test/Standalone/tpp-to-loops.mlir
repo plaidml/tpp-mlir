@@ -99,3 +99,35 @@ func.func @relu_to_loops_scalar(%arg0: f32, %arg1: f32) -> f32 {
   // CHECK: return %[[res]] : f32
   return %arg1: f32
 }
+
+// -----
+
+func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
+  // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:     %[[tostore:.*]] = memref.load %arg1[%[[lb]], %[[j]]] : memref<1x3xf32>
+  // CHECK:     memref.store %[[tostore]], %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
+  // CHECK:   }
+  // CHECK: }
+  tpp.identity ins(%arg1: memref<1x3xf32>) out(%arg0: memref<3x3xf32>)
+  return
+}
+
+// -----
+
+func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
+  // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:     %[[tostore:.*]] = memref.load %arg1[%[[lb]], %[[lb]]] : memref<1x1xf32>
+  // CHECK:     memref.store %[[tostore]], %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
+  // CHECK:   }
+  // CHECK: }
+  tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
+  return
+}

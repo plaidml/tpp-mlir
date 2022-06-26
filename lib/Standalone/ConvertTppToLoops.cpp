@@ -114,10 +114,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     // Handle memref.
     SmallVector<Value> ubs;
     size_t rank = identityOp.getOutput().getType().cast<MemRefType>().getRank();
+    ArrayRef<int64_t> shapeOutput =
+        identityOp.getOutput().getType().cast<MemRefType>().getShape();
     for (size_t idx = 0; idx < rank; idx++) {
-      Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc,
-          identityOp.getOutput().getType().cast<MemRefType>().getShape()[idx]);
+      Value dim =
+          rewriter.create<arith::ConstantIndexOp>(loc, shapeOutput[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -140,7 +141,14 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
           }
           // input is a 2d-memref.
           else {
-            Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs);
+            ArrayRef<int64_t> shapeInput =
+                identityOp.getInput().getType().cast<MemRefType>().getShape();
+            SmallVector<Value, 2> inputIvs = localIvs;
+            // broadcasting dimension with size 1.
+            for (size_t idx = 0; idx < shapeInput.size(); idx++)
+              if (shapeInput[idx] == 1)
+                inputIvs[idx] = zero;
+            Value scalarVal = b.create<memref::LoadOp>(loc, input, inputIvs);
             b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
                                       localIvs);
           }
