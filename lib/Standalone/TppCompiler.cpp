@@ -68,23 +68,33 @@ void TppCompilerPipeline::runOnOperation() {
   // remove-extra-copies
   pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
 
-  if (enableXsmmConversion) // convert-tpp-to-xsmm
-    pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
-  else // convert-tpp-to-loops
-    pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+  // ----
 
-  pm.addPass(createConvertXsmmToFuncPass());
-  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
-  pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
-  pm.addPass(createConvertVectorToLLVMPass());
-  pm.addPass(createMemRefToLLVMPass());
-  pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  pm.addPass(createConvertMathToLibmPass());
-  pm.addPass(createConvertFuncToLLVMPass());
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(createReconcileUnrealizedCastsPass());
+  // Another round of detection to increase mapping to tpp.
+  // (e.g., linalg.fill -> tpp.identity)
+  pm.addNestedPass<func::FuncOp>(createLinalgGeneralizationPass());
+  pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
 
+  // -----
+  /*
+    if (enableXsmmConversion) // convert-tpp-to-xsmm
+      pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+    else // convert-tpp-to-loops
+      pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+
+    pm.addPass(createConvertXsmmToFuncPass());
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+    pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+    pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
+    pm.addPass(createConvertVectorToLLVMPass());
+    pm.addPass(createMemRefToLLVMPass());
+    pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
+    pm.addPass(createConvertMathToLibmPass());
+    pm.addPass(createConvertFuncToLLVMPass());
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(createReconcileUnrealizedCastsPass());
+  */
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();
   return;
