@@ -80,7 +80,7 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
   return reinterpret_cast<int64_t>(sgemm);
 }
-
+/*
 extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(
     int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
     int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type) {
@@ -123,3 +123,4 @@ extern "C" void _mlir_ciface_xsmm_unary_invoke(int64_t addr, void *input,
   param.out.primary = output;
   kernel(&param);
 }
+*/
