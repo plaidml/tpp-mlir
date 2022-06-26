@@ -493,12 +493,12 @@ struct FoldInsertSliceIntoTppIdentity
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<PadSIMDDimensionForGemm,
-               FoldChainOfStaticPaddings,
-               SinkExtractSliceAfterRelu,
-               GenericHighPadOpPattern,
+               //FoldChainOfStaticPaddings,
+               //SinkExtractSliceAfterRelu,
+               GenericHighPadOpPattern/*,
                RemoveChainExtractInsertSlice,
                RemoveChainInsertSlice,
-               FoldInsertSliceIntoTppIdentity>(patterns.getContext());
+               FoldInsertSliceIntoTppIdentity*/>(patterns.getContext());
   // clang-format on
 }
 

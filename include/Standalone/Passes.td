@@ -97,6 +97,12 @@ def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
   let dependentDialects = ["memref::MemRefDialect"];
 }
 
+def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
+  let summary = "Vectorize copy operation using Linalg";
+  let constructor = "mlir::tpp::createVectorizeCopyPass()";
+  let dependentDialects = ["memref::MemRefDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";

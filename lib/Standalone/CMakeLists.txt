@@ -15,6 +15,7 @@ add_mlir_dialect_library(MLIRStandalone
         TppEnforcePrecondition.cpp
         TppCompiler.cpp
         CopyRemoval.cpp
+        VectorizeCopy.cpp
 
         # Conversions
         ConvertTppToVector.cpp  

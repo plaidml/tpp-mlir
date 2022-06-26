@@ -75,9 +75,10 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(createLinalgGeneralizationPass());
   pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+  pm.addNestedPass<func::FuncOp>(createVectorizeCopyPass());
 
   // -----
-  /*
+
     if (enableXsmmConversion) // convert-tpp-to-xsmm
       pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
     else // convert-tpp-to-loops
@@ -94,7 +95,7 @@ void TppCompilerPipeline::runOnOperation() {
     pm.addPass(createConvertFuncToLLVMPass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
-  */
+
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();
   return;
