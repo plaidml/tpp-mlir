@@ -79,22 +79,23 @@ void TppCompilerPipeline::runOnOperation() {
 
   // -----
 
-    if (enableXsmmConversion) // convert-tpp-to-xsmm
-      pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
-    else // convert-tpp-to-loops
-      pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+  if (enableXsmmConversion) // convert-tpp-to-xsmm
+    pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+  else // convert-tpp-to-loops
+    pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
 
-    pm.addPass(createConvertXsmmToFuncPass());
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-    pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
-    pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
-    pm.addPass(createConvertVectorToLLVMPass());
-    pm.addPass(createMemRefToLLVMPass());
-    pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-    pm.addPass(createConvertMathToLibmPass());
-    pm.addPass(createConvertFuncToLLVMPass());
-    pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(createReconcileUnrealizedCastsPass());
+  pm.addPass(createConvertXsmmToFuncPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+  pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
+  pm.addPass(createConvertVectorToLLVMPass());
+  // pm.addPass(createMemRefToLLVMPass());
+  pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
+  pm.addPass(createConvertMathToLibmPass());
+  pm.addPass(createConvertFuncToLLVMPass());
+  pm.addPass(createMemRefToLLVMPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  // pm.addPass(createReconcileUnrealizedCastsPass());
 
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();

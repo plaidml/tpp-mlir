@@ -79,9 +79,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     FlatSymbolRefAttr attrInvoke =
-        FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_add_invoke");
-    rewriter.replaceOpWithNewOp<xsmm::BinaryCallOp>(identityOp, attrInvoke,
-                                                    identityOp->getOperands());
+        FlatSymbolRefAttr::get(identityOp.getContext(), "xsmm_identity_invoke");
+    rewriter.replaceOpWithNewOp<xsmm::UnaryCallOp>(identityOp, attrInvoke,
+                                                   identityOp->getOperands());
     return success();
   }
 };

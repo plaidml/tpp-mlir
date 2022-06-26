@@ -33,6 +33,7 @@ void populateCopyVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeCopyOpWithLinalg>(patterns.getContext());
 }
 
+// TODO: Can also choose to use a tpp.identity
 struct VectorizeCopy : public VectorizeCopyBase<VectorizeCopy> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());

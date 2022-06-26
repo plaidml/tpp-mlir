@@ -61,18 +61,10 @@ OperandRange DispatchOp::getArgOperands() {
 
 LogicalResult TernaryCallOp::verify() {
   if (getArgOperands().size() != 4)
-    return emitError() << "Expect three operands";
+    return emitError() << "Expect four operands";
   return success();
 }
 
-LogicalResult BinaryCallOp::verify() {
-  if (getArgOperands().size() != 2)
-    return emitError() << "Expect two operands";
-  return success();
-}
+LogicalResult BinaryCallOp::verify() { return success(); }
 
-LogicalResult UnaryCallOp::verify() {
-  if (getArgOperands().size() != 1)
-    return emitError() << "Expect single operand";
-  return success();
-}
+LogicalResult UnaryCallOp::verify() { return success(); }
