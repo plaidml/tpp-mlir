@@ -31,11 +31,6 @@ void init_matrix(struct vec_f2d *m) {
       vec_f2d_set(m, x, y, x + y);
 }
 
-void die_usage(const char *program_name) {
-  fprintf(stderr, "Usage: %s [-v]\n", program_name);
-  exit(1);
-}
-
 int main(int argc, char **argv) {
   struct vec_f2d a, b, o, o_ref;
   int verbose = 0;
