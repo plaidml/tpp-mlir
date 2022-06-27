@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Standalone/Dialect/Xsmm/XsmmAttr.h"
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
 #include "Standalone/Passes.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -129,21 +131,34 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
   }
 };
 
-struct ConvertDispatchCallOp : public OpRewritePattern<DispatchOp> {
-  using OpRewritePattern<DispatchOp>::OpRewritePattern;
+struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
+  using OpRewritePattern<TernaryDispatchOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(DispatchOp dispatchOp,
+  LogicalResult matchAndRewrite(TernaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
+    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
+    kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), dispatchOp.getCallee());
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
     if (module.lookupSymbol(fnName.getAttr()))
       return failure();
 
-    auto libFnType =
-        rewriter.getFunctionType(dispatchOp.getOperandTypes(),
-                                 IntegerType::get(rewriter.getContext(), 64));
+    SmallVector<Value, 10> dispatchOperands;
+    SmallVector<Type, 10> dispatchOperandTypes;
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    ArrayAttr integers = dispatchOp.getInputsAttr();
+    size_t arrayAttrSize = integers.size();
+    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
+      IntegerAttr attr = integers[idx].cast<IntegerAttr>();
+      dispatchOperands.push_back(
+          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
+      dispatchOperandTypes.push_back(integer64);
+    }
+
+    auto libFnType = rewriter.getFunctionType(
+        dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
     {
       OpBuilder::InsertionGuard guard(rewriter);
       // Insert before module terminator.
@@ -161,8 +176,26 @@ struct ConvertDispatchCallOp : public OpRewritePattern<DispatchOp> {
 
     rewriter.replaceOpWithNewOp<func::CallOp>(
         dispatchOp, fnName.getValue(),
-        IntegerType::get(rewriter.getContext(), 64), dispatchOp.getOperands());
+        IntegerType::get(rewriter.getContext(), 64), dispatchOperands);
     return success();
+  }
+};
+
+struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
+  using OpRewritePattern<BinaryDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BinaryDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
+  using OpRewritePattern<UnaryDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return failure();
   }
 };
 
@@ -171,7 +204,9 @@ void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTernaryXsmmOp,
                ConvertBinaryXsmmOp,
                ConvertUnaryXsmmOp,
-               ConvertDispatchCallOp>(patterns.getContext());
+               ConvertTernaryDispatch,
+               ConvertBinaryDispatch,
+               ConvertUnaryDispatch>(patterns.getContext());
   // clang-format on
 }
 

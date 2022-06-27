@@ -12,9 +12,20 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Interfaces/CallInterfaces.h"
-#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+
+namespace mlir {
+namespace xsmm {
+enum class BinaryKind : uint64_t;
+class BinaryKindAttr;
+enum class TernaryKind : uint64_t;
+class TernaryKindAttr;
+enum class UnaryKind : uint64_t;
+class UnaryKindAttr;
+enum class UnaryFlags : uint64_t;
+class UnaryFlagsAttr;
+} // namespace xsmm
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/Xsmm/XsmmOps.h.inc"

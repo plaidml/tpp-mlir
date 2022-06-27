@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Dialect/Tpp/TppOps.h"
+#include "Standalone/Dialect/Xsmm/XsmmAttr.h"
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -21,23 +22,15 @@ using namespace mlir::tpp;
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
 
-// TODO: Xsmm should take a I64EnumAttr not a FlatSymbolRefAttr.
-// TODO: Nice if we can mirror typedef in LIBXSMM instead of
-// passing around i32.
 namespace {
 
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
-  Attribute getIntAttr(Builder &builder, IntegerType tp, int64_t val) const {
-    return builder.getIntegerAttr(tp, APInt(tp.getWidth(), val));
-  }
-
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
-    FlatSymbolRefAttr attrDispatch =
-        FlatSymbolRefAttr::get(matmulOp.getContext(), "xsmm_matmul_dispatch");
+
     MemRefType memrefC = matmulOp.getMatrixCType();
     MemRefType memrefA = matmulOp.getMatrixAType();
     int64_t m = memrefC.getShape()[0];
@@ -46,23 +39,12 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t lda = m;
     int64_t ldb = k;
     int64_t ldc = m;
-    SmallVector<Value, 6> dispatchOperands;
-    IntegerType integer = IntegerType::get(rewriter.getContext(), 32);
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, m)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, n)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, k)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, lda)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, ldb)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, ldc)));
-    Value dispatched = rewriter.create<xsmm::DispatchOp>(
-        loc, integer64, attrDispatch, dispatchOperands);
+    ArrayAttr dims = rewriter.getI64ArrayAttr({m, n, k, lda, ldb, ldc});
+    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
+        matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
+    Value dispatched =
+        rewriter.create<xsmm::TernaryDispatchOp>(loc, integer64, attr, dims);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -114,11 +96,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 
   // Return ldi and bCast.
-  std::pair<int64_t, int64_t> getLdiAndBCast(IdentityOp identityOp,
-                                             int64_t ldo) const {
+  std::pair<int64_t, xsmm::UnaryFlags> getLdiAndBCast(IdentityOp identityOp,
+                                                      int64_t ldo) const {
     Type inputType = identityOp.getInput().getType();
     if (!inputType.isa<ShapedType>()) {
-      int64_t bCast = 3; // scalar broadcast
+      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
       int64_t ldi = 1;
       return {ldi, bCast};
     }
@@ -134,19 +116,19 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     assert(shapeOutput.size() == bShapeInput.size());
 
     if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
-      int64_t bCast = 1; // row broadcast
+      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
       int64_t ldi = shapeInput[0];
       return {ldi, bCast};
     }
 
     if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
-      int64_t bCast = 2; // col broadcast
+      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_COL;
       int64_t ldi = shapeInput[1];
       return {ldi, bCast};
     }
 
     if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
-      int64_t bCast = 0; // no broadcast
+      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
       int64_t ldi = shapeInput[0];
       return {ldi, bCast};
     }
@@ -154,66 +136,31 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     llvm_unreachable("failed to get ldi and bCast for identity");
   }
 
-  // See:
-  // https://github.com/libxsmm/libxsmm/blob/d4cd3b2fe127a32562a9cd248fc2f8d97eeaa078/include/libxsmm_typedefs.h#L146
-  // TODO: We should duplicate the typedef in xsmm or import "libxsmm.h".
-  // I prefer the former.
-  int32_t convertDataType(Type t) const {
-    if (t.isa<ShapedType>())
-      t = t.cast<ShapedType>().getElementType();
-    if (t.isF32())
-      return 1;
-    llvm_unreachable("only f32");
-  }
-
-  // TODO: method repeated multiple times.
-  Attribute getIntAttr(Builder &builder, IntegerType tp, int64_t val) const {
-    return builder.getIntegerAttr(tp, APInt(tp.getWidth(), val));
-  }
-
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = identityOp.getLoc();
-    FlatSymbolRefAttr attrDispatch = FlatSymbolRefAttr::get(
-        identityOp.getContext(), "xsmm_identity_dispatch");
     // no conversion if identity is a scalar operation.
     Type outputType = identityOp.getOutput().getType();
     if (!outputType.isa<ShapedType>())
       return failure();
 
-    Type inputType = identityOp.getInput().getType();
     MemRefType outputMemRef = outputType.cast<MemRefType>();
     int64_t m = outputMemRef.getShape()[0];
     int64_t n = outputMemRef.getShape()[1];
     int64_t ldo = n;
-    std::pair<int64_t, int64_t> ldiAndBCast = getLdiAndBCast(identityOp, ldo);
+    std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
+        getLdiAndBCast(identityOp, ldo);
     int64_t ldi = ldiAndBCast.first;
-    int64_t bCast = ldiAndBCast.second;
-    SmallVector<Value, 8> dispatchOperands;
-    IntegerType integer = IntegerType::get(rewriter.getContext(), 32);
+    xsmm::UnaryFlags bCast = ldiAndBCast.second;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, m)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, n)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, ldi)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, ldo)));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer,
-        getIntAttr(rewriter, integer, convertDataType(inputType))));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer,
-        getIntAttr(rewriter, integer, convertDataType(outputType))));
-    // TODO: Clarify the "compute type". Use output type for now.
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer,
-        getIntAttr(rewriter, integer, convertDataType(outputType))));
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer, getIntAttr(rewriter, integer, bCast)));
-    Value dispatched = rewriter.create<xsmm::DispatchOp>(
-        loc, integer64, attrDispatch, dispatchOperands);
+    xsmm::UnaryKindAttr attr = xsmm::UnaryKindAttr::get(
+        identityOp.getContext(), xsmm::UnaryKind::IDENTITY);
+    ArrayAttr dims = rewriter.getI64ArrayAttr({m, n, ldi, ldo});
+    xsmm::UnaryFlagsAttr bCastAttr =
+        xsmm::UnaryFlagsAttr::get(identityOp.getContext(), bCast);
+
+    Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
+        loc, integer64, attr, dims, bCastAttr);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);

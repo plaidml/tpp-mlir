@@ -7,7 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
+#include "Standalone/Dialect/Xsmm/XsmmAttr.h"
 #include "Standalone/Dialect/Xsmm/XsmmDialect.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES

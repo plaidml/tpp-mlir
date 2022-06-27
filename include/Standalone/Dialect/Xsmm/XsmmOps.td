@@ -10,6 +10,7 @@
 #define STANDALONE_XSMM_OPS
 
 include "XsmmDialect.td"
+include "XsmmAttr.td"
 
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
 
@@ -88,22 +89,60 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// DispatchOp
+// TernaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_DispatchOp : Xsmm_Op<"dispatch",[]> {
-  let summary = "dispatch call operation.";
+def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[]> {
+  let summary = "dispatch ternary operation.";
   let description = [{
-    The symbol carries information about the name of the LIBXSMM function to
-    dispatch; additional I32 operands are passed based on the operation to
-    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc.
+    The 'kind' carries information about the name of the LIBXSMM function to
+    dispatch; additional I64 operands are passed based on the operation to
+    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
+    the pointer to call as I64.
   }];
   
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32>:$inputs);
+  let arguments = (ins Xsmm_TernaryKind:$kind, I64ArrayAttr:$inputs);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+    $kind $inputs attr-dict 
+  }]; 
+}
+
+//===----------------------------------------------------------------------===//
+// BinaryDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[]> {
+  let summary = "dispatch binary operation.";
+  let description = [{
+    See 'ternary.dispatch'.
+  }];
+  
+  let arguments = (ins Xsmm_BinaryKind:$kind, I64ArrayAttr:$inputs);
+  let results = (outs I64:$results);
+
+  let assemblyFormat = [{
+    $kind $inputs attr-dict 
+  }]; 
+}
+
+//===----------------------------------------------------------------------===//
+// UnaryDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[]> {
+  let summary = "dispatch unary operation.";
+  let description = [{
+    See 'ternary.dispatch'.
+  }];
+  
+  let arguments = (ins Xsmm_UnaryKind:$kind, I64ArrayAttr:$inputs, 
+                       Xsmm_UnaryFlags:$flags);
+  let results = (outs I64:$results);
+
+  let assemblyFormat = [{
+    $kind $inputs `(` $flags `)` attr-dict 
   }]; 
 }
 

@@ -9,6 +9,7 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/Stdx/StdxDialect.cpp
         Dialect/Xsmm/XsmmOps.cpp
         Dialect/Xsmm/XsmmDialect.cpp
+        Dialect/Xsmm/XsmmAttr.cpp
        
         # Passes 
         LinalgMapToTpp.cpp
@@ -29,6 +30,7 @@ add_mlir_dialect_library(MLIRStandalone
 
         DEPENDS
         TppCompilerPassIncGen
+        MLIRXsmmAttrDefIncGen
 
 	LINK_LIBS PUBLIC
 	MLIRIR
