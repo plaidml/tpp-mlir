@@ -29,7 +29,8 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_unary_dispatch(
     int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
     int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_unary_invoke(int64_t addr, void *input, void *output);
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+_mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
+                               UnrankedMemRefType<float> *output);
 
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H

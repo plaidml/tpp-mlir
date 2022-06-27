@@ -15,6 +15,11 @@
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
+// static constexpr unsigned int NO_BCAST = 0;
+static constexpr unsigned int ROW_BCAST = 1;
+static constexpr unsigned int COL_BCAST = 2;
+static constexpr unsigned int SCALAR_BCAST = 3;
+
 extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
                                                 UnrankedMemRefType<float> *A,
                                                 UnrankedMemRefType<float> *B,
@@ -80,10 +85,21 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
   return reinterpret_cast<int64_t>(sgemm);
 }
-/*
+
 extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(
     int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
     int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type) {
+
+  std::cout << "ldi: " << ldi << "\n";
+  std::cout << "ldo: " << ldo << "\n";
+  std::cout << "m: " << m << "\n";
+  std::cout << "n: " << n << "\n";
+  std::cout << "in_type: " << in_type << "\n";
+  std::cout << "compute_type: " << compute_type << "\n";
+  std::cout << "out_type: " << out_type << "\n";
+  std::cout << "type: " << type << "\n";
+  std::cout << "bcast_type: " << bcast_type << "\n";
+
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
   unsigned int use_bcast = (unsigned int)bcast_type;
@@ -114,8 +130,14 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(
   return reinterpret_cast<int64_t>(kernel);
 }
 
-extern "C" void _mlir_ciface_xsmm_unary_invoke(int64_t addr, void *input,
-                                               void *output) {
+extern "C" void
+_mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
+                               UnrankedMemRefType<float> *output) {
+  std::cout << "tensor input: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
+  std::cout << "tensor output: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
+
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
   libxsmm_meltw_unary_param param;
@@ -123,4 +145,3 @@ extern "C" void _mlir_ciface_xsmm_unary_invoke(int64_t addr, void *input,
   param.out.primary = output;
   kernel(&param);
 }
-*/
