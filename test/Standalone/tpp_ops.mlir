@@ -29,3 +29,17 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
 
   return %arg2: memref<2x2xf32>
 }
+
+// CHECK-LABEL: func.func @identityBcastRow
+func.func @identityBcastRow(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
+  // CHECK: tpp.identity
+  tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @identityBcastCol
+func.func @identityBcastCol(%arg0: memref<5xf32>, %arg1: memref<6x5xf32>) {
+  // CHECK: tpp.identity
+  tpp.identity ins(%arg0: memref<5xf32>) out(%arg1: memref<6x5xf32>)
+  return
+}

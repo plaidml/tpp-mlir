@@ -131,3 +131,18 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
   return
 }
+
+// -----
+
+func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
+  // CHECK-DAG: %[[five:.*]] = arith.constant 5 : index
+  // CHECK-DAG: %[[six:.*]] = arith.constant 6 : index
+  // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[five]] step %[[one]] {
+  // CHECK:   scf.for %[[j:.*]] = %[[zero]] to %[[six]] step %[[one]] {
+  // CHECK:     %[[tostore:.*]] = memref.load %arg0[%[[i]], %[[zero]]] : memref<5x1xf32>
+  // CHECK:     memref.store %[[tostore]], %arg1[%[[i]], %[[j]]] : memref<5x6xf32>
+  tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
+  return
+}
