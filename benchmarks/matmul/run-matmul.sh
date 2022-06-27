@@ -54,7 +54,7 @@ clang -O3 -emit-llvm -S matmul_driver.c
 llc matmul_driver.ll
 
 # Fire tpp compiler.
-standalone-opt matmul_kernel.mlir -tpp-compiler="enable-tpp-preconditions enable-xsmm-conversion" | mlir-translate -mlir-to-llvmir -o matmul_kernel.ll
+standalone-opt matmul_kernel.mlir -tpp-compiler="enable-xsmm-conversion" | mlir-translate -mlir-to-llvmir -o matmul_kernel.ll
 llc matmul_kernel.ll
 
 # Merge them.
