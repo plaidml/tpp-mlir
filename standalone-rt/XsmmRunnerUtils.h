@@ -18,19 +18,21 @@
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_matmul_invoke(int64_t id, UnrankedMemRefType<float> *A,
-                                UnrankedMemRefType<float> *B,
-                                UnrankedMemRefType<float> *C);
+_mlir_ciface_xsmm_matmul_invoke(int64_t, UnrankedMemRefType<float> *,
+                                UnrankedMemRefType<float> *,
+                                UnrankedMemRefType<float> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_matmul_dispatch(
-    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k);
+extern "C" MLIR_RUNNERUTILS_EXPORT
+    int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t, int32_t, int32_t,
+                                              int32_t, int32_t, int32_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_unary_dispatch(
-    int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
-    int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type);
+extern "C" MLIR_RUNNERUTILS_EXPORT
+    int64_t _mlir_ciface_xsmm_unary_dispatch(int32_t, int32_t, int32_t, int32_t,
+                                             int32_t, int32_t, int32_t, int32_t,
+                                             int32_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
-                               UnrankedMemRefType<float> *output);
+_mlir_ciface_xsmm_unary_invoke(int64_t, UnrankedMemRefType<float> *,
+                               UnrankedMemRefType<float> *);
 
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H
