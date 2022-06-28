@@ -15,11 +15,6 @@
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
-// static constexpr unsigned int NO_BCAST = 0;
-static constexpr unsigned int ROW_BCAST = 1;
-static constexpr unsigned int COL_BCAST = 2;
-static constexpr unsigned int SCALAR_BCAST = 3;
-
 extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
                                                 UnrankedMemRefType<float> *A,
                                                 UnrankedMemRefType<float> *B,
@@ -50,9 +45,9 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
-                                                     int32_t k, int32_t lda,
-                                                     int32_t ldb, int32_t ldc) {
+extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t m, int64_t n,
+                                                     int64_t k, int64_t lda,
+                                                     int64_t ldb, int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -86,40 +81,29 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t m, int32_t n,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(
-    int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
-    int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type) {
+extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
+                                                    int64_t ldi, int64_t ldo,
+                                                    int64_t type,
+                                                    int64_t bcast_type) {
 
   std::cout << "ldi: " << ldi << "\n";
   std::cout << "ldo: " << ldo << "\n";
   std::cout << "m: " << m << "\n";
   std::cout << "n: " << n << "\n";
-  std::cout << "in_type: " << in_type << "\n";
-  std::cout << "compute_type: " << compute_type << "\n";
-  std::cout << "out_type: " << out_type << "\n";
   std::cout << "type: " << type << "\n";
   std::cout << "bcast_type: " << bcast_type << "\n";
 
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
-  unsigned int use_bcast = (unsigned int)bcast_type;
   libxsmm_meltw_unary_flags unary_flags = LIBXSMM_MELTW_FLAG_UNARY_NONE;
 
   libxsmm_meltw_unary_shape unary_shape;
 
-  if (use_bcast == ROW_BCAST) {
-    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
-  } else if (use_bcast == COL_BCAST) {
-    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
-  } else if (use_bcast == SCALAR_BCAST) {
-    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
-  }
-
   unary_shape.m = static_cast<libxsmm_blasint>(n);
   unary_shape.n = static_cast<libxsmm_blasint>(m);
-  unary_shape.in0_type = static_cast<libxsmm_datatype>(in_type);
-  unary_shape.comp_type = static_cast<libxsmm_datatype>(compute_type);
-  unary_shape.out_type = static_cast<libxsmm_datatype>(out_type);
+  unary_shape.in0_type = LIBXSMM_DATATYPE_F32;
+  unary_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  unary_shape.out_type = LIBXSMM_DATATYPE_F32;
   unary_shape.ldi = ldi_int;
   unary_shape.ldo = ldo_int;
 

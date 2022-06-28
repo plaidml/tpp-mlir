@@ -23,13 +23,12 @@ _mlir_ciface_xsmm_matmul_invoke(int64_t, UnrankedMemRefType<float> *,
                                 UnrankedMemRefType<float> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_matmul_dispatch(int32_t, int32_t, int32_t,
-                                              int32_t, int32_t, int32_t);
+    int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t, int64_t, int64_t,
+                                              int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_unary_dispatch(int32_t, int32_t, int32_t, int32_t,
-                                             int32_t, int32_t, int32_t, int32_t,
-                                             int32_t);
+    int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t, int64_t, int64_t, int64_t,
+                                             int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_unary_invoke(int64_t, UnrankedMemRefType<float> *,
