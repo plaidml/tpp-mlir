@@ -122,9 +122,8 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
 
   LogicalResult matchAndRewrite(UnaryOp unaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildInvokeCall(unaryOp.getLoc(),
-                                  stringifyEnum(unaryOp.getCallee()).str(),
-                                  unaryOp, rewriter))) {
+    if (succeeded(
+            buildInvokeCall(unaryOp.getLoc(), "unary", unaryOp, rewriter))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
@@ -224,8 +223,7 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
-    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch";
+    std::string kindAsString = "xsmm_unary_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
