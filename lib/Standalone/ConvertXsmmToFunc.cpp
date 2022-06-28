@@ -62,26 +62,16 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-// lookup the function name in the module.
-static LogicalResult isInModule(FlatSymbolRefAttr fnName, Operation *op) {
-  ModuleOp module = op->getParentOfType<ModuleOp>();
-  if (module.lookupSymbol(fnName.getAttr()))
-    return success();
-  return failure();
-}
-
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, PatternRewriter &rewriter) {
   funcName = "xsmm_" + funcName + "_invoke";
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
 
-  if (succeeded(isInModule(fnName, op)))
-    return failure();
-
   ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
       extractInvokeOperandTypes(op->getOperands()), {});
-  {
+
+  if (!module.lookupSymbol(fnName)) {
     OpBuilder::InsertionGuard guard(rewriter);
     // Insert before module terminator.
     rewriter.setInsertionPoint(module.getBody(),
@@ -153,7 +143,8 @@ static func::CallOp buildDispatchCall(Location loc,
                                       PatternRewriter &rewriter) {
   auto libFnType = rewriter.getFunctionType(
       dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
-  {
+
+  if (!module.lookupSymbol(fnName.getAttr())) {
     OpBuilder::InsertionGuard guard(rewriter);
     // Insert before module terminator.
     rewriter.setInsertionPoint(module.getBody(),
@@ -185,11 +176,7 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
-    if (succeeded(isInModule(fnName, dispatchOp)))
-      return failure();
-
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -227,11 +214,7 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
-    if (succeeded(isInModule(fnName, dispatchOp)))
-      return failure();
-
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
