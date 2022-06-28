@@ -66,7 +66,7 @@ void TppCompilerPipeline::runOnOperation() {
       mlir::bufferization::createFinalizingBufferizePass());
 
   // remove-extra-copies
-  pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
+  // pm.addNestedPass<func::FuncOp>(createCopyRemovalPass());
 
   // ----
 
