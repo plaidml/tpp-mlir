@@ -16,7 +16,7 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>) {
   // b_cast = 3 (bcast scalar)
  
   // CHECK: xsmm.unary.dispatch identity [3, 3, 1, 3](bcast_scalar)
-  // CHECK: xsmm.unary @xsmm_identity_invoke
+  // CHECK: xsmm.unary identity
   tpp.identity ins(%cst: f32) out(%arg0: memref<3x3xf32>)
   return 
 }
@@ -37,7 +37,7 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // b_cast = 0 (bcast none)
 
   // CHECK: xsmm.unary.dispatch identity [3, 3, 3, 3](none)
-  // CHECK: xsmm.unary @xsmm_identity_invoke
+  // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
   return 
 }
@@ -57,7 +57,7 @@ func.func @identity_to_xsmm(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
   // b_cast = 1 (bcast row)
 
   // CHECK: xsmm.unary.dispatch identity [5, 6, 5, 6](bcast_row)
-  // CHECK: xsmm.unary @xsmm_identity_invoke
+  // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
   return 
 }
@@ -77,7 +77,7 @@ func.func @identity_to_xsmm(%arg0: memref<1x5xf32>, %arg1: memref<5x5xf32>) {
   // b_cast = 2 (bcast col)
 
   // CHECK: xsmm.unary.dispatch identity [5, 5, 5, 5](bcast_col)
-  // CHECK: xsmm.unary @xsmm_identity_invoke
+  // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<1x5xf32>) out(%arg1: memref<5x5xf32>)
   return 
 }
@@ -88,7 +88,7 @@ func.func @identity_to_xsmm(%arg0: memref<1x5xf32>, %arg1: memref<5x5xf32>) {
 // CHECK-SAME: %[[arg_zero:.*]]: memref<3x3xf32>, %[[arg_one:.*]]: memref<3x3xf32>, %[[arg_two:.*]]: memref<3x3xf32>)
 func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
   // CHECK: %[[dispatch:.*]] = xsmm.ternary.dispatch matmul [3, 3, 3, 3, 3, 3]
-  // CHECK: xsmm.ternary @xsmm_matmul_invoke(%[[dispatch]], %[[arg_zero]], %[[arg_one]], %[[arg_two]]) : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  // CHECK: xsmm.ternary matmul(%[[dispatch]], %[[arg_zero]], %[[arg_one]], %[[arg_two]]) : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
   tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
   return 
 }

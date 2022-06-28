@@ -30,7 +30,7 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
     memref<MxKxf32>, memref<KxNxf32>.
   }];
   
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_TernaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
@@ -59,7 +59,7 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
     difference is the number of operands for the computation is restricted to two. 
   }];
   
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_BinaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
@@ -79,7 +79,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
     difference is the number of operands for the computation is restricted to one.
   }]; 
  
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_UnaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)

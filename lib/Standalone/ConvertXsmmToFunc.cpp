@@ -58,8 +58,9 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-static LogicalResult buildCall(Location loc, StringRef funcName, Operation *op,
-                               PatternRewriter &rewriter) {
+static LogicalResult buildCall(Location loc, std::string funcName,
+                               Operation *op, PatternRewriter &rewriter) {
+  funcName = "xsmm_" + funcName + "_invoke";
   FlatSymbolRefAttr fnName =
       SymbolRefAttr::get(rewriter.getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
@@ -94,7 +95,8 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(ternaryOp.getLoc(), ternaryOp.getCallee(),
+    if (succeeded(buildCall(ternaryOp.getLoc(),
+                            stringifyEnum(ternaryOp.getCallee()).str(),
                             ternaryOp, rewriter))) {
       rewriter.eraseOp(ternaryOp);
       return success();
@@ -108,7 +110,8 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
 
   LogicalResult matchAndRewrite(UnaryOp unaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(unaryOp.getLoc(), unaryOp.getCallee(), unaryOp,
+    if (succeeded(buildCall(unaryOp.getLoc(),
+                            stringifyEnum(unaryOp.getCallee()).str(), unaryOp,
                             rewriter))) {
       rewriter.eraseOp(unaryOp);
       return success();
@@ -122,7 +125,8 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(binaryOp.getLoc(), binaryOp.getCallee(), binaryOp,
+    if (succeeded(buildCall(binaryOp.getLoc(),
+                            stringifyEnum(binaryOp.getCallee()).str(), binaryOp,
                             rewriter))) {
       rewriter.eraseOp(binaryOp);
       return success();
