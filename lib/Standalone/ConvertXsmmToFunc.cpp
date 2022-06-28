@@ -23,6 +23,7 @@ using namespace mlir::xsmm;
 
 namespace {
 
+// Cast memref to unranked memref and leave all the other operands as they are.
 static SmallVector<Type, 4> extractInvokeOperandTypes(OperandRange operands) {
   SmallVector<Type, 4> result;
   result.reserve(operands.size());
@@ -39,6 +40,9 @@ static SmallVector<Type, 4> extractInvokeOperandTypes(OperandRange operands) {
   return result;
 }
 
+// Similar to 'extractInvokeOperandTypes' but acting on Value. Memref
+// are casted by introducing castOp. We cast the memref to clear the shape
+// and have a single function signature in the runtime.
 static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
                                                ValueRange operands) {
   SmallVector<Value, 4> res;
@@ -58,15 +62,23 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-static LogicalResult buildCall(Location loc, std::string funcName,
-                               Operation *op, PatternRewriter &rewriter) {
-  funcName = "xsmm_" + funcName + "_invoke";
-  FlatSymbolRefAttr fnName =
-      SymbolRefAttr::get(rewriter.getContext(), funcName);
+// lookup the function name in the module.
+static LogicalResult isInModule(FlatSymbolRefAttr fnName, Operation *op) {
   ModuleOp module = op->getParentOfType<ModuleOp>();
   if (module.lookupSymbol(fnName.getAttr()))
+    return success();
+  return failure();
+}
+
+static LogicalResult buildInvokeCall(Location loc, std::string funcName,
+                                     Operation *op, PatternRewriter &rewriter) {
+  funcName = "xsmm_" + funcName + "_invoke";
+  FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
+
+  if (succeeded(isInModule(fnName, op)))
     return failure();
 
+  ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
       extractInvokeOperandTypes(op->getOperands()), {});
   {
@@ -95,9 +107,9 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(ternaryOp.getLoc(),
-                            stringifyEnum(ternaryOp.getCallee()).str(),
-                            ternaryOp, rewriter))) {
+    if (succeeded(buildInvokeCall(ternaryOp.getLoc(),
+                                  stringifyEnum(ternaryOp.getCallee()).str(),
+                                  ternaryOp, rewriter))) {
       rewriter.eraseOp(ternaryOp);
       return success();
     }
@@ -110,9 +122,9 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
 
   LogicalResult matchAndRewrite(UnaryOp unaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(unaryOp.getLoc(),
-                            stringifyEnum(unaryOp.getCallee()).str(), unaryOp,
-                            rewriter))) {
+    if (succeeded(buildInvokeCall(unaryOp.getLoc(),
+                                  stringifyEnum(unaryOp.getCallee()).str(),
+                                  unaryOp, rewriter))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
@@ -125,9 +137,9 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildCall(binaryOp.getLoc(),
-                            stringifyEnum(binaryOp.getCallee()).str(), binaryOp,
-                            rewriter))) {
+    if (succeeded(buildInvokeCall(binaryOp.getLoc(),
+                                  stringifyEnum(binaryOp.getCallee()).str(),
+                                  binaryOp, rewriter))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }
@@ -173,9 +185,11 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
-    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-    if (module.lookupSymbol(fnName.getAttr()))
+
+    if (succeeded(isInModule(fnName, dispatchOp)))
       return failure();
+
+    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
 
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
@@ -209,7 +223,43 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
 
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    return failure();
+    Location loc = dispatchOp.getLoc();
+    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
+    kindAsString = "xsmm_" + kindAsString + "_dispatch";
+    FlatSymbolRefAttr fnName =
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
+
+    if (succeeded(isInModule(fnName, dispatchOp)))
+      return failure();
+
+    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
+
+    SmallVector<Value, 10> dispatchOperands;
+    SmallVector<Type, 10> dispatchOperandTypes;
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    ArrayAttr integers = dispatchOp.getInputsAttr();
+    size_t arrayAttrSize = integers.size();
+    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
+      IntegerAttr attr = integers[idx].cast<IntegerAttr>();
+      dispatchOperands.push_back(
+          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
+      dispatchOperandTypes.push_back(integer64);
+    }
+
+    // kind of operation to invoke.
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getKindAttr()));
+    dispatchOperandTypes.push_back(integer64);
+
+    // kind of broadcast
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getFlagsAttr()));
+    dispatchOperandTypes.push_back(integer64);
+
+    func::CallOp call = buildDispatchCall(
+        loc, dispatchOperands, dispatchOperandTypes, module, fnName, rewriter);
+    rewriter.replaceOp(dispatchOp, call.getResult(0));
+    return success();
   }
 };
 
