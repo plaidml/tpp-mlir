@@ -86,12 +86,12 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
                                                     int64_t type,
                                                     int64_t bcast_type) {
 
-  std::cout << "ldi: " << ldi << "\n";
-  std::cout << "ldo: " << ldo << "\n";
-  std::cout << "m: " << m << "\n";
-  std::cout << "n: " << n << "\n";
-  std::cout << "type: " << type << "\n";
-  std::cout << "bcast_type: " << bcast_type << "\n";
+  // std::cout << "ldi: " << ldi << "\n";
+  // std::cout << "ldo: " << ldo << "\n";
+  // std::cout << "m: " << m << "\n";
+  // std::cout << "n: " << n << "\n";
+  // std::cout << "type: " << type << "\n";
+  // std::cout << "bcast_type: " << bcast_type << "\n";
 
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
@@ -117,10 +117,10 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
 extern "C" void
 _mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
                                UnrankedMemRefType<float> *output) {
-  std::cout << "tensor input: \n";
-  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
-  std::cout << "tensor output: \n";
-  printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
+  // std::cout << "tensor input: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
+  // std::cout << "tensor output: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
 
   DynamicMemRefType<float> tensorA = DynamicMemRefType<float>(*input);
   DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*output);
