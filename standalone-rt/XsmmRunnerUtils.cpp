@@ -122,10 +122,13 @@ _mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
   std::cout << "tensor output: \n";
   printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
 
+  DynamicMemRefType<float> tensorA = DynamicMemRefType<float>(*input);
+  DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*output);
+
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
   libxsmm_meltw_unary_param param;
-  param.in.primary = input;
-  param.out.primary = output;
+  param.in.primary = (void *)tensorA.data;
+  param.out.primary = (void *)tensorB.data;
   kernel(&param);
 }
