@@ -49,14 +49,14 @@ func.func @identity_to_xsmm(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 
   // m = 5
   // n = 6
-  // ldi = 5
+  // ldi = 1
   // ldo = 6
   // input_type = 1 (F32)
   // output_type = 1 (F32)
   // compute_type = 1 (F32)
   // b_cast = 1 (bcast row)
 
-  // CHECK: xsmm.unary.dispatch identity [5, 6, 5, 6](bcast_row)
+  // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](bcast_row)
   // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
   return 

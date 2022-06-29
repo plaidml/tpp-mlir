@@ -115,7 +115,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
     if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
-      int64_t ldi = shapeInput[0];
+      int64_t ldi = shapeInput[1];
       return {ldi, bCast};
     }
 
@@ -127,7 +127,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
     if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
-      int64_t ldi = shapeInput[0];
+      int64_t ldi = shapeInput[1];
       return {ldi, bCast};
     }
     // TODO: Handle memref<1x1xf32> and memref<f32>
