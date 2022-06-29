@@ -95,7 +95,8 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
 
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
-  libxsmm_meltw_unary_flags unary_flags = LIBXSMM_MELTW_FLAG_UNARY_NONE;
+  libxsmm_meltw_unary_flags unary_flags =
+      static_cast<libxsmm_meltw_unary_flags>(bcast_type);
 
   libxsmm_meltw_unary_shape unary_shape;
 
