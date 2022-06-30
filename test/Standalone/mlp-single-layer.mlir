@@ -10,23 +10,25 @@ module @predict_function  {
     %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
     %0 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  // no predecessors
+    ^bb0(%arg9: f32, %arg10: f32):  
       linalg.yield %arg9 : f32
     } -> tensor<128x512xf32>
     %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):  // no predecessors
+    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):  
       %16 = arith.mulf %arg9, %arg10 : f32
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%output : tensor<128x512xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  // no predecessors
+    ^bb0(%arg9: f32, %arg10: f32):  
       %16 = mathx.relu %arg9 : f32
       linalg.yield %16 : f32
     } -> tensor<128x512xf32> 
     return %3 : tensor<128x512xf32>
   }
 }
+
+// Note that the output is a function parameter.
 
 //      CHECK: func.func @main(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>
