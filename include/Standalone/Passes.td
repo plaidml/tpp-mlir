@@ -103,6 +103,12 @@ def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
   let dependentDialects = ["memref::MemRefDialect"];
 }
 
+def PreBufferization : Pass<"pre-bufferization", "func::FuncOp"> {
+  let summary = "Prepare IR for bufferization";
+  let constructor = "mlir::tpp::createPreBufferizationPass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";

@@ -214,8 +214,12 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
     if (libraryCall.compare("tpp.relu") == 0) {
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
-                                               operands[1]);
+      if (linalgOp.getNumInputs() == 2)
+        rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
+                                                 operands[1]);
+      else
+        rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
+                                                 operands[0]);
       return success();
     }
     if (libraryCall.compare("tpp.add") == 0) {
