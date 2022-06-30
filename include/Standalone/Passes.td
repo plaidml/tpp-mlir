@@ -109,6 +109,12 @@ def PreBufferization : Pass<"pre-bufferization", "func::FuncOp"> {
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def MainClosure : Pass<"main-closure", "ModuleOp"> {
+  let summary = "Wrap main into a closure to hoist out sequential computation";
+  let constructor = "mlir::tpp::createMainClosurePass()";
+  let dependentDialects = ["func::FuncDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";

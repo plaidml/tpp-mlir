@@ -23,8 +23,10 @@ def Stdx_ClosureOp : Stdx_Op<"closure", [
   let description = [{ }];
 
   let arguments = (ins TypeAttr:$type);
+
   let regions = (region SizedRegion<1>:$body);
   let hasCustomAssemblyFormat = 1;
+  
   let extraClassDeclaration = [{
       mlir::FunctionType getFunctionType() { return type().cast<mlir::FunctionType>(); }
       void setType(mlir::FunctionType type) {

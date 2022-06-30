@@ -18,6 +18,7 @@ add_mlir_dialect_library(MLIRStandalone
         CopyRemoval.cpp
         VectorizeCopy.cpp
         PreBufferization.cpp
+        MainClosure.cpp
 
         # Conversions
         ConvertTppToVector.cpp  
