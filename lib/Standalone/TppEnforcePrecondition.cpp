@@ -36,7 +36,8 @@ namespace {
 // %2 = linalg.generic(%C, %A, %B) {library_call = tpp.matmul}
 // %3 = tensor.extract tensor<3xSIMDxf32> to tensor<3x3xf32>
 //
-struct PadSIMDDimensionForGemm : public OpRewritePattern<linalg::GenericOp> {
+struct PadSIMDAndParallelDimensionForGemm
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   // POD for GEMM operands.
@@ -492,9 +493,9 @@ struct FoldInsertSliceIntoTppIdentity
   }
 };
 
-void populateTppEnforcePatterns(RewritePatternSet &patterns) {
+void populateEnforcePaddingOnSIMDAndParallelDims(RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<PadSIMDDimensionForGemm,
+  patterns.add<PadSIMDAndParallelDimensionForGemm,
                FoldChainOfStaticPaddings,
                SinkExtractSliceAfterRelu,
                GenericHighPadOpPattern,
@@ -508,7 +509,7 @@ struct EnforcePreconditionsToTpp
     : EnforcePreconditionsToTppBase<EnforcePreconditionsToTpp> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateTppEnforcePatterns(patterns);
+    populateEnforcePaddingOnSIMDAndParallelDims(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
