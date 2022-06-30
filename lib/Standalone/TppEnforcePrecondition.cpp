@@ -283,6 +283,8 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     std::string libraryCall = linalgOp.getLibraryCallName();
     if (libraryCall.compare("tpp.relu") != 0)
       return failure();
+    if (linalgOp.getNumInputs() == 0)
+      return failure();
     Location loc = linalgOp.getLoc();
     Value operand = linalgOp.getInputOperand(0)->get();
     tensor::ExtractSliceOp slice =
@@ -493,11 +495,11 @@ struct FoldInsertSliceIntoTppIdentity
 void populateTppEnforcePatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<PadSIMDDimensionForGemm,
-               //FoldChainOfStaticPaddings,
-               //SinkExtractSliceAfterRelu,
-               GenericHighPadOpPattern/*,
+               FoldChainOfStaticPaddings,
+               SinkExtractSliceAfterRelu,
+               GenericHighPadOpPattern,
                RemoveChainExtractInsertSlice,
-               RemoveChainInsertSlice,
+               RemoveChainInsertSlice/*,
                FoldInsertSliceIntoTppIdentity*/>(patterns.getContext());
   // clang-format on
 }
