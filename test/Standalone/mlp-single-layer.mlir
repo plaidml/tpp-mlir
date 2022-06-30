@@ -8,7 +8,6 @@
 module @predict_function  {
   func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, 
     %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
-    %0 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  
       linalg.yield %arg9 : f32
