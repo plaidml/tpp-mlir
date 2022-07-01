@@ -17,7 +17,7 @@ cmake -G Ninja ../llvm \
    -DLLVM_ENABLE_ASSERTIONS=ON \
 ```
 
-LLVM commit to use: `300f8da8e8682cbd881f1874801f59ed804e3560`
+LLVM commit to use: `cc2a614796cb311e65ee658200b58b14c53089a8`
 
 ## How to build
 
@@ -54,6 +54,8 @@ then you are good to go.
 
 - check: getSubMap
 - check: getSliceMap
+- https://libxsmm.readthedocs.io/en/latest/libxsmm_aux/#meta-image-file-io
+
 
 ```
 #trait1 = {
@@ -82,3 +84,5 @@ func.func @add_d(%arga: tensor<32xf32, #DV>, %argb: f32, %argx: tensor<32xf32>) 
   return %0 : tensor<32xf32>
 }
 ```
+
+- in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
