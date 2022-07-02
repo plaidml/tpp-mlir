@@ -10,6 +10,7 @@
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -510,8 +511,76 @@ struct FoldInsertSliceIntoTppIdentity
 /// ```
 ///
 /// if the `linalg.generic` has all parallel iterator types.
+// TODO: relax is2DRowPadding restriction.
 struct FusePadOp : OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+
+  bool is2DRowPadding(tensor::PadOp padOp) const {
+    ArrayRef<int64_t> sourceShape = padOp.getSourceType().getShape();
+    ArrayRef<int64_t> destShape = padOp.getResultType().getShape();
+    if (sourceShape.size() != 2)
+      return false;
+    // if the row have the same value we pad on the columns.
+    if (sourceShape[0] == destShape[0])
+      return false;
+    return true;
+  }
+
+  FailureOr<Value> optimizeFillingImpl(tensor::PadOp padOp,
+                                       linalg::InitTensorOp initTensor,
+                                       PatternRewriter &rewriter) const {
+
+    if (!padOp.getSourceType().hasStaticShape() ||
+        !padOp.getResultType().hasStaticShape())
+      return failure();
+
+    if (!is2DRowPadding(padOp))
+      return failure();
+
+    Location loc = padOp.getLoc();
+    Value padValue = padOp.getConstantPaddingValue();
+    ArrayRef<int64_t> shapeSource = padOp.getSourceType().getShape();
+    ArrayRef<int64_t> shapeResult = padOp.getResultType().getShape();
+    SmallVector<int64_t, 2> cstShape;
+    for (size_t idx = 0, idxEnd = shapeSource.size(); idx < idxEnd; idx++) {
+      if (shapeSource[idx] == shapeResult[idx])
+        cstShape.push_back(shapeSource[idx]);
+      else
+        cstShape.push_back(shapeResult[idx] - shapeSource[idx]);
+    }
+
+    RankedTensorType cstType =
+        RankedTensorType::get(cstShape, padValue.getType());
+    Value cst = rewriter.create<tensor::SplatOp>(loc, padValue, cstType);
+
+    unsigned rank = shapeSource.size();
+    SmallVector<OpFoldResult, 4> offsets, sizes, strides;
+    offsets.reserve(rank);
+    sizes.reserve(rank);
+    strides.reserve(rank);
+    for (unsigned r = 0; r < rank; r++) {
+      offsets.push_back(
+          rewriter.getIndexAttr(shapeResult[r] - cstType.getShape()[r]));
+      strides.push_back(rewriter.getIndexAttr(1));
+      sizes.push_back(rewriter.getIndexAttr(cstType.getShape()[r]));
+    }
+    Value filled = rewriter.create<tensor::InsertSliceOp>(
+        loc, cst, initTensor, offsets, sizes, strides);
+    return filled;
+  }
+
+  Value optimizeFilling(tensor::PadOp padOp, linalg::InitTensorOp initTensor,
+                        PatternRewriter &rewriter) const {
+    Value padValue = padOp.getConstantPaddingValue();
+    Location loc = padOp.getLoc();
+
+    FailureOr<Value> filled = optimizeFillingImpl(padOp, initTensor, rewriter);
+    if (failed(filled))
+      return rewriter
+          .create<linalg::FillOp>(loc, padValue, initTensor.getResult())
+          .getResult(0);
+    return *filled;
+  }
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
@@ -548,14 +617,11 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     // Create the tensor of same size as output of the pad op.
     RankedTensorType padResultType = padOp.getResultType();
     auto resultSizes = getAsOpFoldResult(resultShape[0]);
-    auto initTensor = rewriter.create<linalg::InitTensorOp>(
+    linalg::InitTensorOp initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, resultSizes, padResultType.getElementType());
 
     // Fill the tensor with the pad value.
-    // TODO: There is an option to fill only the boundaries. For now just
-    // filling the whole tensor.
-    auto fillTensor =
-        rewriter.create<linalg::FillOp>(loc, padValue, initTensor.getResult());
+    Value fillTensor = optimizeFilling(padOp, initTensor, rewriter);
 
     // Construct a slice of the fill result that is to be replaced with the
     // result of the generic op. The low pad values are the offsets, the size of
@@ -577,7 +643,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     }
     SmallVector<OpFoldResult> strides(offsets.size(), rewriter.getIndexAttr(1));
     auto slice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, fillTensor.getResult(0), offsets, sizes, strides);
+        loc, fillTensor, offsets, sizes, strides);
 
     // Clone the generic op.
     auto clonedOp =
@@ -586,8 +652,34 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
 
     // Insert it back into the result of the fill.
     rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
-        padOp, clonedOp.getResult(resultNumber), fillTensor.getResult(0),
-        offsets, sizes, strides);
+        padOp, clonedOp.getResult(resultNumber), fillTensor, offsets, sizes,
+        strides);
+    return success();
+  }
+};
+
+// Bufferization fails on this pattern, with error "op was not bufferized".
+// Force materialization of linalg.init in this case by replacing it
+// with a `bufferization::AllocTensorOp` operation.
+//
+// %0 = linalg.init_tensor [132, 512] : tensor<132x512xf32>
+// %1 = tensor.insert_slice %cst_0 into %0
+//
+// With
+//
+// %0 = bufferization.allocTensorOp
+// %1 = tensor.insert_slice %cst_0 into %0
+//
+struct AllocateInitTensor : public OpRewritePattern<linalg::InitTensorOp> {
+  using OpRewritePattern<linalg::InitTensorOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::InitTensorOp initOp,
+                                PatternRewriter &rewriter) const override {
+    for (Operation *user : initOp->getUsers())
+      if (!isa<tensor::InsertSliceOp>(user))
+        return failure();
+    rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
+        initOp, initOp.getType(), initOp.sizes());
     return success();
   }
 };
@@ -600,7 +692,8 @@ void populateEnforcePaddingOnSIMDAndParallelDims(RewritePatternSet &patterns) {
                SinkExtractSliceAfterRelu,
                GenericHighPadOpPattern,
                RemoveChainExtractInsertSlice,
-               RemoveChainInsertSlice/*,
+               RemoveChainInsertSlice,
+               AllocateInitTensor/*,
                FoldInsertSliceIntoTppIdentity*/>(patterns.getContext());
   // clang-format on
 }
