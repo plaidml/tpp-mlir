@@ -67,7 +67,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     if (op->getNumResults() != 1)
       return failure();
     // The output tensor is unused in the body computation.
-    auto outputOperand = op.getOutputOperand(0);
+    auto *outputOperand = op.getOutputOperand(0);
     if (op.payloadUsesValueFromOperand(outputOperand))
       return failure();
 
@@ -77,7 +77,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
-    for (auto in : op.getInputOperands()) {
+    for (auto *in : op.getInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
           op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {

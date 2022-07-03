@@ -43,11 +43,11 @@ struct PadSIMDAndParallelDimensionForGemm
 
   // POD for GEMM operands.
   struct GemmOperands {
-    Value A = nullptr;
-    Value B = nullptr;
-    Value C = nullptr;
+    Value a = nullptr;
+    Value b = nullptr;
+    Value c = nullptr;
     GemmOperands() = delete;
-    GemmOperands(Value A, Value B, Value C) : A(A), B(B), C(C){};
+    GemmOperands(Value a, Value b, Value c) : a(a), b(b), c(c){};
   };
 
   // Pad SIMD-dimension using a multiple of 16.
@@ -61,27 +61,27 @@ struct PadSIMDAndParallelDimensionForGemm
     // simd dimension accordingly.
     int64_t paddedSimd = 16 * std::ceil((float)simdDim / 16.0);
     ArrayRef<int64_t> shapeB =
-        operands.B.getType().cast<ShapedType>().getShape();
+        operands.b.getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeC =
-        operands.C.getType().cast<ShapedType>().getShape();
+        operands.c.getType().cast<ShapedType>().getShape();
     SmallVector<int64_t> newShapeC = {shapeC[0], paddedSimd};
     SmallVector<int64_t> newShapeB = {shapeB[0], paddedSimd};
     RankedTensorType newRankedC = RankedTensorType::get(
-        newShapeC, operands.C.getType().cast<ShapedType>().getElementType());
+        newShapeC, operands.c.getType().cast<ShapedType>().getElementType());
     RankedTensorType newRankedB = RankedTensorType::get(
-        newShapeB, operands.B.getType().cast<ShapedType>().getElementType());
+        newShapeB, operands.b.getType().cast<ShapedType>().getElementType());
     Value padZero = rewriter.create<arith::ConstantOp>(
-        loc, operands.C.getType().cast<ShapedType>().getElementType(),
+        loc, operands.c.getType().cast<ShapedType>().getElementType(),
         rewriter.getZeroAttr(
-            operands.C.getType().cast<ShapedType>().getElementType()));
-    Value paddedC = tensor::createPadHighOp(newRankedC, operands.C, padZero,
+            operands.c.getType().cast<ShapedType>().getElementType()));
+    Value paddedC = tensor::createPadHighOp(newRankedC, operands.c, padZero,
                                             /*nofold*/ false, loc, rewriter);
-    Value paddedB = tensor::createPadHighOp(newRankedB, operands.B, padZero,
+    Value paddedB = tensor::createPadHighOp(newRankedB, operands.b, padZero,
                                             /*nofold*/ false, loc, rewriter);
 
     // update operands.
-    operands.C = paddedC;
-    operands.B = paddedB;
+    operands.c = paddedC;
+    operands.b = paddedB;
   }
 
   // Pad Parallel-dimension using a multiple of 6.
@@ -95,27 +95,27 @@ struct PadSIMDAndParallelDimensionForGemm
     // accordingly.
     int64_t paddedParallel = 6 * std::ceil((float)parallelDim / 6.0);
     ArrayRef<int64_t> shapeA =
-        operands.A.getType().cast<ShapedType>().getShape();
+        operands.a.getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeC =
-        operands.C.getType().cast<ShapedType>().getShape();
+        operands.c.getType().cast<ShapedType>().getShape();
     SmallVector<int64_t> newShapeC = {paddedParallel, shapeC[1]};
     SmallVector<int64_t> newShapeA = {paddedParallel, shapeA[1]};
     RankedTensorType newRankedC = RankedTensorType::get(
-        newShapeC, operands.C.getType().cast<ShapedType>().getElementType());
+        newShapeC, operands.c.getType().cast<ShapedType>().getElementType());
     RankedTensorType newRankedA = RankedTensorType::get(
-        newShapeA, operands.A.getType().cast<ShapedType>().getElementType());
+        newShapeA, operands.a.getType().cast<ShapedType>().getElementType());
     Value padZero = rewriter.create<arith::ConstantOp>(
-        loc, operands.C.getType().cast<ShapedType>().getElementType(),
+        loc, operands.c.getType().cast<ShapedType>().getElementType(),
         rewriter.getZeroAttr(
-            operands.C.getType().cast<ShapedType>().getElementType()));
-    Value paddedC = tensor::createPadHighOp(newRankedC, operands.C, padZero,
+            operands.c.getType().cast<ShapedType>().getElementType()));
+    Value paddedC = tensor::createPadHighOp(newRankedC, operands.c, padZero,
                                             /*nofold*/ false, loc, rewriter);
-    Value paddedA = tensor::createPadHighOp(newRankedA, operands.A, padZero,
+    Value paddedA = tensor::createPadHighOp(newRankedA, operands.a, padZero,
                                             /*nofold*/ false, loc, rewriter);
 
     // update operands.
-    operands.C = paddedC;
-    operands.A = paddedA;
+    operands.c = paddedC;
+    operands.a = paddedA;
   }
 
   LogicalResult padDimensions(linalg::GenericOp linalgOp,
@@ -124,17 +124,17 @@ struct PadSIMDAndParallelDimensionForGemm
     GemmOperands operands(linalgOp->getOperand(0), linalgOp->getOperand(1),
                           linalgOp->getOperand(2));
 
-    if ((!operands.C.getType().isa<ShapedType>()) ||
-        (!operands.B.getType().isa<ShapedType>()) ||
-        (!operands.A.getType().isa<ShapedType>()))
+    if ((!operands.c.getType().isa<ShapedType>()) ||
+        (!operands.b.getType().isa<ShapedType>()) ||
+        (!operands.a.getType().isa<ShapedType>()))
       return failure();
 
     ArrayRef<int64_t> shapeC =
-        operands.C.getType().cast<ShapedType>().getShape();
+        operands.c.getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeB =
-        operands.B.getType().cast<ShapedType>().getShape();
+        operands.b.getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeA =
-        operands.A.getType().cast<ShapedType>().getShape();
+        operands.a.getType().cast<ShapedType>().getShape();
 
     assert(shapeC.size() == 2 && "expect 2d gemm");
     assert(shapeB.size() == 2 && "expect 2d gemm");
@@ -154,8 +154,8 @@ struct PadSIMDAndParallelDimensionForGemm
     padParallelDimension(rewriter, operands, parallelDim, loc);
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-        loc, operands.C.getType(), ValueRange{operands.A, operands.B},
-        ValueRange{operands.C}, linalgOp.getIndexingMaps(),
+        loc, operands.c.getType(), ValueRange{operands.a, operands.b},
+        ValueRange{operands.c}, linalgOp.getIndexingMaps(),
         llvm::to_vector<4>(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.matmul");

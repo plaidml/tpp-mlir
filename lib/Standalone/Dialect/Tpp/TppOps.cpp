@@ -53,17 +53,17 @@ LogicalResult IdentityOp::verify() {
 
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
-  MemRefType A = getMatrixA().getType().cast<MemRefType>();
-  MemRefType B = getMatrixB().getType().cast<MemRefType>();
-  MemRefType C = getMatrixC().getType().cast<MemRefType>();
-  if ((A.getShape().size() != 2) || (B.getShape().size() != 2) ||
-      (C.getShape().size() != 2))
+  MemRefType a = getMatrixA().getType().cast<MemRefType>();
+  MemRefType b = getMatrixB().getType().cast<MemRefType>();
+  MemRefType c = getMatrixC().getType().cast<MemRefType>();
+  if ((a.getShape().size() != 2) || (b.getShape().size() != 2) ||
+      (c.getShape().size() != 2))
     return failure();
-  int64_t m = C.getShape()[0];
-  int64_t n = C.getShape()[1];
-  int64_t k = A.getShape()[1];
-  if ((A.getShape()[0] != m) || (B.getShape()[1] != n) ||
-      (B.getShape()[0] != k))
+  int64_t m = c.getShape()[0];
+  int64_t n = c.getShape()[1];
+  int64_t k = a.getShape()[1];
+  if ((a.getShape()[0] != m) || (b.getShape()[1] != n) ||
+      (b.getShape()[0] != k))
     return failure();
   return success();
 }
