@@ -180,10 +180,10 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    ArrayAttr integers = dispatchOp.getInputsAttr();
+    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = integers[idx].cast<IntegerAttr>();
+      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
       dispatchOperands.push_back(
           rewriter.create<arith::ConstantOp>(loc, integer64, attr));
       dispatchOperandTypes.push_back(integer64);
@@ -218,10 +218,10 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    ArrayAttr integers = dispatchOp.getInputsAttr();
+    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = integers[idx].cast<IntegerAttr>();
+      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
       dispatchOperands.push_back(
           rewriter.create<arith::ConstantOp>(loc, integer64, attr));
       dispatchOperandTypes.push_back(integer64);

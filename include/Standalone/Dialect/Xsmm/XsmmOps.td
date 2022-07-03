@@ -101,7 +101,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[]> {
     the pointer to call as I64.
   }];
   
-  let arguments = (ins Xsmm_TernaryKind:$kind, I64ArrayAttr:$inputs);
+  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
@@ -119,7 +119,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[]> {
     See 'ternary.dispatch'.
   }];
   
-  let arguments = (ins Xsmm_BinaryKind:$kind, I64ArrayAttr:$inputs);
+  let arguments = (ins Xsmm_BinaryKind:$kind, DenseI64ArrayAttr:$inputs);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
@@ -137,7 +137,7 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[]> {
     See 'ternary.dispatch'.
   }];
   
-  let arguments = (ins Xsmm_UnaryKind:$kind, I64ArrayAttr:$inputs, 
+  let arguments = (ins Xsmm_UnaryKind:$kind, DenseI64ArrayAttr:$inputs, 
                        Xsmm_UnaryFlags:$flags);
   let results = (outs I64:$results);
 

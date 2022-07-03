@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -40,7 +41,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t ldb = k;
     int64_t ldc = m;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    ArrayAttr dims = rewriter.getI64ArrayAttr({m, n, k, lda, ldb, ldc});
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
         matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
     Value dispatched =
@@ -153,7 +155,8 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     xsmm::UnaryKindAttr attr = xsmm::UnaryKindAttr::get(
         identityOp.getContext(), xsmm::UnaryKind::IDENTITY);
-    ArrayAttr dims = rewriter.getI64ArrayAttr({m, n, ldi, ldo});
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
     xsmm::UnaryFlagsAttr bCastAttr =
         xsmm::UnaryFlagsAttr::get(identityOp.getContext(), bCast);
 
