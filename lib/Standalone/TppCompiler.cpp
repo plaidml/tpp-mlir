@@ -89,13 +89,12 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
   pm.addPass(createConvertVectorToLLVMPass());
-  // pm.addPass(createMemRefToLLVMPass());
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
   pm.addPass(createConvertMathToLibmPass());
   pm.addPass(createConvertFuncToLLVMPass());
   pm.addPass(createMemRefToLLVMPass());
   pm.addPass(mlir::createCanonicalizerPass());
-  // pm.addPass(createReconcileUnrealizedCastsPass());
+  pm.addPass(createReconcileUnrealizedCastsPass());
 
   if (failed(runPipeline(pm, getOperation())))
     signalPassFailure();

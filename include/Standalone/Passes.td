@@ -47,7 +47,8 @@ def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"
     For tpp.matmul we pad the SIMD dimension (N) to be multiple of 16,
     and the parallel dimension (M) to be multiple of 6.
   }];
-  let dependentDialects = ["linalg::LinalgDialect"];
+  let dependentDialects = ["linalg::LinalgDialect", 
+                           "memref::MemRefDialect"];
 }
 
 def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
