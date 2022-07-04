@@ -200,7 +200,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     int64_t m = outputMemRef.getShape()[0];
     int64_t n = outputMemRef.getShape()[1];
     int64_t ldo = n;
-    int64_t ldi = m;
+    int64_t ldi = n;
 
     xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
     xsmm::UnaryKindAttr attr =

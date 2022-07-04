@@ -120,7 +120,7 @@ func.func @identity_to_xsmm(%arg0: memref<1x1xf32>, %arg1: memref<5x6xf32>) {
 // CHECK-LABEL: @relu_to_xsmm(
 func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 
-  // CHECK: xsmm.unary.dispatch relu [5, 6, 5, 6](none)
+  // CHECK: xsmm.unary.dispatch relu [5, 6, 6, 6](none)
   // CHECK: xsmm.unary relu
   tpp.relu ins(%arg0: memref<5x6xf32>) out(%arg1: memref<5x6xf32>)
   return
