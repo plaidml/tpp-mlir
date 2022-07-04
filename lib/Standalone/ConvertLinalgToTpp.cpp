@@ -209,12 +209,9 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                PatternRewriter &rewriter) const {
     std::string libraryCall = linalgOp.getLibraryCallName();
     if (libraryCall.compare("tpp.identity") == 0) {
-      if (operands.size() == 2)
-        rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
-                                                     operands[1]);
-      else // in-place copy should fold away.
-        rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
-                                                     operands[0]);
+      assert(operands.size() == 2 && "Expect two operands");
+      rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
+                                                   operands[1]);
       return success();
     }
     if (libraryCall.compare("tpp.relu") == 0) {

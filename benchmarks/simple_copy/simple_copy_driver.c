@@ -24,7 +24,7 @@ void simple_copy_ref(const struct vec_f2d *input, struct vec_f2d *output) {
 
 int main(int argc, char **argv) {
   struct vec_f2d input, output, output_ref;
-  int verbose = 0;
+  int verbose = 1;
   int n = 6;
   int m = 9;
 
