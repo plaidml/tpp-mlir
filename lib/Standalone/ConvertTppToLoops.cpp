@@ -85,7 +85,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
-// Lowers identity op.
+// Converts identity op.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 

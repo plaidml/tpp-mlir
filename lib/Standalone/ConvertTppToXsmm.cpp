@@ -185,9 +185,48 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 };
 
+struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
+  using OpRewritePattern<ReluOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReluOp reluOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = reluOp.getLoc();
+    // no conversion if the relu is a scalar operation.
+    Type outputType = reluOp.getOutput().getType();
+    if (!outputType.isa<ShapedType>())
+      return failure();
+
+    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
+    int64_t ldo = n;
+    int64_t ldi = m;
+
+    xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
+    xsmm::UnaryKindAttr attr =
+        xsmm::UnaryKindAttr::get(reluOp.getContext(), xsmm::UnaryKind::RELU);
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
+    xsmm::UnaryFlagsAttr bCastAttr =
+        xsmm::UnaryFlagsAttr::get(reluOp.getContext(), bCast);
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
+        loc, integer64, attr, dims, bCastAttr);
+
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(reluOp->getOperands().begin(),
+                          reluOp->getOperands().end());
+
+    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(reluOp, attr, invokeOperands);
+    return success();
+  }
+};
+
 void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppIdentityOp,
+               ConvertTppReluOp,
                ConvertTppMatmulOp>(patterns.getContext());
   // clang-format on
 }
