@@ -99,10 +99,22 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   std::pair<int64_t, xsmm::UnaryFlags> getLdiAndBCast(IdentityOp identityOp,
                                                       int64_t ldo) const {
     Type inputType = identityOp.getInput().getType();
+
+    // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
+    // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
+    // in tpp at the moment.
     if (!inputType.isa<ShapedType>()) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
       int64_t ldi = 1;
       return {ldi, bCast};
+    }
+    if (inputType.isa<ShapedType>()) {
+      ArrayRef<int64_t> shape = inputType.cast<ShapedType>().getShape();
+      if ((shape[0] == 1) && shape[1] == 1) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
+        int64_t ldi = 1;
+        return {ldi, bCast};
+      }
     }
 
     ArrayRef<int64_t> shapeInput =
@@ -132,7 +144,6 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
       int64_t ldi = shapeInput[1];
       return {ldi, bCast};
     }
-    // TODO: Handle memref<1x1xf32> and memref<f32>
     llvm_unreachable("failed to get ldi and bCast for identity");
   }
 

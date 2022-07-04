@@ -133,3 +133,17 @@ _mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
   param.out.primary = (void *)tensorB.data;
   kernel(&param);
 }
+
+extern "C" void
+_mlir_ciface_xsmm_unary_scalar_invoke(int64_t addr, float input,
+                                      UnrankedMemRefType<float> *output) {
+
+  DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*output);
+
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
+  libxsmm_meltw_unary_param param;
+  param.in.primary = (void *)&input;
+  param.out.primary = (void *)tensorB.data;
+  kernel(&param);
+}

@@ -92,3 +92,25 @@ func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2:
   tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
   return 
 }
+
+// -----
+
+// CHECK-LABEL: @identity_to_xsmm(
+func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
+
+  // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](bcast_scalar)
+  // CHECK: xsmm.unary identity
+  tpp.identity ins(%arg0: f32) out(%arg1: memref<5x6xf32>)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @identity_to_xsmm(
+func.func @identity_to_xsmm(%arg0: memref<1x1xf32>, %arg1: memref<5x6xf32>) {
+
+  // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](bcast_scalar)
+  // CHECK: xsmm.unary identity 
+  tpp.identity ins(%arg0: memref<1x1xf32>) out(%arg1: memref<5x6xf32>)
+  return
+}

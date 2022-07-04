@@ -83,6 +83,17 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
    
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let extraClassDeclaration = [{
+    bool hasScalarInput() {
+      // skip the function pointer. The operand
+      // is at position 1.
+      Type operand = getInputs()[1].getType();
+      if (!operand.isa<ShapedType>())
+        return true;
+      return false;
+    }
   }]; 
 
   let hasVerifier = 1;

@@ -112,8 +112,15 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
 
   LogicalResult matchAndRewrite(UnaryOp unaryOp,
                                 PatternRewriter &rewriter) const override {
+    // Handle the scalar case. There is no operator overloading
+    // in MLIR (thus we need to change the function name from
+    // "unary" to "unary_scalar"). We also don't want to convert
+    // the scalar to a memref by using an alloc/alloca.
+    std::string funcName = "unary";
+    if (unaryOp.hasScalarInput())
+      funcName = "unary_scalar";
     if (succeeded(
-            buildInvokeCall(unaryOp.getLoc(), "unary", unaryOp, rewriter))) {
+            buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, rewriter))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
