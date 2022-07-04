@@ -5,8 +5,11 @@ BASE=$(pwd)
 # This assume you built the sandbox as described in the readme.
 LIB_PATH=$BASE/../../build/lib
 BIN_PATH=$BASE/../../build/bin
+LIB_INCLUDE_PATH=$BASE/../../build/_deps/xsmm-src/include
+
 echo "lib path: ${LIB_PATH}"
 echo "bin path: ${BIN_PATH}"
+echo "lib include path: ${LIB_INCLUDE_PATH}"
 
 # make standalone-opt (TPP compiler) available.
 export PATH=${BIN_PATH}:$PATH

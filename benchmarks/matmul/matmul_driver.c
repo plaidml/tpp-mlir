@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "libxsmm_timer.h"
+
 /* Generated matrix multiplication function under test */
 extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
                    DECL_VEC2D_FUNC_IN_ARGS(b, float),
@@ -31,9 +33,16 @@ void init_matrix(struct vec_f2d *m) {
       vec_f2d_set(m, x, y, x + y);
 }
 
+/* Clear matrix (aka fill with zeros */
+void clear_matrix(struct vec_f2d *m) {
+  for (int64_t y = 0; y < m->sizes[0]; y++)
+    for (int64_t x = 0; x < m->sizes[1]; x++)
+      vec_f2d_set(m, x, y, 0);
+}
+
 int main(int argc, char **argv) {
   struct vec_f2d a, b, o, o_ref;
-  int verbose = 0;
+  int verbose = 1;
   int n = 6;
   int k = 9;
   int m = 12;
@@ -61,6 +70,19 @@ int main(int argc, char **argv) {
     puts("");
   }
 
+  // preheating runs
+  for (int i = 0; i < 5; i++)
+    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+
+  // actual runs
+  libxsmm_timer_tickint start = libxsmm_timer_tick();
+  for (int i = 0; i < 20; i++)
+    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+  libxsmm_timer_tickint stop = libxsmm_timer_tick();
+  double duration = libxsmm_timer_duration(start, stop);
+  printf("Duration LIBXSMM: %f\n", duration);
+
+  clear_matrix(&o);
   matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
   matmul_refimpl(&a, &b, &o_ref);
 
