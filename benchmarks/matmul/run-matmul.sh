@@ -34,4 +34,4 @@ fi
 rm matmul
 rm *.s
 rm *.ll
-#rm result.txt
+rm result.txt
