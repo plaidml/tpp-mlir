@@ -54,7 +54,7 @@ static bool isReadOnly(Value v) {
 // Whoever call the function expects the result
 // to be in the destination operand. You cannot
 // remove the second operand. Simply check to
-// have a yield.
+// have only a yield.
 static bool hasCopySemantics(linalg::GenericOp op) {
   int numInput = op->getNumOperands() - op->getNumResults();
   if (numInput != 1)
