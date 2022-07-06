@@ -11,6 +11,7 @@
 
 include "XsmmDialect.td"
 include "XsmmAttr.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
 
@@ -103,7 +104,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 // TernaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[]> {
+def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[NoSideEffect]> {
   let summary = "dispatch ternary operation.";
   let description = [{
     The 'kind' carries information about the name of the LIBXSMM function to
@@ -124,7 +125,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[]> {
 // BinaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[]> {
+def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[NoSideEffect]> {
   let summary = "dispatch binary operation.";
   let description = [{
     See 'ternary.dispatch'.
@@ -142,7 +143,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[]> {
 // UnaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[]> {
+def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
   let summary = "dispatch unary operation.";
   let description = [{
     See 'ternary.dispatch'.
