@@ -28,8 +28,7 @@ using namespace mlir::tpp;
 
 namespace {
 
-// Ensure the SIMD dimension to be multiple of 16, and the parallel dimension
-// multiple of 6.
+// Ensure the SIMD dimension to be multiple of 16.
 //
 // Example (SIMD dimension):
 // %0 = tensor.pad (%C) : tensor<3x3xf32> to tensor<3xSIMDxf32>
@@ -84,40 +83,6 @@ struct PadSIMDAndParallelDimensionForGemm
     operands.b = paddedB;
   }
 
-  // Pad Parallel-dimension using a multiple of 6.
-  void padParallelDimension(PatternRewriter &rewriter, GemmOperands &operands,
-                            int64_t parallelDim, Location loc) const {
-    // no work to do, exit.
-    if (parallelDim % 6 == 0)
-      return;
-
-    // compute the closes multiple of 6 and pad the parallel dimension
-    // accordingly.
-    int64_t paddedParallel = 6 * std::ceil((float)parallelDim / 6.0);
-    ArrayRef<int64_t> shapeA =
-        operands.a.getType().cast<ShapedType>().getShape();
-    ArrayRef<int64_t> shapeC =
-        operands.c.getType().cast<ShapedType>().getShape();
-    SmallVector<int64_t> newShapeC = {paddedParallel, shapeC[1]};
-    SmallVector<int64_t> newShapeA = {paddedParallel, shapeA[1]};
-    RankedTensorType newRankedC = RankedTensorType::get(
-        newShapeC, operands.c.getType().cast<ShapedType>().getElementType());
-    RankedTensorType newRankedA = RankedTensorType::get(
-        newShapeA, operands.a.getType().cast<ShapedType>().getElementType());
-    Value padZero = rewriter.create<arith::ConstantOp>(
-        loc, operands.c.getType().cast<ShapedType>().getElementType(),
-        rewriter.getZeroAttr(
-            operands.c.getType().cast<ShapedType>().getElementType()));
-    Value paddedC = tensor::createPadHighOp(newRankedC, operands.c, padZero,
-                                            /*nofold*/ false, loc, rewriter);
-    Value paddedA = tensor::createPadHighOp(newRankedA, operands.a, padZero,
-                                            /*nofold*/ false, loc, rewriter);
-
-    // update operands.
-    operands.c = paddedC;
-    operands.a = paddedA;
-  }
-
   LogicalResult padDimensions(linalg::GenericOp linalgOp,
                               PatternRewriter &rewriter) const {
     Location loc = linalgOp.getLoc();
@@ -145,13 +110,11 @@ struct PadSIMDAndParallelDimensionForGemm
     assert(shapeA[1] == shapeB[0] && "expect equal");
 
     int64_t simdDim = shapeC[1];
-    int64_t parallelDim = shapeC[0];
     // no work to do, exit.
-    if ((simdDim % 16 == 0) && (parallelDim % 6 == 0))
+    if (simdDim % 16 == 0)
       return failure();
 
     padSIMDDimension(rewriter, operands, simdDim, loc);
-    padParallelDimension(rewriter, operands, parallelDim, loc);
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, operands.c.getType(), ValueRange{operands.a, operands.b},
