@@ -13,7 +13,7 @@ add_mlir_dialect_library(MLIRStandalone
        
         # Passes 
         LinalgMapToTpp.cpp
-        TppEnforcePrecondition.cpp
+        PadSIMDDimMatmul.cpp
         TppCompiler.cpp
         CopyRemoval.cpp
         VectorizeCopy.cpp
