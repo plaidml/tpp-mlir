@@ -52,3 +52,7 @@ execute
 # --------- matmul M = 64 N = 48 and K = 96
 compile "matmul_driver_64x48x96" "matmul_kernel_64x48x96"
 execute
+
+# --------- matmul M = 48 N = 64 and K = 96
+compile "matmul_driver_48x64x96" "matmul_kernel_48x64x96"
+execute

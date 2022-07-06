@@ -43,9 +43,9 @@ void clear_matrix(struct vec_f2d *m) {
 int main(int argc, char **argv) {
   struct vec_f2d a, b, o, o_ref;
   int verbose = 0;
-  int n = 48;
+  int n = 64;
   int k = 96;
-  int m = 64;
+  int m = 48;
 
   if (vec_f2d_alloc(&a, m, k) || vec_f2d_alloc(&b, k, n) ||
       vec_f2d_alloc(&o, m, n) || vec_f2d_alloc(&o_ref, m, n)) {
