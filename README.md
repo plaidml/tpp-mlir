@@ -55,7 +55,7 @@ then you are good to go.
 - check: getSubMap
 - check: getSliceMap
 - https://libxsmm.readthedocs.io/en/latest/libxsmm_aux/#meta-image-file-io
-
+- Nice link for conv: https://d2l.ai/chapter_convolutional-neural-networks/padding-and-strides.html
 
 ```
 #trait1 = {
