@@ -2,12 +2,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "libxsmm_math.h"
 #include "libxsmm_timer.h"
 
 /* Generated matrix multiplication function under test */
 extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
                    DECL_VEC2D_FUNC_IN_ARGS(b, float),
                    DECL_VEC2D_FUNC_OUT_ARGS(o, float));
+
+extern double libxsmm_matdiff_epsilon(const libxsmm_matdiff_info *input);
 
 /* Reference implementation of a matrix multiplication */
 void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
@@ -71,16 +74,16 @@ int main(int argc, char **argv) {
   }
 
   // preheating runs
-  // for (int i = 0; i < 5; i++)
-  //  matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+  for (int i = 0; i < 5; i++)
+    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
 
   // actual runs
-  // libxsmm_timer_tickint start = libxsmm_timer_tick();
-  // for (int i = 0; i < 20; i++)
-  //  matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
-  // libxsmm_timer_tickint stop = libxsmm_timer_tick();
-  // double duration = libxsmm_timer_duration(start, stop);
-  // printf("Duration LIBXSMM: %f\n", duration);
+  libxsmm_timer_tickint start = libxsmm_timer_tick();
+  for (int i = 0; i < 20; i++)
+    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+  libxsmm_timer_tickint stop = libxsmm_timer_tick();
+  double duration = libxsmm_timer_duration(start, stop);
+  printf("Duration LIBXSMM: %f\n", duration);
 
   clear_matrix(&o);
   clear_matrix(&o_ref);
@@ -97,16 +100,30 @@ int main(int argc, char **argv) {
     puts("");
   }
 
-  if (!vec_f2d_compare(&o, &o_ref)) {
-    fputs("Result differs from reference result\n", stderr);
-    exit(1);
-  }
+  libxsmm_matdiff_info l_diff;
+  double error = 0.0;
+  libxsmm_matdiff(&l_diff, LIBXSMM_DATATYPE_F32, m, n, o_ref.allocatedPtr,
+                  o.allocatedPtr, &n, &n);
+  error = libxsmm_matdiff_epsilon(&l_diff);
+
+  printf("\nPrinting Norms:\n");
+  printf("L1 reference  : %.25g\n", l_diff.l1_ref);
+  printf("L1 test       : %.25g\n", l_diff.l1_tst);
+  printf("L2 abs.error  : %.24f\n", l_diff.l2_abs);
+  printf("L2 rel.error  : %.24f\n", l_diff.l2_rel);
+  printf("Linf abs.error: %.24f\n", l_diff.linf_abs);
+  printf("Linf rel.error: %.24f\n", l_diff.linf_rel);
+  printf("Check-norm    : %.24f\n", error);
+  printf("\n");
 
   vec_f2d_destroy(&a);
   vec_f2d_destroy(&b);
   vec_f2d_destroy(&o);
   vec_f2d_destroy(&o_ref);
 
-  fputs("Result is correct\n", stderr);
+  if (error > 0.000005)
+    fputs("Error too high\n", stderr);
+  else
+    fputs("Result is correct\n", stderr);
   return 0;
 }
