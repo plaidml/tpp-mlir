@@ -121,24 +121,21 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   int64_t n = dims[1];
   int64_t k = dims[2];
 
-  int64_t bestTileM = m - (m % 6);
-  int64_t bestTileN = n - (n % 16);
-  if (bestTileN > 64)
-    bestTileN = 64;
+  int64_t bestTileN = n;
+  if (n % 16 == 0) {
+    bestTileN = n - (n % 16);
+    if (bestTileN > 64)
+      bestTileN = 64;
+  }
   int64_t bestTileK = k;
+  int64_t bestTileM = (m % 32 == 0) ? 32 : m;
 
-  // llvm::errs() << "M: " << m << "\n";
-  // llvm::errs() << "N: " << n << "\n";
-  // llvm::errs() << "K: " << k << "\n";
-  // llvm::errs() << "bestTileM: " << bestTileM << "\n";
-  // llvm::errs() << "bestTileN: " << bestTileN << "\n";
-  // llvm::errs() << "bestTileK: " << bestTileK << "\n";
-
-  // Avoid tiling if the tile size are m, n and k.
   Location loc = linalgOp.getLoc();
   SmallVector<Value, 3> tppTiles(
       3, builder.create<arith::ConstantIndexOp>(loc, 0));
-  if ((m == bestTileM) && (n == bestTileN) && (k == bestTileK))
+
+  // do not tile.
+  if ((bestTileM == m) && (bestTileK == k) && (bestTileN == n))
     return tppTiles;
 
   tppTiles[0] = builder.create<arith::ConstantIndexOp>(loc, bestTileM);
@@ -159,7 +156,8 @@ LogicalResult tileMatmul(linalg::GenericOp linalgOp) {
   OpBuilder builder(linalgOp);
   OpBuilder::InsertionGuard guard(builder);
   linalg::LinalgTilingOptions linalgTilingOptions;
-  linalgTilingOptions.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+  linalgTilingOptions
+      .setLoopType(linalg::LinalgTilingLoopType::/*Parallel*/ Loops)
       .setTileSizeComputationFunction(getTileSizesForOptimalMapping);
   IRRewriter rewriter(builder);
   FailureOr<linalg::TiledLinalgOp> tiledOp =
@@ -268,14 +266,14 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
   ConvertLinalgToTpp(bool enabledPreconditions) {
-    this->enabledPreconditions = enabledPreconditions;
+    this->enableTilingOnMatmul = enableTilingOnMatmul;
   }
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
       if (failed(reshape2D(linalgOp)))
         return signalPassFailure();
     });
-    if (enabledPreconditions)
+    if (enableTilingOnMatmul)
       getOperation().walk(
           [&](linalg::GenericOp linalgOp) { (void)tileMatmul(linalgOp); });
     RewritePatternSet patterns(getOperation().getContext());
@@ -294,6 +292,6 @@ mlir::tpp::createConvertLinalgToTppPass() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass(bool enabledPreconditions) {
-  return std::make_unique<ConvertLinalgToTpp>(enabledPreconditions);
+mlir::tpp::createConvertLinalgToTppPass(bool enableTilingOnMatmul) {
+  return std::make_unique<ConvertLinalgToTpp>(enableTilingOnMatmul);
 }

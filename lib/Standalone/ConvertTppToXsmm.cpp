@@ -28,18 +28,28 @@ namespace {
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
+  // TODO: this must not fail. Check for non-strided memref.
+  FailureOr<int64_t> getLeadingDim(MemRefType memref) const {
+    SmallVector<int64_t> strides;
+    int64_t offset;
+    if (failed(getStridesAndOffset(memref, strides, offset)))
+      return failure();
+    return strides[0];
+  }
+
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
     MemRefType memrefC = matmulOp.getMatrixCType();
     MemRefType memrefA = matmulOp.getMatrixAType();
+    MemRefType memrefB = matmulOp.getMatrixBType();
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[1];
-    int64_t lda = m;
-    int64_t ldb = k;
-    int64_t ldc = m;
+    int64_t lda = *getLeadingDim(memrefA);
+    int64_t ldb = *getLeadingDim(memrefB);
+    int64_t ldc = *getLeadingDim(memrefC);
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});

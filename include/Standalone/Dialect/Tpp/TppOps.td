@@ -138,6 +138,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
   let extraClassDeclaration = [{
     MemRefType getMatrixCType() { return getMatrixC().getType().cast<MemRefType>(); }
     MemRefType getMatrixAType() { return getMatrixA().getType().cast<MemRefType>(); }
+    MemRefType getMatrixBType() { return getMatrixB().getType().cast<MemRefType>(); }
   }];
 
   let hasVerifier = 1;

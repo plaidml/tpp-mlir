@@ -19,7 +19,6 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
                                                 UnrankedMemRefType<float> *A,
                                                 UnrankedMemRefType<float> *B,
                                                 UnrankedMemRefType<float> *C) {
-
   // std::cout << "matrix A: \n";
   // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
   // std::cout << "\n";
@@ -35,12 +34,31 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
   DynamicMemRefType<float> matrixB = DynamicMemRefType<float>(*B);
   DynamicMemRefType<float> matrixC = DynamicMemRefType<float>(*C);
 
+  float *addr_a = matrixA.data + matrixA.offset;
+  float *addr_b = matrixB.data + matrixB.offset;
+  float *addr_c = matrixC.data + matrixC.offset;
+  /*
+    int64_t M = matrixC.sizes[0];
+    int64_t N = matrixC.sizes[1];
+    int64_t K = matrixA.sizes[1];
+
+    for (int i = 0; i < M; i++) {
+      for (int j = 0; j < N; j++) {
+        for (int k = 0; k < K; k++) {
+          float *curr_addr_a = i * matrixA.strides[0] + addr_a + k;
+          float *curr_addr_b = k * matrixB.strides[0] + addr_b + j;
+          float *curr_addr_c = i * matrixC.strides[0] + addr_c + j;
+          *curr_addr_c += (*curr_addr_a) * (*curr_addr_b);
+        }
+      }
+    }
+  */
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = (void *)matrixB.data;
-  gemm_param.b.primary = (void *)matrixA.data;
-  gemm_param.c.primary = (void *)matrixC.data;
+  gemm_param.a.primary = (void *)addr_b;
+  gemm_param.b.primary = (void *)addr_a;
+  gemm_param.c.primary = (void *)addr_c;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(funcAddr);
   sgemm.gemm(&gemm_param);
 }
@@ -51,6 +69,7 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t m, int64_t n,
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
+
   // std::cout << "m: " << m << "\n";
   // std::cout << "n: " << n << "\n";
   // std::cout << "k: " << k << "\n";
@@ -69,9 +88,9 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t m, int64_t n,
   l_shape.m = n_int;
   l_shape.n = m_int;
   l_shape.k = k_int;
-  l_shape.lda = n_int;
-  l_shape.ldb = k_int;
-  l_shape.ldc = n_int;
+  l_shape.lda = ldb;
+  l_shape.ldb = lda;
+  l_shape.ldc = ldc;
   l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
   l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
   l_shape.out_type = LIBXSMM_DATATYPE_F32;

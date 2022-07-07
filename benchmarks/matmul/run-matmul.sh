@@ -11,9 +11,9 @@ compile () {
   llc ${1}.ll
 
   # Fire tpp compiler (with xsmm conversion).
-  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp
+  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp="enable-tiling-on-matmul" -convert-tpp-to-xsmm -loop-invariant-code-motion
 
-  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o ${2}.ll
+  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o ${2}.ll
   llc ${2}.ll
 
   # Merge them.
@@ -33,7 +33,7 @@ compile () {
 execute () {
   # Execute and check result.
   ./matmul > result.txt 2>&1
-  rm matmul
+  rm matmul 
 
  if cat result.txt | grep "Result is correct" &> /dev/null ; then
     printf "${GREEN} OK ${NC} \n"
@@ -49,10 +49,14 @@ execute () {
 compile "matmul_driver_12x6x9" "matmul_kernel_12x6x9"
 execute
 
-# --------- matmul M = 64 N = 48 and K = 96
+# ----- matmul M = 64 N = 48 and K = 96
 compile "matmul_driver_64x48x96" "matmul_kernel_64x48x96"
 execute
 
-# --------- matmul M = 48 N = 64 and K = 96
+# ----- matmul M = 48 N = 64 and K = 96
 compile "matmul_driver_48x64x96" "matmul_kernel_48x64x96"
+execute
+
+# ----- matmul M = 64 N = 64 and K = 64
+compile "matmul_driver_64x64x64" "matmul_kernel_64x64x64"
 execute

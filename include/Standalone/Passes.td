@@ -34,8 +34,8 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
   let options = [
-    Option<"enabledPreconditions", "enabled-tpp-preconditions", "bool", "false",
-           "Try to select optimal tile sizes before mapping to tpp.">
+    Option<"enableTilingOnMatmul", "enable-tiling-on-matmul", "bool", "false",
+           "Try to select optimal tile sizes before mapping to tpp for matmul.">
   ];
 }
 
