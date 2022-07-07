@@ -131,11 +131,12 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[NoSideEffect]> {
     See 'ternary.dispatch'.
   }];
   
-  let arguments = (ins Xsmm_BinaryKind:$kind, DenseI64ArrayAttr:$inputs);
+  let arguments = (ins Xsmm_BinaryKind:$kind, DenseI64ArrayAttr:$inputs,
+                       Xsmm_BinaryFlags:$flags);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs attr-dict 
+    $kind $inputs `(` $flags `)` attr-dict 
   }]; 
 }
 

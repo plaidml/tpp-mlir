@@ -24,6 +24,8 @@ enum class UnaryKind : uint64_t;
 class UnaryKindAttr;
 enum class UnaryFlags : uint64_t;
 class UnaryFlagsAttr;
+enum class BinaryFlags : uint64_t;
+class BinaryFlagsAttr;
 } // namespace xsmm
 } // namespace mlir
 

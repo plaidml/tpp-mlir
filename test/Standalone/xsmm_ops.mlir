@@ -21,7 +21,7 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
   xsmm.ternary.dispatch matmul [3, 2, 1]
 
   // CHECK: xsmm.binary.dispatch
-  xsmm.binary.dispatch add [3, 2, 1]
+  xsmm.binary.dispatch add [3, 2, 1] (none)
 
   // CHECK: xsmm.unary.dispatch
   xsmm.unary.dispatch identity [3, 2, 1] (bcast_row)

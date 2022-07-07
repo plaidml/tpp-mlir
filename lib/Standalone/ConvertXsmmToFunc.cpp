@@ -133,9 +133,9 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildInvokeCall(binaryOp.getLoc(),
-                                  stringifyEnum(binaryOp.getCallee()).str(),
-                                  binaryOp, rewriter))) {
+    std::string funcName = "binary";
+    if (succeeded(
+            buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp, rewriter))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }
@@ -207,7 +207,39 @@ struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
 
   LogicalResult matchAndRewrite(BinaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    return failure();
+    Location loc = dispatchOp.getLoc();
+    std::string kindAsString = "xsmm_binary_dispatch";
+    FlatSymbolRefAttr fnName =
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
+
+    // TODO: duplicate code with `ConvertUnaryDispatch`.
+    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
+    SmallVector<Value, 10> dispatchOperands;
+    SmallVector<Type, 10> dispatchOperandTypes;
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
+    size_t arrayAttrSize = integers.size();
+    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
+      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
+      dispatchOperands.push_back(
+          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
+      dispatchOperandTypes.push_back(integer64);
+    }
+
+    // kind of operation to invoke.
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getKindAttr()));
+    dispatchOperandTypes.push_back(integer64);
+
+    // kind of broadcast
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getFlagsAttr()));
+    dispatchOperandTypes.push_back(integer64);
+
+    func::CallOp call = buildDispatchCall(
+        loc, dispatchOperands, dispatchOperandTypes, module, fnName, rewriter);
+    rewriter.replaceOp(dispatchOp, call.getResult(0));
+    return success();
   }
 };
 

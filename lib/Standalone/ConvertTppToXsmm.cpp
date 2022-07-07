@@ -25,17 +25,17 @@ using namespace mlir::tpp;
 
 namespace {
 
+// TODO: this must not fail. Check for non-strided memref.
+static FailureOr<int64_t> getLeadingDim(MemRefType memref) {
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memref, strides, offset)))
+    return failure();
+  return strides[0];
+}
+
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
-
-  // TODO: this must not fail. Check for non-strided memref.
-  FailureOr<int64_t> getLeadingDim(MemRefType memref) const {
-    SmallVector<int64_t> strides;
-    int64_t offset;
-    if (failed(getStridesAndOffset(memref, strides, offset)))
-      return failure();
-    return strides[0];
-  }
 
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -233,10 +233,51 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   }
 };
 
+struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
+  using OpRewritePattern<AddOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AddOp addOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = addOp.getLoc();
+    // no conversion if the add is a scalar operation.
+    Type outputType = addOp.getOutput().getType();
+    if (!outputType.isa<ShapedType>())
+      return failure();
+
+    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
+    int64_t ldiLhs =
+        *getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
+    int64_t ldiRhs =
+        *getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
+    int64_t ldo = *getLeadingDim(outputMemRef);
+
+    xsmm::BinaryFlags bCast = xsmm::BinaryFlags::NONE;
+    xsmm::BinaryKindAttr attr =
+        xsmm::BinaryKindAttr::get(addOp.getContext(), xsmm::BinaryKind::ADD);
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldiLhs, ldiRhs, ldo});
+    xsmm::BinaryFlagsAttr bCastAttr =
+        xsmm::BinaryFlagsAttr::get(addOp.getContext(), bCast);
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    Value dispatched = rewriter.create<xsmm::BinaryDispatchOp>(
+        loc, integer64, attr, dims, bCastAttr);
+
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(addOp->getOperands().begin(),
+                          addOp->getOperands().end());
+    rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(addOp, attr, invokeOperands);
+    return success();
+  }
+};
+
 void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppIdentityOp,
                ConvertTppReluOp,
+               ConvertTppAddOp,
                ConvertTppMatmulOp>(patterns.getContext());
   // clang-format on
 }

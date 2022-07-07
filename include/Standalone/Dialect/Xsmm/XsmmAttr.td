@@ -48,3 +48,11 @@ def Xsmm_UnaryFlags : I64EnumAttr<
     ]> {
   let cppNamespace = "mlir::xsmm";
 }
+
+def Xsmm_BinaryFlags : I64EnumAttr<
+    "BinaryFlags", "",
+    [
+      I64EnumAttrCase<"NONE", 0, "none">
+    ]> {
+  let cppNamespace = "mlir::xsmm";
+}
