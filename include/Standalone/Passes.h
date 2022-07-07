@@ -50,7 +50,8 @@ namespace tpp {
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass(bool);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertLinalgToTppPass(bool, ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createTppEnforcePreconditions();
 std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToVectorPass();

@@ -146,7 +146,8 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
 
 // Tile the generic operation (annotated with tpp.matmul) such that
 // we can select the best micro-kernel.
-LogicalResult tileMatmul(linalg::GenericOp linalgOp) {
+LogicalResult tileMatmul(linalg::GenericOp linalgOp,
+                         ArrayRef<int64_t> tileSizes) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
   std::string libraryCall = linalgOp.getLibraryCallName();
@@ -156,9 +157,15 @@ LogicalResult tileMatmul(linalg::GenericOp linalgOp) {
   OpBuilder builder(linalgOp);
   OpBuilder::InsertionGuard guard(builder);
   linalg::LinalgTilingOptions linalgTilingOptions;
-  linalgTilingOptions
-      .setLoopType(linalg::LinalgTilingLoopType::/*Parallel*/ Loops)
-      .setTileSizeComputationFunction(getTileSizesForOptimalMapping);
+  linalgTilingOptions.setLoopType(
+      linalg::LinalgTilingLoopType::/*Parallel*/ Loops);
+
+  if (tileSizes.size() == 3)
+    linalgTilingOptions.setTileSizes(tileSizes);
+  else
+    linalgTilingOptions.setTileSizeComputationFunction(
+        getTileSizesForOptimalMapping);
+
   IRRewriter rewriter(builder);
   FailureOr<linalg::TiledLinalgOp> tiledOp =
       linalg::tileLinalgOp(rewriter, linalgOp, linalgTilingOptions);
@@ -265,17 +272,19 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 // because the builder is not properly propagated. But investigate more.
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
-  ConvertLinalgToTpp(bool enabledPreconditions) {
+  ConvertLinalgToTpp(bool enabledPreconditions, ArrayRef<int64_t> tileSizes) {
     this->enableTilingOnMatmul = enableTilingOnMatmul;
+    this->tileSizes = tileSizes;
   }
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
       if (failed(reshape2D(linalgOp)))
         return signalPassFailure();
     });
-    if (enableTilingOnMatmul)
-      getOperation().walk(
-          [&](linalg::GenericOp linalgOp) { (void)tileMatmul(linalgOp); });
+    if (enableTilingOnMatmul || tileSizes.size())
+      getOperation().walk([&](linalg::GenericOp linalgOp) {
+        (void)tileMatmul(linalgOp, tileSizes);
+      });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
@@ -292,6 +301,7 @@ mlir::tpp::createConvertLinalgToTppPass() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass(bool enableTilingOnMatmul) {
-  return std::make_unique<ConvertLinalgToTpp>(enableTilingOnMatmul);
+mlir::tpp::createConvertLinalgToTppPass(bool enableTilingOnMatmul,
+                                        ArrayRef<int64_t> tileSizes) {
+  return std::make_unique<ConvertLinalgToTpp>(enableTilingOnMatmul, tileSizes);
 }

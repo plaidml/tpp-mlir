@@ -35,7 +35,8 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let dependentDialects = ["linalg::LinalgDialect"];
   let options = [
     Option<"enableTilingOnMatmul", "enable-tiling-on-matmul", "bool", "false",
-           "Try to select optimal tile sizes before mapping to tpp for matmul.">
+           "Try to select optimal tile sizes before mapping to tpp for matmul.">,
+    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
   ];
 }
 
