@@ -27,9 +27,13 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Convert linalg to tpp.";
   let description = [{
     Convert marked linalg.generic operation to tpp operations. Before mapping
-    to tpp the conversion makes sure to resize all the tensors to 2d by
-    tiling all but the two innermost dimensions. This pass runs at buffer level
-    as we want to preserve parallel semantics when tiling.
+    to tpp the conversion makes sure to resize all the tensors to 2d by tiling all
+    but the two innermost dimensions. This pass runs at buffer level as we want to
+    preserve parallel semantics when tiling. We do an additional round of tiling to
+    select the best tpp for matmul - SIMD dimension multiple of 16 - 64 the
+    optimal, the other parallel dimension with a tile factor of 32 while we do not
+    tile the reduction dimension. We bail out if we cannot generate full tiles. 
+    The user can pass tile sizes using 'tile-sizes' options.
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
@@ -40,13 +44,12 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   ];
 }
 
-def EnforcePreconditionsToTpp : Pass<"enforce-tpp-preconditions", "func::FuncOp"> {
-  let summary = "Enforce preconditions for tpp mapping.";
-  let constructor = "mlir::tpp::createTppEnforcePreconditions()";
+def PadSIMDDimensionForMatmulTpp : Pass<"pad-simd-dim-for-matmul", "func::FuncOp"> {
+  let summary = "Enforce padding for tpp matmul mapping on the SIMD dimension.";
+  let constructor = "mlir::tpp::createPasSIMDDimensionPass()";
   let description = [{
     Enforce some preconditions to efficiently map on tpp micro-kernels.
-    For tpp.matmul we pad the SIMD dimension (N) to be multiple of 16,
-    and the parallel dimension (M) to be multiple of 6.
+    For tpp.matmul we pad the SIMD dimension (N) to be multiple of 16.
   }];
   let dependentDialects = ["linalg::LinalgDialect", 
                            "memref::MemRefDialect"];
@@ -56,7 +59,7 @@ def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
   let summary = "Convert tpp to the vector dialect";
   let constructor = "mlir::tpp::createConvertTppToVectorPass()";
   let description = [{
-    Convert tpp operations to the vector dialect.
+    Convert tpp operations to the vector dialect. Currently WIP.
   }];
   let dependentDialects = ["vector::VectorDialect"];
 }
@@ -88,17 +91,6 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def CopyRemoval : Pass<"remove-extra-copies", "func::FuncOp"> {
-  let summary = "Remove extra memref.copy operations";
-  let constructor = "mlir::tpp::createCopyRemovalPass()";
-  let description = [{
-    The extra copies are side-effect of bufferization. We 
-    will remove the pass once we understand how to bufferize
-    properly or the bufferization passes are adjusted.
-  }];
-  let dependentDialects = ["memref::MemRefDialect"];
-}
-
 def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
   let summary = "Vectorize copy operation using Linalg";
   let constructor = "mlir::tpp::createVectorizeCopyPass()";
@@ -118,7 +110,7 @@ def MainClosure : Pass<"main-closure", "ModuleOp"> {
 }
 
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
-  let summary = "Build tpp compiler pipeline";
+  let summary = "Build tpp compiler pipeline - WIP do not use";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";
   let options = [
     Option<"enablePreconditions", "enable-tpp-preconditions", "bool", "false",

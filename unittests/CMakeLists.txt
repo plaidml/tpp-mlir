@@ -6,7 +6,7 @@ endfunction()
 
 add_tpp_unittest(TppUnitTests 
   Smoke.cpp
-  )
+)
 
 target_link_libraries(TppUnitTests
   PRIVATE

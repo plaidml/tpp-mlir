@@ -15,7 +15,6 @@ add_mlir_dialect_library(MLIRStandalone
         LinalgMapToTpp.cpp
         PadSIMDDimMatmul.cpp
         TppCompiler.cpp
-        CopyRemoval.cpp
         VectorizeCopy.cpp
         PreBufferization.cpp
         MainClosure.cpp

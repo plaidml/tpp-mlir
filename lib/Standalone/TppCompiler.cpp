@@ -46,7 +46,7 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
   // enforce-tpp-preconditions
   if (enablePreconditions)
-    pm.addNestedPass<func::FuncOp>(createTppEnforcePreconditions());
+    pm.addNestedPass<func::FuncOp>(createPasSIMDDimensionPass());
   // func-bufferize
   pm.addPass(func::createFuncBufferizePass());
   // linalg-bufferize

@@ -661,8 +661,8 @@ void populateEnforcePaddingOnSIMDAndParallelDims(RewritePatternSet &patterns) {
   // clang-format on
 }
 
-struct EnforcePreconditionsToTpp
-    : EnforcePreconditionsToTppBase<EnforcePreconditionsToTpp> {
+struct PadSIMDDimensionForMatmulTpp
+    : PadSIMDDimensionForMatmulTppBase<PadSIMDDimensionForMatmulTpp> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateEnforcePaddingOnSIMDAndParallelDims(patterns);
@@ -674,6 +674,6 @@ struct EnforcePreconditionsToTpp
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTppEnforcePreconditions() {
-  return std::make_unique<EnforcePreconditionsToTpp>();
+mlir::tpp::createPasSIMDDimensionPass() {
+  return std::make_unique<PadSIMDDimensionForMatmulTpp>();
 }
