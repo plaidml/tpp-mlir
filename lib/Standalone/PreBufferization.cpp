@@ -50,50 +50,29 @@ static bool isReadOnly(Value v) {
       .Default([&](Operation *op) { return false; });
 }
 
-// Make sure that the generic op does not copy.
-// Whoever call the function expects the result
-// to be in the destination operand. You cannot
-// remove the second operand. Simply check to
-// have only a yield.
-static bool hasCopySemantics(linalg::GenericOp op) {
-  int numInput = op->getNumOperands() - op->getNumResults();
-  if (numInput != 1)
-    return false;
-  Region &region = op.getRegion();
-  if (!region.hasOneBlock())
-    return false;
-  return std::distance(region.front().begin(), region.front().end()) == 1;
-}
-
-/// Taken from IREE
+/// Taken from IREE - allows RELU to bufferize in place.
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
-/// https://github.com/iree-org/iree/issues/8303
+/// https://github.com/iree-org/iree/issues/8303.
 struct AdaptLinalgInputOperandToOutputOperand
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
-    // All the loops should be parallel loops.
-    if (op.getNumLoops() != op.getNumParallelLoops())
-      return failure();
-    // There is only one result tensor.
-    if (op->getNumResults() != 1)
-      return failure();
-    // The output tensor is unused in the body computation.
-    auto *outputOperand = op.getOutputOperand(0);
-    if (op.payloadUsesValueFromOperand(outputOperand))
+    std::string libraryCall = op.getLibraryCallName();
+    if (libraryCall.compare("tpp.relu") != 0)
       return failure();
 
     // Find an input operand which meets:
     //   1. It has the same indexing map and type.
     //   2. It is not from a readonly tensor.
+    OpOperand *outputOperand = op.getOutputOperand(0);
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto *in : op.getInputOperands()) {
-      if (!operand && !isReadOnly(in->get()) && !hasCopySemantics(op) &&
+      if (!operand && !isReadOnly(in->get()) &&
           op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
