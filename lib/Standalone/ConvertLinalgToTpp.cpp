@@ -160,10 +160,15 @@ getTileSizesForOptimalMappingImpl(OpBuilder &builder,
   arith::ConstantIndexOp index32 =
       builder.create<arith::ConstantIndexOp>(loc, 32);
   for (size_t idx = 0; idx < dims.size(); idx++) {
-    if (dims[idx] % 32 == 0)
-      tppTiles[idx] = index32;
+    if (dims[idx] % 32 == 0) {
+      if (dims[idx] == 32)
+        tppTiles[idx] = index0;
+      else
+        tppTiles[idx] = index32;
+    }
     // do not tile.
-    tppTiles[idx] = index0;
+    else
+      tppTiles[idx] = index0;
   }
   return tppTiles;
 }
@@ -303,7 +308,7 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
   ConvertLinalgToTpp(bool enabledPreconditions, ArrayRef<int64_t> tileSizes) {
-    this->enableTilingOnMatmul = enableTilingOnMatmul;
+    this->enableTiling = enableTiling;
     this->tileSizes = tileSizes;
   }
   void runOnOperation() override {
@@ -311,7 +316,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
       if (failed(reshape2D(linalgOp)))
         return signalPassFailure();
     });
-    if (enableTilingOnMatmul || tileSizes.size())
+    if (enableTiling || tileSizes.size())
       getOperation().walk([&](linalg::GenericOp linalgOp) {
         (void)tileLinalgOp(linalgOp, tileSizes);
       });
@@ -331,7 +336,7 @@ mlir::tpp::createConvertLinalgToTppPass() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass(bool enableTilingOnMatmul,
+mlir::tpp::createConvertLinalgToTppPass(bool enableTiling,
                                         ArrayRef<int64_t> tileSizes) {
-  return std::make_unique<ConvertLinalgToTpp>(enableTilingOnMatmul, tileSizes);
+  return std::make_unique<ConvertLinalgToTpp>(enableTiling, tileSizes);
 }
