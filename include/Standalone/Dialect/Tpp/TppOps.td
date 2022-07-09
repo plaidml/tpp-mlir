@@ -61,7 +61,7 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
 def Tpp_IdentityOp : Tpp_Op<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
-    The `tpp.identity` copies input to output. It performs datatype conversion.
+    The `tpp.identity` copies input to output.
     
     Example:
 
