@@ -115,9 +115,10 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
   return success();
 }
 
-// Try to select optimal tile sizes.
-static SmallVector<Value, 3>
-getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
+// Tile sizes selection specific for matmul.
+static SmallVector<Value>
+getTileSizesForOptimalMappingMatmulImpl(OpBuilder &builder,
+                                        linalg::LinalgOp linalgOp) {
   SmallVector<int64_t> dims = linalgOp.computeStaticLoopSizes();
   int64_t m = dims[0];
   int64_t n = dims[1];
@@ -133,8 +134,8 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   int64_t bestTileM = (m % 32 == 0) ? 32 : m;
 
   Location loc = linalgOp.getLoc();
-  SmallVector<Value, 3> tppTiles(
-      3, builder.create<arith::ConstantIndexOp>(loc, 0));
+  SmallVector<Value> tppTiles(3,
+                              builder.create<arith::ConstantIndexOp>(loc, 0));
 
   // do not tile.
   if ((bestTileM == m) && (bestTileK == k) && (bestTileN == n))
@@ -146,14 +147,41 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   return tppTiles;
 }
 
-// Tile the generic operation (annotated with tpp.matmul) such that
-// we can select the best micro-kernel.
-LogicalResult tileMatmul(linalg::GenericOp linalgOp,
-                         ArrayRef<int64_t> tileSizes) {
+// Tile sizes selection for all the other tpp ops.
+static SmallVector<Value>
+getTileSizesForOptimalMappingImpl(OpBuilder &builder,
+                                  linalg::LinalgOp linalgOp) {
+  Location loc = linalgOp.getLoc();
+  SmallVector<int64_t> dims = linalgOp.computeStaticLoopSizes();
+  arith::ConstantIndexOp index0 =
+      builder.create<arith::ConstantIndexOp>(loc, 0);
+  SmallVector<Value> tppTiles(dims.size(), index0);
+
+  arith::ConstantIndexOp index32 =
+      builder.create<arith::ConstantIndexOp>(loc, 32);
+  for (size_t idx = 0; idx < dims.size(); idx++) {
+    if (dims[idx] % 32 == 0)
+      tppTiles[idx] = index32;
+    // do not tile.
+    tppTiles[idx] = index0;
+  }
+  return tppTiles;
+}
+
+// Try to select optimal tile sizes.
+static SmallVector<Value>
+getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
+  if (isMarkedWithTpp(linalgOp, "tpp.matmul"))
+    return getTileSizesForOptimalMappingMatmulImpl(builder, linalgOp);
+  return getTileSizesForOptimalMappingImpl(builder, linalgOp);
+}
+
+// Tile the generic operation such that we can select the best micro-kernel.
+LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
+                           ArrayRef<int64_t> tileSizes) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
-  std::string libraryCall = linalgOp.getLibraryCallName();
-  if (libraryCall.compare("tpp.matmul") != 0)
+  if (!hasTppMark(linalgOp))
     return failure();
 
   OpBuilder builder(linalgOp);
@@ -162,7 +190,7 @@ LogicalResult tileMatmul(linalg::GenericOp linalgOp,
   linalgTilingOptions.setLoopType(
       linalg::LinalgTilingLoopType::/*Parallel*/ Loops);
 
-  if (tileSizes.size() == 3)
+  if (tileSizes.size())
     linalgTilingOptions.setTileSizes(tileSizes);
   else
     linalgTilingOptions.setTileSizeComputationFunction(
@@ -285,7 +313,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
     });
     if (enableTilingOnMatmul || tileSizes.size())
       getOperation().walk([&](linalg::GenericOp linalgOp) {
-        (void)tileMatmul(linalgOp, tileSizes);
+        (void)tileLinalgOp(linalgOp, tileSizes);
       });
     RewritePatternSet patterns(getOperation().getContext());
     populateConvertLinalgToTppPatterns(patterns);
