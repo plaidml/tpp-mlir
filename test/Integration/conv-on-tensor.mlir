@@ -9,7 +9,7 @@
 module {
 
   func.func @convgemm(%o: tensor<1x2x2x8xf32>, %f: tensor<2x2x3x8xf32>,
-                     %i: tensor<1x4x4x3xf32>) -> tensor<1x2x2x8xf32>  {
+                      %i: tensor<1x3x3x3xf32>) -> tensor<1x2x2x8xf32>  {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -23,7 +23,7 @@ module {
               : tensor<2x2x3x8xf32> to tensor<3x8xf32>
             %2 = affine.apply #map1(%arg5, %arg7)
             %tsi = tensor.extract_slice %i[%arg3, %2, %arg9, 0][1, 1, 2, 3][1, 1, 1, 1]
-              : tensor<1x4x4x3xf32> to tensor<2x3xf32>
+              : tensor<1x3x3x3xf32> to tensor<2x3xf32>
             %mul = linalg.matmul ins(%tsi, %tsf: tensor<2x3xf32>, tensor<3x8xf32>)
                                  outs(%tso: tensor<2x8xf32>) -> tensor<2x8xf32>
             %y = tensor.insert_slice %mul into %arg10[%arg3, %arg5, 0, 0][1, 1, 2, 8][1, 1, 1, 1]
@@ -40,10 +40,10 @@ module {
   }
 
   func.func @convref(%o: tensor<1x2x2x8xf32>, %f: tensor<2x2x3x8xf32>,
-                     %i: tensor<1x4x4x3xf32>) -> tensor<1x2x2x8xf32>  {
+                     %i: tensor<1x3x3x3xf32>) -> tensor<1x2x2x8xf32>  {
     %OO = linalg.conv_2d_nhwc_hwcf { dilations = dense<[1,1]> : tensor<2xi64>,
                                     strides = dense<[1,1]> : tensor<2xi64> }
-      ins(%i, %f: tensor<1x4x4x3xf32>, tensor<2x2x3x8xf32>) outs(%o: tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
+      ins(%i, %f: tensor<1x3x3x3xf32>, tensor<2x2x3x8xf32>) outs(%o: tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
     return %OO: tensor<1x2x2x8xf32>
   }
 
@@ -82,15 +82,14 @@ module {
     return %0 : tensor<2x2x3x8xf32>
   }
 
-  func.func @fillinput(%i: tensor<1x4x4x3xf32>) -> tensor<1x4x4x3xf32> {
+  func.func @fillinput(%i: tensor<1x3x3x3xf32>) -> tensor<1x3x3x3xf32> {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c3 = arith.constant 3 : index
-    %c4 = arith.constant 4 : index
-    %0 = scf.for %arg0 = %c0 to %c1 step %c1 iter_args(%arg1 = %i) -> tensor<1x4x4x3xf32> {
-      %1 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg1) -> tensor<1x4x4x3xf32> {
-        %2 = scf.for %arg4 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg3) -> tensor<1x4x4x3xf32> {
-          %3 = scf.for %arg6 = %c0 to %c3 step %c1 iter_args(%arg7 = %arg5) -> tensor<1x4x4x3xf32> {
+    %0 = scf.for %arg0 = %c0 to %c1 step %c1 iter_args(%arg1 = %i) -> tensor<1x3x3x3xf32> {
+      %1 = scf.for %arg2 = %c0 to %c3 step %c1 iter_args(%arg3 = %arg1) -> tensor<1x3x3x3xf32> {
+        %2 = scf.for %arg4 = %c0 to %c3 step %c1 iter_args(%arg5 = %arg3) -> tensor<1x3x3x3xf32> {
+          %3 = scf.for %arg6 = %c0 to %c3 step %c1 iter_args(%arg7 = %arg5) -> tensor<1x3x3x3xf32> {
           
             %a = arith.index_cast %arg0 : index to i32
             %aa = arith.index_cast %arg2 : index to i32
@@ -104,16 +103,16 @@ module {
             %ll = arith.addf %l, %ccc : f32
             %lll = arith.addf %ll, %cccc : f32
           
-            %ii = tensor.insert %lll into %arg7[%arg0, %arg2, %arg4, %arg6] : tensor<1x4x4x3xf32>
-            scf.yield %ii : tensor<1x4x4x3xf32>
+            %ii = tensor.insert %lll into %arg7[%arg0, %arg2, %arg4, %arg6] : tensor<1x3x3x3xf32>
+            scf.yield %ii : tensor<1x3x3x3xf32>
           }
-          scf.yield %3 : tensor<1x4x4x3xf32>
+          scf.yield %3 : tensor<1x3x3x3xf32>
         }
-        scf.yield %2 : tensor<1x4x4x3xf32>
+        scf.yield %2 : tensor<1x3x3x3xf32>
       }
-      scf.yield %1 : tensor<1x4x4x3xf32>
+      scf.yield %1 : tensor<1x3x3x3xf32>
     }
-    return %0 : tensor<1x4x4x3xf32>
+    return %0 : tensor<1x3x3x3xf32>
   }
 
   func.func @entry() {
@@ -129,10 +128,10 @@ module {
     %Ffill = call @fillfilter(%F) : (tensor<2x2x3x8xf32>) -> tensor<2x2x3x8xf32>
 
     // N H W C
-    %I = arith.constant dense<0.0> : tensor<1x4x4x3xf32>
-    %Ifill = call @fillinput(%I) : (tensor<1x4x4x3xf32>) -> tensor<1x4x4x3xf32>
+    %I = arith.constant dense<0.0> : tensor<1x3x3x3xf32>
+    %Ifill = call @fillinput(%I) : (tensor<1x3x3x3xf32>) -> tensor<1x3x3x3xf32>
 
-    %0 = call @convgemm(%O, %Ffill, %Ifill) : (tensor<1x2x2x8xf32>, tensor<2x2x3x8xf32>, tensor<1x4x4x3xf32>) -> tensor<1x2x2x8xf32> 
+    %0 = call @convgemm(%O, %Ffill, %Ifill) : (tensor<1x2x2x8xf32>, tensor<2x2x3x8xf32>, tensor<1x3x3x3xf32>) -> tensor<1x2x2x8xf32> 
    
     //
     // CHECK:       ( ( ( ( 62, 86, 110, 134, 158, 182, 206, 230 ), 
@@ -146,7 +145,7 @@ module {
     vector.print %v0 : vector<1x2x2x8xf32>
 
     %Oref = arith.constant dense<0.0> : tensor<1x2x2x8xf32>
-    %1 = call @convref(%Oref, %Ffill, %Ifill) : (tensor<1x2x2x8xf32>, tensor<2x2x3x8xf32>, tensor<1x4x4x3xf32>) -> tensor<1x2x2x8xf32>
+    %1 = call @convref(%Oref, %Ffill, %Ifill) : (tensor<1x2x2x8xf32>, tensor<2x2x3x8xf32>, tensor<1x3x3x3xf32>) -> tensor<1x2x2x8xf32>
 
     //
     // CHECK:       ( ( ( ( 62, 86, 110, 134, 158, 182, 206, 230 ), 
