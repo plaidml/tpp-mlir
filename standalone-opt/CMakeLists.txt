@@ -5,6 +5,7 @@ set(LIBS
         ${conversion_libs}
         MLIROptLib
         MLIRStandalone
+        standalone_c_runner_utils
         )
 add_llvm_executable(standalone-opt standalone-opt.cpp)
 
