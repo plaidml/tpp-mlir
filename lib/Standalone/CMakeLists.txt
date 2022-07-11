@@ -18,6 +18,7 @@ add_mlir_dialect_library(MLIRStandalone
         VectorizeCopy.cpp
         PreBufferization.cpp
         MainClosure.cpp
+        Bufferization.cpp
 
         # Conversions
         ConvertTppToVector.cpp  
