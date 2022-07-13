@@ -10,6 +10,8 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/Xsmm/XsmmOps.cpp
         Dialect/Xsmm/XsmmDialect.cpp
         Dialect/Xsmm/XsmmAttr.cpp
+        Dialect/LinalgX/LinalgXOps.cpp
+        Dialect/LinalgX/LinalgXDialect.cpp
        
         # Passes 
         LinalgMapToTpp.cpp

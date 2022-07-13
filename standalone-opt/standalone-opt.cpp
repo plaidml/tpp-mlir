@@ -27,6 +27,8 @@
 #include "Standalone/Dialect/Tpp/TppOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Xsmm/XsmmDialect.h"
 #include "Standalone/Dialect/Xsmm/XsmmOpsDialect.cpp.inc"
+#include "Standalone/Dialect/LinalgX/LinalgXDialect.h"
+#include "Standalone/Dialect/LinalgX/LinalgXOpsDialect.cpp.inc"
 #include "Standalone/Passes.h"
 
 int main(int argc, char **argv) {
@@ -38,6 +40,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::mathx::MathxDialect>();
   registry.insert<mlir::stdx::StdxDialect>();
   registry.insert<mlir::xsmm::XsmmDialect>();
+  registry.insert<mlir::linalgx::LinalgXDialect>();
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated
