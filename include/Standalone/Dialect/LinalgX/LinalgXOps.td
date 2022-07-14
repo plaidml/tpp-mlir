@@ -38,7 +38,8 @@ def LinalgX_BrgemmOp : LinalgX_Op<"brgemm", [
     I64ArrayAttr:$static_offsets_col_matrixB,
     I64ArrayAttr:$static_sizes_matrixB,
 
-    AnyRankedTensor:$matrixC
+    AnyRankedTensor:$matrixC,
+    Index:$batch
   );
   let results = (outs AnyRankedTensor:$result);
   
@@ -59,7 +60,8 @@ def LinalgX_BrgemmOp : LinalgX_Op<"brgemm", [
                                                    $static_offsets_col_matrixB)
     custom<OperandsOrIntegersSizesList>($sizesTileMatrixB, 
                                         $static_sizes_matrixB)
-    `:` type($matrixB)
+    `:` type($matrixB) `,`
+     $batch `:` type($batch)
     `)`
     `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict `->` type(results)
   }];
