@@ -119,7 +119,7 @@ struct PadSIMDAndParallelDimensionForGemm
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, operands.c.getType(), ValueRange{operands.a, operands.b},
         ValueRange{operands.c}, linalgOp.getIndexingMaps(),
-        llvm::to_vector<4>(
+        llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.matmul");
     rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
@@ -266,7 +266,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
         loc, sliceOperandType, ValueRange{slice.source()},
         ValueRange{reluBuffer}, linalgOp.getIndexingMaps(),
-        llvm::to_vector<4>(
+        llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.relu");
     rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
