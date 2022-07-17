@@ -647,7 +647,7 @@ struct AllocateInitTensor : public OpRewritePattern<linalg::InitTensorOp> {
   }
 };
 
-void populateEnforcePaddingOnSIMDAndParallelDims(RewritePatternSet &patterns) {
+void populateEnforcePaddingOnSIMDDim(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<PadSIMDAndParallelDimensionForGemm,
                FusePadOp,
@@ -665,7 +665,7 @@ struct PadSIMDDimensionForMatmulTpp
     : PadSIMDDimensionForMatmulTppBase<PadSIMDDimensionForMatmulTpp> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateEnforcePaddingOnSIMDAndParallelDims(patterns);
+    populateEnforcePaddingOnSIMDDim(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

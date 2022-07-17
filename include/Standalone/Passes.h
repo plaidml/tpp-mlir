@@ -62,6 +62,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizeCopyPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPreBufferizationPass();
 std::unique_ptr<OperationPass<ModuleOp>> createMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createTileConsumerAndFuseProducersPass();
 
 } // namespace tpp
 } // namespace mlir

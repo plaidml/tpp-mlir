@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/StringSet.h"
@@ -106,8 +107,48 @@ struct AdaptLinalgInputOperandToOutputOperand
   }
 };
 
+struct SwapOperandWithIterAtrg
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    // Check if any iter args alias 'source' and if so
+    // update the extract slice to extract from the iter
+    // args to avoid an extra alloc during bufferization.
+    Value source = sliceOp.source();
+    Operation *parent = sliceOp->getParentOp();
+    if (!parent || !isa<scf::ForOp>(parent))
+      return failure();
+
+    BlockArgument replacement = nullptr;
+    while (!isa<func::FuncOp>(parent)) {
+      Operation *currentParent = parent;
+      if (scf::ForOp forOp = dyn_cast_or_null<scf::ForOp>(currentParent)) {
+        if (forOp.hasIterOperands())
+          for (OpOperand &operand : forOp.getIterOpOperands())
+            if (operand.get() == source) {
+              replacement = forOp.getRegionIterArgForOpOperand(operand);
+              break;
+            }
+      }
+      parent = currentParent->getParentOp();
+    }
+
+    if (!replacement)
+      return failure();
+
+    rewriter.updateRootInPlace(
+        sliceOp, [&]() { sliceOp.getSourceMutable().assign(replacement); });
+    return success();
+  }
+};
+
 void populatePreBufferizationPatterns(RewritePatternSet &patterns) {
-  patterns.add<AdaptLinalgInputOperandToOutputOperand>(patterns.getContext());
+  // clang-format off
+  patterns.add<AdaptLinalgInputOperandToOutputOperand, 
+               SwapOperandWithIterAtrg>(patterns.getContext());
+  // clang-format on
 }
 
 struct PreBufferization : public PreBufferizationBase<PreBufferization> {

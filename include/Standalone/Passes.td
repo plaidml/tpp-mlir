@@ -125,4 +125,10 @@ def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   ];
 }
 
+def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
+                                        "func::FuncOp"> {
+  let summary = "Tile consumers and fuse producers";
+  let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES

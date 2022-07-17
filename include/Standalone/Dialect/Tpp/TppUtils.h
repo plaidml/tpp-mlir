@@ -9,6 +9,8 @@
 #ifndef TPP_UTILS_H
 #define TPP_UTILS_H
 
+#include <string>
+
 namespace mlir {
 
 namespace linalg {
