@@ -23,7 +23,7 @@ using namespace mlir::tpp;
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
 
-#define DEBUG_TYPE "enforce-tpp-preconditions"
+#define DEBUG_TYPE "pad-simd-dim-matmul"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 namespace {
