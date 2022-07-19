@@ -129,6 +129,9 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
                                         "func::FuncOp"> {
   let summary = "Tile consumers and fuse producers";
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
+  let options = [
+    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
+  ];
 }
 
 #endif // STANDALONE_DIALECT_TPP_PASSES

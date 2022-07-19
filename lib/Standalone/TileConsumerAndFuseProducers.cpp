@@ -25,7 +25,10 @@ using namespace mlir;
 namespace {
 
 struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  FuseGenericOp(MLIRContext *context, ArrayRef<int64_t> tileSizes,
+                PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::GenericOp>(context, benefit),
+        tileSizes(tileSizes) {}
 
   // Locate an element-wise operation and fuse if the producer
   // is a matmul.
@@ -50,10 +53,15 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     if (!producer || !tpp::isMarkedWithTpp(producer, "tpp.matmul"))
       return failure();
 
+    if (producer.getNumParallelLoops() != tileSizes.size()) {
+      producer->emitRemark(
+          "expect tile sizes to be equal to number of parallel loops");
+      return failure();
+    }
+
     // tile and fuse.
     scf::SCFTilingOptions options;
-    // TODO: better tiling strategy.
-    options.setTileSizes({32, 32});
+    options.setTileSizes(tileSizes);
     scf::TileConsumerAndFuseProducersUsingSCFForOp tileAndFuse(
         linalgOp.getContext(), options);
     TilingInterface tilingInterfaceOp =
@@ -64,21 +72,27 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     return success();
   }
+  ArrayRef<int64_t> tileSizes;
 };
 
-void populateFusionPatterns(RewritePatternSet &patterns) {
-  patterns.add<FuseGenericOp>(patterns.getContext());
+void populateFusionPatterns(RewritePatternSet &patterns,
+                            ArrayRef<int64_t> tileSizes) {
+  patterns.add<FuseGenericOp>(patterns.getContext(), tileSizes);
 }
 
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
+  TileConsumerAndFuseProducers() = default;
+  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
+    this->tileSizes = tileSizes;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect>();
     linalg::registerTilingInterfaceExternalModels(registry);
   }
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateFusionPatterns(patterns);
+    populateFusionPatterns(patterns, tileSizes);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
@@ -87,6 +101,6 @@ struct TileConsumerAndFuseProducers
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTileConsumerAndFuseProducersPass() {
-  return std::make_unique<TileConsumerAndFuseProducers>();
+mlir::tpp::createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles) {
+  return std::make_unique<TileConsumerAndFuseProducers>(tiles);
 }
