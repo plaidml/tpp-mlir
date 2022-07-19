@@ -46,4 +46,9 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_unary_scalar_invoke(int64_t, float,
                                       UnrankedMemRefType<float> *);
 
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+_mlir_ciface_matrix_copy_NC_to_NCNC(UnrankedMemRefType<float> *,
+                                    UnrankedMemRefType<float> *, int64_t,
+                                    int64_t, int64_t, int64_t);
+
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H

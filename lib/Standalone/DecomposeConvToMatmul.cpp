@@ -55,6 +55,15 @@ struct DecomposeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         (!outputType.hasStaticShape()))
       return failure();
 
+    // N
+    //  P
+    //   Q
+    //    K
+    //     R
+    //      S
+    //       C
+    //        output[N][P][Q][K] += image[N][H][W][C] * filter[R][S][C][K]
+
     return failure();
   }
 };

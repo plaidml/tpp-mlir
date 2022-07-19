@@ -283,6 +283,42 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
   }
 };
 
+struct ConvertCopyOp : public OpRewritePattern<CopyOp> {
+  using OpRewritePattern<CopyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = copyOp.getLoc();
+    std::string fnNameAsString = "matrix_copy_NC_to_NCNC";
+    FlatSymbolRefAttr fnName =
+        SymbolRefAttr::get(rewriter.getContext(), fnNameAsString);
+
+    ModuleOp module = copyOp->getParentOfType<ModuleOp>();
+    SmallVector<Value> operands;
+    Value castedInput = getMemRefOperands(rewriter, loc, copyOp.getInput())[0];
+    operands.push_back(castedInput);
+    Value castedOutput =
+        getMemRefOperands(rewriter, loc, copyOp.getOutput())[0];
+    operands.push_back(castedOutput);
+    SmallVector<Type> operandTypes;
+    operandTypes.push_back(castedInput.getType());
+    operandTypes.push_back(castedOutput.getType());
+    ArrayRef<int64_t> tiles = copyOp.getTileAttr().asArrayRef();
+    size_t tilesSize = tiles.size();
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    for (size_t idx = 0; idx < tilesSize; idx++) {
+      IntegerAttr attr = IntegerAttr::get(integer64, tiles[idx]);
+      operands.push_back(
+          rewriter.createOrFold<arith::ConstantOp>(loc, integer64, attr));
+      operandTypes.push_back(integer64);
+    }
+    (void)buildDispatchCall(loc, operands, operandTypes, module, fnName,
+                            rewriter);
+    rewriter.eraseOp(copyOp);
+    return success();
+  }
+};
+
 void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTernaryXsmmOp,
@@ -290,7 +326,8 @@ void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
                ConvertUnaryXsmmOp,
                ConvertTernaryDispatch,
                ConvertBinaryDispatch,
-               ConvertUnaryDispatch>(patterns.getContext());
+               ConvertUnaryDispatch,
+               ConvertCopyOp>(patterns.getContext());
   // clang-format on
 }
 

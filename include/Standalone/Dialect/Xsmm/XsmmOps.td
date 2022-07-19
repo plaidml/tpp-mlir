@@ -14,6 +14,8 @@ include "XsmmAttr.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
+def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [2]>]>;
+def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [4]>]>;
 
 //===----------------------------------------------------------------------===//
 // TernaryOp
@@ -157,6 +159,22 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
   let assemblyFormat = [{
     $kind $inputs `(` $flags `)` attr-dict 
   }]; 
+}
+
+//===----------------------------------------------------------------------===//
+// [N][C] - to - [N/n][C/c][n][c]
+//===----------------------------------------------------------------------===//
+
+def Xsmm_CopyOp : Xsmm_Op<"copy"> {
+  let summary = "copy tensor.";
+ 
+  let arguments = (ins Xsmm2DMemRef:$input, Xsmm4DMemRef:$output, 
+                   DenseI64ArrayAttr:$tile);
+
+  let assemblyFormat = [{
+    `ins` `(` $input `:` type($input) `)` 
+    `outs` `(` $output `:` type($output) `)` $tile attr-dict
+  }];
 }
 
 #endif // STANDALONE_XSMM_OPS
