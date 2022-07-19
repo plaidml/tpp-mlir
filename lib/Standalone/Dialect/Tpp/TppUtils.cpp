@@ -16,7 +16,7 @@ bool hasStaticShape(linalg::LinalgOp linalgOp) {
 }
 
 bool hasTppMark(linalg::LinalgOp linalgOp) {
-  // Here we are abusing a bit the linalg library name mangling.
+  // Here we are abusing a bit the linalg library name machinery.
   // Main asserts if we query the name at tensor level. Inspect
   // only generic operation annotated by us.
   if (!isa<linalg::GenericOp>(linalgOp))
