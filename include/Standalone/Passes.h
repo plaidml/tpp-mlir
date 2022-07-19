@@ -64,6 +64,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles = {});
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
 
 } // namespace tpp
 } // namespace mlir

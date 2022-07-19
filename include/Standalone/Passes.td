@@ -134,4 +134,9 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   ];
 }
 
+def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
+  let summary = "Decompose Conv2DNhwcHwcfOp to a matmul";
+  let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES
