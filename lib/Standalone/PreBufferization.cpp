@@ -8,8 +8,10 @@
 
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -107,7 +109,7 @@ struct AdaptLinalgInputOperandToOutputOperand
   }
 };
 
-struct SwapOperandWithIterAtrg
+struct SwapOperandWithIterArg
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
@@ -144,10 +146,49 @@ struct SwapOperandWithIterAtrg
   }
 };
 
+// Convert tensor pad to linalg.
+struct GenericHighPadOpPattern : public linalg::GeneralizePadOpPattern {
+  GenericHighPadOpPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : linalg::GeneralizePadOpPattern(context, trySimplifyCopy, benefit) {}
+
+  static LogicalResult trySimplifyCopy(PatternRewriter &rewriter,
+                                       tensor::PadOp padOp, Value dest) {
+    return failure();
+  }
+};
+
+// Bufferization fails on this pattern, with error "op was not bufferized".
+// Force materialization of linalg.init in this case by replacing it
+// with a `bufferization::AllocTensorOp` operation.
+//
+// %0 = linalg.init_tensor [132, 512] : tensor<132x512xf32>
+// %1 = tensor.insert_slice %cst_0 into %0
+//
+// With
+//
+// %0 = bufferization.allocTensorOp
+// %1 = tensor.insert_slice %cst_0 into %0
+//
+struct AllocateInitTensor : public OpRewritePattern<linalg::InitTensorOp> {
+  using OpRewritePattern<linalg::InitTensorOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::InitTensorOp initOp,
+                                PatternRewriter &rewriter) const override {
+    for (Operation *user : initOp->getUsers())
+      if (!isa<tensor::InsertSliceOp>(user))
+        return failure();
+    rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
+        initOp, initOp.getType(), initOp.sizes());
+    return success();
+  }
+};
+
 void populatePreBufferizationPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<AdaptLinalgInputOperandToOutputOperand, 
-               SwapOperandWithIterAtrg>(patterns.getContext());
+               SwapOperandWithIterArg,
+               GenericHighPadOpPattern,
+               AllocateInitTensor>(patterns.getContext());
   // clang-format on
 }
 
