@@ -223,4 +223,17 @@ _mlir_ciface_xsmm_unary_scalar_invoke(int64_t addr, float input,
 
 extern "C" void _mlir_ciface_matrix_copy_NC_to_NCNC(
     UnrankedMemRefType<float> *input, UnrankedMemRefType<float> *output,
-    int64_t N, int64_t C, int64_t c, int64_t n) {}
+    int64_t N, int64_t C, int64_t n, int64_t c) {
+  // std::cout << "\n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
+  // std::cout << "\n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
+  // std::cout << "\n";
+  DynamicMemRefType<float> tensorInput = DynamicMemRefType<float>(*input);
+  DynamicMemRefType<float> tensorOutput = DynamicMemRefType<float>(*output);
+
+  float *addr_input = tensorInput.data + tensorInput.offset;
+  float *addr_output = tensorOutput.data + tensorOutput.offset;
+
+  matrix_copy_NC_to_NCNC(addr_input, addr_output, 1, C, N, c, n);
+}
