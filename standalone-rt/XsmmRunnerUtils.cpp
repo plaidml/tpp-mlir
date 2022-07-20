@@ -237,3 +237,64 @@ extern "C" void _mlir_ciface_matrix_copy_NC_to_NCNC(
 
   matrix_copy_NC_to_NCNC(addr_input, addr_output, 1, C, N, c, n);
 }
+
+extern "C" void _mlir_ciface_xsmm_brgemm_invoke(int64_t addr,
+                                                UnrankedMemRefType<float> *A,
+                                                UnrankedMemRefType<float> *B,
+                                                UnrankedMemRefType<float> *C,
+                                                int64_t numBatches) {
+  DynamicMemRefType<float> tensorA = DynamicMemRefType<float>(*A);
+  DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*B);
+  DynamicMemRefType<float> tensorC = DynamicMemRefType<float>(*C);
+  float *addr_tensorA = tensorA.data + tensorA.offset;
+  float *addr_tensorB = tensorB.data + tensorB.offset;
+  float *addr_tensorC = tensorC.data + tensorC.offset;
+
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_param gemm_param;
+  sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(addr);
+  unsigned long long numBatchesVar = numBatches;
+  gemm_param.a.primary = (void *)addr_tensorB;
+  gemm_param.b.primary = (void *)addr_tensorA;
+  gemm_param.c.primary = (void *)addr_tensorC;
+  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  sgemm.gemm(&gemm_param);
+}
+
+extern "C" int64_t _mlir_ciface_brgemm_dispatch(int64_t lda, int64_t ldb,
+                                                int64_t ldc, int64_t m,
+                                                int64_t n, int64_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+  libxsmm_blasint stride_a = k * sizeof(float);
+  libxsmm_blasint stride_b = ldb * k * sizeof(float);
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
+  l_brconfig.br_stride_a_hint = stride_b;
+  l_brconfig.br_stride_b_hint = stride_a;
+  l_brconfig.br_unroll_hint = 0;
+
+  auto sgemm = libxsmm_dispatch_brgemm_v2(l_shape, l_flags, l_prefetch_flags,
+                                          l_brconfig);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
