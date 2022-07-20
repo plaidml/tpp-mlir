@@ -118,17 +118,15 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
       int64_t ldi = 1;
       return {ldi, bCast};
     }
-    if (inputType.isa<ShapedType>()) {
-      ArrayRef<int64_t> shape = inputType.cast<ShapedType>().getShape();
-      if ((shape[0] == 1) && shape[1] == 1) {
-        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
-        int64_t ldi = 1;
-        return {ldi, bCast};
-      }
-    }
-
     ArrayRef<int64_t> shapeInput =
         identityOp.getInput().getType().cast<ShapedType>().getShape();
+    auto isOne = [](int64_t val) { return val == 1; };
+    if (llvm::all_of(shapeInput, isOne)) {
+      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
+      int64_t ldi = 1;
+      return {ldi, bCast};
+    }
+
     ArrayRef<int64_t> shapeOutput =
         identityOp.getOutput().getType().cast<ShapedType>().getShape();
     assert(shapeOutput.size() >= shapeInput.size() &&
@@ -136,6 +134,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     SmallVector<int64_t, 4> bShapeInput;
     computeBcastShapeInput(shapeOutput, shapeInput, bShapeInput);
     assert(shapeOutput.size() == bShapeInput.size());
+    shapeInput = bShapeInput;
 
     if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
