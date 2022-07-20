@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -65,6 +66,74 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, attr,
                                                  invokeOperands);
     return success();
+  }
+};
+
+struct ConvertTppMatmulOpWithBrgemm : public OpRewritePattern<MatmulOp> {
+  using OpRewritePattern<MatmulOp>::OpRewritePattern;
+
+  // b[k][j] = b[BRGEMM][k/BRGEMM][j]
+  Value expand(Value source, int64_t brgemmCount, Location loc,
+               PatternRewriter &rewriter) const {
+    ShapedType sourceType = source.getType().cast<ShapedType>();
+    assert(sourceType.getShape().size() == 2 && "expect 2d memref");
+    assert(brgemmCount > 0 && "brgemmCount must be > 0");
+    int k = sourceType.getShape()[0];
+    int j = sourceType.getShape()[1];
+    MemRefType expanded = MemRefType::get({brgemmCount, k / brgemmCount, j},
+                                          sourceType.getElementType());
+    auto reassociation = convertReassociationIndicesToExprs(
+        rewriter.getContext(), {{0, 1}, {2}});
+    return rewriter.create<memref::ExpandShapeOp>(loc, expanded, source,
+                                                  reassociation);
+  }
+
+  // TODO: Move alloc up righ after the function and dealloc.
+  Value insertAllocAndDealloc(Operation *op, MemRefType dest,
+                              PatternRewriter &rewriter) const {
+    assert(op && "must be valid");
+    rewriter.setInsertionPoint(op);
+    return rewriter.create<memref::AllocOp>(op->getLoc(), dest);
+  }
+
+  // a[i][k] = reshape([i][k] to [1][BRGEMM][i][k/BRGEMM])
+  Value relayout(Value source, int64_t brgemmCount, Location loc,
+                 PatternRewriter &rewriter) const {
+    ShapedType sourceType = source.getType().cast<ShapedType>();
+    assert(sourceType.getShape().size() == 2 && "expect 2d memref");
+    assert(brgemmCount > 0 && "brgemmCount must be > 0");
+    int i = sourceType.getShape()[0];
+    int k = sourceType.getShape()[1];
+    MemRefType relayout = MemRefType::get({1, brgemmCount, i, k / brgemmCount},
+                                          sourceType.getElementType());
+    Value dest = insertAllocAndDealloc(
+        source.getDefiningOp()->getParentOfType<func::FuncOp>(), relayout,
+        rewriter);
+    // TODO: revisit this func in libxsmm... we should not pass the attribute
+    // here.
+    rewriter.create<xsmm::CopyOp>(
+        loc, source, dest,
+        DenseI64ArrayAttr::get(rewriter.getContext(),
+                               {i, k, i, k / brgemmCount}));
+    return dest;
+  }
+
+  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = matmulOp.getLoc();
+    MemRefType memrefA = matmulOp.getMatrixAType();
+    int64_t k = memrefA.getShape()[1];
+    if (k % 8 != 0)
+      return failure();
+    int64_t brgemmCount = 8;
+    Value operandB = expand(matmulOp.getMatrixB(), brgemmCount, loc, rewriter);
+    Value operandA =
+        relayout(matmulOp.getMatrixA(), brgemmCount, loc, rewriter);
+
+    auto m = matmulOp->getParentOfType<ModuleOp>();
+    m.dump();
+    assert(0);
+    return failure();
   }
 };
 
@@ -276,8 +345,9 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppIdentityOp,
                ConvertTppReluOp,
-               ConvertTppAddOp,
-               ConvertTppMatmulOp>(patterns.getContext());
+               ConvertTppAddOp,/*
+               ConvertTppMatmulOp,*/
+               ConvertTppMatmulOpWithBrgemm>(patterns.getContext());
   // clang-format on
 }
 

@@ -46,6 +46,12 @@ class MemRefDialect;
 } // namespace mlir
 
 namespace mlir {
+namespace xsmm {
+class XsmmDialect;
+} // namespace xsmm
+} // namespace mlir
+
+namespace mlir {
 namespace tpp {
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
@@ -65,6 +71,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMapMatmulToBRGemmPass();
 
 } // namespace tpp
 } // namespace mlir

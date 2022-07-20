@@ -104,7 +104,11 @@ def PreBufferization : Pass<"pre-bufferization", "func::FuncOp"> {
 }
 
 def Bufferization : Pass<"bufferize", "ModuleOp"> {
-  let summary = "Bufferize";
+  let summary = "Bufferize (WIP)";
+  let description = [{
+    Work in progress pass to bufferize our flow using one-shot bufferization.
+    Do not use yet, prefer compilation string in the integration tests.
+  }];
   let constructor = "mlir::tpp::createBufferizationPass()";
 }
 
@@ -128,6 +132,11 @@ def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
                                         "func::FuncOp"> {
   let summary = "Tile consumers and fuse producers";
+  let description = [{
+    The pass uses `TileConsumerAndFuseProducersUsingSCFForOp` to tile
+    the consumer and fuse the consumer with the producers. We restrict
+    the pattern to relu operations whose producers are matmul or conv.
+  }];
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
@@ -135,8 +144,17 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
 }
 
 def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
-  let summary = "Decompose Conv2DNhwcHwcfOp to a matmul";
+  let summary = "Decompose Conv2DNhwcHwcfOp to a matmul (WIP)";
+  let description = [{
+    Rewrite a convolution to a matmul operation.
+  }];
   let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
+}
+
+def MapMatmulToBRGemm : Pass<"map-matmul-to-brgemm", "func::FuncOp"> {
+  let summary = "Try to map a matmul operation to a batch reduce GEMM operation.";
+  let constructor = "mlir::tpp::createMapMatmulToBRGemmPass()";
+  let dependentDialects = ["xsmm::XsmmDialect"];
 }
 
 #endif // STANDALONE_DIALECT_TPP_PASSES
