@@ -76,7 +76,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
     AffineExpr i, j, k;
     bindDims(linalgOp.getContext(), i, j, k);
-    if (linalgOp.getIndexingMaps() != infer({{i, k}, {k, j}, {i, j}}))
+    if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
       return false;
     // operations and operands.
     Region &region = linalgOp.getRegion();

@@ -27,12 +27,17 @@ using namespace mlir::tpp;
 namespace {
 
 // TODO: this must not fail. Check for non-strided memref.
-static FailureOr<int64_t> getLeadingDim(MemRefType memref) {
+static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
   SmallVector<int64_t> strides;
   int64_t offset;
   if (failed(getStridesAndOffset(memref, strides, offset)))
     return failure();
-  return strides[0];
+  llvm::errs() << "========\n";
+  llvm::errs() << "strides: \n";
+  for (int64_t stride : strides)
+    llvm::errs() << stride << " ";
+  llvm::errs() << "\n";
+  return strides[pos];
 }
 
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
@@ -104,7 +109,7 @@ struct ConvertTppMatmulOpWithBrgemm : public OpRewritePattern<MatmulOp> {
     assert(brgemmCount > 0 && "brgemmCount must be > 0");
     int i = sourceType.getShape()[0];
     int k = sourceType.getShape()[1];
-    MemRefType relayout = MemRefType::get({1, brgemmCount, i, k / brgemmCount},
+    MemRefType relayout = MemRefType::get({brgemmCount, i, k / brgemmCount},
                                           sourceType.getElementType());
     Value dest = insertAllocAndDealloc(
         source.getDefiningOp()->getParentOfType<func::FuncOp>(), relayout,
@@ -130,9 +135,30 @@ struct ConvertTppMatmulOpWithBrgemm : public OpRewritePattern<MatmulOp> {
     Value operandA =
         relayout(matmulOp.getMatrixA(), brgemmCount, loc, rewriter);
 
-    auto m = matmulOp->getParentOfType<ModuleOp>();
-    m.dump();
-    assert(0);
+    MemRefType memrefC = matmulOp.getMatrixCType();
+    int64_t m = memrefC.getShape()[0];
+    int64_t n = memrefC.getShape()[1];
+    k = operandA.getType().cast<MemRefType>().getShape()[1];
+    // Should we get leading dimension 1 and not 0?
+    int64_t lda = *getLeadingDim(operandA.getType().cast<MemRefType>(), 1);
+    int64_t ldb = *getLeadingDim(operandB.getType().cast<MemRefType>());
+    int64_t ldc = *getLeadingDim(memrefC);
+
+    llvm::errs() << "=============\n";
+    operandB.dump();
+    operandA.dump();
+    matmulOp.getMatrixC().dump();
+
+    llvm::errs() << "-------------\n";
+    llvm::errs() << "brgemmCount: " << brgemmCount << "\n";
+    llvm::errs() << "M: " << m << "\n";
+    llvm::errs() << "N: " << n << "\n";
+    llvm::errs() << "K: " << k << "\n";
+    llvm::errs() << "LDA: " << lda << "\n";
+    llvm::errs() << "LDB: " << ldb << "\n";
+    llvm::errs() << "LDC: " << ldc << "\n";
+    llvm::errs() << "-------------\n";
+    assert(0 && "stopped here");
     return failure();
   }
 };
@@ -345,9 +371,9 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppIdentityOp,
                ConvertTppReluOp,
-               ConvertTppAddOp,/*
-               ConvertTppMatmulOp,*/
-               ConvertTppMatmulOpWithBrgemm>(patterns.getContext());
+               ConvertTppAddOp,
+               ConvertTppMatmulOp/*,
+               ConvertTppMatmulOpWithBrgemm*/>(patterns.getContext());
   // clang-format on
 }
 
