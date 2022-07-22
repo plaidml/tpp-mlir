@@ -6,15 +6,33 @@ standalone `opt`-like tool to operate on that dialect.
 ## How to build LLVM
 
 ```
+# creating project dir
+mkdir -p tpp_compiler_sandbox/
+cd tpp_compiler_sandbox/
+
 git clone -b sandbox https://github.com/chelini/llvm-project.git
 mkdir llvm-project/build
 cd llvm-project/build
+export CUSTOM_LLVM_ROOT=`pwd`
 cmake -G Ninja ../llvm \
    -DLLVM_ENABLE_PROJECTS=mlir \
    -DLLVM_BUILD_EXAMPLES=ON \
    -DLLVM_TARGETS_TO_BUILD="X86;NVPTX;AMDGPU" \
    -DCMAKE_BUILD_TYPE=Release \
-   -DLLVM_ENABLE_ASSERTIONS=ON \
+   -DLLVM_ENABLE_ASSERTIONS=ON 
+
+ninja 
+echo $CUSTOM_LLVM_ROOT
+export PATH=$CUSTOM_LLVM_ROOT/bin:$PATH
+cd ../..
+
+# clone and building the TPP compiler Sandbox
+git clone https://github.com/plaidml/tpp-sandbox.git
+mkdir tpp-sandbox/build
+cd tpp-sandbox/build
+cmake -G Ninja .. -DMLIR_DIR=$CUSTOM_LLVM_ROOT/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit
+cmake --build . --target check-standalone-opt
+
 ```
 
 ## How to build
