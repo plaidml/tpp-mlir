@@ -6,7 +6,7 @@ standalone `opt`-like tool to operate on that dialect.
 ## How to build LLVM
 
 ```
-git clone https://github.com/llvm/llvm-project.git
+git clone -b sandbox https://github.com/chelini/llvm-project.git
 mkdir llvm-project/build
 cd llvm-project/build
 cmake -G Ninja ../llvm \
@@ -16,8 +16,6 @@ cmake -G Ninja ../llvm \
    -DCMAKE_BUILD_TYPE=Release \
    -DLLVM_ENABLE_ASSERTIONS=ON \
 ```
-
-LLVM commit to use: `cc2a614796cb311e65ee658200b58b14c53089a8`
 
 ## How to build
 
@@ -42,13 +40,6 @@ This dialect template is made available under the Apache License 2.0 with LLVM E
 ## Problems
 
 1. **Expect some tests to fail**
-
-2. **LIBXSMM compilation fails**
-
-To fix it: go in `tpp-sandbox/build/_deps/xsmm-src/include/libxsmm_config.h`
-and comment out `include "libxsmm_version.h"` line 12
-
-then you are good to go.
 
 ## Note:
 
@@ -86,3 +77,7 @@ func.func @add_d(%arga: tensor<32xf32, #DV>, %argb: f32, %argx: tensor<32xf32>) 
 ```
 
 - in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
+
+- Set up bufferization options: https://github.com/llvm/llvm-project/commit/c66303c2870c9a77a0f2a8aa16fd0ea87b0358e6
+
+- https://reviews.llvm.org/D129217 See 'getMixedSizes'

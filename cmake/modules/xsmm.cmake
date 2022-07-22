@@ -3,8 +3,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   xsmm
-  URL      https://github.com/libxsmm/libxsmm/archive/394294d7f62efdd25033ee46e73abd4ccb3ded59.zip
-  URL_HASH SHA256=b2307f0374fac07f74414dc4365e078aa97d7abc59204c7955a658ad4e8a676e
+  URL https://github.com/chelini/libxsmm/archive/8b86bb830f670acf565ed26d232d06a4f5e810ce.tar.gz
+  URL_HASH SHA256=3a17d4a8d0d2f05322c02a51c64cc691ddda0bc57d27f1b7c827726f5d051e2c
 )
 
 FetchContent_GetProperties(xsmm)

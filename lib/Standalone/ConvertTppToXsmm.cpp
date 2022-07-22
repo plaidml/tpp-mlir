@@ -32,11 +32,6 @@ static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
   int64_t offset;
   if (failed(getStridesAndOffset(memref, strides, offset)))
     return failure();
-  llvm::errs() << "========\n";
-  llvm::errs() << "strides: \n";
-  for (int64_t stride : strides)
-    llvm::errs() << stride << " ";
-  llvm::errs() << "\n";
   return strides[pos];
 }
 
@@ -73,7 +68,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     return success();
   }
 };
-
+/*
 struct ConvertTppMatmulOpWithBrgemm : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
@@ -162,7 +157,7 @@ struct ConvertTppMatmulOpWithBrgemm : public OpRewritePattern<MatmulOp> {
     return failure();
   }
 };
-
+*/
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
@@ -372,8 +367,7 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTppIdentityOp,
                ConvertTppReluOp,
                ConvertTppAddOp,
-               ConvertTppMatmulOp/*,
-               ConvertTppMatmulOpWithBrgemm*/>(patterns.getContext());
+               ConvertTppMatmulOp>(patterns.getContext());
   // clang-format on
 }
 
