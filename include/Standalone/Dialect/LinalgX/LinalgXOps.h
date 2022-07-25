@@ -9,12 +9,13 @@
 #ifndef LINALGX_STANDALONE_OPS_H
 #define LINALGX_STANDALONE_OPS_H
 
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/CopyOpInterface.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Interfaces/ViewLikeInterface.h"
 
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/LinalgX/LinalgXOps.h.inc"
