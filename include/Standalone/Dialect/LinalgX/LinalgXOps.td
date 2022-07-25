@@ -10,7 +10,7 @@
 #define STANDALONE_LINALGX_OPS
 
 include "LinalgXDialect.td"
-include "/mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 
