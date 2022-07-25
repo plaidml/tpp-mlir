@@ -15,7 +15,9 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CopyOpInterface.td"
 include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 
-// TODO: must also be ranked tensor type with static shape.
+// TODO: input/output must also be ranked tensor type with static shape
+// TODO: enable the operation to bufferize
+// TODO: avoid printing the region (see: `parseNamedStructuredOp`)
 def 2DTensorAnyType : 2DTensorOf<[AnyFloat]>;
 def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 
