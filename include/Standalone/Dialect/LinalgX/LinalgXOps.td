@@ -23,7 +23,7 @@ def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 
 def ToBlockLayout : LinalgX_Op<"to_block", [LinalgStructuredInterface,
                                             SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
-  let summary = "to block layout NC to NCnc with a block factor of 32";
+  let summary = "to block layout NC to NCnc.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
   let results = (outs Variadic<AnyShaped>:$result);
