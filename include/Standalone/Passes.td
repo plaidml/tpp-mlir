@@ -151,10 +151,4 @@ def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
   let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
 }
 
-def MapMatmulToBRGemm : Pass<"map-matmul-to-brgemm", "func::FuncOp"> {
-  let summary = "Try to map a matmul operation to a batch reduce GEMM operation.";
-  let constructor = "mlir::tpp::createMapMatmulToBRGemmPass()";
-  let dependentDialects = ["xsmm::XsmmDialect"];
-}
-
 #endif // STANDALONE_DIALECT_TPP_PASSES
