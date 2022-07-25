@@ -23,6 +23,7 @@ add_mlir_dialect_library(MLIRStandalone
         Bufferization.cpp
         TileConsumerAndFuseProducers.cpp
         DecomposeConvToMatmul.cpp
+        ToBlockLayoutAndBack.cpp
 
         # Conversions
         ConvertTppToVector.cpp  

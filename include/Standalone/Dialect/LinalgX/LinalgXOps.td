@@ -18,6 +18,8 @@ include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 // TODO: input/output must also be ranked tensor type with static shape
 // TODO: enable the operation to bufferize
 // TODO: avoid printing the region (see: `parseNamedStructuredOp`)
+// TODO: we need to verify that the ops contain only linalg::yield
+
 def 2DTensorAnyType : 2DTensorOf<[AnyFloat]>;
 def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 
@@ -25,8 +27,9 @@ def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 // ToBlockLayout
 //===----------------------------------------------------------------------===//
 
-def ToBlockLayout : LinalgX_Op<"to_block", [LinalgStructuredInterface,
-                                            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
+def ToBlockLayout : LinalgX_Op<"to_block", 
+          [LinalgStructuredInterface,
+           SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "to block layout NC to NCnc.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
@@ -35,8 +38,23 @@ def ToBlockLayout : LinalgX_Op<"to_block", [LinalgStructuredInterface,
 
   let assemblyFormat = [{
     `ins` `(` $input `:` type($input) `,` $inputMap `)`  
-    `outs` `(` $output `:` type($output) `,` $outputMap `)` $region (`->` type($result)^)? attr-dict
+    `outs` `(` $output `:` type($output) `,` $outputMap `)` 
+        $region (`->` type($result)^)? attr-dict
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<
+      (ins "TypeRange":$resultTensorTypes, "ValueRange":$inputs,
+            "ValueRange":$outputs, "AffineMap":$inputMap,
+            "AffineMap":$outputMap,
+            CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        buildStructuredOp($_builder, $_state, resultTensorTypes,
+          inputs, outputs, inputMap, outputMap, 
+          attributes, ToBlockLayout::getRegionBuilder());
+      }]>
+  ];
 
   let extraClassDeclaration = [{
 
@@ -67,8 +85,9 @@ def ToBlockLayout : LinalgX_Op<"to_block", [LinalgStructuredInterface,
 // FromBlockLayout
 //===----------------------------------------------------------------------===//
 
-def FromBlockLayout : LinalgX_Op<"from_block", [LinalgStructuredInterface,
-                                            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
+def FromBlockLayout : LinalgX_Op<"from_block", 
+        [LinalgStructuredInterface,
+         SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "from block layout NCnc to NC.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
@@ -77,8 +96,23 @@ def FromBlockLayout : LinalgX_Op<"from_block", [LinalgStructuredInterface,
 
   let assemblyFormat = [{
     `ins` `(` $input `:` type($input) `,` $inputMap `)`  
-    `outs` `(` $output `:` type($output) `,` $outputMap `)` $region (`->` type($result)^)? attr-dict
+    `outs` `(` $output `:` type($output) `,` $outputMap `)` 
+        $region (`->` type($result)^)? attr-dict
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<
+      (ins "TypeRange":$resultTensorTypes, "ValueRange":$inputs,
+            "ValueRange":$outputs, "AffineMap":$inputMap,
+            "AffineMap":$outputMap,
+            CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        buildStructuredOp($_builder, $_state, resultTensorTypes,
+          inputs, outputs, inputMap, outputMap, 
+          attributes, ToBlockLayout::getRegionBuilder());
+      }]>
+  ];
 
   let extraClassDeclaration = [{
 

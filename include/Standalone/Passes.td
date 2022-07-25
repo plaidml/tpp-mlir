@@ -151,4 +151,12 @@ def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
   let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
 }
 
+def ToBlockLayoutAndBack : Pass<"to-block-layout", "func::FuncOp"> {
+  let summary = "Convert to block layout and back (WIP)";
+  let description = [{
+    To and from block layout NC to NCnc and from NCnc to NC.
+  }];
+  let constructor = "mlir::tpp::createToBlockLayoutAndBackPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES
