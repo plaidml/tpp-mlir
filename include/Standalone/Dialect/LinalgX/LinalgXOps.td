@@ -14,6 +14,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CopyOpInterface.td"
 include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
+include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td"
 
 // TODO: input/output must also be ranked tensor type with static shape
 // TODO: enable the operation to bufferize
@@ -28,7 +29,7 @@ def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 //===----------------------------------------------------------------------===//
 
 def ToBlockLayout : LinalgX_Op<"to_block", 
-          [LinalgStructuredInterface, NoSideEffect,
+          [LinalgStructuredInterface, NoSideEffect, BufferizableOpInterface,
            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "to block layout NC to NCnc.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -86,7 +87,7 @@ def ToBlockLayout : LinalgX_Op<"to_block",
 //===----------------------------------------------------------------------===//
 
 def FromBlockLayout : LinalgX_Op<"from_block", 
-        [LinalgStructuredInterface, NoSideEffect,
+        [LinalgStructuredInterface, NoSideEffect, BufferizableOpInterface,
          SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "from block layout NCnc to NC.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,

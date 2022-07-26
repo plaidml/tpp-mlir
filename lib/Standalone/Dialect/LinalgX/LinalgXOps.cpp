@@ -13,6 +13,7 @@
 
 using namespace mlir;
 using namespace mlir::linalgx;
+using namespace mlir::bufferization;
 
 using RegionBuilderFn = llvm::function_ref<void(ImplicitLocOpBuilder &, Block &,
                                                 ArrayRef<NamedAttribute>)>;
