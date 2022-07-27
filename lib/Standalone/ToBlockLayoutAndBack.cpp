@@ -87,11 +87,11 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     AffineExpr p1, p2, r1, p3, p4, r2;
     bindDims(ctx, p1, p2, r1, p3, p4, r2);
     AffineMap mapA =
-        AffineMap::get(/*dims*/ 6, /*symbols*/ 0, {p1, r1, p3, r2}, ctx);
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
     AffineMap mapB =
-        AffineMap::get(/*dims*/ 6, /*symbols*/ 0, {r1, p2, r2, p4}, ctx);
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {r1, p2, r2, p4}, ctx);
     AffineMap mapC =
-        AffineMap::get(/*dims*/ 6, /*symbols*/ 0, {p1, p2, p3, p4}, ctx);
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, reshapedOutputTensor.getType(), reshapedInputTensors,
         ValueRange{reshapedOutputTensor}, ArrayRef<AffineMap>{mapA, mapB, mapC},
