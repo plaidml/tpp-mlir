@@ -9,6 +9,8 @@
 #include "Standalone/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "Standalone/Dialect/LinalgX/LinalgXDialect.h"
 #include "Standalone/Dialect/LinalgX/LinalgXOps.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/IR/Operation.h"
 
 using namespace mlir;
 using namespace mlir::bufferization;
@@ -38,25 +40,36 @@ struct ToBlockLayoutInterface
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
                                 const AnalysisState &state) const {
-    return BufferRelation::None;
+    return BufferRelation::Equivalent;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    // OpBuilder::InsertionGuard g(rewriter);
     linalgx::ToBlockLayout toBlockLayout = cast<linalgx::ToBlockLayout>(op);
 
-    FailureOr<Value> destBuffer =
+    FailureOr<Value> maybeDestBuffer =
         getBuffer(rewriter, toBlockLayout.outputs()[0], options);
-    if (failed(destBuffer))
+    if (failed(maybeDestBuffer))
       return failure();
+    Value destBuffer = *maybeDestBuffer;
 
-    FailureOr<Value> srcBuffer =
+    llvm::errs() << "destBuffer: " << destBuffer << "\n";
+
+    FailureOr<Value> maybeSrcBuffer =
         getBuffer(rewriter, toBlockLayout.inputs()[0], options);
-    if (failed(srcBuffer))
+    if (failed(maybeSrcBuffer))
       return failure();
+    Value srcBuffer = *maybeSrcBuffer;
 
-    replaceOpWithBufferizedValues(rewriter, op, {srcBuffer, destBuffer});
+    llvm::errs() << "srcBuffer: " << srcBuffer << "\n";
+
+    auto r = rewriter.create<linalgx::ToBlockLayout>(
+        op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
+        toBlockLayout.getInputMap(), toBlockLayout.getOutputMap());
+    llvm::errs() << r->getNumResults() << "\n";
+    auto m = op->getParentOfType<ModuleOp>();
+    m.dump();
+    replaceOpWithBufferizedValues(rewriter, op, destBuffer);
     return success();
   }
 };
@@ -99,7 +112,8 @@ struct FromBlockLayoutInterface
     if (failed(srcBuffer))
       return failure();
 
-    replaceOpWithBufferizedValues(rewriter, op, {srcBuffer, destBuffer});
+    replaceOpWithBufferizedValues(rewriter, op,
+                                  ValueRange{*srcBuffer, *destBuffer});
     return success();
   }
 };

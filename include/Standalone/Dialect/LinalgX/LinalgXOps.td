@@ -28,7 +28,8 @@ def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 //===----------------------------------------------------------------------===//
 
 def ToBlockLayout : LinalgX_Op<"to_block", 
-          [LinalgStructuredInterface, NoSideEffect,
+          [LinalgStructuredInterface, 
+           DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "to block layout NC to NCnc.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
