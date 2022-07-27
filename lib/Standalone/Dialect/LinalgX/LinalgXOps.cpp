@@ -151,11 +151,10 @@ void Relayout::getEffects(
                         outputBuffers);
 }
 
-static ParseResult parseInputOutputAndMaps(OpAsmParser &parser,
-                                           OperationState &result,
-                                           Type &inputType, AffineMap &inputMap,
-                                           Type &outputType,
-                                           AffineMap &outputMap) {
+static ParseResult
+parseInputOutputAndMaps(OpAsmParser &parser, OperationState &result,
+                        Type &inputType, AffineMapAttr &inputMap,
+                        Type &outputType, AffineMapAttr &outputMap) {
   OpAsmParser::UnresolvedOperand inputOperand, outputOperand;
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -168,7 +167,9 @@ static ParseResult parseInputOutputAndMaps(OpAsmParser &parser,
       parser.parseComma())
     return failure();
 
-  if (parser.parseAffineMap(inputMap) || parser.parseRParen())
+  if (parser.parseCustomAttributeWithFallback(inputMap, Type(), "inputMap",
+                                              result.attributes) ||
+      parser.parseRParen())
     return failure();
 
   if (succeeded(parser.parseKeyword("outs")))
@@ -179,7 +180,9 @@ static ParseResult parseInputOutputAndMaps(OpAsmParser &parser,
       parser.parseComma())
     return failure();
 
-  if (parser.parseAffineMap(outputMap) || parser.parseRParen())
+  if (parser.parseCustomAttributeWithFallback(outputMap, Type(), "outputMap",
+                                              result.attributes) ||
+      parser.parseRParen())
     return failure();
 
   if (parser.resolveOperand(inputOperand, inputType, result.operands) ||
@@ -194,7 +197,7 @@ static ParseResult parseInputOutputAndMaps(OpAsmParser &parser,
 
 ParseResult Relayout::parse(OpAsmParser &parser, OperationState &state) {
   Type inputType, outputType;
-  AffineMap inputMap, outputMap;
+  AffineMapAttr inputMap, outputMap;
   if (parseInputOutputAndMaps(parser, state, inputType, inputMap, outputType,
                               outputMap))
     return failure();
