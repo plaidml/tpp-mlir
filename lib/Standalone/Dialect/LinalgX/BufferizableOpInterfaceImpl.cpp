@@ -53,15 +53,11 @@ struct BlockLayoutInterface
       return failure();
     Value destBuffer = *maybeDestBuffer;
 
-    // llvm::errs() << "destBuffer: " << destBuffer << "\n";
-
     FailureOr<Value> maybeSrcBuffer =
         getBuffer(rewriter, relayout.inputs()[0], options);
     if (failed(maybeSrcBuffer))
       return failure();
     Value srcBuffer = *maybeSrcBuffer;
-
-    // llvm::errs() << "srcBuffer: " << srcBuffer << "\n";
 
     rewriter.create<linalgx::Relayout>(
         op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
