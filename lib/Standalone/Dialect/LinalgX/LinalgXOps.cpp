@@ -211,5 +211,31 @@ ParseResult Relayout::parse(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
+static void printResult(OpAsmPrinter &printer, TypeRange resultTypes) {
+  if (resultTypes.empty())
+    return printer.printOptionalArrowTypeList(resultTypes);
+}
+
+static void printOperands(OpAsmPrinter &printer, ValueRange inputs,
+                          ValueRange outputs, AffineMap inputMap,
+                          AffineMap outputMap) {
+  assert(inputs.size() == 1 && "expect single input");
+  assert(outputs.size() == 1 && "expect single output");
+  Value input = inputs[0];
+  Value output = outputs[0];
+  printer << " ins(" << input << " : " << input.getType() << ", " << inputMap
+          << ")";
+  printer << " outs(" << output << " : " << output.getType() << ", "
+          << outputMap << ")";
+}
+
+void Relayout::print(OpAsmPrinter &printer) {
+  // print operands.
+  printOperands(printer, inputs(), outputs(), getInputMap(), getOutputMap());
+  // print results.
+  printResult(printer, this->getResultTypes());
+  // Region is elided.
+}
+
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/LinalgX/LinalgXOps.cpp.inc"
