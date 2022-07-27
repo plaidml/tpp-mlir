@@ -174,7 +174,13 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
 
 struct ToBlockLayoutAndBack
     : public ToBlockLayoutAndBackBase<ToBlockLayoutAndBack> {
+  ToBlockLayoutAndBack() = default;
+  ToBlockLayoutAndBack(int64_t blockingFactor) {
+    this->blockingFactor = blockingFactor;
+  }
   void runOnOperation() override {
+    if (blockingFactor == 0)
+      return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx);
@@ -186,6 +192,6 @@ struct ToBlockLayoutAndBack
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createToBlockLayoutAndBackPass() {
+mlir::tpp::createToBlockLayoutAndBackPass(int64_t blockingFactor) {
   return std::make_unique<ToBlockLayoutAndBack>();
 }
