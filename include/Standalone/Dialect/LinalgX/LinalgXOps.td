@@ -37,11 +37,12 @@ def Relayout : LinalgX_Op<"relayout",
   let results = (outs Variadic<AnyShaped>:$result);
   let regions = (region AnyRegion:$region);
 
-  let assemblyFormat = [{
-    `ins` `(` $input `:` type($input) `,` $inputMap `)`  
-    `outs` `(` $output `:` type($output) `,` $outputMap `)` 
-        $region (`->` type($result)^)? attr-dict
-  }];
+  //let assemblyFormat = [{
+  //  `ins` `(` $input `:` type($input) `,` $inputMap `)`  
+  //  `outs` `(` $output `:` type($output) `,` $outputMap `)` 
+  //      $region (`->` type($result)^)? attr-dict
+  //}];
+  let hasCustomAssemblyFormat = 1;
 
   let skipDefaultBuilders = 1;
   let builders = [

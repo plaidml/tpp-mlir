@@ -10,6 +10,7 @@
 #include "Standalone/Dialect/LinalgX/LinalgXDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Parser/Parser.h"
 
 using namespace mlir;
 using namespace mlir::linalgx;
@@ -132,14 +133,13 @@ static void getGenericEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
     ValueRange results, ValueRange inputBuffers, ValueRange outputs) {
-  for (Value value : inputBuffers) {
+  for (Value value : inputBuffers)
     effects.emplace_back(MemoryEffects::Read::get(), value,
                          SideEffects::DefaultResource::get());
-  }
-  for (Value value : outputs) {
+
+  for (Value value : outputs)
     effects.emplace_back(MemoryEffects::Write::get(), value,
                          SideEffects::DefaultResource::get());
-  }
 }
 
 void Relayout::getEffects(
@@ -149,6 +149,66 @@ void Relayout::getEffects(
   SmallVector<Value> outputBuffers = getOutputBufferOperands();
   getGenericEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
                         outputBuffers);
+}
+
+static ParseResult parseInputOutputAndMaps(OpAsmParser &parser,
+                                           OperationState &result,
+                                           Type &inputType, AffineMap &inputMap,
+                                           Type &outputType,
+                                           AffineMap &outputMap) {
+  OpAsmParser::UnresolvedOperand inputOperand, outputOperand;
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  if (succeeded(parser.parseKeyword("ins")))
+    if (parser.parseLParen())
+      return failure();
+
+  if (parser.parseOperand(inputOperand) || parser.parseColonType(inputType) ||
+      parser.parseComma())
+    return failure();
+
+  if (parser.parseAffineMap(inputMap) || parser.parseRParen())
+    return failure();
+
+  if (succeeded(parser.parseKeyword("outs")))
+    if (parser.parseLParen())
+      return failure();
+
+  if (parser.parseOperand(outputOperand) || parser.parseColonType(outputType) ||
+      parser.parseComma())
+    return failure();
+
+  if (parser.parseAffineMap(outputMap) || parser.parseRParen())
+    return failure();
+
+  if (parser.resolveOperand(inputOperand, inputType, result.operands) ||
+      parser.resolveOperand(outputOperand, outputType, result.operands))
+    return failure();
+
+  result.addAttribute("operand_segment_sizes",
+                      parser.getBuilder().getI32VectorAttr({1, 1}));
+
+  return success();
+}
+
+ParseResult Relayout::parse(OpAsmParser &parser, OperationState &state) {
+  Type inputType, outputType;
+  AffineMap inputMap, outputMap;
+  if (parseInputOutputAndMaps(parser, state, inputType, inputMap, outputType,
+                              outputMap))
+    return failure();
+
+  if (parser.parseOptionalArrowTypeList(state.types))
+    return failure();
+
+  std::unique_ptr<Region> region = std::make_unique<Region>();
+  OpBuilder opBuilder(parser.getContext());
+  fillStructuredOpRegion(opBuilder, *region, TypeRange(inputType),
+                         TypeRange(outputType), state.attributes.getAttrs(),
+                         regionBuilder);
+  state.addRegion(std::move(region));
+  return success();
 }
 
 #define GET_OP_CLASSES
