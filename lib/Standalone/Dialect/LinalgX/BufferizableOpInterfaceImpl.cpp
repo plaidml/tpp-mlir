@@ -25,7 +25,7 @@ struct BlockLayoutInterface
                                                     linalgx::Relayout> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -35,7 +35,7 @@ struct BlockLayoutInterface
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
-    return {op->getOpResult(0)};
+    return {};
   }
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
@@ -53,7 +53,7 @@ struct BlockLayoutInterface
       return failure();
     Value destBuffer = *maybeDestBuffer;
 
-    llvm::errs() << "destBuffer: " << destBuffer << "\n";
+    // llvm::errs() << "destBuffer: " << destBuffer << "\n";
 
     FailureOr<Value> maybeSrcBuffer =
         getBuffer(rewriter, relayout.inputs()[0], options);
@@ -61,7 +61,7 @@ struct BlockLayoutInterface
       return failure();
     Value srcBuffer = *maybeSrcBuffer;
 
-    llvm::errs() << "srcBuffer: " << srcBuffer << "\n";
+    // llvm::errs() << "srcBuffer: " << srcBuffer << "\n";
 
     rewriter.create<linalgx::Relayout>(
         op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,

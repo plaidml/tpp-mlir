@@ -137,8 +137,6 @@ static void getGenericEffectsImpl(
                          SideEffects::DefaultResource::get());
   }
   for (Value value : outputs) {
-    effects.emplace_back(MemoryEffects::Read::get(), value,
-                         SideEffects::DefaultResource::get());
     effects.emplace_back(MemoryEffects::Write::get(), value,
                          SideEffects::DefaultResource::get());
   }
