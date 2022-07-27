@@ -4,11 +4,11 @@
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 func.func @myfunc(%arg0: tensor<128x256xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: memref.alloc
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: memref.dealloc
   %0 = bufferization.alloc_tensor() : tensor<4x8x32x32xf32>
-  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4 : f32
-  } -> tensor<4x8x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
+  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) -> tensor<4x8x32x32xf32> 
   return %1 : tensor<4x8x32x32xf32>
 }
 
@@ -19,15 +19,13 @@ func.func @myfunc(%arg0: tensor<128x256xf32>) -> tensor<4x8x32x32xf32> {
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 func.func @myfunc(%arg0: tensor<128x256xf32>) -> tensor<128x256xf32> {
+  // CHECK: memref.alloc
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: memref.dealloc
   %0 = bufferization.alloc_tensor() : tensor<4x8x32x32xf32>
-  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4 : f32
-  } -> tensor<4x8x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
-  %2 = linalgx.relayout ins(%1: tensor<4x8x32x32xf32>, #map1) outs(%arg0: tensor<128x256xf32>, #map0) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4 : f32
-  } -> tensor<128x256xf32>
+  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) -> tensor<4x8x32x32xf32> 
+  %2 = linalgx.relayout ins(%1: tensor<4x8x32x32xf32>, #map1) outs(%arg0: tensor<128x256xf32>, #map0) -> tensor<128x256xf32>
   return %2 : tensor<128x256xf32>
 }
 
@@ -42,20 +40,23 @@ func.func @myfunc(%arg0: tensor<128x256xf32>) -> tensor<128x256xf32> {
 
 func.func @myfunc(%arg0: tensor<128x256xf32>, 
                   %arg1: tensor<256x512xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> {
+  // CHECK: memref.alloc
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: memref.alloc
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: memref.alloc
+  // CHECK-NEXT: linalgx.relayout
+  // CHECK-NEXT: linalg.generic
+  // CHECK: linalgx.relayout
+  // CHECK-NEXT: memref.dealloc
+  // CHECK-NEXT: memref.dealloc
+  // CHECK-NEXT: memref.dealloc
   %0 = bufferization.alloc_tensor() : tensor<4x8x32x32xf32>
-  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4 : f32
-  } -> tensor<4x8x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
+  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) -> tensor<4x8x32x32xf32> 
   %2 = bufferization.alloc_tensor() : tensor<8x16x32x32xf32>
-  %3 = linalgx.relayout ins(%arg1: tensor<256x512xf32>, #map0) outs(%2 : tensor<8x16x32x32xf32>, #map1) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4: f32
-  } -> tensor<8x16x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
+  %3 = linalgx.relayout ins(%arg1: tensor<256x512xf32>, #map0) outs(%2 : tensor<8x16x32x32xf32>, #map1) -> tensor<8x16x32x32xf32> 
   %4 = bufferization.alloc_tensor() : tensor<4x16x32x32xf32>
-  %5 = linalgx.relayout ins(%arg2: tensor<128x512xf32>, #map0) outs(%4 : tensor<4x16x32x32xf32>, #map1) {    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4: f32
-  } -> tensor<4x16x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>} 
+  %5 = linalgx.relayout ins(%arg2: tensor<128x512xf32>, #map0) outs(%4 : tensor<4x16x32x32xf32>, #map1) -> tensor<4x16x32x32xf32>  
   %6 = linalg.generic { indexing_maps = [#mapA, #mapB, #mapC],
                         iterator_types = ["parallel", "parallel", "reduction",
                                           "parallel", "parallel", "reduction"] }
@@ -66,9 +67,6 @@ func.func @myfunc(%arg0: tensor<128x256xf32>,
       %add = arith.addf %c, %mul : f32
       linalg.yield %add : f32
   } -> tensor<4x16x32x32xf32>
-  %7 = linalgx.relayout ins(%6: tensor<4x16x32x32xf32>, #map1) outs(%arg2: tensor<128x512xf32>, #map0) {
-    ^bb0(%arg4: f32, %arg5: f32):
-      linalg.yield %arg4: f32
-  } -> tensor<128x512xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
+  %7 = linalgx.relayout ins(%6: tensor<4x16x32x32xf32>, #map1) outs(%arg2: tensor<128x512xf32>, #map0) -> tensor<128x512xf32> 
   return %7 : tensor<128x512xf32>
 }
