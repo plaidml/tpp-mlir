@@ -24,14 +24,14 @@ def 2DTensorAnyType : 2DTensorOf<[AnyFloat]>;
 def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
-// ToBlockLayout
+// Relayout
 //===----------------------------------------------------------------------===//
 
-def ToBlockLayout : LinalgX_Op<"to_block", 
+def Relayout : LinalgX_Op<"relayout", 
           [LinalgStructuredInterface, 
            DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
-  let summary = "to block layout NC to NCnc.";
+  let summary = "relayout from NC to block layout NCnc and back.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
   let results = (outs Variadic<AnyShaped>:$result);
@@ -53,65 +53,7 @@ def ToBlockLayout : LinalgX_Op<"to_block",
       [{
         buildStructuredOp($_builder, $_state, resultTensorTypes,
           inputs, outputs, inputMap, outputMap, 
-          attributes, ToBlockLayout::getRegionBuilder());
-      }]>
-  ];
-
-  let extraClassDeclaration = [{
-
-    bool hasIndexSemantics() { return false; }
-
-    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
-                              llvm::ArrayRef<mlir::NamedAttribute> attrs);
-    
-    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
-                              llvm::ArrayRef<mlir::NamedAttribute> attrs)>
-    
-    getRegionBuilder() { return regionBuilder; }
-
-    mlir::ArrayAttr getIndexingMaps();
-
-    mlir::ArrayAttr iterator_types();
-
-    std::string getLibraryCallName();
-
-    mlir::ValueRange inputs() { return getOperands().take_front(); }
-
-    mlir::ValueRange outputs() { return getOperands().take_back(); }
-
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// FromBlockLayout
-//===----------------------------------------------------------------------===//
-
-def FromBlockLayout : LinalgX_Op<"from_block", 
-        [LinalgStructuredInterface, NoSideEffect,
-         SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
-  let summary = "from block layout NCnc to NC.";
-  let arguments = (ins AnyShaped:$input, AnyShaped:$output,
-                       AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
-  let results = (outs Variadic<AnyShaped>:$result);
-  let regions = (region AnyRegion:$region);
-
-  let assemblyFormat = [{
-    `ins` `(` $input `:` type($input) `,` $inputMap `)`  
-    `outs` `(` $output `:` type($output) `,` $outputMap `)` 
-        $region (`->` type($result)^)? attr-dict
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<
-      (ins "TypeRange":$resultTensorTypes, "ValueRange":$inputs,
-            "ValueRange":$outputs, "AffineMap":$inputMap,
-            "AffineMap":$outputMap,
-            CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
-      [{
-        buildStructuredOp($_builder, $_state, resultTensorTypes,
-          inputs, outputs, inputMap, outputMap, 
-          attributes, ToBlockLayout::getRegionBuilder());
+          attributes, Relayout::getRegionBuilder());
       }]>
   ];
 

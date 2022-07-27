@@ -20,9 +20,9 @@ namespace mlir {
 namespace linalgx {
 namespace {
 
-struct ToBlockLayoutInterface
-    : public BufferizableOpInterface::ExternalModel<ToBlockLayoutInterface,
-                                                    linalgx::ToBlockLayout> {
+struct BlockLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<BlockLayoutInterface,
+                                                    linalgx::Relayout> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return true;
@@ -45,10 +45,10 @@ struct ToBlockLayoutInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    linalgx::ToBlockLayout toBlockLayout = cast<linalgx::ToBlockLayout>(op);
+    linalgx::Relayout relayout = cast<linalgx::Relayout>(op);
 
     FailureOr<Value> maybeDestBuffer =
-        getBuffer(rewriter, toBlockLayout.outputs()[0], options);
+        getBuffer(rewriter, relayout.outputs()[0], options);
     if (failed(maybeDestBuffer))
       return failure();
     Value destBuffer = *maybeDestBuffer;
@@ -56,64 +56,17 @@ struct ToBlockLayoutInterface
     llvm::errs() << "destBuffer: " << destBuffer << "\n";
 
     FailureOr<Value> maybeSrcBuffer =
-        getBuffer(rewriter, toBlockLayout.inputs()[0], options);
+        getBuffer(rewriter, relayout.inputs()[0], options);
     if (failed(maybeSrcBuffer))
       return failure();
     Value srcBuffer = *maybeSrcBuffer;
 
     llvm::errs() << "srcBuffer: " << srcBuffer << "\n";
 
-    auto r = rewriter.create<linalgx::ToBlockLayout>(
+    rewriter.create<linalgx::Relayout>(
         op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
-        toBlockLayout.getInputMap(), toBlockLayout.getOutputMap());
-    llvm::errs() << r->getNumResults() << "\n";
-    auto m = op->getParentOfType<ModuleOp>();
-    m.dump();
+        relayout.getInputMap(), relayout.getOutputMap());
     replaceOpWithBufferizedValues(rewriter, op, destBuffer);
-    return success();
-  }
-};
-
-struct FromBlockLayoutInterface
-    : public BufferizableOpInterface::ExternalModel<FromBlockLayoutInterface,
-                                                    linalgx::FromBlockLayout> {
-  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                              const AnalysisState &state) const {
-    return true;
-  }
-
-  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                               const AnalysisState &state) const {
-    return true;
-  }
-
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return {op->getOpResult(0)};
-  }
-
-  BufferRelation bufferRelation(Operation *op, OpResult opResult,
-                                const AnalysisState &state) const {
-    return BufferRelation::None;
-  }
-
-  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          const BufferizationOptions &options) const {
-    linalgx::FromBlockLayout fromBlockLayout =
-        cast<linalgx::FromBlockLayout>(op);
-
-    FailureOr<Value> destBuffer =
-        getBuffer(rewriter, fromBlockLayout.outputs()[0], options);
-    if (failed(destBuffer))
-      return failure();
-
-    FailureOr<Value> srcBuffer =
-        getBuffer(rewriter, fromBlockLayout.inputs()[0], options);
-    if (failed(srcBuffer))
-      return failure();
-
-    replaceOpWithBufferizedValues(rewriter, op,
-                                  ValueRange{*srcBuffer, *destBuffer});
     return success();
   }
 };
@@ -124,9 +77,8 @@ struct FromBlockLayoutInterface
 
 void mlir::linalgx::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
-  registry.addExtension(+[](MLIRContext *ctx,
-                            linalgx::LinalgXDialect *dialect) {
-    ToBlockLayout::attachInterface<linalgx::ToBlockLayoutInterface>(*ctx);
-    FromBlockLayout::attachInterface<linalgx::FromBlockLayoutInterface>(*ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *ctx, linalgx::LinalgXDialect *dialect) {
+        Relayout::attachInterface<linalgx::BlockLayoutInterface>(*ctx);
+      });
 }

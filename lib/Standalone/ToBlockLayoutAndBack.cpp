@@ -55,8 +55,8 @@ static Value getReshapedTensor(Location loc, Value tensor, int64_t blockFactor,
       initOp.getType().cast<ShapedType>().getRank(), blockFactor, ctx);
   Value reshapedTensor =
       rewriter
-          .create<linalgx::ToBlockLayout>(loc, initOp.getType(), tensor, initOp,
-                                          maps.first, maps.second)
+          .create<linalgx::Relayout>(loc, initOp.getType(), tensor, initOp,
+                                     maps.first, maps.second)
           .getResult()[0];
   return reshapedTensor;
 }
@@ -111,9 +111,9 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
         ctx);
     Value outReplacement =
         rewriter
-            .create<linalgx::FromBlockLayout>(
-                loc, outUnBlockedTensor.getType(), outBlockedTensor,
-                outUnBlockedTensor, maps.second, maps.first)
+            .create<linalgx::Relayout>(loc, outUnBlockedTensor.getType(),
+                                       outBlockedTensor, outUnBlockedTensor,
+                                       maps.second, maps.first)
             .getResults()[0];
     rewriter.replaceOp(matmulOp, outReplacement);
     return success();
@@ -132,8 +132,8 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     Location loc = linalgOp.getLoc();
     Value operand = linalgOp.getInputOperand(0)->get();
-    linalgx::FromBlockLayout fromBlockLayout =
-        operand.getDefiningOp<linalgx::FromBlockLayout>();
+    linalgx::Relayout fromBlockLayout =
+        operand.getDefiningOp<linalgx::Relayout>();
     if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
       return failure();
 
@@ -163,7 +163,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
 
     Value outReplacement =
         rewriter
-            .create<linalgx::FromBlockLayout>(
+            .create<linalgx::Relayout>(
                 loc, outUnBlockedTensorType, newReluOp->getResult(0),
                 outUnBlockedTensor, maps.first, maps.second)
             .getResult()[0];

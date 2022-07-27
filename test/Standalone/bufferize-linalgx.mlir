@@ -5,7 +5,7 @@
 
 func.func @myfunc(%arg0: tensor<128x256xf32>) -> tensor<4x8x32x32xf32> {
   %0 = bufferization.alloc_tensor() : tensor<4x8x32x32xf32>
-  %1 = linalgx.to_block ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) {
+  %1 = linalgx.relayout ins(%arg0 : tensor<128x256xf32>, #map0) outs(%0 : tensor<4x8x32x32xf32>, #map1) {
     ^bb0(%arg4: f32, %arg5: f32):
       linalg.yield %arg4 : f32
   } -> tensor<4x8x32x32xf32> {operand_segment_sizes = dense<1> : vector<2xi32>}
