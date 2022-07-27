@@ -1,4 +1,6 @@
-// RUN: standalone-opt -to-block-layout %s | FileCheck %s
+// RUN: standalone-opt -map-linalg-to-tpp -to-block-layout="block-factor=32" /Users/lchelini/tpp-sandbox/test/Standalone/block.mlir -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize %s | FileCheck %s
+
+// XFAIL: *
 
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 func.func @myfun(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,

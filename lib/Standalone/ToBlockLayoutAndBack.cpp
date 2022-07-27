@@ -62,7 +62,10 @@ static Value getReshapedTensor(Location loc, Value tensor, int64_t blockFactor,
 }
 
 struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+  DoItOnMatmul(MLIRContext *context, int64_t blockingFactor,
+               PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
+        blockingFactor(blockingFactor) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -71,17 +74,16 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
 
     Location loc = matmulOp.getLoc();
     MLIRContext *ctx = matmulOp.getContext();
-    int64_t blockFactor = 32;
     SmallVector<Value, 2> reshapedInputTensors;
     // reshape input.
     for (Value input : matmulOp.getInputs())
       reshapedInputTensors.push_back(
-          getReshapedTensor(loc, input, blockFactor, rewriter));
+          getReshapedTensor(loc, input, blockingFactor, rewriter));
 
     Value reshapedOutputTensor = nullptr;
     for (Value output : matmulOp.getOutputs())
       reshapedOutputTensor =
-          getReshapedTensor(loc, output, blockFactor, rewriter);
+          getReshapedTensor(loc, output, blockingFactor, rewriter);
 
     // swap linalg.matmul with a linalg.generic.
     AffineExpr p1, p2, r1, p3, p4, r2;
@@ -107,7 +109,7 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     Value outBlockedTensor = replacementOp.getResult(0);
     Value outUnBlockedTensor = matmulOp.getOutputs()[0];
     std::pair<AffineMap, AffineMap> maps = getToBlockLayout(
-        outBlockedTensor.getType().cast<ShapedType>().getRank(), blockFactor,
+        outBlockedTensor.getType().cast<ShapedType>().getRank(), blockingFactor,
         ctx);
     Value outReplacement =
         rewriter
@@ -118,10 +120,16 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     rewriter.replaceOp(matmulOp, outReplacement);
     return success();
   }
+
+private:
+  int64_t blockingFactor = 0;
 };
 
 struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  SinkBlockLayoutAfterRelu(MLIRContext *context, int64_t blockingFactor,
+                           PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::GenericOp>(context, benefit),
+        blockingFactor(blockingFactor) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -137,11 +145,10 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
       return failure();
 
-    int64_t blockFactor = 32;
     Value blockTensor = fromBlockLayout.inputs()[0];
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     Value reluBuffer =
-        getReshapedTensor(loc, linalgOp.outputs()[0], blockFactor, rewriter);
+        getReshapedTensor(loc, linalgOp.outputs()[0], blockingFactor, rewriter);
 
     AffineMap mapI =
         AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());
@@ -159,7 +166,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value outUnBlockedTensor = linalgOp.getOutputOperand(0)->get();
     Type outUnBlockedTensorType = outUnBlockedTensor.getType();
     std::pair<AffineMap, AffineMap> maps =
-        getFromBlockLayout(/*dims=*/4, blockFactor, linalgOp.getContext());
+        getFromBlockLayout(/*dims=*/4, blockingFactor, linalgOp.getContext());
 
     Value outReplacement =
         rewriter
@@ -170,6 +177,9 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     rewriter.replaceOp(linalgOp, outReplacement);
     return success();
   }
+
+private:
+  int64_t blockingFactor = 0;
 };
 
 struct ToBlockLayoutAndBack
@@ -183,7 +193,7 @@ struct ToBlockLayoutAndBack
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx);
+    patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx, blockingFactor);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
