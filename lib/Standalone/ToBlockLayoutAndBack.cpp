@@ -20,11 +20,8 @@ using namespace mlir::linalgx;
 
 namespace {
 
-// TODO: 1. BlockFactor should be an arg to the pass.
-// TODO: 2. map to check already relayout tensors? atm all got relayout.
-
 static std::pair<AffineMap, AffineMap>
-getToBlockLayout(int64_t dims, int64_t blockFactor, MLIRContext *ctx) {
+getMapsToBlockLayout(int64_t dims, int64_t blockFactor, MLIRContext *ctx) {
   AffineMap outputMap = AffineMap::getMultiDimIdentityMap(dims, ctx);
 
   AffineExpr N, C, n, c;
@@ -35,9 +32,9 @@ getToBlockLayout(int64_t dims, int64_t blockFactor, MLIRContext *ctx) {
 }
 
 static std::pair<AffineMap, AffineMap>
-getFromBlockLayout(int64_t dims, int64_t blockFactor, MLIRContext *ctx) {
+getMapsFromBlockLayout(int64_t dims, int64_t blockFactor, MLIRContext *ctx) {
   std::pair<AffineMap, AffineMap> toBlockTensor =
-      getToBlockLayout(dims, blockFactor, ctx);
+      getMapsToBlockLayout(dims, blockFactor, ctx);
   return {toBlockTensor.second, toBlockTensor.first};
 }
 
@@ -51,7 +48,7 @@ static Value getReshapedTensor(Location loc, Value tensor, int64_t blockFactor,
       shape[0] / blockFactor, shape[1] / blockFactor, blockFactor, blockFactor};
   Value initOp = rewriter.create<linalg::InitTensorOp>(
       loc, shapeBlockedTensor, unBlockedTensorType.getElementType());
-  std::pair<AffineMap, AffineMap> maps = getToBlockLayout(
+  std::pair<AffineMap, AffineMap> maps = getMapsToBlockLayout(
       initOp.getType().cast<ShapedType>().getRank(), blockFactor, ctx);
   Value reshapedTensor =
       rewriter
@@ -108,7 +105,7 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     // convert back from block layout.
     Value outBlockedTensor = replacementOp.getResult(0);
     Value outUnBlockedTensor = matmulOp.getOutputs()[0];
-    std::pair<AffineMap, AffineMap> maps = getToBlockLayout(
+    std::pair<AffineMap, AffineMap> maps = getMapsToBlockLayout(
         outBlockedTensor.getType().cast<ShapedType>().getRank(), blockingFactor,
         ctx);
     Value outReplacement =
@@ -166,7 +163,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value outUnBlockedTensor = linalgOp.getOutputOperand(0)->get();
     Type outUnBlockedTensorType = outUnBlockedTensor.getType();
     std::pair<AffineMap, AffineMap> maps =
-        getFromBlockLayout(/*dims=*/4, blockingFactor, linalgOp.getContext());
+        getMapsFromBlockLayout(/*dims=*/4, blockingFactor, linalgOp.getContext());
 
     Value outReplacement =
         rewriter

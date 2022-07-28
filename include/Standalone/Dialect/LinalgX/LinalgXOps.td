@@ -16,12 +16,6 @@ include "mlir/Interfaces/CopyOpInterface.td"
 include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 
 // TODO: input/output must also be ranked tensor type with static shape
-// TODO: enable the operation to bufferize
-// TODO: avoid printing the region (see: `parseNamedStructuredOp`)
-// TODO: we need to verify that the ops contain only linalg::yield
-
-def 2DTensorAnyType : 2DTensorOf<[AnyFloat]>;
-def 4DTensorAnyType : 4DTensorOf<[AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
 // Relayout
@@ -36,12 +30,7 @@ def Relayout : LinalgX_Op<"relayout",
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
   let results = (outs Variadic<AnyShaped>:$result);
   let regions = (region AnyRegion:$region);
-
-  //let assemblyFormat = [{
-  //  `ins` `(` $input `:` type($input) `,` $inputMap `)`  
-  //  `outs` `(` $output `:` type($output) `,` $outputMap `)` 
-  //      $region (`->` type($result)^)? attr-dict
-  //}];
+ 
   let hasCustomAssemblyFormat = 1;
 
   let skipDefaultBuilders = 1;
