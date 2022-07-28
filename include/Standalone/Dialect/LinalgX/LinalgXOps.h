@@ -9,6 +9,7 @@
 #ifndef LINALGX_STANDALONE_OPS_H
 #define LINALGX_STANDALONE_OPS_H
 
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"

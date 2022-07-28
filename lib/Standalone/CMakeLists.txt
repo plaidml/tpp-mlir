@@ -12,6 +12,7 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/Xsmm/XsmmAttr.cpp
         Dialect/LinalgX/LinalgXOps.cpp
         Dialect/LinalgX/LinalgXDialect.cpp
+        Dialect/LinalgX/BufferizableOpInterfaceImpl.cpp
        
         # Passes 
         LinalgMapToTpp.cpp
@@ -23,6 +24,7 @@ add_mlir_dialect_library(MLIRStandalone
         Bufferization.cpp
         TileConsumerAndFuseProducers.cpp
         DecomposeConvToMatmul.cpp
+        ToBlockLayoutAndBack.cpp
 
         # Conversions
         ConvertTppToVector.cpp  
