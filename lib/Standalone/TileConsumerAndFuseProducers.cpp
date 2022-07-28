@@ -30,14 +30,6 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       : OpRewritePattern<linalg::GenericOp>(context, benefit),
         tileSizes(tileSizes) {}
 
-  bool isGemmOrConv(linalg::LinalgOp linalgOp) const {
-    if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
-      return true;
-    if (tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
-      return true;
-    return /*false*/true;
-  }
-
   // Locate an element-wise operation and fuse if the producer
   // is a matmul.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -58,7 +50,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     linalg::LinalgOp producer =
         dyn_cast_or_null<linalg::LinalgOp>(operands[0]->get().getDefiningOp());
-    if (!producer || !isGemmOrConv(producer))
+    if (!producer)
       return failure();
 
     if (producer.getNumParallelLoops() != tileSizes.size()) {
