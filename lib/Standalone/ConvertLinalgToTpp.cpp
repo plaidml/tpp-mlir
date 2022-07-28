@@ -37,7 +37,8 @@ static SmallVector<Value, 4> getTileSizes(OpBuilder &builder,
   SmallVector<Range, 4> loopRanges =
       linalgOp.createLoopRanges(builder, linalgOp.getLoc());
   for (size_t i = 0; i < loopRanges.size(); i++)
-    tppTiles.push_back(loopRanges[i].size);
+    tppTiles.push_back(linalg::materializeOpFoldResult(
+        builder, linalgOp.getLoc(), loopRanges[i].size));
   Value zeroVal = builder.create<arith::ConstantIndexOp>(linalgOp.getLoc(), 1);
   tppTiles[0] = zeroVal;
   tppTiles[1] = zeroVal;
