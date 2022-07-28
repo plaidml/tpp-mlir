@@ -215,7 +215,7 @@ ParseResult Relayout::parse(OpAsmParser &parser, OperationState &state) {
 }
 
 static void printResult(OpAsmPrinter &printer, TypeRange resultTypes) {
-  if (resultTypes.empty())
+  if (!resultTypes.empty())
     return printer.printOptionalArrowTypeList(resultTypes);
 }
 
@@ -226,10 +226,10 @@ static void printOperands(OpAsmPrinter &printer, ValueRange inputs,
   assert(outputs.size() == 1 && "expect single output");
   Value input = inputs[0];
   Value output = outputs[0];
-  printer << " ins(" << input << " : " << input.getType() << ", " << inputMap
+  printer << " ins(" << input << " : " << input.getType() << ", " << AffineMapAttr::get(inputMap)
           << ")";
   printer << " outs(" << output << " : " << output.getType() << ", "
-          << outputMap << ")";
+          << AffineMapAttr::get(outputMap) << ")";
 }
 
 void Relayout::print(OpAsmPrinter &printer) {

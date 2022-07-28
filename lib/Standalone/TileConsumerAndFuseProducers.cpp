@@ -35,7 +35,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return true;
     if (tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
       return true;
-    return false;
+    return /*false*/true;
   }
 
   // Locate an element-wise operation and fuse if the producer
