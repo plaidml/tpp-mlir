@@ -240,5 +240,31 @@ void Relayout::print(OpAsmPrinter &printer) {
   // Region is elided.
 }
 
+struct RelayoutOfRelayout : public OpRewritePattern<Relayout> {
+  using OpRewritePattern<Relayout>::OpRewritePattern;
+
+  bool canFoldIntoProducer(Relayout producer, Relayout consumer) const {
+    Value inputProducer = producer.getOperand(0);
+    Value consumerOutput = consumer.getOperand(1);
+    if (inputProducer.getType() == consumerOutput.getType())
+      return true;
+    return false;
+  }
+
+  LogicalResult matchAndRewrite(Relayout relayout,
+                                PatternRewriter &rewriter) const final {
+    Relayout producer = relayout.getOperand(0).getDefiningOp<Relayout>();
+    if (!producer || !canFoldIntoProducer(producer, relayout))
+      return failure();
+    rewriter.replaceOp(relayout, producer.getOperand(0));
+    return success();
+  }
+};
+
+void Relayout::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.add<RelayoutOfRelayout>(context);
+}
+
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/LinalgX/LinalgXOps.cpp.inc"

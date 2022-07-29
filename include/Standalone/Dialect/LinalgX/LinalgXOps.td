@@ -70,6 +70,8 @@ def Relayout : LinalgX_Op<"relayout",
     mlir::ValueRange outputs() { return getOperands().take_back(); }
 
   }];
+
+  let hasCanonicalizer = 1; 
 }
 
 #endif // STANDALONE_LINALGX_OPS
