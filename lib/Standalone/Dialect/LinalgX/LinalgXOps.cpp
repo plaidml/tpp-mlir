@@ -246,7 +246,8 @@ struct RelayoutOfRelayout : public OpRewritePattern<Relayout> {
   bool canFoldIntoProducer(Relayout producer, Relayout consumer) const {
     Value inputProducer = producer.getOperand(0);
     Value consumerOutput = consumer.getOperand(1);
-    if (inputProducer.getType() == consumerOutput.getType())
+    if ((inputProducer.getType() == consumerOutput.getType()) &&
+        (producer.getInputMap() == consumer.getOutputMap()))
       return true;
     return false;
   }
