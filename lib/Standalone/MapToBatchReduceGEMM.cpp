@@ -40,6 +40,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  // look for: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
   LogicalResult checkAccessPatterns(linalg::GenericOp linalgOp) const {
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
@@ -51,6 +52,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  // single region block with add, mul and linal::yield.
   LogicalResult checkBody(linalg::GenericOp linalgOp) const {
     if (tpp::hasMatmulBody(linalgOp))
       return success();
