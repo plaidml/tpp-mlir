@@ -163,4 +163,9 @@ def ToBlockLayoutAndBack : Pass<"to-block-layout", "func::FuncOp"> {
   let constructor = "mlir::tpp::createToBlockLayoutAndBackPass()";
 }
 
+def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
+  let summary = "Map a GEMM-like pattern to BRGEMM (WIP)";
+  let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES

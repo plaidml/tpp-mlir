@@ -73,6 +73,7 @@ createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createToBlockLayoutAndBackPass(int64_t blockingFactor = 0);
+std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 
 } // namespace tpp
 } // namespace mlir
