@@ -65,7 +65,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   // Return true if the linalg.generic maps to a tpp.gemm.
   bool isTPPGemm(linalg::GenericOp linalgOp) const {
     // structural and access pattern.
-    ArrayAttr iteratorTypes = linalgOp.iterator_types();
+    ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
     if (iteratorTypes.size() != 3)
       return false;
     if (!(isParallelIterator(iteratorTypes[0]) &&
