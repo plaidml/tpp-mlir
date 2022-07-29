@@ -58,15 +58,8 @@ getMapsFromBlockLayoutNCnc_NC(int64_t dims, int64_t blockFactor,
   return {toBlockTensor.second, toBlockTensor.first};
 }
 
-// Get affine maps from KCck layout to KC.
-static std::pair<AffineMap, AffineMap>
-getMapsFromBlockLayoutKCck_KC(int64_t dims, int64_t blockFactor,
-                              MLIRContext *ctx) {
-  std::pair<AffineMap, AffineMap> toBlockLayout =
-      getMapsToBlockLayoutKC_KCck(dims, blockFactor, ctx);
-  return {toBlockLayout.second, toBlockLayout.first};
-}
-
+// Given a tensor `tensor` a layout format and a block factor, relayout
+// the tensor using the specified block factor and tensor relayout.
 static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
                                int64_t blockFactor, PatternRewriter &rewriter) {
   MLIRContext *ctx = rewriter.getContext();
@@ -100,6 +93,9 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
       .getResult()[0];
 }
 
+// Relayout MatmulOp as following:
+// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
+// CB = batch reduce dimension.
 struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
   DoItOnMatmul(MLIRContext *context, int64_t blockingFactor,
                PatternBenefit benefit = 1)
@@ -168,6 +164,7 @@ private:
   int64_t blockingFactor = 0;
 };
 
+// Relayout relu as: [NB][KB][nb][kb]
 struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
   SinkBlockLayoutAfterRelu(MLIRContext *context, int64_t blockingFactor,
                            PatternBenefit benefit = 1)
