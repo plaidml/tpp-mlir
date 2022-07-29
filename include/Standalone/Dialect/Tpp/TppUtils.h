@@ -30,6 +30,9 @@ bool hasTppMark(linalg::LinalgOp linalgOp);
 // Return true if the linalg operation is marked with 'target'.
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target);
 
+// Return true if the linalg operation has a Matmul region.
+bool hasMatmulBody(linalg::LinalgOp linalgOp);
+
 } // namespace tpp
 } // namespace mlir
 
