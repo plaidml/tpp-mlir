@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -67,9 +68,34 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  SmallVector<int64_t>
+  getExpectedResultMemRefShape(ShapedType operandType,
+                               unsigned desiredResultRank) const {
+    MemRefType memrefOperand = operandType.cast<MemRefType>();
+    ArrayRef<int64_t> sizes = memrefOperand.getShape();
+    SmallVector<int64_t> targetShape;
+    int toSkip = sizes.size() - desiredResultRank;
+    assert(toSkip >= 0);
+    // TODO: find better way to express `skipping the first `toSkip`
+    // elements`. Also would be nice to have `inferRankReducedResultType`
+    // for subview to have the same API has the one for tensor. This
+    // would allow us to pass only `desiredResultRank` and avoid
+    // this method.
+    for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
+      if (toSkip > 0) {
+        toSkip--;
+        continue;
+      }
+      targetShape.push_back(sizes[idx]);
+    }
+    return targetShape;
+  }
+
   Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
-                         Value operand, unsigned desiredResultRank) const {
-    RankedTensorType operandType = operand.getType().cast<RankedTensorType>();
+                         linalg::LinalgOp linalgOp, OpOperand *operand,
+                         ValueRange valuesToUse) const {
+    Value operandToUse = valuesToUse[operand->getOperandNumber()];
+    ShapedType operandType = operandToUse.getType().cast<ShapedType>();
     assert(operandType.hasStaticShape() && "tensor must have static shape");
     int rank = operandType.getRank();
     SmallVector<OpFoldResult, 4> offsets, sizes, strides;
@@ -86,12 +112,30 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       strides.push_back(builder.getIndexAttr(1));
       sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
     }
-    RankedTensorType reducedType =
-        tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            desiredResultRank, operandType, offsets, sizes, strides);
-    Value extracted = builder.create<tensor::ExtractSliceOp>(
-        loc, reducedType, operand, offsets, sizes, strides);
-    return extracted;
+    // When mapping to BRGEMM the output operand is 2D while the inputs are
+    // 3D. Thus provide the expected shape to
+    // `inferCanonicalRankReducedResultType`.
+    unsigned desiredResultRank =
+        (operand->getOperandNumber() >= linalgOp.getNumInputs()) ? 2 : 3;
+    Type reducedType =
+        (linalgOp.hasTensorSemantics())
+            ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                  desiredResultRank, operandType.cast<RankedTensorType>(),
+                  offsets, sizes, strides)
+            : memref::SubViewOp::inferRankReducedResultType(
+                  getExpectedResultMemRefShape(operandType, desiredResultRank),
+                  operandType.cast<MemRefType>(), offsets, sizes, strides);
+
+    Operation *extractOperation =
+        (linalgOp.hasTensorSemantics())
+            ? builder.create<tensor::ExtractSliceOp>(
+                  loc, reducedType.cast<RankedTensorType>(), operandToUse,
+                  offsets, sizes, strides)
+            : builder.create<memref::SubViewOp>(
+                  loc, reducedType.cast<MemRefType>(), operandToUse, offsets,
+                  sizes, strides);
+    assert(extractOperation->getNumResults() == 1);
+    return extractOperation->getResult(0);
   }
 
   SmallVector<Value> getSlicedOperands(OpBuilder &builder, Location loc,
@@ -103,25 +147,23 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
     SmallVector<Value> slicedOperands;
-    Value A = valuesToUse[linalgOp.getInputOperands()[0]->getOperandNumber()];
-    slicedOperands.push_back(getSlicedOperand(builder, loc, localIvs[0], A,
-                                              /*desiredResultRank=*/3));
-    Value B = valuesToUse[linalgOp.getInputOperands()[1]->getOperandNumber()];
-    slicedOperands.push_back(getSlicedOperand(builder, loc, localIvs[1], B,
-                                              /*desiredResultRank=*/3));
-    Value C = valuesToUse[linalgOp.getOutputOperands()[0]->getOperandNumber()];
     slicedOperands.push_back(
-        getSlicedOperand(builder, loc, localIvs, C, /*desiredResultRank=*/2));
+        getSlicedOperand(builder, loc, localIvs[0], linalgOp,
+                         linalgOp.getInputOperands()[0], valuesToUse));
+    slicedOperands.push_back(
+        getSlicedOperand(builder, loc, localIvs[1], linalgOp,
+                         linalgOp.getInputOperands()[1], valuesToUse));
+    slicedOperands.push_back(getSlicedOperand(builder, loc, localIvs, linalgOp,
+                                              linalgOp.getOutputOperands()[0],
+                                              valuesToUse));
     return slicedOperands;
   }
 
   // Specific pattern (maybe too specific). Look for a blocked
   // matmul and map it to BRGEMM if the layout allows.
-  // TODO: make it work also at memref level so that
-  // we can emit a parallel for.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::hasStaticShape(linalgOp) || !linalgOp.hasTensorSemantics())
+    if (!tpp::hasStaticShape(linalgOp))
       return failure();
 
     if (failed(checkStructure(linalgOp)) ||
@@ -156,10 +198,14 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       assert(slicedOperands.size() == 3 && "expect three operands");
 
       linalg::ReduceBatchMatmulOp brgemm =
-          builder.create<linalg::ReduceBatchMatmulOp>(
-              loc, slicedOperands[2].getType(),
-              ValueRange{slicedOperands[0], slicedOperands[1]},
-              slicedOperands[2]);
+          (linalgOp.hasTensorSemantics())
+              ? builder.create<linalg::ReduceBatchMatmulOp>(
+                    loc, slicedOperands[2].getType(),
+                    ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2])
+              : builder.create<linalg::ReduceBatchMatmulOp>(
+                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2]);
 
       tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
                                        brgemm->getResults());
@@ -189,8 +235,8 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       if ((outermostLoop = loop))
         break;
 
-    assert(outermostLoop);
-    rewriter.replaceOp(linalgOp, outermostLoop->getResults());
+    rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
+                                               : tensorResults);
     return success();
   }
 };
