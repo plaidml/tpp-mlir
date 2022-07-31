@@ -65,7 +65,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   // Return true if the linalg.generic maps to a tpp.gemm.
   bool isTPPGemm(linalg::GenericOp linalgOp) const {
     // structural and access pattern.
-    ArrayAttr iteratorTypes = linalgOp.iterator_types();
+    ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
     if (iteratorTypes.size() != 3)
       return false;
     if (!(isParallelIterator(iteratorTypes[0]) &&
@@ -79,34 +79,13 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
       return false;
     // operations and operands.
-    Region &region = linalgOp.getRegion();
-    if (!region.hasOneBlock() || !hasStaticShape(linalgOp))
-      return false;
-    using mlir::matchers::m_Any;
-    using mlir::matchers::m_Val;
-    Block &block = region.front();
-    linalg::YieldOp yield = cast<linalg::YieldOp>(block.getTerminator());
-    if (yield.getNumOperands() != 1)
-      return false;
-    if (block.getNumArguments() != 3)
-      return false;
-    // TODO: this low-tech stuff is too manual (see:
-    // https://discourse.llvm.org/t/linalg-to-llvm-lowering/4867/7)
-    // Use OpDSL to generate all this.
-    Operation *maybeAdd = yield.getOperands()[0].getDefiningOp();
-    auto mFloat =
-        m_Op<arith::AddFOp>(m_Val(block.getArgument(2)),
-                            m_Op<arith::MulFOp>(m_Val(block.getArgument(0)),
-                                                m_Val(block.getArgument(1))));
-    auto mInteger =
-        m_Op<arith::AddIOp>(m_Val(block.getArgument(2)),
-                            m_Op<arith::MulIOp>(m_Val(block.getArgument(0)),
-                                                m_Val(block.getArgument(1))));
-    return (mFloat.match(maybeAdd) || mInteger.match(maybeAdd));
+    return hasMatmulBody(linalgOp);
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+    if (!hasStaticShape(linalgOp))
+      return failure();
     if (linalg::isElementwise(linalgOp)) {
       if (hasOnlyYieldOp(linalgOp.getRegion()) && hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");

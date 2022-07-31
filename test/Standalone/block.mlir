@@ -1,4 +1,4 @@
-// RUN: standalone-opt -map-linalg-to-tpp -to-block-layout="block-factor=32" /Users/lchelini/tpp-sandbox/test/Standalone/block.mlir -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize %s | FileCheck %s
+// RUN: standalone-opt %s -map-linalg-to-tpp -to-block-layout="block-factor=32" -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize | FileCheck %s
 
 // XFAIL: *
 
