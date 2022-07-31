@@ -15,11 +15,14 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
+
+#define DEBUG_TYPE "mlir-map-to-brgemm"
 
 namespace {
 
@@ -39,7 +42,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
                  isParallelIterator(iteratorTypes[0]);
     if (!match)
       return failure();
-    llvm::errs() << __func__ << " OK\n";
+    LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
     return success();
   }
 
@@ -52,7 +55,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     if (linalgOp.getIndexingMapsArray() !=
         infer({{p1, r1, p3, r2}, {p2, r1, r2, p4}, {p1, p2, p3, p4}}))
       return failure();
-    llvm::errs() << __func__ << " OK\n";
+    LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
     return success();
   }
 
@@ -60,7 +63,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult checkBody(linalg::GenericOp linalgOp) const {
     if (!tpp::hasMatmulBody(linalgOp))
       return failure();
-    llvm::errs() << __func__ << " OK\n";
+    LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
     return success();
   }
 
@@ -125,8 +128,6 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
         failed(checkAccessPatterns(linalgOp)) || failed(checkBody(linalgOp)))
       return failure();
 
-    // llvm::errs() << "Candidate BRGEMM " << linalgOp << "\n";
-
     Location loc = linalgOp.getLoc();
     auto allShapesSizes = cast<linalg::LinalgOp>(linalgOp.getOperation())
                               .createFlatListOfOperandDims(rewriter, loc);
@@ -152,12 +153,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       ivs.assign(localIvs.begin(), localIvs.end());
       SmallVector<Value> slicedOperands = getSlicedOperands(
           builder, loc, localIvs, linalgOp, operandValuesToUse);
-      assert(slicedOperands.size() == 3);
-
-      llvm::errs() << "******************\n";
-      for (Value slicedOperand : slicedOperands)
-        llvm::errs() << "sliced operands : " << slicedOperand << "\n";
-      llvm::errs() << "\n******************\n";
+      assert(slicedOperands.size() == 3 && "expect three operands");
 
       linalg::ReduceBatchMatmulOp brgemm =
           builder.create<linalg::ReduceBatchMatmulOp>(
