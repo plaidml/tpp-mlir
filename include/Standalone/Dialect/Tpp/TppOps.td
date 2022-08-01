@@ -140,11 +140,14 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
 
   let extraClassDeclaration = [{
     MemRefType getMatrixCType() { 
-      return getMatrixC().getType().cast<MemRefType>(); }
+      return getMatrixC().getType().cast<MemRefType>(); 
+    }
     MemRefType getMatrixAType() { 
-      return getMatrixA().getType().cast<MemRefType>(); }
+      return getMatrixA().getType().cast<MemRefType>(); 
+    }
     MemRefType getMatrixBType() { 
-      return getMatrixB().getType().cast<MemRefType>(); }
+      return getMatrixB().getType().cast<MemRefType>(); 
+    }
   }];
 
   let hasVerifier = 1;
@@ -176,6 +179,18 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,` 
                 $batchMatrixB `:` type($batchMatrixB) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+    }];
+
+    let extraClassDeclaration = [{
+      MemRefType getMatrixCType() {
+        return getMatrixC().getType().cast<MemRefType>(); 
+      }
+      MemRefType getBatchMatrixAType() {
+        return getBatchMatrixA().getType().cast<MemRefType>(); 
+      }
+      MemRefType getBatchMatrixBType() {
+        return getBatchMatrixB().getType().cast<MemRefType>(); 
+      }
     }];
 }
 

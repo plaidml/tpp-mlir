@@ -18,11 +18,7 @@
 using namespace mlir;
 using namespace mlir::xsmm;
 
-LogicalResult TernaryOp::verify() {
-  if (getArgOperands().size() != 4)
-    return emitError() << "Expect four operands";
-  return success();
-}
+LogicalResult TernaryOp::verify() { return success(); }
 
 LogicalResult BinaryOp::verify() { return success(); }
 

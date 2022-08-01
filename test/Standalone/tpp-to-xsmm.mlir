@@ -125,3 +125,15 @@ func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
   tpp.relu ins(%arg0: memref<5x6xf32>) out(%arg1: memref<5x6xf32>)
   return
 }
+
+// -----
+
+// CHECK-LABEL: @brgemm_to_xsmm(
+func.func @brgemm_to_xsmm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
+                          %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
+  // CHECK: xsmm.ternary.dispatch brgemm [5, 5, 4, 4, 5, 5]
+  // CHECK: xsmm.ternary brgemm 
+  tpp.brgemm ins(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>)
+             out(%arg2: memref<5x5xf32>)
+  return %arg2: memref<5x5xf32>
+}
