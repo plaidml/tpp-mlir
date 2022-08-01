@@ -10,7 +10,7 @@
 #define STANDALONE_TPP_OPS
 
 include "TppDialect.td"
-include "/mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
