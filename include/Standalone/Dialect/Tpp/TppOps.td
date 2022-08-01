@@ -21,7 +21,7 @@ class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
          "::mlir::MemRefType">;
 
 def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
-
+def TppBRGEMMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
 
 // Tpp operands is a scalar float or a static memref with rank 1 or 2.
 def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
@@ -40,7 +40,8 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
 
         ```mlir
  
-        tpp.add ins(%1, %2: memref<2x2xf32>, memref<2x2xf32>) out(%3: memref<2x2xf32>)
+        tpp.add ins(%1, %2: memref<2x2xf32>, memref<2x2xf32>) 
+                out(%3: memref<2x2xf32>)
         
         ```
     }];
@@ -123,12 +124,14 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
 
     ```mlir
  
-    tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) out(%3: memref<2x2xf32>)
+    tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) 
+               out(%3: memref<2x2xf32>)
 
     ```
   }];
 
-  let arguments = (ins TppOperand:$matrixA, TppOperand:$matrixB, TppOperand:$matrixC);
+  let arguments = (ins TppOperand:$matrixA, TppOperand:$matrixB, 
+                       TppOperand:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
@@ -136,12 +139,44 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
   }];
 
   let extraClassDeclaration = [{
-    MemRefType getMatrixCType() { return getMatrixC().getType().cast<MemRefType>(); }
-    MemRefType getMatrixAType() { return getMatrixA().getType().cast<MemRefType>(); }
-    MemRefType getMatrixBType() { return getMatrixB().getType().cast<MemRefType>(); }
+    MemRefType getMatrixCType() { 
+      return getMatrixC().getType().cast<MemRefType>(); }
+    MemRefType getMatrixAType() { 
+      return getMatrixA().getType().cast<MemRefType>(); }
+    MemRefType getMatrixBType() { 
+      return getMatrixB().getType().cast<MemRefType>(); }
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// BrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
+  let summary = "Performs batch reduced matrix multiplication of two inputs.";
+  let description = [{
+    The `tpp.brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+  
+    Example:
+  
+    ```mlir
+    
+      tpp.brgemm ins(%1: memref<3x5x4xf32>, %2: memref<3x4x5xf32>) 
+                 out(%3: memref<5x5xf32>)
+    ```
+    }];
+
+    let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA, 
+                         TppBRGEMMemrefInput:$batchMatrixB,
+                         TppMemRef:$matrixC);
+
+    let assemblyFormat = [{
+      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,` 
+                $batchMatrixB `:` type($batchMatrixB) `)`
+      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+    }];
 }
 
 #endif // STANDALONE_TPP_OPS
