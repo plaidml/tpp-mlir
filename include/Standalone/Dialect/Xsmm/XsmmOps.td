@@ -162,7 +162,7 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
 }
 
 //===----------------------------------------------------------------------===//
-// [N][C] - to - [N/n][C/c][n][c]
+// Utility - Copy from [N][C] - to - [N/n][C/c][n][c]
 //===----------------------------------------------------------------------===//
 
 def Xsmm_CopyOp : Xsmm_Op<"copy"> {
