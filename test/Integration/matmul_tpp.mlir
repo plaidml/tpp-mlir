@@ -60,7 +60,7 @@ module {
         [ 10.8, 11.8, 12.8, 13.8 ]
     ]> : tensor<8x4xf32>
 
-    // Call kernels with dense.
+    // Call kernel.
     %C = arith.constant dense<0.0> : tensor<4x4xf32>
     %0 = call @matmultpp(%da, %db, %C)
        : (tensor<4x8xf32>, tensor<8x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>

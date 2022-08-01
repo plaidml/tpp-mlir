@@ -253,11 +253,56 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   }
 };
 
+struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
+  using OpRewritePattern<BrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = brgemmOp.getLoc();
+    ArrayRef<int64_t> shapeC = brgemmOp.getMatrixCType().getShape();
+    ArrayRef<int64_t> shapeA = brgemmOp.getBatchMatrixAType().getShape();
+    Value i = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[0]);
+    Value j = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[1]);
+    Value k = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[2]);
+    Value b = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[0]);
+    SmallVector<Value> ubs = {b, i, j, k};
+    Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> lbs = {zero, zero, zero, zero};
+    Value one = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 1);
+    SmallVector<Value> steps = {one, one, one, one};
+
+    (void)scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps,
+        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+          assert(localIvs.size() == 4);
+          Value localB = localIvs[0];
+          Value localI = localIvs[1];
+          Value localJ = localIvs[2];
+          Value localK = localIvs[3];
+          Value scalarA =
+              b.create<memref::LoadOp>(loc, brgemmOp.getBatchMatrixA(),
+                                       ValueRange{localB, localI, localK});
+          Value scalarB =
+              b.create<memref::LoadOp>(loc, brgemmOp.getBatchMatrixB(),
+                                       ValueRange{localB, localK, localJ});
+          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getMatrixC(),
+                                                   ValueRange{localI, localJ});
+          Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
+          Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
+          b.create<memref::StoreOp>(loc, scalarAdd, brgemmOp.getMatrixC(),
+                                    ValueRange{localI, localJ});
+        });
+    rewriter.eraseOp(brgemmOp);
+    return success();
+  }
+};
+
 void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
                ConvertTppMatmulOp,
+               ConvertTppBrgemmOp,
                ConvertTppReluOp>(patterns.getContext());
   // clang-format on
 }

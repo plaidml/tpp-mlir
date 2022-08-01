@@ -146,3 +146,25 @@ func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
   tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
   return
 }
+
+// -----
+
+func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
+  // CHECK-DAG: %[[three:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[four:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[two:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[b:.*]] = %[[zero]] to %[[two]] step %[[one]] {
+  // CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+  // CHECK: scf.for %[[j:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+  // CHECK: scf.for %[[k:.*]] = %[[zero]] to %[[four]] step %[[one]] {
+  // CHECK: %[[ma:.*]] = memref.load %arg0[%[[b]], %[[i]], %[[k]]] : memref<2x3x4xf32>
+  // CHECK: %[[mb:.*]] = memref.load %arg1[%[[b]], %[[k]], %[[j]]] : memref<2x4x3xf32>
+  // CHECK: %[[mc:.*]] = memref.load %arg2[%[[i]], %[[j]]] : memref<3x3xf32>
+  // CHECK: %[[mul:.*]] = arith.mulf %[[ma]], %[[mb]] : f32
+  // CHECK: %[[add:.*]] = arith.addf %[[mc]], %[[mul]] : f32
+  // CHECK: memref.store %[[add]], %arg2[%[[i]], %[[j]]] : memref<3x3xf32>
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
+  return 
+}

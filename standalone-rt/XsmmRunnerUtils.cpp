@@ -267,6 +267,15 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke(int64_t addr,
                                                 UnrankedMemRefType<float> *B,
                                                 UnrankedMemRefType<float> *C,
                                                 int64_t numBatches) {
+  // std::cout << "numBatch: " << numBatches << "\n";
+  // std::cout << "\n A: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
+  // std::cout << "\n B: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*B));
+  // std::cout << "\n C: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*C));
+  // std::cout << "\n";
+
   DynamicMemRefType<float> tensorA = DynamicMemRefType<float>(*A);
   DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*B);
   DynamicMemRefType<float> tensorC = DynamicMemRefType<float>(*C);
@@ -285,9 +294,16 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke(int64_t addr,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_brgemm_dispatch(int64_t lda, int64_t ldb,
-                                                int64_t ldc, int64_t m,
-                                                int64_t n, int64_t k) {
+extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch(int64_t m, int64_t n,
+                                                     int64_t k, int64_t lda,
+                                                     int64_t ldb, int64_t ldc) {
+  // std::cout << "lda: " << lda << "\n";
+  // std::cout << "lbd: " << ldb << "\n";
+  // std::cout << "ldc: " << ldc << "\n";
+  // std::cout << "m: " << m << "\n";
+  // std::cout << "n: " << n << "\n";
+  // std::cout << "k: " << k << "\n";
+
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;

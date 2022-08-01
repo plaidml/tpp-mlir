@@ -43,3 +43,11 @@ func.func @identityBcastCol(%arg0: memref<5xf32>, %arg1: memref<6x5xf32>) {
   tpp.identity ins(%arg0: memref<5xf32>) out(%arg1: memref<6x5xf32>)
   return
 }
+
+// CHECK-LABEL: func.func @testBrgemm
+func.func @testBrgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
+                      %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
+  tpp.brgemm ins(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>)
+             out(%arg2: memref<5x5xf32>)
+  return %arg2: memref<5x5xf32>
+}

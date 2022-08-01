@@ -13,7 +13,7 @@ include "XsmmDialect.td"
 include "XsmmAttr.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2]>, AnyFloat, I64]>;
+def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2, 3]>, AnyFloat, I64]>;
 def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [2]>]>;
 def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [4]>]>;
 
@@ -162,7 +162,7 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
 }
 
 //===----------------------------------------------------------------------===//
-// [N][C] - to - [N/n][C/c][n][c]
+// Utility - Copy from [N][C] - to - [N/n][C/c][n][c]
 //===----------------------------------------------------------------------===//
 
 def Xsmm_CopyOp : Xsmm_Op<"copy"> {

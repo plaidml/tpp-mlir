@@ -14,7 +14,8 @@ def Xsmm_TernaryKind : I64EnumAttr<
     "TernaryKind", "",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
-      I64EnumAttrCase<"MATMUL", 2, "matmul">
+      I64EnumAttrCase<"MATMUL", 2, "matmul">,
+      I64EnumAttrCase<"BRGEMM", 3, "brgemm">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }

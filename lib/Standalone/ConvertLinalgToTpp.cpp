@@ -298,9 +298,27 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+struct ConvertBrgemmToTpp
+    : public OpRewritePattern<linalg::ReduceBatchMatmulOp> {
+  using OpRewritePattern<linalg::ReduceBatchMatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::ReduceBatchMatmulOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasBufferSemantics())
+      return failure();
+    // TODO: provide more convenient builder.
+    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(
+        linalgOp, linalgOp.getInputOperands()[0]->get(),
+        linalgOp.getInputOperands()[1]->get(),
+        linalgOp.getOutputOperands()[0]->get());
+    return failure();
+  }
+};
+
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<ConvertGenericOpToTpp>(patterns.getContext());
+  patterns.add<ConvertGenericOpToTpp,
+               ConvertBrgemmToTpp>(patterns.getContext());
   // clang-format on
 }
 
