@@ -30,7 +30,17 @@ Optimization we want to do at Linalg level:
 
 - Blocking (relayout the tensor to reduce strides and avoid cache conflicts)
 
-- Logical tiling to map n-d tensor to 2-d tensor before lower to TPP 
+- Logical tiling to map n-d tensor to 2-d tensor before lower to TPP
 
-**XSMM dialect** Interface dialect to the assembler. Consists of dispatc
+Lowerings:
+
+- TPP lowers to loop (scf)
+
+- TPP lowers to XSMM (interface dialect to the assembler) 
+
+**XSMM dialect** Interface dialect to the assembler. Consists of dispatch
 operations and invoke operations.
+
+Lowerings:
+
+- XSMM lowers to func
