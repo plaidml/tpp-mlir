@@ -310,7 +310,9 @@ extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch(int64_t m, int64_t n,
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
-  libxsmm_blasint stride_a = k * sizeof(float);
+  // TODO: move stride computation to dispatch
+  // operation as in: https://github.com/plaidml/plaidml/pull/1983
+  libxsmm_blasint stride_a = lda * m * sizeof(float);
   libxsmm_blasint stride_b = ldb * k * sizeof(float);
 
   libxsmm_gemm_shape l_shape;

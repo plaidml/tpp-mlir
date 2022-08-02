@@ -13,7 +13,6 @@
 //
 
 // TODO when batch > 1 we don't get the same result from xsmm.
-// XFAIL: *
 
 module {
 
