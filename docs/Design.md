@@ -1,4 +1,4 @@
-Design decision.
+Design decisions.
 
 **TPP dialect**. TPP stands for tensor processing primitives, and it is our new
 "ISA". TPP is the end IR we want to lower before using a custom assembler to
