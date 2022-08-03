@@ -60,12 +60,19 @@ getMapsFromBlockLayoutNCnc_NC(int64_t dims, int64_t blockFactor,
 
 // Given a tensor `tensor` a layout format and a block factor, relayout
 // the tensor using the specified block factor and tensor relayout.
-static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
-                               int64_t blockFactor, PatternRewriter &rewriter) {
+static FailureOr<Value> getReshapedTensor(Location loc, Value tensor,
+                                          BlockLayout layout,
+                                          int64_t blockFactor,
+                                          PatternRewriter &rewriter) {
   MLIRContext *ctx = rewriter.getContext();
   RankedTensorType unBlockedTensorType =
       tensor.getType().cast<RankedTensorType>();
   ArrayRef<int64_t> shape = unBlockedTensorType.getShape();
+
+  // check if the 'blockFactor' perfectly divides shape.
+  for (int64_t s : shape)
+    if (s % blockFactor != 0)
+      return failure();
 
   std::pair<AffineMap, AffineMap> maps;
   SmallVector<int64_t> shapeBlockedTensor;
@@ -113,16 +120,23 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     // reshape input A to NCnc and B to KCck.
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
     for (Value input : matmulOp.getInputs()) {
-      reshapedInputTensors.push_back(
-          getReshapedTensor(loc, input, blockLayout, blockingFactor, rewriter));
+      FailureOr<Value> maybeReshaped =
+          getReshapedTensor(loc, input, blockLayout, blockingFactor, rewriter);
+      if (failed(maybeReshaped))
+        return failure();
+      reshapedInputTensors.push_back(*maybeReshaped);
       blockLayout = BlockLayout::FORMAT_KCck;
     }
 
     blockLayout = BlockLayout::FORMAT_NCnc;
     Value reshapedOutputTensor = nullptr;
-    for (Value output : matmulOp.getOutputs())
-      reshapedOutputTensor =
+    for (Value output : matmulOp.getOutputs()) {
+      FailureOr<Value> maybeReshaped =
           getReshapedTensor(loc, output, blockLayout, blockingFactor, rewriter);
+      if (failed(maybeReshaped))
+        return failure();
+      reshapedOutputTensor = *maybeReshaped;
+    }
 
     // swap linalg.matmul with a linalg.generic.
     AffineExpr p1, p2, r1, p3, p4, r2;
@@ -187,8 +201,8 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value blockTensor = fromBlockLayout.inputs()[0];
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-    Value reluBuffer = getReshapedTensor(loc, linalgOp.outputs()[0],
-                                         blockLayout, blockingFactor, rewriter);
+    Value reluBuffer = *getReshapedTensor(
+        loc, linalgOp.outputs()[0], blockLayout, blockingFactor, rewriter);
 
     AffineMap mapI =
         AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());
@@ -222,6 +236,24 @@ private:
   int64_t blockingFactor = 0;
 };
 
+// pattern to go from linalg.generic {tpp.matmul} to linalg.matmul.
+struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasTensorSemantics())
+      return failure();
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
+      return failure();
+    SmallVector<Value> inputOperands = linalgOp.getInputOperands();
+    SmallVector<Value> outputOperands = linalgOp.getOutputOperands();
+    rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
+    return success();
+  }
+};
+
 struct ToBlockLayoutAndBack
     : public ToBlockLayoutAndBackBase<ToBlockLayoutAndBack> {
   ToBlockLayoutAndBack() = default;
@@ -234,6 +266,7 @@ struct ToBlockLayoutAndBack
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx, blockingFactor);
+    patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

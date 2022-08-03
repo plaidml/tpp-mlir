@@ -13,6 +13,7 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/LinalgX/LinalgXOps.cpp
         Dialect/LinalgX/LinalgXDialect.cpp
         Dialect/LinalgX/BufferizableOpInterfaceImpl.cpp
+        Dialect/Stdx/BufferizableOpInterfaceImpl.cpp
        
         # Passes 
         LinalgMapToTpp.cpp
