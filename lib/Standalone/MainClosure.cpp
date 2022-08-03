@@ -8,15 +8,12 @@
 
 #include "Standalone/Dialect/Stdx/StdxOps.h"
 #include "Standalone/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include <set>
 
 using namespace mlir;
-using namespace mlir::stdx;
 
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
@@ -33,30 +30,31 @@ struct MainClosure : public MainClosureBase<MainClosure> {
       return;
 
     SmallVector<Value> closureArgs;
-    SmallVector<unsigned> argsIndex;
     Value closureRes;
     for (BlockArgument argument : main.getArguments()) {
       if (main.getArgAttr(argument.getArgNumber(), "stdx.const"))
         continue;
       if (main.getArgAttr(argument.getArgNumber(), "stdx.res"))
         closureRes = argument;
-      else {
+      else 
         closureArgs.push_back(argument);
-        argsIndex.push_back(argument.getArgNumber());
-      }
     }
 
-    BlockAndValueMapping mapper;
+    // Build the closure.
     Block *mainBlock = &main.getRegion().front();
     ImplicitLocOpBuilder builder =
         ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
-    ClosureOp closure =
+    stdx::ClosureOp closure =
         builder.create<stdx::ClosureOp>(closureRes, closureArgs);
+ 
+    // Map closure region arguments with the main arguments.
+    BlockAndValueMapping mapper;
+    mapper.map(closureArgs, closure.getRegion().getArguments());
 
+    // Get all the operations in main and clone them into the closure.
+    // We skip closure itself and the func::return.
     ImplicitLocOpBuilder closureBuilder = ImplicitLocOpBuilder::atBlockBegin(
         closure.getLoc(), &closure.getRegion().front());
-    mapper.map(main.getArguments(), closure.getRegion().getArguments());
-
     SmallVector<Value> closureResults;
     for (Operation &op : mainBlock->getOperations()) {
       if (isa<func::ReturnOp>(op)) {
@@ -68,10 +66,11 @@ struct MainClosure : public MainClosureBase<MainClosure> {
         continue;
       closureBuilder.clone(op, mapper);
     }
+
+    // Fix up yield and return.
     stdx::YieldOp yield =
         cast<stdx::YieldOp>(closure.getRegion().front().getTerminator());
     yield->setOperands(closureResults);
-
     func::ReturnOp returnOp =
         cast<func::ReturnOp>(main.getRegion().front().getTerminator());
     returnOp->setOperands(closure->getResults());
