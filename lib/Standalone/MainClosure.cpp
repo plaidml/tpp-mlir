@@ -11,9 +11,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include <set>
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
 using namespace mlir::stdx;
 
 #define GEN_PASS_CLASSES
@@ -21,59 +23,38 @@ using namespace mlir::stdx;
 
 namespace {
 
-// TODO: I don't want to erase main args and return.
-
 struct MainClosure : public MainClosureBase<MainClosure> {
   MainClosure() = default;
   void runOnOperation() override {
+
     ModuleOp module = getOperation();
     func::FuncOp main = module.lookupSymbol<func::FuncOp>("main");
     if (!main)
-      assert(0);
+      return;
 
-    SmallVector<BlockArgument> args;
-    llvm::BitVector argIndices(main.getNumArguments());
-    SmallVector<Type> argTypes;
-    for (BlockArgument arg : main.getArguments()) {
-      if (!main.getArgAttr(arg.getArgNumber(), "stdx.const")) {
-        args.push_back(arg);
-        argIndices.set(arg.getArgNumber());
-        argTypes.push_back(arg.getType());
-      }
+    SmallVector<Value> closureArgs;
+    SmallVector<Type> closureArgsTypes;
+    SmallVector<unsigned> argsIndex;
+    for (BlockArgument argument : main.getArguments()) {
+      if (main.getArgAttr(argument.getArgNumber(), "std.const"))
+        continue;
+      closureArgs.push_back(argument);
+      argsIndex.push_back(argument.getArgNumber());
+      closureArgsTypes.push_back(argument.getType());
     }
 
-    Block *origBlock = &main.front();
-    Operation *firstOp = &origBlock->front();
-    func::ReturnOp returnOp = cast<func::ReturnOp>(origBlock->getTerminator());
+    ImplicitLocOpBuilder builder =
+        ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
+    ClosureOp closure = builder.create<stdx::ClosureOp>(closureArgs);
+    ImplicitLocOpBuilder bodyBuilder = 
+      ImplicitLocOpBuilder::atBlockBegin(closure.getLoc(), &closure.getRegion().front());
 
-    auto builder = ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), origBlock);
-    FunctionType funcType =
-        builder.getFunctionType(argTypes, main.getFunctionType().getResults());
-    auto closure = builder.create<stdx::ClosureOp>(funcType);
+    bodyBuilder.create<arith::ConstantIndexOp>(32); 
+    bodyBuilder.create<stdx::YieldOp>(closure.getRegionIterArgs());
 
-    Region &bodyRegion = closure.body();
-    Block *body = new Block();
-    bodyRegion.push_back(body);
-
-    auto &oldBodyOps = origBlock->getOperations();
-    auto &newBodyOps = body->getOperations();
-    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
-                      Block::iterator(firstOp), std::prev(oldBodyOps.end()));
-
-    builder.setInsertionPointToEnd(body);
-    builder.create<stdx::YieldOp>(returnOp.operands());
-
-    returnOp->setOperands({});
-
-    for (BlockArgument arg : args) {
-      BlockArgument newArg = body->addArgument(arg.getType(), arg.getLoc());
-      arg.replaceAllUsesWith(newArg);
-    }
-
-    main.eraseArguments(argIndices);
-    for (unsigned i = 0, e = main.getNumResults(); i < e; ++i)
-      main.eraseResult(0);
-  }
+    return; 
+ 
+  } // end runOnOperation
 };
 
 } // namespace
