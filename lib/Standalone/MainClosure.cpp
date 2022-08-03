@@ -8,12 +8,12 @@
 
 #include "Standalone/Dialect/Stdx/StdxOps.h"
 #include "Standalone/Passes.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include <set>
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 using namespace mlir;
 using namespace mlir::stdx;
@@ -46,14 +46,14 @@ struct MainClosure : public MainClosureBase<MainClosure> {
     ImplicitLocOpBuilder builder =
         ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
     ClosureOp closure = builder.create<stdx::ClosureOp>(closureArgs);
-    ImplicitLocOpBuilder bodyBuilder = 
-      ImplicitLocOpBuilder::atBlockBegin(closure.getLoc(), &closure.getRegion().front());
+    ImplicitLocOpBuilder bodyBuilder = ImplicitLocOpBuilder::atBlockBegin(
+        closure.getLoc(), &closure.getRegion().front());
 
-    bodyBuilder.create<arith::ConstantIndexOp>(32); 
+    bodyBuilder.create<arith::ConstantIndexOp>(32);
     bodyBuilder.create<stdx::YieldOp>(closure.getRegionIterArgs());
 
-    return; 
- 
+    return;
+
   } // end runOnOperation
 };
 

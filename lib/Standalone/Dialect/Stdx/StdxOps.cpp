@@ -16,7 +16,8 @@ using namespace mlir::stdx;
 
 Region &ClosureOp::getLoopBody() { return getRegion(); }
 
-void ClosureOp::build(OpBuilder &builder, OperationState &result, ValueRange arguments) {
+void ClosureOp::build(OpBuilder &builder, OperationState &result,
+                      ValueRange arguments) {
   result.addOperands(arguments);
   for (Value val : arguments)
     result.addTypes(val.getType());
@@ -25,7 +26,7 @@ void ClosureOp::build(OpBuilder &builder, OperationState &result, ValueRange arg
   Block &bodyBlock = bodyRegion->front();
   for (Value v : arguments)
     bodyBlock.addArgument(v.getType(), v.getLoc());
-  //ClosureOp::ensureTerminator(*bodyRegion, builder, result.location); 
+  // ClosureOp::ensureTerminator(*bodyRegion, builder, result.location);
 }
 
 /// Prints the initialization list in the form of
