@@ -33,27 +33,50 @@ struct MainClosure : public MainClosureBase<MainClosure> {
       return;
 
     SmallVector<Value> closureArgs;
-    SmallVector<Type> closureArgsTypes;
     SmallVector<unsigned> argsIndex;
+    Value closureRes;
     for (BlockArgument argument : main.getArguments()) {
-      if (main.getArgAttr(argument.getArgNumber(), "std.const"))
+      if (main.getArgAttr(argument.getArgNumber(), "stdx.const"))
         continue;
-      closureArgs.push_back(argument);
-      argsIndex.push_back(argument.getArgNumber());
-      closureArgsTypes.push_back(argument.getType());
+      if (main.getArgAttr(argument.getArgNumber(), "stdx.res"))
+        closureRes = argument;
+      else {
+        closureArgs.push_back(argument);
+        argsIndex.push_back(argument.getArgNumber());
+      }
     }
 
+    BlockAndValueMapping mapper;
+    Block *mainBlock = &main.getRegion().front();
     ImplicitLocOpBuilder builder =
         ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
-    ClosureOp closure = builder.create<stdx::ClosureOp>(closureArgs);
-    ImplicitLocOpBuilder bodyBuilder = ImplicitLocOpBuilder::atBlockBegin(
-        closure.getLoc(), &closure.getRegion().front());
+    ClosureOp closure =
+        builder.create<stdx::ClosureOp>(closureRes, closureArgs);
 
-    bodyBuilder.create<arith::ConstantIndexOp>(32);
-    bodyBuilder.create<stdx::YieldOp>(closure.getRegionIterArgs());
+    ImplicitLocOpBuilder closureBuilder = ImplicitLocOpBuilder::atBlockBegin(
+        closure.getLoc(), &closure.getRegion().front());
+    mapper.map(main.getArguments(), closure.getRegion().getArguments());
+
+    SmallVector<Value> closureResults;
+    for (Operation &op : mainBlock->getOperations()) {
+      if (isa<func::ReturnOp>(op)) {
+        for (auto opValue : op.getOperands())
+          closureResults.push_back(mapper.lookupOrDefault(opValue));
+        continue;
+      }
+      if (isa<stdx::ClosureOp>(op))
+        continue;
+      closureBuilder.clone(op, mapper);
+    }
+    stdx::YieldOp yield =
+        cast<stdx::YieldOp>(closure.getRegion().front().getTerminator());
+    yield->setOperands(closureResults);
+
+    func::ReturnOp returnOp =
+        cast<func::ReturnOp>(main.getRegion().front().getTerminator());
+    returnOp->setOperands(closure->getResults());
 
     return;
-
   } // end runOnOperation
 };
 

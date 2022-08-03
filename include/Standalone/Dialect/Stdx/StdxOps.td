@@ -22,7 +22,7 @@ def Stdx_ClosureOp : Stdx_Op<"closure", [
                      SingleBlockImplicitTerminator<"stdx::YieldOp">]> {
   let summary = "closure operation";
   let arguments = (ins Variadic<AnyType>:$initArgs);
-  let results = (outs Variadic<AnyType>:$results);
+  let results = (outs AnyType:$results);
   let regions = (region SizedRegion<1>:$region);
  
   let extraClassDeclaration = [{
@@ -39,7 +39,7 @@ def Stdx_ClosureOp : Stdx_Op<"closure", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "ValueRange":$init)>
+    OpBuilder<(ins "Value":$dest, "ValueRange":$init)>
   ]; 
   let hasCustomAssemblyFormat = 1; 
 }
