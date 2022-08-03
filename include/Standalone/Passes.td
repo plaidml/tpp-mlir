@@ -113,7 +113,7 @@ def Bufferization : Pass<"bufferize", "ModuleOp"> {
 }
 
 def MainClosure : Pass<"main-closure", "ModuleOp"> {
-  let summary = "Wrap main into a closure to hoist out sequential computation (WIP)";
+  let summary = "Wrap main into a closure to hoist out constant computation.";
   let constructor = "mlir::tpp::createMainClosurePass()";
   let dependentDialects = ["func::FuncDialect"];
 }

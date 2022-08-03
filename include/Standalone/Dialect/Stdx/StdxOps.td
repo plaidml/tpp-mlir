@@ -18,22 +18,30 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def Stdx_ClosureOp : Stdx_Op<"closure", [
-                     DeclareOpInterfaceMethods<LoopLikeOpInterface>]> {
+                     DeclareOpInterfaceMethods<LoopLikeOpInterface>,
+                     SingleBlockImplicitTerminator<"stdx::YieldOp">]> {
   let summary = "closure operation";
-  let description = [{ }];
-
-  let arguments = (ins TypeAttr:$type);
-
-  let regions = (region SizedRegion<1>:$body);
-  let hasCustomAssemblyFormat = 1;
-  
+  let arguments = (ins Variadic<AnyType>:$initArgs);
+  let results = (outs AnyType:$results);
+  let regions = (region SizedRegion<1>:$region);
+ 
   let extraClassDeclaration = [{
-      mlir::FunctionType getFunctionType() { return type().cast<mlir::FunctionType>(); }
-      void setType(mlir::FunctionType type) {
-        typeAttr(mlir::TypeAttr::get(type));
-      }
-      mlir::Region &getBody() { return body(); }
+    Operation::operand_range getIterOperands() {
+      return getOperands();
+    }
+    bool hasIterOperands() { 
+      return getOperation()->getNumOperands() > 0;
+    }
+    Block::BlockArgListType getRegionIterArgs() {
+      return getBody()->getArguments();
+    }
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$dest, "ValueRange":$init)>
+  ]; 
+  let hasCustomAssemblyFormat = 1; 
 }
 
 //===----------------------------------------------------------------------===//
@@ -46,6 +54,8 @@ def YieldOp : Stdx_Op<"yield", [HasParent<"ClosureOp">, NoSideEffect,
   let description = [{ }];
 
   let arguments = (ins Variadic<AnyType>:$operands);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 

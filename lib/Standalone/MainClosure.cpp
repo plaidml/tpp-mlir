@@ -9,71 +9,74 @@
 #include "Standalone/Dialect/Stdx/StdxOps.h"
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
-using namespace mlir::stdx;
 
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
 
 namespace {
 
-// TODO: I don't want to erase main args and return.
-
 struct MainClosure : public MainClosureBase<MainClosure> {
   MainClosure() = default;
   void runOnOperation() override {
+
     ModuleOp module = getOperation();
     func::FuncOp main = module.lookupSymbol<func::FuncOp>("main");
     if (!main)
-      assert(0);
+      return;
 
-    SmallVector<BlockArgument> args;
-    llvm::BitVector argIndices(main.getNumArguments());
-    SmallVector<Type> argTypes;
-    for (BlockArgument arg : main.getArguments()) {
-      if (!main.getArgAttr(arg.getArgNumber(), "stdx.const")) {
-        args.push_back(arg);
-        argIndices.set(arg.getArgNumber());
-        argTypes.push_back(arg.getType());
+    SmallVector<Value> closureArgs;
+    Value closureRes;
+    for (BlockArgument argument : main.getArguments()) {
+      if (main.getArgAttr(argument.getArgNumber(), "stdx.const"))
+        continue;
+      if (main.getArgAttr(argument.getArgNumber(), "stdx.res"))
+        closureRes = argument;
+      else 
+        closureArgs.push_back(argument);
+    }
+
+    // Build the closure.
+    Block *mainBlock = &main.getRegion().front();
+    ImplicitLocOpBuilder builder =
+        ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
+    stdx::ClosureOp closure =
+        builder.create<stdx::ClosureOp>(closureRes, closureArgs);
+ 
+    // Map closure region arguments with the main arguments.
+    BlockAndValueMapping mapper;
+    mapper.map(closureArgs, closure.getRegion().getArguments());
+
+    // Get all the operations in main and clone them into the closure.
+    // We skip closure itself and the func::return.
+    ImplicitLocOpBuilder closureBuilder = ImplicitLocOpBuilder::atBlockBegin(
+        closure.getLoc(), &closure.getRegion().front());
+    SmallVector<Value> closureResults;
+    for (Operation &op : mainBlock->getOperations()) {
+      if (isa<func::ReturnOp>(op)) {
+        for (auto opValue : op.getOperands())
+          closureResults.push_back(mapper.lookupOrDefault(opValue));
+        continue;
       }
+      if (isa<stdx::ClosureOp>(op))
+        continue;
+      closureBuilder.clone(op, mapper);
     }
 
-    Block *origBlock = &main.front();
-    Operation *firstOp = &origBlock->front();
-    func::ReturnOp returnOp = cast<func::ReturnOp>(origBlock->getTerminator());
+    // Fix up yield and return.
+    stdx::YieldOp yield =
+        cast<stdx::YieldOp>(closure.getRegion().front().getTerminator());
+    yield->setOperands(closureResults);
+    func::ReturnOp returnOp =
+        cast<func::ReturnOp>(main.getRegion().front().getTerminator());
+    returnOp->setOperands(closure->getResults());
 
-    auto builder = ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), origBlock);
-    FunctionType funcType =
-        builder.getFunctionType(argTypes, main.getFunctionType().getResults());
-    auto closure = builder.create<stdx::ClosureOp>(funcType);
-
-    Region &bodyRegion = closure.body();
-    Block *body = new Block();
-    bodyRegion.push_back(body);
-
-    auto &oldBodyOps = origBlock->getOperations();
-    auto &newBodyOps = body->getOperations();
-    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
-                      Block::iterator(firstOp), std::prev(oldBodyOps.end()));
-
-    builder.setInsertionPointToEnd(body);
-    builder.create<stdx::YieldOp>(returnOp.operands());
-
-    returnOp->setOperands({});
-
-    for (BlockArgument arg : args) {
-      BlockArgument newArg = body->addArgument(arg.getType(), arg.getLoc());
-      arg.replaceAllUsesWith(newArg);
-    }
-
-    main.eraseArguments(argIndices);
-    for (unsigned i = 0, e = main.getNumResults(); i < e; ++i)
-      main.eraseResult(0);
-  }
+    return;
+  } // end runOnOperation
 };
 
 } // namespace
