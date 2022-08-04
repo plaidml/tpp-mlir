@@ -112,7 +112,7 @@ def Bufferization : Pass<"bufferize", "ModuleOp"> {
   let constructor = "mlir::tpp::createBufferizationPass()";
 }
 
-def MainClosure : Pass<"main-closure", "ModuleOp"> {
+def MainClosure : Pass<"main-closure", "func::FuncOp"> {
   let summary = "Wrap main into a closure to hoist out constant computation.";
   let constructor = "mlir::tpp::createMainClosurePass()"; 
   let description = [{

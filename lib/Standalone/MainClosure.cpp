@@ -24,9 +24,8 @@ struct MainClosure : public MainClosureBase<MainClosure> {
   MainClosure() = default;
   void runOnOperation() override {
 
-    ModuleOp module = getOperation();
-    func::FuncOp main = module.lookupSymbol<func::FuncOp>("main");
-    if (!main)
+    func::FuncOp main = getOperation();
+    if (main.getName() != "main")
       return;
 
     SmallVector<Value> closureArgs;
@@ -81,6 +80,7 @@ struct MainClosure : public MainClosureBase<MainClosure> {
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createMainClosurePass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createMainClosurePass() {
   return std::make_unique<MainClosure>();
 }
