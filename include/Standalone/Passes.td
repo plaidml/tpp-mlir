@@ -114,7 +114,13 @@ def Bufferization : Pass<"bufferize", "ModuleOp"> {
 
 def MainClosure : Pass<"main-closure", "ModuleOp"> {
   let summary = "Wrap main into a closure to hoist out constant computation.";
-  let constructor = "mlir::tpp::createMainClosurePass()";
+  let constructor = "mlir::tpp::createMainClosurePass()"; 
+  let description = [{
+    Wrap main into a closure. A closure takes n-inputs and 1 output. Inputs of
+    the closure are non-constant tensors (tensors without stdx.const or stdx.res
+    attributes). This allows to move operations that operate on constant tensors
+    outside the closure and isolate the `hot` loops in the main.
+  }];
   let dependentDialects = ["func::FuncDialect"];
 }
 
@@ -152,9 +158,10 @@ def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
 }
 
 def ToBlockLayoutAndBack : Pass<"to-block-layout", "func::FuncOp"> {
-  let summary = "Convert to block layout and back (WIP)";
+  let summary = "Convert to block layout and back";
   let description = [{
-    Relayout from NC to NCnc and back.
+    Block GEMM as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
+    the GEMM has a relu operation as its consumer block also the relu operation.
   }];
   let options = [
     Option<"blockingFactor", "block-factor", "int64_t", "0", 
@@ -164,8 +171,14 @@ def ToBlockLayoutAndBack : Pass<"to-block-layout", "func::FuncOp"> {
 }
 
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
-  let summary = "Map a GEMM-like pattern to BRGEMM (WIP)";
+  let summary = "Map a GEMM-like pattern to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
+  let description = [{
+    Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
+    [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
+    outermost parallel dimensions (as scf.for) and rewrite the body to a
+    linalg.brgemm. The pass works both a memref and tensor level.
+  }];
 }
 
 #endif // STANDALONE_DIALECT_TPP_PASSES
