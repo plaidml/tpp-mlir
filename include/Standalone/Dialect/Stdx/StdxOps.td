@@ -18,6 +18,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def Stdx_ClosureOp : Stdx_Op<"closure", [
+                     NoSideEffect,
                      DeclareOpInterfaceMethods<LoopLikeOpInterface>,
                      SingleBlockImplicitTerminator<"stdx::YieldOp">]> {
   let summary = "closure operation";

@@ -124,6 +124,12 @@ def MainClosure : Pass<"main-closure", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
+def UndoMainClosure : Pass<"undo-main-closure", "func::FuncOp"> {
+  let summary = "Undo the main-closure pass";
+  let constructor = "mlir::tpp::createUndoMainClosurePass()";
+  let dependentDialects = ["func::FuncDialect"];
+}
+
 def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
   let summary = "Build tpp compiler pipeline - WIP do not use";
   let constructor = "mlir::tpp::createTppCompilerPipeline()";

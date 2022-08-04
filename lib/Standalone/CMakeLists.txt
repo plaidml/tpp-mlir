@@ -21,6 +21,7 @@ add_mlir_dialect_library(MLIRStandalone
         VectorizeCopy.cpp
         PreBufferization.cpp
         MainClosure.cpp
+        UndoMainClosure.cpp
         Bufferization.cpp
         TileConsumerAndFuseProducers.cpp
         DecomposeConvToMatmul.cpp

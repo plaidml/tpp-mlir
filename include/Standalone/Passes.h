@@ -74,6 +74,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createToBlockLayoutAndBackPass(int64_t blockingFactor = 0);
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 
 } // namespace tpp
 } // namespace mlir
