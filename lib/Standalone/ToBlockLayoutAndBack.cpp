@@ -222,6 +222,25 @@ private:
   int64_t blockingFactor = 0;
 };
 
+// TODO: should be part of a more structured de-generalization pass.
+// pattern to go from linalg.generic {tpp.matmul} to linalg.matmul.
+struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasTensorSemantics())
+      return failure();
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
+      return failure();
+    SmallVector<Value> inputOperands = linalgOp.getInputOperands();
+    SmallVector<Value> outputOperands = linalgOp.getOutputOperands();
+    rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
+    return success();
+  }
+};
+
 struct ToBlockLayoutAndBack
     : public ToBlockLayoutAndBackBase<ToBlockLayoutAndBack> {
   ToBlockLayoutAndBack() = default;
@@ -234,6 +253,7 @@ struct ToBlockLayoutAndBack
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx, blockingFactor);
+    patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
