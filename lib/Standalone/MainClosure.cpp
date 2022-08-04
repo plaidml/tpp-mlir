@@ -29,7 +29,7 @@ struct MainClosure : public MainClosureBase<MainClosure> {
       return;
 
     SmallVector<Value> closureArgs;
-    Value closureRes;
+    Value closureRes = nullptr;
     for (BlockArgument argument : main.getArguments()) {
       if (main.getArgAttr(argument.getArgNumber(), "stdx.const"))
         continue;
@@ -38,6 +38,14 @@ struct MainClosure : public MainClosureBase<MainClosure> {
       else 
         closureArgs.push_back(argument);
     }
+
+    // no input, return.
+    if (closureArgs.size() == 0)
+      return;
+
+    // no output, return.
+    if (!closureRes)
+      return;
 
     // Build the closure.
     Block *mainBlock = &main.getRegion().front();
