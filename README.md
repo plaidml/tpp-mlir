@@ -55,10 +55,6 @@ CMake so that it installs `FileCheck` to the chosen installation prefix.
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
 
-## Problems
-
-1. **Expect some tests to fail**
-
 ## TODO:
 
 1. Align runtime with IREE see: https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Dialect/VMVX (You don't want to pass the memref to the runtime but the single pointer + offset + strides).
