@@ -187,4 +187,9 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   }];
 }
 
+def RelayoutElimination : Pass<"eliminate-relayout", "func::FuncOp"> {
+  let summary = "Try to eliminate unecessary relayout operations - (WIP)";
+  let constructor = "mlir::tpp::createRelayoutEliminationPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES
