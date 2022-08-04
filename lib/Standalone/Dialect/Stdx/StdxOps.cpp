@@ -20,8 +20,6 @@ void ClosureOp::build(OpBuilder &builder, OperationState &result, Value out,
                       ValueRange inits) {
   result.addOperands(inits);
   result.addOperands(out);
-  // for (Value val : inits)
-  //   result.addTypes(val.getType());
   result.addTypes(out.getType());
 
   Region *bodyRegion = result.addRegion();
@@ -72,7 +70,7 @@ ParseResult ClosureOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseKeyword("init_args"))
     return failure();
 
-  // Parse assignment list and type list.
+  // Parse assignment list and type list for input (init_args).
   SmallVector<Type> argumentsTypes;
   if (parser.parseAssignmentList(regionArgs, operands) ||
       parser.parseArrowTypeList(argumentsTypes))
@@ -81,13 +79,16 @@ ParseResult ClosureOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseKeyword("init_outs"))
     return failure();
 
+  // Parse assignment list for result (init_outs).
   if (parser.parseAssignmentList(regionArgs, operands) ||
       parser.parseArrowTypeList(result.types))
     return failure();
   llvm::append_range(argumentsTypes, result.types);
 
-  assert(argumentsTypes.size() == regionArgs.size());
-  assert(argumentsTypes.size() == operands.size());
+  assert(argumentsTypes.size() == regionArgs.size() &&
+         "expected same length of arguments");
+  assert(argumentsTypes.size() == operands.size() &&
+         "expected same length of arguments");
 
   for (auto argOperandType : llvm::zip(regionArgs, operands, argumentsTypes)) {
     Type type = std::get<2>(argOperandType);
