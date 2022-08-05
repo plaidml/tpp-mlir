@@ -252,16 +252,6 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       assert(operandValuesToUse.size() ==
                  static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
              "expect the number of operands and inputs and outputs to match");
-
-      // for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
-      //   AffineMap map = linalgOp.getTiedIndexingMap(operand);
-      //   map.dump();
-      //   llvm::errs() << map.getNumInputs() << "\n";
-      //   for (unsigned pos = 0; pos < map.getNumInputs(); pos++)
-      //     llvm::errs() << map.isFunctionOfDim(pos) << "\n";
-      // }
-
-      // assert(localIvs.size() == 2 && "expect two induction variables");
       ivs.assign(localIvs.begin(), localIvs.end());
       SmallVector<Value> slicedOperands = getSlicedOperands(
           builder, loc, localIvs, linalgOp, operandValuesToUse);
