@@ -30,31 +30,68 @@ namespace {
 struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  // look for p p r p p r
+  // Look for [p ... p] brgemm[r p p r]
   LogicalResult checkStructure(linalg::GenericOp linalgOp) const {
     ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
-    if (iteratorTypes.size() != 6)
+    if (iteratorTypes.size() < 4)
       return failure();
-    bool match = isReductionIterator(iteratorTypes[5]) &&
-                 isParallelIterator(iteratorTypes[4]) &&
-                 isParallelIterator(iteratorTypes[3]) &&
-                 isReductionIterator(iteratorTypes[2]) &&
-                 isParallelIterator(iteratorTypes[1]) &&
-                 isParallelIterator(iteratorTypes[0]);
+    size_t size = iteratorTypes.size() - 1;
+    bool match = isReductionIterator(iteratorTypes[size]) &&
+                 isParallelIterator(iteratorTypes[size - 1]) &&
+                 isParallelIterator(iteratorTypes[size - 2]) &&
+                 isReductionIterator(iteratorTypes[size - 3]);
     if (!match)
       return failure();
+    size = size - 3;
+    size_t idx = 0;
+    while (idx < size) {
+      if (!isParallelIterator(iteratorTypes[idx++]))
+        return failure();
+    }
     LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
     return success();
   }
 
-  // look for: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
+  // Check if the operand is an input to linalgOp.
+  bool isInputOperand(linalg::GenericOp linalgOp, OpOperand *operand) const {
+    if (operand->getOperandNumber() < linalgOp.getNumInputs())
+      return true;
+    return false;
+  }
+
+  // Check if the operand is an output to linalgOp.
+  bool isOutputOperand(linalg::GenericOp linalgOp, OpOperand *operand) const {
+    return !isInputOperand(linalgOp, operand);
+  }
+
+  // Check the access pattern that must match the one expected for BRGEMM.
+  // We extract the 3 innermost dimensions for the input and the 2 innermost
+  // dimensions for the output. We then check that they equal:
+  // [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
   LogicalResult checkAccessPatterns(linalg::GenericOp linalgOp) const {
+    SmallVector<AffineMap> maps;
+    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+      AffineMap map = linalgOp.getTiedIndexingMap(operand);
+      if (isInputOperand(linalgOp, operand)) {
+        if (map.getNumResults() < 3)
+          return failure();
+        maps.push_back(map.getMinorSubMap(3));
+      } else {
+        assert(isOutputOperand(linalgOp, operand));
+        if (map.getNumResults() < 2)
+          return failure();
+        maps.push_back(map.getMinorSubMap(2));
+      }
+    }
+    SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-    AffineExpr p1, p2, r1, p3, p4, r2;
-    bindDims(linalgOp.getContext(), p1, p2, r1, p3, p4, r2);
-    if (linalgOp.getIndexingMapsArray() !=
-        infer({{p1, r1, p3, r2}, {p2, r1, r2, p4}, {p1, p2, p3, p4}}))
+    AffineExpr r1, p3, p4, r2;
+    bindDims(linalgOp.getContext(), r1, p3, p4, r2);
+    // Expected access patterns of BRGEMM
+    SmallVector<AffineMap> expectedMaps =
+        infer({{r1, p3, r2}, {r1, r2, p4}, {p3, p4}});
+    if (compressedDimMaps != expectedMaps)
       return failure();
     LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
     return success();
@@ -138,6 +175,19 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return extractOperation->getResult(0);
   }
 
+  // Check if the localIvs at position pos is involved
+  // in the map tied to the provided operand.
+  SmallVector<Value> getInvolvedLocalDims(OpOperand *operand,
+                                          AffineMap mapOperand,
+                                          ValueRange localIvs) const {
+    SmallVector<Value> ivs;
+    for (unsigned pos = 0; pos < localIvs.size(); pos++) {
+      if (mapOperand.isFunctionOfDim(pos))
+        ivs.push_back(localIvs[pos]);
+    }
+    return ivs;
+  }
+
   SmallVector<Value> getSlicedOperands(OpBuilder &builder, Location loc,
                                        ValueRange localIvs,
                                        linalg::LinalgOp linalgOp,
@@ -146,16 +196,27 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
            "expect 3 input/output operands");
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
+
+    OpOperand *operandA = linalgOp.getInputOperands()[0];
+    OpOperand *operandB = linalgOp.getInputOperands()[1];
+    OpOperand *operandC = linalgOp.getOutputOperands()[0];
+
     SmallVector<Value> slicedOperands;
-    slicedOperands.push_back(
-        getSlicedOperand(builder, loc, localIvs[0], linalgOp,
-                         linalgOp.getInputOperands()[0], valuesToUse));
-    slicedOperands.push_back(
-        getSlicedOperand(builder, loc, localIvs[1], linalgOp,
-                         linalgOp.getInputOperands()[1], valuesToUse));
-    slicedOperands.push_back(getSlicedOperand(builder, loc, localIvs, linalgOp,
-                                              linalgOp.getOutputOperands()[0],
-                                              valuesToUse));
+    slicedOperands.push_back(getSlicedOperand(
+        builder, loc,
+        getInvolvedLocalDims(operandA, linalgOp.getTiedIndexingMap(operandA),
+                             localIvs),
+        linalgOp, operandA, valuesToUse));
+    slicedOperands.push_back(getSlicedOperand(
+        builder, loc,
+        getInvolvedLocalDims(operandB, linalgOp.getTiedIndexingMap(operandB),
+                             localIvs),
+        linalgOp, operandB, valuesToUse));
+    slicedOperands.push_back(getSlicedOperand(
+        builder, loc,
+        getInvolvedLocalDims(operandC, linalgOp.getTiedIndexingMap(operandC),
+                             localIvs),
+        linalgOp, operandC, valuesToUse));
     return slicedOperands;
   }
 
@@ -191,7 +252,16 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       assert(operandValuesToUse.size() ==
                  static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
              "expect the number of operands and inputs and outputs to match");
-      assert(localIvs.size() == 2 && "expect two induction variables");
+
+      // for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+      //   AffineMap map = linalgOp.getTiedIndexingMap(operand);
+      //   map.dump();
+      //   llvm::errs() << map.getNumInputs() << "\n";
+      //   for (unsigned pos = 0; pos < map.getNumInputs(); pos++)
+      //     llvm::errs() << map.isFunctionOfDim(pos) << "\n";
+      // }
+
+      // assert(localIvs.size() == 2 && "expect two induction variables");
       ivs.assign(localIvs.begin(), localIvs.end());
       SmallVector<Value> slicedOperands = getSlicedOperands(
           builder, loc, localIvs, linalgOp, operandValuesToUse);

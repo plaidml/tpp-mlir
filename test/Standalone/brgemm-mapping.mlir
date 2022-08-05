@@ -67,3 +67,23 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     }
   return %arg2 : memref<4x8x32x32xf32>
 }
+
+// -----
+
+#map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map6 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map7 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+
+// CHECK-LABEL: func.func @blocked_matmul
+// CHECK-SAME: %[[arg_zero:.*]]: tensor<8x32x32xf32>, %[[arg_one:.*]]: tensor<8x32x32xf32>, %[[arg_two:.*]]: tensor<32x32xf32>) -> tensor<32x32xf32> {
+func.func @blocked_matmul(%arg0: tensor<8x32x32xf32>, %arg1: tensor<8x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[arg_zero]], %[[arg_one]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[arg_two]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %0 = linalg.generic {indexing_maps = [#map5, #map6, #map7], iterator_types = ["reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%arg2 : tensor<32x32xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32, %arg5:f32):
+    %m = arith.mulf %arg3, %arg4 : f32
+    %a = arith.addf %arg5, %m : f32
+    linalg.yield %a : f32
+  } -> tensor<32x32xf32>
+  // CHECK: return %[[r]] : tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}
