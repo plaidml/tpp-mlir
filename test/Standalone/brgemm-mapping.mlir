@@ -87,3 +87,66 @@ func.func @blocked_matmul(%arg0: tensor<8x32x32xf32>, %arg1: tensor<8x32x32xf32>
   // CHECK: return %[[r]] : tensor<32x32xf32>
   return %0: tensor<32x32xf32>
 }
+
+// -----
+
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4)>
+
+// CHECK-LABEL: func.func @blocked_matmul
+func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[four:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[sixteen:.*]] = arith.constant 16 : index
+  // CHECK: %[[outer:.*]] = scf.for %arg3 = %[[zero]] to %[[four]] step %[[one]] iter_args(%arg4 = %arg2) -> (tensor<32x32xf32>) {
+  // CHECK: %[[inner:.*]] = scf.for %arg5 = %[[zero]] to %[[sixteen]] step %[[one]] iter_args(%arg6 = %arg4) -> (tensor<32x32xf32>) {
+  // CHECK: %[[sliceA:.*]] = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<8x32x32xf32>
+  // CHECK: %[[sliceB:.*]] = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<16x8x32x32xf32> to tensor<8x32x32xf32>
+  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%arg6 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: scf.yield %[[r]] : tensor<32x32xf32>
+  // CHECK: }
+  // CHECK: scf.yield %[[inner]] : tensor<32x32xf32>
+  // CHECK: return %[[outer]] : tensor<32x32xf32>
+  %0 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1: tensor<4x8x32x32xf32>, tensor<16x8x32x32xf32>) outs(%arg2: tensor<32x32xf32>) {
+  ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
+    %mul = arith.mulf %arg4, %arg5 : f32
+    %add = arith.addf %arg6, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
+
+// -----
+
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d4)>
+
+// CHECK-LABEL: func.func @blocked_matmul
+func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32xf32>, %arg2: tensor<16x32x32xf32>) -> tensor<16x32x32xf32> {
+  // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[four:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[sixteen:.*]] = arith.constant 16 : index
+  // CHECK: %[[outer:.*]] = scf.for %arg3 = %[[zero]] to %[[four]] step %[[one]] iter_args(%arg4 = %arg2) -> (tensor<16x32x32xf32>) {
+  // CHECK: %[[inner:.*]] = scf.for %arg5 = %[[zero]] to %[[sixteen]] step %[[one]] iter_args(%arg6 = %arg4) -> (tensor<16x32x32xf32>) {
+  // CHECK: %[[sliceA:.*]] = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<8x32x32xf32>
+  // CHECK: %[[sliceB:.*]] = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<16x8x32x32xf32> to tensor<8x32x32xf32>
+  // CHECK: %[[sliceC:.*]] = tensor.extract_slice %arg6[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : tensor<16x32x32xf32> to tensor<32x32xf32>
+  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[sliceC]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: %[[full:.*]] = tensor.insert_slice %[[r]] into %arg6[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : tensor<32x32xf32> into tensor<16x32x32xf32>
+  // CHECK: scf.yield %[[full]] : tensor<16x32x32xf32>
+  // CHECK: }
+  // CHECK: scf.yield %[[inner]] : tensor<16x32x32xf32>
+  // CHECK: }
+  // CHECK: return %[[outer]] : tensor<16x32x32xf32>
+  %0 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1: tensor<4x8x32x32xf32>, tensor<16x8x32x32xf32>) outs(%arg2: tensor<16x32x32xf32>) {
+  ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
+    %mul = arith.mulf %arg4, %arg5 : f32
+    %add = arith.addf %arg6, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<16x32x32xf32>
+  return %0 : tensor<16x32x32xf32>
+}
