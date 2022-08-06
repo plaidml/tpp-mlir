@@ -30,6 +30,10 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       : OpRewritePattern<linalg::GenericOp>(context, benefit),
         tileSizes(tileSizes) {}
 
+  bool isInplace(linalg::LinalgOp linalgOp) const {
+    return linalgOp.getNumInputs() == 0;
+  }
+
   // Locate an element-wise operation and fuse if the producer
   // is a matmul.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -44,8 +48,10 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     if (!linalgOp.hasTensorSemantics() || !linalg::isElementwise(linalgOp))
       return failure();
 
-    // further restrict to single operand operations produced by a matmul.
-    linalg::OpOperandVector operands = linalgOp.getInputOperands();
+    // further restrict to single result operations.
+    linalg::OpOperandVector operands = isInplace(linalgOp)
+                                           ? linalgOp.getOutputOperands()
+                                           : linalgOp.getInputOperands();
     if (operands.size() != 1)
       return failure();
     linalg::LinalgOp producer =
@@ -93,6 +99,8 @@ struct TileConsumerAndFuseProducers
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateFusionPatterns(patterns, tileSizes);
+    // fold unit-extent dims for linalg on tensors.
+    linalg::populateFoldUnitExtentDimsPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

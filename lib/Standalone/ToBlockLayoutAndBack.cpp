@@ -179,10 +179,12 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!tpp::isMarkedWithTpp(linalgOp, "tpp.relu"))
       return failure();
-    if (isInPlaceRelu(linalgOp))
-      return failure();
     Location loc = linalgOp.getLoc();
-    Value operand = linalgOp.getInputOperand(0)->get();
+
+    Value operand = (isInPlaceRelu(linalgOp))
+                        ? linalgOp.getOutputOperand(0)->get()
+                        : linalgOp.getInputOperand(0)->get();
+
     linalgx::Relayout fromBlockLayout =
         operand.getDefiningOp<linalgx::Relayout>();
     if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
@@ -197,17 +199,31 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     AffineMap mapI =
         AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());
     AffineMap mapO = mapI;
-    linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
-        loc, blockTensorType, ValueRange{blockTensor}, ValueRange{reluBuffer},
-        ArrayRef<AffineMap>{mapI, mapO},
-        ArrayRef<StringRef>{
-            getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-            getParallelIteratorTypeName(), getParallelIteratorTypeName()},
-        /*doc=*/"", /*libraryCall=*/"tpp.relu");
+    linalg::GenericOp newReluOp =
+        (isInPlaceRelu(linalgOp))
+            ? rewriter.create<linalg::GenericOp>(
+                  loc, blockTensorType, llvm::None, ValueRange{blockTensor},
+                  ArrayRef<AffineMap>{mapO},
+                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName()},
+                  /*doc=*/"", /*libraryCall=*/"tpp.relu")
+            : rewriter.create<linalg::GenericOp>(
+                  loc, blockTensorType, ValueRange{blockTensor},
+                  ValueRange{reluBuffer}, ArrayRef<AffineMap>{mapI, mapO},
+                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName(),
+                                      getParallelIteratorTypeName()},
+                  /*doc=*/"", /*libraryCall=*/"tpp.relu");
     rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
                                 newReluOp.region().begin());
 
-    Value outUnBlockedTensor = linalgOp.getOutputOperand(0)->get();
+    Value outUnBlockedTensor = (isInPlaceRelu(linalgOp))
+                                   ? fromBlockLayout.getOutput()
+                                   : linalgOp.getOutputOperand(0)->get();
+
     Type outUnBlockedTensorType = outUnBlockedTensor.getType();
     std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCnc_NC(
         /*dims=*/4, blockingFactor, linalgOp.getContext());
