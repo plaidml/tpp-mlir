@@ -171,11 +171,15 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
       : OpRewritePattern<linalg::GenericOp>(context, benefit),
         blockingFactor(blockingFactor) {}
 
+  bool isInPlaceRelu(linalg::GenericOp linalgOp) const {
+    return linalgOp.getNumInputs() == 0;
+  }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!tpp::isMarkedWithTpp(linalgOp, "tpp.relu"))
       return failure();
-    if (linalgOp.getNumInputs() == 0)
+    if (isInPlaceRelu(linalgOp))
       return failure();
     Location loc = linalgOp.getLoc();
     Value operand = linalgOp.getInputOperand(0)->get();
