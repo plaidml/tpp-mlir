@@ -35,6 +35,8 @@ void RelayoutElimination::runOnOperation() {
   if (!candidates.size())
     return;
 
+  // See how 'ParallelLoopFusion.cpp' uses walk
+  // to check side effect in between operations.
   DominanceInfo domInfo;
   for (Operation *op : candidates) {
     linalgx::Relayout currentRoot = cast<linalgx::Relayout>(op);
