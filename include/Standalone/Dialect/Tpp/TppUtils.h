@@ -33,6 +33,9 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target);
 // Return true if the linalg operation has a Matmul region.
 bool hasMatmulBody(linalg::LinalgOp linalgOp);
 
+// Return true if the linalg operation has copy semantics.
+bool hasCopySemantics(linalg::LinalgOp linalgOp);
+
 } // namespace tpp
 } // namespace mlir
 

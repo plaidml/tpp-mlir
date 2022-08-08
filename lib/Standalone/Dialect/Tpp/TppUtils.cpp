@@ -117,5 +117,22 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target) {
   return libraryCall.compare(target) == 0;
 }
 
+// Return true if the region of the linalgOp has only a single operation
+// (linalg.yieldOp).
+static bool hasOnlyYieldOp(Region &region) {
+  if (!region.hasOneBlock())
+    return false;
+  return std::distance(region.front().begin(), region.front().end()) == 1;
+}
+
+bool hasCopySemantics(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+    return false;
+  if ((linalgOp.getNumInputsAndOutputs() != 2) ||
+      (linalgOp.getNumInputs() != 1))
+    return false;
+  return hasOnlyYieldOp(linalgOp->getRegion(0));
+}
+
 } // end namespace tpp
 } // end namespace mlir

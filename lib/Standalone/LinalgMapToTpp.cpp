@@ -55,13 +55,6 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return true;
   }
 
-  // Return true if the linalgOp contains only the yieldOp.
-  bool hasOnlyYieldOp(Region &region) const {
-    if (!region.hasOneBlock())
-      return false;
-    return std::distance(region.front().begin(), region.front().end()) == 1;
-  }
-
   // Return true if the linalg.generic maps to a tpp.gemm.
   bool isTPPGemm(linalg::GenericOp linalgOp) const {
     // structural and access pattern.
@@ -87,7 +80,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (!hasStaticShape(linalgOp))
       return failure();
     if (linalg::isElementwise(linalgOp)) {
-      if (hasOnlyYieldOp(linalgOp.getRegion()) && hasStaticShape(linalgOp)) {
+      if (hasCopySemantics(linalgOp) && hasStaticShape(linalgOp)) {
         StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
         rewriter.updateRootInPlace(
             linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
