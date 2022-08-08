@@ -13,6 +13,8 @@ include "TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
+// TODO: implement ResultsBroadcastableShape ?
+
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
     Type<And<[MemRefOf<allowedTypes>.predicate, 
               HasAnyRankOfPred<ranks>, HasStaticShapePred]>,
