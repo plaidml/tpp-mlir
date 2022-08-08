@@ -31,17 +31,20 @@ namespace {
 // TODO: evaluate transform dialect.
 
 // Tiling function to remove all but the zero and first dimension.
+// Tile of zero means no tiling on this dimension. The other
+// dimensions are materialized as loops by tiling with a factor
+// of 1.
 static SmallVector<Value, 4> getTileSizes(OpBuilder &builder,
                                           linalg::LinalgOp linalgOp) {
   SmallVector<Value, 4> tppTiles;
-  SmallVector<Range, 4> loopRanges =
-      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
-  for (size_t i = 0; i < loopRanges.size(); i++)
-    tppTiles.push_back(linalg::materializeOpFoldResult(
-        builder, linalgOp.getLoc(), loopRanges[i].size));
-  Value zeroVal = builder.create<arith::ConstantIndexOp>(linalgOp.getLoc(), 1);
-  tppTiles[0] = zeroVal;
-  tppTiles[1] = zeroVal;
+  size_t numberOfLoops = linalgOp.getNumLoops();
+  for (size_t i = 0; i < numberOfLoops; i++)
+    tppTiles.push_back(
+        builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 1));
+  Value zeroVal =
+      builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 0);
+  tppTiles[numberOfLoops - 1] = zeroVal;
+  tppTiles[numberOfLoops - 2] = zeroVal;
   return tppTiles;
 }
 
