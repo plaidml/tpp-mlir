@@ -237,7 +237,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
       return failure();
 
-    Value blockTensor = fromBlockLayout.inputs()[0];
+    Value blockTensor = fromBlockLayout.getInputs()[0];
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
     Value reluBuffer = getReshapedTensor(loc, linalgOp.outputs()[0],

@@ -64,10 +64,14 @@ def Relayout : LinalgX_Op<"relayout",
     mlir::ArrayAttr iterator_types();
 
     std::string getLibraryCallName();
-
+  
+    // TODO: duplicate methods due to transition to prefix:
+    // see: https://github.com/llvm/llvm-project/commit/7602e285f69c4e3af60629100c151067c27b9eca
     mlir::ValueRange inputs() { return getOperands().take_front(); }
+    mlir::ValueRange getInputs() { return getOperands().take_front(); }
 
     mlir::ValueRange outputs() { return getOperands().take_back(); }
+    mlir::ValueRange getOutputs() { return getOperands().take_back(); }
 
   }];
 

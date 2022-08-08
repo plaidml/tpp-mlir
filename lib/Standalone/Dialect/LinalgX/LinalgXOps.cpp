@@ -234,7 +234,8 @@ static void printOperands(OpAsmPrinter &printer, ValueRange inputs,
 
 void Relayout::print(OpAsmPrinter &printer) {
   // print operands.
-  printOperands(printer, inputs(), outputs(), getInputMap(), getOutputMap());
+  printOperands(printer, getInputs(), getOutputs(), getInputMap(),
+                getOutputMap());
   // print results.
   printResult(printer, this->getResultTypes());
   // Region is elided.

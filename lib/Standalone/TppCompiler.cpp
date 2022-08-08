@@ -57,8 +57,8 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(createTensorBufferizePass());
   // convert-linalg-to-tpp
   if (enablePreconditions)
-    pm.addNestedPass<func::FuncOp>(
-        createConvertLinalgToTppPass(/*enabledPreconditions*/ true));
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass(
+        /*enabledPreconditions*/ true, /*useParallelLoops*/ true));
   else
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
   // finalizing-bufferize

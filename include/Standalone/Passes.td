@@ -40,6 +40,8 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let options = [
     Option<"enableTiling", "enable-tiling", "bool", "false",
            "Try to select optimal tile sizes before mapping to tpp.">,
+    Option<"useParallelLoops", "use-parallel-loops", "bool", "true",
+           "Use parallel loops when mapping to TPPs.">,
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
   ];
 }

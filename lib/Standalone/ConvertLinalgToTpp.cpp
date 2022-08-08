@@ -87,7 +87,7 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
-LogicalResult reshape2D(linalg::GenericOp linalgOp) {
+LogicalResult reshape2D(linalg::GenericOp linalgOp, bool useParallelLoops) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
 
@@ -104,7 +104,10 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp) {
   OpBuilder builder(linalgOp);
   OpBuilder::InsertionGuard guard(builder);
   linalg::LinalgTilingOptions linalgTilingOptions;
-  linalgTilingOptions.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+  linalg::LinalgTilingLoopType loopsTypes =
+      (useParallelLoops) ? linalg::LinalgTilingLoopType::ParallelLoops
+                         : linalg::LinalgTilingLoopType::Loops;
+  linalgTilingOptions.setLoopType(loopsTypes)
       .setTileSizeComputationFunction(getTileSizes);
   IRRewriter rewriter(builder);
   FailureOr<linalg::TiledLinalgOp> tiledOp =
@@ -326,13 +329,15 @@ void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
 // because the builder is not properly propagated. But investigate more.
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
-  ConvertLinalgToTpp(bool enabledPreconditions, ArrayRef<int64_t> tileSizes) {
+  ConvertLinalgToTpp(bool enabledPreconditions, bool useParallelLoops,
+                     ArrayRef<int64_t> tileSizes) {
     this->enableTiling = enableTiling;
+    this->useParallelLoops = useParallelLoops;
     this->tileSizes = tileSizes;
   }
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
-      if (failed(reshape2D(linalgOp)))
+      if (failed(reshape2D(linalgOp, this->useParallelLoops)))
         return signalPassFailure();
     });
     if (enableTiling || tileSizes.size())
@@ -356,6 +361,8 @@ mlir::tpp::createConvertLinalgToTppPass() {
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertLinalgToTppPass(bool enableTiling,
+                                        bool useParallelLoops,
                                         ArrayRef<int64_t> tileSizes) {
-  return std::make_unique<ConvertLinalgToTpp>(enableTiling, tileSizes);
+  return std::make_unique<ConvertLinalgToTpp>(enableTiling, useParallelLoops,
+                                              tileSizes);
 }
