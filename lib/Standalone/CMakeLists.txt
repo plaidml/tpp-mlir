@@ -28,6 +28,7 @@ add_mlir_dialect_library(MLIRStandalone
         ToBlockLayoutAndBack.cpp
         MapToBatchReduceGEMM.cpp
         RelayoutElimination.cpp
+        FuseSequentialLoops.cpp
 
         # Conversions
         ConvertTppToVector.cpp  

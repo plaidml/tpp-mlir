@@ -194,4 +194,9 @@ def RelayoutElimination : Pass<"eliminate-relayout", "func::FuncOp"> {
   let constructor = "mlir::tpp::createRelayoutEliminationPass()";
 }
 
+def FuseSequentialLoops : Pass<"fuse-adjacent-loops", "func::FuncOp"> {
+  let summary = "Fuse adjacent sequential loops - (WIP)";
+  let constructor = "mlir::tpp::createFuseSequentialLoopsPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES
