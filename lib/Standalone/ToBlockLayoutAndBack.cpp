@@ -11,6 +11,7 @@
 #include "Standalone/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Traits.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -21,7 +22,7 @@ using namespace mlir::linalgx;
 
 namespace {
 
-enum class BlockLayout { FORMAT_NCnc, FORMAT_KCck };
+enum class BlockLayout { FORMAT_NCnc, FORMAT_KCck, FORMAT_Cnc };
 
 // Get affine maps from NC layout to NCnc layout.
 static std::pair<AffineMap, AffineMap>
@@ -93,6 +94,48 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
       .getResult()[0];
 }
 
+// Check if the given linalgOp has broadcast semantics.
+// static bool hasBroadCastSemantics(linalg::LinalgOp linalgOp) {
+//  if (!tpp::hasCopySemantics(linalgOp))
+//    return false;
+//  assert(linalgOp.getNumInputs() == 1);
+//  assert(linalgOp.getNumOutputs() == 1);
+//  Type source = linalgOp.getInputOperands()[0]->get().getType();
+//  Type dest = linalgOp.getOutputOperands()[0]->get().getType();
+//  // Both operands must be shaped type with static dimensions
+//  // and the two shapes are broadcast compatible.
+//  if ((!source.isa<ShapedType>()) || (!dest.isa<ShapedType>()))
+//    return false;
+//  if ((!source.cast<ShapedType>().hasStaticShape()) ||
+//      (!dest.cast<ShapedType>().hasStaticShape()))
+//    return false;
+//  return OpTrait::util::staticallyKnownBroadcastable(
+//      source.cast<ShapedType>().getShape(),
+//      dest.cast<ShapedType>().getShape());
+//}
+
+// static bool has1DInputTensor(linalg::LinalgOp linalgOp) {
+//   assert(linalgOp.getNumInputs() == 1);
+//   Type source = linalgOp.getInputOperands()[0]->get().getType();
+//   return source.cast<ShapedType>().getRank() == 1;
+// }
+
+// static BlockLayout getBlockLayoutForOutput(Value outputMul) {
+//   linalg::GenericOp linalgOp = outputMul.getDefiningOp<linalg::GenericOp>();
+//   if (linalgOp && hasBroadCastSemantics(linalgOp) &&
+//   has1DInputTensor(linalgOp))
+//     return BlockLayout::FORMAT_Cnc;
+//   return BlockLayout::FORMAT_NCnc;
+// }
+
+// static std::string toString(BlockLayout layout) {
+//   switch (layout) {
+//     case BlockLayout::FORMAT_NCnc: return "NCnc";
+//     case BlockLayout::FORMAT_KCck: return "KCck";
+//     case BlockLayout::FORMAT_Cnc: return "Cnc";
+//   }
+// }
+
 // Relayout MatmulOp as following:
 // [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
 // CB = batch reduce dimension.
@@ -120,9 +163,13 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
 
     blockLayout = BlockLayout::FORMAT_NCnc;
     Value reshapedOutputTensor = nullptr;
-    for (Value output : matmulOp.getOutputs())
+    for (Value output : matmulOp.getOutputs()) {
+      // llvm::errs() << "block layout: " <<
+      // toString(getBlockLayoutForOutput(output)) << "\n";
       reshapedOutputTensor =
           getReshapedTensor(loc, output, blockLayout, blockingFactor, rewriter);
+    }
+    assert(reshapedOutputTensor && "must be non-null");
 
     // swap linalg.matmul with a linalg.generic.
     AffineExpr p1, p2, r1, p3, p4, r2;

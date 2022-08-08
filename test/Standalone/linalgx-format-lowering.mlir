@@ -59,3 +59,15 @@ func.func @KC_to_KCck(%arg0: tensor<128x256xf32>) -> tensor<8x4x32x32xf32> {
   %1 = linalgx.relayout ins(%arg0: tensor<128x256xf32>, #map2) outs(%0: tensor<8x4x32x32xf32>, #map1) -> tensor<8x4x32x32xf32>
   return %1: tensor<8x4x32x32xf32>
 }
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @custom_relayout
+func.func @custom_relayout(%arg0: tensor<2x4xf32>, %arg1: tensor<2x4x4xf32>) -> tensor<2x4x4xf32> {
+  %0 = bufferization.alloc_tensor() : tensor<2x4x4xf32>
+  %1 = linalgx.relayout ins(%arg0: tensor<2x4xf32>, #map0) outs(%arg1: tensor<2x4x4xf32>, #map1) -> tensor<2x4x4xf32>
+  return %1 : tensor<2x4x4xf32>
+}
