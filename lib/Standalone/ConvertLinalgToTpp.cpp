@@ -321,11 +321,52 @@ struct ConvertBrgemmToTpp
   }
 };
 
+// Given the following pattern:
+// %0 = memref.subview %i : memref<64x32x32> -> memref<1x32x32>
+// %1 = memref.subview %0 : memref<1x32x32> -> memref<32x32>
+// simplify to:
+// %0 = memref.subview %i : memref<64x32x32> -> memref<32x32>
+struct SubViewOfSubViewWithUnitDims
+    : public OpRewritePattern<memref::SubViewOp> {
+  using OpRewritePattern<memref::SubViewOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::SubViewOp subViewOp,
+                                PatternRewriter &rewriter) const override {
+    Value source = subViewOp.getSource();
+    MemRefType sourceType = source.getType().cast<MemRefType>();
+    // bail out if the memref is dynamic.
+    if (!sourceType.hasStaticShape())
+      return failure();
+    SmallVector<int64_t> numberOfOnes = llvm::to_vector(llvm::make_filter_range(
+        sourceType.getShape(), [](int64_t sz) { return sz == 1; }));
+    // no work to do.
+    if (numberOfOnes.size() == 0)
+      return failure();
+
+    // the producer of the current memref should
+    // be another subview.
+    memref::SubViewOp producer = source.getDefiningOp<memref::SubViewOp>();
+    if (!producer)
+      return failure();
+
+    memref::SubViewOp rankReduced = rewriter.create<memref::SubViewOp>(
+        subViewOp.getLoc(), subViewOp.getResult().getType().cast<MemRefType>(),
+        producer.getSource(), producer.getMixedOffsets(),
+        producer.getMixedSizes(), producer.getMixedStrides());
+    rewriter.replaceOp(subViewOp, rankReduced.getResult());
+    return success();
+  }
+};
+
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp>(patterns.getContext());
   // clang-format on
+}
+
+void populateSubViewFoldingPatterns(RewritePatternSet &patterns) {
+  patterns.add<SubViewOfSubViewWithUnitDims>(patterns.getContext());
 }
 
 // TODO: PatternRwriter does not work well with tiling. I suspect
@@ -347,9 +388,12 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
       getOperation().walk([&](linalg::GenericOp linalgOp) {
         (void)tileLinalgOp(linalgOp, tileSizes);
       });
-    RewritePatternSet patterns(getOperation().getContext());
+    MLIRContext *ctx = getOperation().getContext();
+    RewritePatternSet patterns(ctx);
     populateConvertLinalgToTppPatterns(patterns);
+    populateSubViewFoldingPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
+    memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
