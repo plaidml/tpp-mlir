@@ -72,6 +72,10 @@ static LogicalResult areCompatibleDims(Range outerLoopRoot,
 // size like: {1, 0, 0} where '1' is the tile size for the outermost
 // loop (assuming 3 loops) while you don't want to tile all the other
 // dimensions (set to '0').
+//
+// TODO: here we check only the outermost dimensions but I would
+// like a way to fuse *all* the outermost dimensions that are
+// compatible. Pass also the number of dimensions we want to inspect.
 static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
                                      Operation *candidate, OpBuilder &builder) {
   assert(candidate && "expect candidate to be a valid op");

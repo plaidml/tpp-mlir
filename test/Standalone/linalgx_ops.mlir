@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s | standalone-opt %s |  FileCheck %s
+// RUN: standalone-opt %s | FileCheck %s
 
 #mapI = affine_map<(n1, c1, n2, c2) -> (n1 * 2 + n2, c1 * 2 + c2)>
 #mapO = affine_map<(n1, c1, n2, c2) -> (n1, c1, n2, c2)>
