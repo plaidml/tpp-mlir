@@ -310,8 +310,6 @@ struct ConvertBrgemmToTpp
 
   LogicalResult matchAndRewrite(linalg::ReduceBatchMatmulOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics())
-      return failure();
     // TODO: provide more convenient builder.
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(
         linalgOp, linalgOp.getInputOperands()[0]->get(),
