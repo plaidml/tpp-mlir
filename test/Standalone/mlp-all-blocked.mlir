@@ -51,36 +51,6 @@ module @predict_function  {
       %16 = mathx.relu %arg9 : f32 
       linalg.yield %16 : f32
     } -> tensor<128x1024xf32>
-    %9 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg6 : tensor<2048xf32>) outs(%output1 : tensor<128x2048xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
-      linalg.yield %arg9 : f32
-    } -> tensor<128x2048xf32>
-    %10 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%7, %arg5 : tensor<128x1024xf32>, tensor<1024x2048xf32>) outs(%9 : tensor<128x2048xf32>) attrs =  {iterator_ranges = [128, 2048, 1024]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):  
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x2048xf32>
-    %11 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%10 : tensor<128x2048xf32>) outs(%output1 : tensor<128x2048xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
-      %16 = mathx.relu %arg9 : f32
-      linalg.yield %16 : f32
-    } -> tensor<128x2048xf32>
-    %13 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg8 : tensor<1024xf32>) outs(%output : tensor<128x1024xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
-      linalg.yield %arg9 : f32
-    } -> tensor<128x1024xf32>
-    %14 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%11, %arg7 : tensor<128x2048xf32>, tensor<2048x1024xf32>) outs(%13 : tensor<128x1024xf32>) attrs =  {iterator_ranges = [128, 1024, 2048]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):  
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x1024xf32>
-    %15 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<128x1024xf32>) outs(%output : tensor<128x1024xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
-      %16 = mathx.relu %arg9 : f32 
-      linalg.yield %16 : f32
-    } -> tensor<128x1024xf32>
-    return %15 : tensor<128x1024xf32>
+    return %7 : tensor<128x1024xf32>
   }
 }

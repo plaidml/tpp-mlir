@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -map-linalg-to-tpp -to-block-layout="block-factor=32" -main-closure -loop-invariant-code-motion -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1,32,32" -canonicalize -map-to-brgemm -canonicalize -undo-main-closure -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -eliminate-alloc-tensors | FileCheck %s
+// TODO: standalone-opt %s -map-linalg-to-tpp -to-block-layout="block-factor=32" -main-closure -loop-invariant-code-motion -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1,32,32" -canonicalize -map-to-brgemm -canonicalize -undo-main-closure -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -eliminate-alloc-tensors | FileCheck %s
 
 // XFAIL:*
 #map0 = affine_map<(d0, d1) -> (d1)>

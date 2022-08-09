@@ -38,6 +38,12 @@ static bool isStaticRange(Range loopRange) {
   return true;
 }
 
+static int64_t getSizeRange(Range loopRange) {
+  assert(isStaticRange(loopRange));
+  return *getConstantIntValue(loopRange.size) -
+         *getConstantIntValue(loopRange.offset);
+}
+
 // Check if all the loops have static ranges.
 static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
   for (Range loopRange : iterationDomain)
@@ -90,6 +96,32 @@ static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
   return areCompatibleDims(candidateIterationDomain[0], rootIterationDomain[0]);
 }
 
+static LogicalResult tileDivideIterationDomain(linalg::GenericOp linalgOp,
+                                               ArrayRef<int64_t> tiles,
+                                               OpBuilder &builder) {
+  if (linalgOp.getNumLoops() != tiles.size())
+    return failure();
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(linalgOp.getOperation())
+          .getIterationDomain(builder);
+  for (const auto &it : llvm::enumerate(iterationDomain)) {
+    // fine, we are not tiling along this dimension.
+    if (tiles[it.index()] == 0)
+      continue;
+    // require static loop range
+    if (!isStaticRange(it.value()))
+      return failure();
+    int64_t sizeRange = getSizeRange(it.value());
+    // fail if the tail size equals the range
+    // or is not a full tile.
+    if (tiles[it.index()] == sizeRange)
+      return failure();
+    if (sizeRange % tiles[it.index()] != 0)
+      return failure();
+  }
+  return success();
+}
+
 struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
   FuseGenericOp(MLIRContext *context, ArrayRef<int64_t> tileSizes,
                 PatternBenefit benefit = 1)
@@ -104,6 +136,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
   // is a matmul.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+
     // hook only element-wise operation with tensor semantics.
     if (!linalgOp.hasTensorSemantics() || !linalg::isElementwise(linalgOp))
       return failure();
@@ -122,6 +155,11 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     if (producer.getNumParallelLoops() != tileSizes.size()) {
       producer->emitRemark(
           "expect tile sizes to be equal to number of parallel loops");
+      return failure();
+    }
+
+    if (failed(tileDivideIterationDomain(linalgOp, tileSizes, rewriter))) {
+      linalgOp->emitRemark("wrong tile sizes");
       return failure();
     }
 
