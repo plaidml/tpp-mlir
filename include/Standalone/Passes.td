@@ -189,4 +189,9 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   }];
 }
 
+def ExperimentOnBatchReduceGemm : Pass<"experiments-on-brgemm", "func::FuncOp"> {
+  let summary = "Experiments with BRGEMM - Do not use always WIP";
+  let constructor = "mlir::tpp::createExperimentOnBatchReduceGemmPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES
