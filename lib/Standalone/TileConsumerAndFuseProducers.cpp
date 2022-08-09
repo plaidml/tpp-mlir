@@ -24,6 +24,72 @@ using namespace mlir;
 
 namespace {
 
+// Check if loopRange is statically known.
+static bool isStaticRange(Range loopRange) {
+  Optional<int64_t> offsetAsInt = getConstantIntValue(loopRange.offset);
+  if (!offsetAsInt)
+    return false;
+  Optional<int64_t> sizeAsInt = getConstantIntValue(loopRange.size);
+  if (!sizeAsInt)
+    return false;
+  Optional<int64_t> strideAsInt = getConstantIntValue(loopRange.stride);
+  if (!strideAsInt)
+    return false;
+  return true;
+}
+
+// Check if all the loops have static ranges.
+static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
+  for (Range loopRange : iterationDomain)
+    if (!isStaticRange(loopRange))
+      return false;
+  return true;
+}
+
+// Check if two loop range are compatible - meaning same offset, size and step.
+static LogicalResult areCompatibleDims(Range outerLoopRoot,
+                                       Range outerLoopCandidate) {
+  int64_t offset = *getConstantIntValue(outerLoopRoot.offset);
+  if (offset != *getConstantIntValue(outerLoopCandidate.offset))
+    return failure();
+  int64_t size = *getConstantIntValue(outerLoopRoot.size);
+  if (size != *getConstantIntValue(outerLoopCandidate.size))
+    return failure();
+  int64_t stride = *getConstantIntValue(outerLoopRoot.stride);
+  if (stride != *getConstantIntValue(outerLoopCandidate.stride))
+    return failure();
+  return success();
+}
+
+// Attempt to fuse outer dimension. NOTE: since we are trying to
+// fuse the outer dimension only you may want to pass a tile
+// size like: {1, 0, 0} where '1' is the tile size for the outermost
+// loop (assuming 3 loops) while you don't want to tile all the other
+// dimensions (set to '0').
+static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
+                                     Operation *candidate, OpBuilder &builder) {
+  assert(candidate && "expect candidate to be a valid op");
+  linalg::LinalgOp linalgOp = dyn_cast_or_null<linalg::LinalgOp>(candidate);
+  if (!linalgOp)
+    return failure();
+
+  SmallVector<Range> candidateIterationDomain =
+      cast<TilingInterface>(linalgOp.getOperation())
+          .getIterationDomain(builder);
+
+  if ((!isStaticIterationDomain(candidateIterationDomain)) ||
+      (!isStaticIterationDomain(rootIterationDomain)))
+    return failure();
+
+  // Require at least two dimensions.
+  if (candidateIterationDomain.size() < 2)
+    return failure();
+  if (rootIterationDomain.size() < 2)
+    return failure();
+  // Check if the outer loop are compatible, and if so fuse.
+  return areCompatibleDims(candidateIterationDomain[0], rootIterationDomain[0]);
+}
+
 struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
   FuseGenericOp(MLIRContext *context, ArrayRef<int64_t> tileSizes,
                 PatternBenefit benefit = 1)
@@ -38,12 +104,6 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
   // is a matmul.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-
-    // Well.. avoid recursion by checking the parent operation...
-    Operation *parentOp = linalgOp->getParentOp();
-    if (parentOp && isa<scf::ForOp>(parentOp))
-      return failure();
-
     // hook only element-wise operation with tensor semantics.
     if (!linalgOp.hasTensorSemantics() || !linalg::isElementwise(linalgOp))
       return failure();
@@ -73,7 +133,8 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     TilingInterface tilingInterfaceOp =
         cast<TilingInterface>(linalgOp.getOperation());
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        tileAndFuse.returningMatchAndRewrite(tilingInterfaceOp, rewriter);
+        tileAndFuse.returningMatchAndRewrite(tilingInterfaceOp, rewriter,
+                                             canFuseOuterDim);
     if (failed(tileAndFuseResult))
       return failure();
     return success();
