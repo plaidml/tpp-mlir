@@ -46,6 +46,7 @@ struct BrgemmOutput : public OpRewritePattern<linalg::ReduceBatchMatmulOp> {
     return failure();
   }
 
+  // TODO: check me.
   bool hasBroadCastSemantics(Operation *operation) const {
     if (!isa<linalg::GenericOp>(operation))
       return false;
@@ -192,7 +193,7 @@ struct BrgemmOutput : public OpRewritePattern<linalg::ReduceBatchMatmulOp> {
                 newBroadCast)
             .getResult(0);
 
-    // replace uses for relayout and original broadcast.
+    // replace uses for relayout.
     relayoutOp.getResults()[0].replaceAllUsesWith(
         relayoutOp.getOutputOperands()[0]->get());
 
