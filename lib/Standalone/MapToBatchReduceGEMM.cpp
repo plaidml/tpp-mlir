@@ -8,13 +8,12 @@
 
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
+#include "Standalone/TransformUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 
@@ -105,93 +104,9 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
-  SmallVector<int64_t>
-  getExpectedResultMemRefShape(ShapedType operandType,
-                               unsigned desiredResultRank) const {
-    MemRefType memrefOperand = operandType.cast<MemRefType>();
-    ArrayRef<int64_t> sizes = memrefOperand.getShape();
-    SmallVector<int64_t> targetShape;
-    int toSkip = sizes.size() - desiredResultRank;
-    assert(toSkip >= 0);
-    // TODO: find better way to express `skipping the first `toSkip`
-    // elements`. Also would be nice to have `inferRankReducedResultType`
-    // for subview to have the same API has the one for tensor. This
-    // would allow us to pass only `desiredResultRank` and avoid
-    // this method.
-    for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
-      if (toSkip > 0) {
-        toSkip--;
-        continue;
-      }
-      targetShape.push_back(sizes[idx]);
-    }
-    return targetShape;
-  }
-
-  Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
-                         linalg::LinalgOp linalgOp, OpOperand *operand,
-                         ValueRange valuesToUse) const {
-    Value operandToUse = valuesToUse[operand->getOperandNumber()];
-    ShapedType operandType = operandToUse.getType().cast<ShapedType>();
-    assert(operandType.hasStaticShape() && "tensor must have static shape");
-    int rank = operandType.getRank();
-    SmallVector<OpFoldResult, 4> offsets, sizes, strides;
-    offsets.reserve(rank);
-    sizes.reserve(rank);
-    strides.reserve(rank);
-    for (int idx = 0, e = localIvs.size(); idx < e; idx++) {
-      offsets.push_back(localIvs[idx]);
-      strides.push_back(builder.getIndexAttr(1));
-      sizes.push_back(builder.getIndexAttr(1));
-    }
-    for (int idx = localIvs.size(); idx < rank; idx++) {
-      offsets.push_back(builder.getIndexAttr(0));
-      strides.push_back(builder.getIndexAttr(1));
-      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
-    }
-    // When mapping to BRGEMM the output operand is 2D while the inputs are
-    // 3D. Thus provide the expected shape to
-    // `inferCanonicalRankReducedResultType`.
-    unsigned desiredResultRank =
-        (operand->getOperandNumber() >= linalgOp.getNumInputs()) ? 2 : 3;
-    Type reducedType =
-        (linalgOp.hasTensorSemantics())
-            ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                  desiredResultRank, operandType.cast<RankedTensorType>(),
-                  offsets, sizes, strides)
-            : memref::SubViewOp::inferRankReducedResultType(
-                  getExpectedResultMemRefShape(operandType, desiredResultRank),
-                  operandType.cast<MemRefType>(), offsets, sizes, strides);
-
-    Operation *extractOperation =
-        (linalgOp.hasTensorSemantics())
-            ? builder.create<tensor::ExtractSliceOp>(
-                  loc, reducedType.cast<RankedTensorType>(), operandToUse,
-                  offsets, sizes, strides)
-            : builder.create<memref::SubViewOp>(
-                  loc, reducedType.cast<MemRefType>(), operandToUse, offsets,
-                  sizes, strides);
-    assert(extractOperation->getNumResults() == 1);
-    return extractOperation->getResult(0);
-  }
-
-  // Check if the localIvs at position pos is involved
-  // in the map tied to the provided operand.
-  SmallVector<Value> getInvolvedLocalDims(OpOperand *operand,
-                                          AffineMap mapOperand,
-                                          ValueRange localIvs) const {
-    SmallVector<Value> ivs;
-    for (unsigned pos = 0; pos < localIvs.size(); pos++) {
-      if (mapOperand.isFunctionOfDim(pos))
-        ivs.push_back(localIvs[pos]);
-    }
-    return ivs;
-  }
-
-  SmallVector<Value> getSlicedOperands(OpBuilder &builder, Location loc,
-                                       ValueRange localIvs,
-                                       linalg::LinalgOp linalgOp,
-                                       ValueRange valuesToUse) const {
+  FailureOr<SmallVector<Value>>
+  getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
+                    linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
     assert(linalgOp.getNumInputsAndOutputs() == 3 &&
            "expect 3 input/output operands");
     assert(linalgOp.getInputOperands().size() == 2 &&
@@ -201,22 +116,35 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     OpOperand *operandB = linalgOp.getInputOperands()[1];
     OpOperand *operandC = linalgOp.getOutputOperands()[0];
 
+    FailureOr<SmallVector<Value>> involvedDimForOperandA =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, operandA, linalgOp.getTiedIndexingMap(operandA),
+            localIvs);
+    if (failed(involvedDimForOperandA))
+      return failure();
+    FailureOr<SmallVector<Value>> involvedDimForOperandB =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, operandB, linalgOp.getTiedIndexingMap(operandB),
+            localIvs);
+    if (failed(involvedDimForOperandB))
+      return failure();
+    FailureOr<SmallVector<Value>> involvedDimForOperandC =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, operandC, linalgOp.getTiedIndexingMap(operandC),
+            localIvs);
+    if (failed(involvedDimForOperandC))
+      return failure();
+
     SmallVector<Value> slicedOperands;
-    slicedOperands.push_back(getSlicedOperand(
-        builder, loc,
-        getInvolvedLocalDims(operandA, linalgOp.getTiedIndexingMap(operandA),
-                             localIvs),
-        linalgOp, operandA, valuesToUse));
-    slicedOperands.push_back(getSlicedOperand(
-        builder, loc,
-        getInvolvedLocalDims(operandB, linalgOp.getTiedIndexingMap(operandB),
-                             localIvs),
-        linalgOp, operandB, valuesToUse));
-    slicedOperands.push_back(getSlicedOperand(
-        builder, loc,
-        getInvolvedLocalDims(operandC, linalgOp.getTiedIndexingMap(operandC),
-                             localIvs),
-        linalgOp, operandC, valuesToUse));
+    slicedOperands.push_back(utils::getSlicedOperand(
+        builder, loc, *involvedDimForOperandA, linalgOp, operandA, valuesToUse,
+        /*rankForBRGEMMInput=*/3));
+    slicedOperands.push_back(utils::getSlicedOperand(
+        builder, loc, *involvedDimForOperandB, linalgOp, operandB, valuesToUse,
+        /*rankForBRGEMMInput=*/3));
+    slicedOperands.push_back(utils::getSlicedOperand(
+        builder, loc, *involvedDimForOperandC, linalgOp, operandC, valuesToUse,
+        /*rankForBRGEMMOutput=*/2));
     return slicedOperands;
   }
 
@@ -253,8 +181,14 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
                  static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
              "expect the number of operands and inputs and outputs to match");
       ivs.assign(localIvs.begin(), localIvs.end());
-      SmallVector<Value> slicedOperands = getSlicedOperands(
+      FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
           builder, loc, localIvs, linalgOp, operandValuesToUse);
+      if (failed(maybeSlicedOperands)) {
+        // TODO: is safe to just return{} ?
+        assert(0 && "failed to generate loops");
+        return {};
+      }
+      SmallVector<Value> slicedOperands = *maybeSlicedOperands;
       assert(slicedOperands.size() == 3 && "expect three operands");
 
       linalg::ReduceBatchMatmulOp brgemm =
