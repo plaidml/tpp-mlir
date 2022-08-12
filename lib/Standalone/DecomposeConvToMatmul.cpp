@@ -52,8 +52,6 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     OpOperand *filter = linalgOp.getInputOperands()[1];
     OpOperand *output = linalgOp.getOutputOperands()[0];
 
-    SmallVector<Value> slicedOperands;
-
     FailureOr<SmallVector<Value>> ivsImage =
         utils::getInvolvedLocalDimsForOperand(
             builder, loc, image, linalgOp.getTiedIndexingMap(image), localIvs);
@@ -78,6 +76,7 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
+    SmallVector<Value> slicedOperands;
     slicedOperands.push_back(
         utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
                                 valuesToUse, /*rankForGEMMInput=*/2));

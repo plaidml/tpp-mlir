@@ -17,6 +17,17 @@ namespace mlir {
 
 namespace utils {
 
+// void test(OpBuilder &builder, Location loc, OpOperand *operand,
+//           AffineMap mapOperand, ValueRange ivs) {
+//   // ivs (outermost, outermost-1, outermost-2, outermost-3)
+//   assert(ivs.size() == 4);
+//   llvm::errs() << "input map: " << mapOperand << "\n";
+//
+//   for (AffineExpr r : mapOperand.getResults())
+//     r.dump();
+//
+// }
+
 // Given localIvs being outermost dimension of the current linalg
 // operation, return the dimension involved by a given operand looking at its
 // access map. As a simple example consider the following:
@@ -29,6 +40,9 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs) {
 
+  //
+  // test(builder, loc, operand, mapOperand, localIvs);
+  //
   if (mapOperand.getNumSymbols() != 0)
     return failure();
   SmallVector<Value> ivsResult;
@@ -89,22 +103,27 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
-  int rank = operandType.getRank();
-  SmallVector<OpFoldResult, 4> offsets, sizes, strides;
+  size_t rank = operandType.getRank();
+
+  SmallVector<OpFoldResult, 4> offsets, sizes;
   offsets.reserve(rank);
   sizes.reserve(rank);
-  strides.reserve(rank);
 
-  for (int idx = 0, e = desiredResultRank; idx < e; idx++) {
+  // offset into the tensor is the induction var or 0.
+  for (size_t idx = 0, e = localIvs.size(); idx < e; idx++)
     offsets.push_back(localIvs[idx]);
-    strides.push_back(builder.getIndexAttr(1));
-    sizes.push_back(builder.getIndexAttr(1));
-  }
-  for (int idx = desiredResultRank; idx < rank; idx++) {
+  for (size_t idx = localIvs.size(), e = rank; idx < e; idx++)
     offsets.push_back(builder.getIndexAttr(0));
-    strides.push_back(builder.getIndexAttr(1));
+
+  // chunk to collect is 1 if < desiredResultRank or full chunk if >
+  // desiredResultRank
+  for (size_t idx = 0, e = desiredResultRank; idx < e; idx++)
+    sizes.push_back(builder.getIndexAttr(1));
+  for (size_t idx = desiredResultRank, e = rank; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
-  }
+
+  // strides are ones.
+  SmallVector<OpFoldResult, 4> strides(rank, builder.getIndexAttr(1));
 
   assert(rank == offsets.size() && "expect same size");
   assert(rank == strides.size() && "expect same size");
