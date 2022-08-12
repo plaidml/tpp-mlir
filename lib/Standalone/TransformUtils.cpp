@@ -95,9 +95,6 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   sizes.reserve(rank);
   strides.reserve(rank);
 
-  // llvm::errs() << "rank: " << rank << "\n";
-  // llvm::errs() << "desiredResultRank: " << desiredResultRank << "\n";
-
   for (int idx = 0, e = desiredResultRank; idx < e; idx++) {
     offsets.push_back(localIvs[idx]);
     strides.push_back(builder.getIndexAttr(1));
@@ -109,9 +106,9 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
     sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
   }
 
-  assert(rank == offsets.size());
-  assert(rank == strides.size());
-  assert(rank == sizes.size());
+  assert(rank == offsets.size() && "expect same size");
+  assert(rank == strides.size() && "expect same size");
+  assert(rank == sizes.size() && "expect same size");
 
   Type reducedType =
       (linalgOp.hasTensorSemantics())
