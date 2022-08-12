@@ -157,9 +157,9 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
       SmallVector<Value> slicedOperands = *maybeSlicedOperands;
       assert(slicedOperands.size() == 3 && "expect three operands");
 
-      llvm::errs() << "sliced operands: \n";
-      for (Value v : slicedOperands)
-        v.dump();
+      // llvm::errs() << "sliced operands: \n";
+      // for (Value v : slicedOperands)
+      //   v.dump();
 
       linalg::MatmulOp matmul =
           (genericOp.hasTensorSemantics())

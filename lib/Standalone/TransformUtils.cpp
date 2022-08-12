@@ -135,17 +135,6 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
     sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
   }
 
-  llvm::errs() << "-----------------------------\n";
-  llvm::errs() << "operand: " << operandToUse.getType() << "\n";
-  for (OpFoldResult r : offsets)
-    r.dump();
-  llvm::errs() << "---\n";
-  for (OpFoldResult r : sizes)
-    r.dump();
-  SmallVector<int64_t> expectedShape =
-      getExpectedResultMemRefShape(operandType, desiredResultRank);
-  llvm::errs() << "-----------------------------\n";
-
   // strides are ones.
   SmallVector<OpFoldResult, 4> strides(rank, builder.getIndexAttr(1));
 
@@ -153,14 +142,21 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   assert(rank == strides.size() && "expect same size");
   assert(rank == sizes.size() && "expect same size");
 
+  SmallVector<int64_t> expectedShape =
+      getExpectedResultMemRefShape(operandType, desiredResultRank);
+  if (innerSizes.size()) {
+    assert(innerSizes.size() == expectedShape.size());
+    expectedShape = llvm::to_vector(innerSizes);
+  }
+
   Type reducedType =
       (linalgOp.hasTensorSemantics())
           ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
                 desiredResultRank, operandType.cast<RankedTensorType>(),
                 offsets, sizes, strides)
           : memref::SubViewOp::inferRankReducedResultType(
-                getExpectedResultMemRefShape(operandType, desiredResultRank),
-                operandType.cast<MemRefType>(), offsets, sizes, strides);
+                expectedShape, operandType.cast<MemRefType>(), offsets, sizes,
+                strides);
 
   Operation *extractOperation =
       (linalgOp.hasTensorSemantics())
