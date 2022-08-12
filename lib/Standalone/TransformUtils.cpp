@@ -99,7 +99,8 @@ getExpectedResultMemRefShape(ShapedType operandType,
 
 Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
                        linalg::LinalgOp linalgOp, OpOperand *operand,
-                       ValueRange valuesToUse, unsigned desiredResultRank) {
+                       ValueRange valuesToUse, unsigned desiredResultRank,
+                       ArrayRef<int64_t> innerSizes) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
@@ -115,12 +116,35 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   for (size_t idx = localIvs.size(), e = rank; idx < e; idx++)
     offsets.push_back(builder.getIndexAttr(0));
 
-  // chunk to collect is 1 if < desiredResultRank or full chunk if >
-  // desiredResultRank
+  // sizes are:
+  // 1) from [0 to desiredResultRank) = 1
+  // 2) from [desiredResultRank to rank) = fullSize or innerSizes
+  // fullSizes are the size of your tensor
+  // innerSizes are additional sizes you can pass in (i.e., when
+  // you have a convolution you may want to take a chunk of the
+  // tensor and not the full size).
   for (size_t idx = 0, e = desiredResultRank; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(1));
-  for (size_t idx = desiredResultRank, e = rank; idx < e; idx++)
+  for (size_t idx = desiredResultRank, e = rank; idx < e; idx++) {
+    if (innerSizes.size() != 0) {
+      assert(innerSizes.size() == (rank - desiredResultRank));
+      sizes.push_back(
+          builder.getIndexAttr(innerSizes[idx - desiredResultRank]));
+      continue;
+    }
     sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+  }
+
+  llvm::errs() << "-----------------------------\n";
+  llvm::errs() << "operand: " << operandToUse.getType() << "\n";
+  for (OpFoldResult r : offsets)
+    r.dump();
+  llvm::errs() << "---\n";
+  for (OpFoldResult r : sizes)
+    r.dump();
+  SmallVector<int64_t> expectedShape =
+      getExpectedResultMemRefShape(operandType, desiredResultRank);
+  llvm::errs() << "-----------------------------\n";
 
   // strides are ones.
   SmallVector<OpFoldResult, 4> strides(rank, builder.getIndexAttr(1));

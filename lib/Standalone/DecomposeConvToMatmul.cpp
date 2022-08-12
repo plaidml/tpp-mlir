@@ -40,6 +40,23 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     return match;
   }
 
+  bool hasFilterRSEqualOne(OpOperand *filter) const {
+    ShapedType filterType = filter->get().getType().cast<ShapedType>();
+    ArrayRef<int64_t> filterShape = filterType.getShape();
+    bool tmp = ((filterShape[0] == 1) && (filterShape[1] == 1));
+    return tmp;
+  }
+
+  SmallVector<int64_t> computeGemmSizeFrom(OpOperand *filter,
+                                           OpOperand *output) const {
+    ShapedType filterType = filter->get().getType().cast<ShapedType>();
+    ShapedType outputType = output->get().getType().cast<ShapedType>();
+    assert(filterType.getRank() == 4);
+    assert(outputType.getRank() == 4);
+    return SmallVector<int64_t>{outputType.getShape()[2],
+                                filterType.getShape()[2]};
+  }
+
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -77,9 +94,14 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     }
 
     SmallVector<Value> slicedOperands;
-    slicedOperands.push_back(
-        utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
-                                valuesToUse, /*rankForGEMMInput=*/2));
+    Value imgSlice =
+        (hasFilterRSEqualOne(filter))
+            ? utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
+                                      valuesToUse, /*rankForGEMMInput=*/2)
+            : utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
+                                      valuesToUse, /*rankForGEMMInput=*/2,
+                                      computeGemmSizeFrom(filter, output));
+    slicedOperands.push_back(imgSlice);
     slicedOperands.push_back(
         utils::getSlicedOperand(builder, loc, *ivsFilter, linalgOp, filter,
                                 valuesToUse, /*rankForGEMMInput=*/2));
@@ -134,6 +156,10 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
       }
       SmallVector<Value> slicedOperands = *maybeSlicedOperands;
       assert(slicedOperands.size() == 3 && "expect three operands");
+
+      llvm::errs() << "sliced operands: \n";
+      for (Value v : slicedOperands)
+        v.dump();
 
       linalg::MatmulOp matmul =
           (genericOp.hasTensorSemantics())
@@ -257,9 +283,9 @@ struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
       return failure();
 
     // R = S = 1
-    ArrayRef<int64_t> filterShape = filterType.getShape();
-    if ((filterShape[0] != 1) || (filterShape[1] != 1))
-      return failure();
+    // ArrayRef<int64_t> filterShape = filterType.getShape();
+    // if ((filterShape[0] != 1) || (filterShape[1] != 1))
+    //  return failure();
 
     FailureOr<linalg::GenericOp> maybeGeneric =
         generalizeNamedOp(rewriter, convOp);
