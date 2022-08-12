@@ -109,10 +109,6 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     if (!map)
       return failure();
 
-    map.dump();
-    for (OpFoldResult r : allShapeSizes)
-      r.dump();
-
     SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
         rewriter, loc, map, allShapeSizes);
     SmallVector<Range> loopRanges;
