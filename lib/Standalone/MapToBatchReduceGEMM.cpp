@@ -104,6 +104,50 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                            OpOperand *operand, ValueRange ivs,
+                            ValueRange valuesToUse,
+                            unsigned desiredResultRank) const {
+    Value operandToUse = valuesToUse[operand->getOperandNumber()];
+    ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+    assert(operandType.hasStaticShape() && "tensor must have static shape");
+    size_t rank = operandType.getRank();
+
+    SmallVector<OpFoldResult> offsets, sizes;
+    offsets.reserve(rank);
+    sizes.reserve(rank);
+
+    // offset into the tensor is the induction var or 0.
+    for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
+      offsets.push_back(ivs[idx]);
+    for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
+      offsets.push_back(builder.getIndexAttr(0));
+
+    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+    for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+
+    SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+    return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
+                                   sizes, strides, desiredResultRank);
+  }
+
+  FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                   linalg::LinalgOp linalgOp, ValueRange ivs,
+                                   ValueRange valuesToUse,
+                                   unsigned desiredResultRank) const {
+    Location loc = linalgOp.getLoc();
+    FailureOr<SmallVector<Value>> involvedDimForOperand =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+    if (failed(involvedDimForOperand))
+      return failure();
+    return getSliceOperandImpl(builder, linalgOp, operand,
+                               *involvedDimForOperand, valuesToUse,
+                               desiredResultRank);
+  }
+
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -112,40 +156,55 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
 
-    OpOperand *operandA = linalgOp.getInputOperands()[0];
-    OpOperand *operandB = linalgOp.getInputOperands()[1];
-    OpOperand *operandC = linalgOp.getOutputOperands()[0];
-
-    FailureOr<SmallVector<Value>> involvedDimForOperandA =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, operandA, linalgOp.getTiedIndexingMap(operandA),
-            localIvs);
-    if (failed(involvedDimForOperandA))
-      return failure();
-    FailureOr<SmallVector<Value>> involvedDimForOperandB =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, operandB, linalgOp.getTiedIndexingMap(operandB),
-            localIvs);
-    if (failed(involvedDimForOperandB))
-      return failure();
-    FailureOr<SmallVector<Value>> involvedDimForOperandC =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, operandC, linalgOp.getTiedIndexingMap(operandC),
-            localIvs);
-    if (failed(involvedDimForOperandC))
-      return failure();
-
     SmallVector<Value> slicedOperands;
-    slicedOperands.push_back(utils::getSlicedOperand(
-        builder, loc, *involvedDimForOperandA, linalgOp, operandA, valuesToUse,
-        /*rankForBRGEMMInput=*/3));
-    slicedOperands.push_back(utils::getSlicedOperand(
-        builder, loc, *involvedDimForOperandB, linalgOp, operandB, valuesToUse,
-        /*rankForBRGEMMInput=*/3));
-    slicedOperands.push_back(utils::getSlicedOperand(
-        builder, loc, *involvedDimForOperandC, linalgOp, operandC, valuesToUse,
-        /*rankForBRGEMMOutput=*/2));
+    for (OpOperand *operand : linalgOp.getInputOperands()) {
+      FailureOr<Value> slicedOperand =
+          getSliceOperand(builder, operand, linalgOp, localIvs, valuesToUse, 3);
+      if (failed(slicedOperand))
+        return failure();
+      slicedOperands.push_back(*slicedOperand);
+    }
+    for (OpOperand *operand : linalgOp.getOutputOperands()) {
+      FailureOr<Value> slicedOperand =
+          getSliceOperand(builder, operand, linalgOp, localIvs, valuesToUse, 2);
+      if (failed(slicedOperand))
+        return failure();
+      slicedOperands.push_back(*slicedOperand);
+    }
     return slicedOperands;
+    /*
+        OpOperand *operandA = linalgOp.getInputOperands()[0];
+        OpOperand *operandB = linalgOp.getInputOperands()[1];
+        OpOperand *operandC = linalgOp.getOutputOperands()[0];
+
+        FailureOr<SmallVector<Value>> involvedDimForOperandA =
+            utils::getInvolvedLocalDimsForOperand(
+                builder, loc, operandA, linalgOp.getTiedIndexingMap(operandA),
+                localIvs);
+        if (failed(involvedDimForOperandA))
+          return failure();
+        FailureOr<SmallVector<Value>> involvedDimForOperandB =
+            utils::getInvolvedLocalDimsForOperand(
+                builder, loc, operandB, linalgOp.getTiedIndexingMap(operandB),
+                localIvs);
+        if (failed(involvedDimForOperandB))
+          return failure();
+        FailureOr<SmallVector<Value>> involvedDimForOperandC =
+            utils::getInvolvedLocalDimsForOperand(
+                builder, loc, operandC, linalgOp.getTiedIndexingMap(operandC),
+                localIvs);
+        if (failed(involvedDimForOperandC))
+          return failure();
+
+        SmallVector<Value> slicedOperands;
+        slicedOperands.push_back(utils::getSlicedOperand(
+            builder, loc, *involvedDimForOperandA, linalgOp, operandA,
+       valuesToUse, 3)); slicedOperands.push_back(utils::getSlicedOperand(
+            builder, loc, *involvedDimForOperandB, linalgOp, operandB,
+       valuesToUse, 3)); slicedOperands.push_back(utils::getSlicedOperand(
+            builder, loc, *involvedDimForOperandC, linalgOp, operandC,
+       valuesToUse, 2)); return slicedOperands;
+      */
   }
 
   // Specific pattern (maybe too specific). Look for a blocked
