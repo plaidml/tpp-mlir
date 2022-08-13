@@ -123,6 +123,8 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
       offsets.push_back(builder.getIndexAttr(0));
 
+    // sizes are 1 in [0 to rank - desiredResultRank)
+    // and 'full' in [rank - desiredResultRank to rank).
     for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
       sizes.push_back(builder.getIndexAttr(1));
     for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
@@ -172,39 +174,6 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       slicedOperands.push_back(*slicedOperand);
     }
     return slicedOperands;
-    /*
-        OpOperand *operandA = linalgOp.getInputOperands()[0];
-        OpOperand *operandB = linalgOp.getInputOperands()[1];
-        OpOperand *operandC = linalgOp.getOutputOperands()[0];
-
-        FailureOr<SmallVector<Value>> involvedDimForOperandA =
-            utils::getInvolvedLocalDimsForOperand(
-                builder, loc, operandA, linalgOp.getTiedIndexingMap(operandA),
-                localIvs);
-        if (failed(involvedDimForOperandA))
-          return failure();
-        FailureOr<SmallVector<Value>> involvedDimForOperandB =
-            utils::getInvolvedLocalDimsForOperand(
-                builder, loc, operandB, linalgOp.getTiedIndexingMap(operandB),
-                localIvs);
-        if (failed(involvedDimForOperandB))
-          return failure();
-        FailureOr<SmallVector<Value>> involvedDimForOperandC =
-            utils::getInvolvedLocalDimsForOperand(
-                builder, loc, operandC, linalgOp.getTiedIndexingMap(operandC),
-                localIvs);
-        if (failed(involvedDimForOperandC))
-          return failure();
-
-        SmallVector<Value> slicedOperands;
-        slicedOperands.push_back(utils::getSlicedOperand(
-            builder, loc, *involvedDimForOperandA, linalgOp, operandA,
-       valuesToUse, 3)); slicedOperands.push_back(utils::getSlicedOperand(
-            builder, loc, *involvedDimForOperandB, linalgOp, operandB,
-       valuesToUse, 3)); slicedOperands.push_back(utils::getSlicedOperand(
-            builder, loc, *involvedDimForOperandC, linalgOp, operandC,
-       valuesToUse, 2)); return slicedOperands;
-      */
   }
 
   // Specific pattern (maybe too specific). Look for a blocked

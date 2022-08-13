@@ -20,6 +20,7 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs);
 
+// KILL ME
 // Return a sliced operand using the localIvs as offset.
 // TODO: wired method. Need to rethink. innerSize is used to pass m and k for
 // GEMM mapping when r and s are not 1.
