@@ -17,32 +17,15 @@ namespace mlir {
 
 namespace utils {
 
-// void test(OpBuilder &builder, Location loc, OpOperand *operand,
-//           AffineMap mapOperand, ValueRange ivs) {
-//   // ivs (outermost, outermost-1, outermost-2, outermost-3)
-//   assert(ivs.size() == 4);
-//   llvm::errs() << "input map: " << mapOperand << "\n";
-//
-//   for (AffineExpr r : mapOperand.getResults())
-//     r.dump();
-//
-// }
-
-// Given localIvs being outermost dimension of the current linalg
-// operation, return the dimension involved by a given operand looking at its
-// access map. As a simple example consider the following:
-// map operand = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d2, d4 + d3, d6)
-// localIvs = the 4 outermost dimensions (d0, d1, d2, d3)
-// The result is:
-// ivsResult = {d0, affine_apply(d1 + d2), d3}.
+// Given localIvs being outermost dimensions of the current linalg operation,
+// return the dimensions used by a given operand looking at its access map. As
+// a simple example consider the following: map operand = (d0, d1, d2, d3, d4,
+// d5, d6) -> (d0, d1 + d2, d4 + d3, d6) Assuming localIvs = (d0, d1, d2, d3)
+// The result is: {d0, affine_apply(d1 + d2), d3}.
 FailureOr<SmallVector<Value>>
 getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs) {
-
-  //
-  // test(builder, loc, operand, mapOperand, localIvs);
-  //
   if (mapOperand.getNumSymbols() != 0)
     return failure();
   SmallVector<Value> ivsResult;
@@ -77,6 +60,7 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
 static SmallVector<int64_t>
 getExpectedResultMemRefShape(ShapedType operandType,
                              unsigned desiredResultRank) {
+  llvm::errs() << operandType << "\n";
   MemRefType memrefOperand = operandType.cast<MemRefType>();
   ArrayRef<int64_t> sizes = memrefOperand.getShape();
   SmallVector<int64_t> targetShape;
@@ -142,6 +126,8 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   assert(rank == strides.size() && "expect same size");
   assert(rank == sizes.size() && "expect same size");
 
+  // XXX: this is not good. It is only for memref.
+  // 
   SmallVector<int64_t> expectedShape =
       getExpectedResultMemRefShape(operandType, desiredResultRank);
   if (innerSizes.size()) {

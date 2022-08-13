@@ -157,10 +157,6 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
       SmallVector<Value> slicedOperands = *maybeSlicedOperands;
       assert(slicedOperands.size() == 3 && "expect three operands");
 
-      // llvm::errs() << "sliced operands: \n";
-      // for (Value v : slicedOperands)
-      //   v.dump();
-
       linalg::MatmulOp matmul =
           (genericOp.hasTensorSemantics())
               ? builder.create<linalg::MatmulOp>(
@@ -205,6 +201,7 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Interchange iterators for a tpp.Conv2DNhwcHwcfOp.
 struct InterchangeIteratorsConv : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -244,6 +241,8 @@ struct InterchangeIteratorsConv : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Generalize a linalg::Conv2DNhwcHwcfOp. Mark the operation
+// with tpp.Conv2DNhwcHwcfOp such that later pattern can pick it up.
 struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -282,11 +281,6 @@ struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         (!outputType.hasStaticShape()))
       return failure();
 
-    // R = S = 1
-    // ArrayRef<int64_t> filterShape = filterType.getShape();
-    // if ((filterShape[0] != 1) || (filterShape[1] != 1))
-    //  return failure();
-
     FailureOr<linalg::GenericOp> maybeGeneric =
         generalizeNamedOp(rewriter, convOp);
     if (failed(maybeGeneric))
@@ -298,8 +292,12 @@ struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 };
 
 void populateConvDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<GeneralizeConv, DecomposeConv, InterchangeIteratorsConv>(
+  // clang-format off
+  patterns.insert<GeneralizeConv, 
+                  DecomposeConv, 
+                  InterchangeIteratorsConv>(
       patterns.getContext());
+  // clang-format on
 }
 
 struct DecomposeConvToMatmul
