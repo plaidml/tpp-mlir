@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/OpDefinition.h"
+
 namespace mlir {
 
 class OpBuilder;
@@ -25,6 +27,13 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
                        linalg::LinalgOp linalgOp, OpOperand *operand,
                        ValueRange valuesToUse, unsigned desiredResultRank,
                        ArrayRef<int64_t> innerSize = {});
+
+// Extract and return a slice for operand using offsets, sizes, strides.
+Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                       Value operand, SmallVector<OpFoldResult> offsets,
+                       SmallVector<OpFoldResult> sizes,
+                       SmallVector<OpFoldResult> strides,
+                       unsigned desiredResultRank);
 
 } // namespace utils
 

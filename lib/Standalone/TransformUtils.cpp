@@ -81,6 +81,42 @@ getExpectedResultMemRefShape(ShapedType operandType,
   return targetShape;
 }
 
+Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                       Value operand, SmallVector<OpFoldResult> offsets,
+                       SmallVector<OpFoldResult> sizes,
+                       SmallVector<OpFoldResult> strides,
+                       unsigned desiredResultRank) {
+  ShapedType operandType = operand.getType().cast<ShapedType>();
+  assert(operandType.hasStaticShape() && "tensor must have static shape");
+  size_t rank = operandType.getRank();
+
+  assert(rank == offsets.size() && "expect rank == offsets");
+  assert(rank == sizes.size() && "expect rank == sizes");
+  assert(rank == strides.size() && "expect rank == strides");
+
+  Location loc = linalgOp.getLoc();
+  Type reducedType =
+      (linalgOp.hasTensorSemantics())
+          ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                desiredResultRank, operandType.cast<RankedTensorType>(),
+                offsets, sizes, strides)
+          : memref::SubViewOp::inferRankReducedResultType(
+                getExpectedResultMemRefShape(operandType, desiredResultRank),
+                operandType.cast<MemRefType>(), offsets, sizes, strides);
+
+  Operation *extractOperation =
+      (linalgOp.hasTensorSemantics())
+          ? builder.create<tensor::ExtractSliceOp>(
+                loc, reducedType.cast<RankedTensorType>(), operand, offsets,
+                sizes, strides)
+          : builder.create<memref::SubViewOp>(loc,
+                                              reducedType.cast<MemRefType>(),
+                                              operand, offsets, sizes, strides);
+
+  assert(extractOperation->getNumResults() == 1);
+  return extractOperation->getResult(0);
+}
+
 Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
                        linalg::LinalgOp linalgOp, OpOperand *operand,
                        ValueRange valuesToUse, unsigned desiredResultRank,
@@ -127,7 +163,7 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   assert(rank == sizes.size() && "expect same size");
 
   // XXX: this is not good. It is only for memref.
-  // 
+  //
   SmallVector<int64_t> expectedShape =
       getExpectedResultMemRefShape(operandType, desiredResultRank);
   if (innerSizes.size()) {
