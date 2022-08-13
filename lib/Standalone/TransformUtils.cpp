@@ -60,7 +60,6 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
 static SmallVector<int64_t>
 getExpectedResultMemRefShape(ShapedType operandType,
                              unsigned desiredResultRank) {
-  llvm::errs() << operandType << "\n";
   MemRefType memrefOperand = operandType.cast<MemRefType>();
   ArrayRef<int64_t> sizes = memrefOperand.getShape();
   SmallVector<int64_t> targetShape;
@@ -77,6 +76,24 @@ getExpectedResultMemRefShape(ShapedType operandType,
       continue;
     }
     targetShape.push_back(sizes[idx]);
+  }
+  return targetShape;
+}
+
+static SmallVector<int64_t>
+getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
+                             unsigned desiredResultRank) {
+  SmallVector<int64_t> targetShape;
+  int toSkip = sizes.size() - desiredResultRank;
+  assert(toSkip >= 0);
+  for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
+    if (toSkip > 0) {
+      toSkip--;
+      continue;
+    }
+    Optional<int64_t> sizeDim = getConstantIntValue(sizes[idx]);
+    assert(sizeDim && "must be statically known");
+    targetShape.push_back(sizeDim.value());
   }
   return targetShape;
 }
@@ -101,7 +118,7 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                 desiredResultRank, operandType.cast<RankedTensorType>(),
                 offsets, sizes, strides)
           : memref::SubViewOp::inferRankReducedResultType(
-                getExpectedResultMemRefShape(operandType, desiredResultRank),
+                getExpectedResultMemRefShape(sizes, desiredResultRank),
                 operandType.cast<MemRefType>(), offsets, sizes, strides);
 
   Operation *extractOperation =

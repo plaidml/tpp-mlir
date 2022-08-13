@@ -57,6 +57,111 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
                                 filterType.getShape()[2]};
   }
 
+  SmallVector<OpFoldResult> getSizesForImage(OpBuilder &builder,
+                                             linalg::LinalgOp linalgOp,
+                                             unsigned desiredResultRank) const {
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    ShapedType operandType = image->get().getType().cast<ShapedType>();
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    OpOperand *output = linalgOp.getOutputOperands()[0];
+    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
+    SmallVector<OpFoldResult> sizes;
+    sizes.reserve(rank);
+
+    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+    if (!hasFilterRSEqualOne(filter)) {
+      SmallVector<int64_t> gemmSizes = computeGemmSizeFrom(filter, output);
+      for (int64_t s : gemmSizes)
+        sizes.push_back(builder.getIndexAttr(s));
+    } else {
+      for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+        sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+    }
+
+    llvm::errs() << "------\n";
+    for (OpFoldResult r : sizes)
+      r.dump();
+    llvm::errs() << "------\n";
+
+    return sizes;
+  }
+
+  FailureOr<Value> getSlicedImg(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                                ValueRange ivs, ValueRange valuesToUse) const {
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
+    Location loc = linalgOp.getLoc();
+    FailureOr<SmallVector<Value>> ivsImage =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, image, linalgOp.getTiedIndexingMap(image), ivs);
+    if (failed(ivsImage))
+      return failure();
+
+    ivs = *ivsImage;
+    SmallVector<OpFoldResult> offsets;
+
+    // offset into the tensor is the induction var or 0.
+    for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
+      offsets.push_back(ivs[idx]);
+    for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
+      offsets.push_back(builder.getIndexAttr(0));
+
+    unsigned desiredResultRank = 2;
+    SmallVector<OpFoldResult> sizes =
+        getSizesForImage(builder, linalgOp, desiredResultRank);
+    SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+    Value operandToUse = valuesToUse[image->getOperandNumber()];
+    return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
+                                   sizes, strides, desiredResultRank);
+  }
+
+  Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                            OpOperand *operand, ValueRange ivs,
+                            ValueRange valuesToUse,
+                            unsigned desiredResultRank) const {
+    Value operandToUse = valuesToUse[operand->getOperandNumber()];
+    ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+    assert(operandType.hasStaticShape() && "tensor must have static shape");
+    size_t rank = operandType.getRank();
+
+    SmallVector<OpFoldResult> offsets, sizes;
+    offsets.reserve(rank);
+    sizes.reserve(rank);
+
+    // offset into the tensor is the induction var or 0.
+    for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
+      offsets.push_back(ivs[idx]);
+    for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
+      offsets.push_back(builder.getIndexAttr(0));
+
+    // sizes are 1 in [0 to rank - desiredResultRank)
+    // and 'full' in [rank - desiredResultRank to rank).
+    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+    for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+
+    SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+    return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
+                                   sizes, strides, desiredResultRank);
+  }
+
+  FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                   linalg::LinalgOp linalgOp, ValueRange ivs,
+                                   ValueRange valuesToUse,
+                                   unsigned desiredResultRank) const {
+    Location loc = linalgOp.getLoc();
+    FailureOr<SmallVector<Value>> involvedDimForOperand =
+        utils::getInvolvedLocalDimsForOperand(
+            builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+    if (failed(involvedDimForOperand))
+      return failure();
+    return getSliceOperandImpl(builder, linalgOp, operand,
+                               *involvedDimForOperand, valuesToUse,
+                               desiredResultRank);
+  }
+
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -65,49 +170,28 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
 
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    OpOperand *output = linalgOp.getOutputOperands()[0];
-
-    FailureOr<SmallVector<Value>> ivsImage =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, image, linalgOp.getTiedIndexingMap(image), localIvs);
-    if (failed(ivsImage)) {
-      linalgOp.emitError("failed to get ivs for image");
-      return failure();
-    }
-    FailureOr<SmallVector<Value>> ivsFilter =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, filter, linalgOp.getTiedIndexingMap(filter),
-            localIvs);
-    if (failed(ivsFilter)) {
-      linalgOp.emitError("failed to get ivs for filter");
-      return failure();
-    }
-    FailureOr<SmallVector<Value>> ivsOutput =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, output, linalgOp.getTiedIndexingMap(output),
-            localIvs);
-    if (failed(ivsOutput)) {
-      linalgOp.emitError("failed to get ivs for output");
-      return failure();
-    }
-
     SmallVector<Value> slicedOperands;
-    Value imgSlice =
-        (hasFilterRSEqualOne(filter))
-            ? utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
-                                      valuesToUse, /*rankForGEMMInput=*/2)
-            : utils::getSlicedOperand(builder, loc, *ivsImage, linalgOp, image,
-                                      valuesToUse, /*rankForGEMMInput=*/2,
-                                      computeGemmSizeFrom(filter, output));
-    slicedOperands.push_back(imgSlice);
-    slicedOperands.push_back(
-        utils::getSlicedOperand(builder, loc, *ivsFilter, linalgOp, filter,
-                                valuesToUse, /*rankForGEMMInput=*/2));
-    slicedOperands.push_back(
-        utils::getSlicedOperand(builder, loc, *ivsOutput, linalgOp, output,
-                                valuesToUse, /*rankForGEMMOutput=*/2));
+
+    FailureOr<Value> slicedImg =
+        getSlicedImg(builder, linalgOp, localIvs, valuesToUse);
+    if (failed(slicedImg))
+      return failure();
+    slicedOperands.push_back(*slicedImg);
+
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    FailureOr<Value> slicedFilter =
+        getSliceOperand(builder, filter, linalgOp, localIvs, valuesToUse, 2);
+    if (failed(slicedFilter))
+      return failure();
+    slicedOperands.push_back(*slicedFilter);
+
+    OpOperand *output = linalgOp.getOutputOperands()[0];
+    FailureOr<Value> slicedOutput =
+        getSliceOperand(builder, output, linalgOp, localIvs, valuesToUse, 2);
+    if (failed(slicedOutput))
+      return failure();
+    slicedOperands.push_back(*slicedOutput);
+
     return slicedOperands;
   }
 
