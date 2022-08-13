@@ -116,6 +116,7 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
                                    sizes, strides, desiredResultRank);
   }
 
+  // TODO: make this util?
   Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                             OpOperand *operand, ValueRange ivs,
                             ValueRange valuesToUse,
@@ -147,6 +148,7 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
                                    sizes, strides, desiredResultRank);
   }
 
+  // TODO: make this util?
   FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
                                    linalg::LinalgOp linalgOp, ValueRange ivs,
                                    ValueRange valuesToUse,
