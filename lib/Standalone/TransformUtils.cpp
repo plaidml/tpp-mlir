@@ -137,15 +137,15 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
     offsets.push_back(builder.getIndexAttr(0));
 
   // sizes are:
-  // 1) from [0 to desiredResultRank) = 1
-  // 2) from [desiredResultRank to rank) = fullSize or innerSizes
+  // 1) from [0 to rank - desiredResultRank) = 1
+  // 2) from [rank - desiredResultRank to rank) = fullSize or innerSizes
   // fullSizes are the size of your tensor
   // innerSizes are additional sizes you can pass in (i.e., when
   // you have a convolution you may want to take a chunk of the
   // tensor and not the full size).
-  for (size_t idx = 0, e = desiredResultRank; idx < e; idx++)
+  for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(1));
-  for (size_t idx = desiredResultRank, e = rank; idx < e; idx++) {
+  for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++) {
     if (innerSizes.size() != 0) {
       assert(innerSizes.size() == (rank - desiredResultRank));
       sizes.push_back(
@@ -163,10 +163,10 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
   assert(rank == sizes.size() && "expect same size");
 
   // XXX: this is not good. It is only for memref.
-  //
+  // this is for conv.
   SmallVector<int64_t> expectedShape =
       getExpectedResultMemRefShape(operandType, desiredResultRank);
-  if (innerSizes.size()) {
+   if (innerSizes.size()) {
     assert(innerSizes.size() == expectedShape.size());
     expectedShape = llvm::to_vector(innerSizes);
   }
@@ -177,8 +177,8 @@ Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
                 desiredResultRank, operandType.cast<RankedTensorType>(),
                 offsets, sizes, strides)
           : memref::SubViewOp::inferRankReducedResultType(
-                expectedShape, operandType.cast<MemRefType>(), offsets, sizes,
-                strides);
+                /*getExpectedResultMemRefShape(operandType, desiredResultRank)*/expectedShape,
+                operandType.cast<MemRefType>(), offsets, sizes, strides);
 
   Operation *extractOperation =
       (linalgOp.hasTensorSemantics())
