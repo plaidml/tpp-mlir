@@ -249,6 +249,8 @@ private:
 
 // TODO: should be part of a more structured de-generalization pass.
 // pattern to go from linalg.generic {tpp.matmul} to linalg.matmul.
+// see:
+// https://sourcegraph.com/github.com/iree-org/iree/-/blob/llvm-external-projects/iree-dialects/lib/Dialect/LinalgTransform/IR/StructuredTransformOpsExt.cpp?L124
 struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
