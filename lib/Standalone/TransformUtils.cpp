@@ -58,10 +58,8 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
 }
 
 static SmallVector<int64_t>
-getExpectedResultMemRefShape(ShapedType operandType,
+getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
                              unsigned desiredResultRank) {
-  MemRefType memrefOperand = operandType.cast<MemRefType>();
-  ArrayRef<int64_t> sizes = memrefOperand.getShape();
   SmallVector<int64_t> targetShape;
   int toSkip = sizes.size() - desiredResultRank;
   assert(toSkip >= 0);
@@ -70,22 +68,6 @@ getExpectedResultMemRefShape(ShapedType operandType,
   // for subview to have the same API has the one for tensor. This
   // would allow us to pass only `desiredResultRank` and avoid
   // this method.
-  for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
-    if (toSkip > 0) {
-      toSkip--;
-      continue;
-    }
-    targetShape.push_back(sizes[idx]);
-  }
-  return targetShape;
-}
-
-static SmallVector<int64_t>
-getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
-                             unsigned desiredResultRank) {
-  SmallVector<int64_t> targetShape;
-  int toSkip = sizes.size() - desiredResultRank;
-  assert(toSkip >= 0);
   for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
     if (toSkip > 0) {
       toSkip--;
@@ -130,81 +112,6 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                               reducedType.cast<MemRefType>(),
                                               operand, offsets, sizes, strides);
 
-  assert(extractOperation->getNumResults() == 1);
-  return extractOperation->getResult(0);
-}
-
-Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
-                       linalg::LinalgOp linalgOp, OpOperand *operand,
-                       ValueRange valuesToUse, unsigned desiredResultRank,
-                       ArrayRef<int64_t> innerSizes) {
-  Value operandToUse = valuesToUse[operand->getOperandNumber()];
-  ShapedType operandType = operandToUse.getType().cast<ShapedType>();
-  assert(operandType.hasStaticShape() && "tensor must have static shape");
-  size_t rank = operandType.getRank();
-
-  SmallVector<OpFoldResult, 4> offsets, sizes;
-  offsets.reserve(rank);
-  sizes.reserve(rank);
-
-  // offset into the tensor is the induction var or 0.
-  for (size_t idx = 0, e = localIvs.size(); idx < e; idx++)
-    offsets.push_back(localIvs[idx]);
-  for (size_t idx = localIvs.size(), e = rank; idx < e; idx++)
-    offsets.push_back(builder.getIndexAttr(0));
-
-  // sizes are:
-  // 1) from [0 to rank - desiredResultRank) = 1
-  // 2) from [rank - desiredResultRank to rank) = fullSize or innerSizes
-  // fullSizes are the size of your tensor
-  // innerSizes are additional sizes you can pass in (i.e., when
-  // you have a convolution you may want to take a chunk of the
-  // tensor and not the full size).
-  for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
-    sizes.push_back(builder.getIndexAttr(1));
-  for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++) {
-    if (innerSizes.size() != 0) {
-      assert(innerSizes.size() == (rank - desiredResultRank));
-      sizes.push_back(
-          builder.getIndexAttr(innerSizes[idx - desiredResultRank]));
-      continue;
-    }
-    sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
-  }
-
-  // strides are ones.
-  SmallVector<OpFoldResult, 4> strides(rank, builder.getIndexAttr(1));
-
-  assert(rank == offsets.size() && "expect same size");
-  assert(rank == strides.size() && "expect same size");
-  assert(rank == sizes.size() && "expect same size");
-
-  // XXX: this is not good. It is only for memref.
-  // this is for conv.
-  SmallVector<int64_t> expectedShape =
-      getExpectedResultMemRefShape(operandType, desiredResultRank);
-   if (innerSizes.size()) {
-    assert(innerSizes.size() == expectedShape.size());
-    expectedShape = llvm::to_vector(innerSizes);
-  }
-
-  Type reducedType =
-      (linalgOp.hasTensorSemantics())
-          ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                desiredResultRank, operandType.cast<RankedTensorType>(),
-                offsets, sizes, strides)
-          : memref::SubViewOp::inferRankReducedResultType(
-                /*getExpectedResultMemRefShape(operandType, desiredResultRank)*/expectedShape,
-                operandType.cast<MemRefType>(), offsets, sizes, strides);
-
-  Operation *extractOperation =
-      (linalgOp.hasTensorSemantics())
-          ? builder.create<tensor::ExtractSliceOp>(
-                loc, reducedType.cast<RankedTensorType>(), operandToUse,
-                offsets, sizes, strides)
-          : builder.create<memref::SubViewOp>(
-                loc, reducedType.cast<MemRefType>(), operandToUse, offsets,
-                sizes, strides);
   assert(extractOperation->getNumResults() == 1);
   return extractOperation->getResult(0);
 }

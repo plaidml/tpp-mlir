@@ -20,15 +20,6 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs);
 
-// KILL ME
-// Return a sliced operand using the localIvs as offset.
-// TODO: wired method. Need to rethink. innerSize is used to pass m and k for
-// GEMM mapping when r and s are not 1.
-Value getSlicedOperand(OpBuilder &builder, Location loc, ValueRange localIvs,
-                       linalg::LinalgOp linalgOp, OpOperand *operand,
-                       ValueRange valuesToUse, unsigned desiredResultRank,
-                       ArrayRef<int64_t> innerSize = {});
-
 // Extract and return a slice for operand using offsets, sizes, strides.
 Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                        Value operand, SmallVector<OpFoldResult> offsets,
