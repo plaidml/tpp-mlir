@@ -262,6 +262,8 @@ struct InterchangeIteratorsConv : OpRewritePattern<linalg::GenericOp> {
     //      K   [parallel]
     //       C  [reduction]
     //        output[N][P][Q][K] += image[N][H][W][C] * filter[R][S][C][K]
+    //
+    // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
     // clang-format on
 
     SmallVector<unsigned> interchangeVector = {0, 1, 4, 5, 2, 3, 6};
