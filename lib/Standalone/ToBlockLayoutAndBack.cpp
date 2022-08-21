@@ -268,10 +268,9 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct ToBlockLayoutAndBack
-    : public ToBlockLayoutAndBackBase<ToBlockLayoutAndBack> {
-  ToBlockLayoutAndBack() = default;
-  ToBlockLayoutAndBack(int64_t blockingFactor) {
+struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
+  BlockMatmulLayout() = default;
+  BlockMatmulLayout(int64_t blockingFactor) {
     this->blockingFactor = blockingFactor;
   }
   void runOnOperation() override {
@@ -289,6 +288,6 @@ struct ToBlockLayoutAndBack
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createToBlockLayoutAndBackPass(int64_t blockingFactor) {
-  return std::make_unique<ToBlockLayoutAndBack>();
+mlir::tpp::createMatmulToBlockLayout(int64_t blockingFactor) {
+  return std::make_unique<BlockMatmulLayout>();
 }

@@ -165,17 +165,17 @@ def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
   let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
 }
 
-def ToBlockLayoutAndBack : Pass<"to-block-layout", "func::FuncOp"> {
-  let summary = "Convert to block layout and back";
+def BlockMatmulLayout : Pass<"block-matmul-layout", "func::FuncOp"> {
+  let summary = "Convert matmul to block layout and back";
   let description = [{
-    Block GEMM as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
-    the GEMM has a relu operation as its consumer block also the relu operation.
+    Block Matmul as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
+    the Matmul has a relu operation as its consumer block also the relu operation.
   }];
   let options = [
     Option<"blockingFactor", "block-factor", "int64_t", "0", 
            "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createToBlockLayoutAndBackPass()";
+  let constructor = "mlir::tpp::createMatmulToBlockLayout()";
 }
 
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
