@@ -27,6 +27,9 @@ add_mlir_dialect_library(MLIRStandalone
         DecomposeConvToMatmul.cpp
         ToBlockLayoutAndBack.cpp
         MapToBatchReduceGEMM.cpp
+
+        # Utils
+        TransformUtils.cpp
         
         # Conversions
         ConvertTppToVector.cpp  
