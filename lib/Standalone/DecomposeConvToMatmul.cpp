@@ -78,12 +78,6 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
       for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
         sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
     }
-
-    llvm::errs() << "------\n";
-    for (OpFoldResult r : sizes)
-      r.dump();
-    llvm::errs() << "------\n";
-
     return sizes;
   }
 
@@ -116,54 +110,6 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
                                    sizes, strides, desiredResultRank);
   }
 
-  // TODO: make this util?
-  Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                            OpOperand *operand, ValueRange ivs,
-                            ValueRange valuesToUse,
-                            unsigned desiredResultRank) const {
-    Value operandToUse = valuesToUse[operand->getOperandNumber()];
-    ShapedType operandType = operandToUse.getType().cast<ShapedType>();
-    assert(operandType.hasStaticShape() && "tensor must have static shape");
-    size_t rank = operandType.getRank();
-
-    SmallVector<OpFoldResult> offsets, sizes;
-    offsets.reserve(rank);
-    sizes.reserve(rank);
-
-    // offset into the tensor is the induction var or 0.
-    for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
-      offsets.push_back(ivs[idx]);
-    for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
-      offsets.push_back(builder.getIndexAttr(0));
-
-    // sizes are 1 in [0 to rank - desiredResultRank)
-    // and 'full' in [rank - desiredResultRank to rank).
-    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
-      sizes.push_back(builder.getIndexAttr(1));
-    for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
-      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
-
-    SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
-    return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
-                                   sizes, strides, desiredResultRank);
-  }
-
-  // TODO: make this util?
-  FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
-                                   linalg::LinalgOp linalgOp, ValueRange ivs,
-                                   ValueRange valuesToUse,
-                                   unsigned desiredResultRank) const {
-    Location loc = linalgOp.getLoc();
-    FailureOr<SmallVector<Value>> involvedDimForOperand =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
-    if (failed(involvedDimForOperand))
-      return failure();
-    return getSliceOperandImpl(builder, linalgOp, operand,
-                               *involvedDimForOperand, valuesToUse,
-                               desiredResultRank);
-  }
-
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -181,15 +127,15 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
     slicedOperands.push_back(*slicedImg);
 
     OpOperand *filter = linalgOp.getInputOperands()[1];
-    FailureOr<Value> slicedFilter =
-        getSliceOperand(builder, filter, linalgOp, localIvs, valuesToUse, 2);
+    FailureOr<Value> slicedFilter = utils::getSliceOperand(
+        builder, filter, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedFilter))
       return failure();
     slicedOperands.push_back(*slicedFilter);
 
     OpOperand *output = linalgOp.getOutputOperands()[0];
-    FailureOr<Value> slicedOutput =
-        getSliceOperand(builder, output, linalgOp, localIvs, valuesToUse, 2);
+    FailureOr<Value> slicedOutput = utils::getSliceOperand(
+        builder, output, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedOutput))
       return failure();
     slicedOperands.push_back(*slicedOutput);

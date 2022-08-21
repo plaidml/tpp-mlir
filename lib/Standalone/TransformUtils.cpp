@@ -116,6 +116,51 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
   return extractOperation->getResult(0);
 }
 
+static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                                 OpOperand *operand, ValueRange ivs,
+                                 ValueRange valuesToUse,
+                                 unsigned desiredResultRank) {
+  Value operandToUse = valuesToUse[operand->getOperandNumber()];
+  ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+  assert(operandType.hasStaticShape() && "tensor must have static shape");
+  size_t rank = operandType.getRank();
+
+  SmallVector<OpFoldResult> offsets, sizes;
+  offsets.reserve(rank);
+  sizes.reserve(rank);
+
+  // offset into the tensor is the induction var or 0.
+  for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
+    offsets.push_back(ivs[idx]);
+  for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
+    offsets.push_back(builder.getIndexAttr(0));
+
+  // sizes are 1 in [0 to rank - desiredResultRank)
+  // and 'full' in [rank - desiredResultRank to rank).
+  for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+    sizes.push_back(builder.getIndexAttr(1));
+  for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+    sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+
+  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
+                                 sizes, strides, desiredResultRank);
+}
+
+FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                 linalg::LinalgOp linalgOp, ValueRange ivs,
+                                 ValueRange valuesToUse,
+                                 unsigned desiredResultRank) {
+  Location loc = linalgOp.getLoc();
+  FailureOr<SmallVector<Value>> involvedDimForOperand =
+      utils::getInvolvedLocalDimsForOperand(
+          builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+  if (failed(involvedDimForOperand))
+    return failure();
+  return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
+                             valuesToUse, desiredResultRank);
+}
+
 } // namespace utils
 
 } // namespace mlir

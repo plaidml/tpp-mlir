@@ -27,6 +27,16 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                        SmallVector<OpFoldResult> strides,
                        unsigned desiredResultRank);
 
+// Extract and return a slice for operand. Offsets are the induction variable
+// touched by the operand. Sizes are: '1' in [0 to rank - desiredResultRank]
+// while the full chunk in [rank - desiredResultRank to rank). Strides are
+// always 1. The methods effectively peel out the outermost [0 to rank -
+// desiredResultRank] dimensions that are materialized as loops.
+FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                 linalg::LinalgOp linalgOp, ValueRange ivs,
+                                 ValueRange valuesToUse,
+                                 unsigned desiredResultRank);
+
 } // namespace utils
 
 } // namespace mlir
