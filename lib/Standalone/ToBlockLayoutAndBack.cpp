@@ -385,10 +385,9 @@ BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   // reshape the img and the filter.
   int64_t blockingFactorOnC = blockingFactors[0];
   int64_t blockingFactorOnK = blockingFactors[1];
-  SmallVector<int64_t> currentBlockingFactors;
+  SmallVector<int64_t> currentBlockingFactors = {blockingFactorOnC};
   BlockLayout blockLayout = BlockLayout::FORMAT_NCHWc;
   for (Value input : inputOperands) {
-    currentBlockingFactors = {blockingFactorOnC};
     reshapedInputTensors.push_back(getReshapedTensor(
         loc, input, blockLayout, currentBlockingFactors, rewriter));
     currentBlockingFactors = {blockingFactorOnC, blockingFactorOnK};
