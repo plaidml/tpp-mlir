@@ -9,6 +9,7 @@
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
 #include "Standalone/TransformUtils.h"
+#include "Standalone/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -345,11 +346,13 @@ struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-struct GeneralizeConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
+// Block a Conv2DNchwFchw. The pattern returns a generic operation
+// marked as 'tpp.blocked.Conv2DNchwFchwOp' on success.
+struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  blockConv2DNchwFchwPreconditions(linalg::Conv2DNchwFchwOp convOp) const {
     // do not handle convolutions with dilation and strides.
     if (hasStride<linalg::Conv2DNchwFchwOp>(convOp) ||
         hasDilation<linalg::Conv2DNchwFchwOp>(convOp))
@@ -364,33 +367,21 @@ struct GeneralizeConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
 
     if (!hasStaticShape(image, filter, output))
       return failure();
-
-    FailureOr<linalg::GenericOp> maybeGeneric =
-        generalizeNamedOp(rewriter, convOp);
-    if (failed(maybeGeneric))
-      return failure();
-    linalg::GenericOp generic = *maybeGeneric;
-    generic.library_callAttr(rewriter.getStringAttr("tpp.Conv2DNchwFchwOp"));
     return success();
   }
-};
 
-struct BlockConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.Conv2DNchwFchwOp"))
+    if (failed(blockConv2DNchwFchwPreconditions(convOp)))
       return failure();
-    // TODO: user driven blocking factors. Do not encode them.
     FailureOr<linalg::GenericOp> maybeGeneric =
-        BlockConv2DNchwFchwOp(rewriter, linalgOp, {32, 32});
+        mlir::tpp::BlockConv2DNchwFchwOp(rewriter, convOp, {32, 32});
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
     generic.library_callAttr(
         rewriter.getStringAttr("tpp.blocked.Conv2DNchwFchwOp"));
-    return success();
+    return failure();
   }
 };
 
@@ -421,9 +412,8 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
 void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<GeneralizeConv2DNchwFchw, BlockConv2DNchwFchw,
-                  InterchangeIteratorsConv2DNchwFchw, DecomposeConv2DNchwFchw>(
-      patterns.getContext());
+  patterns.insert<BlockConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw,
+                  DecomposeConv2DNchwFchw>(patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
