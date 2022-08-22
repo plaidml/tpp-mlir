@@ -22,7 +22,44 @@ using namespace mlir;
 
 namespace {
 
-struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
+// return true if all operands have static shape.
+static bool hasStaticShape(Value image, Value filter, Value output) {
+  ShapedType imageType = image.getType().cast<ShapedType>();
+  ShapedType filterType = filter.getType().cast<ShapedType>();
+  ShapedType outputType = output.getType().cast<ShapedType>();
+  if ((!imageType.hasStaticShape()) || (!filterType.hasStaticShape()) ||
+      (!outputType.hasStaticShape()))
+    return false;
+  return true;
+}
+
+template <typename CONVOP>
+static bool hasStride(CONVOP convOp) {
+  if (DenseIntElementsAttr strides = convOp.strides()) {
+    auto values = strides.getValues<APInt>();
+    if (llvm::any_of(values, [](const APInt &value) {
+          return value.getSExtValue() != 1;
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename CONVOP>
+static bool hasDilation(CONVOP convOp) {
+  if (DenseIntElementsAttr dilations = convOp.dilations()) {
+    auto values = dilations.getValues<APInt>();
+    if (llvm::any_of(values, [](const APInt &value) {
+          return value.getSExtValue() != 1;
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   bool
@@ -234,7 +271,8 @@ struct DecomposeConv : OpRewritePattern<linalg::GenericOp> {
 };
 
 // Interchange iterators for a tpp.Conv2DNhwcHwcfOp.
-struct InterchangeIteratorsConv : OpRewritePattern<linalg::GenericOp> {
+struct InterchangeIteratorsConv2DNhwcHwcf
+    : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
@@ -277,28 +315,16 @@ struct InterchangeIteratorsConv : OpRewritePattern<linalg::GenericOp> {
 
 // Generalize a linalg::Conv2DNhwcHwcfOp. Mark the operation
 // with tpp.Conv2DNhwcHwcfOp such that later pattern can pick it up.
-struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
     // do not handle convolutions with dilation and strides.
-    if (DenseIntElementsAttr dilations = convOp.dilations()) {
-      auto values = dilations.getValues<APInt>();
-      if (llvm::any_of(values, [](const APInt &value) {
-            return value.getSExtValue() != 1;
-          })) {
-        return failure();
-      }
-    }
-    if (DenseIntElementsAttr strides = convOp.strides()) {
-      auto values = strides.getValues<APInt>();
-      if (llvm::any_of(values, [](const APInt &value) {
-            return value.getSExtValue() != 1;
-          })) {
-        return failure();
-      }
-    }
+    if (hasStride<linalg::Conv2DNhwcHwcfOp>(convOp) ||
+        hasDilation<linalg::Conv2DNhwcHwcfOp>(convOp))
+      return failure();
+
     // [N][H][W][C]
     Value image = convOp.image();
     // [R][S][C][K]
@@ -306,13 +332,7 @@ struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     // [N][P][Q][K]
     Value output = convOp.outputs()[0];
 
-    ShapedType imageType = image.getType().cast<ShapedType>();
-    ShapedType filterType = filter.getType().cast<ShapedType>();
-    ShapedType outputType = output.getType().cast<ShapedType>();
-
-    // only static dimensions.
-    if ((!imageType.hasStaticShape()) || (!filterType.hasStaticShape()) ||
-        (!outputType.hasStaticShape()))
+    if (!hasStaticShape(image, filter, output))
       return failure();
 
     FailureOr<linalg::GenericOp> maybeGeneric =
@@ -325,20 +345,93 @@ struct GeneralizeConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-void populateConvDecomposePatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  patterns.insert<GeneralizeConv, 
-                  DecomposeConv, 
-                  InterchangeIteratorsConv>(
+struct GeneralizeConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
+                                PatternRewriter &rewriter) const override {
+    // do not handle convolutions with dilation and strides.
+    if (hasStride<linalg::Conv2DNchwFchwOp>(convOp) ||
+        hasDilation<linalg::Conv2DNchwFchwOp>(convOp))
+      return failure();
+
+    // [N][C][H][W]
+    Value image = convOp.image();
+    // [K][C][R][S]
+    Value filter = convOp.filter();
+    // [N][K][P][Q]
+    Value output = convOp.outputs()[0];
+
+    if (!hasStaticShape(image, filter, output))
+      return failure();
+
+    FailureOr<linalg::GenericOp> maybeGeneric =
+        generalizeNamedOp(rewriter, convOp);
+    if (failed(maybeGeneric))
+      return failure();
+    linalg::GenericOp generic = *maybeGeneric;
+    generic.library_callAttr(rewriter.getStringAttr("tpp.Conv2DNchwFchwOp"));
+    return success();
+  }
+};
+
+struct BlockConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.Conv2DNchwFchwOp"))
+      return failure();
+    // TODO: user driven blocking factors. Do not encode them.
+    FailureOr<linalg::GenericOp> maybeGeneric =
+        BlockConv2DNchwFchwOp(rewriter, linalgOp, {32, 32});
+    if (failed(maybeGeneric))
+      return failure();
+    linalg::GenericOp generic = *maybeGeneric;
+    generic.library_callAttr(
+        rewriter.getStringAttr("tpp.blocked.Conv2DNchwFchwOp"));
+    return success();
+  }
+};
+
+struct InterchangeIteratorsConv2DNchwFchw
+    : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+// patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
+void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
+  patterns.insert<GeneralizeConv2DNhwcHwcf, DecomposeConv2DNhwcHwcf,
+                  InterchangeIteratorsConv2DNhwcHwcf>(patterns.getContext());
+}
+
+// patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
+void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
+  patterns.insert<GeneralizeConv2DNchwFchw, BlockConv2DNchwFchw,
+                  InterchangeIteratorsConv2DNchwFchw, DecomposeConv2DNchwFchw>(
       patterns.getContext());
-  // clang-format on
 }
 
 struct DecomposeConvToMatmul
     : public DecomposeConvToMatmulBase<DecomposeConvToMatmul> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
-    populateConvDecomposePatterns(patterns);
+    populateConv2DNhwcHwcfOpDecomposePatterns(patterns);
+    populateconv2DNchwFchwOpDecomposePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

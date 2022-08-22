@@ -114,8 +114,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
   std::pair<AffineMap, AffineMap> maps;
   SmallVector<int64_t> shapeBlockedTensor;
   if (layout == BlockLayout::FORMAT_NCnc) {
-    assert(blockFactors.size() == 1);
-    assert(shape.size() == 2);
+    assert(blockFactors.size() == 1 && "FORMAT_NCnc requires 1 blocking factor");
+    assert(shape.size() == 2 && "FORMAT_NCnc requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t N = shape[0] / blockFactor;
     int64_t C = shape[1] / blockFactor;
@@ -124,8 +124,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     maps = getMapsToBlockLayoutNC_NCnc(shapeBlockedTensor.size(), blockFactor,
                                        ctx);
   } else if (layout == BlockLayout::FORMAT_KCck) {
-    assert(blockFactors.size() == 1);
-    assert(shape.size() == 2);
+    assert(blockFactors.size() == 1 && "FORMAT_KCck requires 1 blocking factor");
+    assert(shape.size() == 2 && "FORMAT_KCck requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t K = shape[1] / blockFactor;
     int64_t C = shape[0] / blockFactor;
@@ -134,8 +134,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     maps = getMapsToBlockLayoutKC_KCck(shapeBlockedTensor.size(), blockFactor,
                                        ctx);
   } else if (layout == BlockLayout::FORMAT_NCHWc) {
-    assert(blockFactors.size() == 1);
-    assert(shape.size() == 4);
+    assert(blockFactors.size() == 1 && "FORMAT_NCHWc requires 1 blocking factor");
+    assert(shape.size() == 4 && "FORMAT_NCHWc requires 4d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t N = shape[0];
     int64_t C = shape[1] / blockFactor;
@@ -146,9 +146,9 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     maps = getMapsToBlockLayoutNCHW_to_NCHWc(shapeBlockedTensor.size(),
                                              blockFactor, ctx);
   } else {
-    assert(layout == BlockLayout::FORMAT_KCRSck);
-    assert(blockFactors.size() == 2);
-    assert(shape.size() == 4);
+    assert(layout == BlockLayout::FORMAT_KCRSck && "expect FORMAT_KCRSck");
+    assert(blockFactors.size() == 2 && "FORMAT_KCRSck requires 2 blocking factors");
+    assert(shape.size() == 4 && "FORMAT_KCRSck requires 4d tensor");
     int64_t blockFactorOnC = blockFactors[0];
     int64_t blockFactorOnK = blockFactors[1];
     int64_t K = shape[0] / blockFactorOnK;
@@ -354,6 +354,8 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
   }
 };
 
+
+
 struct DoItOnConv2DNchwFchw
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using OpRewritePattern<linalg::Conv2DNchwFchwOp>::OpRewritePattern;
@@ -402,7 +404,7 @@ struct DoItOnConv2DNchwFchw
             getParallelIteratorTypeName(), getReductionIteratorTypeName(),
             getReductionIteratorTypeName(), getReductionIteratorTypeName(),
             getReductionIteratorTypeName()},
-        /*doc=*/"", /*libraryCall=*/"");
+        /*doc=*/"", /*libraryCall=*/"tpp.blocked.Conv2DNchwFchwOp");
     rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
                                 replacementOp.region().begin());
 
