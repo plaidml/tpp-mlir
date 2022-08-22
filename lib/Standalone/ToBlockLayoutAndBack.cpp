@@ -114,7 +114,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
   std::pair<AffineMap, AffineMap> maps;
   SmallVector<int64_t> shapeBlockedTensor;
   if (layout == BlockLayout::FORMAT_NCnc) {
-    assert(blockFactors.size() == 1 && "FORMAT_NCnc requires 1 blocking factor");
+    assert(blockFactors.size() == 1 &&
+           "FORMAT_NCnc requires 1 blocking factor");
     assert(shape.size() == 2 && "FORMAT_NCnc requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t N = shape[0] / blockFactor;
@@ -124,7 +125,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     maps = getMapsToBlockLayoutNC_NCnc(shapeBlockedTensor.size(), blockFactor,
                                        ctx);
   } else if (layout == BlockLayout::FORMAT_KCck) {
-    assert(blockFactors.size() == 1 && "FORMAT_KCck requires 1 blocking factor");
+    assert(blockFactors.size() == 1 &&
+           "FORMAT_KCck requires 1 blocking factor");
     assert(shape.size() == 2 && "FORMAT_KCck requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t K = shape[1] / blockFactor;
@@ -134,7 +136,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     maps = getMapsToBlockLayoutKC_KCck(shapeBlockedTensor.size(), blockFactor,
                                        ctx);
   } else if (layout == BlockLayout::FORMAT_NCHWc) {
-    assert(blockFactors.size() == 1 && "FORMAT_NCHWc requires 1 blocking factor");
+    assert(blockFactors.size() == 1 &&
+           "FORMAT_NCHWc requires 1 blocking factor");
     assert(shape.size() == 4 && "FORMAT_NCHWc requires 4d tensor");
     int64_t blockFactor = blockFactors[0];
     int64_t N = shape[0];
@@ -147,7 +150,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
                                              blockFactor, ctx);
   } else {
     assert(layout == BlockLayout::FORMAT_KCRSck && "expect FORMAT_KCRSck");
-    assert(blockFactors.size() == 2 && "FORMAT_KCRSck requires 2 blocking factors");
+    assert(blockFactors.size() == 2 &&
+           "FORMAT_KCRSck requires 2 blocking factors");
     assert(shape.size() == 4 && "FORMAT_KCRSck requires 4d tensor");
     int64_t blockFactorOnC = blockFactors[0];
     int64_t blockFactorOnK = blockFactors[1];
@@ -354,8 +358,6 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
   }
 };
 
-
-
 struct DoItOnConv2DNchwFchw
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using OpRewritePattern<linalg::Conv2DNchwFchwOp>::OpRewritePattern;
@@ -413,8 +415,8 @@ struct DoItOnConv2DNchwFchw
     Value outBlockedTensor = replacementOp.getResult(0);
     Value outUnBlockedTensor = linalgOp.getOutputs()[0];
     std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCHWc_NCHW(
-        outBlockedTensor.getType().cast<ShapedType>().getRank(), blockingFactors[0],
-        ctx);
+        outBlockedTensor.getType().cast<ShapedType>().getRank(),
+        blockingFactors[0], ctx);
     Value outReplacement =
         rewriter
             .create<linalgx::Relayout>(loc, outUnBlockedTensor.getType(),
