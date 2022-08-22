@@ -161,20 +161,4 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
   }]; 
 }
 
-//===----------------------------------------------------------------------===//
-// Utility - Copy from [N][C] - to - [N/n][C/c][n][c]
-//===----------------------------------------------------------------------===//
-
-def Xsmm_CopyOp : Xsmm_Op<"copy"> {
-  let summary = "copy tensor.";
- 
-  let arguments = (ins Xsmm2DMemRef:$input, Xsmm4DMemRef:$output, 
-                   DenseI64ArrayAttr:$tile);
-
-  let assemblyFormat = [{
-    `ins` `(` $input `:` type($input) `)` 
-    `outs` `(` $output `:` type($output) `)` $tile attr-dict
-  }];
-}
-
 #endif // STANDALONE_XSMM_OPS
