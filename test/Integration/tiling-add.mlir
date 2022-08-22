@@ -163,8 +163,7 @@ module {
     // CHECK-SAME:  ( 2.64, 4.64, 6.64, 8.64, 10.64, 12.64, 14.64, 16.64, 18.64, 20.64, 22.64, 24.64, 26.64, 28.64, 30.64, 32.64 ) )
     //
 
-    %m0 = bufferization.to_memref %0 : memref<32x16xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<32x16xf32>, vector<32x16xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<32x16xf32>, vector<32x16xf32>
     vector.print %v0 : vector<32x16xf32>
 
     return

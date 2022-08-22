@@ -115,8 +115,7 @@ module {
     // CHECK-SAME:  ( 1.9, 2.9, 3.9, 4.9, 5.9, 6.9 ) )
     //
    
-    %m0 = bufferization.to_memref %0 : memref<9x6xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<9x6xf32>, vector<9x6xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
     vector.print %v0 : vector<9x6xf32>
 
     %bcastrow = arith.constant dense<[
@@ -138,8 +137,7 @@ module {
     // CHECK-SAME:  ( 1.1, 2.1, 3.1, 4.1, 5.1, 6.1 ) )
     //
 
-    %m1 = bufferization.to_memref %1 : memref<9x6xf32>
-    %v1 = vector.transfer_read %m1[%c0, %c0], %d1 : memref<9x6xf32>, vector<9x6xf32>
+    %v1 = vector.transfer_read %1[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
     vector.print %v1 : vector<9x6xf32>
 
     %bcastcol = arith.constant dense<[
@@ -163,8 +161,7 @@ module {
     // CHECK-SAME:  ( 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1 ) )
     // 
 
-    %m2 = bufferization.to_memref %2 : memref<6x9xf32>
-    %v2 = vector.transfer_read %m2[%c0, %c0], %d1 : memref<6x9xf32>, vector<6x9xf32>
+    %v2 = vector.transfer_read %2[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
     vector.print %v2 : vector<6x9xf32> 
 
     %s = arith.constant 23.1 : f32
@@ -180,8 +177,7 @@ module {
     // CHECK-SAME:  ( 23.1, 23.1, 23.1, 23.1, 23.1, 23.1, 23.1, 23.1, 23.1 ) )
     //
 
-    %m3 = bufferization.to_memref %3 : memref<6x9xf32>
-    %v3 = vector.transfer_read %m3[%c0, %c0], %d1 : memref<6x9xf32>, vector<6x9xf32>
+    %v3 = vector.transfer_read %3[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
     vector.print %v3 : vector<6x9xf32>
 
     %ss = arith.constant dense<[
@@ -200,8 +196,7 @@ module {
     // CHECK-SAME:  ( 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1 ) )
     //
     
-    %m4 = bufferization.to_memref %4 : memref<6x9xf32>
-    %v4 = vector.transfer_read %m4[%c0, %c0], %d1 : memref<6x9xf32>, vector<6x9xf32>
+    %v4 = vector.transfer_read %4[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
     vector.print %v4 : vector<6x9xf32>
   
     return 

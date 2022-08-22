@@ -56,8 +56,7 @@ module {
     // CHECK-SAME:   ( 1.3, 2.3, 3.3, 4.3 ),
     // CHECK-SAME:   ( 1.4, 2.4, 3.4, 4.4 ) )
     //
-    %m0 = bufferization.to_memref %0 : memref<4x4xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<4x4xf32>, vector<4x4xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
     vector.print %v0 : vector<4x4xf32>
     return 
   }

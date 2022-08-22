@@ -140,8 +140,7 @@ module {
     // CHECK-SAME:        ( 110, 158, 206, 254, 302, 350, 398, 446 ) ) ) )
     //
  
-    %m0 = bufferization.to_memref %0 : memref<1x2x2x8xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0, %c0, %c0], %d1 : memref<1x2x2x8xf32>, vector<1x2x2x8xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0, %c0, %c0], %d1 : tensor<1x2x2x8xf32>, vector<1x2x2x8xf32>
     vector.print %v0 : vector<1x2x2x8xf32>
 
     %Oref = arith.constant dense<0.0> : tensor<1x2x2x8xf32>
@@ -154,8 +153,7 @@ module {
     // CHECK-SAME:        ( 110, 158, 206, 254, 302, 350, 398, 446 ) ) ) )
     //
  
-    %m1 = bufferization.to_memref %1 : memref<1x2x2x8xf32>
-    %v1 = vector.transfer_read %m1[%c0, %c0, %c0, %c0], %d1 : memref<1x2x2x8xf32>, vector<1x2x2x8xf32>
+    %v1 = vector.transfer_read %1[%c0, %c0, %c0, %c0], %d1 : tensor<1x2x2x8xf32>, vector<1x2x2x8xf32>
     vector.print %v1 : vector<1x2x2x8xf32>  
 
     return 

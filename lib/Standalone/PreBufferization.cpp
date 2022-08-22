@@ -118,7 +118,7 @@ struct SwapOperandWithIterArg
     // Check if any iter args alias 'source' and if so
     // update the extract slice to extract from the iter
     // args to avoid an extra alloc during bufferization.
-    Value source = sliceOp.source();
+    Value source = sliceOp.getSource();
     Operation *parent = sliceOp->getParentOp();
     if (!parent || !isa<scf::ForOp>(parent))
       return failure();

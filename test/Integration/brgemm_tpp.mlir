@@ -54,8 +54,7 @@ module {
     // CHECK-SAME: ( 405.48, 443.88, 482.28, 520.68 ),
     // CHECK-SAME: ( 413.84, 453.04, 492.24, 531.44 ) )
     //
-    %m0 = bufferization.to_memref %0 : memref<4x4xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<4x4xf32>, vector<4x4xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
     vector.print %v0 : vector<4x4xf32>
 
     return 

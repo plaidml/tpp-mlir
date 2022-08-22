@@ -178,11 +178,12 @@ struct FoldChainOfStaticPaddings : public OpRewritePattern<tensor::PadOp> {
 
   LogicalResult matchAndRewrite(tensor::PadOp consumer,
                                 PatternRewriter &rewriter) const override {
-    if (!consumer.hasZeroLowPad() || consumer.nofold() ||
+    if (!consumer.hasZeroLowPad() || consumer.getNofold() ||
         !consumer.getConstantPaddingValue() || consumer.hasZeroHighPad())
       return failure();
-    tensor::PadOp producer = consumer.source().getDefiningOp<tensor::PadOp>();
-    if (!producer || !producer.hasZeroLowPad() || producer.nofold() ||
+    tensor::PadOp producer =
+        consumer.getSource().getDefiningOp<tensor::PadOp>();
+    if (!producer || !producer.hasZeroLowPad() || producer.getNofold() ||
         !producer.getConstantPaddingValue() || producer.hasZeroHighPad())
       return failure();
     if (producer.getConstantPaddingValue() !=
@@ -191,7 +192,7 @@ struct FoldChainOfStaticPaddings : public OpRewritePattern<tensor::PadOp> {
 
     Value paddingVal = producer.getConstantPaddingValue();
     tensor::PadOp newPadOp = tensor::createPadHighOp(
-        consumer.getResultType(), producer.source(), paddingVal,
+        consumer.getResultType(), producer.getSource(), paddingVal,
         /*nofold*/ false, consumer.getLoc(), rewriter);
     rewriter.replaceOp(consumer, newPadOp.getResult());
     return success();
@@ -242,17 +243,17 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value operand = linalgOp.getInputOperand(0)->get();
     tensor::ExtractSliceOp slice =
         operand.getDefiningOp<tensor::ExtractSliceOp>();
-    if (!slice || !slice.result().hasOneUse())
+    if (!slice || !slice.getResult().hasOneUse())
       return failure();
 
     RankedTensorType sliceOperandType =
-        slice.source().getType().cast<RankedTensorType>();
+        slice.getSource().getType().cast<RankedTensorType>();
 
     Value reluBuffer = rewriter.create<linalg::InitTensorOp>(
         loc, sliceOperandType.getShape(), sliceOperandType.getElementType());
 
     linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
-        loc, sliceOperandType, ValueRange{slice.source()},
+        loc, sliceOperandType, ValueRange{slice.getSource()},
         ValueRange{reluBuffer}, linalgOp.getIndexingMapsArray(),
         llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
@@ -261,7 +262,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
                                 newReluOp.region().begin());
 
     RankedTensorType sliceResultType =
-        slice.result().getType().cast<RankedTensorType>();
+        slice.getResult().getType().cast<RankedTensorType>();
     unsigned rank = sliceResultType.getRank();
     SmallVector<OpFoldResult, 4> offsets, sizes, strides;
     offsets.reserve(rank);
@@ -296,7 +297,7 @@ struct RemoveChainExtractInsertSlice
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSlice,
                                 PatternRewriter &rewriter) const override {
-    Value result = extractSlice.result();
+    Value result = extractSlice.getResult();
     if (!result.hasOneUse())
       return failure();
     Operation *user = *result.getUsers().begin();
@@ -305,14 +306,14 @@ struct RemoveChainExtractInsertSlice
 
     tensor::InsertSliceOp insertSlice = cast<tensor::InsertSliceOp>(user);
     RankedTensorType sourceType =
-        extractSlice.source().getType().cast<RankedTensorType>();
+        extractSlice.getSource().getType().cast<RankedTensorType>();
     RankedTensorType destType =
-        insertSlice.dest().getType().cast<RankedTensorType>();
+        insertSlice.getDest().getType().cast<RankedTensorType>();
     if (sourceType != destType)
       return failure();
 
-    insertSlice.replaceAllUsesWith(extractSlice.source());
-    rewriter.replaceOp(extractSlice, extractSlice.source());
+    insertSlice.replaceAllUsesWith(extractSlice.getSource());
+    rewriter.replaceOp(extractSlice, extractSlice.getSource());
     return success();
   }
 };
@@ -324,7 +325,7 @@ struct RemoveChainInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = consumerSlice.getLoc();
     tensor::InsertSliceOp maybeProducerSlice =
-        consumerSlice.source().getDefiningOp<tensor::InsertSliceOp>();
+        consumerSlice.getSource().getDefiningOp<tensor::InsertSliceOp>();
     if (!maybeProducerSlice)
       return failure();
     tensor::InsertSliceOp producerSlice = maybeProducerSlice;
@@ -332,10 +333,10 @@ struct RemoveChainInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
     // TODO: fails (or handle) if stride and offset are different.
     // TODO: Take stride information from operation do not recompute them.
 
-    Value source = producerSlice.source();
-    Value dest = consumerSlice.dest();
+    Value source = producerSlice.getSource();
+    Value dest = consumerSlice.getDest();
     RankedTensorType producerResultType =
-        producerSlice.source().getType().cast<RankedTensorType>();
+        producerSlice.getSource().getType().cast<RankedTensorType>();
     unsigned rank = producerResultType.getRank();
     SmallVector<OpFoldResult, 4> offsets, sizes, strides;
     offsets.reserve(rank);
@@ -409,7 +410,7 @@ struct FoldInsertSliceIntoTppIdentity
                                 PatternRewriter &rewriter) const override {
     Location loc = sliceOp.getLoc();
     linalg::GenericOp maybeTppIdentityOp =
-        sliceOp.source().getDefiningOp<linalg::GenericOp>();
+        sliceOp.getSource().getDefiningOp<linalg::GenericOp>();
     if (!maybeTppIdentityOp ||
         !isMarkedWithTpp(maybeTppIdentityOp, "tpp.identity"))
       return failure();

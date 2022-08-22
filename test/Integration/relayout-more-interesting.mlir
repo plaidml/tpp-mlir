@@ -41,8 +41,7 @@ module {
           linalg.yield %arg2 : f32
       } -> tensor<3x8x2x2xf32>
     
-    %m0 = bufferization.to_memref %1 : memref<3x8x2x2xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0, %c0, %c0], %d1 : memref<3x8x2x2xf32>, vector<3x8x2x2xf32>
+    %v0 = vector.transfer_read %1[%c0, %c0, %c0, %c0], %d1 : tensor<3x8x2x2xf32>, vector<3x8x2x2xf32>
     // 
     // CHECK:       ( ( ( ( 1.1, 2.1 ), ( 1.2, 2.2 ) ), 
     // CHECK-SAME:      ( ( 3.1, 4.1 ), ( 3.2, 4.2 ) ), 
@@ -75,8 +74,7 @@ module {
     %3 = linalg.copy ins(%d: tensor<6x16xf32>) outs(%2: tensor<6x16xf32>) -> tensor<6x16xf32>
     %4 = tensor.collapse_shape %3 [[0, 1]] : tensor<6x16xf32> into tensor<96xf32>
     %5 = tensor.expand_shape %4 [[0, 1, 2, 3]] : tensor<96xf32> into tensor<3x8x2x2xf32>
-    %m1 = bufferization.to_memref %5 : memref<3x8x2x2xf32>
-    %v1 = vector.transfer_read %m1[%c0, %c0, %c0, %c0], %d1 : memref<3x8x2x2xf32>, vector<3x8x2x2xf32>
+    %v1 = vector.transfer_read %5[%c0, %c0, %c0, %c0], %d1 : tensor<3x8x2x2xf32>, vector<3x8x2x2xf32>
     //
     // CHECK:     ( ( ( ( 1.1, 2.1 ), ( 3.1, 4.1 ) ), 
     // CHECK-SAME:    ( ( 5.1, 6.1 ), ( 7.1, 8.1 ) ), 

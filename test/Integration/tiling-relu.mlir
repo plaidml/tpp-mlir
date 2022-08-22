@@ -88,9 +88,7 @@ module {
     ]> : tensor<32x16xf32>
 
     %0 = call @bigrelu(%da) : (tensor<32x16xf32>) -> tensor<32x16xf32>
-
-    %m0 = bufferization.to_memref %0 : memref<32x16xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<32x16xf32>, vector<32x16xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<32x16xf32>, vector<32x16xf32>
 
     // 
     // CHECK:     ( ( 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 12.1, 13.1, 14.1, 15.1, 16.1 ), 

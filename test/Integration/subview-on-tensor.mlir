@@ -47,8 +47,7 @@ module {
     // CHECK-SAME:        ( 6, 6, 6 ) ) ) )
     // 
   
-    %m0 = bufferization.to_memref %1 : memref<2x2x3x3xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0, %c0, %c0], %d1 : memref<2x2x3x3xf32>, vector<2x2x3x3xf32>
+    %v0 = vector.transfer_read %1[%c0, %c0, %c0, %c0], %d1 : tensor<2x2x3x3xf32>, vector<2x2x3x3xf32>
     vector.print %v0 : vector<2x2x3x3xf32>
  
     return 

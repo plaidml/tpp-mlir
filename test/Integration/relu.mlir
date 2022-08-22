@@ -60,8 +60,7 @@ module {
     // CHECK-SAME:    ( 1.9, 2.9, 3.9, 4.9, 5.9, 6.9 ) )
     //  
 
-    %m0 = bufferization.to_memref %0 : memref<9x6xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<9x6xf32>, vector<9x6xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
     vector.print %v0 : vector<9x6xf32>
 
     return

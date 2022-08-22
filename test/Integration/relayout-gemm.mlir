@@ -121,8 +121,7 @@ module {
     %C = arith.constant dense<0.0> : tensor<6x16xf32>
     %0 = call @matmulrelayout(%da, %db, %C) 
       : (tensor<6x8xf32>, tensor<8x16xf32>, tensor<6x16xf32>) -> tensor<6x16xf32>
-    %m0 = bufferization.to_memref %0 : memref<6x16xf32>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<6x16xf32>, vector<6x16xf32>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<6x16xf32>, vector<6x16xf32>
     //
     // CHECK:     ( ( 57.56, 94.36, 131.16, 167.96, 204.76, 241.56, 278.36, 315.16, 351.96, 388.76, 425.56, 462.36, 499.16, 535.96, 572.76, 609.56 ), 
     // CHECK-SAME:  ( 58.72, 96.32, 133.92, 171.52, 209.12, 246.72, 284.32, 321.92, 359.52, 397.12, 434.72, 472.32, 509.92, 547.52, 585.12, 622.72 ), 
