@@ -34,6 +34,7 @@ static bool hasStaticShape(Value image, Value filter, Value output) {
   return true;
 }
 
+// return true if the conv has stride != 1.
 template <typename CONVOP>
 static bool hasStride(CONVOP convOp) {
   if (DenseIntElementsAttr strides = convOp.strides()) {
@@ -47,6 +48,7 @@ static bool hasStride(CONVOP convOp) {
   return false;
 }
 
+// return true if the conv has dilation != 1.
 template <typename CONVOP>
 static bool hasDilation(CONVOP convOp) {
   if (DenseIntElementsAttr dilations = convOp.dilations()) {
@@ -58,6 +60,26 @@ static bool hasDilation(CONVOP convOp) {
     }
   }
   return false;
+}
+
+static FailureOr<SmallVector<Range>>
+getLoopsToMaterialize(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                      unsigned upTo) {
+  if (linalgOp.hasDynamicShape())
+    return failure();
+  Location loc = linalgOp.getLoc();
+  SmallVector<OpFoldResult> allShapeSizes =
+      linalgOp.createFlatListOfOperandDims(rewriter, loc);
+  AffineMap map = linalgOp.getShapesToLoopsMap();
+  if (!map)
+    return failure();
+  SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
+      rewriter, loc, map, allShapeSizes);
+  SmallVector<Range> loopRanges;
+  for (unsigned idx = 0; idx < upTo; idx++)
+    loopRanges.push_back(
+        Range{rewriter.getIndexAttr(0), domain[idx], rewriter.getIndexAttr(1)});
+  return loopRanges;
 }
 
 struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
@@ -365,8 +387,14 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     // [N][K][P][Q]
     Value output = convOp.outputs()[0];
 
+    // static shapes.
     if (!hasStaticShape(image, filter, output))
       return failure();
+
+    // tensor semantics.
+    if (convOp.hasBufferSemantics())
+      return failure();
+
     return success();
   }
 
@@ -432,9 +460,135 @@ struct InterchangeIteratorsConv2DNchwFchw
 struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
+  bool hasInterchangedDims(linalg::GenericOp linalgOp) const {
+    ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+    if (iteratorTypes.size() != 9)
+      return false;
+    bool match = isParallelIterator(iteratorTypes[0]) &&
+                 isParallelIterator(iteratorTypes[1]) &&
+                 isParallelIterator(iteratorTypes[2]) &&
+                 isReductionIterator(iteratorTypes[3]) &&
+                 isReductionIterator(iteratorTypes[4]) &&
+                 isReductionIterator(iteratorTypes[5]) &&
+                 isParallelIterator(iteratorTypes[6]) &&
+                 isParallelIterator(iteratorTypes[7]) &&
+                 isReductionIterator(iteratorTypes[8]);
+    return match;
+  }
+
+  // Make sure we are dealing with a generic 'Conv2DNchwFchwOp' blocked
+  // with interchanged dimensions.
+  LogicalResult
+  decomposeConv2DNchwFchwPreconditions(linalg::GenericOp linalgOp) const {
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
+      return failure();
+    if (!hasInterchangedDims(linalgOp))
+      return failure();
+    return success();
+  }
+
+  FailureOr<SmallVector<Value>>
+  getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
+                    linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
+    assert(linalgOp.getNumInputsAndOutputs() == 3 &&
+           "expect 3 input/output operands");
+    assert(linalgOp.getInputOperands().size() == 2 &&
+           "expect 2 input operands");
+    SmallVector<Value> slicedOperands;
+    for (OpOperand *operand : linalgOp.getInputOperands()) {
+      FailureOr<Value> maybeSliced = utils::getSliceOperand(
+          builder, operand, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
+      if (failed(maybeSliced))
+        return failure();
+      slicedOperands.push_back(*maybeSliced);
+    }
+    FailureOr<Value> maybeSliced = utils::getSliceOperand(
+        builder, linalgOp.getOutputOperands()[0], linalgOp, localIvs,
+        valuesToUse, /*GEMM dims=*/2);
+    if (failed(maybeSliced))
+      return failure();
+    slicedOperands.push_back(*maybeSliced);
+    return slicedOperands;
+  }
+
+  bool hasFilterWithRSEqualOne(OpOperand *filter) const { return true; }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    return failure();
+    if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
+      return failure();
+
+    SmallVector<OpOperand *> inputOperands = linalgOp.getInputOperands();
+    if (!hasFilterWithRSEqualOne(inputOperands[1]))
+      return failure();
+
+    // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.
+    unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
+    FailureOr<SmallVector<Range>> maybeLoopRanges =
+        getLoopsToMaterialize(rewriter, linalgOp, upTo);
+    if (failed(maybeLoopRanges))
+      return failure();
+    SmallVector<Range> loopRanges = *maybeLoopRanges;
+
+    llvm::errs() << "GOT HERE\n";
+
+    SmallVector<Value, 4> ivs, tensorResults;
+    auto gemmBuilder = [&](OpBuilder &builder, Location loc,
+                           ValueRange localIvs,
+                           ValueRange operandsValuesToUse) -> scf::ValueVector {
+      assert(localIvs.size() == 6);
+      assert(operandsValuesToUse.size() ==
+                 static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
+             "expect the number of operands and inputs and outputs to match");
+      ivs.assign(localIvs.begin(), localIvs.end());
+      FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
+          builder, loc, localIvs, linalgOp, operandsValuesToUse);
+      if (failed(maybeSlicedOperands))
+        return {};
+      SmallVector<Value> slicedOperands = *maybeSlicedOperands;
+      assert(slicedOperands.size() == 3 && "expect three operands");
+
+      linalg::MatmulOp matmul =
+          (linalgOp.hasTensorSemantics())
+              ? builder.create<linalg::MatmulOp>(
+                    loc, slicedOperands[2].getType(),
+                    ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2])
+              : builder.create<linalg::MatmulOp>(
+                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2]);
+      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                       matmul->getResults());
+
+      return scf::ValueVector(tensorResults.begin(), tensorResults.end());
+    };
+
+    linalg::GenerateLoopNest<scf::ForOp>::doit(
+        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+        linalgOp.getIteratorTypes(), gemmBuilder);
+
+    // see: `Tiling.cpp` in Linalg/Transforms
+    // Gather the newly created loops and return them with the new op.
+    SmallVector<Operation *, 8> loops;
+    loops.reserve(ivs.size());
+    for (Value iv : ivs) {
+      if (iv.isa<BlockArgument>()) {
+        loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
+        assert(loops.back() && "no owner found for induction variable!");
+      } else {
+        loops.push_back(nullptr);
+      }
+    }
+
+    // Get the tensor results from the outermost loop.
+    Operation *outermostLoop = nullptr;
+    for (Operation *loop : loops)
+      if ((outermostLoop = loop))
+        break;
+
+    rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
+                                               : tensorResults);
+    return success();
   }
 };
 
@@ -446,8 +600,8 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
 void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<BlockConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw,
-                  DecomposeConv2DNchwFchw>(patterns.getContext());
+  patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
+                  InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
