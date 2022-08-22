@@ -380,7 +380,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
     generic.library_callAttr(
-        rewriter.getStringAttr("tpp.blocked.Conv2DNchwFchwOp"));
+        rewriter.getStringAttr("tpp.BlockedConv2DNchwFchwOp"));
     return failure();
   }
 };
@@ -389,9 +389,43 @@ struct InterchangeIteratorsConv2DNchwFchw
     : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    return failure();
+    if (!tpp::isMarkedWithTpp(genericOp, "tpp.BlockedConv2DNchwFchwOp"))
+      return failure();
+
+    // clang-format off
+    // N                [parallel]
+    //  K               [parallel - blocked]
+    //    P             [parallel]
+    //      Q           [parallel]
+    //        k         [parallel - block of K]
+    //          C       [reduction - blocked]
+    //            R     [reduction]
+    //              S   [reduction]
+    //                c [reduction - block of C]
+    
+    // expose matmul by interchange
+
+    // N                [parallel]
+    //  K               [parallel - blocked]
+    //    P             [parallel]
+    //      C           [reduction - blocked]
+    //        R         [reduction]
+    //          S       [reduction]
+    //            Q     [parallel]
+    //              k   [parallel - block of K]
+    //                c [reduction - block of C]
+    //
+    // Matmul: m = %Q, n = %k and k = %c
+    // clang-format on
+
+    SmallVector<unsigned> interchangeVector = {0, 1, 2, 5, 6, 7, 3, 4, 8};
+    FailureOr<linalg::GenericOp> maybeInterchange =
+        interchangeGenericOp(rewriter, genericOp, interchangeVector);
+    if (failed(maybeInterchange))
+      return failure();
+    return success();
   }
 };
 
