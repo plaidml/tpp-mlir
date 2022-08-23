@@ -113,43 +113,110 @@ static LogicalResult MapToBRGEMMOpPreconditions(linalg::LinalgOp linalgOp) {
   return success();
 }
 
-FailureOr<linalg::GenericOp>
+static FailureOr<SmallVector<Value>>
+getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
+                  linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
+  assert(linalgOp.getNumInputsAndOutputs() == 3 &&
+         "expect 3 input/output operands");
+  assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
+
+  SmallVector<Value> slicedOperands;
+  for (OpOperand *operand : linalgOp.getInputOperands()) {
+    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+        builder, operand, linalgOp, localIvs, valuesToUse, 3);
+    if (failed(slicedOperand))
+      return failure();
+    slicedOperands.push_back(*slicedOperand);
+  }
+  for (OpOperand *operand : linalgOp.getOutputOperands()) {
+    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+        builder, operand, linalgOp, localIvs, valuesToUse, 2);
+    if (failed(slicedOperand))
+      return failure();
+    slicedOperands.push_back(*slicedOperand);
+  }
+  return slicedOperands;
+}
+
+FailureOr<SmallVector<Value>>
 mlir::tpp::MapToBRGEMMOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   if (failed(MapToBRGEMMOpPreconditions(linalgOp)))
     return failure();
-  return failure();
+
+  // materialize outer loops
+  unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
+  FailureOr<SmallVector<Range>> maybeLoopRanges =
+      mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
+  if (failed(maybeLoopRanges))
+    return failure();
+  SmallVector<Range> loopRanges = *maybeLoopRanges;
+
+  // replace linalgOp with BRGEMM.
+  SmallVector<Value> ivs, tensorResults;
+  auto brgemmBuilder = [&](OpBuilder &builder, Location loc,
+                           ValueRange localIvs,
+                           ValueRange operandValuesToUse) -> scf::ValueVector {
+    assert(operandValuesToUse.size() ==
+               static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
+           "expect the number of operands and inputs and outputs to match");
+    ivs.assign(localIvs.begin(), localIvs.end());
+    FailureOr<SmallVector<Value>> maybeSlicedOperands =
+        getSlicedOperands(builder, loc, localIvs, linalgOp, operandValuesToUse);
+    if (failed(maybeSlicedOperands)) {
+      // TODO: is safe to just return{} ?
+      assert(0 && "failed to generate loops");
+      return {};
+    }
+    SmallVector<Value> slicedOperands = *maybeSlicedOperands;
+    assert(slicedOperands.size() == 3 && "expect three operands");
+
+    linalg::ReduceBatchMatmulOp brgemm =
+        (linalgOp.hasTensorSemantics())
+            ? builder.create<linalg::ReduceBatchMatmulOp>(
+                  loc, slicedOperands[2].getType(),
+                  ValueRange{slicedOperands[0], slicedOperands[1]},
+                  slicedOperands[2])
+            : builder.create<linalg::ReduceBatchMatmulOp>(
+                  loc, ValueRange{slicedOperands[0], slicedOperands[1]},
+                  slicedOperands[2]);
+
+    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                     brgemm->getResults());
+
+    return scf::ValueVector(tensorResults.begin(), tensorResults.end());
+  };
+  linalg::GenerateLoopNest<scf::ForOp>::doit(
+      rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+      linalgOp.getIteratorTypes(), brgemmBuilder);
+
+  // see: `Tiling.cpp` in Linalg/Transforms
+  // gather the newly created loops and return them with the new op.
+  SmallVector<Operation *, 8> loops;
+  loops.reserve(ivs.size());
+  for (Value iv : ivs) {
+    if (iv.isa<BlockArgument>()) {
+      loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
+      assert(loops.back() && "no owner found for induction variable!");
+    } else {
+      loops.push_back(nullptr);
+    }
+  }
+
+  // get the tensor results from the outermost loop.
+  Operation *outermostLoop = nullptr;
+  for (Operation *loop : loops)
+    if ((outermostLoop = loop))
+      break;
+
+  rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
+                                             : tensorResults);
+  return outermostLoop ? outermostLoop->getResults() : tensorResults;
 }
 
 namespace {
 
 struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  FailureOr<SmallVector<Value>>
-  getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
-                    linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
-    assert(linalgOp.getNumInputsAndOutputs() == 3 &&
-           "expect 3 input/output operands");
-    assert(linalgOp.getInputOperands().size() == 2 &&
-           "expect 2 input operands");
-
-    SmallVector<Value> slicedOperands;
-    for (OpOperand *operand : linalgOp.getInputOperands()) {
-      FailureOr<Value> slicedOperand = utils::getSliceOperand(
-          builder, operand, linalgOp, localIvs, valuesToUse, 3);
-      if (failed(slicedOperand))
-        return failure();
-      slicedOperands.push_back(*slicedOperand);
-    }
-    for (OpOperand *operand : linalgOp.getOutputOperands()) {
-      FailureOr<Value> slicedOperand = utils::getSliceOperand(
-          builder, operand, linalgOp, localIvs, valuesToUse, 2);
-      if (failed(slicedOperand))
-        return failure();
-      slicedOperands.push_back(*slicedOperand);
-    }
-    return slicedOperands;
-  }
 
   // Map a generic operation to BRGEMM. The following conditions apply:
   // 1. The generic has a single region. The region performs a scalar GEMM
@@ -160,86 +227,11 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   // 4. The generic has static shape.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> maybeGeneric =
+    FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
         mlir::tpp::MapToBRGEMMOp(rewriter, linalgOp);
-    if (failed(maybeGeneric))
+    if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();
-
-    /*
-        Location loc = linalgOp.getLoc();
-        auto allShapesSizes = cast<linalg::LinalgOp>(linalgOp.getOperation())
-                                  .createFlatListOfOperandDims(rewriter, loc);
-        AffineMap map = linalgOp.getShapesToLoopsMap();
-        if (!map)
-          return failure();
-        SmallVector<OpFoldResult> domain =
-       makeComposedFoldedMultiResultAffineApply( rewriter, loc, map,
-       allShapesSizes); SmallVector<Range> loopRanges; unsigned brgemmLoops = 4;
-        for (unsigned idx = 0, e = domain.size() - brgemmLoops; idx < e; idx++)
-          loopRanges.push_back(Range{rewriter.getIndexAttr(0), domain[idx],
-                                     rewriter.getIndexAttr(1)});
-
-        SmallVector<Value, 4> ivs, tensorResults;
-        auto brgemmBuilder =
-            [&](OpBuilder &builder, Location loc, ValueRange localIvs,
-                ValueRange operandValuesToUse) -> scf::ValueVector {
-          assert(operandValuesToUse.size() ==
-                     static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
-                 "expect the number of operands and inputs and outputs to
-       match"); ivs.assign(localIvs.begin(), localIvs.end());
-          FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
-              builder, loc, localIvs, linalgOp, operandValuesToUse);
-          if (failed(maybeSlicedOperands)) {
-            // TODO: is safe to just return{} ?
-            assert(0 && "failed to generate loops");
-            return {};
-          }
-          SmallVector<Value> slicedOperands = *maybeSlicedOperands;
-          assert(slicedOperands.size() == 3 && "expect three operands");
-
-          linalg::ReduceBatchMatmulOp brgemm =
-              (linalgOp.hasTensorSemantics())
-                  ? builder.create<linalg::ReduceBatchMatmulOp>(
-                        loc, slicedOperands[2].getType(),
-                        ValueRange{slicedOperands[0], slicedOperands[1]},
-                        slicedOperands[2])
-                  : builder.create<linalg::ReduceBatchMatmulOp>(
-                        loc, ValueRange{slicedOperands[0], slicedOperands[1]},
-                        slicedOperands[2]);
-
-          tensorResults = insertSlicesBack(builder, loc, linalgOp,
-       slicedOperands, brgemm->getResults());
-
-          return scf::ValueVector(tensorResults.begin(), tensorResults.end());
-        };
-        linalg::GenerateLoopNest<scf::ForOp>::doit(
-            rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypes(),
-            brgemmBuilder);
-
-        // see: `Tiling.cpp` in Linalg/Transforms
-        // Gather the newly created loops and return them with the new op.
-        SmallVector<Operation *, 8> loops;
-        loops.reserve(ivs.size());
-        for (Value iv : ivs) {
-          if (iv.isa<BlockArgument>()) {
-            loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
-            assert(loops.back() && "no owner found for induction variable!");
-          } else {
-            loops.push_back(nullptr);
-          }
-        }
-
-        // Get the tensor results from the outermost loop.
-        Operation *outermostLoop = nullptr;
-        for (Operation *loop : loops)
-          if ((outermostLoop = loop))
-            break;
-
-        rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
-                                                   : tensorResults);
-        return success();
-    */
   }
 };
 

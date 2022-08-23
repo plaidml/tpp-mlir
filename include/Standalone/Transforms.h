@@ -15,9 +15,12 @@ class GenericOp;
 
 namespace tpp {
 
-FailureOr<linalg::GenericOp> MapToBRGEMMOp(RewriterBase &rewriter,
-                                           linalg::LinalgOp linalgOp);
+// Attempt to map the current linalgOp to a BRGEMM.
+// On success the returned values are the materialzed loops with BRGEMM inside.
+FailureOr<SmallVector<Value>> MapToBRGEMMOp(RewriterBase &rewriter,
+                                            linalg::LinalgOp linalgOp);
 
+// Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>
 BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
