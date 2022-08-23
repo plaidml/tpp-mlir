@@ -68,6 +68,8 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   if (!filterType.hasStaticShape())
     return false;
   ArrayRef<int64_t> filterShape = filterType.getShape();
+  assert(i >= 0 && i < filterShape.size() && "out of bound");
+  assert(j >= 0 && j < filterShape.size() && "out of bound");
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
@@ -500,7 +502,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     SmallVector<OpOperand *> inputOperands = linalgOp.getInputOperands();
-    if (!hasFilterWithRandSEqualOne(inputOperands[1], /*Rpos=*/3, /*Spos=*/4))
+    if (!hasFilterWithRandSEqualOne(inputOperands[1], /*Rpos=*/2, /*Spos=*/3))
       return failure();
 
     // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.
@@ -571,6 +573,32 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Collapse R and S on the filter if R and S are 1.
+struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult CollapseFilterPreconditions(linalg::GenericOp linalgOp) const {
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
+      return failure();
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    if (!hasFilterWithRandSEqualOne(filter, /*Rpos=*/2, /*Spos=*/3))
+      return failure();
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (failed(CollapseFilterPreconditions(linalgOp)))
+      return failure();
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    FailureOr<linalg::GenericOp> maybeLinalgOp =
+        CollapseDimsAtPosForOperand(rewriter, linalgOp, filter, {2, 3});
+    if (failed(maybeLinalgOp))
+      return failure();
+    return success();
+  }
+};
+
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
 void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
   patterns.insert<GeneralizeConv2DNhwcHwcf, DecomposeConv2DNhwcHwcf,
@@ -583,9 +611,8 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
   // patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
   //                 InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
   // This is for BRGEMM
-  linalg::populateFoldUnitExtentDimsPatterns(patterns);
-  patterns.insert<BlockConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw>(
-      patterns.getContext());
+  // linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  patterns.insert<CollapseFilter, BlockConv2DNchwFchw>(patterns.getContext());
 }
 
 struct DecomposeConvToMatmul

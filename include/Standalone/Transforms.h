@@ -25,5 +25,9 @@ FailureOr<linalg::GenericOp>
 BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
 
+FailureOr<linalg::GenericOp>
+CollapseDimsAtPosForOperand(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                            OpOperand *operand, ArrayRef<int64_t> pos);
+
 } // namespace tpp
 } // namespace mlir
