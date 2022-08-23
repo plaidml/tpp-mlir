@@ -77,6 +77,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 // TODO: pass options for blocking.
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
+// TODO: pass options for collapsing - which dimensions + which operand.
+std::unique_ptr<OperationPass<func::FuncOp>> createCollapseAdjacentDimsPass();
 
 } // namespace tpp
 } // namespace mlir

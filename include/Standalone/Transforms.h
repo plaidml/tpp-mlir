@@ -6,11 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
+
 namespace mlir {
 class RewriterBase;
+class Value;
 
 namespace linalg {
 class GenericOp;
+class LinalgOp;
 } // namespace linalg
 
 namespace tpp {
@@ -25,9 +30,10 @@ FailureOr<linalg::GenericOp>
 BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
 
+// Attempt to collapse the dimensions in 'pos'.
 FailureOr<linalg::GenericOp>
 CollapseDimsAtPosForOperand(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                            OpOperand *operand, ArrayRef<int64_t> pos);
+                            OpOperand *operand, ArrayRef<bool> whichDims);
 
 } // namespace tpp
 } // namespace mlir

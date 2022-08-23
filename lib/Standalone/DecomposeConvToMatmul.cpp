@@ -592,7 +592,8 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
       return failure();
     OpOperand *filter = linalgOp.getInputOperands()[1];
     FailureOr<linalg::GenericOp> maybeLinalgOp =
-        CollapseDimsAtPosForOperand(rewriter, linalgOp, filter, {2, 3});
+        mlir::tpp::CollapseDimsAtPosForOperand(rewriter, linalgOp, filter,
+                                               {0, 1, 1, 1, 0, 0});
     if (failed(maybeLinalgOp))
       return failure();
     return success();
