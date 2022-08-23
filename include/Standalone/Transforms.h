@@ -15,6 +15,9 @@ class GenericOp;
 
 namespace tpp {
 
+FailureOr<linalg::GenericOp> MapToBRGEMMOp(RewriterBase &rewriter,
+                                           linalg::LinalgOp linalgOp);
+
 FailureOr<linalg::GenericOp>
 BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);

@@ -380,8 +380,11 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value blockTensor = fromBlockLayout.getInputs()[0];
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-    Value reluBuffer = getReshapedTensor(loc, linalgOp.outputs()[0],
-                                         blockLayout, blockingFactor, rewriter);
+    FailureOr<Value> maybeReluBuffer = getReshapedTensor(
+        loc, linalgOp.outputs()[0], blockLayout, blockingFactor, rewriter);
+    if (failed(maybeReluBuffer))
+      return failure();
+    Value reluBuffer = *maybeReluBuffer;
 
     AffineMap mapI =
         AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());

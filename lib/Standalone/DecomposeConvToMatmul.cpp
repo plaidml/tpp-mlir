@@ -62,27 +62,6 @@ static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
-// TODO: share this with 'mapToBatchReduce'.
-static FailureOr<SmallVector<Range>>
-getLoopsToMaterialize(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                      unsigned upTo) {
-  if (linalgOp.hasDynamicShape())
-    return failure();
-  Location loc = linalgOp.getLoc();
-  SmallVector<OpFoldResult> allShapeSizes =
-      linalgOp.createFlatListOfOperandDims(rewriter, loc);
-  AffineMap map = linalgOp.getShapesToLoopsMap();
-  if (!map)
-    return failure();
-  SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
-      rewriter, loc, map, allShapeSizes);
-  SmallVector<Range> loopRanges;
-  for (unsigned idx = 0; idx < upTo; idx++)
-    loopRanges.push_back(
-        Range{rewriter.getIndexAttr(0), domain[idx], rewriter.getIndexAttr(1)});
-  return loopRanges;
-}
-
 struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -527,7 +506,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.
     unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
     FailureOr<SmallVector<Range>> maybeLoopRanges =
-        getLoopsToMaterialize(rewriter, linalgOp, upTo);
+        mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
     if (failed(maybeLoopRanges))
       return failure();
     SmallVector<Range> loopRanges = *maybeLoopRanges;

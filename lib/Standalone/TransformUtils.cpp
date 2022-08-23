@@ -165,6 +165,26 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
                              valuesToUse, desiredResultRank);
 }
 
+FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
+                                                    linalg::LinalgOp linalgOp,
+                                                    unsigned upTo) {
+  if (linalgOp.hasDynamicShape())
+    return failure();
+  Location loc = linalgOp.getLoc();
+  SmallVector<OpFoldResult> allShapeSizes =
+      linalgOp.createFlatListOfOperandDims(rewriter, loc);
+  AffineMap map = linalgOp.getShapesToLoopsMap();
+  if (!map)
+    return failure();
+  SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
+      rewriter, loc, map, allShapeSizes);
+  SmallVector<Range> loopRanges;
+  for (unsigned idx = 0; idx < upTo; idx++)
+    loopRanges.push_back(
+        Range{rewriter.getIndexAttr(0), domain[idx], rewriter.getIndexAttr(1)});
+  return loopRanges;
+}
+
 } // namespace utils
 
 } // namespace mlir

@@ -162,6 +162,10 @@ def DecomposeConvToMatmul : Pass<"decompose-conv-to-matmul", "func::FuncOp"> {
   let description = [{
     Rewrite a convolution to a matmul operation.
   }];
+  let options = [
+    Option<"enableBrgemm", "enable-brgemm", "bool", "false",
+           "Map convolution to BRGEMM if possible">
+  ];
   let constructor = "mlir::tpp::createDecomposeConvToMatmulPass()";
 }
 
