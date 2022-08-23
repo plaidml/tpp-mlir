@@ -130,8 +130,13 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     return slicedOperands;
   }
 
-  // Specific pattern (maybe too specific). Look for a blocked
-  // matmul and map it to BRGEMM if the layout allows.
+  // Map a generic operation to BRGEMM. The following conditions apply:
+  // 1. The generic has a single region. The region performs a scalar GEMM
+  // operation.
+  // 2. The innermost dimensions for the generic must be [r, p, p, r]. r =
+  // reduction p = parallel. Outermost dimensions must be parallel.
+  // 3. Access pattern must be [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
+  // 4. The generic has static shape.
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!tpp::hasStaticShape(linalgOp))
