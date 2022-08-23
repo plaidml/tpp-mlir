@@ -62,6 +62,7 @@ static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
+// TODO: share this with 'mapToBatchReduce'.
 static FailureOr<SmallVector<Range>>
 getLoopsToMaterialize(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       unsigned upTo) {
@@ -402,6 +403,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
                                 PatternRewriter &rewriter) const override {
     if (failed(blockConv2DNchwFchwPreconditions(convOp)))
       return failure();
+    // TODO: hardcoded values.
     FailureOr<linalg::GenericOp> maybeGeneric =
         mlir::tpp::BlockConv2DNchwFchwOp(rewriter, convOp, {32, 32});
     if (failed(maybeGeneric))
@@ -529,8 +531,6 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     if (failed(maybeLoopRanges))
       return failure();
     SmallVector<Range> loopRanges = *maybeLoopRanges;
-
-    llvm::errs() << "GOT HERE\n";
 
     SmallVector<Value, 4> ivs, tensorResults;
     auto gemmBuilder = [&](OpBuilder &builder, Location loc,
