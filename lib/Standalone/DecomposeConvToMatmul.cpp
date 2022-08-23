@@ -62,6 +62,15 @@ static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
+static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
+                                       unsigned j) {
+  ShapedType filterType = filter->get().getType().cast<ShapedType>();
+  if (!filterType.hasStaticShape())
+    return false;
+  ArrayRef<int64_t> filterShape = filterType.getShape();
+  return ((filterShape[i] == 1) && (filterShape[j] == 1));
+}
+
 struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -78,13 +87,6 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
                  isParallelIterator(iteratorTypes[5]) &&
                  isReductionIterator(iteratorTypes[6]);
     return match;
-  }
-
-  bool hasFilterRSEqualOne(OpOperand *filter) const {
-    ShapedType filterType = filter->get().getType().cast<ShapedType>();
-    ArrayRef<int64_t> filterShape = filterType.getShape();
-    bool tmp = ((filterShape[0] == 1) && (filterShape[1] == 1));
-    return tmp;
   }
 
   SmallVector<int64_t> computeGemmSizeFrom(OpOperand *filter,
@@ -110,7 +112,7 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
 
     for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
       sizes.push_back(builder.getIndexAttr(1));
-    if (!hasFilterRSEqualOne(filter)) {
+    if (!hasFilterWithRandSEqualOne(filter, /*Rpos=*/0, /*Spos=*/1)) {
       SmallVector<int64_t> gemmSizes = computeGemmSizeFrom(filter, output);
       for (int64_t s : gemmSizes)
         sizes.push_back(builder.getIndexAttr(s));
@@ -492,15 +494,13 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     return slicedOperands;
   }
 
-  bool hasFilterWithRSEqualOne(OpOperand *filter) const { return true; }
-
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
       return failure();
 
     SmallVector<OpOperand *> inputOperands = linalgOp.getInputOperands();
-    if (!hasFilterWithRSEqualOne(inputOperands[1]))
+    if (!hasFilterWithRandSEqualOne(inputOperands[1], /*Rpos=*/3, /*Spos=*/4))
       return failure();
 
     // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.
@@ -579,8 +579,13 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
 void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
-                  InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+  // This is for GEMM
+  // patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
+  //                 InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+  // This is for BRGEMM
+  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  patterns.insert<BlockConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw>(
+      patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
