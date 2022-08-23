@@ -102,12 +102,17 @@ getMapsFromBlockLayoutNCnc_NC(int64_t dims, int64_t blockFactor,
 
 // Given a tensor `tensor` a layout format and a block factor, relayout
 // the tensor using the specified block factor and tensor relayout.
-static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
-                               ArrayRef<int64_t> blockFactors,
-                               RewriterBase &rewriter) {
+// Fail if the blocking factors do not perfectly divide the tensor
+// dimension.
+static FailureOr<Value> getReshapedTensor(Location loc, Value tensor,
+                                          BlockLayout layout,
+                                          ArrayRef<int64_t> blockFactors,
+                                          RewriterBase &rewriter) {
   MLIRContext *ctx = rewriter.getContext();
   RankedTensorType unBlockedTensorType =
       tensor.getType().cast<RankedTensorType>();
+  if (!unBlockedTensorType.hasStaticShape())
+    return failure();
   ArrayRef<int64_t> shape = unBlockedTensorType.getShape();
 
   std::pair<AffineMap, AffineMap> maps;
@@ -117,6 +122,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
            "FORMAT_NCnc requires 1 blocking factor");
     assert(shape.size() == 2 && "FORMAT_NCnc requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
+    if ((shape[0] % blockFactor != 0) || (shape[1] % blockFactor != 0))
+      return failure();
     int64_t N = shape[0] / blockFactor;
     int64_t C = shape[1] / blockFactor;
     int64_t n = blockFactor, c = blockFactor;
@@ -128,6 +135,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
            "FORMAT_KCck requires 1 blocking factor");
     assert(shape.size() == 2 && "FORMAT_KCck requires 2d tensor");
     int64_t blockFactor = blockFactors[0];
+    if ((shape[1] % blockFactor != 0) || (shape[0] % blockFactor != 0))
+      return failure();
     int64_t K = shape[1] / blockFactor;
     int64_t C = shape[0] / blockFactor;
     int64_t k = blockFactor, c = blockFactor;
@@ -139,6 +148,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
            "FORMAT_NCHWc requires 1 blocking factor");
     assert(shape.size() == 4 && "FORMAT_NCHWc requires 4d tensor");
     int64_t blockFactor = blockFactors[0];
+    if (shape[1] % blockFactor != 0)
+      return failure();
     int64_t N = shape[0];
     int64_t C = shape[1] / blockFactor;
     int64_t H = shape[2];
@@ -154,6 +165,8 @@ static Value getReshapedTensor(Location loc, Value tensor, BlockLayout layout,
     assert(shape.size() == 4 && "FORMAT_KCRSck requires 4d tensor");
     int64_t blockFactorOnC = blockFactors[0];
     int64_t blockFactorOnK = blockFactors[1];
+    if ((shape[0] % blockFactorOnK != 0) || (shape[1] % blockFactorOnC != 0))
+      return failure();
     int64_t K = shape[0] / blockFactorOnK;
     int64_t C = shape[1] / blockFactorOnC;
     int64_t R = shape[2];
@@ -203,16 +216,22 @@ mlir::tpp::BlockConv2DNchwFchwOp(RewriterBase &rewriter,
   SmallVector<int64_t> currentBlockingFactors = {blockingFactorOnC};
   BlockLayout blockLayout = BlockLayout::FORMAT_NCHWc;
   for (Value input : inputOperands) {
-    reshapedInputTensors.push_back(getReshapedTensor(
-        loc, input, blockLayout, currentBlockingFactors, rewriter));
+    FailureOr<Value> maybeReshaped = getReshapedTensor(
+        loc, input, blockLayout, currentBlockingFactors, rewriter);
+    if (failed(maybeReshaped))
+      return failure();
+    reshapedInputTensors.push_back(*maybeReshaped);
     currentBlockingFactors = {blockingFactorOnC, blockingFactorOnK};
     blockLayout = BlockLayout::FORMAT_KCRSck;
   }
 
   blockLayout = BlockLayout::FORMAT_NCHWc;
   currentBlockingFactors = {blockingFactorOnC};
-  Value reshapedOutputTensor = getReshapedTensor(
+  FailureOr<Value> maybeReshapedOutputTensor = getReshapedTensor(
       loc, outputOperands[0], blockLayout, currentBlockingFactors, rewriter);
+  if (failed(maybeReshapedOutputTensor))
+    return failure();
+  Value reshapedOutputTensor = *maybeReshapedOutputTensor;
 
   // Swap conv with generic.
   //         N   K   P   Q   k   C   R   S   c
@@ -277,14 +296,20 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
     // reshape input A to NCnc and B to KCck.
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
     for (Value input : matmulOp.getInputs()) {
-      reshapedInputTensors.push_back(
-          getReshapedTensor(loc, input, blockLayout, blockingFactor, rewriter));
+      FailureOr<Value> maybeReshaped =
+          getReshapedTensor(loc, input, blockLayout, blockingFactor, rewriter);
+      if (failed(maybeReshaped))
+        return failure();
+      reshapedInputTensors.push_back(*maybeReshaped);
       blockLayout = BlockLayout::FORMAT_KCck;
     }
 
     blockLayout = BlockLayout::FORMAT_NCnc;
-    Value reshapedOutputTensor = getReshapedTensor(
+    FailureOr<Value> maybeReshapedOutputTensor = getReshapedTensor(
         loc, matmulOp.getOutputs()[0], blockLayout, blockingFactor, rewriter);
+    if (failed(maybeReshapedOutputTensor))
+      return failure();
+    Value reshapedOutputTensor = *maybeReshapedOutputTensor;
 
     // swap linalg.matmul with a linalg.generic.
     AffineExpr p1, p2, r1, p3, p4, r2;
