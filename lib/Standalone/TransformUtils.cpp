@@ -57,6 +57,10 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
   return ivsResult;
 }
 
+// Return the 'desiredResultRank' innermost subtensor dimensions.
+// Example: sizes = {32, 64, 1, 23, 4} and desiredResultRank = 2.
+// Result is {23, 4}.
+// The method assumes the dimension to be statically known.
 static SmallVector<int64_t>
 getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
                              unsigned desiredResultRank) {
