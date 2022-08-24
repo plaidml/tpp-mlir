@@ -1,4 +1,14 @@
-// TODO: standalone-opt %s -map-linalg-to-tpp -tile-consumer-and-fuse-producers="tile-sizes=32,32" -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck %s
+// RUN: standalone-opt %s -map-linalg-to-tpp -tile-consumer-and-fuse-producers="tile-sizes=32,32" -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck %s
+
+// FIXME: This test has a few remarks about wrong tile sizes, when transforming the RELU generic:
+// ../test/Standalone/mlp-fusion.mlir:24:10: remark: wrong tile sizes
+//     %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%output : tensor<128x512xf32>) {
+//          ^
+// ../test/Standalone/mlp-fusion.mlir:24:10: note: see current operation: %11 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"], library_call = "tpp.relu"} ins(%9 : tensor<32x32xf32>) outs(%10 : tensor<32x32xf32>) {
+// ^bb0(%arg8: f32, %arg9: f32):
+//   %13 = mathx.relu %arg8 : f32
+//   linalg.yield %13 : f32
+// } -> tensor<32x32xf32>
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -27,9 +37,9 @@ module @predict_function  {
   }
 }
 
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 256 + s0 + d1)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 256 + s0 + d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 // CHECK: func.func @main(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<256x512xf32>
