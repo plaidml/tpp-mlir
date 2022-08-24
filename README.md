@@ -3,6 +3,10 @@
 This repository contains a template for an out-of-tree [MLIR](https://mlir.llvm.org/) dialect as well as a
 standalone `opt`-like tool to operate on that dialect.
 
+## Build Status
+
+[![Build status](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg)](https://buildkite.com/intel/tpp-compiler)
+
 ## How to build LLVM
 
 ```
