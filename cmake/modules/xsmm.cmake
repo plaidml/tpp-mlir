@@ -17,9 +17,11 @@ list(REMOVE_ITEM _GLOB_XSMM_SRCS ${xsmm_SOURCE_DIR}/src/libxsmm_generator_gemm_d
 
 add_library(xsmm STATIC ${_GLOB_XSMM_SRCS})
 target_include_directories(xsmm PUBLIC ${xsmm_SOURCE_DIR}/include)
+target_compile_definitions(xsmm PUBLIC
+  LIBXSMM_DEFAULT_CONFIG
+)
 target_compile_definitions(xsmm PRIVATE
   __BLAS=0
-  LIBXSMM_DEFAULT_CONFIG
 )
 
 set(XSMM_INCLUDE_DIRS ${xsmm_SOURCE_DIR}/include)
