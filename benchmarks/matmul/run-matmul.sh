@@ -50,18 +50,18 @@ execute () {
 }
 
 
-# ----- matmul M = 12 N = 6 K = 9
+echo "--- MATMUL 12x6x9"
 compile "12x6x9"
 execute "12x6x9"
 
-# ----- matmul M = 64 N = 48 and K = 96
+echo "--- MATMUL 64x48x96"
 compile "64x48x96"
 execute "64x48x96"
 
-# ----- matmul M = 48 N = 64 and K = 96
+echo "--- MATMUL 48x64x96"
 compile "48x64x96"
 execute "48x64x96"
 
-# ----- matmul M = 64 N = 64 and K = 64
+echo "--- MATMUL 64x64x64"
 compile "64x64x64"
 execute "64x64x64"
