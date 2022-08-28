@@ -5,7 +5,12 @@ BASE=$(pwd)
 # This assume you built the sandbox as described in the readme.
 LIB_PATH=$BASE/../../build/lib
 BIN_PATH=$BASE/../../build/bin
-LIB_INCLUDE_PATH=$BASE/../../build/_deps/xsmm-src/include
+
+if [ "$LIBXSMMROOT" ]; then
+  LIB_INCLUDE_PATH=$LIBXSMMROOT/include
+else
+  LIB_INCLUDE_PATH=$BASE/../../build/_deps/xsmm-src/include
+fi
 
 echo "lib path: ${LIB_PATH}"
 echo "bin path: ${BIN_PATH}"
