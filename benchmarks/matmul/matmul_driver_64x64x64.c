@@ -2,15 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "libxsmm_math.h"
-#include "libxsmm_timer.h"
+#include <libxsmm.h>
 
 /* Generated matrix multiplication function under test */
 extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
                    DECL_VEC2D_FUNC_IN_ARGS(b, float),
                    DECL_VEC2D_FUNC_OUT_ARGS(o, float));
-
-extern double libxsmm_matdiff_epsilon(const libxsmm_matdiff_info *input);
 
 /* Reference implementation of a matrix multiplication */
 void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,

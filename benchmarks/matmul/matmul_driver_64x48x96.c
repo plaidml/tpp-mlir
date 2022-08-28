@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "libxsmm_timer.h"
+#include <libxsmm.h>
 
 /* Generated matrix multiplication function under test */
 extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
