@@ -3,28 +3,28 @@
 source ../common.sh
 
 compile () {
-  echo "Compile driver ----> $1"
-  echo "Compile kernel ----> $2"
+  echo "Compile driver ----> matmul_driver_${1}"
+  echo "Compile kernel ----> matmul_kernel_${1}"
   
   # Compile driver. 
-  clang -O3 -emit-llvm -S -I $LIB_INCLUDE_PATH ${1}.c
-  llc ${1}.ll
+  clang -O3 -emit-llvm -S -I $LIB_INCLUDE_PATH matmul_driver_${1}.c
+  llc matmul_driver_${1}.ll
 
   # Fire tpp compiler (with xsmm conversion).
-  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
+  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
 
-  standalone-opt ${2}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o ${2}.ll
-  llc ${2}.ll
+  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o matmul_kernel_${1}.ll
+  llc matmul_kernel_${1}.ll
 
   # Merge them.
   unamestr=$(uname)
   if [[ "$unamestr" == 'Darwin' ]]; then
-    export DYLD_LIBRARY_PATH=$LIB_PATH
+    export DYLD_LIBRARY_PATH=$LIB_PATH:$DYLD_LIBRARY_PATH
   else
-    export LD_LIBRARY_PATH=$LIB_PATH
+    export LD_LIBRARY_PATH=$LIB_PATH:$LD_LIBRARY_PATH
   fi
 
-  clang -O3 ${1}.s ${2}.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul
+  clang -O3 matmul_driver_${1}.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul_driver_${1}
 
   rm *.s
   rm *.ll
@@ -32,31 +32,32 @@ compile () {
 
 execute () {
   # Execute and check result.
-  ./matmul > result.txt 2>&1
-  rm matmul 
+  ./matmul_driver_${1} > matmul_driver_${1}.log 2>&1
+  #rm matmul_driver_${1}
 
- if cat result.txt | grep "Result is correct" &> /dev/null ; then
+ if cat matmul_driver_${1}.log | grep "Result is correct" &> /dev/null ; then
     printf "${GREEN} OK ${NC} \n"
   else
     printf "${RED} Oh NO ${NC} \n";
+    exit 1
   fi 
   
-  rm result.txt
+  #rm matmul_driver_${1}.log
 }
 
 
 # ----- matmul M = 12 N = 6 K = 9
-compile "matmul_driver_12x6x9" "matmul_kernel_12x6x9"
-execute
+compile "12x6x9"
+execute "12x6x9"
 
 # ----- matmul M = 64 N = 48 and K = 96
-compile "matmul_driver_64x48x96" "matmul_kernel_64x48x96"
-execute
+compile "64x48x96"
+execute "64x48x96"
 
 # ----- matmul M = 48 N = 64 and K = 96
-compile "matmul_driver_48x64x96" "matmul_kernel_48x64x96"
-execute
+compile "48x64x96"
+execute "48x64x96"
 
 # ----- matmul M = 64 N = 64 and K = 64
-compile "matmul_driver_64x64x64" "matmul_kernel_64x64x64"
-execute
+compile "64x64x64"
+execute "64x64x64"
