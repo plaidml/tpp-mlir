@@ -82,9 +82,10 @@ static ReplacementInfo getInfo(linalg::LinalgOp linalgOp, OpOperand *operand,
       if (dim == startCollapsePos)
         collapsedDims = exprs[dim];
       else
-        collapsedDims = collapsedDims + exprs[dim];
+        collapsedDims = collapsedDims * shape[dim] + exprs[dim];
       if (dim == endCollapsePos)
         newIndexExprs.push_back(collapsedDims);
+      // end wrong section.
 
       reassociation.push_back(getAffineDimExpr(dim, ctx));
       collapsedShape *= shape[dim];
@@ -240,8 +241,8 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> maybeGeneric =
         mlir::tpp::CollapseDimsAtPosForOperand(rewriter, linalgOp,
-                                               linalgOp.getInputOperands()[1],
-                                               {0, 0, 1, 1, 0, 0});
+                                               linalgOp.getInputOperands()[0],
+                                               {0, 0, 1, 1, 0});
     if (failed(maybeGeneric))
       return failure();
     return success();
