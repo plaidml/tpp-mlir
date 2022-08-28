@@ -7,13 +7,17 @@ compile () {
   echo "Compile kernel ----> matmul_kernel_${1}"
   
   # Compile driver. 
-  clang -O3 -emit-llvm -S -I $LIB_INCLUDE_PATH matmul_driver_${1}.c
-  llc matmul_driver_${1}.ll
+  clang -O3 -emit-llvm -S -I $LIB_INCLUDE_PATH -DARG_MNK=\"${1}\" matmul_driver.c
+  llc matmul_driver.ll
 
   # Fire tpp compiler (with xsmm conversion).
   standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
 
-  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o matmul_kernel_${1}.ll
+  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
+    -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func \
+    -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm \
+    -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts \
+  | mlir-translate -mlir-to-llvmir -o matmul_kernel_${1}.ll
   llc matmul_kernel_${1}.ll
 
   # Merge them.
@@ -24,7 +28,7 @@ compile () {
     export LD_LIBRARY_PATH=$LIB_PATH:$LD_LIBRARY_PATH
   fi
 
-  clang -O3 matmul_driver_${1}.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul_driver_${1}
+  clang -O3 matmul_driver.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul_${1}
 
   rm *.s
   rm *.ll
@@ -32,17 +36,17 @@ compile () {
 
 execute () {
   # Execute and check result.
-  ./matmul_driver_${1} > matmul_driver_${1}.log 2>&1
-  #rm matmul_driver_${1}
+  ./matmul_${1} ${1} > matmul_${1}.log 2>&1
+  #rm matmul_${1}
 
- if cat matmul_driver_${1}.log | grep "Result is correct" &> /dev/null ; then
+  if cat matmul_${1}.log | grep "Result is correct" &> /dev/null ; then
     printf "${GREEN} OK ${NC} \n"
   else
     printf "${RED} Oh NO ${NC} \n";
     exit 1
   fi 
   
-  #rm matmul_driver_${1}.log
+  #rm matmul_${1}.log
 }
 
 
