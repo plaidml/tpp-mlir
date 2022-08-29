@@ -85,7 +85,7 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
   /* Returns the element at position (`x`, `y`) of a 2d memref `v` */          \
   static inline eltype name##_get(const struct name *v, int64_t x,             \
                                   int64_t y) {                                 \
-    return *(v->allocatedPtr + y * v->sizes[1] + x);                           \
+    return *(v->alignedPtr + y * v->sizes[1] + x);                             \
   }                                                                            \
                                                                                \
   /* Assigns `f` to the element at position (`x`, `y`) of a 2d                 \
@@ -93,7 +93,7 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
    */                                                                          \
   static inline void name##_set(struct name *v, int64_t x, int64_t y,          \
                                 eltype f) {                                    \
-    *(v->allocatedPtr + y * v->sizes[1] + x) = f;                              \
+    *(v->alignedPtr + y * v->sizes[1] + x) = f;                                \
   }                                                                            \
                                                                                \
   /* Compares the values of two 2d memrefs. Returns 1 if they are              \
@@ -119,7 +119,7 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
   static inline void name##_dump(const struct name *v) {                       \
     for (int64_t y = 0; y < v->sizes[0]; y++) {                                \
       for (int64_t x = 0; x < v->sizes[1]; x++) {                              \
-        printf(format "%s", *(v->allocatedPtr + y * v->sizes[1] + x),          \
+        printf(format "%s", *(v->alignedPtr + y * v->sizes[1] + x),            \
                x == v->sizes[1] - 1 ? "" : " ");                               \
       }                                                                        \
                                                                                \
