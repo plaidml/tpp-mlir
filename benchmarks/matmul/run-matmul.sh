@@ -36,7 +36,7 @@ compile () {
 
 execute () {
   # Execute and check result.
-  ./matmul_${1} ${1} > matmul_${1}.log 2>&1
+  ./matmul_${1} > matmul_${1}.log 2>&1
   #rm matmul_${1}
 
   if cat matmul_${1}.log | grep "Result is correct" &> /dev/null ; then

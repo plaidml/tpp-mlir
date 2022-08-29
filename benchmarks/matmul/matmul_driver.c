@@ -16,13 +16,12 @@ extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
 /* Reference implementation of a matrix multiplication */
 void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
                     struct vec_f2d *o) {
-  for (int64_t y = 0; y < o->sizes[0]; y++) {
-    for (int64_t x = 0; x < o->sizes[1]; x++) {
-      float accu = 0;
-      for (int64_t k = 0; k < a->sizes[1]; k++) {
-        accu += vec_f2d_get(a, k, y) * vec_f2d_get(b, x, k);
+  for (int64_t m = 0; m < o->sizes[0]; ++m) {
+    for (int64_t k = 0; k < a->sizes[0]; ++k) {
+      for (int64_t n = 0; n < o->sizes[1]; ++n) {
+        vec_f2d_set(o, m, n, vec_f2d_get(a, m, k) * vec_f2d_get(b, k, n)
+          + vec_f2d_get(o, m, n)); // beta=1
       }
-      vec_f2d_set(o, x, y, accu);
     }
   }
 }
@@ -47,10 +46,12 @@ void clear_matrix(struct vec_f2d *m) {
 
 int main(int argc, char* argv[]) {
   struct vec_f2d a, b, o, o_ref;
-  double max_epsilon = 5e-6;
+  const double max_duration = 5.0, max_epsilon = 5e-6;
+  const int nwarmup = 10;
   int result = EXIT_SUCCESS;
-  const char* mnk = (1 < argc ? argv[1] : (ARG_MNK));
-  int verbose = (2 < argc ? atoi(argv[2]) : 0);
+  int nrepeat = (1 < argc ? atoi(argv[1]) : 0);
+  const char* mnk = (2 < argc ? argv[2] : (ARG_MNK));
+  const int verbose = (3 < argc ? atoi(argv[3]) : 0);
   int m = atoi(mnk), n = m, k = m;
   const char* x = strchr(mnk, 'x');
 
@@ -59,6 +60,12 @@ int main(int argc, char* argv[]) {
     n = atoi(++x); x = strchr(x, 'x');
     if (NULL != x) k = atoi(++x);
   }
+
+  // vec_f2d_destroy on unallocated data
+  memset(&a, 0, sizeof(a));
+  memset(&b, 0, sizeof(b));
+  memset(&o, 0, sizeof(o));
+  memset(&o_ref, 0, sizeof(o_ref));
 
   if  (EXIT_SUCCESS == vec_f2d_alloc(&a, m, k)
     && EXIT_SUCCESS == vec_f2d_alloc(&b, k, n)
@@ -82,18 +89,28 @@ int main(int argc, char* argv[]) {
       puts("");
     }
 
-    // preheating runs
-    for (int i = 0; i < 5; i++) {
-      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
-    }
-
-    // actual runs
+    // warmup and calibration for max_duration
     libxsmm_timer_tickint start = libxsmm_timer_tick();
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < nwarmup; i++) {
       matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
     }
     double duration = libxsmm_timer_duration(start, libxsmm_timer_tick());
-    printf("Duration LIBXSMM: %f\n", duration);
+
+    if (0 >= nrepeat) {
+      nrepeat = (0 < duration
+        ? (int)LIBXSMM_ROUND(max_duration / duration)
+        : nwarmup);
+    }
+    if (nwarmup > nrepeat) nrepeat = nwarmup;
+
+    // actual runs
+    start = libxsmm_timer_tick();
+    for (int i = 0; i < nrepeat; i++) {
+      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+    }
+    duration = libxsmm_timer_duration(start, libxsmm_timer_tick());
+    printf("LIBXSMM: %f GFLOPS/s\n",
+      1e-9 * (2.0 * m * n * k * nrepeat) / duration);
 
     clear_matrix(&o);
     clear_matrix(&o_ref);
