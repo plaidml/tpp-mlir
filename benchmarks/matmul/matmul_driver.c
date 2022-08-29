@@ -11,7 +11,7 @@
 /* Generated matrix multiplication function under test */
 extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
                    DECL_VEC2D_FUNC_IN_ARGS(b, float),
-                   DECL_VEC2D_FUNC_OUT_ARGS(o, float));
+                   DECL_VEC2D_FUNC_OUT_ARGS(c, float));
 
 /* Reference implementation of a matrix multiplication */
 void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
@@ -45,7 +45,7 @@ void clear_matrix(struct vec_f2d *m) {
 }
 
 int main(int argc, char* argv[]) {
-  struct vec_f2d a, b, o, o_ref;
+  struct vec_f2d a, b, c, d;
   const double max_duration = 5.0, max_epsilon = 5e-6;
   const int nwarmup = 10;
   int result = EXIT_SUCCESS;
@@ -64,13 +64,13 @@ int main(int argc, char* argv[]) {
   // vec_f2d_destroy on unallocated data
   memset(&a, 0, sizeof(a));
   memset(&b, 0, sizeof(b));
-  memset(&o, 0, sizeof(o));
-  memset(&o_ref, 0, sizeof(o_ref));
+  memset(&c, 0, sizeof(c));
+  memset(&d, 0, sizeof(d));
 
   if  (EXIT_SUCCESS == vec_f2d_alloc(&a, m, k)
     && EXIT_SUCCESS == vec_f2d_alloc(&b, k, n)
-    && EXIT_SUCCESS == vec_f2d_alloc(&o, m, n)
-    && EXIT_SUCCESS == vec_f2d_alloc(&o_ref, m, n))
+    && EXIT_SUCCESS == vec_f2d_alloc(&c, m, n)
+    && EXIT_SUCCESS == vec_f2d_alloc(&d, m, n))
   {
     init_matrix(&a);
     init_matrix(&b);
@@ -85,14 +85,14 @@ int main(int argc, char* argv[]) {
       puts("");
 
       puts("O:");
-      vec_f2d_dump(&o);
+      vec_f2d_dump(&c);
       puts("");
     }
 
     // warmup and calibration for max_duration
     libxsmm_timer_tickint start = libxsmm_timer_tick();
     for (int i = 0; i < nwarmup; i++) {
-      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&c));
     }
     double duration = libxsmm_timer_duration(start, libxsmm_timer_tick());
 
@@ -106,32 +106,31 @@ int main(int argc, char* argv[]) {
     // actual runs
     start = libxsmm_timer_tick();
     for (int i = 0; i < nrepeat; i++) {
-      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
+      matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&c));
     }
     duration = libxsmm_timer_duration(start, libxsmm_timer_tick());
-    printf("LIBXSMM: %f GFLOPS/s\n",
-      1e-9 * (2.0 * m * n * k * nrepeat) / duration);
 
-    clear_matrix(&o);
-    clear_matrix(&o_ref);
-    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&o));
-    matmul_refimpl(&a, &b, &o_ref);
+    // validate result against reference
+    clear_matrix(&c);
+    clear_matrix(&d);
+    matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&c));
+    matmul_refimpl(&a, &b, &d);
 
     if (verbose) {
       puts("Result O:");
-      vec_f2d_dump(&o);
+      vec_f2d_dump(&c);
       puts("");
 
       puts("Reference O:");
-      vec_f2d_dump(&o_ref);
+      vec_f2d_dump(&d);
       puts("");
     }
 
-    if (!vec_f2d_compare(&o, &o_ref)) {
+    if (!vec_f2d_compare(&c, &d)) {
       libxsmm_matdiff_info l_diff;
       double error = 0.0;
-      libxsmm_matdiff(&l_diff, LIBXSMM_DATATYPE_F32, m, n, o_ref.allocatedPtr,
-                      o.allocatedPtr, &n, &n);
+      libxsmm_matdiff(&l_diff, LIBXSMM_DATATYPE_F32, m, n, d.alignedPtr,
+                      c.alignedPtr, &n, &n);
       error = libxsmm_matdiff_epsilon(&l_diff);
 
       printf("\nPrinting Norms:\n");
@@ -145,13 +144,15 @@ int main(int argc, char* argv[]) {
       printf("\n");
 
       fputs("Result differs from reference result\n", stderr);
-      if (error > max_epsilon) {
+      if (max_epsilon < error) {
         fputs("Error exceeds margin\n", stderr);
         result = EXIT_FAILURE;
       }
     }
 
     if (EXIT_SUCCESS == result) {
+      printf("LIBXSMM: %f GFLOPS/s\n",
+        1e-9 * (2.0 * m * n * k * nrepeat) / duration);
       fputs("Result is correct\n", stderr);
     }
   }
@@ -162,8 +163,8 @@ int main(int argc, char* argv[]) {
 
   vec_f2d_destroy(&a);
   vec_f2d_destroy(&b);
-  vec_f2d_destroy(&o);
-  vec_f2d_destroy(&o_ref);
+  vec_f2d_destroy(&c);
+  vec_f2d_destroy(&d);
 
   return result;
 }
