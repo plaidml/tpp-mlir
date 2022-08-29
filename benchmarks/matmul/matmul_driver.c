@@ -14,32 +14,35 @@ extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
                    DECL_VEC2D_FUNC_OUT_ARGS(c, float));
 
 /* Reference implementation of a matrix multiplication */
-void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
-                    struct vec_f2d *o) {
-  for (int64_t m = 0; m < o->sizes[0]; ++m) {
-    for (int64_t k = 0; k < a->sizes[0]; ++k) {
-      for (int64_t n = 0; n < o->sizes[1]; ++n) {
-        vec_f2d_set(o, m, n, vec_f2d_get(a, m, k) * vec_f2d_get(b, k, n)
-          + vec_f2d_get(o, m, n)); // beta=1
+void matmul_refimpl(const struct vec_f2d* a, const struct vec_f2d* b,
+                    struct vec_f2d* c) {
+  const int64_t m = c->sizes[1], n = c->sizes[0], k = a->sizes[1];
+  for (int64_t ni = 0; ni < n; ++ni) {
+    for (int64_t ki = 0; ki < k; ++ki) {
+      for (int64_t mi = 0; mi < m; ++mi) {
+        vec_f2d_set(c, mi, ni, vec_f2d_get(a, ki, ni) * vec_f2d_get(b, mi, ki)
+          + vec_f2d_get(c, mi, ni)); // beta=1
       }
     }
   }
 }
 
 /* Initialize matrix with value x+y at position (x, y) */
-void init_matrix(struct vec_f2d *m) {
-  for (int64_t y = 0; y < m->sizes[0]; y++) {
-    for (int64_t x = 0; x < m->sizes[1]; x++) {
-      vec_f2d_set(m, x, y, x + y);
+void init_matrix(struct vec_f2d* matrix) {
+  const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
+  for (int64_t mi = 0; mi < m; ++mi) {
+    for (int64_t ni = 0; ni < n; ++ni) {
+      vec_f2d_set(matrix, mi, ni, mi + ni);
     }
   }
 }
 
 /* Clear matrix (aka fill with zeros */
-void clear_matrix(struct vec_f2d *m) {
-  for (int64_t y = 0; y < m->sizes[0]; y++) {
-    for (int64_t x = 0; x < m->sizes[1]; x++) {
-      vec_f2d_set(m, x, y, 0);
+void clear_matrix(struct vec_f2d* matrix) {
+  const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
+  for (int64_t mi = 0; mi < m; ++mi) {
+    for (int64_t ni = 0; ni < n; ++ni) {
+      vec_f2d_set(matrix, mi, ni, 0);
     }
   }
 }
@@ -75,7 +78,7 @@ int main(int argc, char* argv[]) {
     init_matrix(&a);
     init_matrix(&b);
 
-    if (verbose) {
+    if (0 != verbose) {
       puts("A:");
       vec_f2d_dump(&a);
       puts("");
@@ -84,9 +87,11 @@ int main(int argc, char* argv[]) {
       vec_f2d_dump(&b);
       puts("");
 
-      puts("O:");
-      vec_f2d_dump(&c);
-      puts("");
+      if (2 <= verbose || 0 > verbose) {
+        puts("C:");
+        vec_f2d_dump(&c);
+        puts("");
+      }
     }
 
     // warmup and calibration for max_duration
@@ -116,37 +121,39 @@ int main(int argc, char* argv[]) {
     matmul(VEC2D_ARGS(&a), VEC2D_ARGS(&b), VEC2D_ARGS(&c));
     matmul_refimpl(&a, &b, &d);
 
-    if (verbose) {
-      puts("Result O:");
+    if (0 != verbose) {
+      puts("Result:");
       vec_f2d_dump(&c);
       puts("");
 
-      puts("Reference O:");
+      puts("Reference:");
       vec_f2d_dump(&d);
       puts("");
     }
 
-    if (!vec_f2d_compare(&c, &d)) {
-      libxsmm_matdiff_info l_diff;
+    if (0 == vec_f2d_compare(&c, &d) || 3 <= verbose || 0 > verbose) {
+      libxsmm_matdiff_info diff;
       double error = 0.0;
-      libxsmm_matdiff(&l_diff, LIBXSMM_DATATYPE_F32, m, n, d.alignedPtr,
+      libxsmm_matdiff(&diff, LIBXSMM_DATATYPE_F32, n, m, d.alignedPtr,
                       c.alignedPtr, &n, &n);
-      error = libxsmm_matdiff_epsilon(&l_diff);
+      error = libxsmm_matdiff_epsilon(&diff);
 
-      printf("\nPrinting Norms:\n");
-      printf("L1 reference  : %.25g\n", l_diff.l1_ref);
-      printf("L1 test       : %.25g\n", l_diff.l1_tst);
-      printf("L2 abs.error  : %.24f\n", l_diff.l2_abs);
-      printf("L2 rel.error  : %.24f\n", l_diff.l2_rel);
-      printf("Linf abs.error: %.24f\n", l_diff.linf_abs);
-      printf("Linf rel.error: %.24f\n", l_diff.linf_rel);
+      printf("Printing Norms:\n");
+      printf("L1 reference  : %.25g\n", diff.l1_ref);
+      printf("L1 test       : %.25g\n", diff.l1_tst);
+      printf("L2 abs.error  : %.24f\n", diff.l2_abs);
+      printf("L2 rel.error  : %.24f\n", diff.l2_rel);
+      printf("Linf abs.error: %.24f\n", diff.linf_abs);
+      printf("Linf rel.error: %.24f\n", diff.linf_rel);
       printf("Check-norm    : %.24f\n", error);
       printf("\n");
 
-      fputs("Result differs from reference result\n", stderr);
-      if (max_epsilon < error) {
-        fputs("Error exceeds margin\n", stderr);
-        result = EXIT_FAILURE;
+      if (0 < error) {
+        fputs("Result differs from reference result\n", stderr);
+        if (max_epsilon < error) {
+          fputs("Error exceeds margin\n", stderr);
+          result = EXIT_FAILURE;
+        }
       }
     }
 
