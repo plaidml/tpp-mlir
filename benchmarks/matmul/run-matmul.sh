@@ -28,7 +28,7 @@ compile () {
     export LD_LIBRARY_PATH=$LIB_PATH:$LD_LIBRARY_PATH
   fi
 
-  clang -O3 matmul_driver.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -o matmul_${1}
+  clang -O3 matmul_driver.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -lm -o matmul_${1}
 
   rm *.s
   rm *.ll
