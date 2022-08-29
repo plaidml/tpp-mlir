@@ -34,4 +34,4 @@ target_compile_definitions(xsmm PRIVATE
   __BLAS=0
 )
 
-#target_link_libraries(xsmm PRIVATE m)
+#target_link_libraries(xsmm PUBLIC m)
