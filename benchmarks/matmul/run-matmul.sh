@@ -36,10 +36,8 @@ compile () {
 
 execute () {
   # Execute and check result.
-  ./matmul_${1} > matmul_${1}.log 2>&1
-  #rm matmul_${1}
-
-  if cat matmul_${1}.log | grep "Result is correct" &> /dev/null ; then
+  if ./matmul_${1} >matmul_${1}.log 2>&1; then
+    grep "LIBXSMM: ..* GFLOPS\/s" matmul_${1}.log
     printf "${GREEN} OK ${NC} \n"
   else
     printf "${RED} Oh NO ${NC} \n";
@@ -47,6 +45,7 @@ execute () {
   fi 
   
   #rm matmul_${1}.log
+  #rm matmul_${1}
 }
 
 
