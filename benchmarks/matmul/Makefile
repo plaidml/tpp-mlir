@@ -1,5 +1,10 @@
 ROOTDIR = $(abspath $(dir $(firstword $(MAKEFILE_LIST))))
-DEPDIR = $(LIBXSMMROOT)
+DEPDIR = $(if $(LIBXSMMROOT),$(LIBXSMMROOT),$(shell echo "$${LIBXSMMROOT}"))
+ifeq (,$(DEPDIR))
+  override MAINLIB = ../../build/libxsmm.$(SLIBEXT)
+  override DEPDIR = ../../build/_deps/xsmm-src
+  override LIBDEP = $(MAINLIB)
+endif
 SRCDIR = .
 INCDIR = .
 BLDDIR = obj
