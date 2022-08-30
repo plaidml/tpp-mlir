@@ -1,2 +1,28 @@
-BasedOnStyle: LLVM
-AlwaysBreakTemplateDeclarations: Yes
+﻿---
+AlignAfterOpenBracket: DontAlign
+AlignEscapedNewlines: DontAlign
+AlignTrailingComments: false
+AllowShortCaseLabelsOnASingleLine: true
+#AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+BraceWrapping:
+  AfterControlStatement: MultiLine
+  BeforeCatch: true
+  BeforeElse: true
+BreakBeforeBraces: Custom
+ColumnLimit: 132
+ConstructorInitializerIndentWidth: 0
+ContinuationIndentWidth: 2
+IndentCaseLabels: true
+IndentPPDirectives: AfterHash
+IndentWidth: 2
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
+PenaltyBreakAssignment: 50
+PointerAlignment: Left
+ReflowComments: false
+SortIncludes: false
+SpaceAfterTemplateKeyword: false
+UseTab: Never
+
+...
