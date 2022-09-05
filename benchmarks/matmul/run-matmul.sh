@@ -35,16 +35,15 @@ compile () {
 }
 
 execute () {
-  # Execute stand-alone matmul driver.
   cat /dev/null >matmul_${1}.log
-  if [ -e ./matmul ] && ./matmul 0 ${1} >>matmul_${1}.log 2>&1; then
-    grep "LIBXSMM: ..* GFLOPS\/s" matmul_${1}.log
-    echo >>matmul_${1}.log
-  fi
 
   # Execute and check result based on MLIR toolchain.
   if [ -e ./matmul_${1} ] && ./matmul_${1} >>matmul_${1}.log 2>&1; then
     grep "LIBXSMM MLIR: ..* GFLOPS\/s" matmul_${1}.log
+    # Execute stand-alone matmul driver.
+    if [ -e ./matmul ] && ./matmul 0 ${1} >>matmul_${1}.log 2>&1; then
+      grep "LIBXSMM: ..* GFLOPS\/s" matmul_${1}.log
+    fi
     printf "${GREEN} OK ${NC} \n"
   else
     printf "${RED} Oh NO ${NC} \n";

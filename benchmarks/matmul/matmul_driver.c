@@ -166,9 +166,9 @@ int main(int argc, char *argv[]) {
     if (EXIT_SUCCESS == result) {
       printf(
 #if defined(MLIR)
-          "LIBXSMM MLIR"
+          "MLIR"
 #else
-          "LIBXSMM"
+          "XSMM"
 #endif
           ": %f GFLOPS/s\n",
           1e-9 * (2.0 * m * n * k * nrepeat) / duration);
