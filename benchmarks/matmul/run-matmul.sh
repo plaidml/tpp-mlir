@@ -49,8 +49,9 @@ execute () {
 }
 
 # compile and execute kernels related to mlir files
-for MLIR in ./matmul_kernel_*.mlir | xargs -I{} basename {} .mlir | cut -d_ -f3; do
-  echo "--- MATMUL ${MLIR}"
-  compile "${MLIR}"
-  execute "${MLIR}"
+for MLIR in ./matmul_kernel_*.mlir; do
+  KERNEL=$(echo "${MLIR}" | xargs -I{} basename {} .mlir | cut -d_ -f3)
+  echo "--- MATMUL ${KERNEL}"
+  compile "${KERNEL}"
+  execute "${KERNEL}"
 done
