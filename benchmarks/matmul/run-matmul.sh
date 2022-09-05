@@ -7,7 +7,7 @@ compile () {
   echo "Compile kernel ----> matmul_kernel_${1}"
   
   # Compile driver. 
-  clang -O3 -emit-llvm -S -I $LIB_INCLUDE_PATH -DARG_MNK=\"${1}\" matmul_driver.c
+  clang -O3 -emit-llvm -S -I$LIB_INCLUDE_PATH -DARG_MNK=\"${1}\" matmul_driver.c
   llc matmul_driver.ll
 
   # Fire tpp compiler (with xsmm conversion).
@@ -35,20 +35,27 @@ compile () {
 }
 
 execute () {
-  # Execute and check result.
-  if ./matmul_${1} >matmul_${1}.log 2>&1; then
+  # Execute stand-alone matmul driver.
+  cat /dev/null >matmul_${1}.log
+  if [ -e ./matmul ] && ./matmul 0 ${1} >>matmul_${1}.log 2>&1; then
     grep "LIBXSMM: ..* GFLOPS\/s" matmul_${1}.log
+    echo >>matmul_${1}.log
+  fi
+
+  # Execute and check result based on MLIR toolchain.
+  if [ -e ./matmul_${1} ] && ./matmul_${1} >>matmul_${1}.log 2>&1; then
+    grep "LIBXSMM MLIR: ..* GFLOPS\/s" matmul_${1}.log
     printf "${GREEN} OK ${NC} \n"
   else
     printf "${RED} Oh NO ${NC} \n";
     exit 1
   fi 
-  
-  #rm matmul_${1}.log
-  #rm matmul_${1}
 }
 
-# compile and execute kernels related to mlir files
+# Compile stand-alone matmul driver without MLIR toolchain.
+clang -O3 matmul_driver.c matmul_kernel.c -I$LIB_INCLUDE_PATH -L$LIB_PATH -lstandalone_c_runner_utils -lm -o matmul
+
+# Compile and execute kernels related to MLIR files.
 for MLIR in ./matmul_kernel_*.mlir; do
   KERNEL=$(echo "${MLIR}" | xargs -I{} basename {} .mlir | cut -d_ -f3)
   echo "--- MATMUL ${KERNEL}"

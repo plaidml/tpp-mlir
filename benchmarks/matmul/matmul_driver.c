@@ -6,6 +6,8 @@
 
 #if !defined(ARG_MNK)
 #define ARG_MNK "32x32x32"
+#elif !defined(MLIR)
+#define MLIR
 #endif
 
 /* Generated matrix multiplication function under test */
@@ -162,8 +164,14 @@ int main(int argc, char *argv[]) {
     }
 
     if (EXIT_SUCCESS == result) {
-      printf("LIBXSMM: %f GFLOPS/s\n",
-             1e-9 * (2.0 * m * n * k * nrepeat) / duration);
+      printf(
+#if defined(MLIR)
+          "LIBXSMM MLIR"
+#else
+          "LIBXSMM"
+#endif
+          ": %f GFLOPS/s\n",
+          1e-9 * (2.0 * m * n * k * nrepeat) / duration);
       fputs("Result is correct\n", stderr);
     }
   } else {
