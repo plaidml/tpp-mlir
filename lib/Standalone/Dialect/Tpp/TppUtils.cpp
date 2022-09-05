@@ -32,8 +32,7 @@ static bool isChainOfUnaryOpsFrom(Value v, Value from) {
 // taken from LinalgInterfaces.cpp
 // Return the unique instance of OpType in `block` if it is indeed unique.
 // Return null if none or more than 1 instances exist.
-template <typename OpType>
-static OpType getSingleOpOfType(Block &block) {
+template <typename OpType> static OpType getSingleOpOfType(Block &block) {
   OpType res = nullptr;
   block.walk([&](OpType op) {
     if (res) {

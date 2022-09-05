@@ -5,29 +5,31 @@
 #include <libxsmm.h>
 
 #if !defined(ARG_MNK)
-#  define ARG_MNK "32x32x32"
+#define ARG_MNK "32x32x32"
 #endif
 
-
 /* Generated matrix multiplication function under test */
-extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float), DECL_VEC2D_FUNC_IN_ARGS(b, float), DECL_VEC2D_FUNC_OUT_ARGS(c, float));
-
+extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
+                   DECL_VEC2D_FUNC_IN_ARGS(b, float),
+                   DECL_VEC2D_FUNC_OUT_ARGS(c, float));
 
 /* Reference implementation of a matrix multiplication */
-void matmul_refimpl(const struct vec_f2d* a, const struct vec_f2d* b, struct vec_f2d* c) {
+void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
+                    struct vec_f2d *c) {
   const int64_t m = c->sizes[1], n = c->sizes[0], k = a->sizes[1];
   for (int64_t ni = 0; ni < n; ++ni) {
     for (int64_t ki = 0; ki < k; ++ki) {
       for (int64_t mi = 0; mi < m; ++mi) {
-        vec_f2d_set(c, mi, ni, vec_f2d_get(a, ki, ni) * vec_f2d_get(b, mi, ki) + vec_f2d_get(c, mi, ni)); // beta=1
+        vec_f2d_set(c, mi, ni,
+                    vec_f2d_get(a, ki, ni) * vec_f2d_get(b, mi, ki) +
+                        vec_f2d_get(c, mi, ni)); // beta=1
       }
     }
   }
 }
 
-
 /* Initialize matrix with value x+y at position (x, y) */
-void init_matrix(struct vec_f2d* matrix) {
+void init_matrix(struct vec_f2d *matrix) {
   const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
   for (int64_t mi = 0; mi < m; ++mi) {
     for (int64_t ni = 0; ni < n; ++ni) {
@@ -36,9 +38,8 @@ void init_matrix(struct vec_f2d* matrix) {
   }
 }
 
-
 /* Clear matrix (aka fill with zeros */
-void clear_matrix(struct vec_f2d* matrix) {
+void clear_matrix(struct vec_f2d *matrix) {
   const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
   for (int64_t mi = 0; mi < m; ++mi) {
     for (int64_t ni = 0; ni < n; ++ni) {
@@ -47,17 +48,16 @@ void clear_matrix(struct vec_f2d* matrix) {
   }
 }
 
-
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   struct vec_f2d a, b, c, d;
   const double max_duration = 5.0, max_epsilon = 5e-6;
   const int nwarmup = 10;
   int result = EXIT_SUCCESS;
   int nrepeat = (1 < argc ? atoi(argv[1]) : 0);
-  const char* mnk = ((2 < argc && 0 < atoi(argv[2])) ? argv[2] : (ARG_MNK));
+  const char *mnk = ((2 < argc && 0 < atoi(argv[2])) ? argv[2] : (ARG_MNK));
   const int verbose = (3 < argc ? atoi(argv[3]) : 0);
   int m = atoi(mnk), n = m, k = m;
-  const char* x = strchr(mnk, 'x');
+  const char *x = strchr(mnk, 'x');
 
   // parse MxNxK
   if (NULL != x) {
@@ -74,9 +74,10 @@ int main(int argc, char* argv[]) {
   memset(&c, 0, sizeof(c));
   memset(&d, 0, sizeof(d));
 
-  if (EXIT_SUCCESS == vec_f2d_alloc(&a, m, k) && EXIT_SUCCESS == vec_f2d_alloc(&b, k, n) &&
-      EXIT_SUCCESS == vec_f2d_alloc(&c, m, n) && EXIT_SUCCESS == vec_f2d_alloc(&d, m, n))
-  {
+  if (EXIT_SUCCESS == vec_f2d_alloc(&a, m, k) &&
+      EXIT_SUCCESS == vec_f2d_alloc(&b, k, n) &&
+      EXIT_SUCCESS == vec_f2d_alloc(&c, m, n) &&
+      EXIT_SUCCESS == vec_f2d_alloc(&d, m, n)) {
     init_matrix(&a);
     init_matrix(&b);
 
@@ -104,7 +105,8 @@ int main(int argc, char* argv[]) {
     double duration = libxsmm_timer_duration(start, libxsmm_timer_tick());
 
     if (0 >= nrepeat) {
-      nrepeat = (0 < duration ? (int)LIBXSMM_ROUND(max_duration / duration) : nwarmup);
+      nrepeat = (0 < duration ? (int)LIBXSMM_ROUND(max_duration / duration)
+                              : nwarmup);
     }
     if (nwarmup > nrepeat) {
       nrepeat = nwarmup;
@@ -136,7 +138,8 @@ int main(int argc, char* argv[]) {
     if (0 == vec_f2d_compare(&c, &d) || 3 <= verbose || 0 > verbose) {
       libxsmm_matdiff_info diff;
       double error = 0.0;
-      libxsmm_matdiff(&diff, LIBXSMM_DATATYPE_F32, n, m, d.alignedPtr, c.alignedPtr, &n, &n);
+      libxsmm_matdiff(&diff, LIBXSMM_DATATYPE_F32, n, m, d.alignedPtr,
+                      c.alignedPtr, &n, &n);
       error = libxsmm_matdiff_epsilon(&diff);
 
       printf("Printing Norms:\n");
@@ -159,11 +162,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (EXIT_SUCCESS == result) {
-      printf("LIBXSMM: %f GFLOPS/s\n", 1e-9 * (2.0 * m * n * k * nrepeat) / duration);
+      printf("LIBXSMM: %f GFLOPS/s\n",
+             1e-9 * (2.0 * m * n * k * nrepeat) / duration);
       fputs("Result is correct\n", stderr);
     }
-  }
-  else {
+  } else {
     fprintf(stderr, "Allocation failed");
     result = EXIT_FAILURE;
   }
