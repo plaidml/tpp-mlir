@@ -44,6 +44,14 @@ module {
 
     // Print result.
     %result = memref.cast %C : memref<4x4xi32> to memref<*xi32>
+
+
+    //
+    // CHECK:       [16,   16,   16,   16], 
+    // CHECK-NEXT:  [16,   16,   16,   16], 
+    // CHECK-NEXT:  [16,   16,   16,   16], 
+    // CHECK-NEXT:  [16,   16,   16,   16]
+    //
     call @printMemrefI32(%result) : (memref<*xi32>) -> () 
    
     memref.dealloc %da : memref<4x8xi32>
