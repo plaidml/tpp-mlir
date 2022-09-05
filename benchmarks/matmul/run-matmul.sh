@@ -48,19 +48,9 @@ execute () {
   #rm matmul_${1}
 }
 
-
-echo "--- MATMUL 12x6x9"
-compile "12x6x9"
-execute "12x6x9"
-
-echo "--- MATMUL 64x48x96"
-compile "64x48x96"
-execute "64x48x96"
-
-echo "--- MATMUL 48x64x96"
-compile "48x64x96"
-execute "48x64x96"
-
-echo "--- MATMUL 64x64x64"
-compile "64x64x64"
-execute "64x64x64"
+# compile and execute kernels related to mlir files
+for MLIR in ./matmul_kernel_*.mlir | xargs -I{} basename {} .mlir | cut -d_ -f3; do
+  echo "--- MATMUL ${MLIR}"
+  compile "${MLIR}"
+  execute "${MLIR}"
+done
