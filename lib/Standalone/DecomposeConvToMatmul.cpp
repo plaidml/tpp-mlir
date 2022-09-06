@@ -620,14 +620,12 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
     if (origResultType == result.getType())
       return result;
     if (origResultType.isa<RankedTensorType>()) {
-      return rewriter.create<tensor::ExpandShapeOp>(
-          loc, origResultType, result,
-          reassociationMap);
+      return rewriter.create<tensor::ExpandShapeOp>(loc, origResultType, result,
+                                                    reassociationMap);
     }
     if (origResultType.isa<MemRefType>()) {
-      return rewriter.create<memref::ExpandShapeOp>(
-          loc, origResultType, result,
-          reassociationMap);
+      return rewriter.create<memref::ExpandShapeOp>(loc, origResultType, result,
+                                                    reassociationMap);
     }
     llvm_unreachable("expect tensor or memref");
   }
