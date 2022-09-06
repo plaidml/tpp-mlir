@@ -573,7 +573,9 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-// Collapse R and S on the filter if R and S are 1.
+// Prepare for BRGEMM. Requires R = S = 1. The pattern collapses
+// H and W on the image and P and Q on the output.
+// TODO: rename
 struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -586,16 +588,157 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  SmallVector<ReassociationExprs, 2>
+  convertAffineMapArrayToExprs(ArrayAttr affineMapArrayAttr) const {
+    SmallVector<ReassociationExprs, 2> reassociationExprs;
+    for (auto attr : affineMapArrayAttr)
+      reassociationExprs.push_back(llvm::to_vector<4>(
+          attr.cast<AffineMapAttr>().getValue().getResults()));
+    return reassociationExprs;
+  }
+
+  // Return the original value if the type is unchanged, or reshape it. Assert
+  // if this is an unsupported type.
+  Value collapse(Value operand, Type newOperandType, ArrayAttr reassociationMap,
+                 Location loc, PatternRewriter &rewriter) const {
+    Type operandType = operand.getType();
+    if (operandType == newOperandType)
+      return operand;
+    if (operandType.isa<MemRefType>()) {
+      return rewriter.create<memref::CollapseShapeOp>(
+          loc, newOperandType, operand, reassociationMap);
+    }
+    if (operandType.isa<RankedTensorType>()) {
+      return rewriter.create<tensor::CollapseShapeOp>(
+          loc, newOperandType, operand, reassociationMap);
+    }
+    llvm_unreachable("expect tensor or memref");
+  }
+
+  Value expand(Value result, Type origResultType, ArrayAttr reassociationMap,
+               Location loc, PatternRewriter &rewriter) const {
+    if (origResultType == result.getType())
+      return result;
+    if (origResultType.isa<RankedTensorType>()) {
+      return rewriter.create<tensor::ExpandShapeOp>(
+          loc, origResultType, result,
+          reassociationMap);
+    }
+    if (origResultType.isa<MemRefType>()) {
+      return rewriter.create<memref::ExpandShapeOp>(
+          loc, origResultType, result,
+          reassociationMap);
+    }
+    llvm_unreachable("expect tensor or memref");
+  }
+
+  Type getCollapsedType(OpOperand *operand, size_t startCollapse,
+                        size_t endCollapse) const {
+    assert(endCollapse > startCollapse && "expect >");
+    ShapedType operandType = operand->get().getType().cast<ShapedType>();
+    size_t rank = operandType.getRank();
+    ArrayRef<int64_t> oldShape = operandType.getShape();
+    SmallVector<int64_t> newShape;
+
+    size_t idx = 0;
+    while (idx < rank) {
+      int64_t collapsedDim = oldShape[idx];
+      if (idx == startCollapse)
+        while (idx < endCollapse)
+          collapsedDim *= oldShape[++idx];
+      newShape.push_back(collapsedDim);
+      idx++;
+    }
+    if (operandType.isa<MemRefType>())
+      return MemRefType::get(newShape, operandType.getElementType());
+    if (operandType.isa<RankedTensorType>())
+      return RankedTensorType::get(newShape, operandType.getElementType());
+    llvm_unreachable("expect tensor or memref");
+  }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (failed(CollapseFilterPreconditions(linalgOp)))
       return failure();
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    FailureOr<linalg::GenericOp> maybeLinalgOp =
-        mlir::tpp::CollapseDimsAtPosForOperand(rewriter, linalgOp, filter,
-                                               {0, 1, 1, 1, 0, 0});
-    if (failed(maybeLinalgOp))
+
+    // [original] = N K P Q k C R S c (R and S are 1)
+    // [drop R and S] = N K P Q k C c
+    // [collapse P and Q ] = N K P0 k C c
+    // [new maps]:
+    //  - filter (N K P0 k C c) -> (K C c k)
+    //  - image  (N K P0 k C c) -> (N C P0 c)
+    //  - output (N K P0 k C c) -> (N K P0 k)
+    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    AffineExpr N, K, P0, k, C, c;
+    bindDims(linalgOp.getContext(), N, K, P0, k, C, c);
+    SmallVector<AffineMap> newIndexingMaps =
+        infer({{N, C, P0, c}, {K, C, c, k}, {N, K, P0, k}});
+
+    // We dropped R and S (two reductions) and collapse
+    // two parallel loops P and Q (aka H and W on the image).
+    SmallVector<StringRef> newIteratorTypes = {
+        getParallelIteratorTypeName(),  getParallelIteratorTypeName(),
+        getParallelIteratorTypeName(),  getParallelIteratorTypeName(),
+        getReductionIteratorTypeName(), getReductionIteratorTypeName()};
+
+    Location loc = linalgOp.getLoc();
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    Type newImageType = getCollapsedType(image, 2, 3);
+    auto reassociationImage = getReassociationIndicesForCollapse(
+        image->get().getType().cast<ShapedType>().getShape(),
+        newImageType.cast<ShapedType>().getShape());
+    if (!reassociationImage)
       return failure();
+
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    Type newFilterType = getCollapsedType(filter, 1, 3);
+    auto reassociationFilter = getReassociationIndicesForCollapse(
+        filter->get().getType().cast<ShapedType>().getShape(),
+        newFilterType.cast<ShapedType>().getShape());
+    if (!reassociationFilter)
+      return failure();
+
+    OpOperand *output = linalgOp.getOutputOperands()[0];
+    Type newOutputType = getCollapsedType(output, 2, 3);
+    auto reassociationOutput = getReassociationIndicesForCollapse(
+        output->get().getType().cast<ShapedType>().getShape(),
+        newOutputType.cast<ShapedType>().getShape());
+    if (!reassociationOutput)
+      return failure();
+
+    Value collapsedImage = collapse(
+        image->get(), newImageType,
+        getReassociationIndicesAttribute(rewriter, *reassociationImage), loc,
+        rewriter);
+
+    Value collapsedFilter = collapse(
+        filter->get(), newFilterType,
+        getReassociationIndicesAttribute(rewriter, *reassociationFilter), loc,
+        rewriter);
+
+    Value collapsedOutput = collapse(
+        output->get(), newOutputType,
+        getReassociationIndicesAttribute(rewriter, *reassociationOutput), loc,
+        rewriter);
+
+    linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
+        loc, newOutputType, ValueRange{collapsedImage, collapsedFilter},
+        collapsedOutput, newIndexingMaps, newIteratorTypes);
+    rewriter.inlineRegionBefore(linalgOp->getRegion(0),
+                                replacementOp.getRegion(),
+                                replacementOp.getRegion().begin());
+    Value res = replacementOp->getResult(0);
+    reassociationOutput = getReassociationIndicesForReshape(
+        res.getType().cast<ShapedType>(),
+        output->get().getType().cast<ShapedType>());
+    if (!reassociationOutput)
+      return failure();
+    Value resExpanded =
+        expand(res, output->get().getType(),
+               getReassociationIndicesAttribute(rewriter, *reassociationOutput),
+               loc, rewriter);
+    rewriter.replaceOp(linalgOp, resExpanded);
     return success();
   }
 };
