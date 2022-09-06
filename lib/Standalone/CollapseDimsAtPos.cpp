@@ -48,23 +48,17 @@ static size_t getEndingDimPos(size_t start, ArrayRef<bool> whichDims) {
   return --idx;
 }
 
-// TODO: what if we have constant dimensions?
-// Can we
 static ReplacementInfo getInfo(linalg::LinalgOp linalgOp, OpOperand *operand,
                                ArrayRef<bool> whichDims) {
+  llvm::errs() << __func__ << "\n";
   MLIRContext *ctx = linalgOp->getContext();
+
   SmallVector<Attribute> reassociationMaps;
   SmallVector<AffineExpr> reassociation;
   SmallVector<AffineExpr> newIndexExprs;
   SmallVector<int64_t> newShape;
   AffineMap indexingMap = linalgOp.getTiedIndexingMap(operand);
   ArrayRef<AffineExpr> exprs = indexingMap.getResults();
-
-  //
-  // indexingMap.dump();
-  // for (AffineExpr e : exprs)
-  //  e.dump();
-  //
 
   Type operandType = operand->get().getType();
   size_t rank = linalgOp.getRank(operand);
@@ -81,17 +75,18 @@ static ReplacementInfo getInfo(linalg::LinalgOp linalgOp, OpOperand *operand,
       // sum up the dimensions involved.
       if (dim == startCollapsePos)
         collapsedDims = exprs[dim];
-      else
+      else {
         collapsedDims = collapsedDims * shape[dim] + exprs[dim];
-      if (dim == endCollapsePos)
+      }
+      if (dim == endCollapsePos) {
         newIndexExprs.push_back(collapsedDims);
-      // end wrong section.
+      }
 
       reassociation.push_back(getAffineDimExpr(dim, ctx));
       collapsedShape *= shape[dim];
       if (dim == endCollapsePos) {
         reassociationMaps.push_back(AffineMapAttr::get(
-            AffineMap::get(rank, /*symbolCount = */ 0, reassociation, ctx)));
+            AffineMap::get(rank, /*symbols=*/0, reassociation, ctx)));
         reassociation.clear();
         newShape.push_back(collapsedShape);
         collapsedShape = 1;
@@ -104,7 +99,7 @@ static ReplacementInfo getInfo(linalg::LinalgOp linalgOp, OpOperand *operand,
       newIndexExprs.push_back(exprs[dim]);
     }
     reassociationMaps.push_back(AffineMapAttr::get(
-        AffineMap::get(rank, /*symbolCount = */ 0, reassociation, ctx)));
+        AffineMap::get(rank, /*symbols=*/0, reassociation, ctx)));
     reassociation.clear();
     ++dim;
   }
@@ -205,9 +200,14 @@ FailureOr<linalg::GenericOp> mlir::tpp::CollapseDimsAtPosForOperand(
 
   // error out if the indexing maps are broken.
   if (!inversePermutation(concatAffineMaps(newIndexingMaps))) {
+    llvm::errs() << "concat map: " << concatAffineMaps(newIndexingMaps) << "\n";
     llvm::errs() << "------- indexing maps ------\n";
     for (AffineMap map : newIndexingMaps)
       llvm::errs() << map << " \n";
+    llvm::errs() << "\n";
+    llvm::errs() << "------- new input/output types -------\n";
+    for (Type t : newInputOutputTypes)
+      llvm::errs() << t << "\n";
     llvm::errs() << "\n";
     return failure();
   }
