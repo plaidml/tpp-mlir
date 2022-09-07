@@ -575,8 +575,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
 
 // Prepare for BRGEMM. Requires R = S = 1. The pattern collapses
 // H and W on the image and P and Q on the output.
-// TODO: rename
-struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
+struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult CollapseFilterPreconditions(linalg::GenericOp linalgOp) const {
@@ -597,7 +596,7 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
     return reassociationExprs;
   }
 
-  // Return the original value if the type is unchanged, or reshape it. Assert
+  // Return the original value if the type is unchanged, or collapse it. Assert
   // if this is an unsupported type.
   Value collapse(Value operand, Type newOperandType, ArrayAttr reassociationMap,
                  Location loc, PatternRewriter &rewriter) const {
@@ -615,6 +614,8 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
     llvm_unreachable("expect tensor or memref");
   }
 
+  // Return the original value if the type is unchanged, or expand it. Assert
+  // if this is an unsupported type.
   Value expand(Value result, Type origResultType, ArrayAttr reassociationMap,
                Location loc, PatternRewriter &rewriter) const {
     if (origResultType == result.getType())
@@ -630,6 +631,7 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
     llvm_unreachable("expect tensor or memref");
   }
 
+  // Collapse dimension at index 'startCollapse' to 'endCollapse'.
   Type getCollapsedType(OpOperand *operand, size_t startCollapse,
                         size_t endCollapse) const {
     assert(endCollapse > startCollapse && "expect >");
@@ -674,7 +676,7 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
         infer({{N, C, P0, c}, {K, C, c, k}, {N, K, P0, k}});
 
     // We dropped R and S (two reductions) and collapse
-    // two parallel loops P and Q (aka H and W on the image).
+    // parallel loops P and Q (aka H and W on the image).
     SmallVector<StringRef> newIteratorTypes = {
         getParallelIteratorTypeName(),  getParallelIteratorTypeName(),
         getParallelIteratorTypeName(),  getParallelIteratorTypeName(),
@@ -722,7 +724,8 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, newOutputType, ValueRange{collapsedImage, collapsedFilter},
-        collapsedOutput, newIndexingMaps, newIteratorTypes);
+        collapsedOutput, newIndexingMaps, newIteratorTypes, /*docs=*/"",
+        /*library_call=*/"tpp.BlockedandCollapsedConv2DNchwFchwOp");
     rewriter.inlineRegionBefore(linalgOp->getRegion(0),
                                 replacementOp.getRegion(),
                                 replacementOp.getRegion().begin());
@@ -741,6 +744,67 @@ struct CollapseFilter : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+struct InterchangeAfterBlockingAndCollapsing
+    : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tpp::isMarkedWithTpp(linalgOp,
+                              "tpp.BlockedandCollapsedConv2DNchwFchwOp"))
+      return failure();
+
+    // clang-format off
+    // N       [parallel]
+    //  K'     [parallel]
+    //   P + Q [parallel]
+    //    k    [parallel]
+    //     C'  [reduction]
+    //      c  [reduction]
+    //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    
+    // expose BRGEMM by interchange:
+
+    // N       [parallel]
+    //  K'     [parallel]
+    //   C'    [reduction] // BRGEMM red dimension
+    //   /* GEMM */
+    //   P + Q [parallel]
+    //    k    [parallel]
+    //      c  [reduction]
+    //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    // clang-format on
+
+    SmallVector<unsigned> interchangeVector = {0, 1, 4, 2, 3, 5};
+    if (linalgOp.getNumLoops() != interchangeVector.size())
+      return failure();
+    FailureOr<linalg::GenericOp> maybeInterchange =
+        interchangeGenericOp(rewriter, linalgOp, interchangeVector);
+    if (failed(maybeInterchange))
+      return failure();
+    StringAttr name =
+        rewriter.getStringAttr("tpp.BlockedCollapsedAndInterConv2DNchwFchwOp");
+    (*maybeInterchange).library_callAttr(name);
+    return success();
+  }
+};
+
+struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tpp::isMarkedWithTpp(linalgOp,
+                              "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
+      return failure();
+    FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
+        mlir::tpp::MapToBRGEMMOp(rewriter, linalgOp);
+    if (failed(maybeLoopsOrGenericRes))
+      return failure();
+    return success();
+  }
+};
+
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
 void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
   patterns.insert<GeneralizeConv2DNhwcHwcf, DecomposeConv2DNhwcHwcf,
@@ -752,9 +816,19 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
   // This is for GEMM
   // patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
   //                 InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+
+  // clang-format off
   // This is for BRGEMM
-  // linalg::populateFoldUnitExtentDimsPatterns(patterns);
-  patterns.insert<CollapseFilter, BlockConv2DNchwFchw>(patterns.getContext());
+  // init: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
+  // blocking: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+  // if (R = S = 1) -> [P + Q] == [H + W]
+  // collapsing: [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
+  // [*][* ][P + Q][k] = [*][* ][H + W][c] * [* ][* ][c][k] // GEMM with c as red.
+  // [*][* ][P + Q][k] = [*][C'][H + W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
+  // clang-format on
+  patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
+                  InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
+      patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
