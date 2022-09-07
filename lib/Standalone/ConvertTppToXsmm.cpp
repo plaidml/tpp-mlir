@@ -26,7 +26,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-// TODO: this must not fail. Check for non-strided memref.
 static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
   SmallVector<int64_t> strides;
   int64_t offset;
@@ -48,9 +47,21 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[1];
-    int64_t lda = *getLeadingDim(memrefA);
-    int64_t ldb = *getLeadingDim(memrefB);
-    int64_t ldc = *getLeadingDim(memrefC);
+    auto ldaDim = getLeadingDim(memrefA);
+    if (failed(ldaDim))
+      return failure();
+    int64_t lda = *ldaDim;
+
+    auto ldbDim = getLeadingDim(memrefB);
+    if (failed(ldbDim))
+      return failure();
+    int64_t ldb = *ldbDim;
+
+    auto ldcDim = getLeadingDim(memrefC);
+    if (failed(ldcDim))
+      return failure();
+    int64_t ldc = *ldcDim;
+
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
@@ -83,9 +94,22 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[2];
     int64_t b = memrefA.getShape()[0];
-    int64_t lda = *getLeadingDim(memrefA, 1);
-    int64_t ldb = *getLeadingDim(memrefB, 1);
-    int64_t ldc = *getLeadingDim(memrefC);
+
+    auto ldaDim = getLeadingDim(memrefA, 1);
+    if (failed(ldaDim))
+      return failure();
+    int64_t lda = *ldaDim;
+
+    auto ldbDim = getLeadingDim(memrefB, 1);
+    if (failed(ldbDim))
+      return failure();
+    int64_t ldb = *ldbDim;
+
+    auto ldcDim = getLeadingDim(memrefC);
+    if (failed(ldcDim))
+      return failure();
+    int64_t ldc = *ldcDim;
+
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
@@ -284,11 +308,22 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     MemRefType outputMemRef = outputType.cast<MemRefType>();
     int64_t m = outputMemRef.getShape()[0];
     int64_t n = outputMemRef.getShape()[1];
-    int64_t ldiLhs =
-        *getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
-    int64_t ldiRhs =
-        *getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
-    int64_t ldo = *getLeadingDim(outputMemRef);
+    auto ldiLhsDim =
+        getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
+    if (failed(ldiLhsDim))
+      return failure();
+    int64_t ldiLhs = *ldiLhsDim;
+
+    auto ldiRhsDim = 
+        getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
+    if (failed(ldiRhsDim))
+      return failure();
+    int64_t ldiRhs = *ldiRhsDim;
+
+    auto ldoDim = getLeadingDim(outputMemRef);
+    if (failed(ldoDim))
+      return failure();
+    int64_t ldo = *ldoDim;
 
     xsmm::BinaryFlags bCast = xsmm::BinaryFlags::NONE;
     xsmm::BinaryKindAttr attr =
