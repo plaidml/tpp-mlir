@@ -40,8 +40,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   // assumption does not hold anymore as now a linalg.generic can map to n tpp
   // operations. If we support 1:n matching what should we do if the entire
   // linalg.op cannot be replace by tpp operations?
-  template <typename OP>
-  bool hasOnlyScalarElementwiseOp(Region &region) const {
+  template <typename OP> bool hasOnlyScalarElementwiseOp(Region &region) const {
     if (!region.hasOneBlock())
       return false;
     if (std::distance(region.front().begin(), region.front().end()) != 2)

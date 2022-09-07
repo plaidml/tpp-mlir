@@ -64,10 +64,8 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
    */                                                                          \
   static inline int name##_alloc(struct name *v, size_t n, size_t m) {         \
     eltype *f;                                                                 \
-                                                                               \
     if (!(f = calloc(n * m, sizeof(eltype))))                                  \
       return 1;                                                                \
-                                                                               \
     v->allocatedPtr = f;                                                       \
     v->alignedPtr = f;                                                         \
     v->offset = 0;                                                             \
@@ -75,27 +73,22 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
     v->sizes[1] = m;                                                           \
     v->strides[0] = m;                                                         \
     v->strides[1] = 1;                                                         \
-                                                                               \
     return 0;                                                                  \
   }                                                                            \
-                                                                               \
   /* Destroys a 2d memref */                                                   \
   static inline void name##_destroy(struct name *v) { free(v->allocatedPtr); } \
-                                                                               \
   /* Returns the element at position (`x`, `y`) of a 2d memref `v` */          \
   static inline eltype name##_get(const struct name *v, int64_t x,             \
                                   int64_t y) {                                 \
-    return *(v->allocatedPtr + y * v->sizes[1] + x);                           \
+    return *(v->alignedPtr + y * v->sizes[1] + x);                             \
   }                                                                            \
-                                                                               \
   /* Assigns `f` to the element at position (`x`, `y`) of a 2d                 \
    * memref `v`                                                                \
    */                                                                          \
   static inline void name##_set(struct name *v, int64_t x, int64_t y,          \
                                 eltype f) {                                    \
-    *(v->allocatedPtr + y * v->sizes[1] + x) = f;                              \
+    *(v->alignedPtr + y * v->sizes[1] + x) = f;                                \
   }                                                                            \
-                                                                               \
   /* Compares the values of two 2d memrefs. Returns 1 if they are              \
    * equal, otherwise 0.                                                       \
    */                                                                          \
@@ -105,24 +98,20 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
     if (a->sizes[0] != b->sizes[0] || a->sizes[1] != b->sizes[1]) {            \
       return 0;                                                                \
     }                                                                          \
-                                                                               \
     /* Compare elements */                                                     \
     for (int64_t y = 0; y < a->sizes[0]; y++)                                  \
       for (int64_t x = 0; x < a->sizes[1]; x++)                                \
         if (name##_get(a, x, y) != name##_get(b, x, y))                        \
           return 0;                                                            \
-                                                                               \
     return 1;                                                                  \
   }                                                                            \
-                                                                               \
   /* Dumps a 2d `v` to stdout. */                                              \
   static inline void name##_dump(const struct name *v) {                       \
     for (int64_t y = 0; y < v->sizes[0]; y++) {                                \
       for (int64_t x = 0; x < v->sizes[1]; x++) {                              \
-        printf(format "%s", *(v->allocatedPtr + y * v->sizes[1] + x),          \
+        printf(format "%s", *(v->alignedPtr + y * v->sizes[1] + x),            \
                x == v->sizes[1] - 1 ? "" : " ");                               \
       }                                                                        \
-                                                                               \
       puts("");                                                                \
     }                                                                          \
   }

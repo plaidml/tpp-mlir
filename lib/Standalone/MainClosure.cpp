@@ -35,7 +35,7 @@ struct MainClosure : public MainClosureBase<MainClosure> {
         continue;
       if (main.getArgAttr(argument.getArgNumber(), "stdx.res"))
         closureRes = argument;
-      else 
+      else
         closureArgs.push_back(argument);
     }
 
@@ -53,7 +53,7 @@ struct MainClosure : public MainClosureBase<MainClosure> {
         ImplicitLocOpBuilder::atBlockBegin(main.getLoc(), &main.front());
     stdx::ClosureOp closure =
         builder.create<stdx::ClosureOp>(closureRes, closureArgs);
- 
+
     // Map closure region arguments with the main arguments.
     BlockAndValueMapping mapper;
     mapper.map(closureArgs, closure.getRegion().getArguments());

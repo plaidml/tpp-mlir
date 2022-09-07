@@ -226,8 +226,8 @@ static void printOperands(OpAsmPrinter &printer, ValueRange inputs,
   assert(outputs.size() == 1 && "expect single output");
   Value input = inputs[0];
   Value output = outputs[0];
-  printer << " ins(" << input << " : " << input.getType() << ", " << AffineMapAttr::get(inputMap)
-          << ")";
+  printer << " ins(" << input << " : " << input.getType() << ", "
+          << AffineMapAttr::get(inputMap) << ")";
   printer << " outs(" << output << " : " << output.getType() << ", "
           << AffineMapAttr::get(outputMap) << ")";
 }
