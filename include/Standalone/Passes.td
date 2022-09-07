@@ -205,9 +205,4 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   }];
 }
 
-def CollapseAdjacentDims : Pass<"collapse-adjacent-dims", "func::FuncOp"> {
-  let summary = "Collapse adjacent dimensions in a linalg.generic - WIP";
-  let constructor = "mlir::tpp::createCollapseAdjacentDimsPass()";
-}
-
 #endif // STANDALONE_DIALECT_TPP_PASSES

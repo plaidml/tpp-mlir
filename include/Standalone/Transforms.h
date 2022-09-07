@@ -30,10 +30,5 @@ FailureOr<linalg::GenericOp>
 BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
 
-// Attempt to collapse the dimensions in 'pos'.
-FailureOr<linalg::GenericOp>
-CollapseDimsAtPosForOperand(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                            OpOperand *operand, ArrayRef<bool> whichDims);
-
 } // namespace tpp
 } // namespace mlir

@@ -30,7 +30,6 @@ add_mlir_dialect_library(MLIRStandalone
 
         # Utils
         TransformUtils.cpp
-        CollapseDimsAtPos.cpp   
  
         # Conversions
         ConvertTppToVector.cpp  
