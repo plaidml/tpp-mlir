@@ -1,8 +1,10 @@
-// TODO: standalone-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | \
-// TODO: mlir-cpu-runner \
-// TODO:  -e entry -entry-point-result=void  \
-// TODO: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
-// TODO: FileCheck %s
+// UNSUPPORTED: !x86_64
+
+// RUN: standalone-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | \
+// RUN: mlir-cpu-runner \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
+// RUN: FileCheck %s
 //
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
