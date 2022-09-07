@@ -814,8 +814,8 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
 void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
   // This is for GEMM
-  // patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
-  //                 InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+  patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
+                   InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
 
   // clang-format off
   // This is for BRGEMM
@@ -826,9 +826,9 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
   // [*][* ][P + Q][k] = [*][* ][H + W][c] * [* ][* ][c][k] // GEMM with c as red.
   // [*][* ][P + Q][k] = [*][C'][H + W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
   // clang-format on
-  patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
-                  InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
-      patterns.getContext());
+  //patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
+  //                InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
+  //    patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
