@@ -7,10 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 namespace mlir {
 
 class OpBuilder;
+struct Range;
+class RewriterBase;
 
 namespace utils {
 
@@ -36,6 +39,12 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
                                  linalg::LinalgOp linalgOp, ValueRange ivs,
                                  ValueRange valuesToUse,
                                  unsigned desiredResultRank);
+
+// Return the loop range to materialize as loops from '0' to 'upTo'.
+// '0' is the outermost loop.
+FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
+                                                    linalg::LinalgOp linalgOp,
+                                                    unsigned upTo);
 
 } // namespace utils
 

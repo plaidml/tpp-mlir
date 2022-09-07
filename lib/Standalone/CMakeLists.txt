@@ -30,7 +30,7 @@ add_mlir_dialect_library(MLIRStandalone
 
         # Utils
         TransformUtils.cpp
-        
+ 
         # Conversions
         ConvertTppToVector.cpp  
         ConvertLinalgToTpp.cpp  

@@ -22,7 +22,8 @@ include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def Relayout : LinalgX_Op<"relayout", 
-          [LinalgStructuredInterface, 
+          [LinalgStructuredInterface,
+           DestinationStyleOpInterface, 
            DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
   let summary = "relayout from to block layout and back.";

@@ -1,15 +1,5 @@
 // RUN: standalone-opt %s -map-linalg-to-tpp -tile-consumer-and-fuse-producers="tile-sizes=32,32" -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck %s
 
-// FIXME: This test has a few remarks about wrong tile sizes, when transforming the RELU generic:
-// ../test/Standalone/mlp-fusion.mlir:24:10: remark: wrong tile sizes
-//     %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%output : tensor<128x512xf32>) {
-//          ^
-// ../test/Standalone/mlp-fusion.mlir:24:10: note: see current operation: %11 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"], library_call = "tpp.relu"} ins(%9 : tensor<32x32xf32>) outs(%10 : tensor<32x32xf32>) {
-// ^bb0(%arg8: f32, %arg9: f32):
-//   %13 = mathx.relu %arg8 : f32
-//   linalg.yield %13 : f32
-// } -> tensor<32x32xf32>
-
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>

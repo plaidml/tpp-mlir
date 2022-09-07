@@ -72,9 +72,11 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createMatmulToBlockLayout(int64_t blockingFactor = 0);
+createBlockMatmulLayout(int64_t blockingFactor = 0);
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
+// TODO: pass options for blocking.
+std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
 
 } // namespace tpp
 } // namespace mlir

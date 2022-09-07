@@ -57,6 +57,10 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
   return ivsResult;
 }
 
+// Return the 'desiredResultRank' innermost subtensor dimensions.
+// Example: sizes = {32, 64, 1, 23, 4} and desiredResultRank = 2.
+// Result is {23, 4}.
+// The method assumes the dimension to be statically known.
 static SmallVector<int64_t>
 getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
                              unsigned desiredResultRank) {
@@ -159,6 +163,26 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
     return failure();
   return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
                              valuesToUse, desiredResultRank);
+}
+
+FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
+                                                    linalg::LinalgOp linalgOp,
+                                                    unsigned upTo) {
+  if (linalgOp.hasDynamicShape())
+    return failure();
+  Location loc = linalgOp.getLoc();
+  SmallVector<OpFoldResult> allShapeSizes =
+      linalgOp.createFlatListOfOperandDims(rewriter, loc);
+  AffineMap map = linalgOp.getShapesToLoopsMap();
+  if (!map)
+    return failure();
+  SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
+      rewriter, loc, map, allShapeSizes);
+  SmallVector<Range> loopRanges;
+  for (unsigned idx = 0; idx < upTo; idx++)
+    loopRanges.push_back(
+        Range{rewriter.getIndexAttr(0), domain[idx], rewriter.getIndexAttr(1)});
+  return loopRanges;
 }
 
 } // namespace utils
