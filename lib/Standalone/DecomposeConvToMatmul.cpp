@@ -35,8 +35,7 @@ static bool hasStaticShape(Value image, Value filter, Value output) {
 }
 
 // return true if the conv has stride != 1.
-template <typename CONVOP>
-static bool hasStride(CONVOP convOp) {
+template <typename CONVOP> static bool hasStride(CONVOP convOp) {
   if (DenseIntElementsAttr strides = convOp.strides()) {
     auto values = strides.getValues<APInt>();
     if (llvm::any_of(values, [](const APInt &value) {
@@ -49,8 +48,7 @@ static bool hasStride(CONVOP convOp) {
 }
 
 // return true if the conv has dilation != 1.
-template <typename CONVOP>
-static bool hasDilation(CONVOP convOp) {
+template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
   if (DenseIntElementsAttr dilations = convOp.dilations()) {
     auto values = dilations.getValues<APInt>();
     if (llvm::any_of(values, [](const APInt &value) {
@@ -812,13 +810,9 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 }
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
-void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
-  // This is for GEMM
-  patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
-                   InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
-
+void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns,
+                                               bool enableBrgemm) {
   // clang-format off
-  // This is for BRGEMM
   // init: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
   // blocking: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
   // if (R = S = 1) -> [P + Q] == [H + W]
@@ -826,9 +820,16 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
   // [*][* ][P + Q][k] = [*][* ][H + W][c] * [* ][* ][c][k] // GEMM with c as red.
   // [*][* ][P + Q][k] = [*][C'][H + W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
   // clang-format on
-  //patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
-  //                InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
-  //    patterns.getContext());
+
+  // This is for GEMM
+  if (!enableBrgemm)
+    patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
+                    InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+  // this is for BRGEMM
+  else
+    patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
+                    InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
+        patterns.getContext());
 }
 
 struct DecomposeConvToMatmul
@@ -840,7 +841,7 @@ struct DecomposeConvToMatmul
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     populateConv2DNhwcHwcfOpDecomposePatterns(patterns);
-    populateconv2DNchwFchwOpDecomposePatterns(patterns);
+    populateconv2DNchwFchwOpDecomposePatterns(patterns, enableBrgemm);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
