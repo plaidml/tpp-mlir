@@ -51,10 +51,7 @@ module {
        : (tensor<4x8xbf16>, tensor<8x4xbf16>, tensor<4x4xbf16>) -> tensor<4x4xbf16>
 
     //
-    // CHECK:    ( ( 388, 426, 462, 500),
-    // CHECK-SAME: ( 396, 434, 472, 510 ),
-    // CHECK-SAME: ( 406, 444, 484, 520 ),
-    // CHECK-SAME: ( 414, 454, 492, 532 ) )
+    // CHECK:( ( 388, 426, 462, 500 ), ( 396, 434, 472, 510 ), ( 406, 444, 484, 520 ), ( 414, 454, 492, 532 ) )
     //
      %d1 = arith.constant -1.0 : bf16
      %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xbf16>, vector<4x4xbf16> 
