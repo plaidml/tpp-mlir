@@ -24,14 +24,14 @@ module {
     %c0 = arith.constant 0 : index
     %d1 = arith.constant -1.0 : f32
     
-    // Initialize various matrices, dense for stress testing,
-    // and sparse to verify correct nonzero structure.
+    // Initialize various matrices.
     %da = arith.constant dense<[[
         [ 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1 ],
         [ 1.2, 2.2, 3.2, 4.2, 5.2, 6.2, 7.2, 8.2 ],
         [ 1.3, 2.3, 3.3, 4.3, 5.3, 6.3, 7.3, 8.3 ],
         [ 1.4, 2.4, 3.4, 4.4, 5.4, 6.4, 7.4, 8.4 ]
     ]]> : tensor<1x4x8xf32>
+
     %db = arith.constant dense<[[
         [ 10.1, 11.1, 12.1, 13.1 ],
         [ 10.2, 11.2, 12.2, 13.2 ],
