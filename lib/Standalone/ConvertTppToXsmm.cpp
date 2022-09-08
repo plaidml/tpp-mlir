@@ -67,8 +67,17 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
         matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
-    Value dispatched =
-        rewriter.create<xsmm::TernaryDispatchOp>(loc, integer64, attr, dims);
+    xsmm::DataTypeAttr dtype;
+    if (memrefC.getElementType().isBF16())
+      dtype =
+          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
+    else {
+      assert(memrefC.getElementType().isF32());
+      dtype =
+          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
+    }
+    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
+        loc, integer64, attr, dims, dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -115,8 +124,18 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
         brgemmOp.getContext(), xsmm::TernaryKind::BRGEMM);
-    Value dispatched =
-        rewriter.create<xsmm::TernaryDispatchOp>(loc, integer64, attr, dims);
+    xsmm::DataTypeAttr dtype;
+    if (memrefC.getElementType().isBF16())
+      dtype =
+          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
+    else {
+      assert(memrefC.getElementType().isF32());
+      dtype =
+          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
+    }
+
+    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
+        loc, integer64, attr, dims, dtype);
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, b));
     SmallVector<Value, 6> invokeOperands;

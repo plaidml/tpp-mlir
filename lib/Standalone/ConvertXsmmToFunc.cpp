@@ -14,7 +14,6 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 using namespace mlir;
 using namespace mlir::xsmm;
 
@@ -65,6 +64,12 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, PatternRewriter &rewriter) {
   funcName = "xsmm_" + funcName + "_invoke";
+  if (op->getOperand(1)
+          .getType()
+          .cast<MemRefType>()
+          .getElementType()
+          .isBF16())
+    funcName = funcName + "_bf16";
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
 
   ModuleOp module = op->getParentOfType<ModuleOp>();
@@ -179,7 +184,12 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
+    std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
     kindAsString = "xsmm_" + kindAsString + "_dispatch";
+    if (typeAsString == "bf16")
+      kindAsString = kindAsString + "_bf16";
+    else
+      assert(typeAsString == "f32");
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
