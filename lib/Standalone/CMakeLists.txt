@@ -24,7 +24,7 @@ add_mlir_dialect_library(MLIRStandalone
         UndoMainClosure.cpp
         Bufferization.cpp
         TileConsumerAndFuseProducers.cpp
-        DecomposeConvToMatmul.cpp
+        DecomposeConvToMatmulOrBrgemm.cpp
         ToBlockLayoutAndBack.cpp
         MapToBatchReduceGEMM.cpp
 

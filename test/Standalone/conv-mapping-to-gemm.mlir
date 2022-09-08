@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -split-input-file -decompose-conv-to-matmul | FileCheck %s
+// RUN: standalone-opt %s -split-input-file -decompose-conv-to-matmul-or-brgemm | FileCheck %s
 
 func.func @conv(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
   // CHECK: linalg.matmul

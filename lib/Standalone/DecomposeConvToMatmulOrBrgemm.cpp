@@ -832,10 +832,10 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns,
         patterns.getContext());
 }
 
-struct DecomposeConvToMatmul
-    : public DecomposeConvToMatmulBase<DecomposeConvToMatmul> {
-  DecomposeConvToMatmul() = default;
-  DecomposeConvToMatmul(bool enableBrgemm) {
+struct DecomposeConvToMatmulOrBrgemm
+    : public DecomposeConvToMatmulOrBrgemmBase<DecomposeConvToMatmulOrBrgemm> {
+  DecomposeConvToMatmulOrBrgemm() = default;
+  DecomposeConvToMatmulOrBrgemm(bool enableBrgemm) {
     this->enableBrgemm = enableBrgemm;
   }
   void runOnOperation() override {
@@ -850,6 +850,6 @@ struct DecomposeConvToMatmul
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createDecomposeConvToMatmulPass() {
-  return std::make_unique<DecomposeConvToMatmul>();
+mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass() {
+  return std::make_unique<DecomposeConvToMatmulOrBrgemm>();
 }

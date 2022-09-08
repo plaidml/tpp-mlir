@@ -70,7 +70,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createDecomposeConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockMatmulLayout();
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
