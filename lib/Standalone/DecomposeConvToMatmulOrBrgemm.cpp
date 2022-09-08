@@ -60,6 +60,8 @@ template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
+// Check dimension at index 'i' and 'j'. If both are '1' return true
+// otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
                                        unsigned j) {
   ShapedType filterType = filter->get().getType().cast<ShapedType>();
@@ -196,21 +198,12 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     // peel-out N, P, R, S and map Q, K and C to GEMM.
-    Location loc = genericOp.getLoc();
-    SmallVector<OpFoldResult> allShapeSizes =
-        cast<linalg::LinalgOp>(genericOp.getOperation())
-            .createFlatListOfOperandDims(rewriter, loc);
-    AffineMap map = genericOp.getShapesToLoopsMap();
-    if (!map)
+    unsigned upTo = genericOp.getNumLoops() - /*GEMM loops=*/3;
+    FailureOr<SmallVector<Range>> maybeLoopRanges =
+        mlir::utils::getLoopsToMaterialize(rewriter, genericOp, upTo);
+    if (failed(maybeLoopRanges))
       return failure();
-
-    SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
-        rewriter, loc, map, allShapeSizes);
-    SmallVector<Range> loopRanges;
-    unsigned outerLoops = 3;
-    for (unsigned idx = 0, e = domain.size() - outerLoops; idx < e; idx++)
-      loopRanges.push_back(Range{rewriter.getIndexAttr(0), domain[idx],
-                                 rewriter.getIndexAttr(1)});
+    SmallVector<Range> loopRanges = *maybeLoopRanges;
 
     SmallVector<Value, 4> ivs, tensorResults;
     auto gemmBuilder = [&](OpBuilder &builder, Location loc,
@@ -246,6 +239,7 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
       return scf::ValueVector(tensorResults.begin(), tensorResults.end());
     };
 
+    Location loc = genericOp.getLoc();
     linalg::GenerateLoopNest<scf::ForOp>::doit(
         rewriter, loc, loopRanges, genericOp, genericOp.getIteratorTypes(),
         gemmBuilder);
@@ -396,6 +390,8 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   }
 };
 
+// Interchange iterator in a linalg.generic marked as
+// 'tpp.BlockedConv2DNchwFchwOp' to expose a GEMM operation.
 struct InterchangeIteratorsConv2DNchwFchw
     : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -440,6 +436,9 @@ struct InterchangeIteratorsConv2DNchwFchw
   }
 };
 
+// Given a blocked convolution where the dimensions have been interchanged
+// to expose a GEMM. Materialize outer loops and map the three innermost
+// ones to a linalg.matmul operation.
 struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -546,7 +545,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
         rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
         linalgOp.getIteratorTypes(), gemmBuilder);
 
-    // see: `Tiling.cpp` in Linalg/Transforms
+    // See: `Tiling.cpp` in Linalg/Transforms.
     // Gather the newly created loops and return them with the new op.
     SmallVector<Operation *, 8> loops;
     loops.reserve(ivs.size());
