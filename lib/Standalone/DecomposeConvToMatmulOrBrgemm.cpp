@@ -73,6 +73,8 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
+// TODO: refactor code as the one in the blocked version
+// can unify?
 struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -469,6 +471,34 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
+  // Return the size of the image slice to extract and use into the GEMM
+  // operation. If we have a slide window (R and S are not 1). The size
+  // of the image slice depend on the filter and output.
+  SmallVector<OpFoldResult>
+  computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) const {
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
+    SmallVector<OpFoldResult> sizes;
+    sizes.reserve(rank);
+
+    // All other dimesions but the last two are not involved and we
+    // can simply use size of 1.
+    for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+
+    OpOperand *output = linalgOp.getOutputOperands()[0];
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    ArrayRef<int64_t> outputShape =
+        output->get().getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> filterShape =
+        filter->get().getType().cast<ShapedType>().getShape();
+    int64_t m = outputShape[outputShape.size() - 2];
+    int64_t k = filterShape[filterShape.size() - 2];
+    sizes.push_back(builder.getIndexAttr(m));
+    sizes.push_back(builder.getIndexAttr(k));
+    return sizes;
+  }
+
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -477,29 +507,42 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
     SmallVector<Value> slicedOperands;
-    for (OpOperand *operand : linalgOp.getInputOperands()) {
-      FailureOr<Value> maybeSliced = utils::getSliceOperand(
-          builder, operand, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
-      if (failed(maybeSliced))
-        return failure();
-      slicedOperands.push_back(*maybeSliced);
-    }
-    FailureOr<Value> maybeSliced = utils::getSliceOperand(
-        builder, linalgOp.getOutputOperands()[0], linalgOp, localIvs,
-        valuesToUse, /*GEMM dims=*/2);
-    if (failed(maybeSliced))
+
+    // Get the slice of the image to use in the GEMM operation.
+    // Keep into account sliding window when R and S on the filter
+    // are not 1.
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    FailureOr<Value> maybeSlicedImage =
+        (hasFilterWithRandSEqualOne(image, /*RPos=*/2, /*Spos=*/3))
+            ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
+                                     valuesToUse, /*GEMM dims=*/2)
+            : utils::getSliceOperand(
+                  builder, image, linalgOp, localIvs, valuesToUse,
+                  computeSizeGemmForImage(builder, linalgOp), /*GEMM dims=*/2);
+    if (failed(maybeSlicedImage))
       return failure();
-    slicedOperands.push_back(*maybeSliced);
+    slicedOperands.push_back(*maybeSlicedImage);
+
+    // Get slice on the filter and on the output.
+    OpOperand *filter = linalgOp.getInputOperands()[1];
+    FailureOr<Value> maybeSlicedFilter = utils::getSliceOperand(
+        builder, filter, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
+    if (failed(maybeSlicedFilter))
+      return failure();
+    slicedOperands.push_back(*maybeSlicedFilter);
+
+    OpOperand *out = linalgOp.getOutputOperands()[0];
+    FailureOr<Value> maybeSlicedOut = utils::getSliceOperand(
+        builder, out, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
+    if (failed(maybeSlicedOut))
+      return failure();
+    slicedOperands.push_back(*maybeSlicedOut);
     return slicedOperands;
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
-      return failure();
-
-    SmallVector<OpOperand *> inputOperands = linalgOp.getInputOperands();
-    if (!hasFilterWithRandSEqualOne(inputOperands[1], /*Rpos=*/2, /*Spos=*/3))
       return failure();
 
     // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.

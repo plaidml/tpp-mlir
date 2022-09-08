@@ -23,6 +23,7 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs);
 
+// TODO: kill me.
 // Extract and return a slice for operand using offsets, sizes, strides.
 Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                        Value operand, SmallVector<OpFoldResult> offsets,
@@ -38,6 +39,15 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
 FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
                                  linalg::LinalgOp linalgOp, ValueRange ivs,
                                  ValueRange valuesToUse,
+                                 unsigned desiredResultRank);
+
+// Same as above but with an addional 'sizes' as operand. This operand
+// is used to extract the size of the slice. Usefull when dealing with
+// sliding windows.
+FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                 linalg::LinalgOp linalgOp, ValueRange ivs,
+                                 ValueRange valuesToUse,
+                                 SmallVector<OpFoldResult> sizes,
                                  unsigned desiredResultRank);
 
 // Return the loop range to materialize as loops from '0' to 'upTo'.

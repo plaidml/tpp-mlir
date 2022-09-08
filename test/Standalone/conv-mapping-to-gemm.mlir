@@ -33,7 +33,7 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x3x3xf32>,
                 %o: tensor<14x1024x26x26xf32>) -> tensor<14x1024x26x26xf32> {
   // we currently do not support R != S != 1.
-  // CHECK-NOT: linalg.matmul
+  // CHECK: linalg.matmul
   %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x3x3xf32>) outs(%o: tensor<14x1024x26x26xf32>) -> tensor<14x1024x26x26xf32>
   return %0 : tensor<14x1024x26x26xf32>
 }

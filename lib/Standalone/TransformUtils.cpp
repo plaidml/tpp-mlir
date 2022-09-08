@@ -123,7 +123,8 @@ Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
 static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                  OpOperand *operand, ValueRange ivs,
                                  ValueRange valuesToUse,
-                                 unsigned desiredResultRank) {
+                                 unsigned desiredResultRank,
+                                 SmallVector<OpFoldResult> sizesToUse = {}) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
@@ -141,10 +142,13 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
 
   // sizes are 1 in [0 to rank - desiredResultRank)
   // and 'full' in [rank - desiredResultRank to rank).
-  for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
-    sizes.push_back(builder.getIndexAttr(1));
-  for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
-    sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+  if (sizesToUse.empty()) {
+    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+    for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+  } else
+    sizes = sizesToUse;
 
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
   return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
@@ -163,6 +167,21 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
     return failure();
   return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
                              valuesToUse, desiredResultRank);
+}
+
+FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
+                                 linalg::LinalgOp linalgOp, ValueRange ivs,
+                                 ValueRange valuesToUse,
+                                 SmallVector<OpFoldResult> sizes,
+                                 unsigned desiredResultRank) {
+  Location loc = linalgOp.getLoc();
+  FailureOr<SmallVector<Value>> involvedDimForOperand =
+      utils::getInvolvedLocalDimsForOperand(
+          builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+  if (failed(involvedDimForOperand))
+    return failure();
+  return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
+                             valuesToUse, desiredResultRank, sizes);
 }
 
 FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
