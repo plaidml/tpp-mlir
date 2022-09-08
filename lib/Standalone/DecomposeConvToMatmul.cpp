@@ -833,6 +833,10 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns) {
 
 struct DecomposeConvToMatmul
     : public DecomposeConvToMatmulBase<DecomposeConvToMatmul> {
+  DecomposeConvToMatmul() = default;
+  DecomposeConvToMatmul(bool enableBrgemm) {
+    this->enableBrgemm = enableBrgemm;
+  }
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     populateConv2DNhwcHwcfOpDecomposePatterns(patterns);

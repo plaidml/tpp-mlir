@@ -501,7 +501,7 @@ struct BlockConv2DNchwFchwLayout
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createBlockMatmulLayout(int64_t blockingFactor) {
+mlir::tpp::createBlockMatmulLayout() {
   return std::make_unique<BlockMatmulLayout>();
 }
 
