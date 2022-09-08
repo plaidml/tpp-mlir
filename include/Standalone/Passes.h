@@ -69,7 +69,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPreBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles = {});
+createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeConvToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockMatmulLayout();
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();

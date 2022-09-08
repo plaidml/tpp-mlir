@@ -212,6 +212,6 @@ struct TileConsumerAndFuseProducers
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tiles) {
-  return std::make_unique<TileConsumerAndFuseProducers>(tiles);
+mlir::tpp::createTileConsumerAndFuseProducersPass() {
+  return std::make_unique<TileConsumerAndFuseProducers>();
 }
