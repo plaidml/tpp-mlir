@@ -15,10 +15,9 @@
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
-extern "C" void _mlir_ciface_xsmm_matmul_invoke(int64_t funcAddr,
-                                                UnrankedMemRefType<float> *A,
-                                                UnrankedMemRefType<float> *B,
-                                                UnrankedMemRefType<float> *C) {
+extern "C" void _mlir_ciface_xsmm_matmul_invoke_f32(
+    int64_t funcAddr, UnrankedMemRefType<float> *A,
+    UnrankedMemRefType<float> *B, UnrankedMemRefType<float> *C) {
   /*   std::cout << "matrix A: \n";
      printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
      std::cout << "\n";
@@ -110,9 +109,10 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke_bf16(
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t m, int64_t n,
-                                                     int64_t k, int64_t lda,
-                                                     int64_t ldb, int64_t ldc) {
+extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch_f32(int64_t m, int64_t n,
+                                                         int64_t k, int64_t lda,
+                                                         int64_t ldb,
+                                                         int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -346,11 +346,9 @@ extern "C" void _mlir_ciface_matrix_copy_NC_to_NCNC(
   matrix_copy_NC_to_NCNC(addr_input, addr_output, 1, C, N, c, n);
 }
 
-extern "C" void _mlir_ciface_xsmm_brgemm_invoke(int64_t addr,
-                                                UnrankedMemRefType<float> *A,
-                                                UnrankedMemRefType<float> *B,
-                                                UnrankedMemRefType<float> *C,
-                                                int64_t numBatches) {
+extern "C" void _mlir_ciface_xsmm_brgemm_invoke_f32(
+    int64_t addr, UnrankedMemRefType<float> *A, UnrankedMemRefType<float> *B,
+    UnrankedMemRefType<float> *C, int64_t numBatches) {
   // std::cout << "numBatch: " << numBatches << "\n";
   // std::cout << "\n A: \n";
   // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
@@ -378,9 +376,10 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke(int64_t addr,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch(int64_t m, int64_t n,
-                                                     int64_t k, int64_t lda,
-                                                     int64_t ldb, int64_t ldc) {
+extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t m, int64_t n,
+                                                         int64_t k, int64_t lda,
+                                                         int64_t ldb,
+                                                         int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "lbd: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
