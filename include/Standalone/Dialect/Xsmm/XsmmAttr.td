@@ -10,6 +10,15 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 include "Standalone/Dialect/Xsmm/XsmmDialect.td"
 
+def Xsmm_DataType: I64EnumAttr<
+    "DataType", "",
+    [
+      I64EnumAttrCase<"BF16", 0, "bf16">,
+      I64EnumAttrCase<"F32",  1, "f32">
+    ]>{
+   let cppNamespace = "mlir::xsmm";
+}
+
 def Xsmm_TernaryKind : I64EnumAttr<
     "TernaryKind", "",
     [

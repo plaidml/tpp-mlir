@@ -115,7 +115,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[NoSideEffect]> {
     the pointer to call as I64.
   }];
   
-  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs);
+  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs, Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
