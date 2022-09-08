@@ -1,9 +1,9 @@
 // UNSUPPORTED: !x86_64
 
-// RUN: standalone-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | \
+// RUN: standalone-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
+// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 
@@ -11,7 +11,6 @@
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-
  func.func @matmultpp(%A: tensor<4x8xbf16>, 
           %B: tensor<8x4xbf16>, %C: tensor<4x4xbf16>) -> tensor<4x4xbf16> attributes {llvm.emit_c_interface} {
     %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
@@ -27,7 +26,6 @@ module {
 
   func.func @entry() {
     %c0 = arith.constant 0 : index
-    %d1 = arith.constant -1.0 : bf16
 
     // Initialize various matrices.
     %da = arith.constant dense<[
@@ -53,14 +51,16 @@ module {
        : (tensor<4x8xbf16>, tensor<8x4xbf16>, tensor<4x4xbf16>) -> tensor<4x4xbf16>
 
     //
-    // CHECK:    ( ( 388.76, 425.56, 462.36, 499.16 ),
-    // CHECK-SAME: ( 397.12, 434.72, 472.32, 509.92 ),
-    // CHECK-SAME: ( 405.48, 443.88, 482.28, 520.68 ),
-    // CHECK-SAME: ( 413.84, 453.04, 492.24, 531.44 ) )
+    // CHECK:    ( ( 388, 426, 462, 500),
+    // CHECK-SAME: ( 396, 434, 472, 510 ),
+    // CHECK-SAME: ( 406, 444, 484, 520 ),
+    // CHECK-SAME: ( 414, 454, 492, 532 ) )
     //
-    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xbf16>, vector<4x4xbf16>
-    vector.print %v0 : vector<4x4xbf16>
+     %d1 = arith.constant -1.0 : bf16
+     %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xbf16>, vector<4x4xbf16> 
+     %f1 = arith.extf %v0: vector<4x4xbf16> to vector<4x4xf32>
+     vector.print %f1 : vector<4x4xf32>
 
     return
   }
-}    
+}

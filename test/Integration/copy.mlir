@@ -86,8 +86,7 @@ module {
     %c0 = arith.constant 0 : index
     %d1 = arith.constant -1.0 : f32
 
-    // Initialize various matrices, dense for stress testing,
-    // and sparse to verify correct nonzero structure.
+    // Initialize various matrices.
     %da = arith.constant dense<[
         [ 1.1, 2.1, 3.1, 4.1, 5.1, 6.1 ],
         [ 1.2, 2.2, 3.2, 4.2, 5.2, 6.2 ],
