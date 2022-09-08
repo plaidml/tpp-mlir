@@ -1,3 +1,5 @@
+// UNSUPPORTED: !x86_64
+
 // RUN: standalone-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
@@ -10,7 +12,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
  func.func @matmultpp(%A: tensor<4x8xbf16>, 
-          %B: tensor<4x4xtuple<bf16,bf16>>, %C: tensor<4x4xbf16>) -> tensor<4x4xbf16> attributes {llvm.emit_c_interface} {
+          %B: tensor<8x4xbf16>, %C: tensor<4x4xbf16>) -> tensor<4x4xbf16> attributes {llvm.emit_c_interface} {
     %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
                          iterator_types = ["parallel", "parallel", "reduction"]} 
     ins(%A, %B: tensor<4x8xbf16>, tensor<8x4xbf16>) outs(%C: tensor<4x4xbf16>) {

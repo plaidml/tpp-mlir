@@ -115,11 +115,12 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[NoSideEffect]> {
     the pointer to call as I64.
   }];
   
-  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs, Xsmm_DataType:$dataType);
+  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs, 
+                       Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs attr-dict 
+    $kind $inputs `(` `dataType` $dataType `)` attr-dict 
   }]; 
 }
 
@@ -138,7 +139,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[NoSideEffect]> {
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` $flags `)` attr-dict 
+    $kind $inputs `(` `broadcast` $flags `)` attr-dict 
   }]; 
 }
 
@@ -157,7 +158,7 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` $flags `)` attr-dict 
+    $kind $inputs `(` `broadcast` $flags `)` attr-dict 
   }]; 
 }
 

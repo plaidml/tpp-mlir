@@ -64,12 +64,6 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, PatternRewriter &rewriter) {
   funcName = "xsmm_" + funcName + "_invoke";
-  if (op->getOperand(1)
-          .getType()
-          .cast<MemRefType>()
-          .getElementType()
-          .isBF16())
-    funcName = funcName + "_bf16";
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
 
   ModuleOp module = op->getParentOfType<ModuleOp>();

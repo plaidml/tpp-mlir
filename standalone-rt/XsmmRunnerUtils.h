@@ -15,6 +15,7 @@
 #ifndef STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H
 #define STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H
 
+#include "mlir/ExecutionEngine/Float16bits.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 // TODO: here we want to have dispatch/invoke only for unary/binary and ternary.

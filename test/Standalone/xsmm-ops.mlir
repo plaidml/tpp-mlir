@@ -18,13 +18,13 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
     : (memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.ternary.dispatch
-  xsmm.ternary.dispatch matmul [3, 2, 1]
+  xsmm.ternary.dispatch matmul [3, 2, 1] (dataType f32)
 
   // CHECK: xsmm.binary.dispatch
-  xsmm.binary.dispatch add [3, 2, 1] (none)
+  xsmm.binary.dispatch add [3, 2, 1] (broadcast none)
 
   // CHECK: xsmm.unary.dispatch
-  xsmm.unary.dispatch identity [3, 2, 1] (bcast_row)
+  xsmm.unary.dispatch identity [3, 2, 1] (broadcast row)
 
   return %arg2: memref<2x2xf32>
 }
