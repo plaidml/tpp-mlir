@@ -84,11 +84,11 @@ getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
   return targetShape;
 }
 
-Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                       Value operand, SmallVector<OpFoldResult> offsets,
-                       SmallVector<OpFoldResult> sizes,
-                       SmallVector<OpFoldResult> strides,
-                       unsigned desiredResultRank) {
+static Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                             Value operand, SmallVector<OpFoldResult> offsets,
+                             SmallVector<OpFoldResult> sizes,
+                             SmallVector<OpFoldResult> strides,
+                             unsigned desiredResultRank) {
   ShapedType operandType = operand.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
   size_t rank = operandType.getRank();
@@ -151,8 +151,8 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
     sizes = sizesToUse;
 
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
-  return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
-                                 sizes, strides, desiredResultRank);
+  return utils::getSliceOperand(builder, linalgOp, operandToUse, offsets, sizes,
+                                strides, desiredResultRank);
 }
 
 FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,

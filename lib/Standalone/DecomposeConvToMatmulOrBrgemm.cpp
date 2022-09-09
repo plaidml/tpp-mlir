@@ -60,6 +60,34 @@ template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
+// Return the size of the image slice to extract and use into the GEMM
+// operation. If we have a slide window (R and S are not 1). The size
+// of the image slice depend on the filter and output.
+static SmallVector<OpFoldResult>
+computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
+  OpOperand *image = linalgOp.getInputOperands()[0];
+  unsigned rank = image->get().getType().cast<ShapedType>().getRank();
+  SmallVector<OpFoldResult> sizes;
+  sizes.reserve(rank);
+
+  // All other dimesions but the last two are not involved and we
+  // can simply use size of 1.
+  for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
+    sizes.push_back(builder.getIndexAttr(1));
+
+  OpOperand *output = linalgOp.getOutputOperands()[0];
+  OpOperand *filter = linalgOp.getInputOperands()[1];
+  ArrayRef<int64_t> outputShape =
+      output->get().getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> filterShape =
+      filter->get().getType().cast<ShapedType>().getShape();
+  int64_t m = outputShape[outputShape.size() - 2];
+  int64_t k = filterShape[filterShape.size() - 2];
+  sizes.push_back(builder.getIndexAttr(m));
+  sizes.push_back(builder.getIndexAttr(k));
+  return sizes;
+}
+
 // Check dimension at index 'i' and 'j'. If both are '1' return true
 // otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
@@ -93,69 +121,6 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
     return match;
   }
 
-  SmallVector<int64_t> computeGemmSizeFrom(OpOperand *filter,
-                                           OpOperand *output) const {
-    ShapedType filterType = filter->get().getType().cast<ShapedType>();
-    ShapedType outputType = output->get().getType().cast<ShapedType>();
-    assert(filterType.getRank() == 4);
-    assert(outputType.getRank() == 4);
-    return SmallVector<int64_t>{outputType.getShape()[2],
-                                filterType.getShape()[2]};
-  }
-
-  SmallVector<OpFoldResult> getSizesForImage(OpBuilder &builder,
-                                             linalg::LinalgOp linalgOp,
-                                             unsigned desiredResultRank) const {
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    ShapedType operandType = image->get().getType().cast<ShapedType>();
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    OpOperand *output = linalgOp.getOutputOperands()[0];
-    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
-    SmallVector<OpFoldResult> sizes;
-    sizes.reserve(rank);
-
-    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
-      sizes.push_back(builder.getIndexAttr(1));
-    if (!hasFilterWithRandSEqualOne(filter, /*Rpos=*/0, /*Spos=*/1)) {
-      SmallVector<int64_t> gemmSizes = computeGemmSizeFrom(filter, output);
-      for (int64_t s : gemmSizes)
-        sizes.push_back(builder.getIndexAttr(s));
-    } else {
-      for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
-        sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
-    }
-    return sizes;
-  }
-
-  FailureOr<Value> getSlicedImg(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                                ValueRange ivs, ValueRange valuesToUse) const {
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
-    Location loc = linalgOp.getLoc();
-    FailureOr<SmallVector<Value>> ivsImage =
-        utils::getInvolvedLocalDimsForOperand(
-            builder, loc, image, linalgOp.getTiedIndexingMap(image), ivs);
-    if (failed(ivsImage))
-      return failure();
-
-    ivs = *ivsImage;
-    SmallVector<OpFoldResult> offsets;
-
-    // offset into the tensor is the induction var or 0.
-    for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
-      offsets.push_back(ivs[idx]);
-    for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
-      offsets.push_back(builder.getIndexAttr(0));
-
-    unsigned desiredResultRank = 2;
-    SmallVector<OpFoldResult> sizes =
-        getSizesForImage(builder, linalgOp, desiredResultRank);
-    SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
-    Value operandToUse = valuesToUse[image->getOperandNumber()];
-    return utils::getSlicedOperand(builder, linalgOp, operandToUse, offsets,
-                                   sizes, strides, desiredResultRank);
-  }
-
   FailureOr<SmallVector<Value>>
   getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                     linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
@@ -163,14 +128,20 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
            "expect 3 input/output operands");
     assert(linalgOp.getInputOperands().size() == 2 &&
            "expect 2 input operands");
-
     SmallVector<Value> slicedOperands;
 
-    FailureOr<Value> slicedImg =
-        getSlicedImg(builder, linalgOp, localIvs, valuesToUse);
-    if (failed(slicedImg))
+    OpOperand *image = linalgOp.getInputOperands()[0];
+    FailureOr<Value> slicedImage =
+        (hasFilterWithRandSEqualOne(image, /*RPos=*/0, /*SPos=*/1))
+            ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
+                                     valuesToUse, /*GEMM dims=*/2)
+            : utils::getSliceOperand(
+                  builder, image, linalgOp, localIvs, valuesToUse,
+                  computeSizeGemmForImage(builder, linalgOp), /*GEMM dims=*/2);
+
+    if (failed(slicedImage))
       return failure();
-    slicedOperands.push_back(*slicedImg);
+    slicedOperands.push_back(*slicedImage);
 
     OpOperand *filter = linalgOp.getInputOperands()[1];
     FailureOr<Value> slicedFilter = utils::getSliceOperand(
@@ -469,34 +440,6 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     if (!hasInterchangedDims(linalgOp))
       return failure();
     return success();
-  }
-
-  // Return the size of the image slice to extract and use into the GEMM
-  // operation. If we have a slide window (R and S are not 1). The size
-  // of the image slice depend on the filter and output.
-  SmallVector<OpFoldResult>
-  computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) const {
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    unsigned rank = image->get().getType().cast<ShapedType>().getRank();
-    SmallVector<OpFoldResult> sizes;
-    sizes.reserve(rank);
-
-    // All other dimesions but the last two are not involved and we
-    // can simply use size of 1.
-    for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
-      sizes.push_back(builder.getIndexAttr(1));
-
-    OpOperand *output = linalgOp.getOutputOperands()[0];
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    ArrayRef<int64_t> outputShape =
-        output->get().getType().cast<ShapedType>().getShape();
-    ArrayRef<int64_t> filterShape =
-        filter->get().getType().cast<ShapedType>().getShape();
-    int64_t m = outputShape[outputShape.size() - 2];
-    int64_t k = filterShape[filterShape.size() - 2];
-    sizes.push_back(builder.getIndexAttr(m));
-    sizes.push_back(builder.getIndexAttr(k));
-    return sizes;
   }
 
   FailureOr<SmallVector<Value>>

@@ -23,14 +23,6 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
                                OpOperand *operand, AffineMap mapOperand,
                                ValueRange localIvs);
 
-// TODO: kill me.
-// Extract and return a slice for operand using offsets, sizes, strides.
-Value getSlicedOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                       Value operand, SmallVector<OpFoldResult> offsets,
-                       SmallVector<OpFoldResult> sizes,
-                       SmallVector<OpFoldResult> strides,
-                       unsigned desiredResultRank);
-
 // Extract and return a slice for operand. Offsets are the induction variable
 // touched by the operand. Sizes are: '1' in [0 to rank - desiredResultRank]
 // while the full chunk in [rank - desiredResultRank to rank). Strides are
