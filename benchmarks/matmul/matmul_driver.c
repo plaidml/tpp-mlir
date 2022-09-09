@@ -40,7 +40,7 @@ void init_matrix(struct vec_f2d *matrix) {
   }
 }
 
-/* Clear matrix (aka fill with zeros */
+/* Clear matrix (aka fill with zeros) */
 void clear_matrix(struct vec_f2d *matrix) {
   const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
   for (int64_t mi = 0; mi < m; ++mi) {

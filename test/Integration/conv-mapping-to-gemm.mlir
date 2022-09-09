@@ -12,6 +12,8 @@
 // RUN: FileCheck --check-prefixes=CHECK-NOOPT %s
 //
 
+// TODO: we probably miss a pass and we abuse sparse-compiler to lower.
+
 module {
 
   func.func @conv(%img: tensor<1x4x4x3xi64>, %filt: tensor<2x2x3x8xi64>,
