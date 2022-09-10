@@ -28,10 +28,8 @@ static bool hasStaticShape(Value image, Value filter, Value output) {
   ShapedType imageType = image.getType().cast<ShapedType>();
   ShapedType filterType = filter.getType().cast<ShapedType>();
   ShapedType outputType = output.getType().cast<ShapedType>();
-  if ((!imageType.hasStaticShape()) || (!filterType.hasStaticShape()) ||
-      (!outputType.hasStaticShape()))
-    return false;
-  return true;
+  return !((!imageType.hasStaticShape()) || (!filterType.hasStaticShape()) ||
+           (!outputType.hasStaticShape()));
 }
 
 // return true if the conv has stride != 1.

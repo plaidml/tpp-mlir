@@ -33,9 +33,7 @@ static bool isStaticRange(Range loopRange) {
   if (!sizeAsInt)
     return false;
   Optional<int64_t> strideAsInt = getConstantIntValue(loopRange.stride);
-  if (!strideAsInt)
-    return false;
-  return true;
+  return static_cast<bool>(strideAsInt);
 }
 
 static int64_t getSizeRange(Range loopRange) {

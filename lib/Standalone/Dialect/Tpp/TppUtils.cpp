@@ -92,7 +92,7 @@ bool hasMatmulBody(linalg::LinalgOp linalgOp) {
 }
 
 bool hasStaticShape(linalg::LinalgOp linalgOp) {
-  return linalgOp.hasDynamicShape() != true;
+  return !linalgOp.hasDynamicShape();
 }
 
 bool hasTppMark(linalg::LinalgOp linalgOp) {

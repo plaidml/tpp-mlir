@@ -49,9 +49,7 @@ static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
 
 // Check if the operand is an input to linalgOp.
 static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand *operand) {
-  if (operand->getOperandNumber() < linalgOp.getNumInputs())
-    return true;
-  return false;
+  return operand->getOperandNumber() < linalgOp.getNumInputs();
 }
 
 // Check if the operand is an output to linalgOp.
