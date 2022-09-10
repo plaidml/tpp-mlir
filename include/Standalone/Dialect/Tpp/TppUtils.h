@@ -28,7 +28,7 @@ bool hasStaticShape(linalg::LinalgOp linalgOp);
 bool hasTppMark(linalg::LinalgOp linalgOp);
 
 // Return true if the linalg operation is marked with 'target'.
-bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target);
+bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
 // Return true if the linalg operation has a Matmul region.
 bool hasMatmulBody(linalg::LinalgOp linalgOp);

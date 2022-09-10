@@ -109,7 +109,7 @@ bool hasTppMark(linalg::LinalgOp linalgOp) {
   return prefix.compare("tpp") == 0;
 }
 
-bool isMarkedWithTpp(linalg::LinalgOp linalgOp, std::string target) {
+bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
   if (!hasTppMark(linalgOp))
     return false;
   std::string libraryCall = linalgOp.getLibraryCallName();

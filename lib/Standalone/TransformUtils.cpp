@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <utility>
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -85,9 +87,10 @@ getExpectedResultMemRefShape(SmallVector<OpFoldResult> sizes,
 }
 
 static Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                             Value operand, SmallVector<OpFoldResult> offsets,
-                             SmallVector<OpFoldResult> sizes,
-                             SmallVector<OpFoldResult> strides,
+                             Value operand,
+                             const SmallVector<OpFoldResult> &offsets,
+                             const SmallVector<OpFoldResult> &sizes,
+                             const SmallVector<OpFoldResult> &strides,
                              unsigned desiredResultRank) {
   ShapedType operandType = operand.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
@@ -120,11 +123,11 @@ static Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
   return extractOperation->getResult(0);
 }
 
-static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                                 OpOperand *operand, ValueRange ivs,
-                                 ValueRange valuesToUse,
-                                 unsigned desiredResultRank,
-                                 SmallVector<OpFoldResult> sizesToUse = {}) {
+static Value
+getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                    OpOperand *operand, ValueRange ivs, ValueRange valuesToUse,
+                    unsigned desiredResultRank,
+                    const SmallVector<OpFoldResult> &sizesToUse = {}) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   assert(operandType.hasStaticShape() && "tensor must have static shape");
@@ -181,7 +184,7 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
   if (failed(involvedDimForOperand))
     return failure();
   return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
-                             valuesToUse, desiredResultRank, sizes);
+                             valuesToUse, desiredResultRank, std::move(sizes));
 }
 
 FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
