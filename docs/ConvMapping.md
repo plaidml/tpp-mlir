@@ -1,4 +1,4 @@
-Mapping convolution to BRGEMM or GEMM.
+**Mapping convolution to BRGEMM or GEMM**
 
 Convolution: linalg.Conv2DNchwFchwOp
 
