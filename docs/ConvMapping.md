@@ -47,6 +47,13 @@ scf.for %N = %c0 to %c14 step %c1 {
 ```
 
 We can already see a GEMM, with m = %Q, n = %k and k = %c
+        %Q  %c     %c  %k      %Q  %k
+GEMM = [28][32] * [32][32] -> [28][32]
+
+You can also collapse %P and %Q together:
+
+GEMM = [784][32] * [32][32] -> [784][32]
+
 
 Loop interchange to expose the GEMM iterators:
 
@@ -63,8 +70,8 @@ scf.for %N = %c0 to %c14 step %c1 {
                                 scf.for %c = %c0 to %c32 step %c1 {
                                     %3 = affine.apply #map1(%P, %R) // H
                                     %4 = affine.apply #map1(%Q, %S) // W
-                                    %5 = memref.load %0[%N, *%C*, %3, %4, %c] : memref<14x16x28x28x32xf32>
-                                    %6 = memref.load %1[%K, *%C*, %R, %S, %c, %k] : memref<32x16x1x1x32x32xf32>
+                                    %5 = memref.load %0[%N, %C, %3, %4, %c] : memref<14x16x28x28x32xf32>
+                                    %6 = memref.load %1[%K, %C, %R, %S, %c, %k] : memref<32x16x1x1x32x32xf32>
                                     %7 = memref.load %2[%N, %K, %P, %Q, %k] : memref<14x32x28x28x32xf32>
                                     %8 = arith.mulf %5, %6 : f32
                                     %9 = arith.addf %7, %8 : f32
@@ -81,6 +88,6 @@ scf.for %N = %c0 to %c14 step %c1 {
 
 ```
 
-Mapping to BRGEMM requires collapsing = H and W, and P and Q. Then you can use *%C* as
+Mapping to BRGEMM requires collapsing = H and W, and P and Q. Then you can use %C as
 the BRGEMM dimension. Note that H = P + R and W = Q + S so H = P and W = Q when R =
 S = 1.
