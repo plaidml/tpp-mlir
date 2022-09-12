@@ -9,6 +9,8 @@
 
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
 #include "mlir/AsmParser/AsmParser.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
 
@@ -41,5 +43,31 @@ void BlockOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), {getStaticSizesAttrName()});
 }
 
+//===----------------------------------------------------------------------===//
+// Transform op registration
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class LinalgTransformDialectExtension
+    : public transform::TransformDialectExtension<
+          LinalgTransformDialectExtension> {
+public:
+  using Base::Base;
+
+  void init() {
+    registerTransformOps<
+#define GET_OP_LIST
+#include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp.inc"
+        >();
+  }
+};
+} // namespace
+
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp.inc"
+
+void mlir::linalgX::registerTransformDialectExtension(
+    DialectRegistry &registry) {
+  registry.addExtensions<LinalgTransformDialectExtension>();
+}
