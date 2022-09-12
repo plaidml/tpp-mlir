@@ -1,4 +1,4 @@
-// RUN: standalone-opt -test-transform-dialect-interpreter -split-input-file %s | FileCheck %s
+// RUN: standalone-opt -transform-dialect-interpreter -split-input-file %s | FileCheck %s
 
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):

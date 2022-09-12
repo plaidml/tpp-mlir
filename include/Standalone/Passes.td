@@ -206,4 +206,12 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   }];
 }
 
+def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
+  let summary = "Apply transform dialect operations one by one";
+  let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
+  let description = [{
+    Copy and paste from 'TestTransformDialectInterpreter.cpp'
+  }];
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES

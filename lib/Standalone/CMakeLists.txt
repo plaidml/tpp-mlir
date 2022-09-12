@@ -28,6 +28,7 @@ add_mlir_dialect_library(MLIRStandalone
         DecomposeConvToMatmulOrBrgemm.cpp
         ToBlockLayoutAndBack.cpp
         MapToBatchReduceGEMM.cpp
+        TransformDialectInterpreter.cpp
 
         # Utils
         TransformUtils.cpp
