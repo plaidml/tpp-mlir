@@ -21,13 +21,13 @@
 // TODO: here we want to have dispatch/invoke only for unary/binary and ternary.
 // matmul, brgemm are way too specific.
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_matmul_invoke(int64_t, UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *);
+_mlir_ciface_xsmm_matmul_invoke_f32(int64_t, UnrankedMemRefType<float> *,
+                                    UnrankedMemRefType<float> *,
+                                    UnrankedMemRefType<float> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_matmul_dispatch(int64_t, int64_t, int64_t,
-                                              int64_t, int64_t, int64_t);
+    int64_t _mlir_ciface_xsmm_matmul_dispatch_f32(int64_t, int64_t, int64_t,
+                                                  int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_matmul_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,

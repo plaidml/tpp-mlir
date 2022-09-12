@@ -63,7 +63,6 @@ static SmallVector<Value, 4> getMemRefOperands(OpBuilder &b, Location loc,
 
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, PatternRewriter &rewriter) {
-  funcName = "xsmm_" + funcName + "_invoke";
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
 
   ModuleOp module = op->getParentOfType<ModuleOp>();
@@ -96,9 +95,11 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    if (succeeded(buildInvokeCall(ternaryOp.getLoc(),
-                                  stringifyEnum(ternaryOp.getCallee()).str(),
-                                  ternaryOp, rewriter))) {
+    std::string funcName = "xsmm_" +
+                           stringifyEnum(ternaryOp.getCallee()).str() +
+                           "_invoke_" + ternaryOp.getOperandTypeAsString();
+    if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
+                                  rewriter))) {
       rewriter.eraseOp(ternaryOp);
       return success();
     }
@@ -115,9 +116,9 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // in MLIR (thus we need to change the function name from
     // "unary" to "unary_scalar"). We also don't want to convert
     // the scalar to a memref by using an alloc/alloca.
-    std::string funcName = "unary";
+    std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
-      funcName = "unary_scalar";
+      funcName = "xsmm_unary_scalar_invoke";
     if (succeeded(
             buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, rewriter))) {
       rewriter.eraseOp(unaryOp);
@@ -132,7 +133,7 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    std::string funcName = "binary";
+    std::string funcName = "xsmm_binary_invoke";
     if (succeeded(
             buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp, rewriter))) {
       rewriter.eraseOp(binaryOp);
@@ -179,11 +180,7 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
     std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch";
-    if (typeAsString == "bf16")
-      kindAsString = kindAsString + "_bf16";
-    else
-      assert(typeAsString == "f32");
+    kindAsString = "xsmm_" + kindAsString + "_dispatch_" + typeAsString;
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 

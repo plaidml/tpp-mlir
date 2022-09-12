@@ -46,6 +46,14 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
     }
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
+    std::string getOperandTypeAsString(){
+      auto operand = std::next(arg_operand_begin());
+      Type type = (*operand).getType().isa<MemRefType>()?(*operand).getType().cast<MemRefType>().getElementType(): (*operand).getType();
+      if(type.isBF16())
+        return "bf16";
+      assert(type.isF32() && "expect bf16 or f32");
+      return "f32";
+    }
   }];
 
   let hasVerifier = 1; 
