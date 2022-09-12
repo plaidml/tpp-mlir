@@ -210,7 +210,7 @@ def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleO
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
   let description = [{
-    Copy and paste from 'TestTransformDialectInterpreter.cpp'
+    Copy and paste from 'TestTransformDialectInterpreter.cpp'.
   }];
 }
 
