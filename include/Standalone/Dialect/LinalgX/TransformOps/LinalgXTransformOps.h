@@ -28,9 +28,9 @@ class LinalgOp;
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h.inc"
 
 namespace mlir {
-namespace linalgX {
+namespace linalgx {
 void registerTransformDialectExtension(DialectRegistry &registry);
-} // namespace linalgX
+} // namespace linalgx
 } // namespace mlir
 
 #endif // MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H

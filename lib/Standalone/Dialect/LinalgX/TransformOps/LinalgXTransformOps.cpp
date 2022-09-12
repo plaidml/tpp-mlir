@@ -43,6 +43,16 @@ void BlockOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), {getStaticSizesAttrName()});
 }
 
+void transform::BlockOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {}
+
+DiagnosedSilenceableFailure
+transform::BlockOp::apply(TransformResults &transformResults,
+                          TransformState &state) {
+
+  return DiagnosedSilenceableFailure::definiteFailure();
+}
+
 //===----------------------------------------------------------------------===//
 // Transform op registration
 //===----------------------------------------------------------------------===//
@@ -67,7 +77,7 @@ public:
 #define GET_OP_CLASSES
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp.inc"
 
-void mlir::linalgX::registerTransformDialectExtension(
+void mlir::linalgx::registerTransformDialectExtension(
     DialectRegistry &registry) {
   registry.addExtensions<LinalgTransformDialectExtension>();
 }
