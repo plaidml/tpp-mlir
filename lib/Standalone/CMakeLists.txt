@@ -11,6 +11,7 @@ add_mlir_dialect_library(MLIRStandalone
         Dialect/Xsmm/XsmmDialect.cpp
         Dialect/Xsmm/XsmmAttr.cpp
         Dialect/LinalgX/LinalgXOps.cpp
+        Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp
         Dialect/LinalgX/LinalgXDialect.cpp
         Dialect/LinalgX/BufferizableOpInterfaceImpl.cpp
        
@@ -44,6 +45,7 @@ add_mlir_dialect_library(MLIRStandalone
         DEPENDS
         TppCompilerPassIncGen
         MLIRXsmmAttrDefIncGen
+        MLIRLinalgXTransformOpsIncGen
 
 	LINK_LIBS PUBLIC
 	MLIRIR
