@@ -109,13 +109,13 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
     ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
     if (iteratorTypes.size() != 7)
       return false;
-    bool match = isParallelIterator(iteratorTypes[0]) &&
-                 isParallelIterator(iteratorTypes[1]) &&
-                 isReductionIterator(iteratorTypes[2]) &&
-                 isReductionIterator(iteratorTypes[3]) &&
-                 isParallelIterator(iteratorTypes[4]) &&
-                 isParallelIterator(iteratorTypes[5]) &&
-                 isReductionIterator(iteratorTypes[6]);
+    bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
+                 linalg::isParallelIterator(iteratorTypes[1]) &&
+                 linalg::isReductionIterator(iteratorTypes[2]) &&
+                 linalg::isReductionIterator(iteratorTypes[3]) &&
+                 linalg::isParallelIterator(iteratorTypes[4]) &&
+                 linalg::isParallelIterator(iteratorTypes[5]) &&
+                 linalg::isReductionIterator(iteratorTypes[6]);
     return match;
   }
 
@@ -417,15 +417,15 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
     if (iteratorTypes.size() != 9)
       return false;
-    bool match = isParallelIterator(iteratorTypes[0]) &&
-                 isParallelIterator(iteratorTypes[1]) &&
-                 isParallelIterator(iteratorTypes[2]) &&
-                 isReductionIterator(iteratorTypes[3]) &&
-                 isReductionIterator(iteratorTypes[4]) &&
-                 isReductionIterator(iteratorTypes[5]) &&
-                 isParallelIterator(iteratorTypes[6]) &&
-                 isParallelIterator(iteratorTypes[7]) &&
-                 isReductionIterator(iteratorTypes[8]);
+    bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
+                 linalg::isParallelIterator(iteratorTypes[1]) &&
+                 linalg::isParallelIterator(iteratorTypes[2]) &&
+                 linalg::isReductionIterator(iteratorTypes[3]) &&
+                 linalg::isReductionIterator(iteratorTypes[4]) &&
+                 linalg::isReductionIterator(iteratorTypes[5]) &&
+                 linalg::isParallelIterator(iteratorTypes[6]) &&
+                 linalg::isParallelIterator(iteratorTypes[7]) &&
+                 linalg::isReductionIterator(iteratorTypes[8]);
     return match;
   }
 
