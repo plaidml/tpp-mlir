@@ -1,4 +1,4 @@
-// RUN: standalone-opt -block-matmul-layout="block-factor=32" %s | FileCheck %s
+// RUN: standalone-opt -block-matmul-layout="block-factors=32,32" %s | FileCheck %s
 
 // CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1, d2, d3) -> (d0 * 32 + d2, d1 * 32 + d3)>
 // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>

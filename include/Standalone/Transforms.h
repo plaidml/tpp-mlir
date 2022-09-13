@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -16,19 +17,26 @@ class Value;
 namespace linalg {
 class GenericOp;
 class LinalgOp;
+class Conv2DNchwFchwOp;
+class MatmulOp;
 } // namespace linalg
 
+// TODO: rename namespace to linalgx
 namespace tpp {
 
 // Attempt to map the current linalgOp to a BRGEMM.
 // On success the returned values are the materialzed loops with BRGEMM inside.
-FailureOr<SmallVector<Value>> MapToBRGEMMOp(RewriterBase &rewriter,
+FailureOr<SmallVector<Value>> mapToBRGEMMOp(RewriterBase &rewriter,
                                             linalg::LinalgOp linalgOp);
 
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>
-BlockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
+
+FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,
+                                           linalg::MatmulOp linalgOp,
+                                           ArrayRef<int64_t> blockingFactors);
 
 } // namespace tpp
 } // namespace mlir

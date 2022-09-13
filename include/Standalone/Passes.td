@@ -177,8 +177,8 @@ def BlockMatmulLayout : Pass<"block-matmul-layout", "func::FuncOp"> {
     the Matmul has a relu operation as its consumer block also the relu operation.
   }];
   let options = [
-    Option<"blockingFactor", "block-factor", "int64_t", "0", 
-           "Blocking factor for relayout">
+    ListOption<"blockingFactors", "block-factors", "int64_t", 
+               "Blocking factor for relayout">
   ];
   let constructor = "mlir::tpp::createBlockMatmulLayout()";
 }
@@ -192,6 +192,10 @@ def BlockConv2DNchwFchwLayout : Pass<"block-conv2DNchwFchw-layout", "func::FuncO
     Block the filter's channels C and K with a factor of BC and BK.
     Block the output's channel K with a factor BK.
   }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for relayout">
+  ];
   let constructor = "mlir::tpp::createBlockConv2DNchwFchwLayout()";
 }
 

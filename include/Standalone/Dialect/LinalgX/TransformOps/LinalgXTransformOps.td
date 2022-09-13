@@ -26,18 +26,24 @@ def BlockEnumLayout : I32EnumAttr<"BlockEnumLayout", "enum for layout",
 }
 
 def BlockOp : Op<Transform_Dialect, "structured.blocking",
-              [DeclareOpInterfaceMethods<TransformOpInterface>,
-               DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+              [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+               TransformOpInterface, TransformEachOpTrait]> {
 
   let description = [{ test }];
 
   let arguments = (ins PDL_Operation:$target,
-                   Variadic<PDL_Operation>:$dynamic_sizes,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_sizes,
-                   ArrayAttr:$formats);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors);
   let results = (outs PDL_Operation:$blocked_linalg_op);
 
   let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target, 
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        TransformState &state);
+  }];
+
 }
 
 #endif // LINALG_TRANSFORM_OPS

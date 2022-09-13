@@ -7,7 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "Standalone/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -16,39 +18,66 @@
 using namespace mlir;
 using namespace mlir::transform;
 
+namespace {
+// A simple pattern rewriter that implements no special logic.
+class SimpleRewriter : public PatternRewriter {
+public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+} // namespace
+
 ParseResult transform::BlockOp::parse(OpAsmParser &parser,
                                       OperationState &result) {
 
   OpAsmParser::UnresolvedOperand target;
-  SmallVector<OpAsmParser::UnresolvedOperand> dynamicSizes;
-  ArrayAttr staticSizes;
-  auto pdlOperationType = pdl::OperationType::get(parser.getContext());
   if (parser.parseOperand(target) ||
-      parser.resolveOperand(target, pdlOperationType, result.operands) ||
-      parseDynamicIndexList(parser, dynamicSizes, staticSizes,
-                            ShapedType::kDynamicSize) ||
-      parser.resolveOperands(dynamicSizes, pdlOperationType, result.operands) ||
       parser.parseOptionalAttrDict(result.attributes))
-    return ParseResult::failure();
-
+    return failure();
+  auto pdlOperationType = pdl::OperationType::get(parser.getContext());
+  if (parser.resolveOperand(target, pdlOperationType, result.operands))
+    return failure();
   result.addTypes(pdlOperationType);
   return success();
 }
 
 void BlockOp::print(OpAsmPrinter &p) {
   p << ' ' << getTarget();
-  printDynamicIndexList(p, getOperation(), getDynamicSizes(), getStaticSizes(),
-                        ShapedType::kDynamicSize);
-  p.printOptionalAttrDict((*this)->getAttrs(), {getStaticSizesAttrName()});
+  p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-void transform::BlockOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {}
-
+// TODO: 1. Handle dynamic block size.
+// TODO: 2. Can we have a more generic blocking? Currently
+// we have a block implementation for Matmul, Conv, Relu ecc..
+// Can we have a single blocking for a linalg.genericOp? What
+// information do we need to pass to BlockOp (already pre-cooked affine maps or
+// enums that represent how we want to block?
 DiagnosedSilenceableFailure
-transform::BlockOp::apply(TransformResults &transformResults,
-                          TransformState &state) {
-
+transform::BlockOp::applyToOne(linalg::LinalgOp target,
+                               SmallVector<Operation *> &results,
+                               transform::TransformState &state) {
+  SmallVector<int64_t> blockSizes =
+      extractFromI64ArrayAttr(getBlockingFactors());
+  SimpleRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  Operation *currentTarget = target;
+  if (linalg::Conv2DNchwFchwOp convOp =
+          dyn_cast<linalg::Conv2DNchwFchwOp>(currentTarget)) {
+    FailureOr<linalg::GenericOp> blockedConv =
+        tpp::blockConv2DNchwFchwOp(rewriter, convOp, blockSizes);
+    if (succeeded(blockedConv)) {
+      results.push_back(*blockedConv);
+      return DiagnosedSilenceableFailure(success());
+    }
+  }
+  if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
+    FailureOr<linalg::GenericOp> blockedMatmul =
+        tpp::blockMatmulOp(rewriter, matmulOp, blockSizes);
+    if (succeeded(blockedMatmul)) {
+      results.push_back(*blockedMatmul);
+      return DiagnosedSilenceableFailure(success());
+    }
+  }
+  results.assign(1, nullptr);
   return DiagnosedSilenceableFailure::definiteFailure();
 }
 

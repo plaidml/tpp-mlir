@@ -33,8 +33,11 @@ struct TransformDialectInterpreter : TransformDialectInterpreterBase<TransformDi
             true/*enableExpensiveChecks*/));
     for (auto op :
          module.getBody()->getOps<transform::TransformOpInterface>()) {
-      if (failed(state.applyTransform(op).checkAndReport()))
+      if (failed(state.applyTransform(op).checkAndReport())) {
+        llvm::errs() << "pass TransformDialectInterpreter failed to apply!\n";
         return signalPassFailure();
+      }
+      module.dump();
     }
   }
 };
