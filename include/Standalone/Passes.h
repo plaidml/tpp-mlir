@@ -75,8 +75,8 @@ createDecomposeConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockMatmulLayout();
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
-// TODO: pass options for blocking.
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
+std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
 
 } // namespace tpp
 } // namespace mlir

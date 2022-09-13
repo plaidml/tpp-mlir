@@ -351,7 +351,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
       return failure();
     // TODO: hardcoded values.
     FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::tpp::BlockConv2DNchwFchwOp(rewriter, convOp, {32, 32});
+        mlir::tpp::blockConv2DNchwFchwOp(rewriter, convOp, {32, 32});
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
@@ -779,7 +779,7 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
                               "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
       return failure();
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::tpp::MapToBRGEMMOp(rewriter, linalgOp);
+        mlir::tpp::mapToBRGEMMOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();
