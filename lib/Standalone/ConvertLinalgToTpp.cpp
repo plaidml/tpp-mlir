@@ -100,8 +100,9 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp, bool useParallelLoops) {
   if (linalgOp.getNumLoops() <= 2)
     return success();
   ArrayAttr iteratorTypes = linalgOp.iterator_types();
-  if (!llvm::all_of(iteratorTypes,
-                    [](Attribute type) { return isParallelIterator(type); }))
+  if (!llvm::all_of(iteratorTypes, [](Attribute type) {
+        return linalg::isParallelIterator(type);
+      }))
     return success();
 
   OpBuilder builder(linalgOp);

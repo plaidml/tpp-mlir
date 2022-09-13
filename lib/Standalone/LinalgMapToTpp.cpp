@@ -60,9 +60,9 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
     if (iteratorTypes.size() != 3)
       return false;
-    if (!(isParallelIterator(iteratorTypes[0]) &&
-          isParallelIterator(iteratorTypes[1]) &&
-          isReductionIterator(iteratorTypes[2])))
+    if (!(linalg::isParallelIterator(iteratorTypes[0]) &&
+          linalg::isParallelIterator(iteratorTypes[1]) &&
+          linalg::isReductionIterator(iteratorTypes[2])))
       return false;
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };

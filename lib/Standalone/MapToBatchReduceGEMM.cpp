@@ -31,16 +31,16 @@ static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
   if (iteratorTypes.size() < 4)
     return failure();
   size_t size = iteratorTypes.size() - 1;
-  bool match = isReductionIterator(iteratorTypes[size]) &&
-               isParallelIterator(iteratorTypes[size - 1]) &&
-               isParallelIterator(iteratorTypes[size - 2]) &&
-               isReductionIterator(iteratorTypes[size - 3]);
+  bool match = linalg::isReductionIterator(iteratorTypes[size]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 1]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 2]) &&
+               linalg::isReductionIterator(iteratorTypes[size - 3]);
   if (!match)
     return failure();
   size = size - /*BRGEMM loops=*/3;
   size_t idx = 0;
   while (idx < size) {
-    if (!isParallelIterator(iteratorTypes[idx++]))
+    if (!linalg::isParallelIterator(iteratorTypes[idx++]))
       return failure();
   }
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
