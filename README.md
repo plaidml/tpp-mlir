@@ -14,7 +14,7 @@ standalone `opt`-like tool to operate on that dialect.
 mkdir -p tpp_compiler_sandbox/
 cd tpp_compiler_sandbox/
 
-git clone -b sandbox https://github.com/chelini/llvm-project.git
+git clone -b sandbox https://github.com/plaidml/llvm-project.git
 mkdir llvm-project/build
 cd llvm-project/build
 export CUSTOM_LLVM_ROOT=`pwd`
