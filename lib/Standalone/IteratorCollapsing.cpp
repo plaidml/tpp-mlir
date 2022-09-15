@@ -22,39 +22,54 @@ using namespace mlir::linalg;
 
 namespace {
 
-static bool isConstantMinusOne(AffineMap map, int64_t dim) {
+// Return true if the result at position 'pos' in 'map' is a constant -1. False
+// otherwise.
+static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
   AffineExpr minusOneExpr = getAffineConstantExpr(-1, map.getContext());
-  return map.getResults()[dim] == minusOneExpr;
+  return map.getResults()[pos] == minusOneExpr;
 }
 
+// Return true if the map has one result that is a constant -1.
 static bool hasMinusOneResults(AffineMap map) {
-  unsigned idx = 0;
+  unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
-  while (idx < numResult) {
-    if (isConstantMinusOne(map, idx))
+  while (pos < numResult) {
+    if (isConstantMinusOneAtPos(map, pos))
       return true;
-    idx++;
+    pos++;
   }
   return false;
 }
 
+// Return the position of the first result that is a constant -1.
 static unsigned getFirstMinusOnePos(AffineMap map) {
-  unsigned idx = 0;
+  unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
-  while (idx < numResult) {
-    if (isConstantMinusOne(map, idx))
-      return idx;
-    idx++;
+  while (pos < numResult) {
+    if (isConstantMinusOneAtPos(map, pos))
+      return pos;
+    pos++;
   }
   llvm_unreachable("non-minus ones");
-  return idx;
+  return pos;
 }
 
 static bool isValidReassociation(ArrayRef<ReassociationIndices> reassociation) {
   // TODO: use isReassociationValid.
   return true;
+}
+
+static Type getNewOperandType(Type type, ArrayRef<int64_t> shape) {
+  Type elementType = getElementTypeOrSelf(type);
+  if (elementType == type)
+    return type;
+  else if (type.isa<RankedTensorType>())
+    return RankedTensorType::get(shape, elementType);
+  else if (type.isa<MemRefType>())
+    return MemRefType::get(shape, elementType);
+  llvm_unreachable("unexpected type");
 }
 
 static FailureOr<linalg::LinalgOp>
@@ -128,10 +143,6 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
     ArrayRef<AffineExpr> resultExprs =
         newIndexingMaps[currentMapIdx].getResults();
 
-    AffineExpr zeroExpr = getAffineConstantExpr(0, context);
-    auto isUnitExtent = [&](int64_t dim) -> bool {
-      return resultExprs[dim] == zeroExpr;
-    };
     auto isCollapsedDim = [&](int64_t dim) -> bool {
       if (AffineDimExpr dimExpr = resultExprs[dim].dyn_cast<AffineDimExpr>())
         if (collapsedDims.count(dimExpr.getPosition()))
@@ -144,7 +155,9 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
     while (pos < origRank) {
       if (isCollapsedDim(pos)) {
         int64_t collapsedSize = shape[pos];
-        while (pos + 1 < origRank && isUnitExtent(pos + 1)) {
+        while (
+            pos + 1 < origRank &&
+            isConstantMinusOneAtPos(newIndexingMaps[currentMapIdx], pos + 1)) {
           ++pos;
           collapsedSize *= shape[pos];
         }
@@ -161,7 +174,12 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
       map = map.dropResult(pos);
     }
     newIndexingMaps[currentMapIdx] = map;
+    Type newOperandType =
+        getNewOperandType(opOperand->get().getType(), newShape);
+    llvm::errs() << "---------\n";
     llvm::errs() << "new map: " << newIndexingMaps[currentMapIdx] << "\n";
+    llvm::errs() << "new type: " << newOperandType << "\n";
+    llvm::errs() << "---------\n";
     currentMapIdx++;
   } // operand loop
 
