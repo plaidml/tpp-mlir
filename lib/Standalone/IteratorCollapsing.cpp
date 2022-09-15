@@ -23,6 +23,8 @@ using namespace mlir;
 
 namespace {
 
+// Most of these has been adapted by "DropUnitDims.cpp".
+
 // Return true if the result at position 'pos' in 'map' is a constant -1. False
 // otherwise.
 static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
@@ -153,7 +155,7 @@ insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
   return reshapedOperands;
 }
 
-static FailureOr<SmallVector<Value>> buildReplacement(
+static FailureOr<linalg::GenericOp> buildReplacement(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     ArrayRef<Value> newOperands, ArrayRef<Type> newInputAndOutputTypes,
     ArrayRef<AffineMap> newIndexingMaps, ArrayRef<Attribute> newIteratorTypes,
@@ -177,7 +179,6 @@ static FailureOr<SmallVector<Value>> buildReplacement(
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, resultTypes, newInputs, newOutputs, newIndexingMaps,
       iteratorsAsString);
-  replacementOp.dump();
   rewriter.inlineRegionBefore(genericOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 
@@ -194,10 +195,11 @@ static FailureOr<SmallVector<Value>> buildReplacement(
       return failure();
     resultReplacements.push_back(*newResult);
   }
-  return resultReplacements;
+  rewriter.replaceOp(genericOp, resultReplacements);
+  return replacementOp;
 }
 
-static FailureOr<SmallVector<Value>>
+static FailureOr<linalg::GenericOp>
 doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
      ArrayRef<ReassociationIndices> reassociation) {
 
@@ -356,13 +358,12 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
   assert(reshapedOperands->size() ==
          genericOp.getInputAndOutputOperands().size());
 
-  FailureOr<SmallVector<Value>> replacements = buildReplacement(
+  FailureOr<linalg::GenericOp> replacement = buildReplacement(
       rewriter, genericOp, *reshapedOperands, newInputOutputTypes,
       newIndexingMaps, newIteratorTypes, operandsReassociationMaps);
-  if (failed(replacements))
+  if (failed(replacement))
     return failure();
-  rewriter.replaceOp(genericOp, *replacements);
-  return replacements;
+  return replacement;
 }
 
 struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
@@ -378,9 +379,9 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
     if (!reassociation)
       return failure();
 
-    FailureOr<SmallVector<Value>> replacements =
+    FailureOr<linalg::GenericOp> replacementOp =
         doIt(rewriter, linalgOp, *reassociation);
-    if (failed(replacements))
+    if (failed(replacementOp))
       return failure();
     return success();
   }
