@@ -27,6 +27,7 @@ using namespace mlir;
 // Return true if the result at position 'pos' in 'map' is a constant -1. False
 // otherwise.
 static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
+  assert(pos < map.getNumResults() && "out of bound");
   AffineExpr minusOneExpr = getAffineConstantExpr(-1, map.getContext());
   return map.getResults()[pos] == minusOneExpr;
 }
@@ -198,6 +199,15 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   return replacementOp;
 }
 
+static bool
+isValidReassociationForOp(ArrayRef<ReassociationIndices> reassociation,
+                          int64_t loops) {
+  int64_t counter = 0;
+  for (auto group : reassociation)
+    counter += group.size();
+  return loops == counter;
+}
+
 FailureOr<linalg::GenericOp>
 mlir::tpp::collapseIterators(RewriterBase &rewriter,
                              linalg::GenericOp genericOp,
@@ -211,6 +221,9 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
   if (indexingMaps.empty())
     return failure();
   ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
+
+  if (!isValidReassociationForOp(reassociation, iteratorTypes.size()))
+    return failure();
 
   DenseSet<unsigned> collapsedDims;
   unsigned numIterationDims = indexingMaps.front().getNumDims();
@@ -268,6 +281,13 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
                                          reassociation.size(), numSymbols)));
   }
 
+  llvm::errs() << "=======================\n";
+  for (AffineMap map : indexingMaps)
+    llvm::errs() << map << "\n";
+  for (AffineMap map : newIndexingMaps)
+    llvm::errs() << map << "\n";
+  llvm::errs() << "=======================\n";
+
   assert(newIndexingMaps.front().getNumDims() == reassociation.size());
 
   // Now compute the operand type and reassociations based on the new maps.
@@ -287,15 +307,20 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
       return false;
     };
 
+    // XXX bad fix. Can we use the set to store all the collapsed dimensions
+    // and just look up? The -1 still are needed for the operands.
+    auto isOK = [&](AffineMap map, int64_t dim) -> bool {
+      return isCollapsedDim(dim) || isConstantMinusOneAtPos(map, dim);
+    };
+
     int64_t pos = 0;
     int64_t origRank = genericOp.getRank(opOperand);
     while (pos < origRank) {
       currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
-      if (isCollapsedDim(pos)) {
+      if (isOK(newIndexingMaps[currentMapIdx], pos)) {
         int64_t collapsedSize = shape[pos];
-        while (
-            pos + 1 < origRank &&
-            isConstantMinusOneAtPos(newIndexingMaps[currentMapIdx], pos + 1)) {
+        while (pos + 1 < origRank &&
+               isOK(newIndexingMaps[currentMapIdx], pos + 1)) {
           ++pos;
           collapsedSize *= shape[pos];
           currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
@@ -330,25 +355,25 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
   // wrong, so abort.
   if (!inversePermutation(concatAffineMaps(newIndexingMaps)))
     return failure();
-  /*
-    llvm::errs() << "--- per operand info ---\n";
-    llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
-    for (Type t : newInputOutputTypes)
-      llvm::errs() << t << "\n";
-    llvm::errs() << "#operand reassociation maps: "
-                 << operandsReassociationMaps.size() << "\n";
-    for (ArrayAttr attr : operandsReassociationMaps)
-      llvm::errs() << attr << "\n";
-    llvm::errs() << "------------------------\n";
-    llvm::errs() << "--- new operation info ---\n";
-    llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
-    for (AffineMap map : newIndexingMaps)
-      llvm::errs() << map << "\n";
-    llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
-    for (Attribute attr : newIteratorTypes)
-      llvm::errs() << attr << "\n";
-    llvm::errs() << "--------------------------\n";
-  */
+
+  llvm::errs() << "--- per operand info ---\n";
+  llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
+  for (Type t : newInputOutputTypes)
+    llvm::errs() << t << "\n";
+  llvm::errs() << "#operand reassociation maps: "
+               << operandsReassociationMaps.size() << "\n";
+  for (ArrayAttr attr : operandsReassociationMaps)
+    llvm::errs() << attr << "\n";
+  llvm::errs() << "------------------------\n";
+  llvm::errs() << "--- new operation info ---\n";
+  llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
+  for (AffineMap map : newIndexingMaps)
+    llvm::errs() << map << "\n";
+  llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
+  for (Attribute attr : newIteratorTypes)
+    llvm::errs() << attr << "\n";
+  llvm::errs() << "--------------------------\n";
+
   // if any operand type change insert a reshape.
   FailureOr<SmallVector<Value>> reshapedOperands = insertReshapes(
       rewriter, genericOp, newInputOutputTypes, operandsReassociationMaps);
@@ -373,9 +398,9 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    // collpasing: [[0, 1], [2], [3, 4]]
-    SmallVector<int64_t> sourceShape = {5, 5, 4, 3, 3};
-    SmallVector<int64_t> targetShape = {25, 4, 9};
+    // collpasing: [[0, 1], [2]]
+    SmallVector<int64_t> sourceShape = {5, 5, 4};
+    SmallVector<int64_t> targetShape = {25, 4};
     auto reassociation =
         getReassociationIndicesForCollapse(sourceShape, targetShape);
     if (!reassociation)
