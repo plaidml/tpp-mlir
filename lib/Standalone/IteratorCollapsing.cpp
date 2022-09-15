@@ -103,9 +103,9 @@ static FailureOr<Value> collapseOperand(Value operand, Type newOperandType,
   return failure();
 }
 
-static Value insertExpand(Value operand, Type newOperandType,
-                          ArrayAttr reassociationMap, Location loc,
-                          RewriterBase &rewriter) {
+static FailureOr<Value> insertExpand(Value operand, Type newOperandType,
+                                     ArrayAttr reassociationMap, Location loc,
+                                     RewriterBase &rewriter) {
   Type operandType = operand.getType();
   if (operandType == newOperandType)
     return operand;
@@ -115,15 +115,13 @@ static Value insertExpand(Value operand, Type newOperandType,
             loc, newOperandType, operand,
             convertAffineMapArrayToExprs(reassociationMap))
         .getResult();
-  if (operandType.isa<RankedTensorType>()) {
-    Value v = rewriter
-                  .create<tensor::ExpandShapeOp>(
-                      loc, newOperandType, operand,
-                      convertAffineMapArrayToExprs(reassociationMap))
-                  .getResult();
-    return v;
-  }
-  return nullptr;
+  if (operandType.isa<RankedTensorType>())
+    return rewriter
+        .create<tensor::ExpandShapeOp>(
+            loc, newOperandType, operand,
+            convertAffineMapArrayToExprs(reassociationMap))
+        .getResult();
+  return failure();
 }
 
 static FailureOr<SmallVector<Value>>
@@ -155,7 +153,7 @@ insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
   return reshapedOperands;
 }
 
-static SmallVector<Value> buildReplacement(
+static FailureOr<SmallVector<Value>> buildReplacement(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     ArrayRef<Value> newOperands, ArrayRef<Type> newInputAndOutputTypes,
     ArrayRef<AffineMap> newIndexingMaps, ArrayRef<Attribute> newIteratorTypes,
@@ -189,13 +187,12 @@ static SmallVector<Value> buildReplacement(
     unsigned index = result.index() + replacementOp.getNumInputs();
     Type origResultType = genericOp.getResult(result.index()).getType();
 
-    Value newResult =
+    FailureOr<Value> newResult =
         insertExpand(result.value(), origResultType,
                      operandReassociationMaps[index], loc, rewriter);
-    // if (failed(newResult))
-    //   return failure();
-    assert(newResult);
-    resultReplacements.push_back(newResult);
+    if (failed(newResult))
+      return failure();
+    resultReplacements.push_back(*newResult);
   }
   return resultReplacements;
 }
@@ -359,10 +356,12 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
   assert(reshapedOperands->size() ==
          genericOp.getInputAndOutputOperands().size());
 
-  SmallVector<Value> replacements = buildReplacement(
+  FailureOr<SmallVector<Value>> replacements = buildReplacement(
       rewriter, genericOp, *reshapedOperands, newInputOutputTypes,
       newIndexingMaps, newIteratorTypes, operandsReassociationMaps);
-  rewriter.replaceOp(genericOp, replacements);
+  if (failed(replacements))
+    return failure();
+  rewriter.replaceOp(genericOp, *replacements);
   return replacements;
 }
 
