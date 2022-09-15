@@ -26,6 +26,10 @@ public:
 };
 } // namespace
 
+//===----------------------------------------------------------------------===//
+// BlockOp
+//===----------------------------------------------------------------------===//
+
 ParseResult transform::BlockOp::parse(OpAsmParser &parser,
                                       OperationState &result) {
 
@@ -79,6 +83,18 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
   }
   results.assign(1, nullptr);
   return DiagnosedSilenceableFailure::definiteFailure();
+}
+
+//===----------------------------------------------------------------------===//
+// CollapseOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::CollapseOp::applyToOne(linalg::LinalgOp target,
+                                  SmallVector<Operation *> &results,
+                                  transform::TransformState &state) {
+  results.push_back(target);
+  return DiagnosedSilenceableFailure(success());
 }
 
 //===----------------------------------------------------------------------===//

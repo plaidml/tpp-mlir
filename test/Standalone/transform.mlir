@@ -77,3 +77,24 @@ func.func @block_linalg_matmul(
     -> tensor<128x128xf32>
   return %0 : tensor<128x128xf32>
 }
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+      %1 = transform.structured.collapsing %0 [[0, 1], [2], [3, 4]]
+  }
+}
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+
+func.func @parallel(%arg0: tensor<5x5x4x3x3xf32>, %arg1: tensor<5x5x4x3x3xf32>) -> tensor<5x5x4x3x3xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<5x5x4x3x3xf32>) outs(%arg1 : tensor<5x5x4x3x3xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      linalg.yield %arg2 : f32
+  } -> tensor<5x5x4x3x3xf32>
+  return %0 : tensor<5x5x4x3x3xf32>
+}
