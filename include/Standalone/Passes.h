@@ -77,6 +77,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createIteratorCollapsingPass();
 
 } // namespace tpp
 } // namespace mlir

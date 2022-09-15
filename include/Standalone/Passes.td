@@ -210,6 +210,11 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   }];
 }
 
+def IteratorCollapsing : Pass<"iterator-collapsing", "func::FuncOp"> {
+  let summary = "Iterator collapsing in Linalg";
+  let constructor = "mlir::tpp::createIteratorCollapsingPass()";
+}
+
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";

@@ -26,6 +26,10 @@ public:
 };
 } // namespace
 
+//===----------------------------------------------------------------------===//
+// BlockOp
+//===----------------------------------------------------------------------===//
+
 ParseResult transform::BlockOp::parse(OpAsmParser &parser,
                                       OperationState &result) {
 
@@ -79,6 +83,37 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
   }
   results.assign(1, nullptr);
   return DiagnosedSilenceableFailure::definiteFailure();
+}
+
+//===----------------------------------------------------------------------===//
+// CollapseOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::CollapseOp::applyToOne(linalg::LinalgOp target,
+                                  SmallVector<Operation *> &results,
+                                  transform::TransformState &state) {
+  if (!isa<linalg::GenericOp>(target))
+    return DiagnosedSilenceableFailure::definiteFailure();
+  SimpleRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  FailureOr<linalg::GenericOp> collapsedOp = tpp::collapseIterators(
+      rewriter, cast<linalg::GenericOp>(target), getReassociationIndices());
+  if (failed(collapsedOp))
+    return DiagnosedSilenceableFailure::definiteFailure();
+  results.push_back(*collapsedOp);
+  return DiagnosedSilenceableFailure(success());
+}
+
+SmallVector<ReassociationIndices, 4>
+transform::CollapseOp::getReassociationIndices() {
+  SmallVector<ReassociationIndices, 4> reassociationIndices;
+  for (auto attr : getReassociation())
+    reassociationIndices.push_back(llvm::to_vector<2>(
+        llvm::map_range(attr.cast<ArrayAttr>(), [&](Attribute indexAttr) {
+          return indexAttr.cast<IntegerAttr>().getInt();
+        })));
+  return reassociationIndices;
 }
 
 //===----------------------------------------------------------------------===//

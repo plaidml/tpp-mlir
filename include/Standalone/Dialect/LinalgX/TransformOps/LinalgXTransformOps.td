@@ -29,7 +29,10 @@ def BlockOp : Op<Transform_Dialect, "structured.blocking",
               [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                TransformOpInterface, TransformEachOpTrait]> {
 
-  let description = [{ test }];
+  let description = [{ 
+    Block the target operation. Currently supports matmul and convolutions.
+    Unclear if we want to have generic blocking.
+  }];
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors);
@@ -43,7 +46,30 @@ def BlockOp : Op<Transform_Dialect, "structured.blocking",
         ::llvm::SmallVector<::mlir::Operation *> &results,
         TransformState &state);
   }];
+}
 
+def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
+                 [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+                  TransformOpInterface, TransformEachOpTrait]> {
+
+  let description = [{
+    Collapse the iterators target operation using the given reassociation.
+  }];
+
+  let arguments = (ins PDL_Operation:$target, IndexListArrayAttr:$reassociation);
+  let results = (outs PDL_Operation:$collapsed_linalg_op);
+
+  let assemblyFormat = "$target $reassociation attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        TransformState &state);
+
+    // get reassociation.
+    SmallVector<ReassociationIndices, 4> getReassociationIndices();
+  }];
 }
 
 #endif // LINALG_TRANSFORM_OPS

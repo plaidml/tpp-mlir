@@ -29,6 +29,7 @@ add_mlir_dialect_library(MLIRStandalone
         ToBlockLayoutAndBack.cpp
         MapToBatchReduceGEMM.cpp
         TransformDialectInterpreter.cpp
+        IteratorCollapsing.cpp
 
         # Utils
         TransformUtils.cpp
