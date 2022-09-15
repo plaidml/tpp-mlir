@@ -22,51 +22,52 @@ using namespace mlir::linalg;
 
 namespace {
 
-// TODO: isReassociationValid
+static bool isConstantMinusOne(AffineMap map, int64_t dim) {
+  AffineExpr minusOneExpr = getAffineConstantExpr(-1, map.getContext());
+  return map.getResults()[dim] == minusOneExpr;
+}
 
-static bool hasZeroResults(AffineMap map) {
+static bool hasMinusOneResults(AffineMap map) {
   unsigned idx = 0;
   unsigned numResult = map.getNumResults();
 
-  MLIRContext *context = map.getContext();
-  AffineExpr zeroExpr = getAffineConstantExpr(0, context);
-  auto isUnitExtent = [&](int64_t dim) -> bool {
-    return map.getResults()[dim] == zeroExpr;
-  };
-
   while (idx < numResult) {
-    if (isUnitExtent(idx))
+    if (isConstantMinusOne(map, idx))
       return true;
     idx++;
   }
   return false;
 }
 
-static unsigned getFirstZeroPos(AffineMap map) {
+static unsigned getFirstMinusOnePos(AffineMap map) {
   unsigned idx = 0;
   unsigned numResult = map.getNumResults();
 
-  MLIRContext *context = map.getContext();
-  AffineExpr zeroExpr = getAffineConstantExpr(0, context);
-  auto isUnitExtent = [&](int64_t dim) -> bool {
-    return map.getResults()[dim] == zeroExpr;
-  };
-
   while (idx < numResult) {
-    if (isUnitExtent(idx))
+    if (isConstantMinusOne(map, idx))
       return idx;
     idx++;
   }
-  assert(0 && "non-zeros");
+  llvm_unreachable("non-minus ones");
   return idx;
+}
+
+static bool isValidReassociation(ArrayRef<ReassociationIndices> reassociation) {
+  // TODO: use isReassociationValid.
+  return true;
 }
 
 static FailureOr<linalg::LinalgOp>
 doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
      ArrayRef<ReassociationIndices> reassociation) {
 
+  if (!isValidReassociation(reassociation))
+    return failure();
+
   MLIRContext *context = genericOp.getContext();
   SmallVector<AffineMap, 4> indexingMaps = genericOp.getIndexingMapsArray();
+  if (indexingMaps.empty())
+    return failure();
 
   DenseSet<unsigned> collapsedDims;
   unsigned numIterationDims = indexingMaps.front().getNumDims();
@@ -76,24 +77,26 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
 
   unsigned numKeptDims = 0;
   for (ArrayRef<int64_t> group : reassociation) {
+    // if group size equals 1 there is no collapsing forward this dimension.
     if (group.size() == 1) {
       dimReplacements.push_back(getAffineDimExpr(numKeptDims++, context));
     } else {
       int64_t groupSize = group.size();
-      assert(groupSize > 1);
-      // the new collapsed dimension.
+      assert(groupSize > 1 && "group size cannot be empty");
+      // the new dimension. All the dimensions that follow will be collapsed
+      // into this one.
       dimReplacements.push_back(getAffineDimExpr(numKeptDims, context));
       for (int64_t start = 1; start < groupSize; start++)
-        // clear all the other dimension.
-        dimReplacements.push_back(getAffineConstantExpr(0, context));
+        // clear all the other dimension. Flag them as '-1'. The constant
+        // '-1' will get removed once we fix-up the operands. It is neccessary
+        // when we look at the operands to see if the given dimension has been
+        // collapsed.
+        dimReplacements.push_back(getAffineConstantExpr(-1, context));
 
       // put in the set the collapsed dims. Note we may need to check that we
       // have "simple" dimension (i.e., d1 + d2 should not allowed). We also
       // need to check that all the collapsed dimension have the same property
       // (parallel, reduction).
-      // for (int64_t dimIdx : group)
-      //  collapsedDims.insert(dimIdx);
-      llvm::errs() << "start collapse dim: " << numKeptDims << "\n";
       collapsedDims.insert(numKeptDims++);
     }
   }
@@ -115,15 +118,11 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
                                          reassociation.size(), numSymbols)));
   }
 
-  // --- maps should be ready here.
-  for (AffineMap map : newIndexingMaps)
-    llvm::errs() << map << "\n";
-  // ---
   assert(newIndexingMaps.front().getNumDims() == reassociation.size());
 
+  // Now adjust the operands, using the new maps.
   unsigned currentMapIdx = 0;
   for (OpOperand *opOperand : genericOp.getInputAndOutputOperands()) {
-    llvm::errs() << "current map: " << newIndexingMaps[currentMapIdx] << "\n";
     ArrayRef<int64_t> shape = genericOp.getShape(opOperand);
     SmallVector<int64_t> newShape;
     ArrayRef<AffineExpr> resultExprs =
@@ -135,10 +134,8 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
     };
     auto isCollapsedDim = [&](int64_t dim) -> bool {
       if (AffineDimExpr dimExpr = resultExprs[dim].dyn_cast<AffineDimExpr>())
-        if (collapsedDims.count(dimExpr.getPosition())) {
-          // llvm::errs() << "found collapsing dim\n";
+        if (collapsedDims.count(dimExpr.getPosition()))
           return true;
-        }
       return false;
     };
 
@@ -152,26 +149,19 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
           collapsedSize *= shape[pos];
         }
         newShape.push_back(collapsedSize);
-      } else {
+      } else
         newShape.push_back(shape[pos]);
-      }
       pos++;
     }
 
-    // print the new size.
-    llvm::errs() << "new shape\n";
-    for (int64_t s : newShape)
-      llvm::errs() << s << " ";
-    llvm::errs() << "\n";
-
-    // drop zero results from the map.
+    // drop collapsed results from the map.
     AffineMap map = newIndexingMaps[currentMapIdx];
-    while (hasZeroResults(map)) {
-      unsigned pos = getFirstZeroPos(map);
+    while (hasMinusOneResults(map)) {
+      unsigned pos = getFirstMinusOnePos(map);
       map = map.dropResult(pos);
     }
-
-    llvm::errs() << "final map: " << map << "\n";
+    newIndexingMaps[currentMapIdx] = map;
+    llvm::errs() << "new map: " << newIndexingMaps[currentMapIdx] << "\n";
     currentMapIdx++;
   } // operand loop
 
