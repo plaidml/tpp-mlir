@@ -66,6 +66,9 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
         ::mlir::linalg::LinalgOp target,
         ::llvm::SmallVector<::mlir::Operation *> &results,
         TransformState &state);
+
+    // get reassociation.
+    SmallVector<ReassociationIndices, 4> getReassociationIndices();
   }];
 }
 

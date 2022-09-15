@@ -38,5 +38,9 @@ FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,
                                            linalg::MatmulOp linalgOp,
                                            ArrayRef<int64_t> blockingFactors);
 
+FailureOr<linalg::GenericOp>
+collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                  ArrayRef<SmallVector<int64_t, 2>> reassociation);
+
 } // namespace tpp
 } // namespace mlir

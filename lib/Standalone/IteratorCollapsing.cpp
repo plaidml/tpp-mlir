@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Passes.h"
+#include "Standalone/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -20,8 +21,6 @@ using namespace mlir;
 #include "Standalone/Passes.h.inc"
 
 #define DEBUG_TYPE "iterator-collapsing"
-
-namespace {
 
 // Most of these has been adapted by "DropUnitDims.cpp".
 
@@ -199,9 +198,10 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   return replacementOp;
 }
 
-static FailureOr<linalg::GenericOp>
-doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
-     ArrayRef<ReassociationIndices> reassociation) {
+FailureOr<linalg::GenericOp>
+mlir::tpp::collapseIterators(RewriterBase &rewriter,
+                             linalg::GenericOp genericOp,
+                             ArrayRef<ReassociationIndices> reassociation) {
 
   if (!isValidReassociation(reassociation))
     return failure();
@@ -330,25 +330,25 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
   // wrong, so abort.
   if (!inversePermutation(concatAffineMaps(newIndexingMaps)))
     return failure();
-
-  llvm::errs() << "--- per operand info ---\n";
-  llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
-  for (Type t : newInputOutputTypes)
-    llvm::errs() << t << "\n";
-  llvm::errs() << "#operand reassociation maps: "
-               << operandsReassociationMaps.size() << "\n";
-  for (ArrayAttr attr : operandsReassociationMaps)
-    llvm::errs() << attr << "\n";
-  llvm::errs() << "------------------------\n";
-  llvm::errs() << "--- new operation info ---\n";
-  llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
-  for (AffineMap map : newIndexingMaps)
-    llvm::errs() << map << "\n";
-  llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
-  for (Attribute attr : newIteratorTypes)
-    llvm::errs() << attr << "\n";
-  llvm::errs() << "--------------------------\n";
-
+  /*
+    llvm::errs() << "--- per operand info ---\n";
+    llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
+    for (Type t : newInputOutputTypes)
+      llvm::errs() << t << "\n";
+    llvm::errs() << "#operand reassociation maps: "
+                 << operandsReassociationMaps.size() << "\n";
+    for (ArrayAttr attr : operandsReassociationMaps)
+      llvm::errs() << attr << "\n";
+    llvm::errs() << "------------------------\n";
+    llvm::errs() << "--- new operation info ---\n";
+    llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
+    for (AffineMap map : newIndexingMaps)
+      llvm::errs() << map << "\n";
+    llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
+    for (Attribute attr : newIteratorTypes)
+      llvm::errs() << attr << "\n";
+    llvm::errs() << "--------------------------\n";
+  */
   // if any operand type change insert a reshape.
   FailureOr<SmallVector<Value>> reshapedOperands = insertReshapes(
       rewriter, genericOp, newInputOutputTypes, operandsReassociationMaps);
@@ -366,6 +366,8 @@ doIt(RewriterBase &rewriter, linalg::GenericOp genericOp,
   return replacement;
 }
 
+namespace {
+
 struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -380,7 +382,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     FailureOr<linalg::GenericOp> replacementOp =
-        doIt(rewriter, linalgOp, *reassociation);
+        mlir::tpp::collapseIterators(rewriter, linalgOp, *reassociation);
     if (failed(replacementOp))
       return failure();
     return success();
