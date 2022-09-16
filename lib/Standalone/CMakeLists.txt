@@ -1,4 +1,4 @@
-add_mlir_dialect_library(MLIRStandalone
+add_mlir_dialect_library(TPPStandalone
         # Ops and dialects
         Dialect/Tpp/TppDialect.cpp
         Dialect/Tpp/TppOps.cpp

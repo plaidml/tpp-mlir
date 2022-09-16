@@ -10,5 +10,5 @@ add_tpp_unittest(TppUnitTests
 
 target_link_libraries(TppUnitTests
   PRIVATE
-  MLIRStandalone
+  TPPStandalone
   )
