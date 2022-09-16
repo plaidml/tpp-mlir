@@ -19,7 +19,7 @@ set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
-option(USE_IREE "Enables being built inside IREE" OFF)
+option(TPP_INSIDE_IREE "Enables being built inside IREE" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
@@ -57,7 +57,7 @@ add_subdirectory(include)
 add_subdirectory(lib)
 
 # IREE doesn't need any of these
-if (NOT USE_IREE)
+if (NOT TPP_INSIDE_IREE)
   message(STATUS "Enabling standalone tooling")
   add_subdirectory(test)
   add_subdirectory(standalone-opt)
