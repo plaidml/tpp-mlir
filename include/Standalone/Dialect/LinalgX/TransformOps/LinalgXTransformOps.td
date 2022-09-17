@@ -17,14 +17,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-def BlockEnumLayout : I32EnumAttr<"BlockEnumLayout", "enum for layout",
-  [
-    I32EnumAttrCase<"FORMAT_NCnc", 0>,
-    I32EnumAttrCase<"FORMAT_KCck", 1>
-  ]>{
-  let cppNamespace = "mlir::transform";
-}
-
 def BlockOp : Op<Transform_Dialect, "structured.blocking",
               [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                TransformOpInterface, TransformEachOpTrait]> {
