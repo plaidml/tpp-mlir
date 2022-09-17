@@ -117,6 +117,27 @@ transform::CollapseOp::getReassociationIndices() {
 }
 
 //===----------------------------------------------------------------------===//
+// MapToBrgemmOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
+                                     SmallVector<Operation *> &results,
+                                     transform::TransformState &state) {
+  if (!isa<linalg::GenericOp>(target))
+    return DiagnosedSilenceableFailure::definiteFailure();
+  SimpleRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  FailureOr<SmallVector<Value>> brgemmLoops =
+      tpp::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
+  if (failed(brgemmLoops))
+    return DiagnosedSilenceableFailure::definiteFailure();
+  // TODO: return linalg.batch_reduce_matmul instead of loops.
+  results.push_back(nullptr);
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===----------------------------------------------------------------------===//
 // Transform op registration
 //===----------------------------------------------------------------------===//
 

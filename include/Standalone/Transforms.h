@@ -34,10 +34,12 @@ FailureOr<linalg::GenericOp>
 blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
                       ArrayRef<int64_t> blockingFactors);
 
+// Attempt to block a MatmulOp.
 FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,
                                            linalg::MatmulOp linalgOp,
                                            ArrayRef<int64_t> blockingFactors);
 
+// Collapse iterators in a linalg.generic based on 'reassociation'.
 FailureOr<linalg::GenericOp>
 collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
                   ArrayRef<SmallVector<int64_t, 2>> reassociation);

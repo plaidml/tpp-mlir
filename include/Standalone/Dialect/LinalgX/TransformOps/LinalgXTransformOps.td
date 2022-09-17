@@ -17,6 +17,10 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
+//===----------------------------------------------------------------------===//
+// BlockOp
+//===----------------------------------------------------------------------===//
+
 def BlockOp : Op<Transform_Dialect, "structured.blocking",
               [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                TransformOpInterface, TransformEachOpTrait]> {
@@ -40,6 +44,10 @@ def BlockOp : Op<Transform_Dialect, "structured.blocking",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// CollapseOp
+//===----------------------------------------------------------------------===//
+
 def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
                  [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                   TransformOpInterface, TransformEachOpTrait]> {
@@ -61,6 +69,32 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
 
     // get reassociation.
     SmallVector<ReassociationIndices, 4> getReassociationIndices();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// MapToBrgemmOp
+//===----------------------------------------------------------------------===//
+
+def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm",
+                      [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+                       TransformOpInterface, TransformEachOpTrait]> {
+
+  let description = [{
+    Check if a linalg.generic maps to brgemm. If so materialize loops (if needed) 
+    and replace the linalg.generic with a linalg.batch_reduce_matmul.
+  }];
+  
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
+
+  let assemblyFormat = "$target attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        TransformState &state);
   }];
 }
 

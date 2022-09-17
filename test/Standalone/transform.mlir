@@ -144,7 +144,6 @@ func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tenso
 
 // -----
 
-// CHECK-LABEL: conv
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   transform.sequence %arg0 failures(propagate) {
@@ -152,12 +151,15 @@ transform.with_pdl_patterns {
       %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
       %1 = transform.structured.blocking %0 { blocking_factors = [32, 32] }
       %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
-      // %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+      %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+      %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+      %5 = transform.structured.map_to_brgemm %4
   }
 }
 
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
                 %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
+  // CHECK: linalg.reduce_batch_matmul
   %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>)
                                 outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
   return %0: tensor<14x1024x28x28xf32>
