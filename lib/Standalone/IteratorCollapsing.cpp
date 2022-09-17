@@ -28,7 +28,7 @@ using namespace mlir;
 // otherwise.
 static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
   assert(pos < map.getNumResults() && "out of bound");
-  AffineExpr minusOneExpr = getAffineConstantExpr(-1, map.getContext());
+  AffineExpr minusOneExpr = getAffineConstantExpr(0, map.getContext());
   return map.getResults()[pos] == minusOneExpr;
 }
 
@@ -212,7 +212,6 @@ FailureOr<linalg::GenericOp>
 mlir::tpp::collapseIterators(RewriterBase &rewriter,
                              linalg::GenericOp genericOp,
                              ArrayRef<ReassociationIndices> reassociation) {
-
   if (!isValidReassociation(reassociation))
     return failure();
 
@@ -239,30 +238,32 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
   SmallVector<ArrayAttr> operandsReassociationMaps;
 
   unsigned numKeptDims = 0;
+  unsigned idxDimension = 0;
   for (ArrayRef<int64_t> group : reassociation) {
     // if group size equals 1 there is no collapsing forward this dimension.
     if (group.size() == 1) {
       dimReplacements.push_back(getAffineDimExpr(numKeptDims, context));
+      newIteratorTypes.push_back(iteratorTypes[idxDimension++]);
     } else {
       int64_t groupSize = group.size();
       assert(groupSize > 1 && "group size cannot be empty");
       // the new dimension. All the dimensions that follow will be collapsed
       // into this one.
       dimReplacements.push_back(getAffineDimExpr(numKeptDims, context));
+      newIteratorTypes.push_back(iteratorTypes[idxDimension]);
       for (int64_t start = 1; start < groupSize; start++)
-        // clear all the other dimension. Flag them as '-1'. The constant
-        // '-1' will get removed once we fix-up the operands. It is neccessary
+        // clear all the other dimension. Flag them as '0'. The constant
+        // '0' will get removed once we fix-up the operands. It is neccessary
         // when we look at the operands to see if the given dimension has been
         // collapsed.
-        dimReplacements.push_back(getAffineConstantExpr(-1, context));
+        dimReplacements.push_back(getAffineConstantExpr(0, context));
 
-      // put in the set the collapsed dims. Note we may need to check that we
-      // have "simple" dimension (i.e., d1 + d2 should not allowed). We also
+      // put in the set the collapsed dims. We
       // need to check that all the collapsed dimension have the same property
       // (parallel, reduction).
       collapsedDims.insert(numKeptDims);
+      idxDimension += group.size();
     }
-    newIteratorTypes.push_back(iteratorTypes[numKeptDims]);
     numKeptDims++;
   }
 
