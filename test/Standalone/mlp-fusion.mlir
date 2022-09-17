@@ -27,9 +27,6 @@ module @predict_function  {
   }
 }
 
-// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 256 + s0 + d1)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 // CHECK: func.func @main(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<256x512xf32>
@@ -41,11 +38,11 @@ module @predict_function  {
 // CHECK-DAG: %[[ubouter:.*]] = arith.constant 128 : index
 // CHECK-DAG: %[[ubinner:.*]] = arith.constant 512 : index
 // CHECK: scf.for %[[outer:.*]] = %[[lb]] to %[[ubouter]] step %[[step]] {
-// CHECK: %[[slicearg0:.*]] = memref.subview %[[ARG0]][%[[outer]], 0] [32, 256] [1, 1] : memref<128x256xf32> to memref<32x256xf32, #[[MAP0]]>
+// CHECK: %[[slicearg0:.*]] = memref.subview %[[ARG0]][%[[outer]], 0] [32, 256] [1, 1] : memref<128x256xf32> to memref<32x256xf32, strided<[256, 1], offset: ?>>
 // CHECK: scf.for %[[inner:.*]] = %[[lb]] to %[[ubinner]] step %[[step]] {
-// CHECK: %[[slicearg1:.*]] = memref.subview %[[ARG1]][0, %[[inner]]] [256, 32] [1, 1] : memref<256x512xf32> to memref<256x32xf32, #[[MAP1]]>
-// CHECK: %[[slicearg2:.*]] = memref.subview %[[ARG2]][%[[inner]]] [32] [1] : memref<512xf32> to memref<32xf32, #[[MAP2]]>
-// CHECK: %[[slicearg3:.*]] = memref.subview %[[ARG3]][%[[outer]], %[[inner]]] [32, 32] [1, 1] : memref<128x512xf32> to memref<32x32xf32, #[[MAP1]]>
-// CHECK: tpp.identity ins(%[[slicearg2]] : memref<32xf32, #[[MAP2]]>) out(%[[slicearg3]] : memref<32x32xf32, #[[MAP1]]>)
-// CHECK: tpp.matmul ins(%[[slicearg0]] : memref<32x256xf32, #[[MAP0]]>, %[[slicearg1]] : memref<256x32xf32, #[[MAP1]]>) out(%[[slicearg3]] : memref<32x32xf32, #[[MAP1]]>)
-// CHECK: tpp.relu ins(%[[slicearg3]] : memref<32x32xf32, #[[MAP1]]>) out(%[[slicearg3]] : memref<32x32xf32, #[[MAP1]]>)
+// CHECK: %[[slicearg1:.*]] = memref.subview %[[ARG1]][0, %[[inner]]] [256, 32] [1, 1] : memref<256x512xf32> to memref<256x32xf32, strided<[512, 1], offset: ?>>
+// CHECK: %[[slicearg2:.*]] = memref.subview %[[ARG2]][%[[inner]]] [32] [1] : memref<512xf32> to memref<32xf32, strided<[1], offset: ?>>
+// CHECK: %[[slicearg3:.*]] = memref.subview %[[ARG3]][%[[outer]], %[[inner]]] [32, 32] [1, 1] : memref<128x512xf32> to memref<32x32xf32, strided<[512, 1], offset: ?>>
+// CHECK: tpp.identity ins(%[[slicearg2]] : memref<32xf32, strided<[1], offset: ?>>) out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+// CHECK: tpp.matmul ins(%[[slicearg0]] : memref<32x256xf32, strided<[256, 1], offset: ?>>, %[[slicearg1]] : memref<256x32xf32, strided<[512, 1], offset: ?>>) out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+// CHECK: tpp.relu ins(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>) out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)

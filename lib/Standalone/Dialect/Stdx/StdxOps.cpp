@@ -31,10 +31,10 @@ void ClosureOp::build(OpBuilder &builder, OperationState &result, Value out,
   ClosureOp::ensureTerminator(*bodyRegion, builder, result.location);
 }
 
-/// Prints the initialization list in the form of
-///   <prefix>(%inner = %outer, %inner2 = %outer2, <...>)
-/// where 'inner' values are assumed to be region arguments and 'outer' values
-/// are regular SSA values.
+// Prints the initialization list in the form of
+//   <prefix>(%inner = %outer, %inner2 = %outer2, <...>)
+// where 'inner' values are assumed to be region arguments and 'outer' values
+// are regular SSA values.
 static void printInitializationList(OpAsmPrinter &p,
                                     Block::BlockArgListType blocksArgs,
                                     ValueRange initializers,

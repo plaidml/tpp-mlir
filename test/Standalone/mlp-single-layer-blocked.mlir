@@ -43,13 +43,13 @@ module @predict_function  {
 // CHECK:    %2 = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
 // CHECK:    linalgx.relayout ins(%arg0 : memref<128x256xf32>, #map2) outs(%2 : memref<4x8x32x32xf32>, #map1)
 // CHECK:    scf.for %arg4 = %c0 to %c4 step %c1 {
-// CHECK:      %3 = memref.subview %2[%arg4, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<8x32x32xf32, #map3>
-// CHECK:      %4 = memref.subview %1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, #map3>
+// CHECK:      %3 = memref.subview %2[%arg4, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK:      %4 = memref.subview %1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:      scf.for %arg5 = %c0 to %c16 step %c1 {
-// CHECK:        %5 = memref.subview %0[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<16x8x32x32xf32> to memref<8x32x32xf32, #map3>
-// CHECK:        %6 = memref.subview %4[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : memref<16x32x32xf32, #map3> to memref<32x32xf32, #map4>
-// CHECK:        linalg.reduce_batch_matmul ins(%3, %5 : memref<8x32x32xf32, #map3>, memref<8x32x32xf32, #map3>) outs(%6 : memref<32x32xf32, #map4>)
-// CHECK:        tpp.relu ins(%6 : memref<32x32xf32, #map4>) out(%6 : memref<32x32xf32, #map4>)
+// CHECK:        %5 = memref.subview %0[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<16x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK:        %6 = memref.subview %4[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK:        linalg.reduce_batch_matmul ins(%3, %5 : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%6 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+// CHECK:        tpp.relu ins(%6 : memref<32x32xf32, strided<[32, 1], offset: ?>>) out(%6 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
 // CHECK:      }
 // CHECK:    }
 // CHECK:    linalgx.relayout ins(%1 : memref<4x16x32x32xf32>, #map1) outs(%arg3 : memref<128x512xf32>, #map2)

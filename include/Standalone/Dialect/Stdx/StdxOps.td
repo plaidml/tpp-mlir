@@ -52,7 +52,6 @@ def Stdx_ClosureOp : Stdx_Op<"closure", [
 def YieldOp : Stdx_Op<"yield", [HasParent<"ClosureOp">, NoSideEffect, 
                                 Terminator]> {
   let summary = "yield operation";
-  let description = [{ }];
 
   let arguments = (ins Variadic<AnyType>:$operands);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
