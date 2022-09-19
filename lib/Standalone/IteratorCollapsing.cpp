@@ -200,13 +200,36 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   return replacementOp;
 }
 
+// The reassociation dimensions must equals the number of loops.
+// Each group should collapsed the same iterators (i.e., the collapsed iterators
+// must be all parallel or all reduction).
 static bool
 isValidReassociationForOp(ArrayRef<ReassociationIndices> reassociation,
-                          int64_t loops) {
+                          linalg::GenericOp genericOp) {
+  int64_t numLoops = genericOp.getNumLoops();
   int64_t counter = 0;
   for (auto group : reassociation)
     counter += group.size();
-  return loops == counter;
+  if (numLoops != counter) {
+    genericOp.emitError("invalid reassociation");
+    return false;
+  }
+  ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
+  for (ArrayRef<int64_t> group : reassociation) {
+    if (group.size() == 1)
+      continue;
+    int64_t groupSize = group.size();
+    auto typeFirstDim = iteratorTypes[group[0]];
+    for (int64_t start = 1; start < groupSize; start++) {
+      auto typeCurrentDim = iteratorTypes[group[start]];
+      if (typeCurrentDim != typeFirstDim) {
+        // TODO: propagate errors using the transform dialect.
+        genericOp.emitError("invalid reassociation");
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 FailureOr<linalg::GenericOp>
@@ -222,7 +245,7 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     return failure();
   ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
 
-  if (!isValidReassociationForOp(reassociation, iteratorTypes.size()))
+  if (!isValidReassociationForOp(reassociation, genericOp))
     return failure();
 
   DenseSet<unsigned> collapsedDims;
