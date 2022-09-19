@@ -22,6 +22,6 @@ func.func @blocked_matmul(%arg0: tensor<16x32x32xf32>, %arg1: tensor<16x32x32xf3
   // CHECK-NEXT: }
   // CHECK-NEXT: }
   // CHECK-NEXT: return
-  %1 = linalg.reduce_batch_matmul ins(%arg0, %arg1: tensor<16x32x32xf32>, tensor<16x32x32xf32>) outs(%arg2: tensor<32x32xf32>) -> tensor<32x32xf32>
+  %1 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<16x32x32xf32>, tensor<16x32x32xf32>) outs(%arg2: tensor<32x32xf32>) -> tensor<32x32xf32>
   return %1 :  tensor<32x32xf32>
 }

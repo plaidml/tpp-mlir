@@ -18,7 +18,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
   // CHECK: %[[sliceA:.*]] = tensor.extract_slice %[[arg_zero]][%[[p1]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<4x16x32x32xf32> to tensor<16x32x32xf32>
   // CHECK: %[[sliceB:.*]] = tensor.extract_slice %[[arg_one]][%[[p2]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<8x16x32x32xf32> to tensor<16x32x32xf32>
   // CHECK: %[[sliceC:.*]] = tensor.extract_slice %[[init2]][%[[p1]], %[[p2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<32x32xf32>
-  // CHECK: %[[mul:.*]] = linalg.reduce_batch_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<16x32x32xf32>, tensor<16x32x32xf32>) outs(%[[sliceC]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: %[[mul:.*]] = linalg.batch_reduce_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<16x32x32xf32>, tensor<16x32x32xf32>) outs(%[[sliceC]] : tensor<32x32xf32>) -> tensor<32x32xf32>
   // CHECK: %[[yield:.*]] = tensor.insert_slice %[[mul]] into %[[init2]][%[[p1]], %[[p2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x8x32x32xf32>
   // CHECK: scf.yield %[[yield]] : tensor<4x8x32x32xf32>
   // CHECK: }
@@ -52,7 +52,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
   // CHECK-NEXT: %[[l1:.*]] = memref.subview %[[arg_zero]][%[[p1]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
   // CHECK-NEXT: %[[l2:.*]] = memref.subview %[[arg_one]][%[[p2]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
   // CHECK-NEXT: %[[l3:.*]] = memref.subview %[[arg_two]][%[[p1]], %[[p2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-  // CHECK-NEXT: linalg.reduce_batch_matmul ins(%[[l1]], %[[l2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[l3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+  // CHECK-NEXT: linalg.batch_reduce_matmul ins(%[[l1]], %[[l2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[l3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
   // CHECK-NEXT: }
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[arg_two]] : memref<4x8x32x32xf32>
@@ -74,7 +74,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
 // CHECK-LABEL: func.func @blocked_matmul
 // CHECK-SAME: %[[arg_zero:.*]]: tensor<8x32x32xf32>, %[[arg_one:.*]]: tensor<8x32x32xf32>, %[[arg_two:.*]]: tensor<32x32xf32>) -> tensor<32x32xf32> {
 func.func @blocked_matmul(%arg0: tensor<8x32x32xf32>, %arg1: tensor<8x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
-  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[arg_zero]], %[[arg_one]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[arg_two]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: %[[r:.*]] = linalg.batch_reduce_matmul ins(%[[arg_zero]], %[[arg_one]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[arg_two]] : tensor<32x32xf32>) -> tensor<32x32xf32>
   %0 = linalg.generic {indexing_maps = [#map5, #map6, #map7], iterator_types = ["reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%arg2 : tensor<32x32xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5:f32):
     %m = arith.mulf %arg3, %arg4 : f32
@@ -101,7 +101,7 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
   // CHECK: %[[inner:.*]] = scf.for %arg5 = %[[zero]] to %[[sixteen]] step %[[one]] iter_args(%arg6 = %arg4) -> (tensor<32x32xf32>) {
   // CHECK: %[[sliceA:.*]] = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<8x32x32xf32>
   // CHECK: %[[sliceB:.*]] = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<16x8x32x32xf32> to tensor<8x32x32xf32>
-  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%arg6 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: %[[r:.*]] = linalg.batch_reduce_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%arg6 : tensor<32x32xf32>) -> tensor<32x32xf32>
   // CHECK: scf.yield %[[r]] : tensor<32x32xf32>
   // CHECK: }
   // CHECK: scf.yield %[[inner]] : tensor<32x32xf32>
@@ -132,7 +132,7 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
   // CHECK: %[[sliceA:.*]] = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<8x32x32xf32>
   // CHECK: %[[sliceB:.*]] = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : tensor<16x8x32x32xf32> to tensor<8x32x32xf32>
   // CHECK: %[[sliceC:.*]] = tensor.extract_slice %arg6[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : tensor<16x32x32xf32> to tensor<32x32xf32>
-  // CHECK: %[[r:.*]] = linalg.reduce_batch_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[sliceC]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  // CHECK: %[[r:.*]] = linalg.batch_reduce_matmul ins(%[[sliceA]], %[[sliceB]] : tensor<8x32x32xf32>, tensor<8x32x32xf32>) outs(%[[sliceC]] : tensor<32x32xf32>) -> tensor<32x32xf32>
   // CHECK: %[[full:.*]] = tensor.insert_slice %[[r]] into %arg6[%arg5, 0, 0] [1, 32, 32] [1, 1, 1] : tensor<32x32xf32> into tensor<16x32x32xf32>
   // CHECK: scf.yield %[[full]] : tensor<16x32x32xf32>
   // CHECK: }
