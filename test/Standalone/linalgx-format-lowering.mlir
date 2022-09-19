@@ -65,8 +65,20 @@ func.func @KC_to_KCck(%arg0: tensor<128x256xf32>) -> tensor<8x4x32x32xf32> {
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
-// CHECK-LABEL: func.func @custom_relayout
+// CHECK-LABEL: func.func @custom_relayout(
 func.func @custom_relayout(%arg0: tensor<2x4xf32>, %arg1: tensor<2x4x4xf32>) -> tensor<2x4x4xf32> {
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ubi:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[ubjk:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ubi]] step %[[step]] {
+  // CHECK: scf.for %[[j:.*]] = %[[lb]] to %[[ubjk]] step %[[step]] {
+  // CHECK: scf.for %[[k:.*]] = %[[lb]] to %[[ubjk]] step %[[step]] {
+  // CHECK: %[[r:.*]] = memref.load %arg0[%[[i]], %[[k]]] : memref<2x4xf32>
+  // CHECK: memref.store %[[r]], %arg1[%[[i]], %[[j]], %[[k]]] : memref<2x4x4xf32>
+  // CHECK: }
+  // CHECK: }
+  // CHECK: }
   %0 = bufferization.alloc_tensor() : tensor<2x4x4xf32>
   %1 = linalgx.relayout ins(%arg0: tensor<2x4xf32>, #map0) outs(%arg1: tensor<2x4x4xf32>, #map1) -> tensor<2x4x4xf32>
   return %1 : tensor<2x4x4xf32>
