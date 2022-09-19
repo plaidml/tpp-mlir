@@ -325,6 +325,8 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     SmallVector<Attribute> operandReassociationMaps;
     SmallVector<AffineExpr> currentOperandReassociation;
 
+    bool isValidGroupReass = false;
+
     // Check if the result at postion 'pos' in 'resultExprs' is a collapsed
     // dimension. A collapsed dimension is either a zero constant or
     // is in the 'collapsedDims' set. A possible change is to look at the
@@ -332,8 +334,12 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     auto isCollapsedDim = [&](int64_t pos) -> bool {
       auto isInSet = [&](int64_t pos) -> bool {
         if (AffineDimExpr dimExpr = resultExprs[pos].dyn_cast<AffineDimExpr>())
-          if (collapsedDims.count(dimExpr.getPosition()))
+          if (collapsedDims.count(dimExpr.getPosition())) {
+            assert(!isValidGroupReass &&
+                   "multiple collapse dimension per reassociation group");
+            isValidGroupReass = true;
             return true;
+          }
         return false;
       };
       return isInSet(pos) ||
@@ -353,12 +359,25 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
         }
         newShape.push_back(collapsedSize);
       } else {
+        // No reassociation, reassociation is valid.
+        isValidGroupReass = true;
         newShape.push_back(shape[pos]);
       }
+
+      // Exit if the current reassociation for the operand is not valid. A
+      // reassociation is valid when it containt the dimension on which the
+      // zeros will be collapsed on.
+      if (!isValidGroupReass) {
+        genericOp.emitError("fail to collapse");
+        return failure();
+      }
+
       operandReassociationMaps.push_back(AffineMapAttr::get(
           AffineMap::get(origRank, /*symbolCount = */ 0,
                          currentOperandReassociation, context)));
       currentOperandReassociation.clear();
+      // end of current reassociation, inspect the next.
+      isValidGroupReass = false;
       pos++;
     }
 
