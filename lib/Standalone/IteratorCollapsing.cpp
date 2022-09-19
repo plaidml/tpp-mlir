@@ -24,34 +24,35 @@ using namespace mlir;
 
 // Most of these has been adapted by "DropUnitDims.cpp".
 
-// Return true if the result at position 'pos' in 'map' is a constant -1. False
+// Return true if the result at position 'pos' in 'map' is a constant 0. False
 // otherwise.
-static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
-  assert(pos < map.getNumResults() && "out of bound");
-  AffineExpr minusOneExpr = getAffineConstantExpr(0, map.getContext());
-  return map.getResults()[pos] == minusOneExpr;
+static bool isConstantZeroAtPos(ArrayRef<AffineExpr> results, unsigned pos,
+                                MLIRContext *ctx) {
+  assert(pos < results.size() && "out of bound");
+  AffineExpr minusOneExpr = getAffineConstantExpr(0, ctx);
+  return results[pos] == minusOneExpr;
 }
 
-// Return true if the map has one result that is a constant -1.
-static bool hasMinusOneResults(AffineMap map) {
+// Return true if the map has one result that is a constant 0.
+static bool hasZeroResults(AffineMap map) {
   unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
   while (pos < numResult) {
-    if (isConstantMinusOneAtPos(map, pos))
+    if (isConstantZeroAtPos(map.getResults(), pos, map.getContext()))
       return true;
     pos++;
   }
   return false;
 }
 
-// Return the position of the first result that is a constant -1.
-static unsigned getFirstMinusOnePos(AffineMap map) {
+// Return the position of the first result that is a constant 0.
+static unsigned getFirstZeroPos(AffineMap map) {
   unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
   while (pos < numResult) {
-    if (isConstantMinusOneAtPos(map, pos))
+    if (isConstantZeroAtPos(map.getResults(), pos, map.getContext()))
       return pos;
     pos++;
   }
@@ -296,32 +297,33 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
   for (OpOperand *opOperand : genericOp.getInputAndOutputOperands()) {
     ArrayRef<int64_t> shape = genericOp.getShape(opOperand);
     SmallVector<int64_t> newShape;
-    ArrayRef<AffineExpr> resultExprs =
-        newIndexingMaps[currentMapIdx].getResults();
+    AffineMap currentMap = newIndexingMaps[currentMapIdx];
+    ArrayRef<AffineExpr> resultExprs = currentMap.getResults();
     SmallVector<Attribute> operandReassociationMaps;
     SmallVector<AffineExpr> currentOperandReassociation;
 
-    auto isCollapsedDim = [&](int64_t dim) -> bool {
-      if (AffineDimExpr dimExpr = resultExprs[dim].dyn_cast<AffineDimExpr>())
-        if (collapsedDims.count(dimExpr.getPosition()))
-          return true;
-      return false;
-    };
-
-    // XXX bad fix. Can we use the set to store all the collapsed dimensions
-    // and just look up? The -1 still are needed for the operands.
-    auto isOK = [&](AffineMap map, int64_t dim) -> bool {
-      return isCollapsedDim(dim) || isConstantMinusOneAtPos(map, dim);
+    // Check if the result at postion 'pos' in 'resultExprs' is a collapsed
+    // dimension. A collapsed dimension is either a zero constant or
+    // is in the 'collapsedDims' set. A possible change is to look at the
+    // original maps and push the collapsed dimension in a set.
+    auto isCollapsedDim = [&](int64_t pos) -> bool {
+      auto isInSet = [&](int64_t pos) -> bool {
+        if (AffineDimExpr dimExpr = resultExprs[pos].dyn_cast<AffineDimExpr>())
+          if (collapsedDims.count(dimExpr.getPosition()))
+            return true;
+        return false;
+      };
+      return isInSet(pos) ||
+             isConstantZeroAtPos(resultExprs, pos, currentMap.getContext());
     };
 
     int64_t pos = 0;
     int64_t origRank = genericOp.getRank(opOperand);
     while (pos < origRank) {
       currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
-      if (isOK(newIndexingMaps[currentMapIdx], pos)) {
+      if (isCollapsedDim(pos)) {
         int64_t collapsedSize = shape[pos];
-        while (pos + 1 < origRank &&
-               isOK(newIndexingMaps[currentMapIdx], pos + 1)) {
+        while (pos + 1 < origRank && isCollapsedDim(pos + 1)) {
           ++pos;
           collapsedSize *= shape[pos];
           currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
@@ -339,8 +341,8 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
 
     // drop collapsed results from the indexing map.
     AffineMap map = newIndexingMaps[currentMapIdx];
-    while (hasMinusOneResults(map)) {
-      unsigned pos = getFirstMinusOnePos(map);
+    while (hasZeroResults(map)) {
+      unsigned pos = getFirstZeroPos(map);
       map = map.dropResult(pos);
     }
     newIndexingMaps[currentMapIdx] = map;
