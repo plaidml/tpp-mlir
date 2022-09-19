@@ -53,3 +53,9 @@ add_mlir_dialect_library(TPPStandalone
 	MLIRIR
   MLIRInferTypeOpInterface
 	)
+
+target_include_directories(TPPStandalone 
+  PUBLIC
+  $<BUILD_INTERFACE:${TPP_GEN_INCLUDE_DIR}>
+  $<BUILD_INTERFACE:${TPP_MAIN_INCLUDE_DIR}>
+)
