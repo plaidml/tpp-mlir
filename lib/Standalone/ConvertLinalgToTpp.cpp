@@ -306,10 +306,10 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 };
 
 struct ConvertBrgemmToTpp
-    : public OpRewritePattern<linalg::ReduceBatchMatmulOp> {
-  using OpRewritePattern<linalg::ReduceBatchMatmulOp>::OpRewritePattern;
+    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
+  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ReduceBatchMatmulOp linalgOp,
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasBufferSemantics())
       return failure();

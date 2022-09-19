@@ -24,34 +24,35 @@ using namespace mlir;
 
 // Most of these has been adapted by "DropUnitDims.cpp".
 
-// Return true if the result at position 'pos' in 'map' is a constant -1. False
+// Return true if the result at position 'pos' in 'map' is a constant 0. False
 // otherwise.
-static bool isConstantMinusOneAtPos(AffineMap map, int64_t pos) {
-  assert(pos < map.getNumResults() && "out of bound");
-  AffineExpr minusOneExpr = getAffineConstantExpr(0, map.getContext());
-  return map.getResults()[pos] == minusOneExpr;
+static bool isConstantZeroAtPos(ArrayRef<AffineExpr> results, unsigned pos,
+                                MLIRContext *ctx) {
+  assert(pos < results.size() && "out of bound");
+  AffineExpr minusOneExpr = getAffineConstantExpr(0, ctx);
+  return results[pos] == minusOneExpr;
 }
 
-// Return true if the map has one result that is a constant -1.
-static bool hasMinusOneResults(AffineMap map) {
+// Return true if the map has one result that is a constant 0.
+static bool hasZeroResults(AffineMap map) {
   unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
   while (pos < numResult) {
-    if (isConstantMinusOneAtPos(map, pos))
+    if (isConstantZeroAtPos(map.getResults(), pos, map.getContext()))
       return true;
     pos++;
   }
   return false;
 }
 
-// Return the position of the first result that is a constant -1.
-static unsigned getFirstMinusOnePos(AffineMap map) {
+// Return the position of the first result that is a constant 0.
+static unsigned getFirstZeroPos(AffineMap map) {
   unsigned pos = 0;
   unsigned numResult = map.getNumResults();
 
   while (pos < numResult) {
-    if (isConstantMinusOneAtPos(map, pos))
+    if (isConstantZeroAtPos(map.getResults(), pos, map.getContext()))
       return pos;
     pos++;
   }
@@ -199,19 +200,42 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   return replacementOp;
 }
 
+// The reassociation dimensions must equals the number of loops.
+// Each group should collapsed the same iterators (i.e., the collapsed iterators
+// must be all parallel or all reduction).
 static bool
 isValidReassociationForOp(ArrayRef<ReassociationIndices> reassociation,
-                          int64_t loops) {
+                          linalg::GenericOp genericOp) {
+  int64_t numLoops = genericOp.getNumLoops();
   int64_t counter = 0;
   for (auto group : reassociation)
     counter += group.size();
-  return loops == counter;
+  if (numLoops != counter) {
+    genericOp.emitError("invalid reassociation");
+    return false;
+  }
+  ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
+  for (ArrayRef<int64_t> group : reassociation) {
+    if (group.size() == 1)
+      continue;
+    int64_t groupSize = group.size();
+    auto typeFirstDim = iteratorTypes[group[0]];
+    for (int64_t start = 1; start < groupSize; start++) {
+      auto typeCurrentDim = iteratorTypes[group[start]];
+      if (typeCurrentDim != typeFirstDim) {
+        // TODO: propagate errors using the transform dialect.
+        genericOp.emitError("invalid reassociation");
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 FailureOr<linalg::GenericOp>
-mlir::tpp::collapseIterators(RewriterBase &rewriter,
-                             linalg::GenericOp genericOp,
-                             ArrayRef<ReassociationIndices> reassociation) {
+mlir::linalgx::collapseIterators(RewriterBase &rewriter,
+                                 linalg::GenericOp genericOp,
+                                 ArrayRef<ReassociationIndices> reassociation) {
   if (!isValidReassociation(reassociation))
     return failure();
 
@@ -221,7 +245,7 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
     return failure();
   ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
 
-  if (!isValidReassociationForOp(reassociation, iteratorTypes.size()))
+  if (!isValidReassociationForOp(reassociation, genericOp))
     return failure();
 
   DenseSet<unsigned> collapsedDims;
@@ -296,51 +320,71 @@ mlir::tpp::collapseIterators(RewriterBase &rewriter,
   for (OpOperand *opOperand : genericOp.getInputAndOutputOperands()) {
     ArrayRef<int64_t> shape = genericOp.getShape(opOperand);
     SmallVector<int64_t> newShape;
-    ArrayRef<AffineExpr> resultExprs =
-        newIndexingMaps[currentMapIdx].getResults();
+    AffineMap currentMap = newIndexingMaps[currentMapIdx];
+    ArrayRef<AffineExpr> resultExprs = currentMap.getResults();
     SmallVector<Attribute> operandReassociationMaps;
     SmallVector<AffineExpr> currentOperandReassociation;
 
-    auto isCollapsedDim = [&](int64_t dim) -> bool {
-      if (AffineDimExpr dimExpr = resultExprs[dim].dyn_cast<AffineDimExpr>())
-        if (collapsedDims.count(dimExpr.getPosition()))
-          return true;
-      return false;
-    };
+    bool isValidGroupReass = false;
 
-    // XXX bad fix. Can we use the set to store all the collapsed dimensions
-    // and just look up? The -1 still are needed for the operands.
-    auto isOK = [&](AffineMap map, int64_t dim) -> bool {
-      return isCollapsedDim(dim) || isConstantMinusOneAtPos(map, dim);
+    // Check if the result at postion 'pos' in 'resultExprs' is a collapsed
+    // dimension. A collapsed dimension is either a zero constant or
+    // is in the 'collapsedDims' set. A possible change is to look at the
+    // original maps and push the collapsed dimension in a set.
+    auto isCollapsedDim = [&](int64_t pos) -> bool {
+      auto isInSet = [&](int64_t pos) -> bool {
+        if (AffineDimExpr dimExpr = resultExprs[pos].dyn_cast<AffineDimExpr>())
+          if (collapsedDims.count(dimExpr.getPosition())) {
+            assert(!isValidGroupReass &&
+                   "multiple collapse dimension per reassociation group");
+            isValidGroupReass = true;
+            return true;
+          }
+        return false;
+      };
+      return isInSet(pos) ||
+             isConstantZeroAtPos(resultExprs, pos, currentMap.getContext());
     };
 
     int64_t pos = 0;
     int64_t origRank = genericOp.getRank(opOperand);
     while (pos < origRank) {
       currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
-      if (isOK(newIndexingMaps[currentMapIdx], pos)) {
+      if (isCollapsedDim(pos)) {
         int64_t collapsedSize = shape[pos];
-        while (pos + 1 < origRank &&
-               isOK(newIndexingMaps[currentMapIdx], pos + 1)) {
+        while (pos + 1 < origRank && isCollapsedDim(pos + 1)) {
           ++pos;
           collapsedSize *= shape[pos];
           currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
         }
         newShape.push_back(collapsedSize);
       } else {
+        // No reassociation, reassociation is valid.
+        isValidGroupReass = true;
         newShape.push_back(shape[pos]);
       }
+
+      // Exit if the current reassociation for the operand is not valid. A
+      // reassociation is valid when it containt the dimension on which the
+      // zeros will be collapsed on.
+      if (!isValidGroupReass) {
+        genericOp.emitError("fail to collapse");
+        return failure();
+      }
+
       operandReassociationMaps.push_back(AffineMapAttr::get(
           AffineMap::get(origRank, /*symbolCount = */ 0,
                          currentOperandReassociation, context)));
       currentOperandReassociation.clear();
+      // end of current reassociation, inspect the next.
+      isValidGroupReass = false;
       pos++;
     }
 
     // drop collapsed results from the indexing map.
     AffineMap map = newIndexingMaps[currentMapIdx];
-    while (hasMinusOneResults(map)) {
-      unsigned pos = getFirstMinusOnePos(map);
+    while (hasZeroResults(map)) {
+      unsigned pos = getFirstZeroPos(map);
       map = map.dropResult(pos);
     }
     newIndexingMaps[currentMapIdx] = map;
@@ -408,7 +452,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     FailureOr<linalg::GenericOp> replacementOp =
-        mlir::tpp::collapseIterators(rewriter, linalgOp, *reassociation);
+        mlir::linalgx::collapseIterators(rewriter, linalgOp, *reassociation);
     if (failed(replacementOp))
       return failure();
     return success();

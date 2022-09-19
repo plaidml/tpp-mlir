@@ -74,29 +74,32 @@ static LogicalResult areCompatibleDims(Range outerLoopRoot,
 // TODO: here we check only the outermost dimensions but I would
 // like a way to fuse *all* the outermost dimensions that are
 // compatible. Pass also the number of dimensions we want to inspect.
-static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
-                                     Operation *candidate, OpBuilder &builder) {
-  assert(candidate && "expect candidate to be a valid op");
-  linalg::LinalgOp linalgOp = dyn_cast_or_null<linalg::LinalgOp>(candidate);
-  if (!linalgOp)
-    return failure();
 
-  SmallVector<Range> candidateIterationDomain =
-      cast<TilingInterface>(linalgOp.getOperation())
-          .getIterationDomain(builder);
-
-  if ((!isStaticIterationDomain(candidateIterationDomain)) ||
-      (!isStaticIterationDomain(rootIterationDomain)))
-    return failure();
-
-  // Require at least two dimensions.
-  if (candidateIterationDomain.size() < 2)
-    return failure();
-  if (rootIterationDomain.size() < 2)
-    return failure();
-  // Check if the outer loop are compatible, and if so fuse.
-  return areCompatibleDims(candidateIterationDomain[0], rootIterationDomain[0]);
-}
+// static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
+//                                      Operation *candidate, OpBuilder
+//                                      &builder) {
+//   assert(candidate && "expect candidate to be a valid op");
+//   linalg::LinalgOp linalgOp = dyn_cast_or_null<linalg::LinalgOp>(candidate);
+//   if (!linalgOp)
+//     return failure();
+//
+//   SmallVector<Range> candidateIterationDomain =
+//       cast<TilingInterface>(linalgOp.getOperation())
+//           .getIterationDomain(builder);
+//
+//   if ((!isStaticIterationDomain(candidateIterationDomain)) ||
+//       (!isStaticIterationDomain(rootIterationDomain)))
+//     return failure();
+//
+//   // Require at least two dimensions.
+//   if (candidateIterationDomain.size() < 2)
+//     return failure();
+//   if (rootIterationDomain.size() < 2)
+//     return failure();
+//   // Check if the outer loop are compatible, and if so fuse.
+//   return areCompatibleDims(candidateIterationDomain[0],
+//   rootIterationDomain[0]);
+// }
 
 static LogicalResult tileDivideIterationDomain(linalg::GenericOp linalgOp,
                                                ArrayRef<int64_t> tiles,
@@ -173,8 +176,8 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     TilingInterface tilingInterfaceOp =
         cast<TilingInterface>(linalgOp.getOperation());
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        tileAndFuse.returningMatchAndRewrite(tilingInterfaceOp, rewriter,
-                                             canFuseOuterDim);
+        tileAndFuse.returningMatchAndRewrite(tilingInterfaceOp, rewriter/*,
+                                             canFuseOuterDim*/);
     if (failed(tileAndFuseResult))
       return failure();
     return success();

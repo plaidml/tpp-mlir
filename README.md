@@ -16,7 +16,7 @@ There's [work in progress](https://github.com/iree-org/iree/tree/tpp) inside [IR
 
 ```sh
 # Clone
-git clone -b sandbox https://github.com/plaidml/llvm-project.git
+https://github.com/llvm/llvm-project.git
 mkdir llvm-project/build
 pushd llvm-project/build
 
@@ -80,22 +80,6 @@ This dialect template is made available under the Apache License 2.0 with LLVM E
 
 - https://libxsmm.readthedocs.io/en/latest/libxsmm_aux/#meta-image-file-io
 - Nice link for conv: https://d2l.ai/chapter_convolutional-neural-networks/padding-and-strides.html
-
-
-How to match something like:
-
-```
-func.func @add_d(%arga: tensor<32xf32, #DV>, %argb: f32, %argx: tensor<32xf32>) -> tensor<32xf32> {
-  %0 = linalg.generic #trait1
-     ins(%arga: tensor<32xf32, #DV>)
-    outs(%argx: tensor<32xf32>) {
-      ^bb(%a: f32, %x: f32):
-        %0 = arith.addf %a, %argb : f32
-        linalg.yield %0 : f32
-  } -> tensor<32xf32>
-  return %0 : tensor<32xf32>
-}
-```
 
 - in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
 

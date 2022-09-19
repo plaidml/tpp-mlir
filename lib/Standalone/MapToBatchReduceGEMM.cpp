@@ -137,7 +137,8 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 }
 
 FailureOr<SmallVector<Value>>
-mlir::tpp::mapToBRGEMMOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
+mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
+                             linalg::LinalgOp linalgOp) {
   if (failed(MapToBRGEMMOpPreconditions(linalgOp)))
     return failure();
 
@@ -168,13 +169,13 @@ mlir::tpp::mapToBRGEMMOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
 
-    linalg::ReduceBatchMatmulOp brgemm =
+    linalg::BatchReduceMatmulOp brgemm =
         (linalgOp.hasTensorSemantics())
-            ? builder.create<linalg::ReduceBatchMatmulOp>(
+            ? builder.create<linalg::BatchReduceMatmulOp>(
                   loc, slicedOperands[2].getType(),
                   ValueRange{slicedOperands[0], slicedOperands[1]},
                   slicedOperands[2])
-            : builder.create<linalg::ReduceBatchMatmulOp>(
+            : builder.create<linalg::BatchReduceMatmulOp>(
                   loc, ValueRange{slicedOperands[0], slicedOperands[1]},
                   slicedOperands[2]);
 
@@ -226,7 +227,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::tpp::mapToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::mapToBRGEMMOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();

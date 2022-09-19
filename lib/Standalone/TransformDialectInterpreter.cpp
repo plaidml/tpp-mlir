@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Standalone/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "Standalone/Passes.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -24,21 +24,17 @@ using namespace mlir::tpp;
 
 namespace {
 
-struct TransformDialectInterpreter : TransformDialectInterpreterBase<TransformDialectInterpreter> {
+struct TransformDialectInterpreter
+    : TransformDialectInterpreterBase<TransformDialectInterpreter> {
   void runOnOperation() override {
     ModuleOp module = getOperation();
     transform::TransformState state(
         module.getBodyRegion(), module,
         transform::TransformOptions().enableExpensiveChecks(
-            true/*enableExpensiveChecks*/));
-    for (auto op :
-         module.getBody()->getOps<transform::TransformOpInterface>()) {
-      if (failed(state.applyTransform(op).checkAndReport())) {
-        llvm::errs() << "pass TransformDialectInterpreter failed to apply!\n";
+            true /*enableExpensiveChecks*/));
+    for (auto op : module.getBody()->getOps<transform::TransformOpInterface>())
+      if (failed(state.applyTransform(op).checkAndReport()))
         return signalPassFailure();
-      }
-      module.dump();
-    }
   }
 };
 
