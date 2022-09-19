@@ -67,7 +67,7 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
   if (linalg::Conv2DNchwFchwOp convOp =
           dyn_cast<linalg::Conv2DNchwFchwOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedConv =
-        tpp::blockConv2DNchwFchwOp(rewriter, convOp, blockSizes);
+        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, convOp, blockSizes);
     if (succeeded(blockedConv)) {
       results.push_back(*blockedConv);
       return DiagnosedSilenceableFailure(success());
@@ -75,7 +75,7 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
   }
   if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedMatmul =
-        tpp::blockMatmulOp(rewriter, matmulOp, blockSizes);
+        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, blockSizes);
     if (succeeded(blockedMatmul)) {
       results.push_back(*blockedMatmul);
       return DiagnosedSilenceableFailure(success());
@@ -97,7 +97,7 @@ transform::CollapseOp::applyToOne(linalg::LinalgOp target,
     return DiagnosedSilenceableFailure::definiteFailure();
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<linalg::GenericOp> collapsedOp = tpp::collapseIterators(
+  FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
       rewriter, cast<linalg::GenericOp>(target), getReassociationIndices());
   if (failed(collapsedOp))
     return DiagnosedSilenceableFailure::definiteFailure();
@@ -129,7 +129,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops =
-      tpp::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
+      mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
   if (failed(brgemmLoops))
     return DiagnosedSilenceableFailure::definiteFailure();
   // TODO: return linalg.batch_reduce_matmul instead of loops.

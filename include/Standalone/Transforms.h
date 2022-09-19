@@ -21,8 +21,7 @@ class Conv2DNchwFchwOp;
 class MatmulOp;
 } // namespace linalg
 
-// TODO: rename namespace to linalgx
-namespace tpp {
+namespace linalgx {
 
 // Attempt to map the current linalgOp to a BRGEMM.
 // On success the returned values are the materialzed loops with BRGEMM inside.
@@ -44,5 +43,5 @@ FailureOr<linalg::GenericOp>
 collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
                   ArrayRef<SmallVector<int64_t, 2>> reassociation);
 
-} // namespace tpp
+} // namespace linalgx
 } // namespace mlir

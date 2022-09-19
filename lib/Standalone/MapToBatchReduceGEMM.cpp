@@ -137,7 +137,8 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 }
 
 FailureOr<SmallVector<Value>>
-mlir::tpp::mapToBRGEMMOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
+mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
+                             linalg::LinalgOp linalgOp) {
   if (failed(MapToBRGEMMOpPreconditions(linalgOp)))
     return failure();
 
@@ -226,7 +227,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::tpp::mapToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::mapToBRGEMMOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();

@@ -210,9 +210,9 @@ isValidReassociationForOp(ArrayRef<ReassociationIndices> reassociation,
 }
 
 FailureOr<linalg::GenericOp>
-mlir::tpp::collapseIterators(RewriterBase &rewriter,
-                             linalg::GenericOp genericOp,
-                             ArrayRef<ReassociationIndices> reassociation) {
+mlir::linalgx::collapseIterators(RewriterBase &rewriter,
+                                 linalg::GenericOp genericOp,
+                                 ArrayRef<ReassociationIndices> reassociation) {
   if (!isValidReassociation(reassociation))
     return failure();
 
@@ -410,7 +410,7 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     FailureOr<linalg::GenericOp> replacementOp =
-        mlir::tpp::collapseIterators(rewriter, linalgOp, *reassociation);
+        mlir::linalgx::collapseIterators(rewriter, linalgOp, *reassociation);
     if (failed(replacementOp))
       return failure();
     return success();

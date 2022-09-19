@@ -202,9 +202,9 @@ static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
 }
 
 FailureOr<linalg::GenericOp>
-mlir::tpp::blockConv2DNchwFchwOp(RewriterBase &rewriter,
-                                 linalg::Conv2DNchwFchwOp convOp,
-                                 ArrayRef<int64_t> blockingFactors) {
+mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
+                                     linalg::Conv2DNchwFchwOp convOp,
+                                     ArrayRef<int64_t> blockingFactors) {
   if (blockingFactors.size() != 2)
     return failure();
   if (failed(BlockOpPreconditions(convOp)))
@@ -282,8 +282,8 @@ mlir::tpp::blockConv2DNchwFchwOp(RewriterBase &rewriter,
 }
 
 FailureOr<linalg::GenericOp>
-mlir::tpp::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                         ArrayRef<int64_t> blockingFactors) {
+mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                             ArrayRef<int64_t> blockingFactors) {
   if (blockingFactors.size() != 2)
     return failure();
   if (failed(BlockOpPreconditions(matmulOp)))
@@ -360,7 +360,7 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> blockedMatmul =
-        mlir::tpp::blockMatmulOp(rewriter, matmulOp, blockingFactors);
+        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, blockingFactors);
     if (failed(blockedMatmul))
       return failure();
     return success();
@@ -501,7 +501,8 @@ struct DoItOnConv2DNchwFchw
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::tpp::blockConv2DNchwFchwOp(rewriter, linalgOp, blockingFactors);
+        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, linalgOp,
+                                             blockingFactors);
     if (failed(maybeGeneric))
       return failure();
     return success();
