@@ -94,8 +94,8 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   if (!filterType.hasStaticShape())
     return false;
   ArrayRef<int64_t> filterShape = filterType.getShape();
-  assert(i >= 0 && i < filterShape.size() && "out of bound");
-  assert(j >= 0 && j < filterShape.size() && "out of bound");
+  assert(i < filterShape.size() && "out of bound");
+  assert(j < filterShape.size() && "out of bound");
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
