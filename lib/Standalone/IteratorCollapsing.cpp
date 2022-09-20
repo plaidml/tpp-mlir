@@ -56,7 +56,7 @@ static unsigned getFirstZeroPos(AffineMap map) {
       return pos;
     pos++;
   }
-  llvm_unreachable("non-minus ones");
+  llvm_unreachable("expect to find a zero");
   return pos;
 }
 
@@ -306,12 +306,14 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
                                          reassociation.size(), numSymbols)));
   }
 
-  llvm::errs() << "=======================\n";
-  for (AffineMap map : indexingMaps)
-    llvm::errs() << map << "\n";
-  for (AffineMap map : newIndexingMaps)
-    llvm::errs() << map << "\n";
-  llvm::errs() << "=======================\n";
+  LLVM_DEBUG({
+    llvm::errs() << "=======================\n";
+    for (AffineMap map : indexingMaps)
+      llvm::errs() << map << "\n";
+    for (AffineMap map : newIndexingMaps)
+      llvm::errs() << map << "\n";
+    llvm::errs() << "=======================\n";
+  });
 
   assert(newIndexingMaps.front().getNumDims() == reassociation.size());
 
@@ -401,23 +403,25 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   if (!inversePermutation(concatAffineMaps(newIndexingMaps)))
     return failure();
 
-  llvm::errs() << "--- per operand info ---\n";
-  llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
-  for (Type t : newInputOutputTypes)
-    llvm::errs() << t << "\n";
-  llvm::errs() << "#operand reassociation maps: "
-               << operandsReassociationMaps.size() << "\n";
-  for (ArrayAttr attr : operandsReassociationMaps)
-    llvm::errs() << attr << "\n";
-  llvm::errs() << "------------------------\n";
-  llvm::errs() << "--- new operation info ---\n";
-  llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
-  for (AffineMap map : newIndexingMaps)
-    llvm::errs() << map << "\n";
-  llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
-  for (Attribute attr : newIteratorTypes)
-    llvm::errs() << attr << "\n";
-  llvm::errs() << "--------------------------\n";
+  LLVM_DEBUG({
+    llvm::errs() << "--- per operand info ---\n";
+    llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
+    for (Type t : newInputOutputTypes)
+      llvm::errs() << t << "\n";
+    llvm::errs() << "#operand reassociation maps: "
+                 << operandsReassociationMaps.size() << "\n";
+    for (ArrayAttr attr : operandsReassociationMaps)
+      llvm::errs() << attr << "\n";
+    llvm::errs() << "------------------------\n";
+    llvm::errs() << "--- new operation info ---\n";
+    llvm::errs() << "#idxmaps: " << newIndexingMaps.size() << "\n";
+    for (AffineMap map : newIndexingMaps)
+      llvm::errs() << map << "\n";
+    llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
+    for (Attribute attr : newIteratorTypes)
+      llvm::errs() << attr << "\n";
+    llvm::errs() << "--------------------------\n";
+  });
 
   // if any operand type change insert a reshape.
   FailureOr<SmallVector<Value>> reshapedOperands = insertReshapes(
