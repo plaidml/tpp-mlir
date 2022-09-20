@@ -22,3 +22,5 @@ void TppDialect::initialize() {
 #include "Standalone/Dialect/Tpp/TppOps.cpp.inc"
       >();
 }
+
+#include "Standalone/Dialect/Tpp/TppOpsDialect.cpp.inc"

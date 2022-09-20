@@ -22,3 +22,5 @@ void LinalgXDialect::initialize() {
 #include "Standalone/Dialect/LinalgX/LinalgXOps.cpp.inc"
       >();
 }
+
+#include "Standalone/Dialect/LinalgX/LinalgXOpsDialect.cpp.inc"

@@ -21,16 +21,11 @@
 
 #include "Standalone/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "Standalone/Dialect/LinalgX/LinalgXDialect.h"
-#include "Standalone/Dialect/LinalgX/LinalgXOpsDialect.cpp.inc"
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
 #include "Standalone/Dialect/Mathx/MathxDialect.h"
-#include "Standalone/Dialect/Mathx/MathxOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Stdx/StdxDialect.h"
-#include "Standalone/Dialect/Stdx/StdxOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Tpp/TppDialect.h"
-#include "Standalone/Dialect/Tpp/TppOpsDialect.cpp.inc"
 #include "Standalone/Dialect/Xsmm/XsmmDialect.h"
-#include "Standalone/Dialect/Xsmm/XsmmOpsDialect.cpp.inc"
 #include "Standalone/Passes.h"
 
 int main(int argc, char **argv) {
