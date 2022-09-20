@@ -26,7 +26,7 @@ def Relayout : LinalgX_Op<"relayout",
            DestinationStyleOpInterface, 
            DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
            SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
-  let summary = "relayout from to block layout and back.";
+  let summary = "relayout from block layout and back.";
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
                        AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
   let results = (outs Variadic<AnyShaped>:$result);
