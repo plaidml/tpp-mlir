@@ -1,0 +1,5 @@
+add_subdirectory(LinalgX)
+add_subdirectory(Mathx)
+add_subdirectory(Stdx)
+add_subdirectory(Tpp)
+add_subdirectory(Xsmm)

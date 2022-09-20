@@ -22,3 +22,5 @@ void MathxDialect::initialize() {
 #include "Standalone/Dialect/Mathx/MathxOps.cpp.inc"
       >();
 }
+
+#include "Standalone/Dialect/Mathx/MathxOpsDialect.cpp.inc"

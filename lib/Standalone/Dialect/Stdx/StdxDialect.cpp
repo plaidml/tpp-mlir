@@ -22,3 +22,5 @@ void StdxDialect::initialize() {
 #include "Standalone/Dialect/Stdx/StdxOps.cpp.inc"
       >();
 }
+
+#include "Standalone/Dialect/Stdx/StdxOpsDialect.cpp.inc"

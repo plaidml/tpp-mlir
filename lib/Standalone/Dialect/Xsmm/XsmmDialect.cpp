@@ -22,3 +22,5 @@ void XsmmDialect::initialize() {
 #include "Standalone/Dialect/Xsmm/XsmmOps.cpp.inc"
       >();
 }
+
+#include "Standalone/Dialect/Xsmm/XsmmOpsDialect.cpp.inc"
