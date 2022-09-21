@@ -9,6 +9,7 @@
 #include "Standalone/Dialect/Xsmm/XsmmAttr.h"
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
 #include "Standalone/Passes.h"
+#include "Standalone/Transforms.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -284,7 +285,18 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
   }
 };
 
-void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
+struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    tpp::populateXsmmToFuncPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
+} // namespace
+
+void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTernaryXsmmOp,
                ConvertBinaryXsmmOp,
@@ -294,17 +306,6 @@ void populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
                ConvertUnaryDispatch>(patterns.getContext());
   // clang-format on
 }
-
-struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateXsmmToFuncPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
-} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createConvertXsmmToFuncPass() {

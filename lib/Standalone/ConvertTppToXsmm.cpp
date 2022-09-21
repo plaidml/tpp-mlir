@@ -10,6 +10,7 @@
 #include "Standalone/Dialect/Xsmm/XsmmAttr.h"
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
 #include "Standalone/Passes.h"
+#include "Standalone/Transforms.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -327,14 +328,12 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     MemRefType outputMemRef = outputType.cast<MemRefType>();
     int64_t m = outputMemRef.getShape()[0];
     int64_t n = outputMemRef.getShape()[1];
-    auto ldiLhsDim =
-        getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
+    auto ldiLhsDim = getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
     if (failed(ldiLhsDim))
       return failure();
     int64_t ldiLhs = *ldiLhsDim;
 
-    auto ldiRhsDim = 
-        getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
+    auto ldiRhsDim = getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
     if (failed(ldiRhsDim))
       return failure();
     int64_t ldiRhs = *ldiRhsDim;
@@ -364,7 +363,18 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
-void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
+struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    tpp::populateTppToXsmmPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
+} // namespace
+
+void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppIdentityOp,
                ConvertTppReluOp,
@@ -373,17 +383,6 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns) {
                ConvertTppBrgemmOp>(patterns.getContext());
   // clang-format on
 }
-
-struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateTppToXsmmPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
-} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertTppToXsmmPass() {

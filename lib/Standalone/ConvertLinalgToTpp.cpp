@@ -9,6 +9,7 @@
 #include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
+#include "Standalone/Transforms.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -359,13 +360,6 @@ struct SubViewOfSubViewWithUnitDims
   }
 };
 
-void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  patterns.add<ConvertGenericOpToTpp,
-               ConvertBrgemmToTpp>(patterns.getContext());
-  // clang-format on
-}
-
 void populateSubViewFoldingPatterns(RewritePatternSet &patterns) {
   patterns.add<SubViewOfSubViewWithUnitDims>(patterns.getContext());
 }
@@ -391,7 +385,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
       });
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    populateConvertLinalgToTppPatterns(patterns);
+    tpp::populateLinalgToTppPatterns(patterns);
     populateSubViewFoldingPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
@@ -401,6 +395,13 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 };
 
 } // end namespace
+
+void mlir::tpp::populateLinalgToTppPatterns(RewritePatternSet &patterns) {
+  // clang-format off
+  patterns.add<ConvertGenericOpToTpp,
+               ConvertBrgemmToTpp>(patterns.getContext());
+  // clang-format on
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertLinalgToTppPass() {
