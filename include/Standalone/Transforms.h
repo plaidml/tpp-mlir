@@ -44,4 +44,10 @@ collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
                   ArrayRef<SmallVector<int64_t, 2>> reassociation);
 
 } // namespace linalgx
+
+namespace tpp {
+void populateLinalgToTppPatterns(RewritePatternSet &patterns);
+void populateTppToXsmmPatterns(RewritePatternSet &patterns);
+void populateXsmmToFuncPatterns(RewritePatternSet &patterns);
+} // namespace tpp
 } // namespace mlir
