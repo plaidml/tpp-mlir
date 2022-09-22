@@ -90,6 +90,10 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let description = [{
     Convert xsmm operations to libXSMM function calls.
   }];
+  let options = [
+    Option<"useExtractMetaData", "use-extract-metadata", "bool", "false",
+           "Use memref.extract_strided_metadata">
+  ];
   let dependentDialects = ["func::FuncDialect"];
 }
 
