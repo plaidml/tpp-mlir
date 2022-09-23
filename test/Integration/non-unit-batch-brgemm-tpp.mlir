@@ -12,8 +12,6 @@
 // RUN: FileCheck %s
 //
 
-// TODO when batch > 1 we don't get the same result from xsmm.
-
 module {
 
   func.func @brgemmtpp(%A: tensor<2x4x8xf32>,
