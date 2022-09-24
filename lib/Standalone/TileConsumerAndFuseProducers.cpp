@@ -43,27 +43,27 @@ static int64_t getSizeRange(Range loopRange) {
 }
 
 // Check if all the loops have static ranges.
-static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
-  for (Range loopRange : iterationDomain)
-    if (!isStaticRange(loopRange))
-      return false;
-  return true;
-}
+// static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
+//  for (Range loopRange : iterationDomain)
+//    if (!isStaticRange(loopRange))
+//      return false;
+//  return true;
+//}
 
 // Check if two loop range are compatible - meaning same offset, size and step.
-static LogicalResult areCompatibleDims(Range outerLoopRoot,
-                                       Range outerLoopCandidate) {
-  int64_t offset = *getConstantIntValue(outerLoopRoot.offset);
-  if (offset != *getConstantIntValue(outerLoopCandidate.offset))
-    return failure();
-  int64_t size = *getConstantIntValue(outerLoopRoot.size);
-  if (size != *getConstantIntValue(outerLoopCandidate.size))
-    return failure();
-  int64_t stride = *getConstantIntValue(outerLoopRoot.stride);
-  if (stride != *getConstantIntValue(outerLoopCandidate.stride))
-    return failure();
-  return success();
-}
+// static LogicalResult areCompatibleDims(Range outerLoopRoot,
+//                                       Range outerLoopCandidate) {
+//  int64_t offset = *getConstantIntValue(outerLoopRoot.offset);
+//  if (offset != *getConstantIntValue(outerLoopCandidate.offset))
+//    return failure();
+//  int64_t size = *getConstantIntValue(outerLoopRoot.size);
+//  if (size != *getConstantIntValue(outerLoopCandidate.size))
+//    return failure();
+//  int64_t stride = *getConstantIntValue(outerLoopRoot.stride);
+//  if (stride != *getConstantIntValue(outerLoopCandidate.stride))
+//    return failure();
+//  return success();
+//}
 
 // Attempt to fuse outer dimension. NOTE: since we are trying to
 // fuse the outer dimension only you may want to pass a tile
