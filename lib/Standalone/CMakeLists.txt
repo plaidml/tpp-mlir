@@ -16,6 +16,7 @@ add_mlir_library(TPPStandalone
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
+    MapConv2DNhwcHwcfToMatmul.cpp
 
   # Utils
     TransformUtils.cpp

@@ -98,4 +98,30 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// MapConv2DNhwcHwcfToMatmulOp
+//===----------------------------------------------------------------------===//
+
+def MapConv2DNhwcHwcfToMatmulOp : Op<Transform_Dialect, 
+                      "structured.map_conv_2d_nhwc_hwcf_to_matmul",
+                      [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+                       TransformOpInterface, TransformEachOpTrait]> {
+
+  let description = [{
+    Map a linalg.conv_2d_nhwc_hwcf to a linalg.matmul.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
+
+  let assemblyFormat = "$target attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        TransformState &state);
+  }];
+}
+
 #endif // LINALG_TRANSFORM_OPS

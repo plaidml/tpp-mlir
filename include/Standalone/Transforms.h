@@ -28,6 +28,9 @@ namespace linalgx {
 FailureOr<SmallVector<Value>> mapToBRGEMMOp(RewriterBase &rewriter,
                                             linalg::LinalgOp linalgOp);
 
+FailureOr<linalg::MatmulOp> mapConv2DNhwcHwcfToGemm(RewriterBase &rewriter,
+                                                    linalg::LinalgOp linalgOp);
+
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>
 blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
