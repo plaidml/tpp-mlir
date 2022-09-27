@@ -15,6 +15,10 @@ class OpBuilder;
 struct Range;
 class RewriterBase;
 
+namespace linalg {
+class LinalgOp;
+}
+
 namespace utils {
 
 // Given an opOperand and a range of ivs return the one used by the operands.
