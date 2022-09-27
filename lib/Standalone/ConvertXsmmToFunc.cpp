@@ -47,7 +47,9 @@ static SmallVector<Type> extractInvokeOperandTypesForMeta(OperandRange operands,
   for (Value operand : operands) {
     Type operandType = operand.getType();
     if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
-      Type basePtrType = MemRefType::get({}, memrefType.getElementType());
+      // TODO: non-POD will require an LLVMTypeConverter.
+      Type basePtrType =
+          LLVM::LLVMPointerType::get(memrefType.getElementType());
       results.push_back(basePtrType);
       results.push_back(indexType); // offset
       size_t rank = memrefType.getRank();
@@ -93,13 +95,25 @@ static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
       res.push_back(operand);
       continue;
     }
-    MemRefType basePtrType = MemRefType::get({}, memrefType.getElementType());
+    MemRefType baseMemrefType =
+        MemRefType::get({}, memrefType.getElementType());
+    Type basePtrType = builder.getIndexType();
     Type offsetType = builder.getIndexType();
     SmallVector<Type> sizesTypes(memrefType.getRank(), offsetType);
     SmallVector<Type> stridesTypes(memrefType.getRank(), offsetType);
     auto meta = builder.create<memref::ExtractStridedMetadataOp>(
-        loc, basePtrType, offsetType, sizesTypes, stridesTypes, operand);
-    res.push_back(meta.getBaseBuffer());
+        loc, baseMemrefType, offsetType, sizesTypes, stridesTypes, operand);
+    Value basePointerAsIndex =
+        builder.create<memref::ExtractAlignedPointerAsIndexOp>(loc, basePtrType,
+                                                               operand);
+    Value basePointerAsI64 = builder.create<arith::IndexCastOp>(
+        loc, builder.getIntegerType(64), basePointerAsIndex);
+
+    // TODO: non-POD will require an LLVMTypeConverter.
+    Value basePointer = builder.create<LLVM::IntToPtrOp>(
+        loc, LLVM::LLVMPointerType::get(memrefType.getElementType()),
+        basePointerAsI64);
+    res.push_back(basePointer);
     res.push_back(meta.getOffset());
     for (Value operand : meta.getSizes())
       res.push_back(operand);
@@ -127,11 +141,13 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    // Insert a function attribute that will trigger the emission of the
-    // corresponding `_mlir_ciface_xxx` interface so that external libraries
-    // see a normalized ABI.
-    funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                    UnitAttr::get(op->getContext()));
+    if (!useMeta) {
+      // Insert a function attribute that will trigger the emission of the
+      // corresponding `_mlir_ciface_xxx` interface so that external libraries
+      // see a normalized ABI.
+      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                      UnitAttr::get(op->getContext()));
+    }
     funcOp.setPrivate();
   }
 
@@ -215,7 +231,7 @@ static func::CallOp buildDispatchCall(Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
                                       ModuleOp module, FlatSymbolRefAttr fnName,
-                                      PatternRewriter &rewriter) {
+                                      bool useMeta, PatternRewriter &rewriter) {
   auto libFnType = rewriter.getFunctionType(
       dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
 
@@ -226,11 +242,13 @@ static func::CallOp buildDispatchCall(Location loc,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    // Insert a function attribute that will trigger the emission of the
-    // corresponding `_mlir_ciface_xxx` interface so that external libraries
-    // see a normalized ABI.
-    funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                    UnitAttr::get(rewriter.getContext()));
+    if (!useMeta) {
+      // Insert a function attribute that will trigger the emission of the
+      // corresponding `_mlir_ciface_xxx` interface so that external libraries
+      // see a normalized ABI.
+      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                      UnitAttr::get(rewriter.getContext()));
+    }
     funcOp.setPrivate();
   }
 
@@ -241,7 +259,10 @@ static func::CallOp buildDispatchCall(Location loc,
 }
 
 struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
-  using OpRewritePattern<TernaryDispatchOp>::OpRewritePattern;
+  ConvertTernaryDispatch(MLIRContext *context, bool useMeta,
+                         PatternBenefit benefit = 1)
+      : OpRewritePattern<TernaryDispatchOp>(context, benefit),
+        useMeta(useMeta) {}
 
   LogicalResult matchAndRewrite(TernaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
@@ -264,15 +285,22 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
           rewriter.create<arith::ConstantOp>(loc, integer64, attr));
       dispatchOperandTypes.push_back(integer64);
     }
-    func::CallOp call = buildDispatchCall(
-        loc, dispatchOperands, dispatchOperandTypes, module, fnName, rewriter);
+    func::CallOp call =
+        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
+                          fnName, useMeta, rewriter);
     rewriter.replaceOp(dispatchOp, call.getResult(0));
     return success();
   }
+
+private:
+  bool useMeta = false;
 };
 
 struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
-  using OpRewritePattern<BinaryDispatchOp>::OpRewritePattern;
+  ConvertBinaryDispatch(MLIRContext *context, bool useMeta,
+                        PatternBenefit benefit = 1)
+      : OpRewritePattern<BinaryDispatchOp>(context, benefit), useMeta(useMeta) {
+  }
 
   LogicalResult matchAndRewrite(BinaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
@@ -305,15 +333,21 @@ struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
         loc, integer64, dispatchOp.getFlagsAttr()));
     dispatchOperandTypes.push_back(integer64);
 
-    func::CallOp call = buildDispatchCall(
-        loc, dispatchOperands, dispatchOperandTypes, module, fnName, rewriter);
+    func::CallOp call =
+        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
+                          fnName, useMeta, rewriter);
     rewriter.replaceOp(dispatchOp, call.getResult(0));
     return success();
   }
+
+private:
+  bool useMeta = false;
 };
 
 struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
-  using OpRewritePattern<UnaryDispatchOp>::OpRewritePattern;
+  ConvertUnaryDispatch(MLIRContext *context, bool useMeta,
+                       PatternBenefit benefit = 1)
+      : OpRewritePattern<UnaryDispatchOp>(context, benefit), useMeta(useMeta) {}
 
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
@@ -345,11 +379,15 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
         loc, integer64, dispatchOp.getFlagsAttr()));
     dispatchOperandTypes.push_back(integer64);
 
-    func::CallOp call = buildDispatchCall(
-        loc, dispatchOperands, dispatchOperandTypes, module, fnName, rewriter);
+    func::CallOp call =
+        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
+                          fnName, useMeta, rewriter);
     rewriter.replaceOp(dispatchOp, call.getResult(0));
     return success();
   }
+
+private:
+  bool useMeta = false;
 };
 
 struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
@@ -373,7 +411,7 @@ void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
       patterns.getContext(), useExtractMetaData);
   patterns
       .add<ConvertTernaryDispatch, ConvertBinaryDispatch, ConvertUnaryDispatch>(
-          patterns.getContext());
+          patterns.getContext(), useExtractMetaData);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>
