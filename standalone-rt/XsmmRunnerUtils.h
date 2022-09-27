@@ -72,4 +72,17 @@ _mlir_ciface_xsmm_brgemm_invoke(int64_t, UnrankedMemRefType<float> *,
                                 UnrankedMemRefType<float> *,
                                 UnrankedMemRefType<float> *, int64_t);
 
+//----------------------------------------------------------------------------//
+// BRGEMM connection on the IREE side.
+//----------------------------------------------------------------------------//
+extern "C" MLIR_RUNNERUTILS_EXPORT
+    int64_t iree_xsmm_brgemm_dispatch_f32(int64_t, int64_t, int64_t, int64_t,
+                                          int64_t, int64_t);
+
+// TODO: most of these arguments are not useful; trim the fat.
+extern "C" MLIR_RUNNERUTILS_EXPORT void iree_xsmm_brgemm_invoke_f32(
+    int64_t, float *, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, float *, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, float *, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
+
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H
