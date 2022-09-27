@@ -423,3 +423,39 @@ extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t m, int64_t n,
 
   return reinterpret_cast<int64_t>(sgemm);
 }
+
+//----------------------------------------------------------------------------//
+// BRGEMM connection on the IREE side.
+//----------------------------------------------------------------------------//
+extern "C" int64_t iree_xsmm_brgemm_dispatch_f32(int64_t m, int64_t n,
+                                                 int64_t k, int64_t lda,
+                                                 int64_t ldb, int64_t ldc) {
+  // printf("m %d n %d k %d lda %d ldb %d ldc %d\n", m, n, k, lda, ldb, ldc);
+  return _mlir_ciface_xsmm_brgemm_dispatch_f32(m, n, k, lda, ldb, ldc);
+}
+
+// TODO: most of these arguments are not useful; trim the fat.
+extern "C" MLIR_RUNNERUTILS_EXPORT void iree_xsmm_brgemm_invoke_f32(
+    int64_t addr, float *pA, int64_t offA, int64_t szA0, int64_t szA1,
+    int64_t szA2, int64_t stA0, int64_t stA1, int64_t stA2, float *pB,
+    int64_t offB, int64_t szB0, int64_t szB1, int64_t szB2, int64_t stB0,
+    int64_t stB1, int64_t stB2, float *pC, int64_t offC, int64_t szC0,
+    int64_t szC1, int64_t stC0, int64_t stC1, int64_t numBatches) {
+
+  // printf("addr %d numBatches %d\n", addr, numBatches);
+  // printf("pA %p offA %d pB %p offB %d pC %p offC %d\n", pA, offA, pB, offB,
+  // pC, offC);
+  float *addr_tensorA = pA + offA;
+  float *addr_tensorB = pB + offB;
+  float *addr_tensorC = pC + offC;
+
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_param gemm_param;
+  sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(addr);
+  unsigned long long numBatchesVar = numBatches;
+  gemm_param.a.primary = (void *)addr_tensorB;
+  gemm_param.b.primary = (void *)addr_tensorA;
+  gemm_param.c.primary = (void *)addr_tensorC;
+  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  sgemm.gemm(&gemm_param);
+}

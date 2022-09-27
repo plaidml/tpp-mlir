@@ -78,12 +78,13 @@ endif()
 
 add_subdirectory(include)
 add_subdirectory(lib)
+# Atm, IREE needs the standalone-rt library to call into libxsmm.
+add_subdirectory(standalone-rt)
 
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
-  add_subdirectory(test)
   add_subdirectory(standalone-opt)
-  add_subdirectory(standalone-rt)
+  add_subdirectory(test)
 endif()
 
 message(STATUS "TPP Project CMakeLists.txt END")
