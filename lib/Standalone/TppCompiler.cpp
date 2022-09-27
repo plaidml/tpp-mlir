@@ -93,7 +93,7 @@ void TppCompilerPipeline::runOnOperation() {
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
   pm.addPass(createConvertMathToLibmPass());
   pm.addPass(createConvertFuncToLLVMPass());
-  pm.addPass(createMemRefToLLVMPass());
+  // pm.addPass(createMemRefToLLVMPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
 
