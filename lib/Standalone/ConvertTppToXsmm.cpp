@@ -52,6 +52,12 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     if (failed(ldaDim))
       return failure();
     int64_t lda = *ldaDim;
+    if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 3) {
+      auto divLdaDim = getLeadingDim(memrefA, 1);
+      if (failed(divLdaDim))
+        return failure();
+      lda = lda / (*divLdaDim);
+    }
 
     auto ldbDim = getLeadingDim(memrefB);
     if (failed(ldbDim))

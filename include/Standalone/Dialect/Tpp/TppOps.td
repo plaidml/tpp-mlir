@@ -23,10 +23,13 @@ class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
          "::mlir::MemRefType">;
 
 def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
+def TppPackedMemrefInput : StaticMemRefRankOf<[AnyFloat], [1, 2, 3]>;
 def TppBRGEMMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
 
 // Tpp operands is a scalar float or a static memref with rank 1 or 2.
 def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
+
+def TppPackedOperand : AnyTypeOf<[TppPackedMemrefInput, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
 // AddOp
@@ -132,7 +135,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
     ```
   }];
 
-  let arguments = (ins TppOperand:$matrixA, TppOperand:$matrixB, 
+  let arguments = (ins TppPackedOperand:$matrixA, TppOperand:$matrixB, 
                        TppOperand:$matrixC);
 
   let assemblyFormat = [{
