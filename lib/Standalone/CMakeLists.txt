@@ -11,7 +11,7 @@ add_mlir_library(TPPStandalone
     UndoMainClosure.cpp
     Bufferization.cpp
     TileConsumerAndFuseProducers.cpp
-    DecomposeConvToMatmulOrBrgemm.cpp
+    DecomposeConvsToMatmulOrBrgemm.cpp
     ToBlockLayoutAndBack.cpp
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
