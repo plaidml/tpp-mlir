@@ -385,7 +385,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
       });
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    tpp::populateLinalgToTppPatterns(patterns);
+    tpp::populateConvertLinalgToTppPatterns(patterns);
     populateSubViewFoldingPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
@@ -396,7 +396,8 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 
 } // end namespace
 
-void mlir::tpp::populateLinalgToTppPatterns(RewritePatternSet &patterns) {
+void mlir::tpp::populateConvertLinalgToTppPatterns(
+    RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp>(patterns.getContext());

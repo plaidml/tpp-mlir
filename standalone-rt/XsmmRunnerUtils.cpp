@@ -443,6 +443,22 @@ extern "C" int iree_xsmm_brgemm_dispatch_f32(void *params) {
   return 0;
 }
 
+extern "C" int iree_xsmm_matmul_dispatch_f32(void *params) {
+  typedef struct {
+    int64_t res;
+    int64_t m;
+    int64_t n;
+    int64_t k;
+    int64_t lda;
+    int64_t ldb;
+    int64_t ldc;
+  } xsmm_matmul_dispatch_f32_t;
+  xsmm_matmul_dispatch_f32_t *p = (xsmm_matmul_dispatch_f32_t *)params;
+  p->res = _mlir_ciface_xsmm_matmul_dispatch_f32(p->m, p->n, p->k, p->lda,
+                                                 p->ldb, p->ldc);
+  return 0;
+}
+
 // TODO: most of these arguments are not useful; trim the fat.
 extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
   typedef struct {
@@ -460,9 +476,6 @@ extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
   } xsmm_brgemm_invoke_f32_t;
   xsmm_brgemm_invoke_f32_t *p = (xsmm_brgemm_invoke_f32_t *)params;
 
-  // printf("addr %d numBatches %d\n", addr, numBatches);
-  // printf("pA %p offA %d pB %p offB %d pC %p offC %d\n", pA, offA, pB, offB,
-  // pC, offC);
   float *addr_tensorA = p->pA + p->offA;
   float *addr_tensorB = p->pB + p->offB;
   float *addr_tensorC = p->pC + p->offC;
@@ -475,6 +488,37 @@ extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
   gemm_param.b.primary = (void *)addr_tensorA;
   gemm_param.c.primary = (void *)addr_tensorC;
   gemm_param.op.tertiary = (void *)&numBatchesVar;
+  sgemm.gemm(&gemm_param);
+
+  return 0;
+}
+
+extern "C" int iree_xsmm_matmul_invoke_f32(void *params) {
+  typedef struct {
+    int64_t addr;
+    float *pA;
+    int64_t offA;
+    int64_t unusedA1, unusedA2, unusedA3, unusedA4;
+    float *pB;
+    int64_t offB;
+    int64_t unusedB1, unusedB2, unusedB3, unusedB4;
+    float *pC;
+    int64_t offC;
+    int64_t unusedC1, unusedC2, unusedC3, unusedC4;
+  } xsmm_matmul_invoke_f32_t;
+  xsmm_matmul_invoke_f32_t *p = (xsmm_matmul_invoke_f32_t *)params;
+
+  float *addr_tensorA = p->pA + p->offA;
+  float *addr_tensorB = p->pB + p->offB;
+  float *addr_tensorC = p->pC + p->offC;
+
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_param gemm_param;
+  // LIBXSMM col-major change A with B.
+  gemm_param.a.primary = (void *)addr_tensorB;
+  gemm_param.b.primary = (void *)addr_tensorA;
+  gemm_param.c.primary = (void *)addr_tensorC;
+  sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->addr);
   sgemm.gemm(&gemm_param);
 
   return 0;
