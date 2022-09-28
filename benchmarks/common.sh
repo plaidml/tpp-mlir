@@ -1,16 +1,20 @@
 #!/bin/bash
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BUILD_DIR=$HERE/../build
+
+# Permit using $TPP_COMPILER (installed) rather than local build directory.
+if [ ! "$TPP_COMPILER_PREBUILT" ] || [ "0" = "$TPP_COMPILER_PREBUILT" ]; then
+  TPP_COMPILER=$HERE/../build
+fi
 
 # This assumes the sandbox was built as described in the readme.
-LIB_PATH=$BUILD_DIR/lib
-BIN_PATH=$BUILD_DIR/bin
+LIB_PATH=$TPP_COMPILER/lib
+BIN_PATH=$TPP_COMPILER/bin
 
 if [ "$LIBXSMMROOT" ]; then
   LIB_INCLUDE_PATH=$LIBXSMMROOT/include
 else
-  LIB_INCLUDE_PATH=$BUILD_DIR/_deps/xsmm-src/include
+  LIB_INCLUDE_PATH=$TPP_COMPILER/_deps/xsmm-src/include
 fi
 
 echo "lib path: ${LIB_PATH}"
