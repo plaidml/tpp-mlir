@@ -99,22 +99,24 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm",
 }
 
 //===----------------------------------------------------------------------===//
-// MapConv2DNhwcHwcfToMatmulOp
+// MapToMatmulOp
 //===----------------------------------------------------------------------===//
 
-def MapConv2DNhwcHwcfToMatmulOp : Op<Transform_Dialect, 
-                      "structured.map_conv_2d_nhwc_hwcf_to_matmul",
+def MapConvToMatmulOp : Op<Transform_Dialect, 
+                      "structured.map_conv_to_matmul",
                       [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                        TransformOpInterface, TransformEachOpTrait]> {
 
   let description = [{
-    Map a linalg.conv_2d_nhwc_hwcf to a linalg.matmul.
+    Map a linalg.conv_* to a linalg.matmul.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins PDL_Operation:$target,
+                       ConfinedAttr<I64Attr, [IntNonNegative]>:$rPos,
+                       ConfinedAttr<I64Attr, [IntNonNegative]>:$sPos);
   let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target `(` `rPos` `=` $rPos `,` `sPos` `=` $sPos `)` attr-dict";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

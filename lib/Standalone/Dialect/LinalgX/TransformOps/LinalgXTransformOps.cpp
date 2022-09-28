@@ -138,18 +138,19 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
 }
 
 //===----------------------------------------------------------------------===//
-// MapConv2DNhwcHwcfToMatmulOp
+// MapConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure transform::MapConv2DNhwcHwcfToMatmulOp::applyToOne(
-    linalg::LinalgOp target, SmallVector<Operation *> &results,
-    transform::TransformState &state) {
+DiagnosedSilenceableFailure
+transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
+                                         SmallVector<Operation *> &results,
+                                         transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConv2DNhwcHwcfToGemm(
-      rewriter, cast<linalg::GenericOp>(target));
+  FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToGemm(
+      rewriter, cast<linalg::GenericOp>(target), getRPos(), getSPos());
   if (failed(matmul))
     return DiagnosedSilenceableFailure::definiteFailure();
   results.push_back(*matmul);

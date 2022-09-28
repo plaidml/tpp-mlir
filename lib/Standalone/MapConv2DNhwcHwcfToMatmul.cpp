@@ -6,14 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/TransformUtils.h"
 #include "Standalone/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 
 using namespace mlir;
-
-// XXX: We copy and pasted a pattern from decomposeConv. Let's fix it.
 
 // Return the size of the image slice to extract and use into the GEMM
 // operation. If we have a slide window (R and S are not 1). The size
@@ -56,31 +55,18 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
-static bool preOptimizeByInterchangeIteratorsConv(linalg::LinalgOp linalgOp) {
-  ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
-  if (iteratorTypes.size() != 7)
-    return false;
-  bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
-               linalg::isParallelIterator(iteratorTypes[1]) &&
-               linalg::isReductionIterator(iteratorTypes[2]) &&
-               linalg::isReductionIterator(iteratorTypes[3]) &&
-               linalg::isParallelIterator(iteratorTypes[4]) &&
-               linalg::isParallelIterator(iteratorTypes[5]) &&
-               linalg::isReductionIterator(iteratorTypes[6]);
-  return match;
-}
-
 static FailureOr<SmallVector<Value>>
-getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
-                  linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
+getSlicedConvOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
+                      linalg::LinalgOp linalgOp, ValueRange valuesToUse,
+                      int64_t rPos, int64_t sPos) {
   assert(linalgOp.getNumInputsAndOutputs() == 3 &&
          "expect 3 input/output operands");
   assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
-  SmallVector<Value> slicedOperands;
 
+  SmallVector<Value> slicedOperands;
   OpOperand *image = linalgOp.getInputOperands()[0];
   FailureOr<Value> slicedImage =
-      (hasFilterWithRandSEqualOne(image, /*RPos=*/0, /*SPos=*/1))
+      (hasFilterWithRandSEqualOne(image, rPos, sPos))
           ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
                                    valuesToUse, /*GEMM dims=*/2)
           : utils::getSliceOperand(
@@ -108,19 +94,41 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
   return slicedOperands;
 }
 
+// Check if the three innermost loop can be mapped to a matmul operation. Check
+// also the body and make sure it is a matmul-like.
+static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
+  if (!tpp::hasMatmulBody(linalgOp))
+    return false;
+  ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+  if (iteratorTypes.size() < 3)
+    return false;
+  size_t size = iteratorTypes.size() - 1;
+  bool match = linalg::isReductionIterator(iteratorTypes[size]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 1]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 2]);
+  return match;
+}
+
+static bool preConditionsMapConvToGemm(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumInputs() != 2)
+    return false;
+  if (linalgOp.getNumOutputs() != 1)
+    return false;
+  if (linalgOp.hasBufferSemantics())
+    return false;
+  return checkMappingToMatmul(linalgOp);
+}
+
 FailureOr<linalg::MatmulOp>
-mlir::linalgx::mapConv2DNhwcHwcfToGemm(RewriterBase &rewriter,
-                                       linalg::LinalgOp linalgOp) {
+mlir::linalgx::mapConvToGemm(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                             int64_t rPos, int64_t sPos) {
   if (!isa<linalg::GenericOp>(linalgOp))
     return failure();
 
-  // Make sure we did loop re-ordering.
-  // XXX: simply check that we have a GEMM operation as innermost similar when
-  // we map to brgemm.
-  if (!preOptimizeByInterchangeIteratorsConv(linalgOp))
+  if (!preConditionsMapConvToGemm(linalgOp))
     return failure();
 
-  // peel-out N, P, R, S and map Q, K and C to GEMM.
+  // peel-out all loops but the three innermost.
   unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
   FailureOr<SmallVector<Range>> maybeLoopRanges =
       mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
@@ -128,17 +136,16 @@ mlir::linalgx::mapConv2DNhwcHwcfToGemm(RewriterBase &rewriter,
     return failure();
   SmallVector<Range> loopRanges = *maybeLoopRanges;
 
-  SmallVector<Value, 4> ivs, tensorResults;
+  SmallVector<Value> ivs, tensorResults;
   linalg::MatmulOp matmul = nullptr;
   auto gemmBuilder = [&](OpBuilder &builder, Location loc, ValueRange localIvs,
                          ValueRange operandsValuesToUse) -> scf::ValueVector {
-    assert(localIvs.size() == 4);
     assert(operandsValuesToUse.size() ==
                static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
-    FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
-        builder, loc, localIvs, linalgOp, operandsValuesToUse);
+    FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedConvOperands(
+        builder, loc, localIvs, linalgOp, operandsValuesToUse, rPos, sPos);
     if (failed(maybeSlicedOperands)) {
       // TODO: Can I just return?
       assert(0 && "failed to generate loops for op");
