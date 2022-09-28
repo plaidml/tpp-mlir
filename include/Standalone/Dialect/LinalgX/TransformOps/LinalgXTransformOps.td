@@ -112,11 +112,14 @@ def MapConvToMatmulOp : Op<Transform_Dialect,
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                       ConfinedAttr<I64Attr, [IntNonNegative]>:$rPos,
-                       ConfinedAttr<I64Attr, [IntNonNegative]>:$sPos);
+                       ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_height_pos,
+                       ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_width_pos);
   let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
 
-  let assemblyFormat = "$target `(` `rPos` `=` $rPos `,` `sPos` `=` $sPos `)` attr-dict";
+  let assemblyFormat = [{
+    $target `(` `filter_height_pos` `=` $filter_height_pos 
+                `,` `filter_width_pos` `=` $filter_width_pos `)` attr-dict
+  }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

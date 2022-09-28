@@ -149,8 +149,9 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
     return DiagnosedSilenceableFailure::definiteFailure();
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToGemm(
-      rewriter, cast<linalg::GenericOp>(target), getRPos(), getSPos());
+  FailureOr<linalg::MatmulOp> matmul =
+      mlir::linalgx::mapConvToGemm(rewriter, cast<linalg::GenericOp>(target),
+                                   getFilterHeightPos(), getFilterWidthPos());
   if (failed(matmul))
     return DiagnosedSilenceableFailure::definiteFailure();
   results.push_back(*matmul);
