@@ -7,7 +7,7 @@ transform.with_pdl_patterns {
       %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       %1 = transform.structured.generalize %0
       %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      %3 = transform.structured.map_conv_to_matmul %2 (rPos = 0, sPos = 1)
+      %3 = transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
   }
 }
 
