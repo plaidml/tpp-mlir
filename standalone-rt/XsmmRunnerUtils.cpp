@@ -460,6 +460,22 @@ extern "C" int iree_xsmm_matmul_dispatch_f32(void *params) {
   return 0;
 }
 
+extern "C" int iree_xsmm_unary_dispatch(void *params) {
+  typedef struct {
+    int64_t res;
+    int64_t m;
+    int64_t n;
+    int64_t ldi;
+    int64_t ldo;
+    int64_t type;
+    int64_t bcast_type;
+  } xsmm_unary_dispatch;
+  xsmm_unary_dispatch *p = (xsmm_unary_dispatch *)params;
+  p->res = _mlir_ciface_xsmm_unary_dispatch(p->m, p->n, p->ldi, p->ldo, p->type,
+                                            p->bcast_type);
+  return 0;
+}
+
 // TODO: struct slicing. BRGEMM struct is the same as the GEMM one plus the
 // batch parameter.
 extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
@@ -517,6 +533,29 @@ extern "C" int iree_xsmm_matmul_invoke_f32(void *params) {
   gemm_param.c.primary = (void *)addr_tensorC;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->addr);
   sgemm.gemm(&gemm_param);
+
+  return 0;
+}
+
+extern "C" int iree_xsmm_unary_invoke(void *params) {
+  typedef struct {
+    int64_t addr;
+    float *pA;
+    int64_t offA;
+    float *pB;
+    int64_t offB;
+  } xsmm_unary_invoke;
+  xsmm_unary_invoke *p = (xsmm_unary_invoke *)params;
+
+  float *addr_a = p->pA + p->offA;
+  float *addr_b = p->pB + p->offB;
+
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(p->addr);
+  libxsmm_meltw_unary_param param;
+  param.in.primary = (void *)addr_a;
+  param.out.primary = (void *)addr_b;
+  kernel(&param);
 
   return 0;
 }

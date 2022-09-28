@@ -81,10 +81,12 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_brgemm_dispatch_f32(void *params);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_matmul_dispatch_f32(void *params);
+extern "C" MLIR_RUNNERUTILS_EXPORT int iree_xsmm_unary_dispatch(void *params);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_brgemm_invoke_f32(void *params);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_matmul_invoke_f32(void *params);
+extern "C" MLIR_RUNNERUTILS_EXPORT int iree_xsmm_unary_invoke(void *params);
 
 #endif // STANDALONE_EXECUTIONENGINE_CRUNNERUTILS_H
