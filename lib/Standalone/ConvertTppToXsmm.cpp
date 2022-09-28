@@ -249,13 +249,23 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     Location loc = identityOp.getLoc();
     // no conversion if identity is a scalar operation.
     Type outputType = identityOp.getOutput().getType();
-    if (!outputType.isa<ShapedType>())
-      return failure();
+    MemRefType outputMemRefType = outputType.dyn_cast<MemRefType>();
+    if (!outputMemRefType || outputMemRefType.getRank() != 2)
+      return rewriter.notifyMatchFailure(identityOp, "not a 2-D memref type");
 
-    MemRefType outputMemRef = outputType.cast<MemRefType>();
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-    int64_t ldo = n;
+    int64_t outputOffset;
+    SmallVector<int64_t> outputStrides;
+    if (failed(
+            getStridesAndOffset(outputMemRefType, outputStrides, outputOffset)))
+      return rewriter.notifyMatchFailure(identityOp, "not a strided memref");
+    if (outputStrides.back() != 1)
+      return rewriter.notifyMatchFailure(identityOp,
+                                         "most minor stride is != 1");
+
+    int64_t m = outputMemRefType.getShape()[0];
+    int64_t n = outputMemRefType.getShape()[1];
+    int64_t ldo = outputStrides.front();
+    // TODO: ldi is probably broken atm since it does not look at strides.
     std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
         getLdiAndBCast(identityOp, ldo);
     int64_t ldi = ldiAndBCast.first;
