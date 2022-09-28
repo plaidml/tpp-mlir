@@ -1,15 +1,16 @@
 #!/bin/bash
 
-BASE=$(pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+BUILD_DIR=$HERE/../build
 
-# This assume you built the sandbox as described in the readme.
-LIB_PATH=$BASE/../../build/lib
-BIN_PATH=$BASE/../../build/bin
+# This assumes the sandbox was built as described in the readme.
+LIB_PATH=$BUILD_DIR/lib
+BIN_PATH=$BUILD_DIR/bin
 
 if [ "$LIBXSMMROOT" ]; then
   LIB_INCLUDE_PATH=$LIBXSMMROOT/include
 else
-  LIB_INCLUDE_PATH=$BASE/../../build/_deps/xsmm-src/include
+  LIB_INCLUDE_PATH=$BUILD_DIR/_deps/xsmm-src/include
 fi
 
 echo "lib path: ${LIB_PATH}"

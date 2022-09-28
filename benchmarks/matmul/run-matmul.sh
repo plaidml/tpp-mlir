@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source ../common.sh
+HERE=$(cd "$(dirname "$0")" && pwd -P)
+source ${HERE}/../common.sh
 
 compile () {
   echo "Compile driver ----> matmul_driver_${1}"
