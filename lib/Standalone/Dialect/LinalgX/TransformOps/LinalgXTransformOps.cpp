@@ -8,11 +8,12 @@
 
 #include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
 #include "Standalone/Transforms.h"
+#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
+#include "mlir/Parser/Parser.h"
 
 using namespace mlir;
 using namespace mlir::transform;
@@ -140,40 +141,12 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
 // MapConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-static bool matchConvolution(transform::SequenceOp sequence) {
-  WalkResult result =
-      sequence.walk([&](transform::MatchOp matchOp) -> WalkResult {
-        auto stringAttrs = matchOp.getOps();
-        if (!stringAttrs)
-          return WalkResult::interrupt();
-        for (Attribute attr : *stringAttrs) {
-          StringRef opName = attr.cast<StringAttr>().getValue();
-          if (opName != "linalg.conv_2d_nhwc_hwcf")
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-      });
-  if (result.wasInterrupted())
-    return false;
-  return true;
-}
-
 DiagnosedSilenceableFailure
 transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                                          SmallVector<Operation *> &results,
                                          transform::TransformState &state) {
-  // The transform is specific to convolutions only. Check if our starting point
-  // is a convolution we can handle. Before applying this transform we have some
-  // other transformations that generalize the named op, thus here we should
-  // expect only linalg.generic.
-  transform::SequenceOp sequenceOp =
-      getOperation()->getParentOfType<transform::SequenceOp>();
-  if (sequenceOp && !matchConvolution(sequenceOp))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToGemm(
