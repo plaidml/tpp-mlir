@@ -29,8 +29,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-// TODO: evaluate transform dialect.
-
 // Tiling function to remove all but the zero and first dimension.
 // Tile of zero means no tiling on this dimension. The other
 // dimensions are materialized as loops by tiling with a factor
@@ -250,6 +248,9 @@ LogicalResult checkOperandForTpp(Value operand) {
   return failure();
 }
 
+// Convert a linalg.generic to a tpp operation. Require the generic to be
+// annotated with the tpp operation to replace. Annotation uses linalg library
+// call mechanism.
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -306,20 +307,34 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Convert a linalg.batch_reduce_matmul to a tpp.brgemm
 struct ConvertBrgemmToTpp
     : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
   using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp linalgOp,
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics())
+    if (!brMatmulOp.hasBufferSemantics())
       return failure();
-    // TODO: provide more convenient builder.
-    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(
-        linalgOp, linalgOp.getInputOperands()[0]->get(),
-        linalgOp.getInputOperands()[1]->get(),
-        linalgOp.getOutputOperands()[0]->get());
-    return failure();
+    SmallVector<Value> inputs = brMatmulOp.getInputOperands();
+    SmallVector<Value> outputs = brMatmulOp.getOutputOperands();
+    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
+    return success();
+  }
+};
+
+// Convert a linalg.matmul to a tpp.matmul.
+struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
+  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    if (!matmulOp.hasBufferSemantics())
+      return failure();
+    SmallVector<Value> inputs = matmulOp.getInputOperands();
+    SmallVector<Value> outputs = matmulOp.getOutputOperands();
+    rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
+    return success();
   }
 };
 
@@ -400,7 +415,8 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
-               ConvertBrgemmToTpp>(patterns.getContext());
+               ConvertBrgemmToTpp,
+               ConvertMatmulToTpp>(patterns.getContext());
   // clang-format on
 }
 

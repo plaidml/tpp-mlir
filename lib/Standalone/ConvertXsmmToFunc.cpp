@@ -52,13 +52,9 @@ static SmallVector<Type> extractInvokeOperandTypesForMeta(OperandRange operands,
           LLVM::LLVMPointerType::get(memrefType.getElementType());
       results.push_back(basePtrType);
       results.push_back(indexType); // offset
-      size_t rank = memrefType.getRank();
-      for (size_t idx = 0; idx < rank; idx++) {
-        results.push_back(indexType); // size
-        results.push_back(indexType); // stride
-      }
-    } else
+    } else {
       results.push_back(operand.getType());
+    }
   }
   return results;
 }
@@ -115,10 +111,6 @@ static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
         basePointerAsI64);
     res.push_back(basePointer);
     res.push_back(meta.getOffset());
-    for (Value operand : meta.getSizes())
-      res.push_back(operand);
-    for (Value operand : meta.getStrides())
-      res.push_back(operand);
   }
   return res;
 }

@@ -16,6 +16,10 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
+//===----------------------------------------------------------------------===//
+// IdentityOp
+//===----------------------------------------------------------------------===//
+
 LogicalResult IdentityOp::verify() {
   Type inputType = getInput().getType();
   Type outputType = getOutput().getType();
@@ -51,6 +55,10 @@ LogicalResult IdentityOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
+
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
   MemRefType a = getMatrixA().getType().cast<MemRefType>();
@@ -69,4 +77,18 @@ LogicalResult MatmulOp::verify() {
       (b.getShape()[1] != n) || (b.getShape()[0] != k))
     return emitError("Dimensions mismatching");
   return success();
+}
+
+void MatmulOp::build(OpBuilder &builder, OperationState &state,
+                     ValueRange inputs, Value output) {
+  MatmulOp::build(builder, state, inputs[0], inputs[1], output);
+}
+
+//===----------------------------------------------------------------------===//
+// BrgemmOp
+//===----------------------------------------------------------------------===//
+
+void BrgemmOp::build(OpBuilder &builder, OperationState &state,
+                     ValueRange inputs, Value output) {
+  BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
 }
