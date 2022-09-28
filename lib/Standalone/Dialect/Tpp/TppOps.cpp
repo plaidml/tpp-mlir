@@ -56,14 +56,17 @@ LogicalResult MatmulOp::verify() {
   MemRefType a = getMatrixA().getType().cast<MemRefType>();
   MemRefType b = getMatrixB().getType().cast<MemRefType>();
   MemRefType c = getMatrixC().getType().cast<MemRefType>();
-  if ((a.getShape().size() != 2) || (b.getShape().size() != 2) ||
-      (c.getShape().size() != 2))
-    return failure();
+  if ((a.getShape().size() != 2 && !a.getElementType().isBF16()) ||
+      (a.getElementType().isBF16() && a.getShape().size() != 3 &&
+       a.getShape().size() != 2) ||
+      (b.getShape().size() != 2) || (c.getShape().size() != 2))
+    return emitError("shapes incompatible");
   int64_t m = c.getShape()[0];
   int64_t n = c.getShape()[1];
   int64_t k = a.getShape()[1];
-  if ((a.getShape()[0] != m) || (b.getShape()[1] != n) ||
-      (b.getShape()[0] != k))
-    return failure();
+  if ((a.getShape().size() == 2 && a.getShape()[0] != m) ||
+      (a.getShape().size() == 3 && a.getShape()[0] * a.getShape()[2] != m) ||
+      (b.getShape()[1] != n) || (b.getShape()[0] != k))
+    return emitError("Dimensions mismatching");
   return success();
 }
