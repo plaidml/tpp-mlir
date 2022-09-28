@@ -155,6 +155,10 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
     }
   }];
 
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
+
   let hasVerifier = 1;
 }
 
@@ -176,27 +180,33 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
     ```
     }];
 
-    let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA, 
-                         TppBRGEMMemrefInput:$batchMatrixB,
-                         TppMemRef:$matrixC);
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA, 
+                       TppBRGEMMemrefInput:$batchMatrixB,
+                       TppMemRef:$matrixC);
 
-    let assemblyFormat = [{
+  let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,` 
                 $batchMatrixB `:` type($batchMatrixB) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
-    }];
+  }];
 
-    let extraClassDeclaration = [{
-      MemRefType getMatrixCType() {
-        return getMatrixC().getType().cast<MemRefType>(); 
-      }
-      MemRefType getBatchMatrixAType() {
-        return getBatchMatrixA().getType().cast<MemRefType>(); 
-      }
-      MemRefType getBatchMatrixBType() {
-        return getBatchMatrixB().getType().cast<MemRefType>(); 
-      }
-    }];
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() {
+      return getMatrixC().getType().cast<MemRefType>(); 
+    }
+    
+    MemRefType getBatchMatrixAType() {
+      return getBatchMatrixA().getType().cast<MemRefType>(); 
+    }
+
+    MemRefType getBatchMatrixBType() {
+      return getBatchMatrixB().getType().cast<MemRefType>(); 
+    }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
 }
 
 #endif // STANDALONE_TPP_OPS
