@@ -288,19 +288,22 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics() || !linalgOp.library_callAttr() ||
-        !hasTppMark(linalgOp))
-      return failure();
+    if (!linalgOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(linalgOp, "expect buffer semantics");
+    if (!linalgOp.library_callAttr() || !hasTppMark(linalgOp))
+      return rewriter.notifyMatchFailure(
+          linalgOp, "not enough information to map to tpps");
 
     if (linalgOp->getNumResults() != 0)
-      return failure();
+      return rewriter.notifyMatchFailure(linalgOp, "expect at least 1 result");
 
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
       Value newOperand = getOperandForTpp(operand, rewriter, loc);
       if (failed(checkOperandForTpp(newOperand)))
-        return failure();
+        return rewriter.notifyMatchFailure(linalgOp,
+                                           "expect scalar or rank 2 memref");
       newOperands.push_back(newOperand);
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
@@ -315,7 +318,7 @@ struct ConvertBrgemmToTpp
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!brMatmulOp.hasBufferSemantics())
-      return failure();
+      return rewriter.notifyMatchFailure(brMatmulOp, "expect buffer semantics");
     SmallVector<Value> inputs = brMatmulOp.getInputOperands();
     SmallVector<Value> outputs = brMatmulOp.getOutputOperands();
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
@@ -330,7 +333,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics())
-      return failure();
+      return rewriter.notifyMatchFailure(matmulOp, "expect buffer semantics");
     SmallVector<Value> inputs = matmulOp.getInputOperands();
     SmallVector<Value> outputs = matmulOp.getOutputOperands();
     rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
