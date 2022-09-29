@@ -221,7 +221,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     ArrayRef<int64_t> shapeA =
         matmulOp.getMatrixA().getType().cast<MemRefType>().getShape();
     if (shapeA.size() == 3)
-      matmulOp.emitError("Packed BF16 loops unsupported");
+      return rewriter.notifyMatchFailure(matmulOp, "Packed BF16 loops unsupported");
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
