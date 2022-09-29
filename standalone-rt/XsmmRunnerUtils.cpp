@@ -428,7 +428,8 @@ extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t m, int64_t n,
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//
 
-extern "C" int iree_xsmm_brgemm_dispatch_f32(void *params) {
+extern "C" int iree_xsmm_brgemm_dispatch_f32(void *context, void *params,
+                                             void *reserved) {
   typedef struct {
     int64_t res;
     int64_t m;
@@ -444,7 +445,8 @@ extern "C" int iree_xsmm_brgemm_dispatch_f32(void *params) {
   return 0;
 }
 
-extern "C" int iree_xsmm_matmul_dispatch_f32(void *params) {
+extern "C" int iree_xsmm_matmul_dispatch_f32(void *context, void *params,
+                                             void *reserved) {
   typedef struct {
     int64_t res;
     int64_t m;
@@ -460,7 +462,8 @@ extern "C" int iree_xsmm_matmul_dispatch_f32(void *params) {
   return 0;
 }
 
-extern "C" int iree_xsmm_unary_dispatch(void *params) {
+extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
+                                        void *reserved) {
   typedef struct {
     int64_t res;
     int64_t m;
@@ -478,7 +481,8 @@ extern "C" int iree_xsmm_unary_dispatch(void *params) {
 
 // TODO: struct slicing. BRGEMM struct is the same as the GEMM one plus the
 // batch parameter.
-extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
+extern "C" int iree_xsmm_brgemm_invoke_f32(void *context, void *params,
+                                           void *reserved) {
   typedef struct {
     int64_t addr;
     float *pA;
@@ -509,7 +513,8 @@ extern "C" int iree_xsmm_brgemm_invoke_f32(void *params) {
   return 0;
 }
 
-extern "C" int iree_xsmm_matmul_invoke_f32(void *params) {
+extern "C" int iree_xsmm_matmul_invoke_f32(void *context, void *params,
+                                           void *reserved) {
   typedef struct {
     int64_t addr;
     float *pA;
@@ -537,7 +542,8 @@ extern "C" int iree_xsmm_matmul_invoke_f32(void *params) {
   return 0;
 }
 
-extern "C" int iree_xsmm_unary_invoke(void *params) {
+extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
+                                      void *reserved) {
   typedef struct {
     int64_t addr;
     float *pA;
