@@ -39,21 +39,21 @@ module {
     // m = 2
     // n = 2
     // k = 2
-    %0 = linalg.init_tensor [3, 8, 2, 2] : tensor<3x8x2x2xf32>
+    %0 = tensor.empty() : tensor<3x8x2x2xf32>
     %1 = linalg.generic #traitToBlock
       ins(%C: tensor<6x16xf32>)
       outs(%0: tensor<3x8x2x2xf32>) {
         ^bb0(%arg2: f32, %arg3: f32):
           linalg.yield %arg2: f32
       } -> tensor<3x8x2x2xf32>
-    %2 = linalg.init_tensor [3, 4, 2, 2] : tensor<3x4x2x2xf32>
+    %2 = tensor.empty() : tensor<3x4x2x2xf32>
     %3 = linalg.generic #traitToBlock
       ins(%A: tensor<6x8xf32>)
       outs(%2: tensor<3x4x2x2xf32>) {
         ^bb0(%arg2: f32, %arg3: f32):
           linalg.yield %arg2: f32
       } -> tensor<3x4x2x2xf32>
-    %4 = linalg.init_tensor [4, 8, 2, 2] : tensor<4x8x2x2xf32>
+    %4 = tensor.empty() : tensor<4x8x2x2xf32>
     %5 = linalg.generic #traitToBlock
       ins(%B: tensor<8x16xf32>)  
       outs(%4: tensor<4x8x2x2xf32>) {

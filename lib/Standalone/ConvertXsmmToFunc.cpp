@@ -10,7 +10,7 @@
 #include "Standalone/Dialect/Xsmm/XsmmOps.h"
 #include "Standalone/Passes.h"
 #include "Standalone/Transforms.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

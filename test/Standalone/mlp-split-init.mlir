@@ -8,7 +8,7 @@
 module @predict_function  {
   func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, 
     %arg2: tensor<512xf32>) -> tensor<128x512xf32> {
-    %0 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+    %0 = tensor.empty() : tensor<128x512xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%0 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  
       linalg.yield %arg9 : f32
@@ -19,7 +19,7 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
-    %10 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+    %10 = tensor.empty() : tensor<128x512xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%10 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  
       %16 = mathx.relu %arg9 : f32
@@ -29,7 +29,7 @@ module @predict_function  {
   }
 }
 
-// Note we splitted the linalg_init to avoid the second alloc.
+// Note we splitted the tensor.empty to avoid the second alloc.
 
 //      CHECK: func.func @main(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>

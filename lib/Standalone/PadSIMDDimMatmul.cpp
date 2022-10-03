@@ -9,7 +9,7 @@
 #include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -121,8 +121,8 @@ struct PadSIMDAndParallelDimensionForGemm
         llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.matmul");
-    rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
-                                replacementOp.region().begin());
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), replacementOp.getRegion(),
+                                replacementOp.getRegion().begin());
 
     // create tensor.extract for C.
     unsigned rank = shapeC.size();
@@ -249,7 +249,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     RankedTensorType sliceOperandType =
         slice.getSource().getType().cast<RankedTensorType>();
 
-    Value reluBuffer = rewriter.create<linalg::InitTensorOp>(
+    Value reluBuffer = rewriter.create<tensor::EmptyOp>(
         loc, sliceOperandType.getShape(), sliceOperandType.getElementType());
 
     linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
@@ -258,8 +258,8 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
         llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.relu");
-    rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
-                                newReluOp.region().begin());
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
+                                newReluOp.getRegion().begin());
 
     RankedTensorType sliceResultType =
         slice.getResult().getType().cast<RankedTensorType>();
@@ -416,8 +416,8 @@ struct FoldInsertSliceIntoTppIdentity
       return failure();
     linalg::GenericOp tppIdentityOp = maybeTppIdentityOp;
     assert(tppIdentityOp.getNumOperands() == 2 && "expect two operands");
-    linalg::InitTensorOp maybeInitOp =
-        tppIdentityOp.getOperand(1).getDefiningOp<linalg::InitTensorOp>();
+    tensor::EmptyOp maybeInitOp =
+        tppIdentityOp.getOperand(1).getDefiningOp<tensor::EmptyOp>();
     if (!maybeInitOp || !maybeInitOp.getResult().hasOneUse())
       return failure();
 
@@ -427,7 +427,7 @@ struct FoldInsertSliceIntoTppIdentity
     if (!areCompatible(source, dest))
       return failure();
 
-    Value init = rewriter.create<linalg::InitTensorOp>(loc, dest.getShape(),
+    Value init = rewriter.create<tensor::EmptyOp>(loc, dest.getShape(),
                                                        dest.getElementType());
 
     linalg::GenericOp newTppIdentityOp = rewriter.create<linalg::GenericOp>(
@@ -438,9 +438,9 @@ struct FoldInsertSliceIntoTppIdentity
         /*docs*/ "", /*library_call*/ "tpp.identity");
     // I think we cannot steal the old region but copy it as per PatternRewriter
     // limitations.
-    rewriter.cloneRegionBefore(tppIdentityOp.region(),
-                               newTppIdentityOp.region(),
-                               newTppIdentityOp.region().begin());
+    rewriter.cloneRegionBefore(tppIdentityOp.getRegion(),
+                               newTppIdentityOp.getRegion(),
+                               newTppIdentityOp.getRegion().begin());
     rewriter.replaceOp(sliceOp, newTppIdentityOp.getResult(0));
     return success();
   }
@@ -479,7 +479,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
   }
 
   FailureOr<Value> optimizeFillingImpl(tensor::PadOp padOp,
-                                       linalg::InitTensorOp initTensor,
+                                       tensor::EmptyOp initTensor,
                                        PatternRewriter &rewriter) const {
 
     if (!padOp.getSourceType().hasStaticShape() ||
@@ -521,7 +521,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     return filled;
   }
 
-  Value optimizeFilling(tensor::PadOp padOp, linalg::InitTensorOp initTensor,
+  Value optimizeFilling(tensor::PadOp padOp, tensor::EmptyOp initTensor,
                         PatternRewriter &rewriter) const {
     Value padValue = padOp.getConstantPaddingValue();
     Location loc = padOp.getLoc();
@@ -569,7 +569,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     // Create the tensor of same size as output of the pad op.
     RankedTensorType padResultType = padOp.getResultType();
     auto resultSizes = getAsOpFoldResult(resultShape[0]);
-    linalg::InitTensorOp initTensor = rewriter.create<linalg::InitTensorOp>(
+    tensor::EmptyOp initTensor = rewriter.create<tensor::EmptyOp>(
         loc, resultSizes, padResultType.getElementType());
 
     // Fill the tensor with the pad value.
