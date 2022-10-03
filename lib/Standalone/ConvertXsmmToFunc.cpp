@@ -184,9 +184,10 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // in MLIR (thus we need to change the function name from
     // "unary" to "unary_scalar"). We also don't want to convert
     // the scalar to a memref by using an alloc/alloca.
-    std::string funcName = "xsmm_unary_invoke";
+    std::string funcName =
+        "xsmm_unary_invoke_" + unaryOp.getOperandTypeAsString();
     if (unaryOp.hasScalarInput())
-      funcName = "xsmm_unary_scalar_invoke";
+      funcName = "xsmm_unary_scalar_invoke_" + unaryOp.getOperandTypeAsString();
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
                                   rewriter))) {
       rewriter.eraseOp(unaryOp);
@@ -344,9 +345,11 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
-    std::string kindAsString = "xsmm_unary_dispatch";
+    std::string kindAsString = "xsmm_unary_dispatch_";
+    std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
+
     FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString + typeAsString);
 
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
     SmallVector<Value, 10> dispatchOperands;

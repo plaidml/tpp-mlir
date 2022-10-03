@@ -24,7 +24,7 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
   xsmm.binary.dispatch add [3, 2, 1] (broadcast none)
 
   // CHECK: xsmm.unary.dispatch
-  xsmm.unary.dispatch identity [3, 2, 1] (broadcast row)
+  xsmm.unary.dispatch identity [3, 2, 1] (broadcast row dataType f32)
 
   return %arg2: memref<2x2xf32>
 }

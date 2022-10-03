@@ -184,10 +184,11 @@ _mlir_ciface_xsmm_matmul_dispatch_bf16(int64_t m, int64_t n, int64_t k,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
-                                                    int64_t ldi, int64_t ldo,
-                                                    int64_t type,
-                                                    int64_t bcast_type) {
+extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t m, int64_t n,
+                                                        int64_t ldi,
+                                                        int64_t ldo,
+                                                        int64_t type,
+                                                        int64_t bcast_type) {
 
   // std::cout << "ldi: " << ldi << "\n";
   // std::cout << "ldo: " << ldo << "\n";
@@ -207,6 +208,40 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t m, int64_t n,
   unary_shape.in0_type = LIBXSMM_DATATYPE_F32;
   unary_shape.comp_type = LIBXSMM_DATATYPE_F32;
   unary_shape.out_type = LIBXSMM_DATATYPE_F32;
+  unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
+  unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
+
+  libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
+      static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
+      static_cast<libxsmm_bitfield>(unary_flags));
+
+  return reinterpret_cast<int64_t>(kernel);
+}
+
+extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_bf16(int64_t m, int64_t n,
+                                                         int64_t ldi,
+                                                         int64_t ldo,
+                                                         int64_t type,
+                                                         int64_t bcast_type) {
+
+  // std::cout << "ldi: " << ldi << "\n";
+  // std::cout << "ldo: " << ldo << "\n";
+  // std::cout << "m: " << m << "\n";
+  // std::cout << "n: " << n << "\n";
+  // std::cout << "type: " << type << "\n";
+  // std::cout << "bcast_type: " << bcast_type << "\n";
+
+  libxsmm_meltw_unary_flags unary_flags =
+      static_cast<libxsmm_meltw_unary_flags>(bcast_type);
+
+  libxsmm_meltw_unary_shape unary_shape;
+
+  // Row major to col major swap m with n.
+  unary_shape.m = static_cast<libxsmm_blasint>(n);
+  unary_shape.n = static_cast<libxsmm_blasint>(m);
+  unary_shape.in0_type = LIBXSMM_DATATYPE_BF16;
+  unary_shape.comp_type = LIBXSMM_DATATYPE_BF16;
+  unary_shape.out_type = LIBXSMM_DATATYPE_BF16;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
@@ -247,8 +282,9 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(int64_t m, int64_t n,
 }
 
 extern "C" void
-_mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
-                               UnrankedMemRefType<float> *output) {
+_mlir_ciface_xsmm_unary_invoke_f32(int64_t addr,
+                                   UnrankedMemRefType<float> *input,
+                                   UnrankedMemRefType<float> *output) {
   // std::cout << "tensor input: \n";
   // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
   // std::cout << "tensor output: \n";
@@ -259,6 +295,29 @@ _mlir_ciface_xsmm_unary_invoke(int64_t addr, UnrankedMemRefType<float> *input,
 
   float *addr_a = tensorA.data + tensorA.offset;
   float *addr_b = tensorB.data + tensorB.offset;
+
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
+  libxsmm_meltw_unary_param param;
+  param.in.primary = (void *)addr_a;
+  param.out.primary = (void *)addr_b;
+  kernel(&param);
+}
+
+extern "C" void
+_mlir_ciface_xsmm_unary_invoke_bf16(int64_t addr,
+                                    UnrankedMemRefType<bf16> *input,
+                                    UnrankedMemRefType<bf16> *output) {
+  /*std::cout << "tensor input: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*input));
+  std::cout << "tensor output: \n";
+  printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*output));
+  */
+  DynamicMemRefType<bf16> tensorA = DynamicMemRefType<bf16>(*input);
+  DynamicMemRefType<bf16> tensorB = DynamicMemRefType<bf16>(*output);
+
+  bf16 *addr_a = tensorA.data + tensorA.offset;
+  bf16 *addr_b = tensorB.data + tensorB.offset;
 
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
@@ -292,10 +351,24 @@ _mlir_ciface_xsmm_binary_invoke(int64_t addr, UnrankedMemRefType<float> *lhs,
 }
 
 extern "C" void
-_mlir_ciface_xsmm_unary_scalar_invoke(int64_t addr, float input,
-                                      UnrankedMemRefType<float> *output) {
+_mlir_ciface_xsmm_unary_scalar_invoke_f32(int64_t addr, float input,
+                                          UnrankedMemRefType<float> *output) {
 
   DynamicMemRefType<float> tensorB = DynamicMemRefType<float>(*output);
+
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
+  libxsmm_meltw_unary_param param;
+  param.in.primary = (void *)&input;
+  param.out.primary = (void *)tensorB.data;
+  kernel(&param);
+}
+
+extern "C" void
+_mlir_ciface_xsmm_unary_scalar_invoke_bf16(int64_t addr, bf16 input,
+                                           UnrankedMemRefType<bf16> *output) {
+
+  DynamicMemRefType<bf16> tensorB = DynamicMemRefType<bf16>(*output);
 
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
@@ -474,8 +547,8 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
     int64_t bcast_type;
   } xsmm_unary_dispatch;
   xsmm_unary_dispatch *p = (xsmm_unary_dispatch *)params;
-  p->res = _mlir_ciface_xsmm_unary_dispatch(p->m, p->n, p->ldi, p->ldo, p->type,
-                                            p->bcast_type);
+  p->res = _mlir_ciface_xsmm_unary_dispatch_f32(p->m, p->n, p->ldi, p->ldo,
+                                                p->type, p->bcast_type);
   return 0;
 }
 
