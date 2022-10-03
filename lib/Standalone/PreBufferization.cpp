@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Standalone/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -76,17 +76,18 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<AffineMap> maps;
     for (auto *in : op.getInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
-          op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
+          op.getMatchingIndexingMap(in) ==
+              op.getMatchingIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
       } else {
         newOperands.push_back(in->get());
-        maps.push_back(op.getTiedIndexingMap(in));
+        maps.push_back(op.getMatchingIndexingMap(in));
       }
     }
     if (!operand)
       return failure();
-    maps.push_back(op.getTiedIndexingMap(operand));
+    maps.push_back(op.getMatchingIndexingMap(operand));
 
     Location loc = op.getLoc();
     SmallVector<StringRef> iterTypes(op.getNumLoops(),
@@ -94,12 +95,12 @@ struct AdaptLinalgInputOperandToOutputOperand
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
         /*bodyBuild=*/nullptr, pruneAttributeList(op));
-    newOp.library_callAttr(rewriter.getStringAttr(op.getLibraryCallName()));
-    rewriter.inlineRegionBefore(op.region(), newOp.region(),
-                                newOp.region().begin());
+    newOp.setLibraryCallAttr(rewriter.getStringAttr(op.getLibraryCallName()));
+    rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
+                                newOp.getRegion().begin());
 
     // Repair the payload entry block.
-    Block &payload = newOp.region().front();
+    Block &payload = newOp.getRegion().front();
     payload.getArgument(operand->getOperandNumber())
         .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
     payload.eraseArgument(operand->getOperandNumber());
@@ -178,7 +179,7 @@ struct AllocateInitTensor : public OpRewritePattern<linalg::InitTensorOp> {
       if (!isa<tensor::InsertSliceOp>(user))
         return failure();
     rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
-        initOp, initOp.getType(), initOp.sizes());
+        initOp, initOp.getType(), initOp.getSizes());
     return success();
   }
 };

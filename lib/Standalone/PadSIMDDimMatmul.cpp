@@ -9,7 +9,7 @@
 #include "Standalone/Dialect/Tpp/TppOps.h"
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -121,8 +121,8 @@ struct PadSIMDAndParallelDimensionForGemm
         llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.matmul");
-    rewriter.inlineRegionBefore(linalgOp.region(), replacementOp.region(),
-                                replacementOp.region().begin());
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), replacementOp.getRegion(),
+                                replacementOp.getRegion().begin());
 
     // create tensor.extract for C.
     unsigned rank = shapeC.size();
@@ -258,8 +258,8 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
         llvm::to_vector(
             linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.relu");
-    rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
-                                newReluOp.region().begin());
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
+                                newReluOp.getRegion().begin());
 
     RankedTensorType sliceResultType =
         slice.getResult().getType().cast<RankedTensorType>();
@@ -438,9 +438,9 @@ struct FoldInsertSliceIntoTppIdentity
         /*docs*/ "", /*library_call*/ "tpp.identity");
     // I think we cannot steal the old region but copy it as per PatternRewriter
     // limitations.
-    rewriter.cloneRegionBefore(tppIdentityOp.region(),
-                               newTppIdentityOp.region(),
-                               newTppIdentityOp.region().begin());
+    rewriter.cloneRegionBefore(tppIdentityOp.getRegion(),
+                               newTppIdentityOp.getRegion(),
+                               newTppIdentityOp.getRegion().begin());
     rewriter.replaceOp(sliceOp, newTppIdentityOp.getResult(0));
     return success();
   }

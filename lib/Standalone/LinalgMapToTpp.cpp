@@ -11,7 +11,7 @@
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
 #include "Standalone/Transforms.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -58,7 +58,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   // Return true if the linalg.generic maps to a tpp.gemm.
   bool isTPPGemm(linalg::GenericOp linalgOp) const {
     // structural and access pattern.
-    ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+    SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
     if (iteratorTypes.size() != 3)
       return false;
     if (!(linalg::isParallelIterator(iteratorTypes[0]) &&
@@ -80,14 +80,14 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (!hasStaticShape(linalgOp))
       return rewriter.notifyMatchFailure(linalgOp, "shape is not static");
 
-    if (linalgOp.library_callAttr())
+    if (linalgOp.getLibraryCallAttr())
       return rewriter.notifyMatchFailure(linalgOp,
                                          "library_call attr already set");
 
     if (isTPPGemm(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
       rewriter.updateRootInPlace(
-          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
+          linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
 
@@ -97,21 +97,21 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (hasCopySemantics(linalgOp) && hasStaticShape(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
       rewriter.updateRootInPlace(
-          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
+          linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
     if (hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
         hasStaticShape(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
       rewriter.updateRootInPlace(
-          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
+          linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
     if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
         hasStaticShape(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
       rewriter.updateRootInPlace(
-          linalgOp, [&]() { linalgOp.library_callAttr(tppMicroKernelName); });
+          linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
 

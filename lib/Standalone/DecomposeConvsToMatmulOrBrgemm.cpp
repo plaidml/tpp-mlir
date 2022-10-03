@@ -34,7 +34,7 @@ static bool hasStaticShape(Value image, Value filter, Value output) {
 
 // return true if the conv has stride != 1.
 template <typename CONVOP> static bool hasStride(CONVOP convOp) {
-  if (DenseIntElementsAttr strides = convOp.strides()) {
+  if (DenseIntElementsAttr strides = convOp.getStrides()) {
     auto values = strides.getValues<APInt>();
     if (llvm::any_of(values, [](const APInt &value) {
           return value.getSExtValue() != 1;
@@ -47,7 +47,7 @@ template <typename CONVOP> static bool hasStride(CONVOP convOp) {
 
 // return true if the conv has dilation != 1.
 template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
-  if (DenseIntElementsAttr dilations = convOp.dilations()) {
+  if (DenseIntElementsAttr dilations = convOp.getDilations()) {
     auto values = dilations.getValues<APInt>();
     if (llvm::any_of(values, [](const APInt &value) {
           return value.getSExtValue() != 1;
@@ -106,7 +106,7 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
 
   bool
   preOptimizeByInterchangeIteratorsConv(linalg::GenericOp genericOp) const {
-    ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
+    SmallVector<StringRef> iteratorTypes = genericOp.getIteratorTypesArray();
     if (iteratorTypes.size() != 7)
       return false;
     bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
@@ -212,7 +212,7 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
 
     Location loc = genericOp.getLoc();
     linalg::GenerateLoopNest<scf::ForOp>::doit(
-        rewriter, loc, loopRanges, genericOp, genericOp.getIteratorTypes(),
+        rewriter, loc, loopRanges, genericOp, genericOp.getIteratorTypesArray(),
         gemmBuilder);
 
     // see: `Tiling.cpp` in Linalg/Transforms
@@ -300,7 +300,7 @@ struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     // [R][S][C][K]
     Value filter = convOp.filter();
     // [N][P][Q][K]
-    Value output = convOp.outputs()[0];
+    Value output = convOp.getOutputs()[0];
 
     if (!hasStaticShape(image, filter, output))
       return failure();
@@ -310,7 +310,7 @@ struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
-    generic.library_callAttr(rewriter.getStringAttr("tpp.Conv2DNhwcHwcfOp"));
+    generic.setLibraryCallAttr(rewriter.getStringAttr("tpp.Conv2DNhwcHwcfOp"));
     return success();
   }
 };
@@ -332,7 +332,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     // [K][C][R][S]
     Value filter = convOp.filter();
     // [N][K][P][Q]
-    Value output = convOp.outputs()[0];
+    Value output = convOp.getOutputs()[0];
 
     // static shapes.
     if (!hasStaticShape(image, filter, output))
@@ -355,7 +355,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
-    generic.library_callAttr(
+    generic.setLibraryCallAttr(
         rewriter.getStringAttr("tpp.BlockedConv2DNchwFchwOp"));
     return failure();
   }
@@ -414,7 +414,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   bool hasInterchangedDims(linalg::GenericOp linalgOp) const {
-    ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+    SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
     if (iteratorTypes.size() != 9)
       return false;
     bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
@@ -527,7 +527,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
 
     linalg::GenerateLoopNest<scf::ForOp>::doit(
         rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
-        linalgOp.getIteratorTypes(), gemmBuilder);
+        linalgOp.getIteratorTypesArray(), gemmBuilder);
 
     // See: `Tiling.cpp` in Linalg/Transforms.
     // Gather the newly created loops and return them with the new op.
@@ -765,7 +765,7 @@ struct InterchangeAfterBlockingAndCollapsing
       return failure();
     StringAttr name =
         rewriter.getStringAttr("tpp.BlockedCollapsedAndInterConv2DNchwFchwOp");
-    (*maybeInterchange).library_callAttr(name);
+    (*maybeInterchange).setLibraryCallAttr(name);
     return success();
   }
 };

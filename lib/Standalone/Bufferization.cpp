@@ -8,7 +8,7 @@
 
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "Standalone/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -33,7 +33,7 @@ struct Bufferize : public BufferizationBase<Bufferize> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
-    registry.insert<arith::ArithmeticDialect,
+    registry.insert<arith::ArithDialect,
                     bufferization::BufferizationDialect,
                     linalg::LinalgDialect,
                     memref::MemRefDialect,

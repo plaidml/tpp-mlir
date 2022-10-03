@@ -27,7 +27,7 @@ using namespace mlir;
 
 // Look for [p ... p] brgemm[r p p r]
 static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
-  ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() < 4)
     return failure();
   size_t size = iteratorTypes.size() - 1;
@@ -64,7 +64,7 @@ static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand *operand) {
 static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> maps;
   for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
-    AffineMap map = linalgOp.getTiedIndexingMap(operand);
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
     if (isInputOperand(linalgOp, operand)) {
       if (map.getNumResults() < 3)
         return failure();
@@ -186,7 +186,7 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   };
   linalg::GenerateLoopNest<scf::ForOp>::doit(
       rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
-      linalgOp.getIteratorTypes(), brgemmBuilder);
+      linalgOp.getIteratorTypesArray(), brgemmBuilder);
 
   // see: `Tiling.cpp` in Linalg/Transforms
   // gather the newly created loops and return them with the new op.
