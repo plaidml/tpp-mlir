@@ -8,7 +8,7 @@
 
 #include "Standalone/Dialect/Mathx/MathxOps.h"
 #include "Standalone/Dialect/Mathx/MathxDialect.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 

@@ -10,7 +10,7 @@
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
 #include "Standalone/Transforms.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -98,8 +98,8 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp, bool useParallelLoops) {
   // TODO: restrict to only the tiling ones.
   if (linalgOp.getNumLoops() <= 2)
     return success();
-  ArrayAttr iteratorTypes = linalgOp.iterator_types();
-  if (!llvm::all_of(iteratorTypes, [](Attribute type) {
+  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
+  if (!llvm::all_of(iteratorTypes, [](StringRef type) {
         return linalg::isParallelIterator(type);
       }))
     return success();
@@ -290,7 +290,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasBufferSemantics())
       return rewriter.notifyMatchFailure(linalgOp, "expect buffer semantics");
-    if (!linalgOp.library_callAttr() || !hasTppMark(linalgOp))
+    if (!linalgOp.getLibraryCallAttr() || !hasTppMark(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "not enough information to map to tpps");
 

@@ -113,7 +113,7 @@ ArrayAttr Relayout::getIndexingMaps() {
 }
 
 ArrayAttr Relayout::iterator_types() {
-  int64_t numLoops = getTiedIndexingMap(getInputOperand(0)).getNumDims();
+  int64_t numLoops = getMatchingIndexingMap(getInputOperand(0)).getNumDims();
   return Builder(getContext())
       .getStrArrayAttr(
           SmallVector<StringRef, 8>(numLoops, getParallelIteratorTypeName()));

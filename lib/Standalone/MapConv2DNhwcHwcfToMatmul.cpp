@@ -99,7 +99,7 @@ getSlicedConvOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   if (!tpp::hasMatmulBody(linalgOp))
     return false;
-  ArrayAttr iteratorTypes = linalgOp.getIteratorTypes();
+  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() < 3)
     return false;
   size_t size = iteratorTypes.size() - 1;
@@ -170,7 +170,7 @@ mlir::linalgx::mapConvToGemm(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 
   Location loc = linalgOp.getLoc();
   linalg::GenerateLoopNest<scf::ForOp>::doit(
-      rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypes(),
+      rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypesArray(),
       gemmBuilder);
 
   // see: `Tiling.cpp` in Linalg/Transforms

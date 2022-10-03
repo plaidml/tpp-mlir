@@ -261,8 +261,8 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
           getReductionIteratorTypeName(), getReductionIteratorTypeName(),
           getReductionIteratorTypeName()},
       /*doc=*/"", /*libraryCall=*/"tpp.blocked.Conv2DNchwFchwOp");
-  rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.region(),
-                              replacementOp.region().begin());
+  rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
+                              replacementOp.getRegion().begin());
 
   // convert back from block layout.
   assert(currentBlockingFactors.size() == 1);
@@ -327,8 +327,8 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
           getReductionIteratorTypeName(), getParallelIteratorTypeName(),
           getParallelIteratorTypeName(), getReductionIteratorTypeName()},
       /*doc=*/"", /*libraryCall=*/"");
-  rewriter.inlineRegionBefore(matmulOp.region(), replacementOp.region(),
-                              replacementOp.region().begin());
+  rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
+                              replacementOp.getRegion().begin());
 
   // convert back from block layout.
   Value outBlockedTensor = replacementOp.getResult(0);
@@ -401,7 +401,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
     FailureOr<Value> maybeReluBuffer = getReshapedTensor(
-        loc, linalgOp.outputs()[0], blockLayout, blockingFactors, rewriter);
+        loc, linalgOp.getOutputs()[0], blockLayout, blockingFactors, rewriter);
     if (failed(maybeReluBuffer))
       return failure();
     Value reluBuffer = *maybeReluBuffer;
@@ -427,8 +427,8 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
                                       getParallelIteratorTypeName(),
                                       getParallelIteratorTypeName()},
                   /*doc=*/"", /*libraryCall=*/"tpp.relu");
-    rewriter.inlineRegionBefore(linalgOp.region(), newReluOp.region(),
-                                newReluOp.region().begin());
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
+                                newReluOp.getRegion().begin());
 
     Value outUnBlockedTensor = (isInPlaceRelu(linalgOp))
                                    ? fromBlockLayout.getOutput()

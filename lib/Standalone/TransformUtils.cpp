@@ -165,7 +165,7 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
   Location loc = linalgOp.getLoc();
   FailureOr<SmallVector<Value>> involvedDimForOperand =
       utils::getInvolvedLocalDimsForOperand(
-          builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+          builder, loc, operand, linalgOp.getMatchingIndexingMap(operand), ivs);
   if (failed(involvedDimForOperand))
     return failure();
   return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,
@@ -180,7 +180,7 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
   Location loc = linalgOp.getLoc();
   FailureOr<SmallVector<Value>> involvedDimForOperand =
       utils::getInvolvedLocalDimsForOperand(
-          builder, loc, operand, linalgOp.getTiedIndexingMap(operand), ivs);
+          builder, loc, operand, linalgOp.getMatchingIndexingMap(operand), ivs);
   if (failed(involvedDimForOperand))
     return failure();
   return getSliceOperandImpl(builder, linalgOp, operand, *involvedDimForOperand,

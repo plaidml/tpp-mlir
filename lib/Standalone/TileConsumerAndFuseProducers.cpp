@@ -169,17 +169,16 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
     }
 
     // tile and fuse.
-    scf::SCFTilingOptions options;
-    options.setTileSizes(tileSizes);
-    scf::TileConsumerAndFuseProducersUsingSCFForOp tileAndFuse(
-        linalgOp.getContext(), options);
+    scf::SCFTileAndFuseOptions options;
+    options.tilingOptions.setTileSizes(tileSizes);
     TilingInterface tilingInterfaceOp =
         cast<TilingInterface>(linalgOp.getOperation());
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        tileAndFuse.returningMatchAndRewrite(tilingInterfaceOp, rewriter/*,
-                                             canFuseOuterDim*/);
+        tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+            rewriter, tilingInterfaceOp, options);
     if (failed(tileAndFuseResult))
       return failure();
+    rewriter.replaceOp(linalgOp, tileAndFuseResult->loops[0].getResults());
     return success();
   }
   ArrayRef<int64_t> tileSizes;
