@@ -69,7 +69,8 @@ def PackOp : LinalgX_Op<"pack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
     Optional<AnyType>:$padding_value);
@@ -79,7 +80,8 @@ def PackOp : LinalgX_Op<"pack", [
     attr-dict
     $input
     (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
-    `dims_pos` `=` $dims_pos
+    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicSize")
@@ -131,9 +133,15 @@ def PackOp : LinalgX_Op<"pack", [
     // Infer the output type.
     ShapedType inferResultType();
 
-    // Return a mapping from positions `dims_pos` to their tile factors.
+    // Return a mapping from positions `inner_dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$input, 
+      "Value":$output, "ArrayRef<int64_t>":$innerDimPos, 
+      "ArrayRef<int64_t>":$outerDimPos, "ArrayRef<OpFoldResult>":$tiles)>
+  ];
 
   let hasVerifier = 1;
 }
@@ -153,7 +161,8 @@ def UnPackOp : LinalgX_Op<"unpack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles);
 
@@ -161,7 +170,8 @@ def UnPackOp : LinalgX_Op<"unpack", [
   let assemblyFormat = [{
     attr-dict
     $input
-    `dims_pos` `=` $dims_pos
+    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicSize")
@@ -211,72 +221,13 @@ def UnPackOp : LinalgX_Op<"unpack", [
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
-
-  let hasVerifier = 1;
-}
-
-// TODO: input/output must also be ranked tensor type with static shape
-
-//===----------------------------------------------------------------------===//
-// Relayout
-//===----------------------------------------------------------------------===//
-
-def Relayout : LinalgX_Op<"relayout", 
-          [LinalgStructuredInterface,
-           DestinationStyleOpInterface, 
-           DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-           SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">]> {
-  let summary = "relayout from block layout and back.";
-  let arguments = (ins AnyShaped:$input, AnyShaped:$output,
-                       AffineMapAttr:$inputMap, AffineMapAttr:$outputMap);
-  let results = (outs Variadic<AnyShaped>:$result);
-  let regions = (region AnyRegion:$region);
  
-  let hasCustomAssemblyFormat = 1;
-
-  let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<
-      (ins "TypeRange":$resultTensorTypes, "ValueRange":$inputs,
-            "ValueRange":$outputs, "AffineMap":$inputMap,
-            "AffineMap":$outputMap,
-            CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
-      [{
-        buildStructuredOp($_builder, $_state, resultTensorTypes,
-          inputs, outputs, inputMap, outputMap, 
-          attributes, Relayout::getRegionBuilder());
-      }]>
+    OpBuilder<(ins "Value":$input, 
+      "Value":$output, "ArrayRef<int64_t>":$dimPos,"ArrayRef<OpFoldResult>":$tiles)>
   ];
 
-  let extraClassDeclaration = [{
-
-    bool hasIndexSemantics() { return false; }
-
-    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
-                              llvm::ArrayRef<mlir::NamedAttribute> attrs);
-    
-    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
-                              llvm::ArrayRef<mlir::NamedAttribute> attrs)>
-    
-    getRegionBuilder() { return regionBuilder; }
-
-    mlir::ArrayAttr getIndexingMaps();
-
-    mlir::ArrayAttr iterator_types();
-
-    std::string getLibraryCallName();
-  
-    // TODO: duplicate methods due to transition to prefix:
-    // see: https://github.com/llvm/llvm-project/commit/7602e285f69c4e3af60629100c151067c27b9eca
-    mlir::ValueRange inputs() { return getOperands().take_front(); }
-    mlir::ValueRange getInputs() { return getOperands().take_front(); }
-
-    mlir::ValueRange outputs() { return getOperands().take_back(); }
-    mlir::ValueRange getOutputs() { return getOperands().take_back(); }
-
-  }];
-
-  let hasCanonicalizer = 1; 
+  let hasVerifier = 1;
 }
 
 #endif // STANDALONE_LINALGX_OPS

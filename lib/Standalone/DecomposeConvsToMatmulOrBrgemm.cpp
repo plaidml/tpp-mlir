@@ -350,8 +350,11 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     if (failed(blockConv2DNchwFchwPreconditions(convOp)))
       return failure();
     // TODO: hardcoded values.
+    SmallVector<int64_t> tiles = {32, 32};
     FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, convOp, {32, 32});
+        mlir::linalgx::blockConv2DNchwFchwOp(
+            rewriter, convOp,
+            getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;

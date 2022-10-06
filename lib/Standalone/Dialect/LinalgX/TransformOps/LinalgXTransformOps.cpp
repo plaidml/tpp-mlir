@@ -59,6 +59,7 @@ DiagnosedSilenceableFailure
 transform::BlockOp::applyToOne(linalg::LinalgOp target,
                                SmallVector<Operation *> &results,
                                transform::TransformState &state) {
+  /*
   SmallVector<int64_t> blockSizes =
       extractFromI64ArrayAttr(getBlockingFactors());
   SimpleRewriter rewriter(target->getContext());
@@ -82,6 +83,7 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
     }
   }
   results.assign(1, nullptr);
+  */
   return DiagnosedSilenceableFailure::definiteFailure();
 }
 
