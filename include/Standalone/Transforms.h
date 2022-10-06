@@ -56,5 +56,6 @@ void populateMapLinalgToTppPatterns(RewritePatternSet &patterns);
 void populateTppToXsmmPatterns(RewritePatternSet &patterns);
 void populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                 bool useExtractMetaData);
+void populateSinkRelayoutPatterns(RewritePatternSet &patterns);
 } // namespace tpp
 } // namespace mlir

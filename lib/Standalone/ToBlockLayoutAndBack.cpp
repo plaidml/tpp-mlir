@@ -370,16 +370,45 @@ private:
   ArrayRef<int64_t> blockingFactors;
 };
 
+// TODO: generalize to any elementWise operation.
 // Relayout relu as: [NB][KB][nb][kb]
 struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
-  SinkBlockLayoutAfterRelu(MLIRContext *context,
-                           ArrayRef<int64_t> blockingFactors,
-                           PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::GenericOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   bool isInPlaceRelu(linalg::GenericOp linalgOp) const {
     return linalgOp.getNumInputs() == 0;
+  }
+
+  // Note this is not what you want. The blocking should be part of the
+  // operation as we did in IREE, not hidden in the affine map. Attempt to
+  // recover the constants (aka blocks factor) in the map, assert on failure.
+  SmallVector<int64_t> getBlockingFactors(linalgx::Relayout relayoutOp) const {
+
+    // Walk the affine expression and return the first constant if any.
+    // Assert if we don't find any constant or multiple constants are found.
+    auto getConstant = [&](AffineExpr expr) -> int64_t {
+      bool onlyOneConstant = false;
+      int64_t value;
+      expr.walk([&](AffineExpr e) -> void {
+        if (e.getKind() == AffineExprKind::Constant) {
+          assert(!onlyOneConstant &&
+                 "failed to extract constant from relayout");
+          value = e.cast<AffineConstantExpr>().getValue();
+          onlyOneConstant = true;
+        }
+      });
+      assert(onlyOneConstant == true &&
+             "failed to extract constant from relayout");
+      return value;
+    };
+
+    AffineMap outputMap = relayoutOp.getOutputMap();
+    SmallVector<int64_t> blocks;
+    blocks.reserve(outputMap.getNumResults());
+    ArrayRef<AffineExpr> results = outputMap.getResults();
+    for (AffineExpr expr : results)
+      blocks.push_back(getConstant(expr));
+    return blocks;
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -400,8 +429,9 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     Value blockTensor = fromBlockLayout.getInputs()[0];
     ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
     BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-    FailureOr<Value> maybeReluBuffer = getReshapedTensor(
-        loc, linalgOp.getOutputs()[0], blockLayout, blockingFactors, rewriter);
+    FailureOr<Value> maybeReluBuffer =
+        getReshapedTensor(loc, linalgOp.getOutputs()[0], blockLayout,
+                          getBlockingFactors(fromBlockLayout), rewriter);
     if (failed(maybeReluBuffer))
       return failure();
     Value reluBuffer = *maybeReluBuffer;
@@ -436,7 +466,7 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
 
     Type outUnBlockedTensorType = outUnBlockedTensor.getType();
     std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCnc_NC(
-        /*dims=*/4, blockingFactors, linalgOp.getContext());
+        /*dims=*/4, getBlockingFactors(fromBlockLayout), linalgOp.getContext());
 
     Value outReplacement =
         rewriter
@@ -447,9 +477,6 @@ struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     rewriter.replaceOp(linalgOp, outReplacement);
     return success();
   }
-
-private:
-  ArrayRef<int64_t> blockingFactors;
 };
 
 // TODO: should be part of a more structured de-generalization pass.
@@ -484,8 +511,8 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<DoItOnMatmul, SinkBlockLayoutAfterRelu>(ctx, blockingFactors);
-    patterns.add<DeGeneralizeMatmul>(ctx);
+    patterns.add<DoItOnMatmul>(ctx, blockingFactors);
+    patterns.add<DeGeneralizeMatmul, SinkBlockLayoutAfterRelu>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
@@ -531,6 +558,13 @@ struct BlockConv2DNchwFchwLayout
 };
 
 } // end namespace
+
+void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
+  // clang-format off
+  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
+  patterns.add<SinkBlockLayoutAfterRelu>(patterns.getContext());
+  // clang-format on
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createBlockMatmulLayout() {
