@@ -76,17 +76,22 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
 // MapToBrgemmOp
 //===----------------------------------------------------------------------===//
 
-def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm",
-                      [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-                       TransformOpInterface, TransformEachOpTrait]> {
+def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformOpInterface,
+    TransformEachOpTrait]> {
 
   let description = [{
     Check if a linalg.generic maps to brgemm. If so materialize loops (if needed) 
     and replace the linalg.generic with a linalg.batch_reduce_matmul.
+
+    This transform never returns anything and could be made to return the brgemm
+    operation if needed.
   }];
   
   let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
+  let results = (outs);
 
   let assemblyFormat = "$target attr-dict";
 

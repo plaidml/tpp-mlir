@@ -153,7 +153,7 @@ transform.with_pdl_patterns {
       %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
       %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
       %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
-      %5 = transform.structured.map_to_brgemm %4
+      transform.structured.map_to_brgemm %4
   }
 }
 
