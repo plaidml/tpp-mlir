@@ -227,4 +227,10 @@ def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleO
   }];
 }
 
+def LinalgExtToLoops :
+    Pass<"linalg-ext-to-loops", "func::FuncOp"> {
+  let summary = "Convert LinalgX ops to loops and Linalg ops.";
+  let constructor = "mlir::tpp::createLinalgXToLoopsPass()";
+}
+
 #endif // STANDALONE_DIALECT_TPP_PASSES

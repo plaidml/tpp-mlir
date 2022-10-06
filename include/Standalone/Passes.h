@@ -78,6 +78,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createIteratorCollapsingPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 
 } // namespace tpp
 } // namespace mlir
