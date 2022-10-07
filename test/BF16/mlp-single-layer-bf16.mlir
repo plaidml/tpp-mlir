@@ -1,10 +1,7 @@
-// UNSUPPORTED: !x86_64
-
 // RUN: standalone-opt %s -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -sparse-compiler|\
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
+// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%standalonelibdir/libstandalone_c_runner_utils%shlibext
 //
 
 #map0 = affine_map<(d0,d1,d2)->(d0*2+d2, d1)>
@@ -28,4 +25,3 @@ module{
     return
   }
 }
-
