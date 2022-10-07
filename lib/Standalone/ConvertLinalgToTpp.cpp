@@ -89,7 +89,8 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
-LogicalResult reshape2D(linalg::GenericOp linalgOp, bool useParallelLoops) {
+LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
+                        bool useParallelLoops) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
 
@@ -104,23 +105,31 @@ LogicalResult reshape2D(linalg::GenericOp linalgOp, bool useParallelLoops) {
       }))
     return success();
 
-  OpBuilder builder(linalgOp);
-  OpBuilder::InsertionGuard guard(builder);
   linalg::LinalgTilingOptions linalgTilingOptions;
   linalg::LinalgTilingLoopType loopsTypes =
       (useParallelLoops) ? linalg::LinalgTilingLoopType::ParallelLoops
                          : linalg::LinalgTilingLoopType::Loops;
   linalgTilingOptions.setLoopType(loopsTypes)
       .setTileSizeComputationFunction(getTileSizes);
-  IRRewriter rewriter(builder);
   FailureOr<linalg::TiledLinalgOp> tiledOp =
       linalg::tileLinalgOp(rewriter, linalgOp, linalgTilingOptions);
   if (failed(tiledOp))
     return linalgOp->emitError("Failed to tile linalgOp");
 
-  linalgOp->erase();
+  rewriter.eraseOp(linalgOp);
   return success();
 }
+
+/// Massages a linalg.generic for mapping to 2-D TPP library calls.
+/// This may introduce loops, at this point loops are forced to be sequential.
+struct ReshapeGenericOpForTpp : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    return reshape2D(rewriter, linalgOp, /*useParallellLoops=*/false);
+  }
+};
 
 // Tile sizes selection specific for matmul.
 static SmallVector<Value>
@@ -249,8 +258,8 @@ LogicalResult checkOperandForTpp(Value operand) {
 }
 
 // Convert a linalg.generic to a tpp operation. Require the generic to be
-// annotated with the tpp operation to replace. Annotation uses linalg library
-// call mechanism.
+// annotated with the tpp operation to replace. Annotation uses linalg
+// library call mechanism.
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -283,7 +292,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                                  operands[1], operands[2]);
       return success();
     }
-    return failure();
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match a known library_call attribute");
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -394,7 +404,9 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   }
   void runOnOperation() override {
     getOperation().walk([&](linalg::GenericOp linalgOp) {
-      if (failed(reshape2D(linalgOp, this->useParallelLoops)))
+      OpBuilder builder(linalgOp);
+      IRRewriter rewriter(builder);
+      if (failed(reshape2D(rewriter, linalgOp, this->useParallelLoops)))
         return signalPassFailure();
     });
     if (enableTiling || tileSizes.size())
@@ -419,7 +431,8 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
-               ConvertMatmulToTpp>(patterns.getContext());
+               ConvertMatmulToTpp,
+               ReshapeGenericOpForTpp>(patterns.getContext());
   // clang-format on
 }
 
