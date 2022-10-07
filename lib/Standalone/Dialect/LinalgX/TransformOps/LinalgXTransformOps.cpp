@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
+#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 using namespace mlir::transform;
@@ -124,16 +125,12 @@ DiagnosedSilenceableFailure
 transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
                                      SmallVector<Operation *> &results,
                                      transform::TransformState &state) {
-  if (!isa<linalg::GenericOp>(target))
-    return DiagnosedSilenceableFailure::definiteFailure();
+  if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
+    return DiagnosedSilenceableFailure::success();
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops =
       mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
-  if (failed(brgemmLoops))
-    return DiagnosedSilenceableFailure::definiteFailure();
-  // TODO: return linalg.batch_reduce_matmul instead of loops.
-  results.push_back(nullptr);
   return DiagnosedSilenceableFailure(success());
 }
 
