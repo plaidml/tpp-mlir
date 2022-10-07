@@ -277,9 +277,19 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
         rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
     xsmm::UnaryFlagsAttr bCastAttr =
         xsmm::UnaryFlagsAttr::get(identityOp.getContext(), bCast);
+    xsmm::DataTypeAttr dtype;
+    if (outputMemRefType.getElementType().isBF16()) {
+      dtype = xsmm::DataTypeAttr::get(identityOp.getContext(),
+                                      xsmm::DataType::BF16);
+    } else {
+      assert(outputMemRefType.getElementType().isF32() &&
+             "Element type neither bf16 nor f32");
+      dtype =
+          xsmm::DataTypeAttr::get(identityOp.getContext(), xsmm::DataType::F32);
+    }
 
     Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr);
+        loc, integer64, attr, dims, bCastAttr, dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -317,8 +327,18 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     xsmm::UnaryFlagsAttr bCastAttr =
         xsmm::UnaryFlagsAttr::get(reluOp.getContext(), bCast);
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    xsmm::DataTypeAttr dtype;
+    if (outputMemRef.getElementType().isBF16()) {
+      dtype =
+          xsmm::DataTypeAttr::get(reluOp.getContext(), xsmm::DataType::BF16);
+    } else {
+      assert(outputMemRef.getElementType().isF32() &&
+             "Element type neither bf16 nor f32");
+      dtype = xsmm::DataTypeAttr::get(reluOp.getContext(), xsmm::DataType::F32);
+    }
+
     Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr);
+        loc, integer64, attr, dims, bCastAttr, dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);

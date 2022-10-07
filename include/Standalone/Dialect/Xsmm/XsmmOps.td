@@ -105,6 +105,15 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
         return true;
       return false;
     }
+    std::string getOperandTypeAsString(){
+      Type operand = getInputs()[1].getType();
+      if(MemRefType type = operand.dyn_cast<MemRefType>())
+         operand = type.getElementType();
+      if(operand.isBF16())
+        return "bf16";
+      assert(operand.isF32() && "Element type neither bf16 nor f32");
+      return "f32";
+    }
   }]; 
 
   let hasVerifier = 1;
@@ -162,11 +171,11 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[NoSideEffect]> {
   }];
   
   let arguments = (ins Xsmm_UnaryKind:$kind, DenseI64ArrayAttr:$inputs, 
-                       Xsmm_UnaryFlags:$flags);
+                       Xsmm_UnaryFlags:$flags, Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `)` attr-dict 
+    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict 
   }]; 
 }
 
