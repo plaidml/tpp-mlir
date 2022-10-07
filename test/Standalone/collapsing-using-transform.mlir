@@ -23,11 +23,11 @@ transform.with_pdl_patterns {
 
 // CHECK-LABEL: func.func @conv(
 func.func @conv(%arg0: tensor<14x512x28x28xf32>, %arg1: tensor<1024x512x1x1xf32>, %arg2: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
-  %0 = linalg.init_tensor [14, 16, 28, 28, 32] : tensor<14x16x28x28x32xf32>
+  %0 = tensor.empty() : tensor<14x16x28x28x32xf32>
   %1 = linalgx.relayout ins(%arg0 : tensor<14x512x28x28xf32>, #map0) outs(%0 : tensor<14x16x28x28x32xf32>, #map1) -> tensor<14x16x28x28x32xf32>
-  %2 = linalg.init_tensor [32, 16, 1, 1, 32, 32] : tensor<32x16x1x1x32x32xf32>
+  %2 = tensor.empty() : tensor<32x16x1x1x32x32xf32>
   %3 = linalgx.relayout ins(%arg1 : tensor<1024x512x1x1xf32>, #map2) outs(%2 : tensor<32x16x1x1x32x32xf32>, #map3) -> tensor<32x16x1x1x32x32xf32>
-  %4 = linalg.init_tensor [14, 32, 28, 28, 32] : tensor<14x32x28x28x32xf32>
+  %4 = tensor.empty() : tensor<14x32x28x28x32xf32>
   %5 = linalgx.relayout ins(%arg2 : tensor<14x1024x28x28xf32>, #map0) outs(%4 : tensor<14x32x28x28x32xf32>, #map1) -> tensor<14x32x28x28x32xf32>
   %6 = tensor.collapse_shape %3 [[0], [1, 2, 3], [4], [5]] : tensor<32x16x1x1x32x32xf32> into tensor<32x16x32x32xf32>
   // CHECK: %{{.*}} = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins({{.*}}, %{{.*}} : tensor<14x16x784x32xf32>, tensor<32x16x32x32xf32>) outs(%{{.*}} : tensor<14x32x784x32xf32>) 

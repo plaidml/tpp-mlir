@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Traits.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 using namespace mlir::linalgx;
@@ -187,10 +188,10 @@ static FailureOr<Value> getReshapedTensor(Location loc, Value tensor,
     maps = getMapsToBlockLayoutKCRS_to_KCRSck(shapeBlockedTensor.size(),
                                               blockFactors, ctx);
   }
-  Value initTensor = rewriter.create<linalg::InitTensorOp>(
+  Value emptyTensor = rewriter.create<tensor::EmptyOp>(
       loc, shapeBlockedTensor, unBlockedTensorType.getElementType());
   return rewriter
-      .create<linalgx::Relayout>(loc, initTensor.getType(), tensor, initTensor,
+      .create<linalgx::Relayout>(loc, emptyTensor.getType(), tensor, emptyTensor,
                                  maps.first, maps.second)
       .getResult()[0];
 }

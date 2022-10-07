@@ -63,11 +63,11 @@ transform.with_pdl_patterns {
 func.func @block_linalg_matmul(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>)
     -> tensor<128x128xf32> {
-  // CHECK: %[[BBufA:.*]] = linalg.init_tensor [4, 4, 32, 32] : tensor<4x4x32x32xf32>
+  // CHECK: %[[BBufA:.*]] = tensor.empty() : tensor<4x4x32x32xf32>
   // CHECK: %[[BA:.*]] = linalgx.relayout ins(%[[TA]] : tensor<128x128xf32>, #[[MAP0]]) outs(%[[BBufA]] : tensor<4x4x32x32xf32>, #[[MAP1]]) -> tensor<4x4x32x32xf32>
-  // CHECK: %[[BBufB:.*]] = linalg.init_tensor [4, 4, 32, 32] : tensor<4x4x32x32xf32>
+  // CHECK: %[[BBufB:.*]] = tensor.empty() : tensor<4x4x32x32xf32>
   // CHECK: %[[BB:.*]] = linalgx.relayout ins(%[[TB]] : tensor<128x128xf32>, #[[MAP2]]) outs(%[[BBufB]] : tensor<4x4x32x32xf32>, #[[MAP1]]) -> tensor<4x4x32x32xf32>
-  // CHECK: %[[BBufC:.*]] = linalg.init_tensor [4, 4, 32, 32] : tensor<4x4x32x32xf32>
+  // CHECK: %[[BBufC:.*]] = tensor.empty() : tensor<4x4x32x32xf32>
   // CHECK: %[[BC:.*]] = linalgx.relayout ins(%[[TC]] : tensor<128x128xf32>, #[[MAP0]]) outs(%[[BBufC]] : tensor<4x4x32x32xf32>, #[[MAP1]]) -> tensor<4x4x32x32xf32>
   // CHECK: %[[res:.*]] = linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP5]]], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%[[BA]], %[[BB]] : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>) outs(%[[BC]] : tensor<4x4x32x32xf32>)
   // CHECK: %[[Ur:.*]] = linalgx.relayout ins(%[[res]] : tensor<4x4x32x32xf32>, #[[MAP1]]) outs(%[[TC]] : tensor<128x128xf32>, #[[MAP0]]) -> tensor<128x128xf32>
