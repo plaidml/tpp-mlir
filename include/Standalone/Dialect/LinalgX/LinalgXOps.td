@@ -23,6 +23,7 @@ include "mlir/Interfaces/TilingInterface.td"
 def PackOp : LinalgX_Op<"pack", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
@@ -92,7 +93,7 @@ def PackOp : LinalgX_Op<"pack", [
   let extraClassDeclaration = [{
 
     // Return the output rank.
-    int64_t getOutputRank() {
+    size_t getOutputRank() {
       return  getOutputType().getRank();
     }
 
@@ -122,7 +123,7 @@ def PackOp : LinalgX_Op<"pack", [
     }
 
     // Return the rank of the input operand.
-    int64_t getInputRank() {
+    size_t getInputRank() {
       return getInputType().getRank();
     }
 
@@ -144,6 +145,7 @@ def PackOp : LinalgX_Op<"pack", [
   ];
 
   let hasVerifier = 1;
+  let hasCanonicalizeMethod = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -152,6 +154,7 @@ def PackOp : LinalgX_Op<"pack", [
 
 def UnPackOp : LinalgX_Op<"unpack", [
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
@@ -182,7 +185,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
   let extraClassDeclaration =  [{
 
     // Return the output rank.
-    int64_t getOutputRank() {
+    size_t getOutputRank() {
       return  getOutputType().getRank();
     }
 
@@ -207,7 +210,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
     }
 
     // Return the rank of the input operand.
-    int64_t getInputRank() {
+    size_t getInputRank() {
       return getInputType().getRank();
     }
 
@@ -227,6 +230,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
       "Value":$output, "ArrayRef<int64_t>":$dimPos,"ArrayRef<OpFoldResult>":$tiles)>
   ];
 
+  let hasCanonicalizeMethod = 1;
   let hasVerifier = 1;
 }
 

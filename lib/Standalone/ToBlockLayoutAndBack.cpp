@@ -192,6 +192,8 @@ static Value fromPackLayoutNCHWc(Location loc, Value input, Value output,
   return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, builder);
 }
 
+/// Helper function ensure packing preconditions. We pack only if the operation
+/// has static shape and it is at tensor level.
 static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
   if (linalgOp.hasDynamicShape() || linalgOp.hasBufferSemantics())
     return failure();
@@ -314,9 +316,7 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 
 namespace {
 
-// Relayout MatmulOp as following:
-// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
-// CB = batch reduce dimension.
+// Pack MatmulOp.
 struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
   DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> tiles,
                PatternBenefit benefit = 1)
@@ -335,118 +335,28 @@ private:
   ArrayRef<int64_t> tiles;
 };
 
-#if 0
-// TODO: generalize to any elementWise operation.
-// Relayout relu as: [NB][KB][nb][kb]
-struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
+// From linalg.generic to linalg.matmul.
+struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  bool isInPlaceRelu(linalg::GenericOp linalgOp) const {
-    return linalgOp.getNumInputs() == 0;
-  }
-
-  // Note this is not what you want. The blocking should be part of the
-  // operation as we did in IREE, not hidden in the affine map. Attempt to
-  // recover the constants (aka blocks factor) in the map, assert on failure.
-  SmallVector<int64_t> getBlockingFactors(linalgx::Relayout relayoutOp) const {
-
-    // Walk the affine expression and return the first constant if any.
-    // Assert if we don't find any constant or multiple constants are found.
-    auto getConstant = [&](AffineExpr expr) -> int64_t {
-      bool onlyOneConstant = false;
-      int64_t value;
-      expr.walk([&](AffineExpr e) -> void {
-        if (e.getKind() == AffineExprKind::Constant) {
-          assert(!onlyOneConstant &&
-                 "failed to extract constant from relayout");
-          value = e.cast<AffineConstantExpr>().getValue();
-          onlyOneConstant = true;
-        }
-      });
-      assert(onlyOneConstant == true &&
-             "failed to extract constant from relayout");
-      return value;
-    };
-
-    AffineMap outputMap = relayoutOp.getOutputMap();
-    SmallVector<int64_t> blocks;
-    blocks.reserve(outputMap.getNumResults());
-    ArrayRef<AffineExpr> results = outputMap.getResults();
-    for (AffineExpr expr : results)
-      blocks.push_back(getConstant(expr));
-    return blocks;
-  }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.relu"))
+    if (!linalgOp.hasTensorSemantics())
       return failure();
-    Location loc = linalgOp.getLoc();
-
-    Value operand = (isInPlaceRelu(linalgOp))
-                        ? linalgOp.getOutputOperand(0)->get()
-                        : linalgOp.getInputOperand(0)->get();
-
-    linalgx::Relayout fromBlockLayout =
-        operand.getDefiningOp<linalgx::Relayout>();
-    if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
+    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
       return failure();
-
-    Value blockTensor = fromBlockLayout.getInputs()[0];
-    ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
-    BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-    FailureOr<Value> maybeReluBuffer =
-        getReshapedTensor(loc, linalgOp.getOutputs()[0], blockLayout,
-                          getBlockingFactors(fromBlockLayout), rewriter);
-    if (failed(maybeReluBuffer))
-      return failure();
-    Value reluBuffer = *maybeReluBuffer;
-
-    AffineMap mapI =
-        AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());
-    AffineMap mapO = mapI;
-    linalg::GenericOp newReluOp =
-        (isInPlaceRelu(linalgOp))
-            ? rewriter.create<linalg::GenericOp>(
-                  loc, blockTensorType, llvm::None, ValueRange{blockTensor},
-                  ArrayRef<AffineMap>{mapO},
-                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName()},
-                  /*doc=*/"", /*libraryCall=*/"tpp.relu")
-            : rewriter.create<linalg::GenericOp>(
-                  loc, blockTensorType, ValueRange{blockTensor},
-                  ValueRange{reluBuffer}, ArrayRef<AffineMap>{mapI, mapO},
-                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName()},
-                  /*doc=*/"", /*libraryCall=*/"tpp.relu");
-    rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
-                                newReluOp.getRegion().begin());
-
-    Value outUnBlockedTensor = (isInPlaceRelu(linalgOp))
-                                   ? fromBlockLayout.getOutput()
-                                   : linalgOp.getOutputOperand(0)->get();
-
-    Type outUnBlockedTensorType = outUnBlockedTensor.getType();
-    //std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCnc_NC(
-    //    /*dims=*/4, getBlockingFactors(fromBlockLayout), linalgOp.getContext());
-
-    //Value outReplacement =
-    //    rewriter
-    //        .create<linalgx::Relayout>(
-    //            loc, outUnBlockedTensorType, newReluOp->getResult(0),
-    //            outUnBlockedTensor, maps.first, maps.second)
-    //        .getResult()[0];
-    //rewriter.replaceOp(linalgOp, outReplacement);
-    //return success();
-    return failure();
+    SmallVector<Value> inputOperands = linalgOp.getInputOperands();
+    SmallVector<Value> outputOperands = linalgOp.getOutputOperands();
+    rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
+    return success();
   }
 };
-#endif
 
+// Entry point for packing a matmul operation.
+// Pack MatmulOp as following:
+// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
+// CB = batch reduce dimension.
 struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
   BlockMatmulLayout() = default;
   BlockMatmulLayout(ArrayRef<int64_t> blockingFactors) {
@@ -458,7 +368,9 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkRelayoutPatterns(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
+    patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
@@ -504,13 +416,132 @@ struct BlockConv2DNchwFchwLayout
   }
 };
 
+//===----------------------------------------------------------------------===//
+// SinkBlockLayout
+//===----------------------------------------------------------------------===//
+
+struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  Value packInput(Location loc, OpOperand *operand,
+                  DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
+                  PatternRewriter &rewriter) const {
+    linalgx::UnPackOp unpackOp =
+        operand->get().getDefiningOp<linalgx::UnPackOp>();
+    assert(unpackOp);
+    DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
+        unpackOp.getDimAndTileMapping();
+    SmallVector<int64_t> currentInnerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    // TODO: the tile need to be the same if already in the map.
+    for (int64_t currentInnerDimPos : currentInnerDimsPos)
+      dimAndTileMapping[currentInnerDimPos] =
+          currentDimAndTileMapping[currentInnerDimPos];
+    // TODO: handle outer perm or restrict to NCnc
+    return toPackLayoutImpl(loc, operand->get(), unpackOp.getMixedTiles(),
+                            currentInnerDimsPos, {}, rewriter);
+  }
+
+  LogicalResult preconditions(linalg::GenericOp linalgOp) const {
+    if (llvm::any_of(linalgOp.getIndexingMapsArray(),
+                     [](AffineMap map) { return !map.isIdentity(); }))
+      return failure();
+
+    if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+      return failure();
+
+    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+      linalgx::UnPackOp unpackOp =
+          operand->get().getDefiningOp<linalgx::UnPackOp>();
+      if (!unpackOp)
+        return failure();
+    }
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+
+    if (failed(preconditions(linalgOp)))
+      return failure();
+    Location loc = linalgOp.getLoc();
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+    SmallVector<Value> packedInputs;
+    // input packing
+    for (OpOperand *operand : linalgOp.getInputOperands()) {
+      packedInputs.push_back(
+          packInput(loc, operand, dimAndTileMapping, rewriter));
+    }
+
+    // output packing
+    SmallVector<Value> packedOutputs;
+    SmallVector<Type> packedOutputsTypes;
+    SmallVector<Value> unpackOutputs;
+    for (OpOperand *operand : linalgOp.getOutputOperands()) {
+      SmallVector<OpFoldResult> tiles;
+      SmallVector<int64_t> innerDimsPos;
+
+      // if the output is already unpacked -> repack.
+      linalgx::UnPackOp unpackOp =
+          operand->get().getDefiningOp<linalgx::UnPackOp>();
+      if (unpackOp) {
+        tiles = unpackOp.getMixedTiles();
+        innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+        unpackOutputs.push_back(unpackOp.getOutput());
+      } else {
+        AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
+        for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
+          unsigned posInDomain = mapOperand.getDimPosition(pos);
+          if (dimAndTileMapping.count(posInDomain)) {
+            tiles.push_back(dimAndTileMapping[posInDomain]);
+            innerDimsPos.push_back(posInDomain);
+          }
+        }
+      }
+      if (tiles.empty())
+        return failure();
+      Value packedOutput = toPackLayoutImpl(loc, operand->get(), tiles,
+                                            innerDimsPos, {}, rewriter);
+      packedOutputs.push_back(packedOutput);
+      packedOutputsTypes.push_back(packedOutput.getType());
+    }
+
+    AffineMap map = AffineMap::getMultiDimIdentityMap(
+        linalgOp.getNumLoops() + 2, linalgOp.getContext());
+    SmallVector<AffineMap> maps(linalgOp.getIndexingMapsArray().size(), map);
+    SmallVector<StringRef> iteratorsTypes(linalgOp.getNumLoops() + 2,
+                                          getParallelIteratorTypeName());
+
+    linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
+        loc, packedOutputsTypes, packedInputs, packedOutputs, maps,
+        iteratorsTypes, /*docs=*/"", /*libraryCall=*/"");
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), replacementOp.getRegion(),
+                                replacementOp.getRegion().begin());
+
+    SmallVector<Value> outReplacements;
+    size_t idx = 0;
+    for (OpOperand *operand : replacementOp.getOutputOperands()) {
+      linalgx::PackOp packOp = operand->get().getDefiningOp<linalgx::PackOp>();
+      assert(packOp && "expect def pack op");
+      Value result = replacementOp.getTiedOpResult(operand);
+      if (linalgOp.getNumInputs() != 0)
+        outReplacements.push_back(
+            fromPackLayoutNCnc(loc, result, linalgOp.getOutputs()[idx++],
+                               packOp.getMixedTiles(), rewriter));
+      else
+        outReplacements.push_back(
+            fromPackLayoutNCnc(loc, result, unpackOutputs[idx++],
+                               packOp.getMixedTiles(), rewriter));
+    }
+    rewriter.replaceOp(linalgOp, outReplacements);
+    return success();
+  }
+};
+
 } // end namespace
 
 void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
-  // patterns.add<SinkBlockLayoutAfterRelu>(patterns.getContext());
-  // clang-format on
+  patterns.add<SinkBlockLayout>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

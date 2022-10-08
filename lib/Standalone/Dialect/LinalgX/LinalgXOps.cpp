@@ -25,6 +25,29 @@ using namespace mlir::linalgx;
 using namespace mlir::bufferization;
 
 //===----------------------------------------------------------------------===//
+// PackOp and UnPackOp canonicalizer
+//===----------------------------------------------------------------------===//
+
+LogicalResult PackOp::canonicalize(PackOp packOp, PatternRewriter &rewriter) {
+  linalgx::UnPackOp unpackOp =
+      packOp.getInput().getDefiningOp<linalgx::UnPackOp>();
+  if (!unpackOp)
+    return failure();
+  rewriter.replaceOp(packOp, unpackOp.getInput());
+  return success();
+}
+
+LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,
+                                     PatternRewriter &rewriter) {
+  // linalgx::PackOp packOp =
+  // unpackOp.getInput().getDefiningOp<linalgx::PackOp>(); if (!packOp)
+  //   return failure();
+  // if (packOp.getInput() != unpackOp.getOutput())
+  //   return failure();
+  return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // PackOp and UnPackOp builders
 //===----------------------------------------------------------------------===//
 
@@ -64,6 +87,26 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
 //===----------------------------------------------------------------------===//
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
+
+static void getEffectsImpl(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects,
+    ValueRange results, ValueRange inputBuffers, ValueRange outputBuffers) {
+  for (Value value : results) {
+    effects.emplace_back(MemoryEffects::Allocate::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+  for (Value value : inputBuffers) {
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+  for (Value value : outputBuffers) {
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+}
 
 static Value getDimValue(OpBuilder &builder, Location loc, Value v,
                          int64_t dim) {
@@ -353,6 +396,7 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
 //===----------------------------------------------------------------------===//
 // PackOp
 //===----------------------------------------------------------------------===//
+
 /// verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
@@ -599,6 +643,19 @@ PackOp::reifyResultShapes(OpBuilder &builder,
   return success();
 }
 
+void PackOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> inputBuffers;
+  if (getInput().getType().isa<MemRefType>())
+    inputBuffers.push_back(getInput());
+  SmallVector<Value> outputBuffers;
+  if (getOutput().getType().isa<MemRefType>())
+    outputBuffers.push_back(getOutput());
+  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
+                 outputBuffers);
+}
+
 //===----------------------------------------------------------------------===//
 // UnPackOp
 //===----------------------------------------------------------------------===//
@@ -752,6 +809,19 @@ SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
+}
+
+void UnPackOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> inputBuffers;
+  if (getInput().getType().isa<MemRefType>())
+    inputBuffers.push_back(getInput());
+  SmallVector<Value> outputBuffers;
+  if (getOutput().getType().isa<MemRefType>())
+    outputBuffers.push_back(getOutput());
+  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
+                 outputBuffers);
 }
 
 #define GET_OP_CLASSES

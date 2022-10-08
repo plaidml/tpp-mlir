@@ -1,7 +1,5 @@
 // RUN: standalone-opt %s -map-linalg-to-tpp -main-closure -pre-bufferization -block-matmul-layout="block-factors=32,32" -loop-invariant-code-motion -canonicalize -undo-main-closure -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0" -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm | FileCheck %s
 
-// XFAIL: *
-
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
