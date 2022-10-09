@@ -68,9 +68,8 @@ struct PackLayoutInterface
     Value srcBuffer = *maybeSrcBuffer;
 
     rewriter.create<linalgx::PackOp>(
-        op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
-        packOp.getOuterDimsPos(), packOp.getInnerDimsPos(),
-        packOp.getInnerTiles(), packOp.getStaticInnerTiles(),
+        op->getLoc(), srcBuffer, destBuffer, packOp.getOuterDimsPos(),
+        packOp.getInnerDimsPos(), packOp.getMixedTiles(),
         packOp.getPaddingValue());
     replaceOpWithBufferizedValues(rewriter, op, destBuffer);
     return success();
@@ -124,9 +123,8 @@ struct UnPackLayoutInterface
     Value srcBuffer = *maybeSrcBuffer;
 
     rewriter.create<linalgx::UnPackOp>(
-        op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
-        unpackOp.getOuterDimsPos(), unpackOp.getInnerDimsPos(),
-        unpackOp.getInnerTiles(), unpackOp.getStaticInnerTiles());
+        op->getLoc(), srcBuffer, destBuffer, unpackOp.getOuterDimsPos(),
+        unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles());
     replaceOpWithBufferizedValues(rewriter, op, destBuffer);
     return success();
   }

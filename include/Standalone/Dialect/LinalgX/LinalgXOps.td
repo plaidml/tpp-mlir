@@ -139,9 +139,13 @@ def PackOp : LinalgX_Op<"pack", [
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$input, 
-      "Value":$output, "ArrayRef<int64_t>":$innerDimPos, 
-      "ArrayRef<int64_t>":$outerDimPos, "ArrayRef<OpFoldResult>":$tiles)>
+    OpBuilder<(ins "Value":$input, "Value":$output, 
+      "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos, 
+      "ArrayRef<OpFoldResult>":$tiles)>,
+
+    OpBuilder<(ins "Value":$input, "Value":$output,
+      "ArrayAttr":$outerDimPerm, "ArrayAttr":$innerDimPerm,
+      "ArrayRef<OpFoldResult>":$tiles, "Value":$padding)>
   ];
 
   let hasVerifier = 1;
@@ -226,8 +230,12 @@ def UnPackOp : LinalgX_Op<"unpack", [
   }];
  
   let builders = [
-    OpBuilder<(ins "Value":$input, 
-      "Value":$output, "ArrayRef<int64_t>":$dimPos,"ArrayRef<OpFoldResult>":$tiles)>
+    OpBuilder<(ins "Value":$input, "Value":$output, 
+               "ArrayRef<int64_t>":$dimPos,"ArrayRef<OpFoldResult>":$tiles)>,
+
+    OpBuilder<(ins "Value":$input, "Value":$output,
+      "ArrayAttr":$outerDimPerm, "ArrayAttr":$innerDimPerm,
+      "ArrayRef<OpFoldResult>":$tiles)>
   ];
 
   let hasCanonicalizeMethod = 1;

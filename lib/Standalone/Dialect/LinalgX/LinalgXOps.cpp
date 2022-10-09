@@ -39,11 +39,6 @@ LogicalResult PackOp::canonicalize(PackOp packOp, PatternRewriter &rewriter) {
 
 LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,
                                      PatternRewriter &rewriter) {
-  // linalgx::PackOp packOp =
-  // unpackOp.getInput().getDefiningOp<linalgx::PackOp>(); if (!packOp)
-  //   return failure();
-  // if (packOp.getInput() != unpackOp.getOutput())
-  //   return failure();
   return failure();
 }
 
@@ -52,9 +47,28 @@ LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,
 //===----------------------------------------------------------------------===//
 
 void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
+                   Value output, ArrayAttr outerDimPerm, ArrayAttr innerDimsPos,
+                   ArrayRef<OpFoldResult> tiles, Value padding) {
+  SmallVector<Value> innerTiles;
+  SmallVector<int64_t> staticInnerTiles;
+  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
+                             ShapedType::kDynamicSize);
+  if (!outerDimPerm.size())
+    build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
+          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles),
+          padding);
+  else
+    build(builder, result, llvm::None, input, output, outerDimPerm,
+          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles),
+          padding);
+}
+
+void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
                    Value output, ArrayRef<int64_t> innerDimPos,
                    ArrayRef<int64_t> outerDimPerm,
                    ArrayRef<OpFoldResult> tiles) {
+  assert(!innerDimPos.empty() && "expect innerDimPos to be non empty");
+  assert(!tiles.empty() && "expect tiles to be non empty");
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
@@ -82,6 +96,21 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
   build(builder, result, typeOutput, input, output, /*output_dims_pos=*/{},
         builder.getI64ArrayAttr(dimPos), innerTiles,
         builder.getI64ArrayAttr(staticInnerTiles));
+}
+
+void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
+                     Value output, ArrayAttr outerDimPerm,
+                     ArrayAttr innerDimsPos, ArrayRef<OpFoldResult> tiles) {
+  SmallVector<Value> innerTiles;
+  SmallVector<int64_t> staticInnerTiles;
+  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
+                             ShapedType::kDynamicSize);
+  if (!outerDimPerm.size())
+    build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
+          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles));
+  else
+    build(builder, result, llvm::None, input, output, outerDimPerm,
+          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles));
 }
 
 //===----------------------------------------------------------------------===//

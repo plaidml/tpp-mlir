@@ -423,26 +423,29 @@ struct BlockConv2DNchwFchwLayout
 struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
+  // Pack the `operand`. All the packing information can be extracted by the
+  // defining op that must be an unpackOp.
   Value packInput(Location loc, OpOperand *operand,
                   DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
                   PatternRewriter &rewriter) const {
     linalgx::UnPackOp unpackOp =
         operand->get().getDefiningOp<linalgx::UnPackOp>();
-    assert(unpackOp);
+    assert(unpackOp && "defining op must be an unpack");
     DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
         unpackOp.getDimAndTileMapping();
     SmallVector<int64_t> currentInnerDimsPos =
         extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
-    // TODO: the tile need to be the same if already in the map.
     for (int64_t currentInnerDimPos : currentInnerDimsPos)
       dimAndTileMapping[currentInnerDimPos] =
           currentDimAndTileMapping[currentInnerDimPos];
-    // TODO: handle outer perm or restrict to NCnc
     return toPackLayoutImpl(loc, operand->get(), unpackOp.getMixedTiles(),
-                            currentInnerDimsPos, {}, rewriter);
+                            extractFromI64ArrayAttr(unpackOp.getInnerDimsPos()),
+                            {}, rewriter);
   }
 
-  LogicalResult preconditions(linalg::GenericOp linalgOp) const {
+  // Check sinking preconditions: a) All maps must be identity, b) all loops mut
+  // be parallel and c) all operands need to be packed.
+  LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
     if (llvm::any_of(linalgOp.getIndexingMapsArray(),
                      [](AffineMap map) { return !map.isIdentity(); }))
       return failure();
@@ -455,6 +458,11 @@ struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
           operand->get().getDefiningOp<linalgx::UnPackOp>();
       if (!unpackOp)
         return failure();
+      // Avoid having to deal with tile loop interchange.
+      SmallVector<int64_t> outerDimsPerm =
+          extractFromI64ArrayAttr(unpackOp.getOuterDimsPos());
+      if (!outerDimsPerm.empty())
+        return failure();
     }
     return success();
   }
@@ -462,33 +470,40 @@ struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (failed(preconditions(linalgOp)))
+    if (failed(checkPreconditions(linalgOp)))
       return failure();
+
+    // input.
     Location loc = linalgOp.getLoc();
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
     SmallVector<Value> packedInputs;
-    // input packing
     for (OpOperand *operand : linalgOp.getInputOperands()) {
       packedInputs.push_back(
           packInput(loc, operand, dimAndTileMapping, rewriter));
     }
 
-    // output packing
+    // output.
     SmallVector<Value> packedOutputs;
     SmallVector<Type> packedOutputsTypes;
     SmallVector<Value> unpackOutputs;
     for (OpOperand *operand : linalgOp.getOutputOperands()) {
       SmallVector<OpFoldResult> tiles;
       SmallVector<int64_t> innerDimsPos;
-
-      // if the output is already unpacked -> repack.
-      linalgx::UnPackOp unpackOp =
-          operand->get().getDefiningOp<linalgx::UnPackOp>();
-      if (unpackOp) {
+      // If the linalg op does not have input. The defining op for the output
+      // must be an unpack operation. In this case, we can simply extract all
+      // the information from there. Note that we also save the output of the
+      // unpack which need to be the output of the new unpack after the packed
+      // operation.
+      if (linalgOp.getNumInputs() == 0) {
+        linalgx::UnPackOp unpackOp =
+            operand->get().getDefiningOp<linalgx::UnPackOp>();
+        assert(unpackOp && "defining op must be an unpack");
         tiles = unpackOp.getMixedTiles();
         innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
         unpackOutputs.push_back(unpackOp.getOutput());
       } else {
+        // Infer which dimensions need to be packed by looking at the domain and
+        // codomain of the affine map associated with the operand.
         AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
         for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
           unsigned posInDomain = mapOperand.getDimPosition(pos);
@@ -498,8 +513,11 @@ struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
           }
         }
       }
+
+      // no work to do, exit.
       if (tiles.empty())
         return failure();
+
       Value packedOutput = toPackLayoutImpl(loc, operand->get(), tiles,
                                             innerDimsPos, {}, rewriter);
       packedOutputs.push_back(packedOutput);
@@ -525,13 +543,13 @@ struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
       assert(packOp && "expect def pack op");
       Value result = replacementOp.getTiedOpResult(operand);
       if (linalgOp.getNumInputs() != 0)
-        outReplacements.push_back(
-            fromPackLayoutNCnc(loc, result, linalgOp.getOutputs()[idx++],
-                               packOp.getMixedTiles(), rewriter));
+        outReplacements.push_back(toUnPackLayoutImpl(
+            loc, result, linalgOp.getOutputs()[idx++], packOp.getMixedTiles(),
+            extractFromI64ArrayAttr(packOp.getInnerDimsPos()), rewriter));
       else
-        outReplacements.push_back(
-            fromPackLayoutNCnc(loc, result, unpackOutputs[idx++],
-                               packOp.getMixedTiles(), rewriter));
+        outReplacements.push_back(toUnPackLayoutImpl(
+            loc, result, unpackOutputs[idx++], packOp.getMixedTiles(),
+            extractFromI64ArrayAttr(packOp.getInnerDimsPos()), rewriter));
     }
     rewriter.replaceOp(linalgOp, outReplacements);
     return success();
