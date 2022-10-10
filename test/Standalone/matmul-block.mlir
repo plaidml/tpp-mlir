@@ -1,4 +1,4 @@
-// RUN: standalone-opt -split-input-file -block-matmul-layout="block-factors=32,32,32" %s | FileCheck %s
+// RUN: standalone-opt -split-input-file -block-matmul-layout="block-factors=32,32,32" --canonicalize %s | FileCheck %s
 
 func.func @matmul(%arg0: tensor<128x512xf32>, 
                   %arg1: tensor<512x256xf32>, 
@@ -38,16 +38,10 @@ func.func @matmul(%arg0: tensor<128x256xf32>,
       %20 = mathx.relu %arg3 : f32
       linalg.yield %20 : f32
   } -> tensor<128x256xf32>
-  %2 = linalg.generic {indexing_maps = [#map0], iterator_types = ["parallel", "parallel"]} outs(%arg0: tensor<128x256xf32>) {
-    ^bb0(%arg5 : f32):
-      %22 = mathx.relu %arg5 : f32
-      linalg.yield %22 : f32
-  } -> tensor<128x256xf32>
-  %3 = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%1, %2: tensor<128x256xf32>, tensor<128x256xf32>) outs(%arg2: tensor<128x256xf32>) {
-    ^bb0(%arg6 : f32, %arg7 : f32, %arg8 : f32):
+  %3 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%arg0: tensor<128x256xf32>) outs(%1: tensor<128x256xf32>) {
+    ^bb0(%arg6 : f32, %arg7 : f32):
       %23 = arith.addf %arg6, %arg7 : f32
-      %3 = arith.addf %23, %arg8 : f32
-      linalg.yield %3 : f32
+      linalg.yield %23 : f32
   } -> tensor<128x256xf32>
   return %3 : tensor<128x256xf32>
 }

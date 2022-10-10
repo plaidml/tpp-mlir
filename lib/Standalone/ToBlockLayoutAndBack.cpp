@@ -10,6 +10,7 @@
 #include "Standalone/Dialect/Tpp/TppUtils.h"
 #include "Standalone/Passes.h"
 #include "Standalone/Transforms.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Traits.h"
@@ -107,7 +108,7 @@ static Value toPackLayoutImpl(Location loc, Value input,
                               ArrayRef<OpFoldResult> tiles,
                               ArrayRef<int64_t> innerDimPos,
                               ArrayRef<int64_t> outerDimPerm,
-                              OpBuilder &builder) {
+                              OpBuilder &builder, bool useAlloc = false) {
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
       buildTileAndPosMapping(innerDimPos, tiles);
   SmallVector<Value> dynamicTiles;
@@ -118,8 +119,14 @@ static Value toPackLayoutImpl(Location loc, Value input,
                                       tileAndPosMapping, outerDimPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();
   ArrayRef<int64_t> shape = result.getShape();
-  Value output = builder.create<linalg::InitTensorOp>(
-      loc, shape, inputType.getElementType());
+  Value output;
+  if (useAlloc)
+    output = builder.create<bufferization::AllocTensorOp>(
+        loc, RankedTensorType::get(shape, inputType.getElementType()),
+        ValueRange{});
+  else
+    output = builder.create<linalg::InitTensorOp>(loc, shape,
+                                                  inputType.getElementType());
   return builder
       .create<linalgx::PackOp>(loc, input, output, innerDimPos, outerDimPerm,
                                tiles)
@@ -138,22 +145,23 @@ static Value toUnPackLayoutImpl(Location loc, Value input, Value output,
 
 /// Helper function to get an NCnc pack layout.
 static Value toPackLayoutNCnc(Location loc, Value input,
-                              ArrayRef<OpFoldResult> tiles,
-                              OpBuilder &builder) {
+                              ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
+                              bool useAlloc = false) {
   assert(tiles.size() == 2 && "expect two tile sizes for NCnc");
   SmallVector<int64_t> innerDimPos = {0, 1};
-  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder);
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
+                          useAlloc);
 }
 
 /// Helper function to get a CKkc pack layout.
 static Value toPackLayoutCKkc(Location loc, Value input,
-                              ArrayRef<OpFoldResult> tiles,
-                              OpBuilder &builder) {
+                              ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
+                              bool useAlloc = false) {
   assert(tiles.size() == 2 && "expect two tiles size for CKkc");
   SmallVector<int64_t> innerDimPos = {0, 1};
   SmallVector<int64_t> outerDimPerm = {1, 0};
-  return toPackLayoutImpl(loc, input, tiles, innerDimPos, outerDimPerm,
-                          builder);
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, outerDimPerm, builder,
+                          useAlloc);
 }
 
 /// Helper function to get a NCHWc pack layout.
@@ -291,14 +299,14 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   SmallVector<Value> reshapedInputTensors;
   // reshape input A and B
   Value packedMatrixA =
-      toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
+      toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter, true);
   Value packedMatrixB =
-      toPackLayoutCKkc(loc, matmulOp.getInputs()[1], tilesOnB, rewriter);
+      toPackLayoutCKkc(loc, matmulOp.getInputs()[1], tilesOnB, rewriter, true);
   SmallVector<Value> packedInputs = {packedMatrixA, packedMatrixB};
 
   // reshape output C.
   Value packMatrixC =
-      toPackLayoutNCnc(loc, matmulOp.getOutputs()[0], tilesOnC, rewriter);
+      toPackLayoutNCnc(loc, matmulOp.getOutputs()[0], tilesOnC, rewriter, true);
 
   // swap linalg.matmul with a linalg.generic.
   MLIRContext *ctx = matmulOp.getContext();
@@ -444,6 +452,7 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
     if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
       return failure();
+
     return success();
   }
 
@@ -532,12 +541,10 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
           getPackOperand(operand, linalgOp, dimAndTileMapping, rewriter);
       packedOutputOperands.push_back(packedOperand);
       packedOutputTypes.push_back(packedOperand.getType());
-      // in-place operation propagate the unpack down.
-      if (linalgOp.getNumInputs() == 0) {
-        linalgx::UnPackOp unpackOp =
-            operand->get().getDefiningOp<linalgx::UnPackOp>();
+      linalgx::UnPackOp unpackOp =
+          operand->get().getDefiningOp<linalgx::UnPackOp>();
+      if (unpackOp)
         unpackOutputs.push_back(unpackOp.getOutput());
-      }
     }
 
     unsigned packedDims = dimAndTileMapping.size();
@@ -579,7 +586,7 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
     for (OpOperand *operand : replacementOp.getOutputOperands()) {
       linalgx::PackOp packOp = operand->get().getDefiningOp<linalgx::PackOp>();
       Value result = replacementOp.getTiedOpResult(operand);
-      if (linalgOp.getNumInputs() != 0)
+      if (unpackOutputs.empty())
         outReplacements.push_back(toUnPackLayoutImpl(
             linalgOp.getLoc(), result, linalgOp.getOutputs()[idx++],
             packOp.getMixedTiles(),
