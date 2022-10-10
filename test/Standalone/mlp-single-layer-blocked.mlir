@@ -29,10 +29,6 @@ module @predict_function  {
   }
 }
 
-// CHECK-DAG: #[[map0:.*]] = affine_map<(d0, d1, d2, d3) -> (d1 * 32 + d2, d0 * 32 + d3)>
-// CHECK-DAG: #[[map1:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-DAG: #[[map2:.*]] = affine_map<(d0, d1, d2, d3) -> (d0 * 32 + d2, d1 * 32 + d3)>
-
 // CHECK-LABEL: func.func @main(
 // CHECK-SAME:  %[[arg0:.*]]: memref<128x256xf32>,
 // CHECK-SAME:  %[[arg1:.*]]: memref<256x512xf32> {stdx.const},
@@ -43,12 +39,12 @@ module @predict_function  {
 // CHECK-DAG: %[[sixteen:.*]] = arith.constant 16 : index
 // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
 // CHECK: tpp.identity ins(%[[arg2]] : memref<512xf32>) out(%[[arg3]] : memref<128x512xf32>)
-// CHECK: %[[rel_arg1:.*]] = memref.alloc() {alignment = 128 : i64} : memref<16x8x32x32xf32>
-// CHECK: linalgx.relayout ins(%[[arg1]] : memref<256x512xf32>, #[[map0]]) outs(%[[rel_arg1]] : memref<16x8x32x32xf32>, #[[map1]])
-// CHECK: %[[rel_arg3:.*]] = memref.alloc() {alignment = 128 : i64} : memref<4x16x32x32xf32>
-// CHECK: linalgx.relayout ins(%[[arg3]] : memref<128x512xf32>, #[[map2]]) outs(%[[rel_arg3]] : memref<4x16x32x32xf32>, #[[map1]])
-// CHECK: %[[rel_arg0:.*]] = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
-// CHECK: linalgx.relayout ins(%[[arg0]] : memref<128x256xf32>, #[[map2]]) outs(%[[rel_arg0]] : memref<4x8x32x32xf32>, #[[map1]])
+// CHECK: %[[rel_arg0:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
+// CHECK: linalgx.pack %[[arg0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg0]] : (memref<128x256xf32> memref<4x8x32x32xf32>)
+// CHECK: %[[rel_arg1:.+]] = memref.alloc() {alignment = 128 : i64} : memref<16x8x32x32xf32>
+// CHECK: linalgx.pack %[[arg1]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg1]] : (memref<256x512xf32> memref<16x8x32x32xf32>)
+// CHECK: %[[rel_arg3:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x16x32x32xf32>
+// CHECK: linalgx.pack %[[arg3]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg3]] : (memref<128x512xf32> memref<4x16x32x32xf32>)
 // CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[four]] step %[[one]] {
 // CHECK: %[[sub_arg0:.*]] = memref.subview %[[rel_arg0]][%[[i]], 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK: %[[sub_arg3:.*]] = memref.subview %[[rel_arg3]][%[[i]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
@@ -59,7 +55,7 @@ module @predict_function  {
 // CHECK: tpp.relu ins(%[[sub_sub_arg3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>) out(%[[sub_sub_arg3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
 // CHECK: }
 // CHECK: }
-// CHECK: linalgx.relayout ins(%[[rel_arg3]] : memref<4x16x32x32xf32>, #[[map1]]) outs(%[[arg3]] : memref<128x512xf32>, #[[map2]])
-// CHECK: memref.dealloc %[[rel_arg1]] : memref<16x8x32x32xf32>
-// CHECK: memref.dealloc %[[rel_arg3]] : memref<4x16x32x32xf32>
-// CHECK: memref.dealloc %[[rel_arg0]] : memref<4x8x32x32xf32>
+// CHECK: linalgx.unpack %[[rel_arg3]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[arg3]] : (memref<4x16x32x32xf32> memref<128x512xf32>)
+// CHECK-DAG: memref.dealloc %[[rel_arg1]] : memref<16x8x32x32xf32>
+// CHECK-DAG: memref.dealloc %[[rel_arg3]] : memref<4x16x32x32xf32>
+// CHECK-DAG: memref.dealloc %[[rel_arg0]] : memref<4x8x32x32xf32>

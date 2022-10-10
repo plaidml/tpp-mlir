@@ -36,12 +36,12 @@ FailureOr<linalg::MatmulOp> mapConvToGemm(RewriterBase &rewriter,
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>
 blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
-                      ArrayRef<int64_t> blockingFactors);
+                      ArrayRef<OpFoldResult> tiles);
 
 // Attempt to block a MatmulOp.
 FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,
                                            linalg::MatmulOp linalgOp,
-                                           ArrayRef<int64_t> blockingFactors);
+                                           ArrayRef<OpFoldResult> tiles);
 
 // Collapse iterators in a linalg.generic based on 'reassociation'.
 FailureOr<linalg::GenericOp>

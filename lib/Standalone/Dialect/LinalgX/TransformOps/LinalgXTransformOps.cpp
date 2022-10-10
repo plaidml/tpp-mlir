@@ -28,11 +28,11 @@ public:
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// BlockOp
+// PackOp
 //===----------------------------------------------------------------------===//
 
-ParseResult transform::BlockOp::parse(OpAsmParser &parser,
-                                      OperationState &result) {
+ParseResult transform::PackOp::parse(OpAsmParser &parser,
+                                     OperationState &result) {
 
   OpAsmParser::UnresolvedOperand target;
   if (parser.parseOperand(target) ||
@@ -45,30 +45,25 @@ ParseResult transform::BlockOp::parse(OpAsmParser &parser,
   return success();
 }
 
-void BlockOp::print(OpAsmPrinter &p) {
+void PackOp::print(OpAsmPrinter &p) {
   p << ' ' << getTarget();
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-// TODO: 1. Handle dynamic block size.
-// TODO: 2. Can we have a more generic blocking? Currently
-// we have a block implementation for Matmul, Conv, Relu ecc..
-// Can we have a single blocking for a linalg.genericOp? What
-// information do we need to pass to BlockOp (already pre-cooked affine maps or
-// enums that represent how we want to block?
 DiagnosedSilenceableFailure
-transform::BlockOp::applyToOne(linalg::LinalgOp target,
-                               SmallVector<Operation *> &results,
-                               transform::TransformState &state) {
-  SmallVector<int64_t> blockSizes =
-      extractFromI64ArrayAttr(getBlockingFactors());
+transform::PackOp::applyToOne(linalg::LinalgOp target,
+                              SmallVector<Operation *> &results,
+                              transform::TransformState &state) {
+  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackingFactors());
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
+  SmallVector<OpFoldResult> tilesAsOpFold =
+      getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles));
   Operation *currentTarget = target;
   if (linalg::Conv2DNchwFchwOp convOp =
           dyn_cast<linalg::Conv2DNchwFchwOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedConv =
-        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, convOp, blockSizes);
+        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, convOp, tilesAsOpFold);
     if (succeeded(blockedConv)) {
       results.push_back(*blockedConv);
       return DiagnosedSilenceableFailure(success());
@@ -76,7 +71,7 @@ transform::BlockOp::applyToOne(linalg::LinalgOp target,
   }
   if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedMatmul =
-        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, blockSizes);
+        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, tilesAsOpFold);
     if (succeeded(blockedMatmul)) {
       results.push_back(*blockedMatmul);
       return DiagnosedSilenceableFailure(success());

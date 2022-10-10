@@ -17,6 +17,7 @@ add_mlir_library(TPPStandalone
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
     MapConv2DNhwcHwcfToMatmul.cpp
+    LinalgXToLoops.cpp
 
   # Utils
     TransformUtils.cpp

@@ -18,21 +18,20 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// BlockOp
+// PackOp
 //===----------------------------------------------------------------------===//
 
-def BlockOp : Op<Transform_Dialect, "structured.blocking",
+def PackOp : Op<Transform_Dialect, "structured.packing",
               [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                TransformOpInterface, TransformEachOpTrait]> {
 
   let description = [{ 
     Block the target operation. Currently supports matmul and convolutions.
-    Unclear if we want to have generic blocking.
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors);
-  let results = (outs PDL_Operation:$blocked_linalg_op);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$packing_factors);
+  let results = (outs PDL_Operation:$packed_linalg_op);
 
   let hasCustomAssemblyFormat = 1;
 

@@ -13,7 +13,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Traits.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace mlir::linalgx;
@@ -21,193 +24,191 @@ using namespace mlir::linalgx;
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
 
-enum class BlockLayout {
-  FORMAT_NCnc,
-  FORMAT_KCck,
-  FORMAT_NCHWc,
-  FORMAT_KCRSck
-};
+//===----------------------------------------------------------------------===//
+// Utils
+//===----------------------------------------------------------------------===//
 
-static std::pair<AffineMap, AffineMap>
-getMapsToBlockLayoutNCHW_to_NCHWc(int64_t dims, int64_t blockFactor,
-                                  MLIRContext *ctx) {
-  AffineMap outputMap = AffineMap::getMultiDimIdentityMap(dims, ctx);
-
-  AffineExpr N, C, H, W, c;
-  bindDims(ctx, N, C, H, W, c);
-  AffineMap inputMap = AffineMap::get(
-      dims, /*symbols=*/0, {{N}, {C * blockFactor + c}, {H}, {W}}, ctx);
-  return {inputMap, outputMap};
+static DenseMap<int64_t, OpFoldResult>
+buildTileAndPosMapping(ArrayRef<int64_t> dimPos, ArrayRef<OpFoldResult> tiles) {
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
+  int64_t dims = dimPos.size();
+  for (int64_t idx = 0; idx < dims; idx++)
+    tileAndPosMapping[dimPos[idx]] = tiles[idx];
+  return tileAndPosMapping;
 }
 
-static std::pair<AffineMap, AffineMap>
-getMapsFromBlockLayoutNCHWc_NCHW(int64_t dims, int64_t blockFactor,
-                                 MLIRContext *ctx) {
-  std::pair<AffineMap, AffineMap> toBlockLayout =
-      getMapsToBlockLayoutNCHW_to_NCHWc(dims, blockFactor, ctx);
-  return {toBlockLayout.second, toBlockLayout.first};
-}
-
-static std::pair<AffineMap, AffineMap>
-getMapsToBlockLayoutKCRS_to_KCRSck(int64_t dims, ArrayRef<int64_t> blockFactors,
-                                   MLIRContext *ctx) {
-  assert(blockFactors.size() == 2 &&
-         "expect two blocking factors for KCRS_to_KCRSck");
-  AffineMap outputMap = AffineMap::getMultiDimIdentityMap(dims, ctx);
-
-  AffineExpr K, C, R, S, c, k;
-  bindDims(ctx, K, C, R, S, c, k);
-  int64_t blockFactorC = blockFactors[0];
-  int64_t blockFactorK = blockFactors[1];
-  AffineMap inputMap = AffineMap::get(
-      dims, /*symbols=*/0,
-      {{K * blockFactorK + k}, {C * blockFactorC + c}, {R}, {S}}, ctx);
-  return {inputMap, outputMap};
-}
-
-// Get affine maps from NC layout to NCnc layout.
-static std::pair<AffineMap, AffineMap>
-getMapsToBlockLayoutNC_NCnc(int64_t dims, ArrayRef<int64_t> blockFactors,
-                            MLIRContext *ctx) {
-  assert(blockFactors.size() == 2 && "expect two blocking factors for NC_NCnc");
-  AffineMap outputMap = AffineMap::getMultiDimIdentityMap(dims, ctx);
-
-  AffineExpr N, C, n, c;
-  bindDims(ctx, N, C, n, c);
-  int64_t blockFactorOnN = blockFactors[0];
-  int64_t blockFactorOnC = blockFactors[1];
-  AffineMap inputMap =
-      AffineMap::get(dims, /*symbols=*/0,
-                     {{N * blockFactorOnN + n}, {C * blockFactorOnC + c}}, ctx);
-  return {inputMap, outputMap};
-}
-
-// Get affine maps from KC to KCck layout.
-static std::pair<AffineMap, AffineMap>
-getMapsToBlockLayoutKC_KCck(int64_t dims, ArrayRef<int64_t> blockFactors,
-                            MLIRContext *ctx) {
-  assert(blockFactors.size() == 2 && "expect two blocking factors for KC_KCck");
-  AffineMap outputMap = AffineMap::getMultiDimIdentityMap(dims, ctx);
-
-  AffineExpr K, C, c, k;
-  bindDims(ctx, K, C, c, k);
-  int64_t blockFactorOnC = blockFactors[0];
-  int64_t blockFactorOnK = blockFactors[1];
-  AffineMap inputMap =
-      AffineMap::get(dims, /*symbols=*/0,
-                     {{C * blockFactorOnC + c}, {K * blockFactorOnK + k}}, ctx);
-  return {inputMap, outputMap};
-}
-
-// Get affine maps fron NCnc layout to NC.
-static std::pair<AffineMap, AffineMap>
-getMapsFromBlockLayoutNCnc_NC(int64_t dims, ArrayRef<int64_t> blockFactors,
-                              MLIRContext *ctx) {
-  std::pair<AffineMap, AffineMap> toBlockLayout =
-      getMapsToBlockLayoutNC_NCnc(dims, blockFactors, ctx);
-  return {toBlockLayout.second, toBlockLayout.first};
-}
-
-// Given a tensor `tensor` a layout format and a block factor, relayout
-// the tensor using the specified block factor and tensor relayout.
-// Fail if the blocking factors do not perfectly divide the tensor
-// dimension.
-static FailureOr<Value> getReshapedTensor(Location loc, Value tensor,
-                                          BlockLayout layout,
-                                          ArrayRef<int64_t> blockFactors,
-                                          RewriterBase &rewriter) {
-  MLIRContext *ctx = rewriter.getContext();
-  RankedTensorType unBlockedTensorType =
-      tensor.getType().cast<RankedTensorType>();
-  if (!unBlockedTensorType.hasStaticShape())
-    return failure();
-  ArrayRef<int64_t> shape = unBlockedTensorType.getShape();
-
-  std::pair<AffineMap, AffineMap> maps;
-  SmallVector<int64_t> shapeBlockedTensor;
-  if (layout == BlockLayout::FORMAT_NCnc) {
-    assert(blockFactors.size() == 2 &&
-           "FORMAT_NCnc requires 2 blocking factor");
-    assert(shape.size() == 2 && "FORMAT_NCnc requires 2d tensor");
-    int64_t blockFactorOnN = blockFactors[0];
-    int64_t blockFactorOnC = blockFactors[1];
-    if ((shape[0] % blockFactorOnN != 0) || (shape[1] % blockFactorOnC != 0))
-      return failure();
-    int64_t N = shape[0] / blockFactorOnN;
-    int64_t C = shape[1] / blockFactorOnC;
-    int64_t n = blockFactorOnN, c = blockFactorOnC;
-    shapeBlockedTensor = {N, C, n, c};
-    maps = getMapsToBlockLayoutNC_NCnc(shapeBlockedTensor.size(), blockFactors,
-                                       ctx);
-  } else if (layout == BlockLayout::FORMAT_KCck) {
-    assert(blockFactors.size() == 2 &&
-           "FORMAT_KCck requires 2 blocking factor");
-    assert(shape.size() == 2 && "FORMAT_KCck requires 2d tensor");
-    int64_t blockFactorOnC = blockFactors[0];
-    int64_t blockFactorOnK = blockFactors[1];
-    if ((shape[0] % blockFactorOnC != 0) || (shape[1] % blockFactorOnK != 0))
-      return failure();
-    int64_t K = shape[1] / blockFactorOnK;
-    int64_t C = shape[0] / blockFactorOnC;
-    int64_t k = blockFactorOnK, c = blockFactorOnC;
-    shapeBlockedTensor = {K, C, c, k};
-    maps = getMapsToBlockLayoutKC_KCck(shapeBlockedTensor.size(), blockFactors,
-                                       ctx);
-  } else if (layout == BlockLayout::FORMAT_NCHWc) {
-    assert(blockFactors.size() == 1 &&
-           "FORMAT_NCHWc requires 1 blocking factor");
-    assert(shape.size() == 4 && "FORMAT_NCHWc requires 4d tensor");
-    int64_t blockFactor = blockFactors[0];
-    if (shape[1] % blockFactor != 0)
-      return failure();
-    int64_t N = shape[0];
-    int64_t C = shape[1] / blockFactor;
-    int64_t H = shape[2];
-    int64_t W = shape[3];
-    int64_t c = blockFactor;
-    shapeBlockedTensor = {N, C, H, W, c};
-    maps = getMapsToBlockLayoutNCHW_to_NCHWc(shapeBlockedTensor.size(),
-                                             blockFactor, ctx);
-  } else {
-    assert(layout == BlockLayout::FORMAT_KCRSck && "expect FORMAT_KCRSck");
-    assert(blockFactors.size() == 2 &&
-           "FORMAT_KCRSck requires 2 blocking factors");
-    assert(shape.size() == 4 && "FORMAT_KCRSck requires 4d tensor");
-    int64_t blockFactorOnC = blockFactors[0];
-    int64_t blockFactorOnK = blockFactors[1];
-    if ((shape[0] % blockFactorOnK != 0) || (shape[1] % blockFactorOnC != 0))
-      return failure();
-    int64_t K = shape[0] / blockFactorOnK;
-    int64_t C = shape[1] / blockFactorOnC;
-    int64_t R = shape[2];
-    int64_t S = shape[3];
-    int64_t c = blockFactorOnC;
-    int64_t k = blockFactorOnK;
-    shapeBlockedTensor = {K, C, R, S, c, k};
-    maps = getMapsToBlockLayoutKCRS_to_KCRSck(shapeBlockedTensor.size(),
-                                              blockFactors, ctx);
+/// Interchange `elements` starting at offset `offset` based on the indexes in
+/// `interchangeVector`.
+// TODO: (lorenzo) avoid copy and paste
+template <typename T>
+static SmallVector<T> interchange(ArrayRef<T> elements,
+                                  ArrayRef<int64_t> interchangeVector,
+                                  int64_t offset) {
+  SmallVector<T> rearrangedElements = llvm::to_vector(elements);
+  if (interchangeVector.empty())
+    return rearrangedElements;
+  // assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
+  //        "number of elements must equal number of permutations");
+  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
+    rearrangedElements[interchangeVector[idx] + offset] =
+        elements[idx + offset];
   }
-  Value initTensor = rewriter.create<linalg::InitTensorOp>(
-      loc, shapeBlockedTensor, unBlockedTensorType.getElementType());
-  return rewriter
-      .create<linalgx::Relayout>(loc, initTensor.getType(), tensor, initTensor,
-                                 maps.first, maps.second)
-      .getResult()[0];
+  return rearrangedElements;
 }
 
+/// Infer the packed type.
+// TODO: (lorenzo) avoid copy and paste.
+static ShapedType
+inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
+                const DenseMap<int64_t, OpFoldResult> &tileAndPosMapping,
+                ArrayRef<int64_t> outerDimsPos) {
+  SmallVector<int64_t> inferredShape;
+  int64_t rank = sourceType.getRank();
+
+  // tile loop.
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    if (tileAndPosMapping.count(dim)) {
+      Optional<int64_t> tileSize =
+          getConstantIntValue(tileAndPosMapping.lookup(dim));
+      if (sourceType.isDynamicDim(dim) || !tileSize) {
+        inferredShape.push_back(ShapedType::kDynamicSize);
+      } else {
+        int64_t sizeTiledDim = ceilDiv(sourceType.getDimSize(dim), *tileSize);
+        inferredShape.push_back(sizeTiledDim);
+      }
+    } else {
+      inferredShape.push_back(sourceType.getShape()[dim]);
+    }
+  }
+
+  // swap tile loops if `outer_dims_pos` is available.
+  inferredShape =
+      interchange<int64_t>(inferredShape, outerDimsPos, /*offset=*/0);
+
+  // point loop.
+  inferredShape.append(innerTiles.begin(), innerTiles.end());
+
+  return TypeSwitch<Type, ShapedType>(sourceType)
+      .Case<RankedTensorType>([&](RankedTensorType t) -> ShapedType {
+        return RankedTensorType::get(inferredShape,
+                                     sourceType.getElementType());
+      })
+      .Case<MemRefType>([&](MemRefType t) -> ShapedType {
+        return MemRefType::get(inferredShape, sourceType.getElementType());
+      })
+      .Default([&](Type t) {
+        llvm_unreachable("unexpected type");
+        return nullptr;
+      });
+}
+
+/// Helper function to create the pack operation.
+static Value toPackLayoutImpl(Location loc, Value input,
+                              ArrayRef<OpFoldResult> tiles,
+                              ArrayRef<int64_t> innerDimPos,
+                              ArrayRef<int64_t> outerDimPerm,
+                              OpBuilder &builder) {
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
+      buildTileAndPosMapping(innerDimPos, tiles);
+  SmallVector<Value> dynamicTiles;
+  SmallVector<int64_t> staticTiles;
+  dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
+                             ShapedType::kDynamicSize);
+  ShapedType result = inferPackedType(input.getType(), staticTiles,
+                                      tileAndPosMapping, outerDimPerm);
+  ShapedType inputType = input.getType().cast<ShapedType>();
+  ArrayRef<int64_t> shape = result.getShape();
+  Value output = builder.create<linalg::InitTensorOp>(
+      loc, shape, inputType.getElementType());
+  return builder
+      .create<linalgx::PackOp>(loc, input, output, innerDimPos, outerDimPerm,
+                               tiles)
+      .getResults()[0];
+}
+
+/// Helper function to create the unpack operation.
+static Value toUnPackLayoutImpl(Location loc, Value input, Value output,
+                                ArrayRef<OpFoldResult> tiles,
+                                ArrayRef<int64_t> innerDimPos,
+                                OpBuilder &builder) {
+  return builder
+      .create<linalgx::UnPackOp>(loc, input, output, innerDimPos, tiles)
+      .getResults()[0];
+}
+
+/// Helper function to get an NCnc pack layout.
+static Value toPackLayoutNCnc(Location loc, Value input,
+                              ArrayRef<OpFoldResult> tiles,
+                              OpBuilder &builder) {
+  assert(tiles.size() == 2 && "expect two tile sizes for NCnc");
+  SmallVector<int64_t> innerDimPos = {0, 1};
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder);
+}
+
+/// Helper function to get a CKkc pack layout.
+static Value toPackLayoutCKkc(Location loc, Value input,
+                              ArrayRef<OpFoldResult> tiles,
+                              OpBuilder &builder) {
+  assert(tiles.size() == 2 && "expect two tiles size for CKkc");
+  SmallVector<int64_t> innerDimPos = {0, 1};
+  SmallVector<int64_t> outerDimPerm = {1, 0};
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, outerDimPerm,
+                          builder);
+}
+
+/// Helper function to get a NCHWc pack layout.
+static Value toPackLayoutNCHWc(Location loc, Value input,
+                               ArrayRef<OpFoldResult> tiles,
+                               OpBuilder &builder) {
+  assert(tiles.size() == 1 && "expect one tile size for NCHWc");
+  SmallVector<int64_t> innerDimPos = {1};
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder);
+}
+
+/// Helper function to get a KCRSck pack layout.
+static Value toPackLayoutKCRSck(Location loc, Value input,
+                                ArrayRef<OpFoldResult> tiles,
+                                OpBuilder &builder) {
+  assert(tiles.size() == 2 && "expect two tiles size for KCRSck");
+  SmallVector<int64_t> innerDimPos = {1, 0};
+  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder);
+}
+
+/// Helper function to get an NC unpack layout from NCnc.
+static Value fromPackLayoutNCnc(Location loc, Value input, Value output,
+                                ArrayRef<OpFoldResult> tiles,
+                                OpBuilder &builder) {
+  assert(tiles.size() == 2 && "expect two tile sizes for NCnc");
+  SmallVector<int64_t> innerDimPos = {0, 1};
+  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, builder);
+}
+
+/// Helper function to get an NCHW unpack layout from NCHWc.
+static Value fromPackLayoutNCHWc(Location loc, Value input, Value output,
+                                 ArrayRef<OpFoldResult> tiles,
+                                 OpBuilder &builder) {
+  assert(tiles.size() == 1 && "expect one tile size for NCHWc");
+  SmallVector<int64_t> innerDimPos = {1};
+  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, builder);
+}
+
+/// Helper function ensure packing preconditions. We pack only if the operation
+/// has static shape and it is at tensor level.
 static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
   if (linalgOp.hasDynamicShape() || linalgOp.hasBufferSemantics())
     return failure();
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Conv2DNchwFchwOp
+//===----------------------------------------------------------------------===//
+
 FailureOr<linalg::GenericOp>
 mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
                                      linalg::Conv2DNchwFchwOp convOp,
-                                     ArrayRef<int64_t> blockingFactors) {
-  if (blockingFactors.size() != 2)
-    return failure();
-  if (failed(BlockOpPreconditions(convOp)))
+                                     ArrayRef<OpFoldResult> tiles) {
+  if ((tiles.size() != 2) || (failed(BlockOpPreconditions(convOp))))
     return failure();
 
   Location loc = convOp.getLoc();
@@ -217,28 +218,16 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
   SmallVector<Value> inputOperands = convOp.getInputOperands();
   SmallVector<Value> outputOperands = convOp.getOutputOperands();
 
-  // reshape the img and the filter.
-  int64_t blockingFactorOnC = blockingFactors[0];
-  int64_t blockingFactorOnK = blockingFactors[1];
-  SmallVector<int64_t> currentBlockingFactors = {blockingFactorOnC};
-  BlockLayout blockLayout = BlockLayout::FORMAT_NCHWc;
-  for (Value input : inputOperands) {
-    FailureOr<Value> maybeReshaped = getReshapedTensor(
-        loc, input, blockLayout, currentBlockingFactors, rewriter);
-    if (failed(maybeReshaped))
-      return failure();
-    reshapedInputTensors.push_back(*maybeReshaped);
-    currentBlockingFactors = {blockingFactorOnC, blockingFactorOnK};
-    blockLayout = BlockLayout::FORMAT_KCRSck;
-  }
+  // pack the image and the filter.
+  Value image = inputOperands[0];
+  Value packedImage = toPackLayoutNCHWc(loc, image, tiles[0], rewriter);
+  Value filter = inputOperands[1];
+  Value packedFilter = toPackLayoutKCRSck(loc, filter, tiles, rewriter);
+  SmallVector<Value> packedInputs = {packedImage, packedFilter};
 
-  blockLayout = BlockLayout::FORMAT_NCHWc;
-  currentBlockingFactors = {blockingFactorOnC};
-  FailureOr<Value> maybeReshapedOutputTensor = getReshapedTensor(
-      loc, outputOperands[0], blockLayout, currentBlockingFactors, rewriter);
-  if (failed(maybeReshapedOutputTensor))
-    return failure();
-  Value reshapedOutputTensor = *maybeReshapedOutputTensor;
+  // pack the output.
+  Value output = outputOperands[0];
+  Value packedOutput = toPackLayoutNCHWc(loc, output, tiles[0], rewriter);
 
   // Swap conv with generic.
   //         N   K   P   Q   k   C   R   S   c
@@ -251,8 +240,7 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
   AffineMap mapFil =
       AffineMap::get(/*dims=*/9, /*symbols=*/0, {p2, r1, r2, r3, r4, p5}, ctx);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-      loc, reshapedOutputTensor.getType(), reshapedInputTensors,
-      ValueRange{reshapedOutputTensor},
+      loc, packedOutput.getType(), packedInputs, ValueRange{packedOutput},
       ArrayRef<AffineMap>{mapImg, mapFil, mapOut},
       ArrayRef<StringRef>{
           getParallelIteratorTypeName(), getParallelIteratorTypeName(),
@@ -260,57 +248,44 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
           getParallelIteratorTypeName(), getReductionIteratorTypeName(),
           getReductionIteratorTypeName(), getReductionIteratorTypeName(),
           getReductionIteratorTypeName()},
-      /*doc=*/"", /*libraryCall=*/"tpp.blocked.Conv2DNchwFchwOp");
+      /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 
   // convert back from block layout.
-  assert(currentBlockingFactors.size() == 1);
-  Value outBlockedTensor = replacementOp.getResult(0);
-  Value outUnBlockedTensor = outputOperands[0];
-  std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCHWc_NCHW(
-      outBlockedTensor.getType().cast<ShapedType>().getRank(),
-      currentBlockingFactors[0], ctx);
-  Value outReplacement =
-      rewriter
-          .create<linalgx::Relayout>(loc, outUnBlockedTensor.getType(),
-                                     outBlockedTensor, outUnBlockedTensor,
-                                     maps.first, maps.second)
-          .getResults()[0];
+  Value outPackedTensor = replacementOp.getResult(0);
+  Value outUnPackedTensor = outputOperands[0];
+  Value outReplacement = fromPackLayoutNCHWc(
+      loc, outPackedTensor, outUnPackedTensor, tiles[0], rewriter);
   rewriter.replaceOp(convOp, outReplacement);
   return replacementOp;
 }
 
+//===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
+
 FailureOr<linalg::GenericOp>
 mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                             ArrayRef<int64_t> blockingFactors) {
-  if (blockingFactors.size() != 2)
-    return failure();
-  if (failed(BlockOpPreconditions(matmulOp)))
+                             ArrayRef<OpFoldResult> tiles) {
+  if ((tiles.size() != 2) || (failed(BlockOpPreconditions(matmulOp))))
     return failure();
 
   Location loc = matmulOp.getLoc();
-  MLIRContext *ctx = matmulOp.getContext();
   SmallVector<Value, 2> reshapedInputTensors;
-  // reshape input A to NCnc and B to KCck.
-  BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-  for (Value input : matmulOp.getInputs()) {
-    FailureOr<Value> maybeReshaped =
-        getReshapedTensor(loc, input, blockLayout, blockingFactors, rewriter);
-    if (failed(maybeReshaped))
-      return failure();
-    reshapedInputTensors.push_back(*maybeReshaped);
-    blockLayout = BlockLayout::FORMAT_KCck;
-  }
+  // reshape input A to NCnc and B to CKkc.
+  Value packedMatrixA =
+      toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tiles, rewriter);
+  Value packedMatrixB =
+      toPackLayoutCKkc(loc, matmulOp.getInputs()[1], tiles, rewriter);
+  SmallVector<Value> packedInputs = {packedMatrixA, packedMatrixB};
 
-  blockLayout = BlockLayout::FORMAT_NCnc;
-  FailureOr<Value> maybeReshapedOutputTensor = getReshapedTensor(
-      loc, matmulOp.getOutputs()[0], blockLayout, blockingFactors, rewriter);
-  if (failed(maybeReshapedOutputTensor))
-    return failure();
-  Value reshapedOutputTensor = *maybeReshapedOutputTensor;
+  // reshape output C to NCnc.
+  Value packMatrixC =
+      toPackLayoutNCnc(loc, matmulOp.getOutputs()[0], tiles, rewriter);
 
   // swap linalg.matmul with a linalg.generic.
+  MLIRContext *ctx = matmulOp.getContext();
   AffineExpr p1, p2, r1, p3, p4, r2;
   bindDims(ctx, p1, p2, r1, p3, p4, r2);
   AffineMap mapA =
@@ -320,8 +295,8 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   AffineMap mapC =
       AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-      loc, reshapedOutputTensor.getType(), reshapedInputTensors,
-      ValueRange{reshapedOutputTensor}, ArrayRef<AffineMap>{mapA, mapB, mapC},
+      loc, packMatrixC.getType(), packedInputs, ValueRange{packMatrixC},
+      ArrayRef<AffineMap>{mapA, mapB, mapC},
       ArrayRef<StringRef>{
           getParallelIteratorTypeName(), getParallelIteratorTypeName(),
           getReductionIteratorTypeName(), getParallelIteratorTypeName(),
@@ -330,159 +305,37 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 
-  // convert back from block layout.
-  Value outBlockedTensor = replacementOp.getResult(0);
-  Value outUnBlockedTensor = matmulOp.getOutputs()[0];
-  std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCnc_NC(
-      outBlockedTensor.getType().cast<ShapedType>().getRank(), blockingFactors,
-      ctx);
+  // convert back from pack layout.
+  Value outPackTensor = replacementOp.getResult(0);
+  Value outUnPackTensor = matmulOp.getOutputs()[0];
   Value outReplacement =
-      rewriter
-          .create<linalgx::Relayout>(loc, outUnBlockedTensor.getType(),
-                                     outBlockedTensor, outUnBlockedTensor,
-                                     maps.first, maps.second)
-          .getResults()[0];
+      fromPackLayoutNCnc(loc, outPackTensor, outUnPackTensor, tiles, rewriter);
   rewriter.replaceOp(matmulOp, outReplacement);
   return replacementOp;
 }
 
 namespace {
 
-// Relayout MatmulOp as following:
-// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
-// CB = batch reduce dimension.
+// Pack MatmulOp.
 struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
-  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> tiles,
                PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit), tiles(tiles) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> blockedMatmul =
-        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, blockingFactors);
+    FailureOr<linalg::GenericOp> blockedMatmul = mlir::linalgx::blockMatmulOp(
+        rewriter, matmulOp, getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
     if (failed(blockedMatmul))
       return failure();
     return success();
   }
 
 private:
-  ArrayRef<int64_t> blockingFactors;
+  ArrayRef<int64_t> tiles;
 };
 
-// TODO: generalize to any elementWise operation.
-// Relayout relu as: [NB][KB][nb][kb]
-struct SinkBlockLayoutAfterRelu : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  bool isInPlaceRelu(linalg::GenericOp linalgOp) const {
-    return linalgOp.getNumInputs() == 0;
-  }
-
-  // Note this is not what you want. The blocking should be part of the
-  // operation as we did in IREE, not hidden in the affine map. Attempt to
-  // recover the constants (aka blocks factor) in the map, assert on failure.
-  SmallVector<int64_t> getBlockingFactors(linalgx::Relayout relayoutOp) const {
-
-    // Walk the affine expression and return the first constant if any.
-    // Assert if we don't find any constant or multiple constants are found.
-    auto getConstant = [&](AffineExpr expr) -> int64_t {
-      bool onlyOneConstant = false;
-      int64_t value;
-      expr.walk([&](AffineExpr e) -> void {
-        if (e.getKind() == AffineExprKind::Constant) {
-          assert(!onlyOneConstant &&
-                 "failed to extract constant from relayout");
-          value = e.cast<AffineConstantExpr>().getValue();
-          onlyOneConstant = true;
-        }
-      });
-      assert(onlyOneConstant == true &&
-             "failed to extract constant from relayout");
-      return value;
-    };
-
-    AffineMap outputMap = relayoutOp.getOutputMap();
-    SmallVector<int64_t> blocks;
-    blocks.reserve(outputMap.getNumResults());
-    ArrayRef<AffineExpr> results = outputMap.getResults();
-    for (AffineExpr expr : results)
-      blocks.push_back(getConstant(expr));
-    return blocks;
-  }
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.relu"))
-      return failure();
-    Location loc = linalgOp.getLoc();
-
-    Value operand = (isInPlaceRelu(linalgOp))
-                        ? linalgOp.getOutputOperand(0)->get()
-                        : linalgOp.getInputOperand(0)->get();
-
-    linalgx::Relayout fromBlockLayout =
-        operand.getDefiningOp<linalgx::Relayout>();
-    if (!fromBlockLayout || !fromBlockLayout->getResult(0).hasOneUse())
-      return failure();
-
-    Value blockTensor = fromBlockLayout.getInputs()[0];
-    ShapedType blockTensorType = blockTensor.getType().cast<ShapedType>();
-    BlockLayout blockLayout = BlockLayout::FORMAT_NCnc;
-    FailureOr<Value> maybeReluBuffer =
-        getReshapedTensor(loc, linalgOp.getOutputs()[0], blockLayout,
-                          getBlockingFactors(fromBlockLayout), rewriter);
-    if (failed(maybeReluBuffer))
-      return failure();
-    Value reluBuffer = *maybeReluBuffer;
-
-    AffineMap mapI =
-        AffineMap::getMultiDimIdentityMap(/*dims=*/4, linalgOp.getContext());
-    AffineMap mapO = mapI;
-    linalg::GenericOp newReluOp =
-        (isInPlaceRelu(linalgOp))
-            ? rewriter.create<linalg::GenericOp>(
-                  loc, blockTensorType, llvm::None, ValueRange{blockTensor},
-                  ArrayRef<AffineMap>{mapO},
-                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName()},
-                  /*doc=*/"", /*libraryCall=*/"tpp.relu")
-            : rewriter.create<linalg::GenericOp>(
-                  loc, blockTensorType, ValueRange{blockTensor},
-                  ValueRange{reluBuffer}, ArrayRef<AffineMap>{mapI, mapO},
-                  ArrayRef<StringRef>{getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName(),
-                                      getParallelIteratorTypeName()},
-                  /*doc=*/"", /*libraryCall=*/"tpp.relu");
-    rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
-                                newReluOp.getRegion().begin());
-
-    Value outUnBlockedTensor = (isInPlaceRelu(linalgOp))
-                                   ? fromBlockLayout.getOutput()
-                                   : linalgOp.getOutputOperand(0)->get();
-
-    Type outUnBlockedTensorType = outUnBlockedTensor.getType();
-    std::pair<AffineMap, AffineMap> maps = getMapsFromBlockLayoutNCnc_NC(
-        /*dims=*/4, getBlockingFactors(fromBlockLayout), linalgOp.getContext());
-
-    Value outReplacement =
-        rewriter
-            .create<linalgx::Relayout>(
-                loc, outUnBlockedTensorType, newReluOp->getResult(0),
-                outUnBlockedTensor, maps.first, maps.second)
-            .getResult()[0];
-    rewriter.replaceOp(linalgOp, outReplacement);
-    return success();
-  }
-};
-
-// TODO: should be part of a more structured de-generalization pass.
-// pattern to go from linalg.generic {tpp.matmul} to linalg.matmul.
-// see:
-// https://sourcegraph.com/github.com/iree-org/iree/-/blob/llvm-external-projects/iree-dialects/lib/Dialect/LinalgTransform/IR/StructuredTransformOpsExt.cpp?L124
+// From linalg.generic to linalg.matmul.
 struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -500,6 +353,10 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Entry point for packing a matmul operation.
+// Pack MatmulOp as following:
+// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
+// CB = batch reduce dimension.
 struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
   BlockMatmulLayout() = default;
   BlockMatmulLayout(ArrayRef<int64_t> blockingFactors) {
@@ -511,8 +368,9 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkRelayoutPatterns(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
-    patterns.add<DeGeneralizeMatmul, SinkBlockLayoutAfterRelu>(ctx);
+    patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
@@ -520,23 +378,24 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
 
 struct DoItOnConv2DNchwFchw
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  DoItOnConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+  DoItOnConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> tiles,
                        PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
+        tiles(tiles) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, linalgOp,
-                                             blockingFactors);
+        mlir::linalgx::blockConv2DNchwFchwOp(
+            rewriter, linalgOp,
+            getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
     if (failed(maybeGeneric))
       return failure();
     return success();
   }
 
 private:
-  ArrayRef<int64_t> blockingFactors;
+  ArrayRef<int64_t> tiles;
 };
 
 struct BlockConv2DNchwFchwLayout
@@ -557,13 +416,150 @@ struct BlockConv2DNchwFchwLayout
   }
 };
 
+//===----------------------------------------------------------------------===//
+// SinkBlockLayout
+//===----------------------------------------------------------------------===//
+
+struct SinkBlockLayout : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  // Pack the `operand`. All the packing information can be extracted by the
+  // defining op that must be an unpackOp.
+  Value packInput(Location loc, OpOperand *operand,
+                  DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
+                  PatternRewriter &rewriter) const {
+    linalgx::UnPackOp unpackOp =
+        operand->get().getDefiningOp<linalgx::UnPackOp>();
+    assert(unpackOp && "defining op must be an unpack");
+    DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
+        unpackOp.getDimAndTileMapping();
+    SmallVector<int64_t> currentInnerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    for (int64_t currentInnerDimPos : currentInnerDimsPos)
+      dimAndTileMapping[currentInnerDimPos] =
+          currentDimAndTileMapping[currentInnerDimPos];
+    return toPackLayoutImpl(loc, operand->get(), unpackOp.getMixedTiles(),
+                            extractFromI64ArrayAttr(unpackOp.getInnerDimsPos()),
+                            {}, rewriter);
+  }
+
+  // Check sinking preconditions: a) All maps must be identity, b) all loops mut
+  // be parallel and c) all operands need to be packed.
+  LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
+    if (llvm::any_of(linalgOp.getIndexingMapsArray(),
+                     [](AffineMap map) { return !map.isIdentity(); }))
+      return failure();
+
+    if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+      return failure();
+
+    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+      linalgx::UnPackOp unpackOp =
+          operand->get().getDefiningOp<linalgx::UnPackOp>();
+      if (!unpackOp)
+        return failure();
+      // Avoid having to deal with tile loop interchange.
+      SmallVector<int64_t> outerDimsPerm =
+          extractFromI64ArrayAttr(unpackOp.getOuterDimsPos());
+      if (!outerDimsPerm.empty())
+        return failure();
+    }
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+
+    if (failed(checkPreconditions(linalgOp)))
+      return failure();
+
+    // input.
+    Location loc = linalgOp.getLoc();
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+    SmallVector<Value> packedInputs;
+    for (OpOperand *operand : linalgOp.getInputOperands()) {
+      packedInputs.push_back(
+          packInput(loc, operand, dimAndTileMapping, rewriter));
+    }
+
+    // output.
+    SmallVector<Value> packedOutputs;
+    SmallVector<Type> packedOutputsTypes;
+    SmallVector<Value> unpackOutputs;
+    for (OpOperand *operand : linalgOp.getOutputOperands()) {
+      SmallVector<OpFoldResult> tiles;
+      SmallVector<int64_t> innerDimsPos;
+      // If the linalg op does not have input. The defining op for the output
+      // must be an unpack operation. In this case, we can simply extract all
+      // the information from there. Note that we also save the output of the
+      // unpack which need to be the output of the new unpack after the packed
+      // operation.
+      if (linalgOp.getNumInputs() == 0) {
+        linalgx::UnPackOp unpackOp =
+            operand->get().getDefiningOp<linalgx::UnPackOp>();
+        assert(unpackOp && "defining op must be an unpack");
+        tiles = unpackOp.getMixedTiles();
+        innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+        unpackOutputs.push_back(unpackOp.getOutput());
+      } else {
+        // Infer which dimensions need to be packed by looking at the domain and
+        // codomain of the affine map associated with the operand.
+        AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
+        for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
+          unsigned posInDomain = mapOperand.getDimPosition(pos);
+          if (dimAndTileMapping.count(posInDomain)) {
+            tiles.push_back(dimAndTileMapping[posInDomain]);
+            innerDimsPos.push_back(posInDomain);
+          }
+        }
+      }
+
+      // no work to do, exit.
+      if (tiles.empty())
+        return failure();
+
+      Value packedOutput = toPackLayoutImpl(loc, operand->get(), tiles,
+                                            innerDimsPos, {}, rewriter);
+      packedOutputs.push_back(packedOutput);
+      packedOutputsTypes.push_back(packedOutput.getType());
+    }
+
+    AffineMap map = AffineMap::getMultiDimIdentityMap(
+        linalgOp.getNumLoops() + 2, linalgOp.getContext());
+    SmallVector<AffineMap> maps(linalgOp.getIndexingMapsArray().size(), map);
+    SmallVector<StringRef> iteratorsTypes(linalgOp.getNumLoops() + 2,
+                                          getParallelIteratorTypeName());
+
+    linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
+        loc, packedOutputsTypes, packedInputs, packedOutputs, maps,
+        iteratorsTypes, /*docs=*/"", /*libraryCall=*/"");
+    rewriter.inlineRegionBefore(linalgOp.getRegion(), replacementOp.getRegion(),
+                                replacementOp.getRegion().begin());
+
+    SmallVector<Value> outReplacements;
+    size_t idx = 0;
+    for (OpOperand *operand : replacementOp.getOutputOperands()) {
+      linalgx::PackOp packOp = operand->get().getDefiningOp<linalgx::PackOp>();
+      assert(packOp && "expect def pack op");
+      Value result = replacementOp.getTiedOpResult(operand);
+      if (linalgOp.getNumInputs() != 0)
+        outReplacements.push_back(toUnPackLayoutImpl(
+            loc, result, linalgOp.getOutputs()[idx++], packOp.getMixedTiles(),
+            extractFromI64ArrayAttr(packOp.getInnerDimsPos()), rewriter));
+      else
+        outReplacements.push_back(toUnPackLayoutImpl(
+            loc, result, unpackOutputs[idx++], packOp.getMixedTiles(),
+            extractFromI64ArrayAttr(packOp.getInnerDimsPos()), rewriter));
+    }
+    rewriter.replaceOp(linalgOp, outReplacements);
+    return success();
+  }
+};
+
 } // end namespace
 
 void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
-  patterns.add<SinkBlockLayoutAfterRelu>(patterns.getContext());
-  // clang-format on
+  patterns.add<SinkBlockLayout>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

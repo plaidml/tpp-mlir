@@ -20,9 +20,12 @@ namespace mlir {
 namespace linalgx {
 namespace {
 
-struct BlockLayoutInterface
-    : public BufferizableOpInterface::ExternalModel<BlockLayoutInterface,
-                                                    linalgx::Relayout> {
+// TODO: bufferization interface for pack and unpack to avoid duplicating the
+// code.
+// TODO: double check bufferization.
+struct PackLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<PackLayoutInterface,
+                                                    linalgx::PackOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return false;
@@ -30,6 +33,66 @@ struct BlockLayoutInterface
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
+    return true;
+  }
+
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) const {
+    return false;
+  }
+
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return {};
+  }
+
+  BufferRelation bufferRelation(Operation *op, OpResult opResult,
+                                const AnalysisState &state) const {
+    return BufferRelation::Equivalent;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    linalgx::PackOp packOp = cast<linalgx::PackOp>(op);
+
+    FailureOr<Value> maybeDestBuffer =
+        getBuffer(rewriter, packOp.getOutput(), options);
+    if (failed(maybeDestBuffer))
+      return failure();
+    Value destBuffer = *maybeDestBuffer;
+
+    FailureOr<Value> maybeSrcBuffer =
+        getBuffer(rewriter, packOp.getInput(), options);
+    if (failed(maybeSrcBuffer))
+      return failure();
+    Value srcBuffer = *maybeSrcBuffer;
+
+    rewriter.create<linalgx::PackOp>(
+        op->getLoc(), srcBuffer, destBuffer, packOp.getOuterDimsPos(),
+        packOp.getInnerDimsPos(), packOp.getMixedTiles(),
+        packOp.getPaddingValue());
+    replaceOpWithBufferizedValues(rewriter, op, destBuffer);
+    return success();
+  }
+};
+
+struct UnPackLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<UnPackLayoutInterface,
+                                                    linalgx::UnPackOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return true;
+  }
+
+  /// Skew bufferization heuristics towards ensuring unpack are bufferized
+  /// inplace.
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) const {
     return true;
   }
 
@@ -45,23 +108,23 @@ struct BlockLayoutInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    linalgx::Relayout relayout = cast<linalgx::Relayout>(op);
+    linalgx::UnPackOp unpackOp = cast<linalgx::UnPackOp>(op);
 
     FailureOr<Value> maybeDestBuffer =
-        getBuffer(rewriter, relayout.outputs()[0], options);
+        getBuffer(rewriter, unpackOp.getOutput(), options);
     if (failed(maybeDestBuffer))
       return failure();
     Value destBuffer = *maybeDestBuffer;
 
     FailureOr<Value> maybeSrcBuffer =
-        getBuffer(rewriter, relayout.inputs()[0], options);
+        getBuffer(rewriter, unpackOp.getInput(), options);
     if (failed(maybeSrcBuffer))
       return failure();
     Value srcBuffer = *maybeSrcBuffer;
 
-    rewriter.create<linalgx::Relayout>(
-        op->getLoc(), /*destResultType=*/llvm::None, srcBuffer, destBuffer,
-        relayout.getInputMap(), relayout.getOutputMap());
+    rewriter.create<linalgx::UnPackOp>(
+        op->getLoc(), srcBuffer, destBuffer, unpackOp.getOuterDimsPos(),
+        unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles());
     replaceOpWithBufferizedValues(rewriter, op, destBuffer);
     return success();
   }
@@ -75,6 +138,7 @@ void mlir::linalgx::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, linalgx::LinalgXDialect *dialect) {
-        Relayout::attachInterface<linalgx::BlockLayoutInterface>(*ctx);
+        PackOp::attachInterface<linalgx::PackLayoutInterface>(*ctx);
+        UnPackOp::attachInterface<linalgx::UnPackLayoutInterface>(*ctx);
       });
 }
