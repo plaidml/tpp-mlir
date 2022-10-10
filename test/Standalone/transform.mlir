@@ -44,7 +44,7 @@ transform.with_pdl_patterns {
   transform.sequence %arg0 failures(propagate) {
     ^bb0(%arg1: !pdl.operation):
       %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-      %1 = transform.structured.packing %0 { packing_factors = [32, 32] }
+      %1 = transform.structured.packing %0 { packing_factors = [32, 32, 32] }
   }
 }
 

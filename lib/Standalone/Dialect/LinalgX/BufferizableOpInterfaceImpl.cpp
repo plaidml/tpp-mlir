@@ -22,28 +22,24 @@ namespace {
 
 // TODO: bufferization interface for pack and unpack to avoid duplicating the
 // code.
-// TODO: double check bufferization.
 struct PackLayoutInterface
     : public BufferizableOpInterface::ExternalModel<PackLayoutInterface,
                                                     linalgx::PackOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return false;
+    return opOperand.getOperandNumber() == 0;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    return true;
-  }
-
-  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
-                            const AnalysisState &state) const {
-    return false;
+    return opOperand.getOperandNumber() == 1;
   }
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
-    return {};
+    if (opOperand.getOperandNumber() < 1)
+      return {};
+    return {op->getResult(0)};
   }
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
@@ -81,12 +77,12 @@ struct UnPackLayoutInterface
                                                     linalgx::UnPackOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return false;
+    return opOperand.getOperandNumber() == 0;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    return true;
+    return opOperand.getOperandNumber() == 1;
   }
 
   /// Skew bufferization heuristics towards ensuring unpack are bufferized
