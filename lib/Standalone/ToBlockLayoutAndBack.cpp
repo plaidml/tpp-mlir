@@ -441,13 +441,15 @@ struct BlockConv2DNchwFchwLayout
 };
 
 //===----------------------------------------------------------------------===//
-// PropagateThrElementWiseOp
+// PropagateThroughElementWiseOp
 //===----------------------------------------------------------------------===//
 
-struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
+// Propagate packing through element-wise linalg generic operation.
+struct PropagateThroughElementWiseOp
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  // Check sinking preconditions: a) all loops mut
+  // Check sinking preconditions: a) all loops must
   // be parallel.
   LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
     if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
@@ -605,7 +607,7 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
 } // end namespace
 
 void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
-  patterns.add<PropagateThrElementWiseOp>(patterns.getContext());
+  patterns.add<PropagateThroughElementWiseOp>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
