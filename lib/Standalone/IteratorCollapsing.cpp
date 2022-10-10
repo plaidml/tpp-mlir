@@ -23,6 +23,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "iterator-collapsing"
 
+// TODO: Can we drop this pass: https://github.com/llvm/llvm-project/commit/83c65fbc2842909444bfe0a74ed083d164381078 ?
 // Most of these has been adapted by "DropUnitDims.cpp".
 
 // Return true if the result at position 'pos' in 'map' is a constant 0. False
