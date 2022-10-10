@@ -299,14 +299,14 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   SmallVector<Value> reshapedInputTensors;
   // reshape input A and B
   Value packedMatrixA =
-      toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter, true);
+      toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
   Value packedMatrixB =
-      toPackLayoutCKkc(loc, matmulOp.getInputs()[1], tilesOnB, rewriter, true);
+      toPackLayoutCKkc(loc, matmulOp.getInputs()[1], tilesOnB, rewriter);
   SmallVector<Value> packedInputs = {packedMatrixA, packedMatrixB};
 
   // reshape output C.
   Value packMatrixC =
-      toPackLayoutNCnc(loc, matmulOp.getOutputs()[0], tilesOnC, rewriter, true);
+      toPackLayoutNCnc(loc, matmulOp.getOutputs()[0], tilesOnC, rewriter);
 
   // swap linalg.matmul with a linalg.generic.
   MLIRContext *ctx = matmulOp.getContext();
