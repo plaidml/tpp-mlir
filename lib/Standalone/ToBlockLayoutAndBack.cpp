@@ -439,7 +439,7 @@ struct BlockConv2DNchwFchwLayout
 struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  // Check sinking preconditions: a) All maps must be identity, b) all loops mut
+  // Check sinking preconditions: a) all loops mut
   // be parallel.
   LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
     if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
@@ -476,10 +476,14 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    // if (failed(checkPreconditions(linalgOp)))
-    //   return failure();
+    if (failed(checkPreconditions(linalgOp)))
+      return failure();
 
-    // step1: get `dimAndTileMapping` by scanning all inputs/outputs.
+    // Pack and unpack operate on result of each operand map in the linalg
+    // operation. We need to map these dimensions (co-domain) to the domain of
+    // the linalg operation. Scan each input and output operands. For each map
+    // associated to the operand check the equivalent dimension in the domain
+    // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       linalgx::UnPackOp unpackOp =
@@ -497,8 +501,11 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       for (unsigned posInCodomain = 0;
            posInCodomain < mapOperand.getNumResults(); posInCodomain++) {
-        unsigned posInDomain =
-            mapOperand.getDimPosition(posInCodomain); // XXX: can assert.
+        // fail if we dealing with 'complex' affine maps. Only dim expression
+        // are accepted.
+        if (!mapOperand.getResult(posInCodomain).isa<AffineDimExpr>())
+          return failure();
+        unsigned posInDomain = mapOperand.getDimPosition(posInCodomain);
         if (currentDimAndTileMapping.count(posInCodomain))
           dimAndTileMapping[posInDomain] =
               currentDimAndTileMapping[posInCodomain];
@@ -525,6 +532,7 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
           getPackOperand(operand, linalgOp, dimAndTileMapping, rewriter);
       packedOutputOperands.push_back(packedOperand);
       packedOutputTypes.push_back(packedOperand.getType());
+      // in-place operation propagate the unpack down.
       if (linalgOp.getNumInputs() == 0) {
         linalgx::UnPackOp unpackOp =
             operand->get().getDefiningOp<linalgx::UnPackOp>();
@@ -534,6 +542,7 @@ struct PropagateThrElementWiseOp : public OpRewritePattern<linalg::GenericOp> {
 
     unsigned packedDims = dimAndTileMapping.size();
     SmallVector<AffineMap> newMaps;
+    // get the new map for each operand.
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       unsigned numSymbols = 0;
