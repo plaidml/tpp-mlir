@@ -74,19 +74,6 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
       loc, resultType, input, subViewOffsets, subViewSizes, subViewStrides);
 }
 
-// Expand rank by adding unit dimensions.
-// Example, memref<3xf32> -> memref<1x3xf32>
-// static Value rankExpandUnitDims(OpBuilder &builder, Location loc, Value
-// input) {
-//  MemRefType memrefOrig = input.getType().cast<MemRefType>();
-//  assert(memrefOrig.getShape().size() == 1 && "expect 1d memref");
-//  MemRefType newShape = MemRefType::get({1, memrefOrig.getShape()[0]},
-//                                        memrefOrig.getElementType());
-//  ArrayAttr rZero = builder.getI64ArrayAttr({0, 1});
-//  ArrayAttr r = ArrayAttr::get(builder.getContext(), {rZero});
-//  return builder.create<memref::ExpandShapeOp>(loc, newShape, input, r);
-//}
-
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
 LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
@@ -233,10 +220,8 @@ LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
 // check if the returned operand is valid using 'checkOperandForTpp'.
 Value getOperandForTpp(Value operand, PatternRewriter &rewriter, Location loc) {
   Type operandType = operand.getType();
-  // Scalar value.
   if (!operandType.isa<ShapedType>())
     return operand;
-  // Shaped type.
   if (operandType.cast<ShapedType>().getRank() <= 2)
     return operand;
   // Attempt to rank reduce, it may fail.
