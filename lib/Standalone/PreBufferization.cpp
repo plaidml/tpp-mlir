@@ -170,16 +170,16 @@ struct GenericHighPadOpPattern : public linalg::GeneralizePadOpPattern {
 // %0 = bufferization.allocTensorOp
 // %1 = tensor.insert_slice %cst_0 into %0
 //
-struct AllocateInitTensor : public OpRewritePattern<linalg::InitTensorOp> {
-  using OpRewritePattern<linalg::InitTensorOp>::OpRewritePattern;
+struct AllocateInitTensor : public OpRewritePattern<tensor::EmptyOp> {
+  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::InitTensorOp initOp,
+  LogicalResult matchAndRewrite(tensor::EmptyOp initOp,
                                 PatternRewriter &rewriter) const override {
     for (Operation *user : initOp->getUsers())
       if (!isa<tensor::InsertSliceOp>(user))
         return failure();
     rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
-        initOp, initOp.getType(), initOp.getSizes());
+        initOp, initOp.getType(), initOp.getDynamicSizes());
     return success();
   }
 };

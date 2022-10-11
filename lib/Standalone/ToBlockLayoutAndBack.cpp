@@ -18,6 +18,7 @@
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 using namespace mlir::linalgx;
@@ -125,7 +126,7 @@ static Value toPackLayoutImpl(Location loc, Value input,
         loc, RankedTensorType::get(shape, inputType.getElementType()),
         ValueRange{});
   else
-    output = builder.create<linalg::InitTensorOp>(loc, shape,
+    output = builder.create<tensor::EmptyOp>(loc, shape,
                                                   inputType.getElementType());
   return builder
       .create<linalgx::PackOp>(loc, input, output, innerDimPos, outerDimPerm,

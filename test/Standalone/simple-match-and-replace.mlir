@@ -7,7 +7,7 @@
 
 // CHECK-LABEL: func.func @identity
 func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
-  %0 = linalg.init_tensor [1, 512] : tensor<1x512xf32>
+  %0 = tensor.empty() : tensor<1x512xf32>
   // CHECK: tpp.identity
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
@@ -23,7 +23,7 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 // CHECK-LABEL: func.func @relu
 func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
-  %0 = linalg.init_tensor [1, 512] : tensor<1x512xf32>
+  %0 = tensor.empty() : tensor<1x512xf32>
   // CHECK: tpp.relu
   %1 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
@@ -41,7 +41,7 @@ func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 // CHECK-LABEL: func.func @add
 func.func @add(%arg1: tensor<256x256xf32>, %arg2: tensor<256x256xf32>) -> tensor<256x256xf32> {
-  %0 = linalg.init_tensor [256, 256] : tensor<256x256xf32>
+  %0 = tensor.empty() : tensor<256x256xf32>
   // CHECK: tpp.add
   %1 = linalg.generic {indexing_maps = [#map4, #map5, #map6], iterator_types = ["parallel", "parallel"]} ins(%arg1, %arg2: tensor<256x256xf32>, tensor<256x256xf32>) outs(%0 : tensor<256x256xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
@@ -93,7 +93,7 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>, %arg2: ten
 #map14 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 func.func @identity(%arg1: tensor<32x33x34x35xf32>) -> tensor<32x33x34x35xf32> {
-  %0 = linalg.init_tensor [32, 33, 34, 35] : tensor<32x33x34x35xf32>
+  %0 = tensor.empty() : tensor<32x33x34x35xf32>
   // CHECK: tpp.identity
   %1 = linalg.generic {indexing_maps = [#map13, #map14], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<32x33x34x35xf32>) outs(%0 : tensor<32x33x34x35xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
