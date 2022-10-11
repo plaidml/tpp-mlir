@@ -249,7 +249,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     RankedTensorType sliceOperandType =
         slice.getSource().getType().cast<RankedTensorType>();
 
-    Value reluBuffer = rewriter.create<linalg::InitTensorOp>(
+    Value reluBuffer = rewriter.create<tensor::EmptyOp>(
         loc, sliceOperandType.getShape(), sliceOperandType.getElementType());
 
     linalg::GenericOp newReluOp = rewriter.create<linalg::GenericOp>(
@@ -416,8 +416,8 @@ struct FoldInsertSliceIntoTppIdentity
       return failure();
     linalg::GenericOp tppIdentityOp = maybeTppIdentityOp;
     assert(tppIdentityOp.getNumOperands() == 2 && "expect two operands");
-    linalg::InitTensorOp maybeInitOp =
-        tppIdentityOp.getOperand(1).getDefiningOp<linalg::InitTensorOp>();
+    tensor::EmptyOp maybeInitOp =
+        tppIdentityOp.getOperand(1).getDefiningOp<tensor::EmptyOp>();
     if (!maybeInitOp || !maybeInitOp.getResult().hasOneUse())
       return failure();
 
@@ -427,7 +427,7 @@ struct FoldInsertSliceIntoTppIdentity
     if (!areCompatible(source, dest))
       return failure();
 
-    Value init = rewriter.create<linalg::InitTensorOp>(loc, dest.getShape(),
+    Value init = rewriter.create<tensor::EmptyOp>(loc, dest.getShape(),
                                                        dest.getElementType());
 
     linalg::GenericOp newTppIdentityOp = rewriter.create<linalg::GenericOp>(
@@ -479,7 +479,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
   }
 
   FailureOr<Value> optimizeFillingImpl(tensor::PadOp padOp,
-                                       linalg::InitTensorOp initTensor,
+                                       tensor::EmptyOp emptyTensor,
                                        PatternRewriter &rewriter) const {
 
     if (!padOp.getSourceType().hasStaticShape() ||
@@ -517,19 +517,19 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
       sizes.push_back(rewriter.getIndexAttr(cstType.getShape()[r]));
     }
     Value filled = rewriter.create<tensor::InsertSliceOp>(
-        loc, cst, initTensor, offsets, sizes, strides);
+        loc, cst, emptyTensor, offsets, sizes, strides);
     return filled;
   }
 
-  Value optimizeFilling(tensor::PadOp padOp, linalg::InitTensorOp initTensor,
+  Value optimizeFilling(tensor::PadOp padOp, tensor::EmptyOp emptyTensor,
                         PatternRewriter &rewriter) const {
     Value padValue = padOp.getConstantPaddingValue();
     Location loc = padOp.getLoc();
 
-    FailureOr<Value> filled = optimizeFillingImpl(padOp, initTensor, rewriter);
+    FailureOr<Value> filled = optimizeFillingImpl(padOp, emptyTensor, rewriter);
     if (failed(filled))
       return rewriter
-          .create<linalg::FillOp>(loc, padValue, initTensor.getResult())
+          .create<linalg::FillOp>(loc, padValue, emptyTensor.getResult())
           .getResult(0);
     return *filled;
   }
@@ -569,11 +569,11 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     // Create the tensor of same size as output of the pad op.
     RankedTensorType padResultType = padOp.getResultType();
     auto resultSizes = getAsOpFoldResult(resultShape[0]);
-    linalg::InitTensorOp initTensor = rewriter.create<linalg::InitTensorOp>(
+    tensor::EmptyOp emptyTensor = rewriter.create<tensor::EmptyOp>(
         loc, resultSizes, padResultType.getElementType());
 
     // Fill the tensor with the pad value.
-    Value fillTensor = optimizeFilling(padOp, initTensor, rewriter);
+    Value fillTensor = optimizeFilling(padOp, emptyTensor, rewriter);
 
     // Construct a slice of the fill result that is to be replaced with the
     // result of the generic op. The low pad values are the offsets, the size of

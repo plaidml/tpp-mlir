@@ -33,7 +33,7 @@ module {
         [ 1.6, 2.6, 3.6, 4.6, 5.6, 6.6, 7.6, 8.6, 9.6, 10.6, 11.6, 12.6, 13.6, 14.6, 15.6, 16.6 ]
     ]> : tensor<6x16xf32>
 
-    %0 = linalg.init_tensor [3, 8, 2, 2] : tensor<3x8x2x2xf32>  
+    %0 = tensor.empty() : tensor<3x8x2x2xf32>  
     %1 = linalg.generic #traitToBlock
       ins(%d: tensor<6x16xf32>)
       outs(%0: tensor<3x8x2x2xf32>) {
@@ -70,7 +70,7 @@ module {
     //
     vector.print %v0 : vector<3x8x2x2xf32>
     
-    %2 = linalg.init_tensor [6, 16] : tensor<6x16xf32>
+    %2 = tensor.empty() : tensor<6x16xf32>
     %3 = linalg.copy ins(%d: tensor<6x16xf32>) outs(%2: tensor<6x16xf32>) -> tensor<6x16xf32>
     %4 = tensor.collapse_shape %3 [[0, 1]] : tensor<6x16xf32> into tensor<96xf32>
     %5 = tensor.expand_shape %4 [[0, 1, 2, 3]] : tensor<96xf32> into tensor<3x8x2x2xf32>

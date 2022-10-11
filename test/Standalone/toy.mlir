@@ -8,7 +8,7 @@
 module @predict_function {
   // CHECK-LABEL: func.func @main
   func.func @main(%arg0: tensor<256x512xf32> {stdx.const}, %arg1: tensor<512xf32> {stdx.const}, %arg10: tensor<1x256xf32>) -> tensor<1x512xf32> {
-    %0 = linalg.init_tensor [1, 512] : tensor<1x512xf32>
+    %0 = tensor.empty() : tensor<1x512xf32>
     // CHECK: tpp.identity
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
