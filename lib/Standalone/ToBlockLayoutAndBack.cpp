@@ -213,9 +213,7 @@ static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
 // Conv2DNchwFchwOp
 //===----------------------------------------------------------------------===//
 // Original layout: [N][K][P][Q] += [N][C][H][W] * [K][C][R][S]
-// K' block on K
-// C' block on C
-// [N][K'][P][Q][k] += [N][C'][H][W][c] + [K'][C'][R][S][c][k]
+// New      layout: [N][K'][P][Q][k] += [N][C'][H][W][c] + [K'][C'][R][S][c][k]
 FailureOr<linalg::GenericOp>
 mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
                                      linalg::Conv2DNchwFchwOp convOp,
