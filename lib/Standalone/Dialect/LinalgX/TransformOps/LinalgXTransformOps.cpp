@@ -31,30 +31,20 @@ public:
 // PackOp
 //===----------------------------------------------------------------------===//
 
-ParseResult transform::PackOp::parse(OpAsmParser &parser,
-                                     OperationState &result) {
-
-  OpAsmParser::UnresolvedOperand target;
-  if (parser.parseOperand(target) ||
-      parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-  auto pdlOperationType = pdl::OperationType::get(parser.getContext());
-  if (parser.resolveOperand(target, pdlOperationType, result.operands))
-    return failure();
-  result.addTypes(pdlOperationType);
+LogicalResult transform::PackOp::verify() {
+  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
+  if (any_of(tiles, [](int64_t tile) { return tile <= 0; }))
+    return emitOpError()
+           << "expects pack factors to be positive integers, found "
+           << getPackFactors();
   return success();
-}
-
-void PackOp::print(OpAsmPrinter &p) {
-  p << ' ' << getTarget();
-  p.printOptionalAttrDict((*this)->getAttrs());
 }
 
 DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
                               SmallVector<Operation *> &results,
                               transform::TransformState &state) {
-  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackingFactors());
+  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   SmallVector<OpFoldResult> tilesAsOpFold =
@@ -68,6 +58,12 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       results.push_back(*blockedConv);
       return DiagnosedSilenceableFailure(success());
     }
+    else {
+      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack Conv2DNchwFchwOp";
+      diag.attachNote(target.getLoc()) << "this operation";
+      results.assign(1, nullptr);
+      return diag;
+    }
   }
   if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedMatmul =
@@ -76,8 +72,16 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       results.push_back(*blockedMatmul);
       return DiagnosedSilenceableFailure(success());
     }
+    else {
+      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack MatmulOp";
+      diag.attachNote(target.getLoc()) << "this operation";
+      results.assign(1, nullptr);
+      return diag;
+    }
   }
   results.assign(1, nullptr);
+  auto diag = this->emitOpError() << "Could not pack op: " << target << "\n";
+  diag.attachNote(target.getLoc()) << "when applied to this op";
   return DiagnosedSilenceableFailure::definiteFailure();
 }
 

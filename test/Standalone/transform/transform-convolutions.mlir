@@ -38,3 +38,26 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 // CHECK: %[[chunkC:.*]] = tensor.extract_slice %[[larg2]][0, %[[p0]], 0, 0] [1, 1, 56, 64] [1, 1, 1, 1] : tensor<1x56x56x64xf32> to tensor<56x64xf32>
 // CHECK: %[[matmul:.*]] = linalg.matmul ins(%[[chunkA]], %[[chunkB]] : tensor<56x64xf32>, tensor<64x64xf32>) outs(%[[chunkC]] : tensor<56x64xf32>) -> tensor<56x64xf32>
 // CHECK: %{{.*}} = tensor.insert_slice %[[matmul]] into %[[larg2]][0, %[[p0]], 0, 0] [1, 1, 56, 64] [1, 1, 1, 1] : tensor<56x64xf32> into tensor<1x56x56x64xf32>
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
+      %1 = transform.structured.pack %0 { pack_factors = [32, 32] }
+      %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+      %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+      %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+      transform.structured.map_to_brgemm %4
+  }
+}
+
+func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
+                %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
+  // CHECK: linalg.batch_reduce_matmul
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>)
+                                outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+  return %0: tensor<14x1024x28x28xf32>
+}

@@ -21,7 +21,7 @@ include "mlir/IR/OpBase.td"
 // PackOp
 //===----------------------------------------------------------------------===//
 
-def PackOp : Op<Transform_Dialect, "structured.packing",
+def PackOp : Op<Transform_Dialect, "structured.pack",
               [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
                TransformOpInterface, TransformEachOpTrait]> {
 
@@ -29,11 +29,11 @@ def PackOp : Op<Transform_Dialect, "structured.packing",
     Block the target operation. Currently supports matmul and convolutions.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$packing_factors);
-  let results = (outs PDL_Operation:$packed_linalg_op);
+  let assemblyFormat = "$target attr-dict";
 
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_factors);
+  let results = (outs PDL_Operation:$packed_linalg_op);
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -41,6 +41,8 @@ def PackOp : Op<Transform_Dialect, "structured.packing",
         ::llvm::SmallVector<::mlir::Operation *> &results,
         TransformState &state);
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -66,7 +68,7 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
         ::llvm::SmallVector<::mlir::Operation *> &results,
         TransformState &state);
 
-    // get reassociation.
+    // Get reassociation.
     SmallVector<ReassociationIndices, 4> getReassociationIndices();
   }];
 }
