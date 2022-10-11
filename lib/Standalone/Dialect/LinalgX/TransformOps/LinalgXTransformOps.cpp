@@ -80,8 +80,8 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
     }
   }
   results.assign(1, nullptr);
-  auto diag = this->emitOpError("pack available for MatmulOp and Conv2DNchwFchwOp only");
-  diag.attachNote(target->getLoc()) << "invalid target operation";
+  auto diag = this->emitOpError() << "Could not pack op: " << target << "\n";
+  diag.attachNote(target.getLoc()) << "when applied to this op";
   return DiagnosedSilenceableFailure::definiteFailure();
 }
 

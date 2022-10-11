@@ -13,7 +13,7 @@ transform.sequence failures(propagate) {
 #mapI = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tensor<5x5x5xf32> {
-  // expected-note @below {{invalid target operation}}
+  // expected-note @below {{when applied to this op}}
   %0 = linalg.generic {indexing_maps = [#mapI, #mapO], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: tensor<5x5x5xf32>) outs(%arg1: tensor<5x5x5xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
@@ -26,7 +26,7 @@ transform.sequence failures(propagate) {
   sequence %arg0 failures(propagate) {
     ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    // expected-error @below {{op pack available for MatmulOp and Conv2DNchwFchwOp only}}
+    // expected-error @below {{Could not pack op}}
     %1 = transform.structured.pack %0 { pack_factors = [2, 2, 2] }
     %2 = transform.structured.vectorize %1 {vectorize_padding}
   }
