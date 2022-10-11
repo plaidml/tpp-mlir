@@ -31,30 +31,20 @@ public:
 // PackOp
 //===----------------------------------------------------------------------===//
 
-ParseResult transform::PackOp::parse(OpAsmParser &parser,
-                                     OperationState &result) {
-
-  OpAsmParser::UnresolvedOperand target;
-  if (parser.parseOperand(target) ||
-      parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-  auto pdlOperationType = pdl::OperationType::get(parser.getContext());
-  if (parser.resolveOperand(target, pdlOperationType, result.operands))
-    return failure();
-  result.addTypes(pdlOperationType);
+LogicalResult transform::PackOp::verify() {
+  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
+  if (any_of(tiles, [](int64_t tile) { return tile <= 0; }))
+    return emitOpError()
+           << "expects pack factors to be positive integers, found "
+           << getPackFactors();
   return success();
-}
-
-void PackOp::print(OpAsmPrinter &p) {
-  p << ' ' << getTarget();
-  p.printOptionalAttrDict((*this)->getAttrs());
 }
 
 DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
                               SmallVector<Operation *> &results,
                               transform::TransformState &state) {
-  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackingFactors());
+  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   SmallVector<OpFoldResult> tilesAsOpFold =

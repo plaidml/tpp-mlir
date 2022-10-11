@@ -46,7 +46,7 @@ transform.with_pdl_patterns {
   transform.sequence %arg0 failures(propagate) {
     ^bb0(%arg1: !pdl.operation):
       %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
-      %1 = transform.structured.packing %0 { packing_factors = [32, 32] }
+      %1 = transform.structured.pack %0 { pack_factors = [32, 32] }
       %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
       %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
       %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
