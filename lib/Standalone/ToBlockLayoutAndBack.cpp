@@ -212,7 +212,10 @@ static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
 //===----------------------------------------------------------------------===//
 // Conv2DNchwFchwOp
 //===----------------------------------------------------------------------===//
-
+// Original layout: [N][K][P][Q] += [N][C][H][W] * [K][C][R][S]
+// K' block on K
+// C' block on C
+// [N][K'][P][Q][k] += [N][C'][H][W][c] + [K'][C'][R][S][c][k]
 FailureOr<linalg::GenericOp>
 mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
                                      linalg::Conv2DNchwFchwOp convOp,
@@ -286,8 +289,14 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
 FailureOr<linalg::GenericOp>
 mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
                              ArrayRef<OpFoldResult> tiles) {
-  if ((tiles.size() != 3) || (failed(BlockOpPreconditions(matmulOp))))
-    return failure();
+  if (tiles.size() != 3)
+    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+
+  if (matmulOp.hasDynamicShape())
+    return rewriter.notifyMatchFailure(matmulOp, "require static shape");
+
+  if (matmulOp.hasBufferSemantics())
+    return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
   OpFoldResult tileOnI = tiles[0];
   OpFoldResult tileOnJ = tiles[1];
@@ -298,7 +307,7 @@ mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 
   Location loc = matmulOp.getLoc();
   SmallVector<Value> reshapedInputTensors;
-  // reshape input A and B
+  // reshape input A and B.
   Value packedMatrixA =
       toPackLayoutNCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
   Value packedMatrixB =

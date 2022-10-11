@@ -58,6 +58,12 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       results.push_back(*blockedConv);
       return DiagnosedSilenceableFailure(success());
     }
+    else {
+      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack Conv2DNchwFchwOp";
+      diag.attachNote(target.getLoc()) << "this operation";
+      results.assign(1, nullptr);
+      return diag;
+    }
   }
   if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
     FailureOr<linalg::GenericOp> blockedMatmul =
@@ -66,8 +72,16 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       results.push_back(*blockedMatmul);
       return DiagnosedSilenceableFailure(success());
     }
+    else {
+      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack MatmulOp";
+      diag.attachNote(target.getLoc()) << "this operation";
+      results.assign(1, nullptr);
+      return diag;
+    }
   }
   results.assign(1, nullptr);
+  auto diag = this->emitOpError("pack available for MatmulOp and Conv2DNchwFchwOp only");
+  diag.attachNote(target->getLoc()) << "invalid target operation";
   return DiagnosedSilenceableFailure::definiteFailure();
 }
 
