@@ -166,8 +166,10 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
 
 /// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
 /// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
-/// rank).
+/// rank). c) the number of elements in `dimsPos` is > thank `rank`.
 static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
+  if (dimsPos.size() > rank)
+    return true;
   DenseSet<int64_t> uniqued;
   for (int64_t dim : dimsPos)
     uniqued.insert(dim);
@@ -236,11 +238,8 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   SmallVector<T> rearrangedElements = llvm::to_vector(elements);
   if (interchangeVector.empty())
     return rearrangedElements;
-  // assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
-  //        "number of elements must equal number of permutations");
-  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
-    rearrangedElements[interchangeVector[idx] + offset] =
-        elements[idx + offset];
+  for (auto en : llvm::enumerate(interchangeVector)) {
+    rearrangedElements[en.index() + offset] = elements[en.value() + offset];
   }
   return rearrangedElements;
 }
@@ -359,18 +358,10 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
-  // Reject `inner_dims_pos` if it contains duplicate.
   if (isInvalid(innerDimsPos, rank))
     return op->emitError("invalid inner_dims_pos vector");
-  // Reject `outer_dims_pos` if it contains duplicate.
   if (isInvalid(outerDimsPos, rank))
     return op->emitError("invalid outer_dims_pos vector");
-  // Reject if `inner_dims_pos` and `outer_dims_pos` contain different
-  // dimensions.
-  if (isInvalid(innerDimsPos, outerDimsPos)) {
-    return op->emitError(
-        "inner_dims_pos and outer_dims_pos must have the same elements");
-  }
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
