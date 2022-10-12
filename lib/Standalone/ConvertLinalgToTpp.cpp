@@ -413,6 +413,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 
 void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
+  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
