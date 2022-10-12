@@ -35,6 +35,11 @@ struct PackLayoutInterface
     return opOperand.getOperandNumber() == 1;
   }
 
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) const {
+    return false;
+  }
+
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 1)
@@ -85,16 +90,16 @@ struct UnPackLayoutInterface
     return opOperand.getOperandNumber() == 1;
   }
 
-  /// Skew bufferization heuristics towards ensuring unpack are bufferized
-  /// inplace.
   bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
                             const AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
-    return {};
+    if (opOperand.getOperandNumber() < 1)
+      return {};
+    return {op->getResult(0)};
   }
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
