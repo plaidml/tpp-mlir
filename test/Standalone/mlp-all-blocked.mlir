@@ -92,22 +92,22 @@ module @predict_function  {
 // CHECK: %[[ALLOC0:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
 // CHECK: linalgx.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC0]] : (memref<128x256xf32> memref<4x8x32x32xf32>)
 // CHECK: %[[ALLOC1:.+]] = memref.alloc() {alignment = 128 : i64} : memref<16x8x32x32xf32>
-// CHECK: linalgx.pack %[[ARG1]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC1]] : (memref<256x512xf32> memref<16x8x32x32xf32>)
+// CHECK: linalgx.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC1]] : (memref<256x512xf32> memref<16x8x32x32xf32>)
 // CHECK: %[[ALLOC2:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x16x32x32xf32>
 // CHECK: linalgx.pack %[[ARG12]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC2]] : (memref<128x512xf32> memref<4x16x32x32xf32>)
 // CHECK: tpp.identity ins(%[[ARG4]] : memref<1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
 // CHECK: %[[ALLOC3:.+]] = memref.alloc() {alignment = 128 : i64} : memref<32x16x32x32xf32>
-// CHECK: linalgx.pack %[[ARG3]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC3]] : (memref<512x1024xf32> memref<32x16x32x32xf32>)
+// CHECK: linalgx.pack %[[ARG3]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC3]] : (memref<512x1024xf32> memref<32x16x32x32xf32>)
 // CHECK: %[[ALLOC4:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x32x32x32xf32>
 // CHECK: linalgx.pack %[[ARG11]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC4]] : (memref<128x1024xf32> memref<4x32x32x32xf32>)
 // CHECK: tpp.identity ins(%[[ARG6]] : memref<2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
 // CHECK: %[[ALLOC5:.+]] = memref.alloc() {alignment = 128 : i64} : memref<64x32x32x32xf32>
-// CHECK: linalgx.pack %[[ARG5]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC5]] : (memref<1024x2048xf32> memref<64x32x32x32xf32>)
+// CHECK: linalgx.pack %[[ARG5]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC5]] : (memref<1024x2048xf32> memref<64x32x32x32xf32>)
 // CHECK: %[[ALLOC6:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x64x32x32xf32>
 // CHECK: linalgx.pack %[[ARG10]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC6]] : (memref<128x2048xf32> memref<4x64x32x32xf32>)
 // CHECK: tpp.identity ins(%[[ARG8]] : memref<1024xf32>) out(%[[ARG9]] : memref<128x1024xf32>)
 // CHECK: %[[ALLOC7:.+]] = memref.alloc() {alignment = 128 : i64} : memref<32x64x32x32xf32>
-// CHECK: linalgx.pack %[[ARG7]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC7]] : (memref<2048x1024xf32> memref<32x64x32x32xf32>)
+// CHECK: linalgx.pack %[[ARG7]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC7]] : (memref<2048x1024xf32> memref<32x64x32x32xf32>)
 // CHECK: %[[ALLOC8:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x32x32x32xf32>
 // CHECK: linalgx.pack %[[ARG9]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC8]] : (memref<128x1024xf32> memref<4x32x32x32xf32>)
 // CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {

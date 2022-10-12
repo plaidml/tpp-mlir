@@ -168,7 +168,8 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
 /// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
 /// rank). c) the number of elements in `dimsPos` is > thank `rank`.
 static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
-  if (dimsPos.size() > rank)
+  int64_t size = dimsPos.size();
+  if (size > rank)
     return true;
   DenseSet<int64_t> uniqued;
   for (int64_t dim : dimsPos)
@@ -177,20 +178,6 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
     return true;
   return llvm::any_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
-}
-
-/// Return true if `inner_dims_pos` and `outer_dims_pos` are incompatible. They
-/// are incompatible when: a) They have different sizes and b) They have
-/// different elements.
-static bool isInvalid(SmallVectorImpl<int64_t> &innerDimsPos,
-                      SmallVectorImpl<int64_t> &outerDimsPos) {
-  if (outerDimsPos.empty())
-    return false;
-  if (innerDimsPos.size() != outerDimsPos.size())
-    return true;
-  llvm::sort(innerDimsPos);
-  llvm::sort(outerDimsPos);
-  return innerDimsPos != outerDimsPos;
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -354,7 +341,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   SmallVector<int64_t> innerDimsPos =
       extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
   SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos());
+      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
@@ -450,7 +437,7 @@ LogicalResult PackOp::verify() {
   }
   // Verify result type against inferred type.
   SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(getOuterDimsPos());
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   ShapedType expectedOutputType = inferPackedType(
       getInputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);
@@ -509,7 +496,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   SmallVector<int64_t> dimsToInnerBlock =
       extractFromI64ArrayAttr(packOp.getInnerDimsPos());
   SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(packOp.getOuterDimsPos());
+      extractFromI64ArrayAttr(packOp.getOuterDimsPerm());
 
   SmallVector<Value> interchangedIvs = ivs;
   SmallVector<int64_t> interchangeVector =
@@ -738,7 +725,7 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
   // interchange the tiled loops induction variables based on `outer_dims_pos`.
-  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPos());
+  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!outerDims.empty()) {
     interchangeVector =
         computeInterchangeFromDimPos(outerDims, getOutputRank());
@@ -813,7 +800,7 @@ LogicalResult UnPackOp::verify() {
   // Verify input type against inferred type. The check includes the cases for
   // incompilete tiles. We allow to `undo` the padding done in the pack.
   SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(getOuterDimsPos());
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   ShapedType expectedInputType = inferPackedType(
       getOutputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);

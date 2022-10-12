@@ -70,7 +70,7 @@ def PackOp : LinalgX_Op<"pack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
@@ -81,7 +81,7 @@ def PackOp : LinalgX_Op<"pack", [
     attr-dict
     $input
     (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
-    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
@@ -168,7 +168,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles);
@@ -177,7 +177,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
   let assemblyFormat = [{
     attr-dict
     $input
-    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,

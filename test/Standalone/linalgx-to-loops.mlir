@@ -541,7 +541,7 @@ func.func @NCnc_to_NC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 // -----
 
 func.func @NPQK_to_NKPQk(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x2x56x56x32xf32>) {
-  iree_linalg_ext.pack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg1 : (memref<1x56x56x64xf32> memref<1x2x56x56x32xf32>)
+  linalgx.pack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg1 : (memref<1x56x56x64xf32> memref<1x2x56x56x32xf32>)
   return 
 }
 

@@ -42,7 +42,7 @@ module @predict_function  {
 // CHECK: %[[rel_arg0:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
 // CHECK: linalgx.pack %[[arg0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg0]] : (memref<128x256xf32> memref<4x8x32x32xf32>)
 // CHECK: %[[rel_arg1:.+]] = memref.alloc() {alignment = 128 : i64} : memref<16x8x32x32xf32>
-// CHECK: linalgx.pack %[[arg1]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg1]] : (memref<256x512xf32> memref<16x8x32x32xf32>)
+// CHECK: linalgx.pack %[[arg1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg1]] : (memref<256x512xf32> memref<16x8x32x32xf32>)
 // CHECK: %[[rel_arg3:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x16x32x32xf32>
 // CHECK: linalgx.pack %[[arg3]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[rel_arg3]] : (memref<128x512xf32> memref<4x16x32x32xf32>)
 // CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[four]] step %[[one]] {

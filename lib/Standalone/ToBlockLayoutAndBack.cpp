@@ -511,7 +511,7 @@ struct PropagateThroughElementWiseOp
         continue;
       // avoid having to deal with tile loop interchange.
       SmallVector<int64_t> outerDimsPerm =
-          extractFromI64ArrayAttr(unpackOp.getOuterDimsPos());
+          extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
       if (!outerDimsPerm.empty())
         return failure();
       // map *domain* of linalg operation to tiles.

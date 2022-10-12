@@ -47,7 +47,7 @@ func.func @matmul_static(
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 128 : i64} : memref<8x16x32x32xf32
 // CHECK: linalgx.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC]] : (memref<256x512xf32> memref<8x16x32x32xf32>)
 // CHECK: %[[ALLOC1:.+]] = memref.alloc() {alignment = 128 : i64} : memref<32x16x32x32xf32>
-// CHECK: linalgx.pack %[[ARG1]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC1]] : (memref<512x1024xf32> memref<32x16x32x32xf32>)
+// CHECK: linalgx.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC1]] : (memref<512x1024xf32> memref<32x16x32x32xf32>)
 // CHECK: %[[ALLOC2:.+]] = memref.alloc() {alignment = 128 : i64} : memref<8x32x32x32xf32>
 // CHECK: linalgx.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC2]] : (memref<256x1024xf32> memref<8x32x32x32xf32>)
 // CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
