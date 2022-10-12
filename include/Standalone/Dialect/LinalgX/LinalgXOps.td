@@ -134,6 +134,12 @@ def PackOp : LinalgX_Op<"pack", [
     // Infer the output type.
     ShapedType inferResultType();
 
+    // Method to get the `ShapedType` of the result. This is a static method
+    // to allow getting the type of the destination while creating the `pack` op.
+    static ShapedType getPackedType(ShapedType sourceType,
+      ArrayRef<int64_t> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
+      ArrayRef<int64_t> outerDimsPerm = {});
+
     // Return a mapping from positions `inner_dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
@@ -230,8 +236,9 @@ def UnPackOp : LinalgX_Op<"unpack", [
   }];
  
   let builders = [
-    OpBuilder<(ins "Value":$input, "Value":$output, 
-               "ArrayRef<int64_t>":$dimPos,"ArrayRef<OpFoldResult>":$tiles)>,
+    OpBuilder<(ins "Value":$input, "Value":$output,
+      "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos,
+      "ArrayRef<OpFoldResult>":$tiles)>,
 
     OpBuilder<(ins "Value":$input, "Value":$output,
       "ArrayAttr":$outerDimPerm, "ArrayAttr":$innerDimPerm,
