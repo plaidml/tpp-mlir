@@ -203,6 +203,22 @@ def BlockConv2DNchwFchwLayout : Pass<"block-conv2DNchwFchw-layout", "func::FuncO
   let constructor = "mlir::tpp::createBlockConv2DNchwFchwLayout()";
 }
 
+def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
+  let summary = "Pack and unpack Conv2DNhwcHwcf";
+  let description = [{
+    Pack Conv2DNhwcHwcf as [N][K'][P][Q][k] += [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+                           output           += image            * filter
+    Pack the image and block the image's channel with a factor k.
+    Pack the filter and block the filter's channels with k and c.
+    Pack the output and block the output's channel with k.
+  }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for pack and unpack operation">
+  ];
+  let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
+}
+
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   let summary = "Map a GEMM-like pattern to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";

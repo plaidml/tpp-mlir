@@ -18,6 +18,7 @@ namespace linalg {
 class GenericOp;
 class LinalgOp;
 class Conv2DNchwFchwOp;
+class Conv2DNhwcHwcfOp;
 class MatmulOp;
 } // namespace linalg
 
@@ -37,6 +38,11 @@ FailureOr<linalg::MatmulOp> mapConvToGemm(RewriterBase &rewriter,
 FailureOr<linalg::GenericOp>
 blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
                       ArrayRef<OpFoldResult> tiles);
+
+// Attempt to pack a Conv2DNhwcHwcfOp.
+FailureOr<linalg::GenericOp>
+packConv2DNhwcHwcfOp(RewriterBase &rewriter, linalg::Conv2DNhwcHwcfOp linalgOp,
+                     ArrayRef<OpFoldResult> tiles);
 
 // Attempt to block a MatmulOp.
 FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,

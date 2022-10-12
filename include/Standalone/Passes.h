@@ -79,6 +79,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createIteratorCollapsingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();
 
 } // namespace tpp
 } // namespace mlir
