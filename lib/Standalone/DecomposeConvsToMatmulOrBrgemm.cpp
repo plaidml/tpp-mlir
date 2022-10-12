@@ -595,7 +595,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
       return rewriter.create<tensor::CollapseShapeOp>(
           loc, newOperandType, operand, reassociationMap);
     }
-    llvm_unreachable("expect tensor or memref");
+    assert(false && "expect tensor or memref");
   }
 
   // Return the original value if the type is unchanged, or expand it. Assert
@@ -612,7 +612,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
       return rewriter.create<memref::ExpandShapeOp>(loc, origResultType, result,
                                                     reassociationMap);
     }
-    llvm_unreachable("expect tensor or memref");
+    assert(false && "expect tensor or memref");
   }
 
   // Collapse dimension at index 'startCollapse' to 'endCollapse'.
@@ -637,7 +637,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
       return MemRefType::get(newShape, operandType.getElementType());
     if (operandType.isa<RankedTensorType>())
       return RankedTensorType::get(newShape, operandType.getElementType());
-    llvm_unreachable("expect tensor or memref");
+    assert(false && "expect tensor or memref");
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,

@@ -99,7 +99,7 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
         return MemRefType::get(inferredShape, sourceType.getElementType());
       })
       .Default([&](Type t) {
-        llvm_unreachable("unexpected type");
+        assert(false && "unexpected type");
         return nullptr;
       });
 }

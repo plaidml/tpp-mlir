@@ -189,7 +189,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
                (lowerRankDim == higherRankDim))
         reshapeOutputShape[i] = lowerRankDim;
       else if (higherRankDim != lowerRankDim)
-        llvm_unreachable("bCast semantics for identity op broken");
+        assert(false && "bCast semantics for identity op broken");
     }
   }
 
@@ -241,7 +241,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
       int64_t ldi = shapeInput[1];
       return {ldi, bCast};
     }
-    llvm_unreachable("failed to get ldi and bCast for identity");
+    assert(false && "failed to get ldi and bCast for identity");
   }
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,

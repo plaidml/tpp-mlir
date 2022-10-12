@@ -58,7 +58,7 @@ static unsigned getFirstZeroPos(AffineMap map) {
       return pos;
     pos++;
   }
-  llvm_unreachable("expect to find a zero");
+  assert(false && "expect to find a zero");
   return pos;
 }
 
@@ -75,7 +75,7 @@ static Type getNewOperandType(Type type, ArrayRef<int64_t> shape) {
     return RankedTensorType::get(shape, elementType);
   else if (type.isa<MemRefType>())
     return MemRefType::get(shape, elementType);
-  llvm_unreachable("unexpected type");
+  assert(false && "unexpected type");
 }
 
 static SmallVector<ReassociationExprs, 2>
