@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 
 using namespace mlir;
@@ -32,11 +33,11 @@ public:
 //===----------------------------------------------------------------------===//
 
 LogicalResult transform::PackOp::verify() {
-  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
-  if (any_of(tiles, [](int64_t tile) { return tile <= 0; }))
+  SmallVector<int64_t> factors = extractFromI64ArrayAttr(getBlockingFactors());
+  if (any_of(factors, [](int64_t factor) { return factor <= 0; }))
     return emitOpError()
-           << "expects pack factors to be positive integers, found "
-           << getPackFactors();
+           << "expects blocking factors to be positive integers, found "
+           << getBlockingFactors();
   return success();
 }
 
@@ -44,40 +45,29 @@ DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
                               SmallVector<Operation *> &results,
                               transform::TransformState &state) {
-  SmallVector<int64_t> tiles = extractFromI64ArrayAttr(getPackFactors());
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  SmallVector<OpFoldResult> tilesAsOpFold =
-      getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles));
+  SmallVector<OpFoldResult> blockingFactors = getAsOpFoldResult(
+      rewriter.getI64ArrayAttr(extractFromI64ArrayAttr(getBlockingFactors())));
   Operation *currentTarget = target;
-  if (linalg::Conv2DNchwFchwOp convOp =
-          dyn_cast<linalg::Conv2DNchwFchwOp>(currentTarget)) {
-    FailureOr<linalg::GenericOp> blockedConv =
-        mlir::linalgx::blockConv2DNchwFchwOp(rewriter, convOp, tilesAsOpFold);
-    if (succeeded(blockedConv)) {
-      results.push_back(*blockedConv);
-      return DiagnosedSilenceableFailure(success());
-    }
-    else {
-      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack Conv2DNchwFchwOp";
-      diag.attachNote(target.getLoc()) << "this operation";
-      results.assign(1, nullptr);
-      return diag;
-    }
-  }
-  if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(currentTarget)) {
-    FailureOr<linalg::GenericOp> blockedMatmul =
-        mlir::linalgx::blockMatmulOp(rewriter, matmulOp, tilesAsOpFold);
-    if (succeeded(blockedMatmul)) {
-      results.push_back(*blockedMatmul);
-      return DiagnosedSilenceableFailure(success());
-    }
-    else {
-      DiagnosedSilenceableFailure diag = emitSilenceableError() << "failed to pack MatmulOp";
-      diag.attachNote(target.getLoc()) << "this operation";
-      results.assign(1, nullptr);
-      return diag;
-    }
+  FailureOr<linalg::GenericOp> packedOp = failure();
+  TypeSwitch<Operation *>(currentTarget)
+      .Case([&](linalg::Conv2DNchwFchwOp convOp) {
+        packedOp = mlir::linalgx::packConv2DNchwFchwOp(rewriter, convOp,
+                                                       blockingFactors);
+      })
+      .Case([&](linalg::Conv2DNhwcHwcfOp convOp) {
+        packedOp = mlir::linalgx::packConv2DNhwcHwcfOp(rewriter, convOp,
+                                                       blockingFactors);
+      })
+      .Case([&](linalg::MatmulOp matmulOp) {
+        packedOp =
+            mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
+      })
+      .Default([&](Operation *op) { packedOp = failure(); });
+  if (succeeded(packedOp)) {
+    results.push_back(*packedOp);
+    return DiagnosedSilenceableFailure(success());
   }
   results.assign(1, nullptr);
   auto diag = this->emitOpError() << "Could not pack op: " << target << "\n";
