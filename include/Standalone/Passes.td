@@ -174,7 +174,7 @@ def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm",
   let constructor = "mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass()";
 }
 
-def BlockMatmulLayout : Pass<"block-matmul-layout", "func::FuncOp"> {
+def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   let summary = "Convert matmul to block layout and back";
   let description = [{
     Block Matmul as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
@@ -184,10 +184,10 @@ def BlockMatmulLayout : Pass<"block-matmul-layout", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t", 
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createBlockMatmulLayout()";
+  let constructor = "mlir::tpp::createPackMatmulPass()";
 }
 
-def BlockConv2DNchwFchwLayout : Pass<"block-conv2DNchwFchw-layout", "func::FuncOp"> {
+def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
   let summary = "Convert Conv2DNchwFchw to block layout and back";
   let description = [{
     Block Conv2DNchwFchw as: [N][BK][P][Q][bk] += [N][BC][H][W][bc] * [BK][BC][R][S][bk][bc]
@@ -200,7 +200,7 @@ def BlockConv2DNchwFchwLayout : Pass<"block-conv2DNchwFchw-layout", "func::FuncO
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createBlockConv2DNchwFchwLayout()";
+  let constructor = "mlir::tpp::createPackConv2DNchwFchwPass()";
 }
 
 def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {

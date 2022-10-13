@@ -72,10 +72,10 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposeConvToMatmulOrBrgemmPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createBlockMatmulLayout();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
-std::unique_ptr<OperationPass<func::FuncOp>> createBlockConv2DNchwFchwLayout();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createIteratorCollapsingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
