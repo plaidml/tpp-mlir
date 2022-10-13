@@ -124,7 +124,7 @@ static bool isConvLike(linalg::LinalgOp linalgOp) {
 }
 
 static bool isInBound(unsigned filterRank, unsigned rPos, unsigned sPos) {
-  if (rPos >= filterRank || sPos >= filterRank)
+  return !(rPos >= filterRank || sPos >= filterRank);
     return false;
   return true;
 }
