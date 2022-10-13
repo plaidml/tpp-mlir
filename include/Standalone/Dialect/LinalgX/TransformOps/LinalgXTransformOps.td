@@ -105,7 +105,7 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
 }
 
 //===----------------------------------------------------------------------===//
-// MapToMatmulOp
+// MapConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
 def MapConvToMatmulOp : Op<Transform_Dialect, 
