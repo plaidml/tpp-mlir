@@ -64,6 +64,8 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 
 // -----
 
+// Expect the test to fail because we don't have [parallel, parallel, reduction]
+// as innermost loop - we did not interchnage.
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   sequence %arg0 failures(propagate) {
@@ -86,6 +88,7 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 
 // -----
 
+// Expect test to fail as the filter is out of bound.
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   sequence %arg0 failures(propagate) {
