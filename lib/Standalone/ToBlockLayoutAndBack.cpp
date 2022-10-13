@@ -32,7 +32,6 @@ using namespace mlir::linalgx;
 // only RSCK)
 // 2. Protect against strided convolution as we don't pass the stride to the map
 // atm.
-// 3. Share code between convolutions.
 // 4. Agree on terminology (passes.td/passes.h) use `block factors` or `tile`.
 //===----------------------------------------------------------------------===//
 // Utils
@@ -159,14 +158,6 @@ static Value fromPackLayoutNKPQk(Location loc, Value input, Value output,
                             outerDimsPerm, builder);
 }
 
-/// Helper function ensure packing preconditions. We pack only if the operation
-/// has static shape and it is at tensor level.
-static LogicalResult BlockOpPreconditions(linalg::LinalgOp linalgOp) {
-  if (linalgOp.hasDynamicShape() || linalgOp.hasBufferSemantics())
-    return failure();
-  return success();
-}
-
 static Value toPackLayoutRSCK_KCRSck(Location loc, Value input,
                                      ArrayRef<OpFoldResult> tiles,
                                      OpBuilder &builder) {
@@ -190,46 +181,49 @@ template <typename CONVOP> static bool hasStride(CONVOP convOp) {
   return false;
 }
 
-//===----------------------------------------------------------------------===//
-// Conv2DNhwcHwcfOp
-//===----------------------------------------------------------------------===//
-// Original layout: [N][P][Q][K] += [N][H][W][C] * [R][S][C][K]
-// New      layout: [N][K'][P][Q][k] += [N][C'][H][W][c] * [K'][C'][R][S][c][k]
-FailureOr<linalg::GenericOp>
-mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
-                                    linalg::Conv2DNhwcHwcfOp convOp,
-                                    ArrayRef<OpFoldResult> tiles) {
+template <typename OpTy>
+static FailureOr<linalg::GenericOp>
+packConvolutions(RewriterBase &rewriter, OpTy convOp,
+                 ArrayRef<OpFoldResult> tiles) {
+  static_assert(llvm::is_one_of<OpTy, linalg::Conv2DNhwcHwcfOp,
+                                linalg::Conv2DNchwFchwOp>::value,
+                "applies to only pack or unpack operations");
+
   if (tiles.size() != 2)
     return rewriter.notifyMatchFailure(convOp, "require 2 tile factors");
-
   if (convOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(convOp, "require static shape");
-
   if (convOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(convOp, "require tensor semantics");
-
-  // TODO: (lorenzo) add the stride when you compose the affine map.
   if (hasStride(convOp))
     return rewriter.notifyMatchFailure(convOp, "require unit stride");
 
+  bool isConv2DNhwcHwcfOp =
+      (std::is_same<OpTy, linalg::Conv2DNhwcHwcfOp>::value) ? true : false;
+
   Location loc = convOp.getLoc();
   MLIRContext *ctx = convOp.getContext();
-  SmallVector<Value, 2> reshapedInputTensors;
 
   SmallVector<Value> inputOperands = convOp.getInputOperands();
   SmallVector<Value> outputOperands = convOp.getOutputOperands();
 
   // pack the image and the filter.
   Value image = inputOperands[0];
-  Value packedImage = toPackLayoutNKPQk(loc, image, tiles[0], rewriter);
-
+  Value packedImage = (isConv2DNhwcHwcfOp)
+                          ? toPackLayoutNKPQk(loc, image, tiles[0], rewriter)
+                          : toPackLayoutNCHWc(loc, image, tiles[0], rewriter);
   Value filter = inputOperands[1];
-  Value packedFilter = toPackLayoutRSCK_KCRSck(loc, filter, tiles, rewriter);
-  SmallVector<Value> packedInputs = {packedImage, packedFilter};
+  Value packedFilter =
+      (isConv2DNhwcHwcfOp)
+          ? toPackLayoutRSCK_KCRSck(loc, filter, tiles, rewriter)
+          : toPackLayoutKCRSck(loc, filter, tiles, rewriter);
+  SmallVector<Value, 2> packedInputs = {packedImage, packedFilter};
 
   // pack the output.
   Value output = outputOperands[0];
-  Value packedOutput = toPackLayoutNKPQk(loc, output, tiles[0], rewriter);
+  Value packedOutput = (isConv2DNhwcHwcfOp)
+                           ? toPackLayoutNKPQk(loc, output, tiles[0], rewriter)
+                           : toPackLayoutNCHWc(loc, output, tiles[0], rewriter);
 
   // Swap convolution with generic.
   //         N   K   P   Q   k   C   R   S   c
@@ -257,10 +251,26 @@ mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
   // convert back from pack layout.
   Value outPackedTensor = replacementOp.getResult(0);
   Value outUnPackedTensor = outputOperands[0];
-  Value outReplacement = fromPackLayoutNKPQk(
-      loc, outPackedTensor, outUnPackedTensor, tiles[0], rewriter);
+  Value outReplacement =
+      (isConv2DNhwcHwcfOp)
+          ? fromPackLayoutNKPQk(loc, outPackedTensor, outUnPackedTensor,
+                                tiles[0], rewriter)
+          : fromPackLayoutNCHWc(loc, outPackedTensor, outUnPackedTensor,
+                                tiles[0], rewriter);
   rewriter.replaceOp(convOp, outReplacement);
   return replacementOp;
+}
+
+//===----------------------------------------------------------------------===//
+// Conv2DNhwcHwcfOp
+//===----------------------------------------------------------------------===//
+// Original layout: [N][P][Q][K] += [N][H][W][C] * [R][S][C][K]
+// New      layout: [N][K'][P][Q][k] += [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+FailureOr<linalg::GenericOp>
+mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
+                                    linalg::Conv2DNhwcHwcfOp convOp,
+                                    ArrayRef<OpFoldResult> tiles) {
+  return packConvolutions(rewriter, convOp, tiles);
 }
 
 //===----------------------------------------------------------------------===//
@@ -272,56 +282,7 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
                                      linalg::Conv2DNchwFchwOp convOp,
                                      ArrayRef<OpFoldResult> tiles) {
-  if ((tiles.size() != 2) || (failed(BlockOpPreconditions(convOp))))
-    return failure();
-
-  Location loc = convOp.getLoc();
-  MLIRContext *ctx = convOp.getContext();
-
-  SmallVector<Value> inputOperands = convOp.getInputOperands();
-  SmallVector<Value> outputOperands = convOp.getOutputOperands();
-
-  // pack the image and the filter.
-  Value image = inputOperands[0];
-  Value packedImage = toPackLayoutNCHWc(loc, image, tiles[0], rewriter);
-  Value filter = inputOperands[1];
-  Value packedFilter = toPackLayoutKCRSck(loc, filter, tiles, rewriter);
-  SmallVector<Value> packedInputs = {packedImage, packedFilter};
-
-  // pack the output.
-  Value output = outputOperands[0];
-  Value packedOutput = toPackLayoutNCHWc(loc, output, tiles[0], rewriter);
-
-  // Swap convolution with generic.
-  //         N   K   P   Q   k   C   R   S   c
-  AffineExpr p1, p2, p3, p4, p5, r1, r2, r3, r4;
-  bindDims(ctx, p1, p2, p3, p4, p5, r1, r2, r3, r4);
-  AffineMap mapOut =
-      AffineMap::get(/*dims=*/9, /*symbols=*/0, {p1, p2, p3, p4, p5}, ctx);
-  AffineMap mapImg = AffineMap::get(/*dims=*/9, /*symbols=*/0,
-                                    {p1, r1, p3 + r2, p4 + r3, r4}, ctx);
-  AffineMap mapFil =
-      AffineMap::get(/*dims=*/9, /*symbols=*/0, {p2, r1, r2, r3, r4, p5}, ctx);
-  linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-      loc, packedOutput.getType(), packedInputs, ValueRange{packedOutput},
-      ArrayRef<AffineMap>{mapImg, mapFil, mapOut},
-      ArrayRef<StringRef>{
-          getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-          getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-          getParallelIteratorTypeName(), getReductionIteratorTypeName(),
-          getReductionIteratorTypeName(), getReductionIteratorTypeName(),
-          getReductionIteratorTypeName()},
-      /*doc=*/"", /*libraryCall=*/"");
-  rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
-                              replacementOp.getRegion().begin());
-
-  // convert back from pack layout.
-  Value outPackedTensor = replacementOp.getResult(0);
-  Value outUnPackedTensor = outputOperands[0];
-  Value outReplacement = fromPackLayoutNCHWc(
-      loc, outPackedTensor, outUnPackedTensor, tiles[0], rewriter);
-  rewriter.replaceOp(convOp, outReplacement);
-  return replacementOp;
+  return packConvolutions(rewriter, convOp, tiles);
 }
 
 //===----------------------------------------------------------------------===//
