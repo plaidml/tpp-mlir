@@ -26,9 +26,6 @@ using namespace mlir::linalgx;
 #define GEN_PASS_CLASSES
 #include "Standalone/Passes.h.inc"
 
-// TODO: lorenzo
-// 2. Protect against strided convolution as we don't pass the stride to the map
-// atm.
 //===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
@@ -185,19 +182,6 @@ static Value toPackLayoutKCRS_KCRSck(Location loc, Value input,
                           useAlloc);
 }
 
-// return true if the conv has stride != 1.
-template <typename CONVOP> static bool hasStride(CONVOP convOp) {
-  if (DenseIntElementsAttr strides = convOp.getStrides()) {
-    auto values = strides.getValues<APInt>();
-    if (llvm::any_of(values, [](const APInt &value) {
-          return value.getSExtValue() != 1;
-        })) {
-      return true;
-    }
-  }
-  return false;
-}
-
 template <typename OpTy>
 static FailureOr<linalg::GenericOp>
 packConvolutions(RewriterBase &rewriter, OpTy convOp,
@@ -212,8 +196,6 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
     return rewriter.notifyMatchFailure(convOp, "require static shape");
   if (convOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(convOp, "require tensor semantics");
-  if (hasStride(convOp))
-    return rewriter.notifyMatchFailure(convOp, "require unit stride");
 
   bool isConv2DNhwcHwcfOp =
       (std::is_same<OpTy, linalg::Conv2DNhwcHwcfOp>::value) ? true : false;
@@ -244,14 +226,23 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
           ? toPackLayoutNPQK_NKPQk(loc, output, tiles[0], rewriter)
           : toPackLayoutNCHW_NCHWc(loc, output, tiles[0], rewriter);
 
+  SmallVector<int64_t, 2> strides = {1, 1};
+  if (DenseIntElementsAttr stridesAttr = convOp.getStrides()) {
+    auto strideValues = stridesAttr.getValues<int64_t>();
+    assert(strideValues.size() == 2 && "expect two stride values");
+    strides[0] = strideValues[0];
+    strides[1] = strideValues[1];
+  }
+
   // Swap convolution with generic.
   //         N   K   P   Q   k   C   R   S   c
   AffineExpr p1, p2, p3, p4, p5, r1, r2, r3, r4;
   bindDims(ctx, p1, p2, p3, p4, p5, r1, r2, r3, r4);
   AffineMap mapOut =
       AffineMap::get(/*dims=*/9, /*symbols=*/0, {p1, p2, p3, p4, p5}, ctx);
-  AffineMap mapImg = AffineMap::get(/*dims=*/9, /*symbols=*/0,
-                                    {p1, r1, p3 + r2, p4 + r3, r4}, ctx);
+  AffineMap mapImg = AffineMap::get(
+      /*dims=*/9, /*symbols=*/0,
+      {p1, r1, p3 * strides[0] + r2, p4 * strides[1] + r3, r4}, ctx);
   AffineMap mapFil =
       AffineMap::get(/*dims=*/9, /*symbols=*/0, {p2, r1, r2, r3, r4, p5}, ctx);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
