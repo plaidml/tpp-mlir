@@ -1,4 +1,4 @@
-// RUN: standalone-opt -block-conv2DNchwFchw-layout="block-factors=32,32" %s | FileCheck %s
+// RUN: standalone-opt -pack-conv2DNchwFchw="block-factors=32,32" %s | FileCheck %s
 
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>, 
                 %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {

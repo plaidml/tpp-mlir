@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -block-matmul-layout="block-factors=32,32,32" -canonicalize -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
+// RUN: standalone-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
 
 !A_tensor_t = tensor<256x512xf32>
 !B_tensor_t = tensor<512x1024xf32>

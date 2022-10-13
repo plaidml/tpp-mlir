@@ -29,7 +29,6 @@ using namespace mlir::linalgx;
 // TODO: lorenzo
 // 2. Protect against strided convolution as we don't pass the stride to the map
 // atm.
-// 4. Agree on terminology (passes.td/passes.h) use `block factors` or `tile`.
 //===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
@@ -383,21 +382,23 @@ namespace {
 
 // Pack MatmulOp.
 struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
-  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> tiles,
+  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
                PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit), tiles(tiles) {}
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
+        blockingFactors(blockingFactors) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> blockedMatmul = mlir::linalgx::blockMatmulOp(
-        rewriter, matmulOp, getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
+        rewriter, matmulOp,
+        getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
     if (failed(blockedMatmul))
       return failure();
     return success();
   }
 
 private:
-  ArrayRef<int64_t> tiles;
+  ArrayRef<int64_t> blockingFactors;
 };
 
 // From linalg.generic to linalg.matmul.
@@ -422,9 +423,9 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
 // Pack MatmulOp as following:
 // [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
 // CB = batch reduce dimension.
-struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
-  BlockMatmulLayout() = default;
-  BlockMatmulLayout(ArrayRef<int64_t> blockingFactors) {
+struct PackMatmul : public PackMatmulBase<PackMatmul> {
+  PackMatmul() = default;
+  PackMatmul(ArrayRef<int64_t> blockingFactors) {
     this->blockingFactors = blockingFactors;
   }
 
@@ -443,30 +444,29 @@ struct BlockMatmulLayout : public BlockMatmulLayoutBase<BlockMatmulLayout> {
 
 struct DoItOnConv2DNchwFchw
     : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  DoItOnConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> tiles,
+  DoItOnConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
                        PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit),
-        tiles(tiles) {}
+        blockingFactors(blockingFactors) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> maybeGeneric =
         mlir::linalgx::blockConv2DNchwFchwOp(
             rewriter, linalgOp,
-            getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
+            getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
     if (failed(maybeGeneric))
       return failure();
     return success();
   }
 
 private:
-  SmallVector<int64_t> tiles;
+  SmallVector<int64_t> blockingFactors;
 };
 
-struct BlockConv2DNchwFchwLayout
-    : public BlockConv2DNchwFchwLayoutBase<BlockConv2DNchwFchwLayout> {
-  BlockConv2DNchwFchwLayout() = default;
-  BlockConv2DNchwFchwLayout(ArrayRef<int64_t> blockingFactors) {
+struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
+  PackConv2DNchwFchw() = default;
+  PackConv2DNchwFchw(ArrayRef<int64_t> blockingFactors) {
     this->blockingFactors = blockingFactors;
   }
 
@@ -692,14 +692,13 @@ void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
   patterns.add<PropagateThroughElementWiseOp>(patterns.getContext());
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createBlockMatmulLayout() {
-  return std::make_unique<BlockMatmulLayout>();
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
+  return std::make_unique<PackMatmul>();
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createBlockConv2DNchwFchwLayout() {
-  return std::make_unique<BlockConv2DNchwFchwLayout>();
+mlir::tpp::createPackConv2DNchwFchwPass() {
+  return std::make_unique<PackConv2DNchwFchw>();
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

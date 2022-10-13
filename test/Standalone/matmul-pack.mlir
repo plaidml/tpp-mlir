@@ -1,4 +1,4 @@
-// RUN: standalone-opt -split-input-file -block-matmul-layout="block-factors=32,32,32" --canonicalize %s | FileCheck %s
+// RUN: standalone-opt -split-input-file -pack-matmul="block-factors=32,32,32" --canonicalize %s | FileCheck %s
 
 func.func @matmul(%arg0: tensor<128x512xf32>, 
                   %arg1: tensor<512x256xf32>, 
