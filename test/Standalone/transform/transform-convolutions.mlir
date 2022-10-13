@@ -175,6 +175,7 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
  return %3 : tensor<1x56x56x64xf32>
 }
 
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
 // CHECK: func.func @conv2d_1x56x56x64_3x3x64x64_pad(
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<3x3x64x64xf32>,
@@ -195,7 +196,7 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 // CHECK: %[[LOOP2:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[LOOP2VAL:.+]] = %[[LOOP1VAL]]) -> (tensor<1x2x56x56x32xf32>) {
 // CHECK: %[[LOOP3:.+]] = scf.for %[[L:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[LOOP3VAL:.+]] = %[[LOOP2VAL]]) -> (tensor<1x2x56x56x32xf32>) {
 // CHECK: %[[LOOP4:.+]] = scf.for %[[E:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[LOOP4VAL:.+]] = %[[LOOP3VAL]]) -> (tensor<1x2x56x56x32xf32>) {
-// CHECK: %[[APPLY:.+]] = affine.apply #map(%arg5, %arg9)
+// CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[J]], %[[L]])
 // CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[PACK0]][0, %[[K]], %[[APPLY]], %[[E]], 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : tensor<1x2x58x58x32xf32> to tensor<56x32xf32>
 // CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[PACK1]][%[[I]], %[[K]], %[[L]], %[[E]], 0, 0] [1, 1, 1, 1, 32, 32] [1, 1, 1, 1, 1, 1] : tensor<2x2x3x3x32x32xf32> to tensor<32x32xf32>
 // CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[LOOP4VAL]][0, %[[I]], %[[J]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : tensor<1x2x56x56x32xf32> to tensor<56x32xf32>
