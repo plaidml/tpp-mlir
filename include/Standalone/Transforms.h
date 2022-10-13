@@ -36,8 +36,8 @@ FailureOr<linalg::MatmulOp> mapConvToGemm(RewriterBase &rewriter,
 
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>
-blockConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
-                      ArrayRef<OpFoldResult> tiles);
+packConv2DNchwFchwOp(RewriterBase &rewriter, linalg::Conv2DNchwFchwOp linalgOp,
+                     ArrayRef<OpFoldResult> tiles);
 
 // Attempt to pack a Conv2DNhwcHwcfOp.
 FailureOr<linalg::GenericOp>
@@ -45,9 +45,9 @@ packConv2DNhwcHwcfOp(RewriterBase &rewriter, linalg::Conv2DNhwcHwcfOp linalgOp,
                      ArrayRef<OpFoldResult> tiles);
 
 // Attempt to block a MatmulOp.
-FailureOr<linalg::GenericOp> blockMatmulOp(RewriterBase &rewriter,
-                                           linalg::MatmulOp linalgOp,
-                                           ArrayRef<OpFoldResult> tiles);
+FailureOr<linalg::GenericOp> packMatmulOp(RewriterBase &rewriter,
+                                          linalg::MatmulOp linalgOp,
+                                          ArrayRef<OpFoldResult> tiles);
 
 // Collapse iterators in a linalg.generic based on 'reassociation'.
 FailureOr<linalg::GenericOp>

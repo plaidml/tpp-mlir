@@ -289,9 +289,9 @@ mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
 // Original layout: [N][K][P][Q] += [N][C][H][W] * [K][C][R][S]
 // New      layout: [N][K'][P][Q][k] += [N][C'][H][W][c] + [K'][C'][R][S][c][k]
 FailureOr<linalg::GenericOp>
-mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
-                                     linalg::Conv2DNchwFchwOp convOp,
-                                     ArrayRef<OpFoldResult> tiles) {
+mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
+                                    linalg::Conv2DNchwFchwOp convOp,
+                                    ArrayRef<OpFoldResult> tiles) {
   return packConvolutions(rewriter, convOp, tiles);
 }
 
@@ -309,8 +309,8 @@ mlir::linalgx::blockConv2DNchwFchwOp(RewriterBase &rewriter,
 // [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
 // KB is the batch reduce dimension.
 FailureOr<linalg::GenericOp>
-mlir::linalgx::blockMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                             ArrayRef<OpFoldResult> tiles) {
+mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                            ArrayRef<OpFoldResult> tiles) {
   if (tiles.size() != 3)
     return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
 
@@ -380,10 +380,10 @@ struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> blockedMatmul = mlir::linalgx::blockMatmulOp(
+    FailureOr<linalg::GenericOp> packedMatmul = mlir::linalgx::packMatmulOp(
         rewriter, matmulOp,
         getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(blockedMatmul))
+    if (failed(packedMatmul))
       return failure();
     return success();
   }
@@ -442,11 +442,11 @@ struct DoItOnConv2DNchwFchw
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::linalgx::blockConv2DNchwFchwOp(
+    FailureOr<linalg::GenericOp> genericOp =
+        mlir::linalgx::packConv2DNchwFchwOp(
             rewriter, linalgOp,
             getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(maybeGeneric))
+    if (failed(genericOp))
       return failure();
     return success();
   }
