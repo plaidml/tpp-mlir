@@ -65,7 +65,7 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 // -----
 
 // Expect the test to fail because we don't have [parallel, parallel, reduction]
-// as innermost loop - we did not interchnage.
+// as innermost loops - we did not interchnage.
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   sequence %arg0 failures(propagate) {
