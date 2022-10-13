@@ -87,6 +87,17 @@ void MatmulOp::build(OpBuilder &builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 // BrgemmOp
 //===----------------------------------------------------------------------===//
+LogicalResult BrgemmOp::verify() {
+  MemRefType a = getBatchMatrixA().getType().cast<MemRefType>();
+  MemRefType b = getBatchMatrixB().getType().cast<MemRefType>();
+  MemRefType c = getMatrixC().getType().cast<MemRefType>();
+  if ((a.getShape().size() != 3 && !a.getElementType().isBF16()) ||
+      (a.getElementType().isBF16() && a.getShape().size() != 3 &&
+       a.getShape().size() != 4) ||
+      (b.getShape().size() != 3) || (c.getShape().size() != 2))
+    return emitError("shapes incompatible");
+  return success();
+}
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {

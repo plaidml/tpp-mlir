@@ -25,6 +25,7 @@ class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
 def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
 def TppPackedMemrefInput : StaticMemRefRankOf<[AnyFloat], [1, 2, 3]>;
 def TppBRGEMMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
+def TppBRGEMMPackedMemrefInput : StaticMemRefRankOf<[AnyFloat], [3,4]>;
 
 // Tpp operands is a scalar float or a static memref with rank 1 or 2.
 def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
@@ -180,7 +181,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
     ```
     }];
 
-  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA, 
+  let arguments = (ins TppBRGEMMPackedMemrefInput:$batchMatrixA, 
                        TppBRGEMMemrefInput:$batchMatrixB,
                        TppMemRef:$matrixC);
 
@@ -207,6 +208,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
   ];
+  let hasVerifier = 1;
 }
 
 #endif // STANDALONE_TPP_OPS
