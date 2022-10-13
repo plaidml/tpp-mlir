@@ -1,4 +1,4 @@
-// RUN: standalone-opt -transform-dialect-interpreter -split-input-file -canonicalize %s | FileCheck %s
+// RUN: standalone-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics -canonicalize %s | FileCheck %s
 
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
@@ -7,7 +7,7 @@ transform.with_pdl_patterns {
       %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       %1 = transform.structured.generalize %0
       %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      %3 = transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
+      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
   }
 }
 
@@ -60,4 +60,94 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
   %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>)
                                 outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
   return %0: tensor<14x1024x28x28xf32>
+}
+
+// -----
+
+// Expect the test to fail because we don't have [parallel, parallel, reduction]
+// as innermost loops - we did not interchnage.
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.generalize %0
+      // expected-error @below {{Could not map to matmul}}
+      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
+  }
+}
+
+func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
+                                           %arg1: tensor<3x3x64x64xf32>,
+                                           %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
+  // expected-note @below {{when applied to this op}} 
+  %0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}  ins(%arg2, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>)
+             outs(%arg0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+  return %0 : tensor<1x56x56x64xf32>
+}
+
+// -----
+
+// Expect test to fail as the filter is out of bound.
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.generalize %0
+      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+      // expected-error @below {{Could not map to matmul}}
+      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 100, filter_width_pos = 1)
+  }
+}
+
+func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
+                                           %arg1: tensor<3x3x64x64xf32>,
+                                           %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
+  // expected-note @below {{when applied to this op}}
+  %0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}  ins(%arg2, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>)
+             outs(%arg0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+  return %0 : tensor<1x56x56x64xf32>
+}
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+      %1 = transform.structured.generalize %0
+      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
+  }
+}
+
+func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<58x64xf32>,
+                                           %arg1: tensor<64x64xf32>,
+                                           %arg2: tensor<58x64xf32>) -> tensor<58x64xf32> {
+  // CHECK: linalg.matmul
+  %3 = linalg.matmul ins(%arg2, %arg1 : tensor<58x64xf32>, tensor<64x64xf32>)
+             outs(%arg0 : tensor<58x64xf32>) -> tensor<58x64xf32>
+  return %3 : tensor<58x64xf32>
+}
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+      %1 = transform.structured.generalize %0
+      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 1, filter_width_pos = 0)
+  }
+}
+
+func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<58x64xf32>,
+                                           %arg1: tensor<64x64xf32>,
+                                           %arg2: tensor<58x64xf32>) -> tensor<58x64xf32> {
+  // CHECK: linalg.matmul
+  %3 = linalg.matmul ins(%arg2, %arg1 : tensor<58x64xf32>, tensor<64x64xf32>)
+             outs(%arg0 : tensor<58x64xf32>) -> tensor<58x64xf32>
+  return %3 : tensor<58x64xf32>
 }

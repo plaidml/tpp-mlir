@@ -109,24 +109,51 @@ static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   return match;
 }
 
-static bool preConditionsMapConvToGemm(linalg::LinalgOp linalgOp) {
+// Check if the operation looks like a convolution.
+static bool isConvLike(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumInputs() != 2)
     return false;
   if (linalgOp.getNumOutputs() != 1)
     return false;
-  if (linalgOp.hasBufferSemantics())
+  if (llvm::any_of(linalgOp.getInputAndOutputOperands(),
+                   [](OpOperand *operand) {
+                     return !operand->get().getType().isa<RankedTensorType>();
+                   }))
     return false;
-  return checkMappingToMatmul(linalgOp);
+  return tpp::hasMatmulBody(linalgOp);
+}
+
+static bool isInBound(unsigned filterRank, unsigned rPos, unsigned sPos) {
+  return !(rPos >= filterRank || sPos >= filterRank);
 }
 
 FailureOr<linalg::MatmulOp>
 mlir::linalgx::mapConvToGemm(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                              int64_t rPos, int64_t sPos) {
-  if (!isa<linalg::GenericOp>(linalgOp))
-    return failure();
+  if (!llvm::isa_and_nonnull<linalg::GenericOp>(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "require a linalg.generic");
 
-  if (!preConditionsMapConvToGemm(linalgOp))
-    return failure();
+  if (!isConvLike(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "operation is not a convolution");
+
+  if (!linalgOp.hasTensorSemantics())
+    return rewriter.notifyMatchFailure(linalgOp, "expect tensor semantics");
+
+  if (!checkMappingToMatmul(linalgOp))
+    return rewriter.notifyMatchFailure(
+        linalgOp, "cannot match operation iterators with matmul iterators");
+
+  if (rPos == sPos)
+    return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and sPos");
+
+  unsigned filterRank = linalgOp.getInputOperands()[1]
+                            ->get()
+                            .getType()
+                            .cast<ShapedType>()
+                            .getRank();
+  if (!isInBound(filterRank, rPos, sPos))
+    return rewriter.notifyMatchFailure(linalgOp, "rPos or sPos out of bound");
 
   // peel-out all loops but the three innermost.
   unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
