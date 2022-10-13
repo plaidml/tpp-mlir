@@ -141,16 +141,18 @@ DiagnosedSilenceableFailure
 transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                                          SmallVector<Operation *> &results,
                                          transform::TransformState &state) {
-  if (!isa<linalg::GenericOp>(target))
+  if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul =
       mlir::linalgx::mapConvToGemm(rewriter, cast<linalg::GenericOp>(target),
                                    getFilterHeightPos(), getFilterWidthPos());
-  if (failed(matmul))
-    return DiagnosedSilenceableFailure::definiteFailure();
-  results.push_back(*matmul);
+  if (failed(matmul)) {
+    auto diag = this->emitOpError()
+                << "Could not map to matmul: " << target << "\n";
+    diag.attachNote(target.getLoc()) << "when applied to this op";
+  }
   return DiagnosedSilenceableFailure(success());
 }
 

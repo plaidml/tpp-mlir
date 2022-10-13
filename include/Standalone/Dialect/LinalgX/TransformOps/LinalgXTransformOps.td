@@ -108,19 +108,23 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
 // MapConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-def MapConvToMatmulOp : Op<Transform_Dialect, 
-                      "structured.map_conv_to_matmul",
-                      [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-                       TransformOpInterface, TransformEachOpTrait]> {
+def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
+    FunctionalStyleTransformOpTrait, 
+    MemoryEffectsOpInterface,
+    TransformOpInterface, 
+    TransformEachOpTrait]> {
 
   let description = [{
     Map a linalg.conv_* to a linalg.matmul.
+
+    This transform never returns anything and could be made to return the matmul
+    operation if needed.
   }];
 
   let arguments = (ins PDL_Operation:$target,
                        ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_height_pos,
                        ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_width_pos);
-  let results = (outs PDL_Operation:$maybe_linalg_batch_reduce_op);
+  let results = (outs);
 
   let assemblyFormat = [{
     $target `(` `filter_height_pos` `=` $filter_height_pos 
