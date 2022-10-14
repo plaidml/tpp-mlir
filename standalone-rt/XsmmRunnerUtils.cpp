@@ -18,17 +18,18 @@
 extern "C" void _mlir_ciface_xsmm_matmul_invoke_f32(
     int64_t funcAddr, UnrankedMemRefType<float> *A,
     UnrankedMemRefType<float> *B, UnrankedMemRefType<float> *C) {
-  /*   std::cout << "matrix A: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
-     std::cout << "\n";
-     std::cout << "matrix B: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<float>(*B));
-     std::cout << "\n";
-     std::cout << "matrix C: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<float>(*C));
-     std::cout << "\n";
-     std::cout << "funcAddr: " << funcAddr << "\n";
-  */
+
+  //   std::cout << "matrix A: \n";
+  //   printMemRefMetaData(std::cout, DynamicMemRefType<float>(*A));
+  //    std::cout << "\n";
+  //   std::cout << "matrix B: \n";
+  //   printMemRefMetaData(std::cout, DynamicMemRefType<float>(*B));
+  //   std::cout << "\n";
+  //   std::cout << "matrix C: \n";
+  //   printMemRefMetaData(std::cout, DynamicMemRefType<float>(*C));
+  //   std::cout << "\n";
+  //   std::cout << "funcAddr: " << funcAddr << "\n";
+
   DynamicMemRefType<float> matrixA = DynamicMemRefType<float>(*A);
   DynamicMemRefType<float> matrixB = DynamicMemRefType<float>(*B);
   DynamicMemRefType<float> matrixC = DynamicMemRefType<float>(*C);
@@ -36,22 +37,22 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke_f32(
   float *addr_a = matrixA.data + matrixA.offset;
   float *addr_b = matrixB.data + matrixB.offset;
   float *addr_c = matrixC.data + matrixC.offset;
-  /*
-      int64_t M = matrixC.sizes[0];
-      int64_t N = matrixC.sizes[1];
-      int64_t K = matrixA.sizes[1];
 
-      for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-          for (int k = 0; k < K; k++) {
-            float *curr_addr_a = i * matrixA.strides[0] + addr_a + k;
-            float *curr_addr_b = k * matrixB.strides[0] + addr_b + j;
-            float *curr_addr_c = i * matrixC.strides[0] + addr_c + j;
-            *curr_addr_c += (*curr_addr_a) * (*curr_addr_b);
-          }
-        }
-      }
-    */
+  //    int64_t M = matrixC.sizes[0];
+  //    int64_t N = matrixC.sizes[1];
+  //    int64_t K = matrixA.sizes[1];
+  //
+  //    for (int i = 0; i < M; i++) {
+  //      for (int j = 0; j < N; j++) {
+  //        for (int k = 0; k < K; k++) {
+  //          float *curr_addr_a = i * matrixA.strides[0] + addr_a + k;
+  //          float *curr_addr_b = k * matrixB.strides[0] + addr_b + j;
+  //          float *curr_addr_c = i * matrixC.strides[0] + addr_c + j;
+  //          *curr_addr_c += (*curr_addr_a) * (*curr_addr_b);
+  //        }
+  //      }
+  //    }
+
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
@@ -65,17 +66,18 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke_f32(
 extern "C" void _mlir_ciface_xsmm_matmul_invoke_bf16(
     int64_t funcAddr, UnrankedMemRefType<bf16> *A, UnrankedMemRefType<bf16> *B,
     UnrankedMemRefType<bf16> *C) {
-  /*   std::cout << "matrix A: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*A));
-     std::cout << "\n";
-     std::cout << "matrix B: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*B));
-     std::cout << "\n";
-     std::cout << "matrix C: \n";
-     printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*C));
-     std::cout << "\n";
-     std::cout << "funcAddr: " << funcAddr << "\n";
-  */
+
+  // std::cout << "matrix A: \n";
+  //    printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*A));
+  //    std::cout << "\n";
+  //    std::cout << "matrix B: \n";
+  //    printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*B));
+  //    std::cout << "\n";
+  //    std::cout << "matrix C: \n";
+  //    printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*C));
+  //    std::cout << "\n";
+  //    std::cout << "funcAddr: " << funcAddr << "\n";
+
   DynamicMemRefType<bf16> matrixA = DynamicMemRefType<bf16>(*A);
   DynamicMemRefType<bf16> matrixB = DynamicMemRefType<bf16>(*B);
   DynamicMemRefType<bf16> matrixC = DynamicMemRefType<bf16>(*C);
@@ -83,22 +85,22 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke_bf16(
   bf16 *addr_a = matrixA.data + matrixA.offset;
   bf16 *addr_b = matrixB.data + matrixB.offset;
   bf16 *addr_c = matrixC.data + matrixC.offset;
-  /*
-      int64_t M = matrixC.sizes[0];
-      int64_t N = matrixC.sizes[1];
-      int64_t K = matrixA.sizes[1];
 
-      for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-          for (int k = 0; k < K; k++) {
-            float *curr_addr_a = i * matrixA.strides[0] + addr_a + k;
-            float *curr_addr_b = k * matrixB.strides[0] + addr_b + j;
-            float *curr_addr_c = i * matrixC.strides[0] + addr_c + j;
-            *curr_addr_c += (*curr_addr_a) * (*curr_addr_b);
-          }
-        }
-      }
-    */
+  //    int64_t M = matrixC.sizes[0];
+  //    int64_t N = matrixC.sizes[1];
+  //    int64_t K = matrixA.sizes[1];
+  //
+  //    for (int i = 0; i < M; i++) {
+  //      for (int j = 0; j < N; j++) {
+  //        for (int k = 0; k < K; k++) {
+  //          float *curr_addr_a = i * matrixA.strides[0] + addr_a + k;
+  //          float *curr_addr_b = k * matrixB.strides[0] + addr_b + j;
+  //          float *curr_addr_c = i * matrixC.strides[0] + addr_c + j;
+  //          *curr_addr_c += (*curr_addr_a) * (*curr_addr_b);
+  //        }
+  //      }
+  //    }
+
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
@@ -308,11 +310,11 @@ extern "C" void
 _mlir_ciface_xsmm_unary_invoke_bf16(int64_t addr,
                                     UnrankedMemRefType<bf16> *input,
                                     UnrankedMemRefType<bf16> *output) {
-  /*std::cout << "tensor input: \n";
-  printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*input));
-  std::cout << "tensor output: \n";
-  printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*output));
-  */
+  // std::cout << "tensor input: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*input));
+  // std::cout << "tensor output: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<bf16>(*output));
+
   DynamicMemRefType<bf16> tensorA = DynamicMemRefType<bf16>(*input);
   DynamicMemRefType<bf16> tensorB = DynamicMemRefType<bf16>(*output);
 
