@@ -670,9 +670,9 @@ struct PropagateThroughElementWiseOp
     // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
     SmallVector<int64_t> tileLoopPerms;
-    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+    for (OpOperand &operand : linalgOp->getOpOperands()) {
       linalgx::UnPackOp unpackOp =
-          operand->get().getDefiningOp<linalgx::UnPackOp>();
+          operand.get().getDefiningOp<linalgx::UnPackOp>();
       if (!unpackOp)
         continue;
 
@@ -692,7 +692,7 @@ struct PropagateThroughElementWiseOp
       // Map *domain* of linalg operation to tiles.
       DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
           unpackOp.getDimAndTileMapping();
-      AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
+      AffineMap mapOperand = linalgOp.getMatchingIndexingMap(&operand);
       for (unsigned posInCodomain = 0;
            posInCodomain < mapOperand.getNumResults(); posInCodomain++) {
         // Fail if we dealing with 'complex' affine maps. Only dim expression
@@ -740,8 +740,8 @@ struct PropagateThroughElementWiseOp
     unsigned packedDims = dimAndTileMapping.size();
     SmallVector<AffineMap> newMaps;
     // Get the new map for each operand.
-    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
-      AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
+    for (OpOperand &operand : linalgOp->getOpOperands()) {
+      AffineMap mapOperand = linalgOp.getMatchingIndexingMap(&operand);
       unsigned numSymbols = 0;
       unsigned numDims = linalgOp.getNumLoops() + packedDims;
       unsigned oldResultExprs = mapOperand.getNumResults();

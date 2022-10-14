@@ -1,12 +1,9 @@
 // RUN: tpp-opt -transform-dialect-interpreter -split-input-file %s | FileCheck %s
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-      %1 = transform.structured.collapsing %0 [[0, 1], [2], [3, 4]]
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1], [2], [3, 4]]
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -31,13 +28,10 @@ func.func @parallel(%arg0: tensor<5x5x4x3x3xf32>, %arg1: tensor<5x5x4x3x3xf32>) 
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-      %1 = transform.structured.collapsing %0 [[0, 1], [2]]
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
 }
 
 // CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d1, d0)>

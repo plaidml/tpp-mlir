@@ -190,7 +190,7 @@ static FailureOr<SmallVector<Value>>
 getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
                       linalg::LinalgOp linalgOp, ValueRange valuesToUse,
                       ArrayRef<int64_t> rAndSPos) {
-  assert(linalgOp.getNumInputsAndOutputs() == 3 &&
+  assert(linalgOp->getNumOperands() == 3 &&
          "expect 3 input/output operands");
   assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
 
@@ -288,7 +288,7 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
   auto gemmBuilder = [&](OpBuilder &builder, Location loc, ValueRange localIvs,
                          ValueRange operandsValuesToUse) -> scf::ValueVector {
     assert(operandsValuesToUse.size() ==
-               static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
+               static_cast<size_t>(linalgOp->getNumOperands()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
     SmallVector<int64_t> rAndSPos = {rPos, sPos};

@@ -1,13 +1,10 @@
 // RUN: tpp-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics %s | FileCheck %s
 
 // This must fail as we attempt to collapse dimensions of different types.
-transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
-    sequence %arg0 failures(propagate) {
-      ^bb0(%arg1: !pdl.operation):
-        %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-        %1 = transform.structured.collapsing %0 [[0, 1, 2]]
-    }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1, 2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -28,13 +25,10 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 // -----
 
 // This must fail as the reassociation dimensions do not match the number of loops.
-transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
-    sequence %arg0 failures(propagate) {
-      ^bb0(%arg1: !pdl.operation):
-        %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-        %1 = transform.structured.collapsing %0 [[0, 1]]
-    }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -54,13 +48,10 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 
 // -----
 
-transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
-    sequence %arg0 failures(propagate) {
-      ^bb0(%arg1: !pdl.operation):
-        %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-        %1 = transform.structured.collapsing %0 [[0, 1], [2]]
-    }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j, k)>
@@ -81,13 +72,10 @@ func.func @parallel(%arg0: tensor<3x3x3xf32> , %arg1: tensor<3x3x3xf32>) -> tens
 
 // -----
 
-transform.with_pdl_patterns {
-  ^bb0(%arg0: !pdl.operation):
-    sequence %arg0 failures(propagate) {
-      ^bb0(%arg1: !pdl.operation):
-        %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-        %1 = transform.structured.collapsing %0 [[0, 1], [2]]
-    }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
