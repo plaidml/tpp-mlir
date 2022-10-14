@@ -39,19 +39,31 @@ extern "C" MLIR_RUNNERUTILS_EXPORT
                                                    int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_unary_dispatch(int64_t, int64_t, int64_t, int64_t,
-                                             int64_t, int64_t);
+    int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t, int64_t, int64_t,
+                                                 int64_t, int64_t, int64_t);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT
+    int64_t _mlir_ciface_xsmm_unary_dispatch_bf16(int64_t, int64_t, int64_t,
+                                                  int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_binary_dispatch(
     int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_brgemm_dispatch(int64_t, int64_t, int64_t,
-                                              int64_t, int64_t, int64_t);
+    int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t, int64_t, int64_t,
+                                                  int64_t, int64_t, int64_t);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT
+    int64_t _mlir_ciface_xsmm_brgemm_dispatch_bf16(int64_t, int64_t, int64_t,
+                                                   int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke(int64_t, UnrankedMemRefType<float> *,
-                               UnrankedMemRefType<float> *);
+_mlir_ciface_xsmm_unary_invoke_f32(int64_t, UnrankedMemRefType<float> *,
+                                   UnrankedMemRefType<float> *);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+_mlir_ciface_xsmm_unary_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
+                                    UnrankedMemRefType<bf16> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_binary_invoke(int64_t, UnrankedMemRefType<float> *,
@@ -59,8 +71,12 @@ _mlir_ciface_xsmm_binary_invoke(int64_t, UnrankedMemRefType<float> *,
                                 UnrankedMemRefType<float> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_scalar_invoke(int64_t, float,
-                                      UnrankedMemRefType<float> *);
+_mlir_ciface_xsmm_unary_scalar_invoke_f32(int64_t, float,
+                                          UnrankedMemRefType<float> *);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+_mlir_ciface_xsmm_unary_scalar_invoke_bf16(int64_t, bf16,
+                                           UnrankedMemRefType<bf16> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_matrix_copy_NC_to_NCNC(UnrankedMemRefType<float> *,
@@ -68,10 +84,14 @@ _mlir_ciface_matrix_copy_NC_to_NCNC(UnrankedMemRefType<float> *,
                                     int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_brgemm_invoke(int64_t, UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *, int64_t);
+_mlir_ciface_xsmm_brgemm_invoke_f32(int64_t, UnrankedMemRefType<float> *,
+                                    UnrankedMemRefType<float> *,
+                                    UnrankedMemRefType<float> *, int64_t);
 
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+_mlir_ciface_xsmm_brgemm_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
+                                     UnrankedMemRefType<bf16> *,
+                                     UnrankedMemRefType<bf16> *, int64_t);
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//
