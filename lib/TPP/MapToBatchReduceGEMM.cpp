@@ -48,12 +48,12 @@ static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
 }
 
 // Check if the operand is an input to linalgOp.
-static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand *operand) {
-  return operand->getOperandNumber() < linalgOp.getNumInputs();
+static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
+  return operand.getOperandNumber() < linalgOp.getNumInputs();
 }
 
 // Check if the operand is an output to linalgOp.
-static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand *operand) {
+static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
   return !isInputOperand(linalgOp, operand);
 }
 
@@ -63,8 +63,8 @@ static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand *operand) {
 // [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
 static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> maps;
-  for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
-    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+  for (OpOperand &operand : linalgOp->getOpOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
     if (isInputOperand(linalgOp, operand)) {
       if (map.getNumResults() < 3)
         return failure();
@@ -114,7 +114,7 @@ static LogicalResult MapToBRGEMMOpPreconditions(linalg::LinalgOp linalgOp) {
 static FailureOr<SmallVector<Value>>
 getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                   linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
-  assert(linalgOp.getNumInputsAndOutputs() == 3 &&
+  assert(linalgOp->getNumOperands() == 3 &&
          "expect 3 input/output operands");
   assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
 
@@ -156,7 +156,7 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
                            ValueRange localIvs,
                            ValueRange operandValuesToUse) -> scf::ValueVector {
     assert(operandValuesToUse.size() ==
-               static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
+               static_cast<size_t>(linalgOp->getNumOperands()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
     FailureOr<SmallVector<Value>> maybeSlicedOperands =

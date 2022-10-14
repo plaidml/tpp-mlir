@@ -28,13 +28,13 @@ struct TransformDialectInterpreter
     : TransformDialectInterpreterBase<TransformDialectInterpreter> {
   void runOnOperation() override {
     ModuleOp module = getOperation();
-    transform::TransformState state(
-        module.getBodyRegion(), module,
-        transform::TransformOptions().enableExpensiveChecks(
-            true /*enableExpensiveChecks*/));
-    for (auto op : module.getBody()->getOps<transform::TransformOpInterface>())
-      if (failed(state.applyTransform(op).checkAndReport()))
+    for (auto op :
+         module.getBody()->getOps<transform::TransformOpInterface>()) {
+      if (failed(transform::applyTransforms(
+              module, op,
+              transform::TransformOptions().enableExpensiveChecks(true))))
         return signalPassFailure();
+    }
   }
 };
 

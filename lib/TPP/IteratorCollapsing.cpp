@@ -134,20 +134,20 @@ insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
                ArrayRef<Type> newOperandTypes,
                ArrayRef<ArrayAttr> operandsReassociationMaps) {
   assert(newOperandTypes.size() == operandsReassociationMaps.size());
-  auto operands = genericOp.getInputAndOutputOperands();
+  auto operands = genericOp->getOpOperands();
   assert(operands.size() == newOperandTypes.size());
 
   Location loc = genericOp.getLoc();
   SmallVector<Value> reshapedOperands;
   unsigned idx = 0;
-  for (OpOperand *operand : operands) {
-    Type currentOperandType = operand->get().getType();
+  for (OpOperand &operand : operands) {
+    Type currentOperandType = operand.get().getType();
     if (currentOperandType == newOperandTypes[idx]) {
-      reshapedOperands.push_back(operand->get());
+      reshapedOperands.push_back(operand.get());
     } else {
       // insert a reshape.
       FailureOr<Value> reshaped =
-          collapseOperand(operand->get(), newOperandTypes[idx],
+          collapseOperand(operand.get(), newOperandTypes[idx],
                           operandsReassociationMaps[idx], loc, rewriter);
       if (failed(reshaped))
         return failure();
@@ -321,8 +321,8 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
 
   // Now compute the operand type and reassociations based on the new maps.
   unsigned currentMapIdx = 0;
-  for (OpOperand *opOperand : genericOp.getInputAndOutputOperands()) {
-    ArrayRef<int64_t> shape = genericOp.getShape(opOperand);
+  for (OpOperand &opOperand : genericOp->getOpOperands()) {
+    ArrayRef<int64_t> shape = genericOp.getShape(&opOperand);
     SmallVector<int64_t> newShape;
     AffineMap currentMap = newIndexingMaps[currentMapIdx];
     ArrayRef<AffineExpr> resultExprs = currentMap.getResults();
@@ -351,7 +351,7 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     };
 
     int64_t pos = 0;
-    int64_t origRank = genericOp.getRank(opOperand);
+    int64_t origRank = genericOp.getRank(&opOperand);
     while (pos < origRank) {
       currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
       if (isCollapsedDim(pos)) {
@@ -393,7 +393,7 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     }
     newIndexingMaps[currentMapIdx] = map;
     Type newOperandType =
-        getNewOperandType(opOperand->get().getType(), newShape);
+        getNewOperandType(opOperand.get().getType(), newShape);
     newInputOutputTypes.push_back(newOperandType);
     operandsReassociationMaps.push_back(
         ArrayAttr::get(context, operandReassociationMaps));
@@ -432,7 +432,7 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     return failure();
 
   assert(reshapedOperands->size() ==
-         genericOp.getInputAndOutputOperands().size());
+         genericOp->getNumOperands());
 
   FailureOr<linalg::GenericOp> replacement = buildReplacement(
       rewriter, genericOp, *reshapedOperands, newInputOutputTypes,
