@@ -71,7 +71,7 @@ def PackOp : LinalgX_Op<"pack", [
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
     DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
+    I64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
     Optional<AnyType>:$padding_value);
@@ -175,7 +175,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
     DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
+    I64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles);
 
