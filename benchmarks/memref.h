@@ -18,6 +18,89 @@
     int64_t strides[ndims];                                                    \
   };
 
+//===----------------------------------------------------------------------===//
+// 1D memref
+//===----------------------------------------------------------------------===//
+
+/* 1D memref */
+#define DECL_VEC1D_STRUCT(name, eltype) DECL_VECND_STRUCT(1, name, eltype)
+
+/* Generates a comma-separated list of arguments from the fields of a
+ * 1d memref */
+#define VEC1D_ARGS(v)                                                          \
+  (v)->allocatedPtr, (v)->alignedPtr, (v)->offset, (v)->sizes[0],              \
+      (v)->strides[0]
+
+/* Forwards all arguments declared with DECL_VEC1D_FUNC_ARGS to
+ * another function */
+#define VEC1D_FWD_ARGS(prefix)                                                 \
+  prefix##_allocatedPtr, prefix##_alignedPtr, prefix##_offset, prefix##_size0, \
+      prefix##_stride0
+
+#define DECL_VEC1D_FUNC_ARGS(prefix, eltype, cst)                              \
+  cst eltype *prefix##_allocatedPtr, cst eltype *prefix##_alignedPtr,          \
+      int64_t prefix##_offset, int64_t prefix##_size0,                         \
+      int64_t prefix##_stride0
+
+#define DECL_VEC1D_FUNC_IN_ARGS(prefix, eltype)                                \
+  DECL_VEC1D_FUNC_ARGS(prefix, eltype, const)
+
+#define DECL_VEC1D_FUNC_OUT_ARGS(prefix, eltype)                               \
+  DECL_VEC1D_FUNC_ARGS(prefix, eltype, )
+
+/* Dumps the meta-information of a 1d memref to stdout. */
+static inline void memref_1d_dump_metainfo(DECL_VEC1D_FUNC_ARGS(m, void,
+                                                                const)) {
+  printf("1d memref:\n"
+         "  allocatedPtr: %p\n"
+         "  alignedPtr: %p\n"
+         "  offset: %" PRIu64 "\n"
+         "  size0: %" PRIu64 "\n"
+         "  stride0: %" PRIu64 "\n",
+         m_allocatedPtr, m_alignedPtr, m_offset, m_size0, m_stride0);
+}
+
+#define DECL_VEC1D_FUNCTIONS(name, eltype, format)                             \
+  /* Allocates and initializes a 1d memref. Returns 0 on success,              \
+   * otherwise 1.                                                              \
+   */                                                                          \
+  static inline int name##_alloc(struct name *v, size_t n) {                   \
+    eltype *f;                                                                 \
+    if (!(f = (eltype *)calloc(n, sizeof(eltype))))                            \
+      return 1;                                                                \
+    v->allocatedPtr = f;                                                       \
+    v->alignedPtr = f;                                                         \
+    v->offset = 0;                                                             \
+    v->sizes[0] = n;                                                           \
+    v->strides[0] = 1;                                                         \
+    return 0;                                                                  \
+  }                                                                            \
+  /* Destroys a 1d memref */                                                   \
+  static inline void name##_destroy(struct name *v) { free(v->allocatedPtr); } \
+  /* Returns the element at position (`x`) of a 1d memref `v` */               \
+  static inline eltype name##_get(const struct name *v, int64_t x) {           \
+    return *(v->alignedPtr + x);                                               \
+  }                                                                            \
+  /* Assigns `f` to the element at position (`x`) of a 1d                      \
+   * memref `v`                                                                \
+   */                                                                          \
+  static inline void name##_set(struct name *v, int64_t x, eltype f) {         \
+    v->alignedPtr[x] = f;                                                      \
+  }                                                                            \
+  /* Dumps a 1d `v` to stdout. */                                              \
+  static inline void name##_dump(const struct name *v) {                       \
+    for (int64_t x = 0; x < v->sizes[0]; x++) {                                \
+      printf(format "%s", *(v->alignedPtr + x),                                \
+             x == v->sizes[0] - 1 ? "" : " ");                                 \
+    }                                                                          \
+    puts("");                                                                  \
+  }
+
+//===----------------------------------------------------------------------===//
+// 2D memref
+//===----------------------------------------------------------------------===//
+
+/* 2D memref */
 #define DECL_VEC2D_STRUCT(name, eltype) DECL_VECND_STRUCT(2, name, eltype)
 
 /* Generates a comma-separated list of arguments from the fields of a
@@ -64,7 +147,7 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
    */                                                                          \
   static inline int name##_alloc(struct name *v, size_t n, size_t m) {         \
     eltype *f;                                                                 \
-    if (!(f = calloc(n * m, sizeof(eltype))))                                  \
+    if (!(f = (eltype *)calloc(n * m, sizeof(eltype))))                        \
       return 1;                                                                \
     v->allocatedPtr = f;                                                       \
     v->alignedPtr = f;                                                         \
@@ -118,5 +201,12 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
 
 DECL_VEC2D_STRUCT(vec_f2d, float)
 DECL_VEC2D_FUNCTIONS(vec_f2d, float, "%f")
+DECL_VEC2D_STRUCT(vec_i2d, int)
+DECL_VEC2D_FUNCTIONS(vec_i2d, int, "%i")
+
+DECL_VEC1D_STRUCT(vec_f1d, float)
+DECL_VEC1D_FUNCTIONS(vec_f1d, float, "%f")
+DECL_VEC1D_STRUCT(vec_i1d, int)
+DECL_VEC1D_FUNCTIONS(vec_i1d, int, "%i")
 
 #endif

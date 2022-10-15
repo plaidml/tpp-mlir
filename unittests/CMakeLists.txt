@@ -6,6 +6,7 @@ endfunction()
 
 add_tpp_unittest(TppUnitTests 
   Smoke.cpp
+  Memref.cpp
 )
 
 target_link_libraries(TppUnitTests
