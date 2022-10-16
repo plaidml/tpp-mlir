@@ -16,7 +16,7 @@ using namespace mlir;
 
 // Return the size of the image slice to extract and use into the GEMM
 // operation. If we have a slide window (R and S are not 1). The size
-// of the image slice depend on the filter and output.
+// of the image slice depend on the filter and on the output.
 static SmallVector<OpFoldResult>
 computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   OpOperand *image = linalgOp.getInputOperands()[0];

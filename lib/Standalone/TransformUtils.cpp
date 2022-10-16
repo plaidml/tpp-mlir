@@ -153,6 +153,7 @@ getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   } else
     sizes = sizesToUse;
 
+  // strides
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
   return utils::getSliceOperand(builder, linalgOp, operandToUse, offsets, sizes,
                                 strides, desiredResultRank);
