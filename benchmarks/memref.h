@@ -86,14 +86,6 @@ static inline void memref_1d_dump_metainfo(DECL_VEC1D_FUNC_ARGS(m, void,
    */                                                                          \
   static inline void name##_set(struct name *v, int64_t x, eltype f) {         \
     v->alignedPtr[x] = f;                                                      \
-  }                                                                            \
-  /* Dumps a 1d `v` to stdout. */                                              \
-  static inline void name##_dump(const struct name *v) {                       \
-    for (int64_t x = 0; x < v->sizes[0]; x++) {                                \
-      printf(format "%s", *(v->alignedPtr + x),                                \
-             x == v->sizes[0] - 1 ? "" : " ");                                 \
-    }                                                                          \
-    puts("");                                                                  \
   }
 
 //===----------------------------------------------------------------------===//
@@ -160,33 +152,17 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
   }                                                                            \
   /* Destroys a 2d memref */                                                   \
   static inline void name##_destroy(struct name *v) { free(v->allocatedPtr); } \
-  /* Returns the element at position (`x`, `y`) of a 2d memref `v` */          \
-  static inline eltype name##_get(const struct name *v, int64_t x,             \
-                                  int64_t y) {                                 \
-    return *(v->alignedPtr + y * v->sizes[1] + x);                             \
+  /* Returns the element at position (`p1`, `p2`) of a 2d memref `v` */        \
+  static inline eltype name##_get(const struct name *v, int64_t p1,            \
+                                  int64_t p2) {                                \
+    return *(v->alignedPtr + p1 * v->sizes[1] + p2);                           \
   }                                                                            \
-  /* Assigns `f` to the element at position (`x`, `y`) of a 2d                 \
+  /* Assigns `f` to the element at position (`p1`, `p2`) of a 2d               \
    * memref `v`                                                                \
    */                                                                          \
-  static inline void name##_set(struct name *v, int64_t x, int64_t y,          \
+  static inline void name##_set(struct name *v, int64_t p1, int64_t p2,        \
                                 eltype f) {                                    \
-    *(v->alignedPtr + y * v->sizes[1] + x) = f;                                \
-  }                                                                            \
-  /* Compares the values of two 2d memrefs. Returns 1 if they are              \
-   * equal, otherwise 0.                                                       \
-   */                                                                          \
-  static inline int name##_compare(const struct name *a,                       \
-                                   const struct name *b) {                     \
-    /* Compare shapes */                                                       \
-    if (a->sizes[0] != b->sizes[0] || a->sizes[1] != b->sizes[1]) {            \
-      return 0;                                                                \
-    }                                                                          \
-    /* Compare elements */                                                     \
-    for (int64_t y = 0; y < a->sizes[0]; y++)                                  \
-      for (int64_t x = 0; x < a->sizes[1]; x++)                                \
-        if (name##_get(a, x, y) != name##_get(b, x, y))                        \
-          return 0;                                                            \
-    return 1;                                                                  \
+    *(v->alignedPtr + p1 * v->sizes[1] + p2) = f;                              \
   }                                                                            \
   /* Dumps a 2d `v` to stdout. */                                              \
   static inline void name##_dump(const struct name *v) {                       \
@@ -198,6 +174,199 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
       puts("");                                                                \
     }                                                                          \
   }
+
+//===----------------------------------------------------------------------===//
+// 3D memref
+//===----------------------------------------------------------------------===//
+
+/* 3D memref */
+#define DECL_VEC3D_STRUCT(name, eltype) DECL_VECND_STRUCT(3, name, eltype)
+
+/* Generates a comma-separated list of arguments from the fields of a
+ * 3d memref */
+#define VEC3D_ARGS(v)                                                          \
+  (v)->allocatedPtr, (v)->alignedPtr, (v)->offset, (v)->sizes[0],              \
+      (v)->sizes[1], (v)->sizes[2], (v)->strides[0], (v)->strides[1],          \
+      (v)->strides[2]
+
+/* Forwards all arguments declared with DECL_VEC3D_FUNC_ARGS to
+ * another function */
+#define VEC3D_FWD_ARGS(prefix)                                                 \
+  prefix##_allocatedPtr, prefix##_alignedPtr, prefix##_offset, prefix##_size0, \
+      prefix##_size1, prefix##_size2, prefix##_stride0, prefix##_stride1,      \
+      prefix##_stride2
+
+#define DECL_VEC3D_FUNC_ARGS(prefix, eltype, cst)                              \
+  cst eltype *prefix##_allocatedPtr, cst eltype *prefix##_alignedPtr,          \
+      int64_t prefix##_offset, int64_t prefix##_size0, int64_t prefix##_size1, \
+      int64_t prefix##_size2, int64_t prefix##_stride0,                        \
+      int64_t prefix##_stride1, int64_t prefix##_stride2
+
+#define DECL_VEC3D_FUNC_IN_ARGS(prefix, eltype)                                \
+  DECL_VEC3D_FUNC_ARGS(prefix, eltype, const)
+
+#define DECL_VEC3D_FUNC_OUT_ARGS(prefix, eltype)                               \
+  DECL_VEC3D_FUNC_ARGS(prefix, eltype, )
+
+/* Dumps the meta-information of a 3d memref to stdout. */
+static inline void memref_3d_dump_metainfo(DECL_VEC3D_FUNC_ARGS(m, void,
+                                                                const)) {
+  printf("3d memref:\n"
+         "  allocatedPtr: %p\n"
+         "  alignedPtr: %p\n"
+         "  offset: %" PRIu64 "\n"
+         "  size0: %" PRIu64 "\n"
+         "  size1: %" PRIu64 "\n"
+         "  size2: %" PRIu64 "\n"
+         "  stride0: %" PRIu64 "\n"
+         "  stride1: %" PRIu64 "\n"
+         "  stride2: %" PRIu64 "\n",
+         m_allocatedPtr, m_alignedPtr, m_offset, m_size0, m_size1, m_size2,
+         m_stride0, m_stride1, m_stride2);
+}
+
+#define DECL_VEC3D_FUNCTIONS(name, eltype, format)                             \
+  /* Allocates and initializes a 3d memref. Returns 0 on success,              \
+   * otherwise 1.                                                              \
+   */                                                                          \
+  static inline int name##_alloc(struct name *v, size_t n, size_t m,           \
+                                 size_t l) {                                   \
+    eltype *f;                                                                 \
+    if (!(f = (eltype *)calloc(n * m * l, sizeof(eltype))))                    \
+      return 1;                                                                \
+    v->allocatedPtr = f;                                                       \
+    v->alignedPtr = f;                                                         \
+    v->offset = 0;                                                             \
+    v->sizes[0] = n;                                                           \
+    v->sizes[1] = m;                                                           \
+    v->sizes[2] = l;                                                           \
+    v->strides[0] = m * l;                                                     \
+    v->strides[1] = l;                                                         \
+    v->strides[2] = 1;                                                         \
+    return 0;                                                                  \
+  }                                                                            \
+  /* Destroys a 3d memref */                                                   \
+  static inline void name##_destroy(struct name *v) { free(v->allocatedPtr); } \
+  /* Returns the element at position (`p1`, `p2`, `p3`) of a 3d memref         \
+   * `v`                                                                       \
+   */                                                                          \
+  static inline eltype name##_get(const struct name *v, int64_t p1,            \
+                                  int64_t p2, int64_t p3) {                    \
+    return *(v->alignedPtr + (p1 * v->sizes[1] * v->sizes[2]) +                \
+             (p2 * v->sizes[2]) + p3);                                         \
+  }                                                                            \
+  /* Assigns `f` to the element at position (`p1`, `p2`, `p3`) of a 3d         \
+   * memref `v`                                                                \
+   */                                                                          \
+  static inline void name##_set(struct name *v, int64_t p1, int64_t p2,        \
+                                int64_t p3, eltype f) {                        \
+    *(v->alignedPtr + (p1 * v->sizes[1] * v->sizes[2]) + (p2 * v->sizes[2]) +  \
+      p3) = f;                                                                 \
+  }
+
+//===----------------------------------------------------------------------===//
+// 4D memref
+//===----------------------------------------------------------------------===//
+
+/* 4D memref */
+#define DECL_VEC4D_STRUCT(name, eltype) DECL_VECND_STRUCT(4, name, eltype)
+
+/* Generates a comma-separated list of arguments from the fields of a
+ * 4d memref */
+#define VEC4D_ARGS(v)                                                          \
+  (v)->allocatedPtr, (v)->alignedPtr, (v)->offset, (v)->sizes[0],              \
+      (v)->sizes[1], (v)->sizes[2], (v)->sizes[3], (v)->strides[0],            \
+      (v)->strides[1], (v)->strides[2], (v)->strides[3]
+
+/* Forwards all arguments declared with DECL_VEC4D_FUNC_ARGS to
+ * another function */
+#define VEC4D_FWD_ARGS(prefix)                                                 \
+  prefix##_allocatedPtr, prefix##_alignedPtr, prefix##_offset, prefix##_size0, \
+      prefix##_size1, prefix##_size2, prefix##_size3, prefix##_stride0,        \
+      prefix##_stride1, prefix##_stride2, prefix##_stride3
+
+#define DECL_VEC4D_FUNC_ARGS(prefix, eltype, cst)                              \
+  cst eltype *prefix##_allocatedPtr, cst eltype *prefix##_alignedPtr,          \
+      int64_t prefix##_offset, int64_t prefix##_size0, int64_t prefix##_size1, \
+      int64_t prefix##_size2, int64_t prefix##_size3,                          \
+      int64_t prefix##_stride0, int64_t prefix##_stride1,                      \
+      int64_t prefix##_stride2, int64_t prefix##_stride3
+
+#define DECL_VEC4D_FUNC_IN_ARGS(prefix, eltype)                                \
+  DECL_VEC4D_FUNC_ARGS(prefix, eltype, const)
+
+#define DECL_VEC4D_FUNC_OUT_ARGS(prefix, eltype)                               \
+  DECL_VEC4D_FUNC_ARGS(prefix, eltype, )
+
+/* Dumps the meta-information of a 4d memref to stdout. */
+static inline void memref_4d_dump_metainfo(DECL_VEC4D_FUNC_ARGS(m, void,
+                                                                const)) {
+  printf("4d memref:\n"
+         "  allocatedPtr: %p\n"
+         "  alignedPtr: %p\n"
+         "  offset: %" PRIu64 "\n"
+         "  size0: %" PRIu64 "\n"
+         "  size1: %" PRIu64 "\n"
+         "  size2: %" PRIu64 "\n"
+         "  size3: %" PRIu64 "\n"
+         "  stride0: %" PRIu64 "\n"
+         "  stride1: %" PRIu64 "\n"
+         "  stride2: %" PRIu64 "\n"
+         "  stride3: %" PRIu64 "\n",
+         m_allocatedPtr, m_alignedPtr, m_offset, m_size0, m_size1, m_size2,
+         m_size3, m_stride0, m_stride1, m_stride2, m_stride3);
+}
+
+#define DECL_VEC4D_FUNCTIONS(name, eltype, format)                             \
+  /* Allocates and initializes a 4d memref. Returns 0 on success,              \
+   * otherwise 1.                                                              \
+   */                                                                          \
+  static inline int name##_alloc(struct name *v, size_t n, size_t m, size_t l, \
+                                 size_t e) {                                   \
+    eltype *f;                                                                 \
+    if (!(f = (eltype *)calloc(n * m * l * e, sizeof(eltype))))                \
+      return 1;                                                                \
+    v->allocatedPtr = f;                                                       \
+    v->alignedPtr = f;                                                         \
+    v->offset = 0;                                                             \
+    v->sizes[0] = n;                                                           \
+    v->sizes[1] = m;                                                           \
+    v->sizes[2] = l;                                                           \
+    v->sizes[3] = e;                                                           \
+    v->strides[0] = m * l * e;                                                 \
+    v->strides[1] = l * e;                                                     \
+    v->strides[2] = e;                                                         \
+    v->strides[3] = 1;                                                         \
+    return 0;                                                                  \
+  }                                                                            \
+  /* Destroys a 4d memref */                                                   \
+  static inline void name##_destroy(struct name *v) { free(v->allocatedPtr); } \
+  /* Returns the element at position (`p1`, `p2`, `p3`, `p4`) of a 4d memref   \
+   * `v`                                                                       \
+   */                                                                          \
+  static inline eltype name##_get(const struct name *v, int64_t p1,            \
+                                  int64_t p2, int64_t p3, int64_t p4) {        \
+    return *(v->alignedPtr + (p1 * v->sizes[1] * v->sizes[2] * v->sizes[3]) +  \
+             (p2 * v->sizes[2] * v->sizes[3]) + (p3 * v->sizes[3]) + p4);      \
+  }                                                                            \
+  /* Assigns `f` to the element at position (`p1`, `p2`, `p3`, `p4`) of a 4d   \
+   * memref `v`                                                                \
+   */                                                                          \
+  static inline void name##_set(struct name *v, int64_t p1, int64_t p2,        \
+                                int64_t p3, int64_t p4, eltype f) {            \
+    *(v->alignedPtr + (p1 * v->sizes[1] * v->sizes[2] * v->sizes[3]) +         \
+      (p2 * v->sizes[2] * v->sizes[3]) + (p3 * v->sizes[3]) + p4) = f;         \
+  }
+
+DECL_VEC4D_STRUCT(vec_f4d, float)
+DECL_VEC4D_FUNCTIONS(vec_f4d, float, "%f")
+DECL_VEC4D_STRUCT(vec_i4d, int)
+DECL_VEC4D_FUNCTIONS(vec_i4d, int, "%i")
+
+DECL_VEC3D_STRUCT(vec_f3d, float)
+DECL_VEC3D_FUNCTIONS(vec_f3d, float, "%f")
+DECL_VEC3D_STRUCT(vec_i3d, int)
+DECL_VEC3D_FUNCTIONS(vec_i3d, int, "%i")
 
 DECL_VEC2D_STRUCT(vec_f2d, float)
 DECL_VEC2D_FUNCTIONS(vec_f2d, float, "%f")
