@@ -22,7 +22,7 @@ if [[ "$unamestr" == 'Darwin' ]]; then
 else
   export LD_LIBRARY_PATH=$LIB_PATH
 fi
-clang -O3 ${DRIVER}.s ${KERNEL}.s -L$LIB_PATH -lstandalone_c_runner_utils -o copy
+clang -O3 ${DRIVER}.s ${KERNEL}.s -L$LIB_PATH -ltpp_c_runner_utils -o copy
 
 # Execute and check result.
 ./copy > result.txt 2>&1

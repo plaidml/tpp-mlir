@@ -24,7 +24,7 @@ compile () {
     export LD_LIBRARY_PATH=$LIB_PATH:$LD_LIBRARY_PATH
   fi
 
-  clang -O3 mlp_driver.s mlp_kernel.s -L$LIB_PATH -lstandalone_c_runner_utils -lm -o mlp
+  clang -O3 mlp_driver.s mlp_kernel.s -L$LIB_PATH -ltpp_c_runner_utils -lm -o mlp
  
   rm *.s
   rm *.ll
@@ -36,7 +36,7 @@ execute () {
   # Execute and check result based on MLIR toolchain.
   if [ -e ./mlp ] && ./mlp >>mlp.log 2>&1; then
     #grep "MLIR: ..* GFLOPS\/s" mlp_${1}.log
-    # Execute stand-alone mlp driver.
+    # Execute tpp mlp driver.
     #if [ -e ./mlp ] && ./mlp 0 ${1} >>mlp_${1}.log 2>&1; then
     #  grep "XSMM: ..* GFLOPS\/s" mlp_${1}.log
     #fi
@@ -47,8 +47,8 @@ execute () {
   fi 
 }
 
-# Compile stand-alone mlp driver without MLIR toolchain.
-#clang -O3 mlp_driver.c -I$LIB_INCLUDE_PATH -L$LIB_PATH -lstandalone_c_runner_utils -lm -o mlp
+# Compile tpp mlp driver without MLIR toolchain.
+#clang -O3 mlp_driver.c -I$LIB_INCLUDE_PATH -L$LIB_PATH -ltpp_c_runner_utils -lm -o mlp
 
 # Compile and execute kernels related to MLIR files.
 for MLIR in ./mlp_kernel_*.mlir; do
