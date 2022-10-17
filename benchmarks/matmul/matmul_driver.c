@@ -18,10 +18,9 @@ extern void matmul(DECL_VEC2D_FUNC_IN_ARGS(a, float),
 /* Reference implementation of a matrix multiplication */
 void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
                     struct vec_f2d *c) {
-  const int64_t m = c->sizes[1], n = c->sizes[0], k = a->sizes[1];
-  for (int64_t ni = 0; ni < n; ++ni) {
-    for (int64_t ki = 0; ki < k; ++ki) {
-      for (int64_t mi = 0; mi < m; ++mi) {
+  for (int64_t mi = 0; mi < c->sizes[0]; ++mi) {
+    for (int64_t ni = 0; ni < c->sizes[1]; ++ni) {
+      for (int64_t ki = 0; ki < a->sizes[1]; ++ki) {
         vec_f2d_set(c, mi, ni,
                     vec_f2d_get(a, ki, ni) * vec_f2d_get(b, mi, ki) +
                         vec_f2d_get(c, mi, ni)); // beta=1
@@ -32,9 +31,8 @@ void matmul_refimpl(const struct vec_f2d *a, const struct vec_f2d *b,
 
 /* Initialize matrix with value x+y at position (x, y) */
 void init_matrix(struct vec_f2d *matrix) {
-  const int64_t m = matrix->sizes[1], n = matrix->sizes[0];
-  for (int64_t mi = 0; mi < m; ++mi) {
-    for (int64_t ni = 0; ni < n; ++ni) {
+  for (int64_t mi = 0; mi < matrix->sizes[0]; ++mi) {
+    for (int64_t ni = 0; ni < matrix->sizes[1]; ++ni) {
       vec_f2d_set(matrix, mi, ni, mi + ni);
     }
   }
