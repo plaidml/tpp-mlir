@@ -29,10 +29,12 @@ namespace linalgx {
 FailureOr<SmallVector<Value>> mapToBRGEMMOp(RewriterBase &rewriter,
                                             linalg::LinalgOp linalgOp);
 
-//
-FailureOr<linalg::MatmulOp> mapConvToGemm(RewriterBase &rewriter,
-                                          linalg::LinalgOp linalgOp,
-                                          int64_t rPos, int64_t sPos);
+// Map a convolution to a matmul operation. We support the following formats:
+// 1. [N][P][Q][K] += [N][H][W][C] * [R][S][C][K]
+// 2. [N][K’][P][Q][k] += [N][C’][H][W][c] * [K’][C’][R][S][c][k] (blocked)
+FailureOr<linalg::MatmulOp> mapConvToMatmul(RewriterBase &rewriter,
+                                            linalg::LinalgOp linalgOp,
+                                            int64_t rPos, int64_t sPos);
 
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>

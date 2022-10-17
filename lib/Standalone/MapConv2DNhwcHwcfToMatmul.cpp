@@ -42,6 +42,7 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   return sizes;
 }
 
+// XXX: We can also handle `?` as long as the filter R and S are static.
 // Check dimension at index 'i' and 'j'. If both are '1' return true
 // otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
@@ -55,38 +56,89 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
+static FailureOr<Value>
+getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                         OpOperand *operand, ValueRange ivs,
+                         ValueRange valuesToUse, ArrayRef<int64_t> rAndSPos) {
+  Value operandToUse = valuesToUse[operand->getOperandNumber()];
+  ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+  assert(operandType.hasStaticShape() && "tensor must have static shape");
+  size_t rank = operandType.getRank();
+  bool isImage = (operand->getOperandNumber() == 0) ? true : false;
+  unsigned desiredResultRank = 2;
+
+  SmallVector<OpFoldResult> offsets, sizes;
+  offsets.reserve(rank);
+  sizes.reserve(rank);
+
+  // offset into the tensor is the induction var or 0.
+  for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
+    offsets.push_back(ivs[idx]);
+  for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
+    offsets.push_back(builder.getIndexAttr(0));
+
+  OpOperand *filter = linalgOp.getInputOperands()[1];
+  if (isImage &&
+      !hasFilterWithRandSEqualOne(filter, rAndSPos[0], rAndSPos[1])) {
+    sizes = computeSizeGemmForImage(builder, linalgOp);
+  } else {
+    for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(1));
+    for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
+      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+  }
+
+  // XXX: strides are assumed to be 1. This is not the case if
+  // the convolution has stride. Fix it.
+  SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  return utils::getSliceOperand(builder, linalgOp, operandToUse, offsets, sizes,
+                                strides, desiredResultRank);
+}
+
+// Extract the sliced version of `operand` such that we can use it in a
+// linalg.matmul.
+static FailureOr<Value>
+getSlicedConvOperand(OpBuilder &builder, OpOperand *operand,
+                     linalg::LinalgOp linalgOp, ValueRange ivs,
+                     ValueRange valuesToUse, ArrayRef<int64_t> rAndSPos = {}) {
+  Location loc = linalgOp.getLoc();
+  FailureOr<SmallVector<Value>> involvedDimForOperand =
+      utils::getInvolvedLocalDimsForOperand(
+          builder, loc, operand, linalgOp.getMatchingIndexingMap(operand), ivs);
+  if (failed(involvedDimForOperand))
+    return failure();
+  return getSlicedConvOperandImpl(builder, linalgOp, operand,
+                                  *involvedDimForOperand, valuesToUse,
+                                  rAndSPos);
+}
+
 static FailureOr<SmallVector<Value>>
-getSlicedConvOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
+getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
                       linalg::LinalgOp linalgOp, ValueRange valuesToUse,
-                      int64_t rPos, int64_t sPos) {
+                      ArrayRef<int64_t> rAndSPos) {
   assert(linalgOp.getNumInputsAndOutputs() == 3 &&
          "expect 3 input/output operands");
   assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
 
   SmallVector<Value> slicedOperands;
   OpOperand *image = linalgOp.getInputOperands()[0];
-  FailureOr<Value> slicedImage =
-      (hasFilterWithRandSEqualOne(image, rPos, sPos))
-          ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
-                                   valuesToUse, /*GEMM dims=*/2)
-          : utils::getSliceOperand(
-                builder, image, linalgOp, localIvs, valuesToUse,
-                computeSizeGemmForImage(builder, linalgOp), /*GEMM dims=*/2);
+  FailureOr<Value> slicedImage = getSlicedConvOperand(
+      builder, image, linalgOp, localIvs, valuesToUse, rAndSPos);
 
   if (failed(slicedImage))
     return failure();
   slicedOperands.push_back(*slicedImage);
 
   OpOperand *filter = linalgOp.getInputOperands()[1];
-  FailureOr<Value> slicedFilter = utils::getSliceOperand(
-      builder, filter, linalgOp, localIvs, valuesToUse, 2);
+  FailureOr<Value> slicedFilter =
+      getSlicedConvOperand(builder, filter, linalgOp, localIvs, valuesToUse);
   if (failed(slicedFilter))
     return failure();
   slicedOperands.push_back(*slicedFilter);
 
   OpOperand *output = linalgOp.getOutputOperands()[0];
-  FailureOr<Value> slicedOutput = utils::getSliceOperand(
-      builder, output, linalgOp, localIvs, valuesToUse, 2);
+  FailureOr<Value> slicedOutput =
+      getSlicedConvOperand(builder, output, linalgOp, localIvs, valuesToUse);
   if (failed(slicedOutput))
     return failure();
   slicedOperands.push_back(*slicedOutput);
@@ -117,7 +169,7 @@ static bool isConvLike(linalg::LinalgOp linalgOp) {
     return false;
   if (llvm::any_of(linalgOp.getInputAndOutputOperands(),
                    [](OpOperand *operand) {
-                     return !operand->get().getType().isa<RankedTensorType>();
+                     return !operand->get().getType().isa<ShapedType>();
                    }))
     return false;
   return tpp::hasMatmulBody(linalgOp);
@@ -128,17 +180,15 @@ static bool isInBound(unsigned filterRank, unsigned rPos, unsigned sPos) {
 }
 
 FailureOr<linalg::MatmulOp>
-mlir::linalgx::mapConvToGemm(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                             int64_t rPos, int64_t sPos) {
+mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
+                               linalg::LinalgOp linalgOp, int64_t rPos,
+                               int64_t sPos) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "require a linalg.generic");
 
   if (!isConvLike(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp,
                                        "operation is not a convolution");
-
-  if (!linalgOp.hasTensorSemantics())
-    return rewriter.notifyMatchFailure(linalgOp, "expect tensor semantics");
 
   if (!checkMappingToMatmul(linalgOp))
     return rewriter.notifyMatchFailure(
@@ -171,10 +221,10 @@ mlir::linalgx::mapConvToGemm(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
+    SmallVector<int64_t> rAndSPos = {rPos, sPos};
     FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedConvOperands(
-        builder, loc, localIvs, linalgOp, operandsValuesToUse, rPos, sPos);
+        builder, localIvs, linalgOp, operandsValuesToUse, rAndSPos);
     if (failed(maybeSlicedOperands)) {
-      // TODO: Can I just return?
       assert(0 && "failed to generate loops for op");
       return {};
     }

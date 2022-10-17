@@ -58,34 +58,6 @@ template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
   return false;
 }
 
-// Return the size of the image slice to extract and use into the GEMM
-// operation. If we have a slide window (R and S are not 1). The size
-// of the image slice depend on the filter and output.
-static SmallVector<OpFoldResult>
-computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
-  OpOperand *image = linalgOp.getInputOperands()[0];
-  unsigned rank = image->get().getType().cast<ShapedType>().getRank();
-  SmallVector<OpFoldResult> sizes;
-  sizes.reserve(rank);
-
-  // All other dimesions but the last two are not involved and we
-  // can simply use size of 1.
-  for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
-    sizes.push_back(builder.getIndexAttr(1));
-
-  OpOperand *output = linalgOp.getOutputOperands()[0];
-  OpOperand *filter = linalgOp.getInputOperands()[1];
-  ArrayRef<int64_t> outputShape =
-      output->get().getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> filterShape =
-      filter->get().getType().cast<ShapedType>().getShape();
-  int64_t m = outputShape[outputShape.size() - 2];
-  int64_t k = filterShape[filterShape.size() - 2];
-  sizes.push_back(builder.getIndexAttr(m));
-  sizes.push_back(builder.getIndexAttr(k));
-  return sizes;
-}
-
 // Check dimension at index 'i' and 'j'. If both are '1' return true
 // otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
@@ -99,9 +71,7 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
-// TODO: refactor code as the one in the blocked version
-// can unify?
-struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
+struct MapConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   bool
@@ -119,45 +89,6 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
     return match;
   }
 
-  FailureOr<SmallVector<Value>>
-  getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
-                    linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
-    assert(linalgOp.getNumInputsAndOutputs() == 3 &&
-           "expect 3 input/output operands");
-    assert(linalgOp.getInputOperands().size() == 2 &&
-           "expect 2 input operands");
-    SmallVector<Value> slicedOperands;
-
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    FailureOr<Value> slicedImage =
-        (hasFilterWithRandSEqualOne(image, /*RPos=*/0, /*SPos=*/1))
-            ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
-                                     valuesToUse, /*GEMM dims=*/2)
-            : utils::getSliceOperand(
-                  builder, image, linalgOp, localIvs, valuesToUse,
-                  computeSizeGemmForImage(builder, linalgOp), /*GEMM dims=*/2);
-
-    if (failed(slicedImage))
-      return failure();
-    slicedOperands.push_back(*slicedImage);
-
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    FailureOr<Value> slicedFilter = utils::getSliceOperand(
-        builder, filter, linalgOp, localIvs, valuesToUse, 2);
-    if (failed(slicedFilter))
-      return failure();
-    slicedOperands.push_back(*slicedFilter);
-
-    OpOperand *output = linalgOp.getOutputOperands()[0];
-    FailureOr<Value> slicedOutput = utils::getSliceOperand(
-        builder, output, linalgOp, localIvs, valuesToUse, 2);
-    if (failed(slicedOutput))
-      return failure();
-    slicedOperands.push_back(*slicedOutput);
-
-    return slicedOperands;
-  }
-
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
 
@@ -168,74 +99,11 @@ struct DecomposeConv2DNhwcHwcf : OpRewritePattern<linalg::GenericOp> {
     if (!preOptimizeByInterchangeIteratorsConv(genericOp))
       return failure();
 
-    // peel-out N, P, R, S and map Q, K and C to GEMM.
-    unsigned upTo = genericOp.getNumLoops() - /*GEMM loops=*/3;
-    FailureOr<SmallVector<Range>> maybeLoopRanges =
-        mlir::utils::getLoopsToMaterialize(rewriter, genericOp, upTo);
-    if (failed(maybeLoopRanges))
-      return failure();
-    SmallVector<Range> loopRanges = *maybeLoopRanges;
-
-    SmallVector<Value, 4> ivs, tensorResults;
-    auto gemmBuilder = [&](OpBuilder &builder, Location loc,
-                           ValueRange localIvs,
-                           ValueRange operandsValuesToUse) -> scf::ValueVector {
-      assert(localIvs.size() == 4);
-      assert(operandsValuesToUse.size() ==
-                 static_cast<size_t>(genericOp.getNumInputsAndOutputs()) &&
-             "expect the number of operands and inputs and outputs to match");
-      ivs.assign(localIvs.begin(), localIvs.end());
-      FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
-          builder, loc, localIvs, genericOp, operandsValuesToUse);
-      if (failed(maybeSlicedOperands)) {
-        // TODO: Can I just return?
-        assert(0 && "failed to generate loops for op");
-        return {};
-      }
-      SmallVector<Value> slicedOperands = *maybeSlicedOperands;
-      assert(slicedOperands.size() == 3 && "expect three operands");
-
-      linalg::MatmulOp matmul =
-          (genericOp.hasTensorSemantics())
-              ? builder.create<linalg::MatmulOp>(
-                    loc, slicedOperands[2].getType(),
-                    ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2])
-              : builder.create<linalg::MatmulOp>(
-                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2]);
-      tensorResults = insertSlicesBack(builder, loc, genericOp, slicedOperands,
-                                       matmul->getResults());
-
-      return scf::ValueVector(tensorResults.begin(), tensorResults.end());
-    };
-
-    Location loc = genericOp.getLoc();
-    linalg::GenerateLoopNest<scf::ForOp>::doit(
-        rewriter, loc, loopRanges, genericOp, genericOp.getIteratorTypesArray(),
-        gemmBuilder);
-
-    // see: `Tiling.cpp` in Linalg/Transforms
-    // Gather the newly created loops and return them with the new op.
-    SmallVector<Operation *, 8> loops;
-    loops.reserve(ivs.size());
-    for (Value iv : ivs) {
-      if (iv.isa<BlockArgument>()) {
-        loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
-        assert(loops.back() && "no owner found for induction variable!");
-      } else {
-        loops.push_back(nullptr);
-      }
-    }
-
-    // Get the tensor results from the outermost loop.
-    Operation *outermostLoop = nullptr;
-    for (Operation *loop : loops)
-      if ((outermostLoop = loop))
-        break;
-
-    rewriter.replaceOp(genericOp, outermostLoop ? outermostLoop->getResults()
-                                                : tensorResults);
+    FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToMatmul(
+        rewriter, genericOp, /*RPos=*/0, /*SPos=*/1);
+    if (failed(matmul))
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "failed to map convolution to matmul");
     return success();
   }
 };
@@ -360,7 +228,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     linalg::GenericOp generic = *maybeGeneric;
     generic.setLibraryCallAttr(
         rewriter.getStringAttr("tpp.BlockedConv2DNchwFchwOp"));
-    return failure();
+    return success();
   }
 };
 
@@ -443,116 +311,14 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
     return success();
   }
 
-  FailureOr<SmallVector<Value>>
-  getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
-                    linalg::LinalgOp linalgOp, ValueRange valuesToUse) const {
-    assert(linalgOp.getNumInputsAndOutputs() == 3 &&
-           "expect 3 input/output operands");
-    assert(linalgOp.getInputOperands().size() == 2 &&
-           "expect 2 input operands");
-    SmallVector<Value> slicedOperands;
-
-    // Get the slice of the image to use in the GEMM operation.
-    // Keep into account sliding window when R and S on the filter
-    // are not 1.
-    OpOperand *image = linalgOp.getInputOperands()[0];
-    FailureOr<Value> maybeSlicedImage =
-        (hasFilterWithRandSEqualOne(image, /*RPos=*/2, /*Spos=*/3))
-            ? utils::getSliceOperand(builder, image, linalgOp, localIvs,
-                                     valuesToUse, /*GEMM dims=*/2)
-            : utils::getSliceOperand(
-                  builder, image, linalgOp, localIvs, valuesToUse,
-                  computeSizeGemmForImage(builder, linalgOp), /*GEMM dims=*/2);
-    if (failed(maybeSlicedImage))
-      return failure();
-    slicedOperands.push_back(*maybeSlicedImage);
-
-    // Get slice on the filter and on the output.
-    OpOperand *filter = linalgOp.getInputOperands()[1];
-    FailureOr<Value> maybeSlicedFilter = utils::getSliceOperand(
-        builder, filter, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
-    if (failed(maybeSlicedFilter))
-      return failure();
-    slicedOperands.push_back(*maybeSlicedFilter);
-
-    OpOperand *out = linalgOp.getOutputOperands()[0];
-    FailureOr<Value> maybeSlicedOut = utils::getSliceOperand(
-        builder, out, linalgOp, localIvs, valuesToUse, /*GEMM dims=*/2);
-    if (failed(maybeSlicedOut))
-      return failure();
-    slicedOperands.push_back(*maybeSlicedOut);
-    return slicedOperands;
-  }
-
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
       return failure();
-
-    // peelout {N, K, P, C, R, S} and map {Q, k, c} to GEMM.
-    unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
-    FailureOr<SmallVector<Range>> maybeLoopRanges =
-        mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
-    if (failed(maybeLoopRanges))
+    FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToMatmul(
+        rewriter, linalgOp, /*RPos=*/2, /*Spos=*/3);
+    if (failed(matmul))
       return failure();
-    SmallVector<Range> loopRanges = *maybeLoopRanges;
-
-    SmallVector<Value, 4> ivs, tensorResults;
-    auto gemmBuilder = [&](OpBuilder &builder, Location loc,
-                           ValueRange localIvs,
-                           ValueRange operandsValuesToUse) -> scf::ValueVector {
-      assert(localIvs.size() == 6);
-      assert(operandsValuesToUse.size() ==
-                 static_cast<size_t>(linalgOp.getNumInputsAndOutputs()) &&
-             "expect the number of operands and inputs and outputs to match");
-      ivs.assign(localIvs.begin(), localIvs.end());
-      FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
-          builder, loc, localIvs, linalgOp, operandsValuesToUse);
-      if (failed(maybeSlicedOperands))
-        return {};
-      SmallVector<Value> slicedOperands = *maybeSlicedOperands;
-      assert(slicedOperands.size() == 3 && "expect three operands");
-
-      linalg::MatmulOp matmul =
-          (linalgOp.hasTensorSemantics())
-              ? builder.create<linalg::MatmulOp>(
-                    loc, slicedOperands[2].getType(),
-                    ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2])
-              : builder.create<linalg::MatmulOp>(
-                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2]);
-      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                       matmul->getResults());
-
-      return scf::ValueVector(tensorResults.begin(), tensorResults.end());
-    };
-
-    linalg::GenerateLoopNest<scf::ForOp>::doit(
-        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
-        linalgOp.getIteratorTypesArray(), gemmBuilder);
-
-    // See: `Tiling.cpp` in Linalg/Transforms.
-    // Gather the newly created loops and return them with the new op.
-    SmallVector<Operation *, 8> loops;
-    loops.reserve(ivs.size());
-    for (Value iv : ivs) {
-      if (iv.isa<BlockArgument>()) {
-        loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
-        assert(loops.back() && "no owner found for induction variable!");
-      } else {
-        loops.push_back(nullptr);
-      }
-    }
-
-    // Get the tensor results from the outermost loop.
-    Operation *outermostLoop = nullptr;
-    for (Operation *loop : loops)
-      if ((outermostLoop = loop))
-        break;
-
-    rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
-                                               : tensorResults);
     return success();
   }
 };
@@ -791,7 +557,7 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
 
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
 void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<GeneralizeConv2DNhwcHwcf, DecomposeConv2DNhwcHwcf,
+  patterns.insert<GeneralizeConv2DNhwcHwcf, MapConv2DNhwcHwcfToMatmul,
                   InterchangeIteratorsConv2DNhwcHwcf>(patterns.getContext());
 }
 
