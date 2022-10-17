@@ -173,6 +173,22 @@ static inline void memref_2d_dump_metainfo(DECL_VEC2D_FUNC_ARGS(m, void,
       }                                                                        \
       puts("");                                                                \
     }                                                                          \
+  }                                                                            \
+  /* Compares the values of two 2d memrefs. Returns 1 if they are              \
+   * equal, otherwise 0.                                                       \
+   */                                                                          \
+  static inline int name##_compare(const struct name *a,                       \
+                                   const struct name *b) {                     \
+    /* Compare shapes */                                                       \
+    if (a->sizes[0] != b->sizes[0] || a->sizes[1] != b->sizes[1]) {            \
+      return 0;                                                                \
+    }                                                                          \
+    /* Compare elements */                                                     \
+    for (int64_t y = 0; y < a->sizes[0]; y++)                                  \
+      for (int64_t x = 0; x < a->sizes[1]; x++)                                \
+        if (name##_get(a, x, y) != name##_get(b, x, y))                        \
+          return 0;                                                            \
+    return 1;                                                                  \
   }
 
 //===----------------------------------------------------------------------===//
