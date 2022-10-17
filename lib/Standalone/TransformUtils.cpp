@@ -66,23 +66,20 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
 static SmallVector<int64_t>
 getExpectedResultMemRefShape(ArrayRef<OpFoldResult> sizes,
                              unsigned desiredResultRank) {
+
   SmallVector<int64_t> targetShape;
-  int toSkip = sizes.size() - desiredResultRank;
-  assert(toSkip >= 0);
-  // TODO: find better way to express `skipping the first `toSkip`
-  // elements`. Also would be nice to have `inferRankReducedResultType`
-  // for subview to have the same API has the one for tensor. This
-  // would allow us to pass only `desiredResultRank` and avoid
-  // this method.
-  for (unsigned idx = 0, e = sizes.size(); idx < e; idx++) {
-    if (toSkip > 0) {
-      toSkip--;
-      continue;
-    }
-    Optional<int64_t> sizeDim = getConstantIntValue(sizes[idx]);
-    assert(sizeDim && "must be statically known");
-    targetShape.push_back(sizeDim.value());
-  }
+  SmallVector<int64_t> sourceShapeStatic;
+  SmallVector<Value> sourceShapeDynamic;
+  dispatchIndexOpFoldResults(sizes, sourceShapeDynamic, sourceShapeStatic,
+                             ShapedType::kDynamicSize);
+
+  // TODO: Would be nice to have `inferRankReducedResultType` for subview to
+  // have the same API has the one for tensor. This would allow us to pass only
+  // `desiredResultRank` and avoid this method.
+  unsigned rank = sourceShapeStatic.size();
+  unsigned currentSize = rank - desiredResultRank;
+  for (unsigned idx = currentSize; idx < rank; idx++)
+    targetShape.push_back(sourceShapeStatic[idx]);
   return targetShape;
 }
 
@@ -96,7 +93,6 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
   ShapedType operandType = operand.getType().cast<ShapedType>();
   size_t rank = operandType.getRank();
 
-  // TODO: can we avoid passing `desiredResultRank`?
   assert(rank == offsets.size() && "expect rank == offsets");
   assert(rank == sizes.size() && "expect rank == sizes");
   assert(rank == strides.size() && "expect rank == strides");
