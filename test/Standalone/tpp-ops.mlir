@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s | standalone-opt | FileCheck %s
+// RUN: tpp-opt %s | tpp-opt | FileCheck %s
 
 // CHECK-LABEL: @myfunc
 func.func @myfunc(%arg0: memref<2x2xf32>, 

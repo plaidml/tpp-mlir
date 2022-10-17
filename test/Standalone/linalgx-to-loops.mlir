@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -split-input-file -linalg-ext-to-loops | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -linalg-ext-to-loops | FileCheck %s
 
 func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {
   linalgx.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)

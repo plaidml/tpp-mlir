@@ -12,9 +12,9 @@ compile () {
   llc matmul_driver.ll
 
   # Fire tpp compiler (with xsmm conversion).
-  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
+  tpp-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
 
-  standalone-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
+  tpp-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
     -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func \
     -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm \
     -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts \
@@ -29,7 +29,7 @@ compile () {
     export LD_LIBRARY_PATH=$LIB_PATH:$LD_LIBRARY_PATH
   fi
 
-  clang -O3 matmul_driver.s matmul_kernel_${1}.s -L$LIB_PATH -lstandalone_c_runner_utils -lm -o matmul_${1}
+  clang -O3 matmul_driver.s matmul_kernel_${1}.s -L$LIB_PATH -ltpp_c_runner_utils -lm -o matmul_${1}
 
   rm *.s
   rm *.ll
@@ -41,7 +41,7 @@ execute () {
   # Execute and check result based on MLIR toolchain.
   if [ -e ./matmul_${1} ] && ./matmul_${1} >>matmul_${1}.log 2>&1; then
     grep "MLIR: ..* GFLOPS\/s" matmul_${1}.log
-    # Execute stand-alone matmul driver.
+    # Execute TPP matmul driver.
     if [ -e ./matmul ] && ./matmul 0 ${1} >>matmul_${1}.log 2>&1; then
       grep "XSMM: ..* GFLOPS\/s" matmul_${1}.log
     fi
@@ -52,8 +52,8 @@ execute () {
   fi 
 }
 
-# Compile stand-alone matmul driver without MLIR toolchain.
-clang -O3 matmul_driver.c matmul_kernel.c -I$LIB_INCLUDE_PATH -L$LIB_PATH -lstandalone_c_runner_utils -lm -o matmul
+# Compile TPP matmul driver without MLIR toolchain.
+clang -O3 matmul_driver.c matmul_kernel.c -I$LIB_INCLUDE_PATH -L$LIB_PATH -ltpp_c_runner_utils -lm -o matmul
 
 # Compile and execute kernels related to MLIR files.
 for MLIR in ./matmul_kernel_*.mlir; do

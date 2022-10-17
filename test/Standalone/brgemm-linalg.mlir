@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops | FileCheck %s
+// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops | FileCheck %s
 
 // CHECK-LABEL: func.func @blocked_matmul(
 // CHECK-SAME: %[[arg_zero:.*]]: memref<16x32x32xf32>, %[[arg_one:.*]]: memref<16x32x32xf32>, %[[arg_two:.*]]: memref<32x32xf32>)

@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize | FileCheck %s
+// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize | FileCheck %s
 
 func.func @myfunc(%arg0: tensor<4x4xi32>) -> tensor<4x4xi32> {
   %0 = bufferization.alloc_tensor() : tensor<2x2x2x2xi32>

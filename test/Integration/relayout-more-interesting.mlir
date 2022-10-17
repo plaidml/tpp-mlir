@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -sparse-compiler | \
+// RUN: tpp-opt %s -sparse-compiler | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \

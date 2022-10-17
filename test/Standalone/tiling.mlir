@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -split-input-file -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp='enable-tiling' | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp='enable-tiling' | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 

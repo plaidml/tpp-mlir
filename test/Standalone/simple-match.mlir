@@ -1,6 +1,6 @@
-// RUN: standalone-opt %s -split-input-file -linalg-bufferize -func-bufferize -map-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -linalg-bufferize -func-bufferize -map-linalg-to-tpp | FileCheck %s
 
-// RUN: standalone-opt %s -split-input-file -map-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -map-linalg-to-tpp | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>

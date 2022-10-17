@@ -1,4 +1,4 @@
-// RUN: standalone-opt -pack-conv2DNhwcHwcf="block-factors=32,32" -split-input-file %s | FileCheck %s
+// RUN: tpp-opt -pack-conv2DNhwcHwcf="block-factors=32,32" -split-input-file %s | FileCheck %s
 
 func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
   %1 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>,

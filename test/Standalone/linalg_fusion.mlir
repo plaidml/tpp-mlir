@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s | standalone-opt | FileCheck %s
+// RUN: tpp-opt %s | tpp-opt | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> ()>

@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -split-input-file -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -convert-linalg-to-tpp | FileCheck %s
 
 // CHECK-LABEL: func.func @brgemm_lowering(
 // CHECK-SAME: %[[arg0:.*]]: memref<3x5x4xf32>,
