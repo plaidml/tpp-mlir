@@ -140,15 +140,17 @@ transform.with_pdl_patterns {
     ^bb0(%arg1: !pdl.operation):
       %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
       %1 = transform.structured.generalize %0
+      // expected-error @below {{Could not map to matmul}}
       transform.structured.map_conv_to_matmul %1 (filter_height_pos = 1, filter_width_pos = 0)
   }
 }
 
-// Expect linalg.matmul: linalg.matmul -> linalg.generic -> linalg.matmul
+// We don't expect a matmul here as filter_height_pos and filter_width_pos are invalid. 
+// filter_width_pos must at position filter_height_pos + 1
 func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<58x64xf32>,
                                            %arg1: tensor<64x64xf32>,
                                            %arg2: tensor<58x64xf32>) -> tensor<58x64xf32> {
-  // CHECK: linalg.matmul
+  // expected-note @below {{when applied to this op}}
   %3 = linalg.matmul ins(%arg2, %arg1 : tensor<58x64xf32>, tensor<64x64xf32>)
              outs(%arg0 : tensor<58x64xf32>) -> tensor<58x64xf32>
   return %3 : tensor<58x64xf32>
