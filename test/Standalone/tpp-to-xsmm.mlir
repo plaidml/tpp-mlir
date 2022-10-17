@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -convert-tpp-to-xsmm -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -convert-tpp-to-xsmm -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @identity_to_xsmm(
 // CHECK-SAME: %[[arg:.*]]: memref<3x3xf32>) {

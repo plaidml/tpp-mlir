@@ -1,4 +1,4 @@
-// RUN: standalone-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: tpp-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics %s | FileCheck %s
 
 // This must fail as we attempt to collapse dimensions of different types.
 transform.with_pdl_patterns {

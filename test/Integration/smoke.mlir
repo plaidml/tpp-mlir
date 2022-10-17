@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s \
+// RUN: tpp-opt %s \
 // RUN:   --linalg-generalize-named-ops --linalg-fuse-elementwise-ops \
 // RUN:   --sparsification --sparse-tensor-conversion \
 // RUN:   --linalg-bufferize --convert-linalg-to-loops \

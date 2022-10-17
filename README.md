@@ -56,7 +56,7 @@ cmake -G Ninja .. \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DMLIR_DIR=$CUSTOM_LLVM_ROOT/lib/cmake/mlir \
    -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit
-cmake --build . --target check-standalone-opt
+cmake --build . --target check-tpp-opt
 
 popd
 ```

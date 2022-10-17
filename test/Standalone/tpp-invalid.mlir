@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -split-input-file -verify-diagnostics 
+// RUN: tpp-opt %s -split-input-file -verify-diagnostics 
 
 func.func @myfunc(%arg0: memref<1x2xf32>, 
                   %arg1: memref<2x2xf32>, %arg2: memref<2x1xf32>) -> memref<2x1xf32> {

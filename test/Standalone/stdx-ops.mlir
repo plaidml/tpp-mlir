@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s | FileCheck %s
+// RUN: tpp-opt %s | FileCheck %s
 
 func.func @main(%arg0: tensor<8x3xf32>, %arg1: tensor<3x3xf32>,
                 %arg2: tensor<8x3xf32>) -> tensor<8x3xf32> {

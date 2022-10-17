@@ -21,16 +21,16 @@ echo "lib path: ${LIB_PATH}"
 echo "bin path: ${BIN_PATH}"
 echo "lib include path: ${LIB_INCLUDE_PATH}"
 
-# make standalone-opt (TPP compiler) available.
+# make tpp-opt (TPP compiler) available.
 export PATH=${BIN_PATH}:$PATH
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-if ! command -v standalone-opt &> /dev/null
+if ! command -v tpp-opt &> /dev/null
 then
-  echo "standalone-opt could not be found"
+  echo "tpp-opt could not be found"
   exit
 fi
 
@@ -66,4 +66,4 @@ which mlir-translate
 
 # TPP compiler.
 echo "Using tpp compiler in: "
-which standalone-opt
+which tpp-opt

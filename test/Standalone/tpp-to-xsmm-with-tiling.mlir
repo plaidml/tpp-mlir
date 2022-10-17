@@ -1,8 +1,8 @@
-// RUN: standalone-opt %s -convert-linalg-to-tpp="tile-sizes=32,32,32" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG1
+// RUN: tpp-opt %s -convert-linalg-to-tpp="tile-sizes=32,32,32" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG1
 
-// RUN: standalone-opt %s -convert-linalg-to-tpp="tile-sizes=64,32,32" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG2
+// RUN: tpp-opt %s -convert-linalg-to-tpp="tile-sizes=64,32,32" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG2
 
-// RUN: standalone-opt %s -convert-linalg-to-tpp="tile-sizes=0,0,0" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG3
+// RUN: tpp-opt %s -convert-linalg-to-tpp="tile-sizes=0,0,0" -convert-tpp-to-xsmm -loop-invariant-code-motion -split-input-file | FileCheck %s -check-prefix=CONFIG3
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>

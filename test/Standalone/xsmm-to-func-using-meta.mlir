@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -convert-xsmm-to-func="use-extract-metadata" | FileCheck %s
+// RUN: tpp-opt %s -convert-xsmm-to-func="use-extract-metadata" | FileCheck %s
 
 // CHECK-DAG: func.func private @xsmm_brgemm_dispatch_f32(i64, i64, i64, i64, i64, i64) -> i64
 // CHECK-DAG: func.func private @xsmm_brgemm_invoke_f32(i64, !llvm.ptr<f32>, index, !llvm.ptr<f32>, index, !llvm.ptr<f32>, index, i64)

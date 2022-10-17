@@ -1,4 +1,4 @@
-// RUN: standalone-opt -split-input-file -map-to-brgemm %s | FileCheck %s
+// RUN: tpp-opt -split-input-file -map-to-brgemm %s | FileCheck %s
 
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>

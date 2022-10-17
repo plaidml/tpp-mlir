@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -convert-tpp-to-loops -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -convert-tpp-to-loops -split-input-file | FileCheck %s
 
 func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index

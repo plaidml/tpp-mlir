@@ -83,7 +83,7 @@ add_subdirectory(standalone-rt)
 
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
-  add_subdirectory(standalone-opt)
+  add_subdirectory(tpp-opt)
   add_subdirectory(test)
 endif()
 

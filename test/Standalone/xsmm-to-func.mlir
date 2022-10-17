@@ -1,4 +1,4 @@
-// RUN: standalone-opt %s -convert-xsmm-to-func -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -convert-xsmm-to-func -split-input-file | FileCheck %s
 
 // CHECK: func.func private @xsmm_matmul_dispatch_f32(i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 // CHECK: func.func private @xsmm_unary_dispatch_f32(i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
