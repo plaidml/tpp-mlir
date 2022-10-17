@@ -19,6 +19,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
@@ -38,8 +40,10 @@ int main(int argc, char **argv) {
   registry.insert<mlir::stdx::StdxDialect>();
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::linalgx::LinalgXDialect>();
+  registry.insert<mlir::check::CheckDialect>();
   mlir::linalgx::registerTransformDialectExtension(registry);
   mlir::linalgx::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::check::registerBufferizableOpInterfaceExternalModels(registry);
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated

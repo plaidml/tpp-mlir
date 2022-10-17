@@ -85,6 +85,7 @@ void TppCompilerPipeline::runOnOperation() {
     pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
 
   pm.addPass(createConvertXsmmToFuncPass());
+  pm.addPass(createConvertCheckToFuncPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());

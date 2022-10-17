@@ -63,6 +63,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createTppCompilerPipeline();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToVectorPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizeCopyPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPreBufferizationPass();
