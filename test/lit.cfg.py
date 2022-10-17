@@ -43,7 +43,7 @@ llvm_config.use_default_substitutions()
 # subdirectories contain auxiliary inputs for various tests in their parent
 # directories.
 # See: https://github.com/plaidml/tpp-sandbox/issues/45
-config.excludes = [ "stdx-ops.mlir" ]
+config.excludes = [ ]
 
 # test_exec_root: The root path where tests should be run.
 config.test_exec_root = os.path.join(config.standalone_obj_root, 'test')
