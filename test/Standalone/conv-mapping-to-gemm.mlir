@@ -36,3 +36,21 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x3x3xf32>,
   %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x3x3xf32>) outs(%o: tensor<14x1024x26x26xf32>) -> tensor<14x1024x26x26xf32>
   return %0 : tensor<14x1024x26x26xf32>
 }
+
+// -----
+
+func.func @conv(%i: tensor<?x?x?x?xf32>, %f: tensor<?x?x3x3xf32>,
+                %o: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+  // CHECK-NOT: linalg.matmul
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<?x?x?x?xf32>, tensor<?x?x3x3xf32>) outs(%o: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  return %0 : tensor<?x?x?x?xf32>
+}
+
+// -----
+
+func.func @conv(%i: tensor<?x?x?x?xf32>, %f: tensor<?x?x3x?xf32>,
+                %o: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+  // CHECK-NOT: linalg.matmul
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<?x?x?x?xf32>, tensor<?x?x3x?xf32>) outs(%o: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  return %0 : tensor<?x?x?x?xf32>
+}
