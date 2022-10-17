@@ -77,6 +77,9 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
     offsets.push_back(builder.getIndexAttr(0));
 
+  // If the filter has R and S not 1 we need to deal with a sliding window. The
+  // sizes of the matmul depend on the filter and output, use
+  // `computeSizeGemmForImage` to compute them.
   OpOperand *filter = linalgOp.getInputOperands()[1];
   if (isImage &&
       !hasFilterWithRandSEqualOne(filter, rAndSPos[0], rAndSPos[1])) {
