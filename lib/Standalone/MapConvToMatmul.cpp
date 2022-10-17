@@ -194,7 +194,7 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(
         linalgOp, "cannot match operation iterators with matmul iterators");
 
-  if (rPos == sPos)
+  if (sPos != rPos + 1)
     return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and sPos");
 
   unsigned filterRank = linalgOp.getInputOperands()[1]
