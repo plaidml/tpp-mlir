@@ -109,19 +109,19 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[2];
-    int64_t b = memrefA.getShape()[0];
+    int64_t batchSize = memrefB.getShape()[0];
 
     auto ldaDim = getLeadingDim(memrefA, 1);
     if (failed(ldaDim))
       return failure();
     int64_t lda = *ldaDim;
-    if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 3) {
-      auto divLdaDim = getLeadingDim(memrefA, 1);
+    //If the tensor is in bf16 packed format, ignore the packing dimension
+    if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 4) {
+      auto divLdaDim = getLeadingDim(memrefA, 2);
       if (failed(divLdaDim))
         return failure();
       lda = lda / (*divLdaDim);
     }
-
     auto ldbDim = getLeadingDim(memrefB, 1);
     if (failed(ldbDim))
       return failure();
@@ -150,7 +150,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
         loc, integer64, attr, dims, dtype);
     Value batchDim = rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, b));
+        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(brgemmOp->getOperands().begin(),
