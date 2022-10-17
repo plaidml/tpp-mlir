@@ -136,8 +136,8 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
   SimpleRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul =
-      mlir::linalgx::mapConvToGemm(rewriter, cast<linalg::GenericOp>(target),
-                                   getFilterHeightPos(), getFilterWidthPos());
+      mlir::linalgx::mapConvToMatmul(rewriter, cast<linalg::GenericOp>(target),
+                                     getFilterHeightPos(), getFilterWidthPos());
   if (failed(matmul)) {
     auto diag = this->emitOpError()
                 << "Could not map to matmul: " << target << "\n";

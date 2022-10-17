@@ -30,21 +30,20 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
 // Extract and return a slice for operand. Offsets are the induction variable
 // touched by the operand. Sizes are: '1' in [0 to rank - desiredResultRank]
 // while the full chunk in [rank - desiredResultRank to rank). Strides are
-// always 1. The methods effectively peel out the outermost [0 to rank -
-// desiredResultRank] dimensions that are materialized as loops.
+// assumed to be always 1. The methods effectively peel out the outermost [0 to
+// rank - desiredResultRank] dimensions that are materialized as loops.
 FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
                                  linalg::LinalgOp linalgOp, ValueRange ivs,
                                  ValueRange valuesToUse,
                                  unsigned desiredResultRank);
 
-// Same as above but with an addional 'sizes' as operand. This operand
-// is used to extract the size of the slice. Usefull when dealing with
-// sliding windows.
-FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
-                                 linalg::LinalgOp linalgOp, ValueRange ivs,
-                                 ValueRange valuesToUse,
-                                 SmallVector<OpFoldResult> sizes,
-                                 unsigned desiredResultRank);
+// Extract a slice of `operand` based on `offset`, `sizes` and
+// `strides`.
+Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                      Value operand, ArrayRef<OpFoldResult> offset,
+                      ArrayRef<OpFoldResult> sizes,
+                      ArrayRef<OpFoldResult> strides,
+                      unsigned desiredResultRank);
 
 // Return the loop range to materialize as loops from '0' to 'upTo'.
 // '0' is the outermost loop.
