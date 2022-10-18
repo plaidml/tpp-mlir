@@ -19,14 +19,14 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-#include "Standalone/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
-#include "Standalone/Dialect/LinalgX/LinalgXDialect.h"
-#include "Standalone/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
-#include "Standalone/Dialect/Mathx/MathxDialect.h"
-#include "Standalone/Dialect/Stdx/StdxDialect.h"
-#include "Standalone/Dialect/Tpp/TppDialect.h"
-#include "Standalone/Dialect/Xsmm/XsmmDialect.h"
-#include "Standalone/Passes.h"
+#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
+#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "TPP/Dialect/Mathx/MathxDialect.h"
+#include "TPP/Dialect/Stdx/StdxDialect.h"
+#include "TPP/Dialect/Tpp/TppDialect.h"
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Passes.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
@@ -46,6 +46,6 @@ int main(int argc, char **argv) {
   registerAllDialects(registry);
 
   return mlir::asMainReturnCode(
-      mlir::MlirOptMain(argc, argv, "Standalone optimizer driver\n", registry,
+      mlir::MlirOptMain(argc, argv, "TPP optimizer driver\n", registry,
                         /*preload in context*/ true));
 }

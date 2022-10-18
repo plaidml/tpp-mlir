@@ -8,7 +8,7 @@ if(POLICY CMP0116)
   cmake_policy(SET CMP0116 OLD)
 endif()
 
-project(standalone-dialect LANGUAGES CXX C)
+project(tpp-dialect LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
@@ -20,7 +20,7 @@ if (NOT TPP_INSIDE_IREE)
   set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
   set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
   set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
-  message(STATUS "Enabling standalone tooling")
+  message(STATUS "Enabling tpp tooling")
   message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
   list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
@@ -69,7 +69,7 @@ message (STATUS ${XSMM_INCLUDE_DIRS})
 # Unit test
 set(LLVM_MAIN_SRC_DIR ${LLVM_MAIN_INCLUDE_DIR}/../)
 message(STATUS "Using LLVM: ${LLVM_MAIN_SRC_DIR}")
-add_custom_target(StandaloneUnitTests)
+add_custom_target(TPPUnitTests)
 if (EXISTS ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include/gtest/gtest.h)
   add_subdirectory(unittests)
 else()
@@ -78,8 +78,8 @@ endif()
 
 add_subdirectory(include)
 add_subdirectory(lib)
-# Atm, IREE needs the standalone-rt library to call into libxsmm.
-add_subdirectory(standalone-rt)
+# Atm, IREE needs the tpp-rt library to call into libxsmm.
+add_subdirectory(tpp-rt)
 
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
