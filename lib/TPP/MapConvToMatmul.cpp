@@ -11,6 +11,7 @@
 #include "TPP/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 using namespace mlir;
 
@@ -56,6 +57,59 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
+// Return success if `expr` is either a dimExpr or a mul expression dim * cst OR
+// cst * dim.
+static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
+                                        AffineExpr &multiplicativeFactor) {
+  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>())
+    return success();
+  if (auto mulExpr = expr.dyn_cast<AffineBinaryOpExpr>()) {
+    if (mulExpr.getKind() != AffineExprKind::Mul)
+      return failure();
+    auto lhs = mulExpr.getLHS();
+    auto rhs = mulExpr.getRHS();
+    // Assert if we find a symbol. We need to check that we don't have them in
+    // the preconditions for this pattern. `verifyConvolutionInterface` allows
+    // them.
+    if (auto symbol = lhs.dyn_cast<AffineSymbolExpr>())
+      assert(false && "unexpected symbol expr");
+    if (auto symbol = rhs.dyn_cast<AffineSymbolExpr>())
+      assert(false && "unexpected symbol expr");
+    // If the lhs is a constant the rhs is a dim and viceversa.
+    if (auto constant = lhs.dyn_cast<AffineConstantExpr>()) {
+      if (auto dim = rhs.dyn_cast<AffineDimExpr>()) {
+        multiplicativeFactor = multiplicativeFactor * constant.getValue();
+        return success();
+      }
+      return failure();
+    }
+    if (auto constant = rhs.dyn_cast<AffineConstantExpr>()) {
+      if (auto dim = lhs.dyn_cast<AffineDimExpr>()) {
+        multiplicativeFactor = multiplicativeFactor * constant.getValue();
+        return success();
+      }
+      return failure();
+    }
+    return failure();
+  }
+  return failure();
+}
+
+// Walk `convExpr` in pre-order and extract a constant if any.
+static LogicalResult walkConvExpr(AffineExpr convExpr,
+                                  AffineExpr &multiplicativeFactor) {
+  if (auto dimExpr = convExpr.dyn_cast<AffineDimExpr>())
+    return success();
+  if (auto binExpr = convExpr.dyn_cast<AffineBinaryOpExpr>()) {
+    if (binExpr.getKind() != AffineExprKind::Add)
+      return failure();
+    return success(
+        succeeded(isDimExprOrMulExpr(binExpr.getLHS(), multiplicativeFactor)) &&
+        succeeded(isDimExprOrMulExpr(binExpr.getRHS(), multiplicativeFactor)));
+  }
+  return failure();
+}
+
 static FailureOr<Value>
 getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                          OpOperand *operand, ValueRange ivs,
@@ -71,7 +125,7 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   offsets.reserve(rank);
   sizes.reserve(rank);
 
-  // offset into the tensor is the induction var or 0.
+  // Offset into the tensor is the induction var or 0.
   for (size_t idx = 0, e = ivs.size(); idx < e; idx++)
     offsets.push_back(ivs[idx]);
   for (size_t idx = ivs.size(), e = rank; idx < e; idx++)
@@ -85,15 +139,31 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
       !hasFilterWithRandSEqualOne(filter, rAndSPos[0], rAndSPos[1])) {
     sizes = computeSizeGemmForImage(builder, linalgOp);
   } else {
+    // Get full sizes from [rank - desiredResultRank, rank).
     for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
       sizes.push_back(builder.getIndexAttr(1));
     for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
       sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
   }
 
-  // XXX: strides are assumed to be 1. This is not the case if
-  // the convolution has stride. Fix it.
+  // We need to take into accound possible strides on W. Strides on the H
+  // are already computed using affine maps as the loops iterating over H are
+  // materialized. The W dimension is the last - 1 dimension.
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
+  if (isImage) {
+    AffineMap imageMap = linalgOp.getMatchingIndexingMap(operand);
+    AffineExpr wExpr = imageMap.getResult(imageMap.getNumResults() - 2);
+    AffineExpr multiplicativeFactor =
+        getAffineConstantExpr(1, linalgOp.getContext());
+    // By definition a convolution affine expression can either be:
+    // a) AffineDimExpr
+    // b) AffineDimExpr + AffineDimExpr
+    // c) AffineDimExpr * AffineConstantExpr/AffineSymbolExpr + AffineDimExpr
+    assert(succeeded(walkConvExpr(wExpr, multiplicativeFactor)) &&
+           "something went really wrong");
+    strides[strides.size() - 2] = builder.getIndexAttr(
+        multiplicativeFactor.cast<AffineConstantExpr>().getValue());
+  }
   return utils::getSliceOperand(builder, linalgOp, operandToUse, offsets, sizes,
                                 strides, desiredResultRank);
 }
@@ -164,20 +234,6 @@ static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   return match;
 }
 
-// Check if the operation looks like a convolution.
-static bool isConvLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumInputs() != 2)
-    return false;
-  if (linalgOp.getNumOutputs() != 1)
-    return false;
-  if (llvm::any_of(linalgOp.getInputAndOutputOperands(),
-                   [](OpOperand *operand) {
-                     return !operand->get().getType().isa<ShapedType>();
-                   }))
-    return false;
-  return tpp::hasMatmulBody(linalgOp);
-}
-
 static bool isInBound(unsigned filterRank, unsigned rPos, unsigned sPos) {
   return !(rPos >= filterRank || sPos >= filterRank);
 }
@@ -189,7 +245,7 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "require a linalg.generic");
 
-  if (!isConvLike(linalgOp))
+  if (failed(mlir::linalg::detail::verifyConvolutionInterface(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp,
                                        "operation is not a convolution");
 
