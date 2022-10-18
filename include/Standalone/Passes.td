@@ -169,7 +169,9 @@ def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm",
   }];
   let options = [
     Option<"enableBrgemm", "enable-brgemm", "bool", "false",
-           "Map convolution to BRGEMM if possible">
+           "Map convolution to BRGEMM if possible">,
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for relayout">
   ];
   let constructor = "mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass()";
 }

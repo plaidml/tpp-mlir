@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -split-input-file -decompose-conv-to-matmul-or-brgemm | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -decompose-conv-to-matmul-or-brgemm="block-factors=32,32" | FileCheck %s
 
 func.func @conv(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
   // CHECK: linalg.matmul

@@ -186,7 +186,10 @@ struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 // Block a Conv2DNchwFchw. The pattern returns a generic operation
 // marked as 'tpp.blocked.Conv2DNchwFchwOp' on success.
 struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  using OpRewritePattern::OpRewritePattern;
+  BlockConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+                      PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit),
+        blockingFactors(blockingFactors) {}
 
   LogicalResult
   blockConv2DNchwFchwPreconditions(linalg::Conv2DNchwFchwOp convOp) const {
@@ -210,6 +213,10 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     if (convOp.hasBufferSemantics())
       return failure();
 
+    // blocking factors.
+    if (blockingFactors.empty())
+      return failure();
+
     return success();
   }
 
@@ -217,12 +224,10 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
                                 PatternRewriter &rewriter) const override {
     if (failed(blockConv2DNchwFchwPreconditions(convOp)))
       return failure();
-    // TODO: hardcoded values.
-    SmallVector<int64_t> tiles = {32, 32};
     FailureOr<linalg::GenericOp> maybeGeneric =
         mlir::linalgx::packConv2DNchwFchwOp(
             rewriter, convOp,
-            getAsOpFoldResult(rewriter.getI64ArrayAttr(tiles)));
+            getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
     if (failed(maybeGeneric))
       return failure();
     linalg::GenericOp generic = *maybeGeneric;
@@ -230,6 +235,9 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
         rewriter.getStringAttr("tpp.BlockedConv2DNchwFchwOp"));
     return success();
   }
+
+private:
+  SmallVector<int64_t> blockingFactors;
 };
 
 // Interchange iterator in a linalg.generic marked as
@@ -562,8 +570,9 @@ void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
 }
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
-void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns,
-                                               bool enableBrgemm) {
+void populateconv2DNchwFchwOpDecomposePatterns(
+    RewritePatternSet &patterns, ArrayRef<int64_t> blockingFactors,
+    bool enableBrgemm) {
   // clang-format off
   // init: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
   // blocking: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
@@ -574,26 +583,40 @@ void populateconv2DNchwFchwOpDecomposePatterns(RewritePatternSet &patterns,
   // clang-format on
 
   // This is for GEMM
-  if (!enableBrgemm)
-    patterns.insert<BlockConv2DNchwFchw, DecomposeConv2DNchwFchw,
-                    InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
+  if (!enableBrgemm) {
+    patterns.insert<BlockConv2DNchwFchw>(patterns.getContext(),
+                                         blockingFactors);
+    patterns
+        .insert<DecomposeConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw>(
+            patterns.getContext());
+  }
   // this is for BRGEMM
-  else
-    patterns.insert<BlockConv2DNchwFchw, CollapseFilterAndImage,
+  else {
+    patterns.insert<BlockConv2DNchwFchw>(patterns.getContext(),
+                                         blockingFactors);
+    patterns.insert<CollapseFilterAndImage,
                     InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
         patterns.getContext());
+  }
 }
 
 struct DecomposeConvToMatmulOrBrgemm
     : public DecomposeConvToMatmulOrBrgemmBase<DecomposeConvToMatmulOrBrgemm> {
   DecomposeConvToMatmulOrBrgemm() = default;
-  DecomposeConvToMatmulOrBrgemm(bool enableBrgemm) {
+  DecomposeConvToMatmulOrBrgemm(bool enableBrgemm,
+                                ArrayRef<int64_t> blockingFactors) {
     this->enableBrgemm = enableBrgemm;
+    this->blockingFactors = blockingFactors;
+  }
+  DecomposeConvToMatmulOrBrgemm(ArrayRef<int64_t> blockingFactors) {
+    this->enableBrgemm = false;
+    this->blockingFactors = blockingFactors;
   }
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     populateConv2DNhwcHwcfOpDecomposePatterns(patterns);
-    populateconv2DNchwFchwOpDecomposePatterns(patterns, enableBrgemm);
+    populateconv2DNchwFchwOpDecomposePatterns(patterns, blockingFactors,
+                                              enableBrgemm);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
