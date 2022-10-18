@@ -215,3 +215,64 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 // CHECK: scf.yield %[[LOOP1]] : tensor<1x2x56x56x32xf32>
 // CHECK: }
 // CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[LOOP0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG0]] : (tensor<1x2x56x56x32xf32> tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 2, filter_width_pos = 3)
+  }
+}
+
+func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
+  %1 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>,
+                                 strides = dense<2> : tensor<2xi64>}
+    ins(%arg0, %arg1 : tensor<1x113x113x64xf32>, tensor<3x3x64x256xf32>)
+    outs(%arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32>
+  return %1 : tensor<1x56x56x256xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
+// CHECK: func.func @main(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x113x113x64xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<3x3x64x256xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C56:.+]] = arith.constant 56 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<1x2x113x113x32xf32>
+// CHECK: %[[PACK0:.+]] = linalgx.pack %[[ARG0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUF0]] : (tensor<1x113x113x64xf32> tensor<1x2x113x113x32xf32>) -> tensor<1x2x113x113x32xf32>
+// CHECK: %[[BUF1:.+]] = tensor.empty() : tensor<8x2x3x3x32x32xf32>
+// CHECK: %[[PACK1:.+]] = linalgx.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[BUF1]] : (tensor<3x3x64x256xf32> tensor<8x2x3x3x32x32xf32>) -> tensor<8x2x3x3x32x32xf32>
+// CHECK: %[[BUF2:.+]] = tensor.empty() : tensor<1x8x56x56x32xf32>
+// CHECK: %[[PACK2:.+]] = linalgx.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUF2]] : (tensor<1x56x56x256xf32> tensor<1x8x56x56x32xf32>) -> tensor<1x8x56x56x32xf32>
+// CHECK: %[[LOOP1:.+]] = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C8]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[PACK2]]) -> (tensor<1x8x56x56x32xf32>) {
+// CHECK: %[[LOOP2:.+]] = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C56]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<1x8x56x56x32xf32>) {
+// CHECK: %[[LOOP3:.+]] = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG8:.+]] = %[[ARG6]]) -> (tensor<1x8x56x56x32xf32>) {
+// CHECK: %[[LOOP4:.+]] = scf.for %[[ARG9:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG10:.+]] = %[[ARG8]]) -> (tensor<1x8x56x56x32xf32>) {
+// CHECK: %[[LOOP5:.+]] = scf.for %[[ARG11:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG12:.+]] = %[[ARG10]]) -> (tensor<1x8x56x56x32xf32>) {
+// CHECK: %[[AFFINEAPPLY:.+]] = affine.apply #[[MAP]](%[[ARG5]], %[[ARG9]])
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[PACK0]][0, %[[ARG7]], %[[AFFINEAPPLY]], %[[ARG11]], 0] [1, 1, 1, 56, 32] [1, 1, 1, 2, 1] : tensor<1x2x113x113x32xf32> to tensor<56x32xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[PACK1]][%[[ARG3]], %[[ARG7]], %[[ARG9]], %[[ARG11]], 0, 0] [1, 1, 1, 1, 32, 32] [1, 1, 1, 1, 1, 1] : tensor<8x2x3x3x32x32xf32> to tensor<32x32xf32>
+// CHECK: %[[SLICE3:.+]] = tensor.extract_slice %[[ARG12]][0, %[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : tensor<1x8x56x56x32xf32> to tensor<56x32xf32>
+// CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[SLICE1]], %[[SLICE2]] : tensor<56x32xf32>, tensor<32x32xf32>) outs(%[[SLICE3]] : tensor<56x32xf32>) -> tensor<56x32xf32>
+// CHECK: %[[INSERT1:.+]] = tensor.insert_slice %[[MUL]] into %[[ARG12]][0, %[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : tensor<56x32xf32> into tensor<1x8x56x56x32xf32>
+// CHECK: scf.yield %[[INSERT1]] : tensor<1x8x56x56x32xf32>
+// CHECK: }
+// CHECK: scf.yield %[[LOOP5]] : tensor<1x8x56x56x32xf32>
+// CHECK: }
+// CHECK: scf.yield %[[LOOP4]] : tensor<1x8x56x56x32xf32>
+// CHECK: }
+// CHECK: scf.yield %[[LOOP3]] : tensor<1x8x56x56x32xf32>
+// CHECK: }
+// CHECK: scf.yield %[[LOOP2]] : tensor<1x8x56x56x32xf32>
+// CHECK: }
+// CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[LOOP1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : (tensor<1x8x56x56x32xf32> tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32>
