@@ -16,6 +16,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 
 using namespace mlir;
 
@@ -147,7 +148,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     // further restrict to single result operations.
-    linalg::OpOperandVector operands = isInplace(linalgOp)
+    OpOperandVector operands = isInplace(linalgOp)
                                            ? linalgOp.getOutputOperands()
                                            : linalgOp.getInputOperands();
     if (operands.size() != 1)
