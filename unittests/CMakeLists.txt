@@ -1,14 +1,14 @@
-set_target_properties(StandaloneUnitTests PROPERTIES FOLDER "Standalone Tests")
+set_target_properties(TPPUnitTests PROPERTIES FOLDER "TPP Tests")
 
 function(add_tpp_unittest name)
-  add_unittest(StandaloneUnitTests ${name} ${ARGN})
+  add_unittest(TPPUnitTests ${name} ${ARGN})
 endfunction()
 
-add_tpp_unittest(TppUnitTests 
+add_tpp_unittest(SmokeUnitTests 
   Smoke.cpp
 )
 
-target_link_libraries(TppUnitTests
+target_link_libraries(SmokeUnitTests
   PRIVATE
   MLIRTPP
   )
