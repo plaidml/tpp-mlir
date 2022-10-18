@@ -16,7 +16,7 @@ There's [work in progress](https://github.com/iree-org/iree/tree/tpp) inside [IR
 
 ```sh
 # Clone
-https://github.com/llvm/llvm-project.git
+git clone https://github.com/llvm/llvm-project.git
 mkdir llvm-project/build
 pushd llvm-project/build
 
