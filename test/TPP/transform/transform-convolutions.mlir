@@ -11,7 +11,7 @@ transform.with_pdl_patterns {
   }
 }
 
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>, 
+func.func @conv2d(%arg0: tensor<1x56x56x64xf32>, 
                                            %arg1: tensor<3x3x64x64xf32>,
                                            %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> { 
   %3 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg2, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) 
@@ -20,7 +20,7 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 + d1)>
-// CHECK: func.func @conv2d_1x56x56x64_3x3x64x64_pad(
+// CHECK: func.func @conv2d(
 // CHECK-SAME: %[[arg0:.*]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME: %[[arg1:.*]]: tensor<3x3x64x64xf32>,
 // CHECK-SAME: %[[arg2:.*]]: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
@@ -28,7 +28,6 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
 // CHECK-DAG: %[[ubFilter:.*]] = arith.constant 3 : index
 // CHECK-DAG: %[[ubImage:.*]] = arith.constant 56 : index
-
 // CHECK: %{{.*}} = scf.for %[[p0:.*]] = %[[zero]] to %[[ubImage]] step %[[step]] iter_args(%[[larg0:.*]] = %[[arg0]]) -> (tensor<1x56x56x64xf32>) {
 // CHECK: %{{.*}} = scf.for %[[r0:.*]] = %[[zero]] to %[[ubFilter]] step %[[step]] iter_args(%[[larg1:.*]] = %[[larg0]]) -> (tensor<1x56x56x64xf32>) {
 // CHECK: %{{.*}} = scf.for %[[r1:.*]] = %[[zero]] to %[[ubFilter]] step %[[step]] iter_args(%[[larg2:.*]] = %[[larg1]]) -> (tensor<1x56x56x64xf32>) {
@@ -77,7 +76,7 @@ transform.with_pdl_patterns {
   }
 }
 
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
+func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
                                            %arg1: tensor<3x3x64x64xf32>,
                                            %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
   // expected-note @below {{when applied to this op}} 
@@ -101,7 +100,7 @@ transform.with_pdl_patterns {
   }
 }
 
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
+func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
                                            %arg1: tensor<3x3x64x64xf32>,
                                            %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
   // expected-note @below {{when applied to this op}}
@@ -123,7 +122,7 @@ transform.with_pdl_patterns {
 }
 
 // Expect linalg.matmul: linalg.matmul -> linalg.generic -> linalg.matmul 
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<58x64xf32>,
+func.func @matmul(%arg0: tensor<58x64xf32>,
                                            %arg1: tensor<64x64xf32>,
                                            %arg2: tensor<58x64xf32>) -> tensor<58x64xf32> {
   // CHECK: linalg.matmul
@@ -146,8 +145,8 @@ transform.with_pdl_patterns {
 }
 
 // We don't expect a matmul here as filter_height_pos and filter_width_pos are invalid. 
-// filter_width_pos must at position filter_height_pos + 1
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<58x64xf32>,
+// filter_width_pos must be at position filter_height_pos + 1
+func.func @matmul(%arg0: tensor<58x64xf32>,
                                            %arg1: tensor<64x64xf32>,
                                            %arg2: tensor<58x64xf32>) -> tensor<58x64xf32> {
   // expected-note @below {{when applied to this op}}
@@ -169,7 +168,7 @@ transform.with_pdl_patterns {
   }
 }
 
-func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
+func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
                                            %arg1: tensor<3x3x64x64xf32>,
                                            %arg2: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
   %3 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg2, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>)
@@ -178,7 +177,7 @@ func.func @conv2d_1x56x56x64_3x3x64x64_pad(%arg0: tensor<1x56x56x64xf32>,
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
-// CHECK: func.func @conv2d_1x56x56x64_3x3x64x64_pad(
+// CHECK: func.func @conv2d(
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<3x3x64x64xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<1x58x58x64xf32>) -> tensor<1x56x56x64xf32> {
@@ -229,7 +228,7 @@ transform.with_pdl_patterns {
   }
 }
 
-func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
+func.func @conv2d(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
   %1 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>,
                                  strides = dense<2> : tensor<2xi64>}
     ins(%arg0, %arg1 : tensor<1x113x113x64xf32>, tensor<3x3x64x256xf32>)
@@ -238,7 +237,7 @@ func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, 
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
-// CHECK: func.func @main(
+// CHECK: func.func @conv2d(
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<1x113x113x64xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<3x3x64x256xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
