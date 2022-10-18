@@ -53,7 +53,8 @@ llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [config.tpp_tools_dir, config.llvm_tools_dir]
 tools = [
-    'tpp-opt'
+    'tpp-opt',
+    'tpp-run'
 ]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)

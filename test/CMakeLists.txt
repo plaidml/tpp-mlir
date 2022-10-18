@@ -15,6 +15,7 @@ configure_lit_site_cfg(
 set(TPP_OPT_TEST_DEPENDS
         FileCheck count not
         tpp-opt
+        tpp-run
         TPPUnitTests
         )
 
