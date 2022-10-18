@@ -3,8 +3,10 @@
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 # Permit using $TPP_COMPILER (installed) rather than local build directory.
-if [ ! "$TPP_COMPILER_PREBUILT" ] || [ "0" = "$TPP_COMPILER_PREBUILT" ]; then
-  TPP_COMPILER=$HERE/../build
+if [ ! "$TPP_COMPILER" ]; then
+  if [ ! "$TPP_COMPILER_PREBUILT" ] || [ "0" = "$TPP_COMPILER_PREBUILT" ]; then
+    TPP_COMPILER=$HERE/../build
+  fi
 fi
 
 # This assumes the sandbox was built as described in the readme.
@@ -24,8 +26,11 @@ echo "lib include path: ${LIB_INCLUDE_PATH}"
 # make tpp-opt (TPP compiler) available.
 export PATH=${BIN_PATH}:$PATH
 
-# Common LLC args
+# LLVM options.
 LLC_ARGS="-opaque-pointers --relocation-model=pic"
+if [ "$LLVM_DIR" ]; then
+  export PATH=$PATH:$LLVM_DIR/bin
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,24 +39,30 @@ NC='\033[0m' # No Color
 if ! command -v tpp-opt &> /dev/null
 then
   echo "tpp-opt could not be found"
+  echo "Try: TPP_COMPILER=/path/to/tpp/build $0"
   exit
 fi
 
 if ! command -v mlir-translate &> /dev/null
 then
   echo "mlir-translate could not be found"
+  echo "Try: LLVM_DIR=/path/to/llvm/build $0"
   exit
 fi
 
 if ! command -v llc &> /dev/null
 then
   echo "llc could not be found"
+  echo "Try: LLVM_DIR=/path/to/llvm/build $0"
   exit
 fi
 
 if ! command -v clang &> /dev/null
 then
   echo "clang could not be found"
+  echo "If clang is built in, try:"
+  echo "    LLVM_DIR=/path/to/llvm/build $0"
+  echo "Otherwise, just install the clang package"
   exit
 fi
 
