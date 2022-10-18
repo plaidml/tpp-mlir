@@ -9,7 +9,7 @@ compile () {
   
   # Compile driver. 
   clang -O3 -emit-llvm -S -I$LIB_INCLUDE_PATH -DARG_MNK=\"${1}\" matmul_driver.c
-  llc matmul_driver.ll
+  llc $LLC_ARGS matmul_driver.ll
 
   # Fire tpp compiler (with xsmm conversion).
   tpp-opt matmul_kernel_${1}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize
@@ -19,7 +19,7 @@ compile () {
     -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm \
     -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts \
   | mlir-translate -mlir-to-llvmir -o matmul_kernel_${1}.ll
-  llc matmul_kernel_${1}.ll
+  llc $LLC_ARGS matmul_kernel_${1}.ll
 
   # Merge them.
   unamestr=$(uname)

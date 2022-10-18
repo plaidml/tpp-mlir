@@ -7,13 +7,13 @@ KERNEL=simple_copy_kernel
 
 # Compile driver. 
 clang -O3 -emit-llvm -S ${DRIVER}.c
-llc ${DRIVER}.ll
+llc $LLC_ARGS ${DRIVER}.ll
 
 # Fire tpp compiler.
 tpp-opt ${KERNEL}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp
 
 tpp-opt ${KERNEL}.mlir -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts | mlir-translate -mlir-to-llvmir -o ${KERNEL}.ll
-llc ${KERNEL}.ll
+llc $LLC_ARGS ${KERNEL}.ll
 
 # Merge them.
 unamestr=$(uname)

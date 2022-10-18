@@ -24,6 +24,9 @@ echo "lib include path: ${LIB_INCLUDE_PATH}"
 # make tpp-opt (TPP compiler) available.
 export PATH=${BIN_PATH}:$PATH
 
+# Common LLC args
+LLC_ARGS="-opaque-pointers --relocation-model=pic"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
