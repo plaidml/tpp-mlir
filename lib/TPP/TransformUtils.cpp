@@ -169,8 +169,6 @@ FailureOr<Value> getSliceOperand(OpBuilder &builder, OpOperand *operand,
 FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     linalg::LinalgOp linalgOp,
                                                     unsigned upTo) {
-  if (linalgOp.hasDynamicShape())
-    return failure();
   Location loc = linalgOp.getLoc();
   SmallVector<OpFoldResult> allShapeSizes =
       linalgOp.createFlatListOfOperandDims(rewriter, loc);
