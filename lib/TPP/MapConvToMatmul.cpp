@@ -36,24 +36,25 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
       output->get().getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> filterShape =
       filter->get().getType().cast<ShapedType>().getShape();
-  int64_t m = outputShape[outputShape.size() - 2];
-  int64_t k = filterShape[filterShape.size() - 2];
-  sizes.push_back(builder.getIndexAttr(m));
-  sizes.push_back(builder.getIndexAttr(k));
+  int64_t mIdx = outputShape.size() - 2;
+  int64_t kIdx = filterShape.size() - 2;
+  sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
+                                            output->get(), mIdx));
+  sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
+                                            filter->get(), kIdx));
   return sizes;
 }
 
-// XXX: We can also handle `?` as long as the filter R and S are static.
 // Check dimension at index 'i' and 'j'. If both are '1' return true
 // otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
                                        unsigned j) {
   ShapedType filterType = filter->get().getType().cast<ShapedType>();
-  if (!filterType.hasStaticShape())
-    return false;
   ArrayRef<int64_t> filterShape = filterType.getShape();
   assert(i < filterShape.size() && "out of bound");
   assert(j < filterShape.size() && "out of bound");
+  assert(filterShape[i] != ShapedType::kDynamicSize && "must be static");
+  assert(filterShape[j] != ShapedType::kDynamicSize && "must be static");
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
@@ -116,7 +117,6 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                          ValueRange valuesToUse, ArrayRef<int64_t> rAndSPos) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
-  assert(operandType.hasStaticShape() && "tensor must have static shape");
   size_t rank = operandType.getRank();
   bool isImage = (operand->getOperandNumber() == 0) ? true : false;
   unsigned desiredResultRank = 2;
@@ -143,7 +143,8 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
     for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
       sizes.push_back(builder.getIndexAttr(1));
     for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
-      sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+      sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
+                                                operand->get(), idx));
   }
 
   // We need to take into accound possible strides on W. Strides on the H
@@ -234,8 +235,22 @@ static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   return match;
 }
 
-static bool isInBound(unsigned filterRank, unsigned rPos, unsigned sPos) {
+// Return true if Rpos and Spos are valid.
+static bool isValidRandS(OpOperand *filter, unsigned rPos, unsigned sPos) {
+  ShapedType filterType = filter->get().getType().cast<ShapedType>();
+  unsigned filterRank = filterType.getRank();
+  if (sPos != rPos + 1)
+    return false;
   return !(rPos >= filterRank || sPos >= filterRank);
+}
+
+// Return true if the filter shape at pos rPos and sPos is statically known.
+static bool isValidFilterShape(OpOperand *filter, unsigned rPos,
+                               unsigned sPos) {
+  ShapedType filterType = filter->get().getType().cast<ShapedType>();
+  ArrayRef<int64_t> filterShape = filterType.getShape();
+  return ((filterShape[rPos] != ShapedType::kDynamicSize) &&
+          (filterShape[sPos] != ShapedType::kDynamicSize));
 }
 
 FailureOr<linalg::MatmulOp>
@@ -253,16 +268,12 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(
         linalgOp, "cannot match operation iterators with matmul iterators");
 
-  if (sPos != rPos + 1)
-    return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and sPos");
+  OpOperand *filter = linalgOp.getInputOperands()[1];
+  if (!isValidRandS(filter, rPos, sPos))
+    return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and SPos");
 
-  unsigned filterRank = linalgOp.getInputOperands()[1]
-                            ->get()
-                            .getType()
-                            .cast<ShapedType>()
-                            .getRank();
-  if (!isInBound(filterRank, rPos, sPos))
-    return rewriter.notifyMatchFailure(linalgOp, "rPos or sPos out of bound");
+  if (!isValidFilterShape(filter, rPos, sPos))
+    return rewriter.notifyMatchFailure(linalgOp, "invalid filter shape");
 
   // peel-out all loops but the three innermost.
   unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;

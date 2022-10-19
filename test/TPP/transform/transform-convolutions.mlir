@@ -275,3 +275,75 @@ func.func @conv2d(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>
 // CHECK: scf.yield %[[LOOP2]] : tensor<1x8x56x56x32xf32>
 // CHECK: }
 // CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[LOOP1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : (tensor<1x8x56x56x32xf32> tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32>
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.generalize %0
+      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
+  }
+}
+
+func.func @conv2d(%arg0: tensor<?x?x?x?xf32>,
+                                           %arg1: tensor<3x3x?x?xf32>,
+                                           %arg2: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+  %3 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg2, %arg1 : tensor<?x?x?x?xf32>, tensor<3x3x?x?xf32>)
+             outs(%arg0 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+ return %3 : tensor<?x?x?x?xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+// CHECK: func.func @conv2d(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<?x?x?x?xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<3x3x?x?xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[DIM:.+]] = tensor.dim %[[ARG2]], %[[C0]] : tensor<?x?x?x?xf32>
+// CHECK: %[[DIM0:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?x?x?xf32>
+// CHECK: %[[LOOP0:.+]] = scf.for %[[ARG3]] = %[[C0]] to %[[DIM]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[ARG0]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5]] = %[[C0]] to %[[DIM0]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK: %[[LOOP2:.+]] = scf.for %[[ARG7]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG8:.+]] = %[[ARG6]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK: %[[LOOP3:.+]] = scf.for %[[ARG9]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG10:.+]] = %[[ARG8]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG5]], %[[ARG7]])
+// CHECK: %[[DIM1:.+]] = tensor.dim %[[ARG0]], %[[C2]] : tensor<?x?x?x?xf32>
+// CHECK: %[[DIM2:.+]] = tensor.dim %[[ARG1]], %[[C2]] : tensor<3x3x?x?xf32>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], %[[APPLY]], %[[ARG9]], 0] [1, 1, %[[DIM1]], %[[DIM2]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<?x?xf32>
+// CHECK: %[[DIM3:.+]] = tensor.dim %[[ARG1]], %[[C2]] : tensor<3x3x?x?xf32>
+// CHECK: %[[DIM4:.+]] = tensor.dim %[[ARG1]], %[[C3]] : tensor<3x3x?x?xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG7]], %[[ARG9]], 0, 0] [1, 1, %[[DIM3]], %[[DIM4]]] [1, 1, 1, 1] : tensor<3x3x?x?xf32> to tensor<?x?xf32>
+// CHECK: %[[DIM6:.+]] = tensor.dim %[[ARG0]], %[[C2]] : tensor<?x?x?x?xf32>
+// CHECK: %[[DIM7:.+]] = tensor.dim %[[ARG0]], %[[C3]] : tensor<?x?x?x?xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[ARG10]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, %[[DIM6]], %[[DIM7]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<?x?xf32>
+// CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[SLICE0]], %[[SLICE1]] : tensor<?x?xf32>, tensor<?x?xf32>) outs(%[[SLICE2]] : tensor<?x?xf32>) -> tensor<?x?xf32>
+// CHECK: %[[INSERTED:.+]] = tensor.insert_slice %[[MUL]] into %[[ARG10]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, %[[DIM6]], %[[DIM7]]] [1, 1, 1, 1] : tensor<?x?xf32> into tensor<?x?x?x?xf32>
+
+// -----
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  sequence %arg0 failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.generalize %0
+      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+      // expected-error @below {{Could not map to matmul}}
+      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
+  }
+}
+
+func.func @conv2d(%arg0: tensor<?x?x?x?xf32>,
+                                           %arg1: tensor<3x?x?x?xf32>,
+                                           %arg2: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+  // expected-note @below {{when applied to this op}}
+  %3 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg2, %arg1 : tensor<?x?x?x?xf32>, tensor<3x?x?x?xf32>)
+             outs(%arg0 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+ return %3 : tensor<?x?x?x?xf32>
+}

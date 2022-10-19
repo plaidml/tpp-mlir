@@ -14,7 +14,9 @@ compile () {
 
   # Let's avoid calling the sparse compiler to lower to LLVM.
   tpp-opt mlp_kernel.mlir -map-linalg-to-tpp -main-closure -pre-bufferization -pack-matmul="block-factors=2,2" -loop-invariant-code-motion -canonicalize -undo-main-closure -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0" -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm -convert-linalg-to-tpp -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-linalg-to-loops -arith-expand -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -sparse-compiler | mlir-translate -mlir-to-llvmir -o mlp_kernel.ll
+
   llc $LLC_ARGS mlp_kernel.ll
+
 
   # Merge them.
   unamestr=$(uname)
