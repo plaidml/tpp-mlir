@@ -28,13 +28,87 @@ using namespace mlir::bufferization;
 // PackOp and UnPackOp canonicalizer
 //===----------------------------------------------------------------------===//
 
-LogicalResult PackOp::canonicalize(PackOp packOp, PatternRewriter &rewriter) {
-  linalgx::UnPackOp unpackOp =
-      packOp.getInput().getDefiningOp<linalgx::UnPackOp>();
-  if (!unpackOp)
-    return failure();
-  rewriter.replaceOp(packOp, unpackOp.getInput());
-  return success();
+// Remove chain of pack(unpack(x)).
+struct PackUnPackSequence : public OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    UnPackOp unpackOp = packOp.getInput().getDefiningOp<linalgx::UnPackOp>();
+    if (!unpackOp)
+      return failure();
+    rewriter.replaceOp(packOp, unpackOp.getInput());
+    return success();
+  }
+};
+
+static FailureOr<Value> insertExpand(Value operand, Type newOperandType,
+                                     ArrayAttr reassociation, Location loc,
+                                     RewriterBase &rewriter) {
+  Type operandType = operand.getType();
+  if (operandType == newOperandType)
+    return operand;
+  if (operandType.isa<MemRefType>())
+    return rewriter
+        .create<memref::ExpandShapeOp>(loc, newOperandType, operand,
+                                       reassociation)
+        .getResult();
+  if (operandType.isa<RankedTensorType>())
+    return rewriter
+        .create<tensor::ExpandShapeOp>(loc, newOperandType, operand,
+                                       reassociation)
+        .getResult();
+  return failure();
+}
+
+// Packing a one-dimensional tensor can be expressed as an expand operation.
+struct PackToExpandShape : public OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    Value input = packOp.getInput();
+    ShapedType inputType = input.getType().cast<ShapedType>();
+    ShapedType outputType = packOp.getOutput().getType().cast<ShapedType>();
+    if (inputType.getRank() != 1)
+      return failure();
+    auto reassociation =
+        getReassociationIndicesForReshape(inputType, outputType);
+    if (!reassociation)
+      return failure();
+    FailureOr<Value> expanded =
+        insertExpand(input, outputType,
+                     getReassociationIndicesAttribute(rewriter, *reassociation),
+                     packOp.getLoc(), rewriter);
+    if (failed(expanded))
+      return failure();
+    rewriter.replaceOp(packOp, *expanded);
+    return success();
+  }
+};
+
+// Packing a tensor.empty does not make sense, forward it.
+struct ForwardTensorEmpty : public OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    Value input = packOp.getInput();
+    tensor::EmptyOp tensorEmpty = input.getDefiningOp<tensor::EmptyOp>();
+    if (!tensorEmpty)
+      return failure();
+    ShapedType outputType = packOp.getOutputType();
+    if (!outputType.hasStaticShape())
+      return failure();
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
+        packOp, packOp.getOutputShape(), packOp.getElementType());
+    return success();
+  }
+};
+
+void PackOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *ctx) {
+  results.add<PackUnPackSequence, PackToExpandShape, ForwardTensorEmpty>(ctx);
 }
 
 LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,

@@ -155,7 +155,7 @@ def PackOp : LinalgX_Op<"pack", [
   ];
 
   let hasVerifier = 1;
-  let hasCanonicalizeMethod = 1;
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
