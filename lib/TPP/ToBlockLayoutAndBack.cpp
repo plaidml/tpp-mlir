@@ -466,6 +466,7 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkRelayoutPatterns(patterns);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -512,6 +513,71 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
 };
 
 //===----------------------------------------------------------------------===//
+// PropagateThroughPadOp
+//===----------------------------------------------------------------------===//
+
+// The idea is to add as many zero padding dimensions in `high` and `low` based
+// on the number of point loops.
+struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    Value inputPad = padOp.getSource();
+    linalgx::UnPackOp unpackOp = inputPad.getDefiningOp<linalgx::UnPackOp>();
+    if (!unpackOp)
+      return failure();
+
+    // no outer dim allowed.
+    SmallVector<int64_t> outerDimsPerm =
+        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
+    if (!outerDimsPerm.empty())
+      return failure();
+
+    // bail out if one of the padded dimension is a tiled one.
+    llvm::SmallBitVector paddedDims = padOp.getPaddedDims();
+    SmallVector<int64_t> innerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    llvm::SmallBitVector innerDims(paddedDims.size());
+    for (int64_t dim : innerDimsPos)
+      paddedDims.flip(dim);
+    if (paddedDims.anyCommon(innerDims))
+      return failure();
+
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+    size_t innerDimsPosSize = innerDimsPos.size();
+    lowPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
+    highPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
+
+    auto newPadOp = rewriter.create<tensor::PadOp>(
+        padOp.getLoc(), /*result type=*/nullptr, unpackOp.getInput(), lowPad,
+        highPad, padOp.getNofold());
+    SmallVector<Type> padArgsType(lowPad.size(), rewriter.getIndexType());
+    SmallVector<Location> locs(lowPad.size(), padOp.getLoc());
+    // Well, why this is not done by the builder?
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.createBlock(&newPadOp.getRegion(), newPadOp.getRegion().begin(),
+                           padArgsType, locs);
+      rewriter.create<tensor::YieldOp>(padOp.getLoc(),
+                                       padOp.getConstantPaddingValue());
+    }
+    Value padOpRes = newPadOp.getResult();
+    ShapedType padResultType = padOp.getResultType();
+    Value outputUnPack = rewriter.create<tensor::EmptyOp>(
+        padOp.getLoc(), padResultType.getShape(),
+        padResultType.getElementType());
+    Value replacement = toUnPackLayoutImpl(
+        padOp.getLoc(), padOpRes, outputUnPack, unpackOp.getMixedTiles(),
+        innerDimsPos, /*outer_dims_perm=*/{}, rewriter);
+
+    rewriter.replaceOp(padOp, replacement);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // PropagateThroughElementWiseOp
 //===----------------------------------------------------------------------===//
 
@@ -525,7 +591,6 @@ struct PropagateThroughElementWiseOp
   LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
     if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
       return failure();
-
     return success();
   }
 
@@ -627,20 +692,24 @@ struct PropagateThroughElementWiseOp
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       unsigned numSymbols = 0;
       unsigned numDims = linalgOp.getNumLoops() + packedDims;
-      SmallVector<AffineExpr> dimTiledLoops;
+      unsigned oldResultExprs = mapOperand.getNumResults();
+      SmallVector<AffineExpr> dimLoops(oldResultExprs,
+                                       rewriter.getAffineDimExpr(-1));
       SmallVector<AffineExpr> dimPointLoops;
-      for (unsigned posInCodomain = 0;
-           posInCodomain < mapOperand.getNumResults(); posInCodomain++) {
+      unsigned pointLoopIdx = 0;
+      for (unsigned posInCodomain = 0; posInCodomain < oldResultExprs;
+           posInCodomain++) {
         unsigned posInDomain = mapOperand.getDimPosition(posInCodomain);
-        if (dimAndTileMapping.count(posInDomain)) {
-          dimTiledLoops.push_back(rewriter.getAffineDimExpr(posInDomain));
-          dimPointLoops.push_back(
-              rewriter.getAffineDimExpr(posInDomain + packedDims));
-        }
+        if (dimAndTileMapping.count(posInDomain))
+          dimPointLoops.push_back(rewriter.getAffineDimExpr(
+              linalgOp.getNumLoops() + pointLoopIdx++));
+        dimLoops[posInCodomain] = rewriter.getAffineDimExpr(posInDomain);
       }
-      dimTiledLoops.append(dimPointLoops.begin(), dimPointLoops.end());
-      AffineMap newMap = AffineMap::get(numDims, numSymbols, dimTiledLoops,
-                                        linalgOp.getContext());
+      // TODO: bail out if we need to interchange the point loops:
+      // inner_dims_pos.
+      dimLoops.append(dimPointLoops);
+      AffineMap newMap =
+          AffineMap::get(numDims, numSymbols, dimLoops, linalgOp.getContext());
       newMaps.push_back(newMap);
     }
 
@@ -680,7 +749,8 @@ struct PropagateThroughElementWiseOp
 } // end namespace
 
 void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
-  patterns.add<PropagateThroughElementWiseOp>(patterns.getContext());
+  patterns.add<PropagateThroughElementWiseOp, PropagateThroughPadOp>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
