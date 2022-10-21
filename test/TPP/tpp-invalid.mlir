@@ -4,8 +4,7 @@ func.func @myfunc(%arg0: memref<1x2xf32>,
                   %arg1: memref<2x2xf32>, %arg2: memref<2x1xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
-  tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) 
-          out(%arg2: memref<2x1xf32>)
+  tpp.add ins(%arg0: memref<1x2xf32>) out(%arg2: memref<2x1xf32>)
 
   return %arg2: memref<2x1xf32>
 }

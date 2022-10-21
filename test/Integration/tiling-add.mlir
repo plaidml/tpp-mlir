@@ -35,11 +35,11 @@
 module {
 
   func.func @bigadd(%A: tensor<32x16xf32>,
-                  %B: tensor<32x16xf32>, %C: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
-    %O = linalg.generic { indexing_maps = [#map0, #map0, #map0],
+                  %B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
+    %O = linalg.generic { indexing_maps = [#map0, #map0],
                         iterator_types = ["parallel", "parallel"] }
-      ins(%A, %B: tensor<32x16xf32>, tensor<32x16xf32>) outs(%C: tensor<32x16xf32>) {
-        ^bb0(%a: f32, %b: f32, %c: f32):
+      ins(%A : tensor<32x16xf32>) outs(%B: tensor<32x16xf32>) {
+        ^bb0(%a: f32, %b: f32):
           %0 = arith.addf %a, %b : f32
           linalg.yield %0: f32
       } -> tensor<32x16xf32>
@@ -125,8 +125,7 @@ module {
 
     ]> : tensor<32x16xf32>
 
-    %C = arith.constant dense<0.0> : tensor<32x16xf32>
-    %0 = call @bigadd(%da, %db, %C) : (tensor<32x16xf32>, tensor<32x16xf32>, tensor<32x16xf32>) -> tensor<32x16xf32>
+    %0 = call @bigadd(%da, %db) : (tensor<32x16xf32>, tensor<32x16xf32>) -> tensor<32x16xf32>
 
     // 
     // CHECK: (     ( 2.2, 4.2, 6.2, 8.2, 10.2, 12.2, 14.2, 16.2, 18.2, 20.2, 22.2, 24.2, 26.2, 28.2, 30.2, 32.2 ), 

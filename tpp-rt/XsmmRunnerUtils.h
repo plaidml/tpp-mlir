@@ -67,7 +67,6 @@ _mlir_ciface_xsmm_unary_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_binary_invoke(int64_t, UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *,
                                 UnrankedMemRefType<float> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
