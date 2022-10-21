@@ -30,7 +30,7 @@ def Tpp_Dialect : Dialect {
 // Base operation definition.
 //===----------------------------------------------------------------------===//
 
-class Tpp_Op<string mnemonic, list<Trait> traits = []> :
+class Tpp_Op<string mnemonic, list<Trait> traits = [SameOperandsElementType]> :
         Op<Tpp_Dialect, mnemonic, traits>;
 
 #endif // TPP_TPP_DIALECT

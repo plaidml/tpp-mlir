@@ -75,6 +75,11 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     return hasMatmulBody(linalgOp);
   }
 
+  // Return true if the operation as 1 input and 1 output.
+  bool hasOneInputOneOutput(linalg::GenericOp linalgOp) const {
+    return ((linalgOp.getNumInputs() == 1) && (linalgOp.getNumOutputs() == 1));
+  }
+
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!hasStaticShape(linalgOp))
@@ -108,7 +113,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
     if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
-        hasStaticShape(linalgOp)) {
+        hasStaticShape(linalgOp) && hasOneInputOneOutput(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
       rewriter.updateRootInPlace(
           linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });

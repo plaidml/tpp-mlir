@@ -1,18 +1,25 @@
 // RUN: tpp-opt %s -split-input-file -verify-diagnostics 
 
-func.func @myfunc(%arg0: memref<1x2xf32>, 
-                  %arg1: memref<2x2xf32>, %arg2: memref<2x1xf32>) -> memref<2x1xf32> {
+func.func @tpp_add_invalid(%arg0: memref<1x2xf32>, 
+                           %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
-  tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) 
-          out(%arg2: memref<2x1xf32>)
-
-  return %arg2: memref<2x1xf32>
+  tpp.add ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x2xf32>)
+  return %arg1: memref<2x2xf32>
 }
 
 // -----
 
-func.func @myfunc(%arg0: memref<1x2xf32>, %arg1: memref<2x1xf32>) -> memref<2x1xf32> {
+func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
+  // expected-error @below {{'tpp.add' op expects both operands to be shaped type}}
+  tpp.add ins(%arg0: f32) out(%arg1: f32)
+  return
+} 
+
+
+// -----
+
+func.func @tpp_relu_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x1xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.relu' op requires all operands to have the same type}}
   tpp.relu ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x1xf32>)
@@ -21,9 +28,9 @@ func.func @myfunc(%arg0: memref<1x2xf32>, %arg1: memref<2x1xf32>) -> memref<2x1x
 
 // -----
 
-func.func @myfunc(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) -> memref<1x2xf32> {
+func.func @tpp_identity_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) -> memref<1x2xf32> {
 
-  // expected-error @below {{broadcast incompatible}}
+  // expected-error @below {{'tpp.identity' op fails to verify broadcasting rules}}
   tpp.identity ins(%arg1: memref<2x2xf32>) out(%arg0: memref<1x2xf32>)
   return %arg0: memref<1x2xf32>
 }
@@ -38,9 +45,57 @@ func.func @myfunc(%arg0: memref<?x?xf32>, %arg1: memref<2x2xf32>) -> memref<2x2x
 
 // -----
 
-func.func @myfunc(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) -> memref<3x3xf32> {
+func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) -> memref<3x3xf32> {
 
-  // expected-error @below {{broadcast incompatible}}
+  // expected-error @below {{'tpp.identity' op fails to verify broadcasting rules}}
   tpp.identity ins(%arg1: memref<2x3xf32>) out(%arg0: memref<3x3xf32>)
   return %arg0: memref<3x3xf32>
+}
+
+// -----
+
+func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, 
+                              %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
+  // expected-error @below {{'tpp.matmul' op fails to verify operands dimensions mismatch}}
+  tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>) out(%arg2: memref<5x5xf32>)
+  return %arg2: memref<5x5xf32>
+}
+
+// -----
+
+// The batch dimension must agree in both arg0 and arg1.
+func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>, 
+                              %arg2: memref<2x2xf32>) -> memref<2x2xf32> {
+  // expected-error @below {{'tpp.brgemm' op fails to verify operands dimensions mismatch}}
+  tpp.brgemm ins(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>) out(%arg2: memref<2x2xf32>)
+  return %arg2: memref<2x2xf32>
+}
+
+// -----
+
+func.func @tpp_matmul_invalid(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>,
+                              %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
+  // expected-error @below {{'tpp.matmul' op fails to verify operands dimensions mismatch}}
+  tpp.matmul ins(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xbf16>)
+  return %arg2: memref<6x6xbf16>
+}
+
+// -----
+
+// Mixed types
+func.func @tpp_matmul_invalid(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>,
+                              %arg2: memref<6x6xf32>) -> memref<6x6xf32> {
+  // expected-error @below {{'tpp.matmul' op requires the same element type for all operands}}
+  tpp.matmul ins(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xf32>)
+  return %arg2: memref<6x6xf32>
+}
+
+// -----
+
+// Mixed types
+func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
+                              %arg2: memref<3x3xbf16>) -> memref<3x3xbf16> {
+  // expected-error @below {{'tpp.matmul' op requires the same element type for all operands}}
+  tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>) out(%arg2: memref<3x3xbf16>)
+  return %arg2: memref<3x3xbf16>
 }

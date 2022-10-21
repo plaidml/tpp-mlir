@@ -331,16 +331,13 @@ _mlir_ciface_xsmm_unary_invoke_bf16(int64_t addr,
 
 extern "C" void
 _mlir_ciface_xsmm_binary_invoke(int64_t addr, UnrankedMemRefType<float> *lhs,
-                                UnrankedMemRefType<float> *rhs,
-                                UnrankedMemRefType<float> *output) {
+                                UnrankedMemRefType<float> *rhs) {
 
   DynamicMemRefType<float> tensorLhs = DynamicMemRefType<float>(*lhs);
   DynamicMemRefType<float> tensorRhs = DynamicMemRefType<float>(*rhs);
-  DynamicMemRefType<float> tensorOut = DynamicMemRefType<float>(*output);
 
   float *addr_tensor_lhs = tensorLhs.data + tensorLhs.offset;
   float *addr_tensor_rhs = tensorRhs.data + tensorRhs.offset;
-  float *addr_tensor_out = tensorOut.data + tensorOut.offset;
 
   libxsmm_meltwfunction_binary kernel =
       reinterpret_cast<libxsmm_meltwfunction_binary>(addr);
@@ -348,7 +345,7 @@ _mlir_ciface_xsmm_binary_invoke(int64_t addr, UnrankedMemRefType<float> *lhs,
   // TODO: check if we need to swap also here.
   param.in0.primary = (void *)addr_tensor_lhs;
   param.in1.primary = (void *)addr_tensor_rhs;
-  param.out.primary = (void *)addr_tensor_out;
+  param.out.primary = (void *)addr_tensor_rhs;
   kernel(&param);
 }
 

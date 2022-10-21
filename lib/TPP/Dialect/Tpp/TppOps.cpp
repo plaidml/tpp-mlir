@@ -32,10 +32,10 @@ LogicalResult IdentityOp::verify() {
   // rank.
   unsigned rankInput = inputType.cast<ShapedType>().getRank();
   if (!outputType.isa<ShapedType>())
-    return emitError("expect a shape type for output");
+    return emitOpError("expects a shape type for output");
   unsigned rankOutput = outputType.cast<ShapedType>().getRank();
   if (rankOutput < rankInput)
-    return emitError("output rank must be >= of input rank");
+    return emitOpError("expects output rank to be >= of input rank");
 
   // check if the shape are broadcast compatible.
   ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
@@ -50,7 +50,7 @@ LogicalResult IdentityOp::verify() {
       continue;
     if (inputDim == 1 && outputDim > 1)
       continue;
-    return emitError("broadcast incompatible");
+    return emitOpError("fails to verify broadcasting rules");
   }
   return success();
 }
@@ -59,23 +59,45 @@ LogicalResult IdentityOp::verify() {
 // MatmulOp
 //===----------------------------------------------------------------------===//
 
+static bool verifyMatmulShape(MemRefType memrefA, MemRefType memrefB,
+                              MemRefType memrefC, bool isPackedBF16) {
+  if (memrefB.getRank() != 2 || memrefC.getRank() != 2)
+    return false;
+  if (isPackedBF16 && memrefA.getRank() != 3)
+    return false;
+  if (!isPackedBF16 && memrefA.getRank() != 2)
+    return false;
+  return true;
+}
+
+static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
+                                     ArrayRef<int64_t> shapeB,
+                                     ArrayRef<int64_t> shapeC,
+                                     bool isPackedBF16) {
+  int64_t m = shapeC[0];
+  int64_t n = shapeC[1];
+  int64_t k = shapeA[1];
+  // Verify C(m, n) = A(m, k) B(k, n)
+  if (shapeB[0] != k || shapeB[1] != n)
+    return false;
+  return ((isPackedBF16 && shapeA[0] * shapeA[2] == m) ||
+          (!isPackedBF16 && (shapeA[0] == m) && (shapeA[1] == k)));
+}
+
+// XXX: Changing the op semantics based on the type is so bad and brittle.
+// We don't want to do this. This BF16 packing need to be revisited.
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
-  MemRefType a = getMatrixA().getType().cast<MemRefType>();
-  MemRefType b = getMatrixB().getType().cast<MemRefType>();
-  MemRefType c = getMatrixC().getType().cast<MemRefType>();
-  if ((a.getShape().size() != 2 && !a.getElementType().isBF16()) ||
-      (a.getElementType().isBF16() && a.getShape().size() != 3 &&
-       a.getShape().size() != 2) ||
-      (b.getShape().size() != 2) || (c.getShape().size() != 2))
-    return emitError("shapes incompatible");
-  int64_t m = c.getShape()[0];
-  int64_t n = c.getShape()[1];
-  int64_t k = a.getShape()[1];
-  if ((a.getShape().size() == 2 && a.getShape()[0] != m) ||
-      (a.getShape().size() == 3 && a.getShape()[0] * a.getShape()[2] != m) ||
-      (b.getShape()[1] != n) || (b.getShape()[0] != k))
-    return emitError("Dimensions mismatching");
+  MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
+  MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
+  MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
+  bool isPackedBF16 =
+      memrefA.getElementType().isBF16() && memrefA.getRank() == 3;
+  if (!verifyMatmulShape(memrefA, memrefB, memrefC, isPackedBF16))
+    return emitOpError("fails to verify operands shapes");
+  if (!verifyMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
+                                memrefC.getShape(), isPackedBF16))
+    return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
 
@@ -87,19 +109,59 @@ void MatmulOp::build(OpBuilder &builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 // BrgemmOp
 //===----------------------------------------------------------------------===//
+
+static bool verifyBRGemmShape(MemRefType memrefA, MemRefType memrefB,
+                              MemRefType memrefC, bool isPackedBF16) {
+  if (memrefB.getRank() != 3 || memrefC.getRank() != 2)
+    return false;
+  if (!isPackedBF16 && memrefA.getRank() != 3)
+    return false;
+  if (isPackedBF16 && memrefA.getRank() != 4)
+    return false;
+  return true;
+}
+
+// XXX: Changing the op semantics based on the type is so bad and brittle.
+// We don't want to do this. This BF16 packing need to be revisited.
 LogicalResult BrgemmOp::verify() {
-  MemRefType a = getBatchMatrixA().getType().cast<MemRefType>();
-  MemRefType b = getBatchMatrixB().getType().cast<MemRefType>();
-  MemRefType c = getMatrixC().getType().cast<MemRefType>();
-  if ((a.getShape().size() != 3 && !a.getElementType().isBF16()) ||
-      (a.getElementType().isBF16() && a.getShape().size() != 3 &&
-       a.getShape().size() != 4) ||
-      (b.getShape().size() != 3) || (c.getShape().size() != 2))
-    return emitError("shapes incompatible");
+  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
+  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
+  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
+  bool isPackedBF16 =
+      tensorA.getElementType().isBF16() && tensorA.getRank() == 4;
+  if (!verifyBRGemmShape(tensorA, tensorB, matrixC, isPackedBF16))
+    return emitOpError("fails to verify operands shapes");
+  // Check batch dimension.
+  if (!isPackedBF16 && tensorA.getShape()[0] != tensorB.getShape()[0])
+    return emitOpError("fails to verify operands dimensions mismatch");
+  if (isPackedBF16 &&
+      tensorA.getShape()[0] * tensorA.getShape()[3] != tensorB.getShape()[0])
+    return emitOpError("fails to verify operands dimensions mismatch");
+  // Check all others that must be 'matmul' like.
+  if (!isPackedBF16 &&
+      !verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
+                                tensorB.getShape().drop_front(),
+                                matrixC.getShape(), isPackedBF16))
+    return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
   BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
+}
+
+//===----------------------------------------------------------------------===//
+// AdddOp
+//===----------------------------------------------------------------------===//
+
+// Accept only shaped operands for AddOp. We currently do not support
+// broadcasting and TPP operations are memory to memory thus disallow scalar
+// operand for now.
+LogicalResult AddOp::verify() {
+  Type lhsType = getLhs().getType();
+  Type rhsType = getRhs().getType();
+  if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()))
+    return emitOpError("expects both operands to be shaped type");
+  return success();
 }

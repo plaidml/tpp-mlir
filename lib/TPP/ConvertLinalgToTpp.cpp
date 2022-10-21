@@ -269,7 +269,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     }
     if (libraryCall.compare("tpp.add") == 0) {
       rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
-                                              operands[1], operands[2]);
+                                              operands[1]);
       return success();
     }
     if (libraryCall.compare("tpp.matmul") == 0) {
