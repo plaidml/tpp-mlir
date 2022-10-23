@@ -40,25 +40,29 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
     let summary = "Element-wise addition.";
     let description = [{
         The `tpp.add` operation performs element-wise addition
-        on two-dimensional tensors.
+        on two-dimensional memref.
 
         Example:
 
         ```mlir
  
-        tpp.add ins(%1, %2: memref<2x2xf32>, memref<2x2xf32>) 
-                out(%3: memref<2x2xf32>)
+        tpp.add ins(%1 : memref<2x2xf32>) out(%2: memref<2x2xf32>)
         
         ```
     }];
 
-    let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, 
-                         TppOperand:$output);
+    let arguments = (ins TppOperand:$lhs, TppOperand:$rhs);
 
     let assemblyFormat = [{
-        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` 
-        `out` `(` $output `:` type($output) `)` attr-dict
+        `ins` `(` $lhs `:` type($lhs) `)` 
+        `out` `(` $rhs `:` type($rhs) `)` attr-dict
     }];
+
+    let extraClassDeclaration = [{
+      Value getOutput() { return getRhs(); };
+    }];
+
+    let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -68,7 +72,7 @@ def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
 def Tpp_IdentityOp : Tpp_Op<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
-    The `tpp.identity` copies input to output.
+    The `tpp.identity` copies input memref to output memref.
     
     Example:
 
@@ -208,6 +212,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
   ];
+  
   let hasVerifier = 1;
 }
 
