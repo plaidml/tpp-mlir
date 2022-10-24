@@ -4,10 +4,8 @@
 // RUN:   --linalg-bufferize --convert-linalg-to-loops \
 // RUN:   --convert-vector-to-scf --convert-scf-to-cf \
 // RUN:   --func-bufferize --arith-bufferize --tensor-bufferize \
-// RUN:   --finalizing-bufferize --lower-affine \
-// RUN:   --convert-vector-to-llvm --convert-memref-to-llvm \
-// RUN:   --convert-func-to-llvm --reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
+// RUN:   --finalizing-bufferize --lower-affine | \
+// RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s

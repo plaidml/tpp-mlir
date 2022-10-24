@@ -84,6 +84,7 @@ add_subdirectory(tpp-rt)
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
   add_subdirectory(tpp-opt)
+  add_subdirectory(tpp-run)
   add_subdirectory(test)
 endif()
 
