@@ -7,8 +7,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <iostream>
-
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
@@ -85,7 +83,7 @@ static LogicalResult lowerToLLVMDialect(ModuleOp module) {
 
   auto result = passManager.run(module);
   if (failed(result)) {
-    std::cerr << "ERROR: Failed to lower module to LLVM dialect" << std::endl;
+    llvm::errs() << "ERROR: Failed to lower module to LLVM dialect\n";
     module.dump();
   }
 
