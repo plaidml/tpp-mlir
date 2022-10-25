@@ -506,6 +506,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkRelayoutPatterns(patterns);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -595,30 +596,35 @@ struct PropagateThroughElementWiseOp
   }
 
   Value getPackOperand(OpOperand *operand, linalg::GenericOp linalgOp,
-                       DenseMap<int64_t, OpFoldResult> dimAndTileMapping,
+                       const DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
+                       const DenseSet<int64_t> &tileLoopPerm,
                        PatternRewriter &rewriter) const {
     linalgx::UnPackOp unpackOp =
         operand->get().getDefiningOp<linalgx::UnPackOp>();
     SmallVector<OpFoldResult> tiles;
     SmallVector<int64_t> innerDimsPos;
+    SmallVector<int64_t> outerDimsPerm;
     // If the operand comes from an unpack operation simply pack the operand
     // with the same tiles, and dimsPos extracted from the unpack, otherwise
     // infer them from `dimsAndTileMapping`.
     if (unpackOp) {
       tiles = unpackOp.getMixedTiles();
       innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+      outerDimsPerm = extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
     } else {
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
         unsigned posInDomain = mapOperand.getDimPosition(pos);
         if (dimAndTileMapping.count(posInDomain)) {
-          tiles.push_back(dimAndTileMapping[posInDomain]);
+          tiles.push_back(dimAndTileMapping.lookup(posInDomain));
           innerDimsPos.push_back(pos);
         }
+        if (tileLoopPerm.count(posInDomain))
+          outerDimsPerm.push_back(pos);
       }
     }
     return toPackLayoutImpl(linalgOp.getLoc(), operand->get(), tiles,
-                            innerDimsPos, {}, rewriter);
+                            innerDimsPos, outerDimsPerm, rewriter);
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -632,16 +638,20 @@ struct PropagateThroughElementWiseOp
     // associated to the operand check the equivalent dimension in the domain
     // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+    DenseSet<int64_t> tileLoopPerms;
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       linalgx::UnPackOp unpackOp =
           operand->get().getDefiningOp<linalgx::UnPackOp>();
       if (!unpackOp)
         continue;
-      // avoid having to deal with tile loop interchange.
+
+      // Handle outer dims perm. If the given tensor dimension is permuted get
+      // the domain dimension and use it to infer which co-domain dimension is
+      // permuted in `getPackedOperand`.
       SmallVector<int64_t> outerDimsPerm =
           extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
-      if (!outerDimsPerm.empty())
-        return failure();
+      DenseSet<int64_t> currentTileLoopPerm(outerDimsPerm.begin(),
+                                            outerDimsPerm.end());
       // map *domain* of linalg operation to tiles.
       DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
           unpackOp.getDimAndTileMapping();
@@ -656,18 +666,21 @@ struct PropagateThroughElementWiseOp
         if (currentDimAndTileMapping.count(posInCodomain))
           dimAndTileMapping[posInDomain] =
               currentDimAndTileMapping[posInCodomain];
+        if (currentTileLoopPerm.count(posInCodomain))
+          tileLoopPerms.insert(posInDomain);
       }
     }
 
     // no work to do, exit. We did not find any unpacked input or output
     // operands.
-    if (dimAndTileMapping.empty())
+    if (dimAndTileMapping.empty()) {
       return failure();
+    }
 
     SmallVector<Value> packedInputOperands;
     for (OpOperand *operand : linalgOp.getInputOperands()) {
-      Value packedOperand =
-          getPackOperand(operand, linalgOp, dimAndTileMapping, rewriter);
+      Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
+                                           tileLoopPerms, rewriter);
       packedInputOperands.push_back(packedOperand);
     }
 
@@ -675,8 +688,8 @@ struct PropagateThroughElementWiseOp
     SmallVector<Type> packedOutputTypes;
     SmallVector<Value> unpackOutputs;
     for (OpOperand *operand : linalgOp.getOutputOperands()) {
-      Value packedOperand =
-          getPackOperand(operand, linalgOp, dimAndTileMapping, rewriter);
+      Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
+                                           tileLoopPerms, rewriter);
       packedOutputOperands.push_back(packedOperand);
       packedOutputTypes.push_back(packedOperand.getType());
       linalgx::UnPackOp unpackOp =
@@ -733,13 +746,13 @@ struct PropagateThroughElementWiseOp
             linalgOp.getLoc(), result, linalgOp.getOutputs()[idx++],
             packOp.getMixedTiles(),
             extractFromI64ArrayAttr(packOp.getInnerDimsPos()),
-            /*outer_dims_perm=*/{}, rewriter));
+            extractFromI64ArrayAttr(packOp.getOuterDimsPerm()), rewriter));
       else
         outReplacements.push_back(toUnPackLayoutImpl(
             linalgOp.getLoc(), result, unpackOutputs[idx++],
             packOp.getMixedTiles(),
             extractFromI64ArrayAttr(packOp.getInnerDimsPos()),
-            /*outer_dims_perm=*/{}, rewriter));
+            extractFromI64ArrayAttr(packOp.getOuterDimsPerm()), rewriter));
     }
     rewriter.replaceOp(linalgOp, outReplacements);
     return success();
