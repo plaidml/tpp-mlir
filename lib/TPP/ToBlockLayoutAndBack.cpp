@@ -517,6 +517,19 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
 // PropagateThroughPadOp
 //===----------------------------------------------------------------------===//
 
+// Returns a vector that interchanges `elements` starting at offset `offset`
+// based on the indexes in `interchangeVector`.
+template <typename T>
+SmallVector<T> interchange(ArrayRef<T> elements,
+                           ArrayRef<int64_t> interchangeVector,
+                           int offset = 0) {
+  SmallVector<T> vec = llvm::to_vector(elements);
+  for (auto en : llvm::enumerate(interchangeVector)) {
+    vec[en.index() + offset] = elements[en.value() + offset];
+  }
+  return vec;
+}
+
 // The idea is to add as many zero padding dimensions in `high` and `low` based
 // on the number of point loops.
 struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
@@ -529,12 +542,6 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     if (!unpackOp)
       return failure();
 
-    // no outer dim allowed.
-    SmallVector<int64_t> outerDimsPerm =
-        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
-    if (!outerDimsPerm.empty())
-      return failure();
-
     // bail out if one of the padded dimension is a tiled one.
     llvm::SmallBitVector paddedDims = padOp.getPaddedDims();
     SmallVector<int64_t> innerDimsPos =
@@ -545,8 +552,14 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     if (paddedDims.anyCommon(innerDims))
       return failure();
 
+    SmallVector<int64_t> outerDimsPerm =
+        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+    if (!outerDimsPerm.empty()) {
+      lowPad = interchange<OpFoldResult>(lowPad, outerDimsPerm, /*offset=*/0);
+      highPad = interchange<OpFoldResult>(highPad, outerDimsPerm, /*offset=*/0);
+    }
     size_t innerDimsPosSize = innerDimsPos.size();
     lowPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
     highPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
@@ -571,7 +584,8 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
         padResultType.getElementType());
     Value replacement = toUnPackLayoutImpl(
         padOp.getLoc(), padOpRes, outputUnPack, unpackOp.getMixedTiles(),
-        innerDimsPos, /*outer_dims_perm=*/{}, rewriter);
+        innerDimsPos, extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm()),
+        rewriter);
 
     rewriter.replaceOp(padOp, replacement);
     return success();
