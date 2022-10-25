@@ -597,7 +597,7 @@ struct PropagateThroughElementWiseOp
 
   Value getPackOperand(OpOperand *operand, linalg::GenericOp linalgOp,
                        const DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
-                       const DenseSet<int64_t> &tileLoopPerm,
+                       const DenseMap<int64_t, int64_t> &tileLoopPerm,
                        PatternRewriter &rewriter) const {
     linalgx::UnPackOp unpackOp =
         operand->get().getDefiningOp<linalgx::UnPackOp>();
@@ -620,7 +620,7 @@ struct PropagateThroughElementWiseOp
           innerDimsPos.push_back(pos);
         }
         if (tileLoopPerm.count(posInDomain))
-          outerDimsPerm.push_back(pos);
+          outerDimsPerm.push_back(tileLoopPerm.lookup(posInDomain));
       }
     }
     return toPackLayoutImpl(linalgOp.getLoc(), operand->get(), tiles,
@@ -638,7 +638,7 @@ struct PropagateThroughElementWiseOp
     // associated to the operand check the equivalent dimension in the domain
     // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-    DenseSet<int64_t> tileLoopPerms;
+    DenseMap<int64_t, int64_t> tileLoopPerms;
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       linalgx::UnPackOp unpackOp =
           operand->get().getDefiningOp<linalgx::UnPackOp>();
@@ -650,8 +650,15 @@ struct PropagateThroughElementWiseOp
       // permuted in `getPackedOperand`.
       SmallVector<int64_t> outerDimsPerm =
           extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
-      DenseSet<int64_t> currentTileLoopPerm(outerDimsPerm.begin(),
-                                            outerDimsPerm.end());
+      if (!outerDimsPerm.empty()) {
+        assert(outerDimsPerm.size() == linalgOp.getNumLoops() &&
+               "expect dims perm to match the number of loops in the "
+               "linalg.generic");
+        DenseSet<int64_t> currentTileLoopPerm(outerDimsPerm.begin(),
+                                              outerDimsPerm.end());
+        for (int64_t idx = 0; idx < linalgOp.getNumLoops(); idx++)
+          tileLoopPerms[idx] = outerDimsPerm[idx];
+      }
       // map *domain* of linalg operation to tiles.
       DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
           unpackOp.getDimAndTileMapping();
@@ -666,8 +673,6 @@ struct PropagateThroughElementWiseOp
         if (currentDimAndTileMapping.count(posInCodomain))
           dimAndTileMapping[posInDomain] =
               currentDimAndTileMapping[posInCodomain];
-        if (currentTileLoopPerm.count(posInCodomain))
-          tileLoopPerms.insert(posInDomain);
       }
     }
 
