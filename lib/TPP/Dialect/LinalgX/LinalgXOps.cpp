@@ -37,6 +37,8 @@ struct PackUnPackSequence : public OpRewritePattern<PackOp> {
     UnPackOp unpackOp = packOp.getInput().getDefiningOp<linalgx::UnPackOp>();
     if (!unpackOp)
       return failure();
+    if (unpackOp.getInputType() != packOp.getOutputType())
+      return failure();
     rewriter.replaceOp(packOp, unpackOp.getInput());
     return success();
   }
@@ -113,7 +115,13 @@ void PackOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,
                                      PatternRewriter &rewriter) {
-  return failure();
+  PackOp packOp = unpackOp.getInput().getDefiningOp<linalgx::PackOp>();
+  if (!packOp)
+    return failure();
+  if (packOp.getOutputType() != unpackOp.getInputType())
+    return failure();
+  rewriter.replaceOp(unpackOp, packOp.getInput());
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
