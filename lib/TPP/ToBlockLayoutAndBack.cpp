@@ -557,8 +557,8 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
     if (!outerDimsPerm.empty()) {
-      lowPad = interchange<OpFoldResult>(lowPad, outerDimsPerm, /*offset=*/0);
-      highPad = interchange<OpFoldResult>(highPad, outerDimsPerm, /*offset=*/0);
+      lowPad = interchange<OpFoldResult>(lowPad, outerDimsPerm);
+      highPad = interchange<OpFoldResult>(highPad, outerDimsPerm);
     }
     size_t innerDimsPosSize = innerDimsPos.size();
     lowPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
@@ -601,17 +601,14 @@ struct PropagateThroughElementWiseOp
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  // Check sinking preconditions: a) all loops must
-  // be parallel.
-  LogicalResult checkPreconditions(linalg::GenericOp linalgOp) const {
-    if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
-      return failure();
+  LogicalResult isElementwise(linalg::GenericOp linalgOp) const {
     return success();
   }
 
   Value getPackOperand(OpOperand *operand, linalg::GenericOp linalgOp,
                        const DenseMap<int64_t, OpFoldResult> &dimAndTileMapping,
-                       const DenseMap<int64_t, int64_t> &tileLoopPerm,
+                       ArrayRef<int64_t> tileLoopPerm,
+                       SmallVector<SmallVector<int64_t>> &outerPerms,
                        PatternRewriter &rewriter) const {
     linalgx::UnPackOp unpackOp =
         operand->get().getDefiningOp<linalgx::UnPackOp>();
@@ -620,7 +617,7 @@ struct PropagateThroughElementWiseOp
     SmallVector<int64_t> outerDimsPerm;
     // If the operand comes from an unpack operation simply pack the operand
     // with the same tiles, and dimsPos extracted from the unpack, otherwise
-    // infer them from `dimsAndTileMapping`.
+    // infer them.
     if (unpackOp) {
       tiles = unpackOp.getMixedTiles();
       innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
@@ -633,17 +630,37 @@ struct PropagateThroughElementWiseOp
           tiles.push_back(dimAndTileMapping.lookup(posInDomain));
           innerDimsPos.push_back(pos);
         }
-        if (tileLoopPerm.count(posInDomain))
-          outerDimsPerm.push_back(tileLoopPerm.lookup(posInDomain));
+      }
+      // Handle `outer_dims_perm`. See example:
+      // current map      : (d0, d1, d2, d3) -> (d2, d3)
+      // dimAndTileMapping: dim | tile
+      //                    3   | 32
+      // tileLoopPerm     : [0, 3, 1, 2]
+      // First map d2, d3 with their position in the array as:
+      // currentPositionTileLoops: dim | pos
+      //                           d2  | 0
+      //                           d3  | 1
+      // then scan `tileLoopPerm` in order and get the `outer_dims_perm`
+      // to be used, here it would be [1, 0].
+      DenseMap<int64_t, int64_t> currentPositionTileLoops;
+      for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
+        unsigned posInDomain = mapOperand.getDimPosition(pos);
+        currentPositionTileLoops[posInDomain] = pos;
+      }
+      for (int64_t loopIdx : tileLoopPerm) {
+        if (currentPositionTileLoops.count(loopIdx))
+          outerDimsPerm.push_back(currentPositionTileLoops.lookup(loopIdx));
       }
     }
+    // save the outer perm for later, when we compute the map.
+    outerPerms.push_back(outerDimsPerm);
     return toPackLayoutImpl(linalgOp.getLoc(), operand->get(), tiles,
                             innerDimsPos, outerDimsPerm, rewriter);
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (failed(checkPreconditions(linalgOp)))
+    if (failed(isElementwise(linalgOp)))
       return failure();
 
     // Pack and unpack operate on result of each operand map in the linalg
@@ -652,34 +669,33 @@ struct PropagateThroughElementWiseOp
     // associated to the operand check the equivalent dimension in the domain
     // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-    DenseMap<int64_t, int64_t> tileLoopPerms;
+    SmallVector<int64_t> tileLoopPerms;
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       linalgx::UnPackOp unpackOp =
           operand->get().getDefiningOp<linalgx::UnPackOp>();
       if (!unpackOp)
         continue;
 
-      // Handle outer dims perm. If the given tensor dimension is permuted get
-      // the domain dimension and use it to infer which co-domain dimension is
-      // permuted in `getPackedOperand`.
       SmallVector<int64_t> outerDimsPerm =
           extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
       if (!outerDimsPerm.empty()) {
-        assert(outerDimsPerm.size() == linalgOp.getNumLoops() &&
-               "expect dims perm to match the number of loops in the "
-               "linalg.generic");
-        DenseSet<int64_t> currentTileLoopPerm(outerDimsPerm.begin(),
-                                              outerDimsPerm.end());
-        for (int64_t idx = 0; idx < linalgOp.getNumLoops(); idx++)
-          tileLoopPerms[idx] = outerDimsPerm[idx];
+        tileLoopPerms = outerDimsPerm;
+        // tileLoopPerms represents the new permutation of the tiled loops and
+        // need to cover all the current loop index range, and must be a valid
+        // permutation.
+        if (tileLoopPerms.size() != linalgOp.getNumLoops())
+          return failure();
+        // if (linalg::isPermutation(tileLoopPerms))
+        //   return failure();
       }
-      // map *domain* of linalg operation to tiles.
+
+      // Map *domain* of linalg operation to tiles.
       DenseMap<int64_t, OpFoldResult> currentDimAndTileMapping =
           unpackOp.getDimAndTileMapping();
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       for (unsigned posInCodomain = 0;
            posInCodomain < mapOperand.getNumResults(); posInCodomain++) {
-        // fail if we dealing with 'complex' affine maps. Only dim expression
+        // Fail if we dealing with 'complex' affine maps. Only dim expression
         // are accepted.
         if (!mapOperand.getResult(posInCodomain).isa<AffineDimExpr>())
           return failure();
@@ -690,16 +706,18 @@ struct PropagateThroughElementWiseOp
       }
     }
 
-    // no work to do, exit. We did not find any unpacked input or output
+    // No work to do, exit. We did not find any unpacked input or output
     // operands.
     if (dimAndTileMapping.empty()) {
       return failure();
     }
 
+    SmallVector<SmallVector<int64_t>> outerPermsForMaps;
     SmallVector<Value> packedInputOperands;
     for (OpOperand *operand : linalgOp.getInputOperands()) {
-      Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
-                                           tileLoopPerms, rewriter);
+      Value packedOperand =
+          getPackOperand(operand, linalgOp, dimAndTileMapping, tileLoopPerms,
+                         outerPermsForMaps, rewriter);
       packedInputOperands.push_back(packedOperand);
     }
 
@@ -707,8 +725,9 @@ struct PropagateThroughElementWiseOp
     SmallVector<Type> packedOutputTypes;
     SmallVector<Value> unpackOutputs;
     for (OpOperand *operand : linalgOp.getOutputOperands()) {
-      Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
-                                           tileLoopPerms, rewriter);
+      Value packedOperand =
+          getPackOperand(operand, linalgOp, dimAndTileMapping, tileLoopPerms,
+                         outerPermsForMaps, rewriter);
       packedOutputOperands.push_back(packedOperand);
       packedOutputTypes.push_back(packedOperand.getType());
       linalgx::UnPackOp unpackOp =
@@ -717,9 +736,10 @@ struct PropagateThroughElementWiseOp
         unpackOutputs.push_back(unpackOp.getOutput());
     }
 
+    assert(outerPermsForMaps.size() == linalgOp->getNumOperands());
     unsigned packedDims = dimAndTileMapping.size();
     SmallVector<AffineMap> newMaps;
-    // get the new map for each operand.
+    // Get the new map for each operand.
     for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       unsigned numSymbols = 0;
@@ -737,8 +757,9 @@ struct PropagateThroughElementWiseOp
               linalgOp.getNumLoops() + pointLoopIdx++));
         dimLoops[posInCodomain] = rewriter.getAffineDimExpr(posInDomain);
       }
-      // TODO: bail out if we need to interchange the point loops:
-      // inner_dims_pos.
+      if (!tileLoopPerms.empty())
+        dimLoops = interchange<AffineExpr>(
+            dimLoops, outerPermsForMaps[operand->getOperandNumber()]);
       dimLoops.append(dimPointLoops);
       AffineMap newMap =
           AffineMap::get(numDims, numSymbols, dimLoops, linalgOp.getContext());
