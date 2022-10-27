@@ -15,6 +15,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "libxsmm.h"
 using namespace mlir;
 using namespace mlir::xsmm;
 
@@ -261,8 +262,9 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch_" + typeAsString;
+    std::string type = stringifyEnum(dispatchOp.getDataType()).str();
+    libxsmm_datatype dataType = (type == "bf16"? LIBXSMM_DATATYPE_BF16: (type == "f32"?LIBXSMM_DATATYPE_F32:assert("Type neither BF16 nor FP32"));
+    kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
@@ -270,6 +272,11 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), dataType);
+    dispatchOperands.push_back(
+          rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+    dispatchOperandTypes.push_back(integer64);
+
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {

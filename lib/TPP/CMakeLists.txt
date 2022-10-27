@@ -37,13 +37,14 @@ add_mlir_library(MLIRTPP
     TPPCompilerPassIncGen
     TPPLinalgXTransformOps
 
-	LINK_LIBS PUBLIC
+  LINK_LIBS PUBLIC
     TPPLinalgXDialect
     TPPMathxDialect
     TPPStdxDialect
     TPPTppDialect
     TPPXsmmDialect
-    
+    xsmm
+ 
     MLIRIR
     MLIRInferTypeOpInterface
 )
