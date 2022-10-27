@@ -97,6 +97,15 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
+def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {  
+  let summary = "Convert check to func";
+  let constructor = "mlir::tpp::createConvertCheckToFuncPass()";
+  let description = [{
+    Convert check operations to function calls.
+  }];
+  let dependentDialects = ["func::FuncDialect"];
+}
+
 def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
   let summary = "Vectorize copy operation using Linalg";
   let constructor = "mlir::tpp::createVectorizeCopyPass()";
