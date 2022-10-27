@@ -759,7 +759,7 @@ struct PropagateThroughElementWiseOp
       }
       if (!tileLoopPerms.empty())
         dimLoops = interchange<AffineExpr>(
-            dimLoops, outerPermsForMaps[operand->getOperandNumber()]);
+            dimLoops, outerPermsForMaps[operand.getOperandNumber()]);
       dimLoops.append(dimPointLoops);
       AffineMap newMap =
           AffineMap::get(numDims, numSymbols, dimLoops, linalgOp.getContext());
