@@ -1,6 +1,6 @@
 add_subdirectory(Dialect)
 
-add_mlir_library(MLIRTPP       
+add_mlir_library(MLIRTPP
   # Passes 
     LinalgMapToTpp.cpp
     PadSIMDDimMatmul.cpp
@@ -23,32 +23,32 @@ add_mlir_library(MLIRTPP
     TransformUtils.cpp
 
   # Conversions
-    ConvertTppToVector.cpp  
-    ConvertLinalgToTpp.cpp  
-    ConvertTppToLoops.cpp    
-    ConvertTppToXsmm.cpp    
-    ConvertXsmmToFunc.cpp   
+    ConvertTppToVector.cpp
+    ConvertLinalgToTpp.cpp
+    ConvertTppToLoops.cpp
+    ConvertTppToXsmm.cpp
+    ConvertXsmmToFunc.cpp
     ConvertCheckToFunc.cpp
 
-  ADDITIONAL_HEADER_DIRS
+    ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
 
   DEPENDS
     TPPCompilerPassIncGen
     TPPLinalgXTransformOps
 
-	LINK_LIBS PUBLIC
+    LINK_LIBS PUBLIC
     TPPLinalgXDialect
     TPPMathxDialect
     TPPStdxDialect
     TPPTppDialect
     TPPXsmmDialect
-    
+
     MLIRIR
     MLIRInferTypeOpInterface
 )
 
-target_include_directories(MLIRTPP 
+target_include_directories(MLIRTPP
   PUBLIC
     $<BUILD_INTERFACE:${TPP_GEN_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${TPP_MAIN_INCLUDE_DIR}>
