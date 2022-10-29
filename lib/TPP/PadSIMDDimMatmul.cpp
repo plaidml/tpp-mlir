@@ -237,10 +237,10 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
     std::string libraryCall = linalgOp.getLibraryCallName();
     if (libraryCall.compare("tpp.relu") != 0)
       return failure();
-    if (linalgOp.getNumInputs() == 0)
+    if (linalgOp.getNumDpsInputs() == 0)
       return failure();
     Location loc = linalgOp.getLoc();
-    Value operand = linalgOp.getInputOperand(0)->get();
+    Value operand = linalgOp.getDpsInputOperand(0)->get();
     tensor::ExtractSliceOp slice =
         operand.getDefiningOp<tensor::ExtractSliceOp>();
     if (!slice || !slice.getResult().hasOneUse())
@@ -600,7 +600,7 @@ struct FusePadOp : OpRewritePattern<tensor::PadOp> {
     // Clone the generic op.
     auto clonedOp =
         cast<linalg::GenericOp>(rewriter.clone(*linalgOp.getOperation()));
-    clonedOp.setOutputOperand(resultNumber, slice.getResult());
+    clonedOp.setDpsInitOperand(resultNumber, slice.getResult());
 
     // Insert it back into the result of the fill.
     rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(

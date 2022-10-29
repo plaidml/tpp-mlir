@@ -77,7 +77,8 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   // Return true if the operation as 1 input and 1 output.
   bool hasOneInputOneOutput(linalg::GenericOp linalgOp) const {
-    return ((linalgOp.getNumInputs() == 1) && (linalgOp.getNumOutputs() == 1));
+    return ((linalgOp.getNumDpsInputs() == 1) &&
+            (linalgOp.getNumDpsInits() == 1));
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,

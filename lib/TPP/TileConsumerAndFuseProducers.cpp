@@ -14,9 +14,9 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 
 using namespace mlir;
 
@@ -44,63 +44,57 @@ static int64_t getSizeRange(Range loopRange) {
 }
 
 // Check if all the loops have static ranges.
-// static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
-//  for (Range loopRange : iterationDomain)
-//    if (!isStaticRange(loopRange))
-//      return false;
-//  return true;
-//}
+static bool isStaticIterationDomain(ArrayRef<Range> iterationDomain) {
+  for (Range loopRange : iterationDomain)
+    if (!isStaticRange(loopRange))
+      return false;
+  return true;
+}
 
 // Check if two loop range are compatible - meaning same offset, size and step.
-// static LogicalResult areCompatibleDims(Range outerLoopRoot,
-//                                       Range outerLoopCandidate) {
-//  int64_t offset = *getConstantIntValue(outerLoopRoot.offset);
-//  if (offset != *getConstantIntValue(outerLoopCandidate.offset))
-//    return failure();
-//  int64_t size = *getConstantIntValue(outerLoopRoot.size);
-//  if (size != *getConstantIntValue(outerLoopCandidate.size))
-//    return failure();
-//  int64_t stride = *getConstantIntValue(outerLoopRoot.stride);
-//  if (stride != *getConstantIntValue(outerLoopCandidate.stride))
-//    return failure();
-//  return success();
-//}
+static LogicalResult areCompatibleDims(Range loopConsumer, Range loopProducer) {
+  int64_t offset = *getConstantIntValue(loopConsumer.offset);
+  if (offset != *getConstantIntValue(loopProducer.offset))
+    return failure();
+  int64_t size = *getConstantIntValue(loopConsumer.size);
+  if (size != *getConstantIntValue(loopProducer.size))
+    return failure();
+  int64_t stride = *getConstantIntValue(loopConsumer.stride);
+  if (stride != *getConstantIntValue(loopProducer.stride))
+    return failure();
+  return success();
+}
 
 // Attempt to fuse outer dimension. NOTE: since we are trying to
 // fuse the outer dimension only you may want to pass a tile
 // size like: {1, 0, 0} where '1' is the tile size for the outermost
 // loop (assuming 3 loops) while you don't want to tile all the other
 // dimensions (set to '0').
-//
-// TODO: here we check only the outermost dimensions but I would
-// like a way to fuse *all* the outermost dimensions that are
-// compatible. Pass also the number of dimensions we want to inspect.
+static LogicalResult
+haveSameOuterMostDim(ArrayRef<Range> consumerIterationDomain,
+                     Operation *producer, OpBuilder &builder) {
+  assert(producer && "expect producer to be a valid op");
+  linalg::LinalgOp linalgOp = dyn_cast_or_null<linalg::LinalgOp>(producer);
+  if (!linalgOp)
+    return failure();
 
-// static LogicalResult canFuseOuterDim(ArrayRef<Range> rootIterationDomain,
-//                                      Operation *candidate, OpBuilder
-//                                      &builder) {
-//   assert(candidate && "expect candidate to be a valid op");
-//   linalg::LinalgOp linalgOp = dyn_cast_or_null<linalg::LinalgOp>(candidate);
-//   if (!linalgOp)
-//     return failure();
-//
-//   SmallVector<Range> candidateIterationDomain =
-//       cast<TilingInterface>(linalgOp.getOperation())
-//           .getIterationDomain(builder);
-//
-//   if ((!isStaticIterationDomain(candidateIterationDomain)) ||
-//       (!isStaticIterationDomain(rootIterationDomain)))
-//     return failure();
-//
-//   // Require at least two dimensions.
-//   if (candidateIterationDomain.size() < 2)
-//     return failure();
-//   if (rootIterationDomain.size() < 2)
-//     return failure();
-//   // Check if the outer loop are compatible, and if so fuse.
-//   return areCompatibleDims(candidateIterationDomain[0],
-//   rootIterationDomain[0]);
-// }
+  SmallVector<Range> producerIterationDomain =
+      cast<TilingInterface>(linalgOp.getOperation())
+          .getIterationDomain(builder);
+
+  if ((!isStaticIterationDomain(producerIterationDomain)) ||
+      (!isStaticIterationDomain(consumerIterationDomain)))
+    return failure();
+
+  // Require at least two loop dimensions.
+  if ((consumerIterationDomain.size() < 2) ||
+      (producerIterationDomain.size() < 2))
+    return failure();
+
+  // Check if the outer loop are compatible, and if so fuse.
+  return areCompatibleDims(consumerIterationDomain[0],
+                           producerIterationDomain[0]);
+}
 
 static LogicalResult tileDivideIterationDomain(linalg::GenericOp linalgOp,
                                                ArrayRef<int64_t> tiles,
@@ -135,7 +129,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
         tileSizes(tileSizes) {}
 
   bool isInplace(linalg::LinalgOp linalgOp) const {
-    return linalgOp.getNumInputs() == 0;
+    return linalgOp.getNumDpsInputs() == 0;
   }
 
   // Locate an element-wise operation and fuse if the producer
@@ -149,8 +143,8 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
 
     // further restrict to single result operations.
     OpOperandVector operands = isInplace(linalgOp)
-                                           ? linalgOp.getOutputOperands()
-                                           : linalgOp.getInputOperands();
+                                   ? linalgOp.getDpsInitOperands()
+                                   : linalgOp.getDpsInputOperands();
     if (operands.size() != 1)
       return failure();
     linalg::LinalgOp producer =
@@ -159,19 +153,17 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     if (producer.getNumParallelLoops() != tileSizes.size()) {
-      producer->emitRemark(
-          "expect tile sizes to be equal to number of parallel loops");
       return failure();
     }
 
     if (failed(tileDivideIterationDomain(linalgOp, tileSizes, rewriter))) {
-      linalgOp->emitRemark("wrong tile sizes");
       return failure();
     }
 
     // tile and fuse.
     scf::SCFTileAndFuseOptions options;
     options.tilingOptions.setTileSizes(tileSizes);
+    options.controlFusionWithProducerFn = haveSameOuterMostDim;
     TilingInterface tilingInterfaceOp =
         cast<TilingInterface>(linalgOp.getOperation());
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
