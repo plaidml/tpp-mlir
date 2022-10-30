@@ -99,8 +99,8 @@ struct MapConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
     if (!preOptimizeByInterchangeIteratorsConv(genericOp))
       return failure();
 
-    FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToMatmul(
-        rewriter, genericOp, /*RPos=*/0, /*SPos=*/1);
+    FailureOr<linalg::MatmulOp> matmul =
+        mlir::linalgx::mapConvToMatmul(rewriter, genericOp);
     if (failed(matmul))
       return rewriter.notifyMatchFailure(genericOp,
                                          "failed to map convolution to matmul");
@@ -323,8 +323,8 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
       return failure();
-    FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::mapConvToMatmul(
-        rewriter, linalgOp, /*RPos=*/2, /*Spos=*/3);
+    FailureOr<linalg::MatmulOp> matmul =
+        mlir::linalgx::mapConvToMatmul(rewriter, linalgOp);
     if (failed(matmul))
       return failure();
     return success();

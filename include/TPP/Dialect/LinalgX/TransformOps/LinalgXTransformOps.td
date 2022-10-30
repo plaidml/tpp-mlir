@@ -121,14 +121,11 @@ def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
     operation if needed.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_height_pos,
-                       ConfinedAttr<I64Attr, [IntNonNegative]>:$filter_width_pos);
+  let arguments = (ins PDL_Operation:$target);
   let results = (outs);
 
   let assemblyFormat = [{
-    $target `(` `filter_height_pos` `=` $filter_height_pos 
-                `,` `filter_width_pos` `=` $filter_width_pos `)` attr-dict
+    $target attr-dict
   }];
 
   let extraClassDeclaration = [{

@@ -45,19 +45,6 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   return sizes;
 }
 
-// Check dimension at index 'i' and 'j'. If both are '1' return true
-// otherwise false. The operand is expected to have static shape.
-static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
-                                       unsigned j) {
-  ShapedType filterType = filter->get().getType().cast<ShapedType>();
-  ArrayRef<int64_t> filterShape = filterType.getShape();
-  assert(i < filterShape.size() && "out of bound");
-  assert(j < filterShape.size() && "out of bound");
-  assert(filterShape[i] != ShapedType::kDynamicSize && "must be static");
-  assert(filterShape[j] != ShapedType::kDynamicSize && "must be static");
-  return ((filterShape[i] == 1) && (filterShape[j] == 1));
-}
-
 // Return success if `expr` is either a dimExpr or a mul expression dim * cst OR
 // cst * dim.
 static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
@@ -111,10 +98,11 @@ static LogicalResult walkConvExpr(AffineExpr convExpr,
   return failure();
 }
 
-static FailureOr<Value>
-getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                         OpOperand *operand, ValueRange ivs,
-                         ValueRange valuesToUse, ArrayRef<int64_t> rAndSPos) {
+static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
+                                                 linalg::LinalgOp linalgOp,
+                                                 OpOperand *operand,
+                                                 ValueRange ivs,
+                                                 ValueRange valuesToUse) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   size_t rank = operandType.getRank();
@@ -134,9 +122,7 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   // If the filter has R and S not 1 we need to deal with a sliding window. The
   // sizes of the matmul depend on the filter and output, use
   // `computeSizeGemmForImage` to compute them.
-  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
-  if (isImage &&
-      !hasFilterWithRandSEqualOne(filter, rAndSPos[0], rAndSPos[1])) {
+  if (isImage) {
     sizes = computeSizeGemmForImage(builder, linalgOp);
   } else {
     // Get full sizes from [rank - desiredResultRank, rank).
@@ -171,10 +157,11 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
 
 // Extract the sliced version of `operand` such that we can use it in a
 // linalg.matmul.
-static FailureOr<Value>
-getSlicedConvOperand(OpBuilder &builder, OpOperand *operand,
-                     linalg::LinalgOp linalgOp, ValueRange ivs,
-                     ValueRange valuesToUse, ArrayRef<int64_t> rAndSPos = {}) {
+static FailureOr<Value> getSlicedConvOperand(OpBuilder &builder,
+                                             OpOperand *operand,
+                                             linalg::LinalgOp linalgOp,
+                                             ValueRange ivs,
+                                             ValueRange valuesToUse) {
   Location loc = linalgOp.getLoc();
   FailureOr<SmallVector<Value>> involvedDimForOperand =
       utils::getInvolvedLocalDimsForOperand(
@@ -182,14 +169,12 @@ getSlicedConvOperand(OpBuilder &builder, OpOperand *operand,
   if (failed(involvedDimForOperand))
     return failure();
   return getSlicedConvOperandImpl(builder, linalgOp, operand,
-                                  *involvedDimForOperand, valuesToUse,
-                                  rAndSPos);
+                                  *involvedDimForOperand, valuesToUse);
 }
 
 static FailureOr<SmallVector<Value>>
 getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
-                      linalg::LinalgOp linalgOp, ValueRange valuesToUse,
-                      ArrayRef<int64_t> rAndSPos) {
+                      linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
   assert(linalgOp->getNumOperands() == 3 &&
          "expect 3 input/output operands");
   assert(linalgOp.getDpsInputOperands().size() == 2 &&
@@ -197,8 +182,8 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
 
   SmallVector<Value> slicedOperands;
   OpOperand *image = linalgOp.getDpsInputOperands()[0];
-  FailureOr<Value> slicedImage = getSlicedConvOperand(
-      builder, image, linalgOp, localIvs, valuesToUse, rAndSPos);
+  FailureOr<Value> slicedImage =
+      getSlicedConvOperand(builder, image, linalgOp, localIvs, valuesToUse);
 
   if (failed(slicedImage))
     return failure();
@@ -236,28 +221,9 @@ static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   return match;
 }
 
-// Return true if Rpos and Spos are valid.
-static bool isValidRandS(OpOperand *filter, unsigned rPos, unsigned sPos) {
-  ShapedType filterType = filter->get().getType().cast<ShapedType>();
-  unsigned filterRank = filterType.getRank();
-  if (sPos != rPos + 1)
-    return false;
-  return !(rPos >= filterRank || sPos >= filterRank);
-}
-
-// Return true if the filter shape at pos rPos and sPos is statically known.
-static bool isValidFilterShape(OpOperand *filter, unsigned rPos,
-                               unsigned sPos) {
-  ShapedType filterType = filter->get().getType().cast<ShapedType>();
-  ArrayRef<int64_t> filterShape = filterType.getShape();
-  return ((filterShape[rPos] != ShapedType::kDynamicSize) &&
-          (filterShape[sPos] != ShapedType::kDynamicSize));
-}
-
 FailureOr<linalg::MatmulOp>
 mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp, int64_t rPos,
-                               int64_t sPos) {
+                               linalg::LinalgOp linalgOp) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "require a linalg.generic");
 
@@ -268,13 +234,6 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
   if (!checkMappingToMatmul(linalgOp))
     return rewriter.notifyMatchFailure(
         linalgOp, "cannot match operation iterators with matmul iterators");
-
-  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
-  if (!isValidRandS(filter, rPos, sPos))
-    return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and SPos");
-
-  if (!isValidFilterShape(filter, rPos, sPos))
-    return rewriter.notifyMatchFailure(linalgOp, "invalid filter shape");
 
   // peel-out all loops but the three innermost.
   unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
@@ -292,9 +251,8 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
                static_cast<size_t>(linalgOp->getNumOperands()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
-    SmallVector<int64_t> rAndSPos = {rPos, sPos};
-    FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedConvOperands(
-        builder, localIvs, linalgOp, operandsValuesToUse, rAndSPos);
+    FailureOr<SmallVector<Value>> maybeSlicedOperands =
+        getSlicedConvOperands(builder, localIvs, linalgOp, operandsValuesToUse);
     if (failed(maybeSlicedOperands)) {
       assert(0 && "failed to generate loops for op");
       return {};
