@@ -90,7 +90,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 // CONV-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 // CONV-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
 // CONV-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
-// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d2, d4)>
 // CONV: func.func @conv(
 // CONV-SAME: %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
 // CONV-SAME: %[[ARG1:.+]]: tensor<1x1x64x64xf32>,
@@ -123,7 +123,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 // CONV-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 // CONV-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
 // CONV-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
-// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d2, d4)>
 // CONV: func.func @conv(
 // CONV-SAME: %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
 // CONV-SAME: %[[ARG1:.+]]: tensor<1x1x64x64xf32>,
@@ -163,7 +163,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 // CONV-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 // CONV-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
 // CONV-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
-// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+// CONV-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d2, d4)>
 // CONV: func.func @conv(
 // CONV-SAME: %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
 // CONV-SAME: %[[ARG1:.+]]: tensor<1x1x64x64xf32>,
@@ -179,36 +179,4 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 // CONV: %[[PADDED:.+]] = tensor.pad %[[VAL1]] low[0, 0, 1, 1, 0] high[0, 0, 1, 1, 0] 
 // CONV: %[[OUT:.+]] = tensor.empty() : tensor<1x58x58x64xf32>
 // CONV: %[[UNPACK:.+]] = linalgx.unpack %[[PADDED]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[OUT]] : (tensor<1x2x58x58x32xf32> tensor<1x58x58x64xf32>) -> tensor<1x58x58x64xf32>
-// CONV: return %[[UNPACK]] : tensor<1x58x58x64xf32>
-
-// -----
-
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3)>
-
-func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %arg2: tensor<1x56x56x64xf32>, %arg3: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
-  %0 = linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
-    ins(%0, %arg3 : tensor<1x56x56x64xf32>, tensor<64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) {
-    ^bb0(%in: f32, %in_1: f32, %out: f32):
-      %168 = arith.addf %in, %in_1 : f32
-      linalg.yield %168 : f32
-  } -> tensor<1x56x56x64xf32>
-  return %1 : tensor<1x56x56x64xf32>
-}
-
-// -----
-
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
-
-func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %arg2: tensor<1x56x56x64xf32>, %arg3: tensor<56x64xf32>) -> tensor<1x56x56x64xf32> {
-  %0 = linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
-    ins(%0, %arg3 : tensor<1x56x56x64xf32>, tensor<56x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) {
-    ^bb0(%in: f32, %in_1: f32, %out: f32):
-      %168 = arith.addf %in, %in_1 : f32
-      linalg.yield %168 : f32
-  } -> tensor<1x56x56x64xf32>
-  return %1 : tensor<1x56x56x64xf32>
-} 
+// CONV: return %[[UNPACK]] : tensor<1x58x58x64xf32> 
