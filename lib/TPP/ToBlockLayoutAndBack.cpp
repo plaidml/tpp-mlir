@@ -638,7 +638,7 @@ struct PropagateThroughElementWiseOp
     // associated to the operand check the equivalent dimension in the domain
     // and bind it with the tile size.
     DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-    SmallVector<int64_t> tileLoopPerms;
+    DenseMap<int64_t, int64_t> tileLoopPerms;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
       linalgx::UnPackOp unpackOp =
           operand.get().getDefiningOp<linalgx::UnPackOp>();
