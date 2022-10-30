@@ -13,8 +13,8 @@ else()
 
   FetchContent_Declare(
     xsmm
-    URL https://github.com/libxsmm/libxsmm/archive/f58b32fb89c52a1a074c1de1ec19f8cd07ddbeb1.tar.gz
-    URL_HASH SHA256=23ef5b38d538067db5cfe3d5027973abb59761cbf53152e98429010069a06530
+    URL https://github.com/libxsmm/libxsmm/archive/efa1502f13f7ed0c447351496c66abd0e729e80c.tar.gz
+    URL_HASH SHA256=ca5a508c6127d78ea068a73c632035a30583bba96dd5f0514238d249c60dedfc
   )
 
   FetchContent_GetProperties(xsmm)
@@ -23,9 +23,13 @@ else()
   endif()
 
   set(LIBXSMMROOT ${xsmm_SOURCE_DIR})
+endif()
+
+if(NOT XSMM_SRCS)
   file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/src/*.c)
   list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/src/libxsmm_generator_gemm_driver.c)
 endif()
+
 set(XSMM_INCLUDE_DIRS ${LIBXSMMROOT}/include)
 
 add_library(xsmm STATIC ${XSMM_SRCS})
