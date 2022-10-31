@@ -203,8 +203,8 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   Location loc = convOp.getLoc();
   MLIRContext *ctx = convOp.getContext();
 
-  SmallVector<Value> inputOperands = convOp.getInputOperands();
-  SmallVector<Value> outputOperands = convOp.getOutputOperands();
+  SmallVector<Value> inputOperands = convOp.getDpsInputOperands();
+  SmallVector<Value> outputOperands = convOp.getDpsInitOperands();
 
   // pack the image and the filter.
   Value image = inputOperands[0];
@@ -402,8 +402,8 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     if (!tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
       return failure();
-    SmallVector<Value> inputOperands = linalgOp.getInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getOutputOperands();
+    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
+    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
         linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
     return success();
@@ -683,7 +683,7 @@ struct PropagateThroughElementWiseOp
     }
 
     SmallVector<Value> packedInputOperands;
-    for (OpOperand *operand : linalgOp.getInputOperands()) {
+    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
       Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
                                            tileLoopPerms, rewriter);
       packedInputOperands.push_back(packedOperand);
@@ -692,7 +692,7 @@ struct PropagateThroughElementWiseOp
     SmallVector<Value> packedOutputOperands;
     SmallVector<Type> packedOutputTypes;
     SmallVector<Value> unpackOutputs;
-    for (OpOperand *operand : linalgOp.getOutputOperands()) {
+    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       Value packedOperand = getPackOperand(operand, linalgOp, dimAndTileMapping,
                                            tileLoopPerms, rewriter);
       packedOutputOperands.push_back(packedOperand);
@@ -743,7 +743,7 @@ struct PropagateThroughElementWiseOp
 
     SmallVector<Value> outReplacements;
     size_t idx = 0;
-    for (OpOperand *operand : replacementOp.getOutputOperands()) {
+    for (OpOperand *operand : replacementOp.getDpsInitOperands()) {
       linalgx::PackOp packOp = operand->get().getDefiningOp<linalgx::PackOp>();
       Value result = replacementOp.getTiedOpResult(operand);
       if (unpackOutputs.empty())

@@ -339,7 +339,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
   LogicalResult CollapseFilterPreconditions(linalg::GenericOp linalgOp) const {
     if (!tpp::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
       return failure();
-    OpOperand *filter = linalgOp.getInputOperands()[1];
+    OpOperand *filter = linalgOp.getDpsInputOperands()[1];
     if (!hasFilterWithRandSEqualOne(filter, /*Rpos=*/2, /*Spos=*/3))
       return failure();
     return success();
@@ -441,7 +441,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
         getReductionIteratorTypeName(), getReductionIteratorTypeName()};
 
     Location loc = linalgOp.getLoc();
-    OpOperand *image = linalgOp.getInputOperands()[0];
+    OpOperand *image = linalgOp.getDpsInputOperands()[0];
     Type newImageType = getCollapsedType(image, 2, 3);
     auto reassociationImage = getReassociationIndicesForCollapse(
         image->get().getType().cast<ShapedType>().getShape(),
@@ -449,7 +449,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     if (!reassociationImage)
       return failure();
 
-    OpOperand *filter = linalgOp.getInputOperands()[1];
+    OpOperand *filter = linalgOp.getDpsInputOperands()[1];
     Type newFilterType = getCollapsedType(filter, 1, 3);
     auto reassociationFilter = getReassociationIndicesForCollapse(
         filter->get().getType().cast<ShapedType>().getShape(),
@@ -457,7 +457,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     if (!reassociationFilter)
       return failure();
 
-    OpOperand *output = linalgOp.getOutputOperands()[0];
+    OpOperand *output = linalgOp.getDpsInitOperands()[0];
     Type newOutputType = getCollapsedType(output, 2, 3);
     auto reassociationOutput = getReassociationIndicesForCollapse(
         output->get().getType().cast<ShapedType>().getShape(),
