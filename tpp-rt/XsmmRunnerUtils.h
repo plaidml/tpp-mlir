@@ -15,6 +15,7 @@
 #ifndef TPP_EXECUTIONENGINE_CRUNNERUTILS_H
 #define TPP_EXECUTIONENGINE_CRUNNERUTILS_H
 
+#include "libxsmm.h"
 #include "mlir/ExecutionEngine/Float16bits.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
@@ -25,37 +26,26 @@ _mlir_ciface_xsmm_matmul_invoke_f32(int64_t, UnrankedMemRefType<float> *,
                                     UnrankedMemRefType<float> *,
                                     UnrankedMemRefType<float> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_matmul_dispatch_f32(int64_t, int64_t, int64_t,
-                                                  int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype, int64_t, int64_t,
+                                  int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_matmul_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
                                      UnrankedMemRefType<bf16> *,
                                      UnrankedMemRefType<bf16> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_matmul_dispatch_bf16(int64_t, int64_t, int64_t,
-                                                   int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+_mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype, int64_t, int64_t,
+                                 int64_t, int64_t, int64_t, int64_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t, int64_t, int64_t,
-                                                 int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+_mlir_ciface_xsmm_binary_dispatch(const libxsmm_datatype, int64_t, int64_t,
+                                  int64_t, int64_t, int64_t, int64_t, int64_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_unary_dispatch_bf16(int64_t, int64_t, int64_t,
-                                                  int64_t, int64_t, int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_binary_dispatch(
-    int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t, int64_t, int64_t,
-                                                  int64_t, int64_t, int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT
-    int64_t _mlir_ciface_xsmm_brgemm_dispatch_bf16(int64_t, int64_t, int64_t,
-                                                   int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t,
+                                  int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_unary_invoke_f32(int64_t, UnrankedMemRefType<float> *,

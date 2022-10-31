@@ -111,10 +111,10 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke_bf16(
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch_f32(int64_t m, int64_t n,
-                                                         int64_t k, int64_t lda,
-                                                         int64_t ldb,
-                                                         int64_t ldc) {
+extern "C" int64_t
+_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype dtype, int64_t m,
+                                  int64_t n, int64_t k, int64_t lda,
+                                  int64_t ldb, int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -140,57 +140,19 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch_f32(int64_t m, int64_t n,
   l_shape.lda = ldb;
   l_shape.ldb = lda;
   l_shape.ldc = ldc;
-  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
-  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
-  l_shape.out_type = LIBXSMM_DATATYPE_F32;
-  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_shape.a_in_type = dtype;
+  l_shape.b_in_type = dtype;
+  l_shape.out_type = dtype;
+  l_shape.comp_type = dtype;
 
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
   return reinterpret_cast<int64_t>(sgemm);
 }
 
 extern "C" int64_t
-_mlir_ciface_xsmm_matmul_dispatch_bf16(int64_t m, int64_t n, int64_t k,
-                                       int64_t lda, int64_t ldb, int64_t ldc) {
-  // std::cout << "lda: " << lda << "\n";
-  // std::cout << "ldb: " << ldb << "\n";
-  // std::cout << "ldc: " << ldc << "\n";
-
-  // std::cout << "m: " << m << "\n";
-  // std::cout << "n: " << n << "\n";
-  // std::cout << "k: " << k << "\n";
-
-  libxsmm_blasint m_int = m;
-  libxsmm_blasint n_int = n;
-  libxsmm_blasint k_int = k;
-
-  libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
-  libxsmm_bitfield l_prefetch_flags = 0;
-
-  // See:
-  // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
-  // LIBXSMM col-major change m with n.
-  l_shape.m = n_int;
-  l_shape.n = m_int;
-  l_shape.k = k_int;
-  l_shape.lda = ldb;
-  l_shape.ldb = lda;
-  l_shape.ldc = ldc;
-  l_shape.a_in_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.b_in_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.out_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.comp_type = LIBXSMM_DATATYPE_BF16;
-
-  auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
-  return reinterpret_cast<int64_t>(sgemm);
-}
-
-extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t m, int64_t n,
-                                                        int64_t ldi,
-                                                        int64_t ldo,
-                                                        int64_t type,
-                                                        int64_t bcast_type) {
+_mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
+                                 int64_t n, int64_t ldi, int64_t ldo,
+                                 int64_t type, int64_t bcast_type) {
 
   // std::cout << "ldi: " << ldi << "\n";
   // std::cout << "ldo: " << ldo << "\n";
@@ -207,9 +169,9 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t m, int64_t n,
   // Row major to col major swap m with n.
   unary_shape.m = static_cast<libxsmm_blasint>(n);
   unary_shape.n = static_cast<libxsmm_blasint>(m);
-  unary_shape.in0_type = LIBXSMM_DATATYPE_F32;
-  unary_shape.comp_type = LIBXSMM_DATATYPE_F32;
-  unary_shape.out_type = LIBXSMM_DATATYPE_F32;
+  unary_shape.in0_type = dtype;
+  unary_shape.comp_type = dtype;
+  unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
@@ -220,45 +182,9 @@ extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_f32(int64_t m, int64_t n,
   return reinterpret_cast<int64_t>(kernel);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_unary_dispatch_bf16(int64_t m, int64_t n,
-                                                         int64_t ldi,
-                                                         int64_t ldo,
-                                                         int64_t type,
-                                                         int64_t bcast_type) {
-
-  // std::cout << "ldi: " << ldi << "\n";
-  // std::cout << "ldo: " << ldo << "\n";
-  // std::cout << "m: " << m << "\n";
-  // std::cout << "n: " << n << "\n";
-  // std::cout << "type: " << type << "\n";
-  // std::cout << "bcast_type: " << bcast_type << "\n";
-
-  libxsmm_meltw_unary_flags unary_flags =
-      static_cast<libxsmm_meltw_unary_flags>(bcast_type);
-
-  libxsmm_meltw_unary_shape unary_shape;
-
-  // Row major to col major swap m with n.
-  unary_shape.m = static_cast<libxsmm_blasint>(n);
-  unary_shape.n = static_cast<libxsmm_blasint>(m);
-  unary_shape.in0_type = LIBXSMM_DATATYPE_BF16;
-  unary_shape.comp_type = LIBXSMM_DATATYPE_BF16;
-  unary_shape.out_type = LIBXSMM_DATATYPE_BF16;
-  unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
-  unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
-
-  libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
-      static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
-      static_cast<libxsmm_bitfield>(unary_flags));
-
-  return reinterpret_cast<int64_t>(kernel);
-}
-
-extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(int64_t m, int64_t n,
-                                                     int64_t ldiLhs,
-                                                     int64_t ldiRhs,
-                                                     int64_t ldo, int64_t type,
-                                                     int64_t bcast_type) {
+extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
+    const libxsmm_datatype dtype, int64_t m, int64_t n, int64_t ldiLhs,
+    int64_t ldiRhs, int64_t ldo, int64_t type, int64_t bcast_type) {
 
   libxsmm_meltw_binary_flags binary_flags =
       static_cast<libxsmm_meltw_binary_flags>(bcast_type);
@@ -268,10 +194,10 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(int64_t m, int64_t n,
   // Row major to col major swap m with n.
   binary_shape.m = static_cast<libxsmm_blasint>(n);
   binary_shape.n = static_cast<libxsmm_blasint>(m);
-  binary_shape.in0_type = LIBXSMM_DATATYPE_F32;
-  binary_shape.in1_type = LIBXSMM_DATATYPE_F32;
-  binary_shape.comp_type = LIBXSMM_DATATYPE_F32;
-  binary_shape.out_type = LIBXSMM_DATATYPE_F32;
+  binary_shape.in0_type = dtype;
+  binary_shape.in1_type = dtype;
+  binary_shape.comp_type = dtype;
+  binary_shape.out_type = dtype;
   binary_shape.ldi = static_cast<libxsmm_blasint>(ldiLhs);
   binary_shape.ldi2 = static_cast<libxsmm_blasint>(ldiRhs);
   binary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
@@ -478,57 +404,10 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke_bf16(
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch_f32(int64_t m, int64_t n,
-                                                         int64_t k, int64_t lda,
-                                                         int64_t ldb,
-                                                         int64_t ldc) {
-  // std::cout << "lda: " << lda << "\n";
-  // std::cout << "lbd: " << ldb << "\n";
-  // std::cout << "ldc: " << ldc << "\n";
-  // std::cout << "m: " << m << "\n";
-  // std::cout << "n: " << n << "\n";
-  // std::cout << "k: " << k << "\n";
-
-  libxsmm_blasint lda_int = lda;
-  libxsmm_blasint ldb_int = ldb;
-  libxsmm_blasint ldc_int = ldc;
-  libxsmm_blasint m_int = m;
-  libxsmm_blasint n_int = n;
-  libxsmm_blasint k_int = k;
-  // TODO: move stride computation to dispatch
-  // operation as in: https://github.com/plaidml/plaidml/pull/1983
-  libxsmm_blasint stride_a = lda * m * sizeof(float);
-  libxsmm_blasint stride_b = ldb * k * sizeof(float);
-
-  libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
-  libxsmm_bitfield l_prefetch_flags = 0;
-  libxsmm_gemm_batch_reduce_config l_brconfig;
-
-  l_shape.m = n_int;
-  l_shape.n = m_int;
-  l_shape.k = k_int;
-  l_shape.lda = ldb_int;
-  l_shape.ldb = lda_int;
-  l_shape.ldc = ldc_int;
-  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
-  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
-  l_shape.out_type = LIBXSMM_DATATYPE_F32;
-  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
-  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
-  l_brconfig.br_stride_a_hint = stride_b;
-  l_brconfig.br_stride_b_hint = stride_a;
-  l_brconfig.br_unroll_hint = 0;
-
-  auto sgemm = libxsmm_dispatch_brgemm_v2(l_shape, l_flags, l_prefetch_flags,
-                                          l_brconfig);
-
-  return reinterpret_cast<int64_t>(sgemm);
-}
-
 extern "C" int64_t
-_mlir_ciface_xsmm_brgemm_dispatch_bf16(int64_t m, int64_t n, int64_t k,
-                                       int64_t lda, int64_t ldb, int64_t ldc) {
+_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
+                                  int64_t n, int64_t k, int64_t lda,
+                                  int64_t ldb, int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "lbd: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -544,8 +423,9 @@ _mlir_ciface_xsmm_brgemm_dispatch_bf16(int64_t m, int64_t n, int64_t k,
   libxsmm_blasint k_int = k;
   // TODO: move stride computation to dispatch
   // operation as in: https://github.com/plaidml/plaidml/pull/1983
-  libxsmm_blasint stride_a = lda * m * sizeof(bf16);
-  libxsmm_blasint stride_b = ldb * k * sizeof(bf16);
+  auto typeSize = dtype == LIBXSMM_DATATYPE_F32 ? sizeof(float) : sizeof(bf16);
+  libxsmm_blasint stride_a = lda * m * typeSize;
+  libxsmm_blasint stride_b = ldb * k * typeSize;
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
@@ -558,10 +438,10 @@ _mlir_ciface_xsmm_brgemm_dispatch_bf16(int64_t m, int64_t n, int64_t k,
   l_shape.lda = ldb_int;
   l_shape.ldb = lda_int;
   l_shape.ldc = ldc_int;
-  l_shape.a_in_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.b_in_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.out_type = LIBXSMM_DATATYPE_BF16;
-  l_shape.comp_type = LIBXSMM_DATATYPE_BF16;
+  l_shape.a_in_type = dtype;
+  l_shape.b_in_type = dtype;
+  l_shape.out_type = dtype;
+  l_shape.comp_type = dtype;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
   l_brconfig.br_stride_a_hint = stride_b;
   l_brconfig.br_stride_b_hint = stride_a;
@@ -589,8 +469,8 @@ extern "C" int iree_xsmm_brgemm_dispatch_f32(void *context, void *params,
     int64_t ldc;
   } xsmm_brgemm_dispatch_f32_t;
   xsmm_brgemm_dispatch_f32_t *p = (xsmm_brgemm_dispatch_f32_t *)params;
-  p->res = _mlir_ciface_xsmm_brgemm_dispatch_f32(p->m, p->n, p->k, p->lda,
-                                                 p->ldb, p->ldc);
+  p->res = _mlir_ciface_xsmm_brgemm_dispatch(LIBXSMM_DATATYPE_F32, p->m, p->n,
+                                             p->k, p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -606,8 +486,8 @@ extern "C" int iree_xsmm_matmul_dispatch_f32(void *context, void *params,
     int64_t ldc;
   } xsmm_matmul_dispatch_f32_t;
   xsmm_matmul_dispatch_f32_t *p = (xsmm_matmul_dispatch_f32_t *)params;
-  p->res = _mlir_ciface_xsmm_matmul_dispatch_f32(p->m, p->n, p->k, p->lda,
-                                                 p->ldb, p->ldc);
+  p->res = _mlir_ciface_xsmm_matmul_dispatch(LIBXSMM_DATATYPE_F32, p->m, p->n,
+                                             p->k, p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -623,8 +503,8 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
     int64_t bcast_type;
   } xsmm_unary_dispatch;
   xsmm_unary_dispatch *p = (xsmm_unary_dispatch *)params;
-  p->res = _mlir_ciface_xsmm_unary_dispatch_f32(p->m, p->n, p->ldi, p->ldo,
-                                                p->type, p->bcast_type);
+  p->res = _mlir_ciface_xsmm_unary_dispatch(
+      LIBXSMM_DATATYPE_F32, p->m, p->n, p->ldi, p->ldo, p->type, p->bcast_type);
   return 0;
 }
 

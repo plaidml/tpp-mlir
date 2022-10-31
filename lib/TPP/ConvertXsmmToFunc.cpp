@@ -261,8 +261,8 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch_" + typeAsString;
+    auto type = (uint64_t)(dispatchOp.getDataType());
+    kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
@@ -270,6 +270,11 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+    dispatchOperandTypes.push_back(integer64);
+
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {
@@ -302,11 +307,18 @@ struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
-    // TODO: duplicate code with `ConvertUnaryDispatch`.
+    auto type = (uint64_t)(dispatchOp.getDataType());
+
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+    dispatchOperandTypes.push_back(integer64);
+
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {
@@ -345,16 +357,22 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
-    std::string kindAsString = "xsmm_unary_dispatch_";
-    std::string typeAsString = stringifyEnum(dispatchOp.getDataType()).str();
+    std::string kindAsString = "xsmm_unary_dispatch";
+    auto type = (uint64_t)dispatchOp.getDataType();
 
     FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString + typeAsString);
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+    dispatchOperandTypes.push_back(integer64);
+
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {

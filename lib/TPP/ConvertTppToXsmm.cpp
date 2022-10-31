@@ -142,7 +142,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
       dtype =
           xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
     else {
-      assert(memrefC.getElementType().isF32());
+      assert(memrefC.getElementType().isF32() ||
+             "Element type neither bf16 nor f32");
       dtype =
           xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
     }
@@ -393,8 +394,17 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     xsmm::BinaryFlagsAttr bCastAttr =
         xsmm::BinaryFlagsAttr::get(addOp.getContext(), bCast);
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    xsmm::DataTypeAttr dtype;
+    if (outputMemRef.getElementType().isBF16()) {
+      dtype = xsmm::DataTypeAttr::get(addOp.getContext(), xsmm::DataType::BF16);
+    } else {
+      assert(outputMemRef.getElementType().isF32() &&
+             "Element type neither bf16 nor f32");
+      dtype = xsmm::DataTypeAttr::get(addOp.getContext(), xsmm::DataType::F32);
+    }
+
     Value dispatched = rewriter.create<xsmm::BinaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr);
+        loc, integer64, attr, dims, bCastAttr, dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
