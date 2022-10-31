@@ -20,7 +20,7 @@ using namespace mlir;
 // of the image slice depend on the filter and on the output.
 static SmallVector<OpFoldResult>
 computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
-  OpOperand *image = linalgOp.getInputOperands()[0];
+  OpOperand *image = linalgOp.getDpsInputOperands()[0];
   unsigned rank = image->get().getType().cast<ShapedType>().getRank();
   SmallVector<OpFoldResult> sizes;
   sizes.reserve(rank);
@@ -30,8 +30,8 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(1));
 
-  OpOperand *output = linalgOp.getOutputOperands()[0];
-  OpOperand *filter = linalgOp.getInputOperands()[1];
+  OpOperand *output = linalgOp.getDpsInitOperands()[0];
+  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
   ArrayRef<int64_t> outputShape =
       output->get().getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> filterShape =
@@ -134,7 +134,7 @@ getSlicedConvOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   // If the filter has R and S not 1 we need to deal with a sliding window. The
   // sizes of the matmul depend on the filter and output, use
   // `computeSizeGemmForImage` to compute them.
-  OpOperand *filter = linalgOp.getInputOperands()[1];
+  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
   if (isImage &&
       !hasFilterWithRandSEqualOne(filter, rAndSPos[0], rAndSPos[1])) {
     sizes = computeSizeGemmForImage(builder, linalgOp);
@@ -192,10 +192,11 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
                       ArrayRef<int64_t> rAndSPos) {
   assert(linalgOp->getNumOperands() == 3 &&
          "expect 3 input/output operands");
-  assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
+  assert(linalgOp.getDpsInputOperands().size() == 2 &&
+         "expect 2 input operands");
 
   SmallVector<Value> slicedOperands;
-  OpOperand *image = linalgOp.getInputOperands()[0];
+  OpOperand *image = linalgOp.getDpsInputOperands()[0];
   FailureOr<Value> slicedImage = getSlicedConvOperand(
       builder, image, linalgOp, localIvs, valuesToUse, rAndSPos);
 
@@ -203,14 +204,14 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
     return failure();
   slicedOperands.push_back(*slicedImage);
 
-  OpOperand *filter = linalgOp.getInputOperands()[1];
+  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
   FailureOr<Value> slicedFilter =
       getSlicedConvOperand(builder, filter, linalgOp, localIvs, valuesToUse);
   if (failed(slicedFilter))
     return failure();
   slicedOperands.push_back(*slicedFilter);
 
-  OpOperand *output = linalgOp.getOutputOperands()[0];
+  OpOperand *output = linalgOp.getDpsInitOperands()[0];
   FailureOr<Value> slicedOutput =
       getSlicedConvOperand(builder, output, linalgOp, localIvs, valuesToUse);
   if (failed(slicedOutput))
@@ -268,7 +269,7 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(
         linalgOp, "cannot match operation iterators with matmul iterators");
 
-  OpOperand *filter = linalgOp.getInputOperands()[1];
+  OpOperand *filter = linalgOp.getDpsInputOperands()[1];
   if (!isValidRandS(filter, rPos, sPos))
     return rewriter.notifyMatchFailure(linalgOp, "invalid rPos and SPos");
 

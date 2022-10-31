@@ -70,11 +70,11 @@ struct AdaptLinalgInputOperandToOutputOperand
     // Find an input operand which meets:
     //   1. It has the same indexing map and type.
     //   2. It is not from a readonly tensor.
-    OpOperand *outputOperand = op.getOutputOperand(0);
+    OpOperand *outputOperand = op.getDpsInitOperand(0);
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
-    for (auto *in : op.getInputOperands()) {
+    for (auto *in : op.getDpsInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
           op.getMatchingIndexingMap(in) ==
               op.getMatchingIndexingMap(outputOperand) &&
@@ -102,7 +102,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     // Repair the payload entry block.
     Block &payload = newOp.getRegion().front();
     payload.getArgument(operand->getOperandNumber())
-        .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
+        .replaceAllUsesWith(payload.getArgument(op.getNumDpsInputs()));
     payload.eraseArgument(operand->getOperandNumber());
 
     rewriter.replaceOp(op, newOp.getResults());

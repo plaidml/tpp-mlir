@@ -135,7 +135,7 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
         tileSizes(tileSizes) {}
 
   bool isInplace(linalg::LinalgOp linalgOp) const {
-    return linalgOp.getNumInputs() == 0;
+    return linalgOp.getNumDpsInputs() == 0;
   }
 
   // Locate an element-wise operation and fuse if the producer
@@ -149,8 +149,8 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
 
     // further restrict to single result operations.
     OpOperandVector operands = isInplace(linalgOp)
-                                   ? linalgOp.getOutputOperands()
-                                   : linalgOp.getInputOperands();
+                                   ? linalgOp.getDpsInitOperands()
+                                   : linalgOp.getDpsInputOperands();
     if (operands.size() != 1)
       return failure();
     linalg::LinalgOp producer =

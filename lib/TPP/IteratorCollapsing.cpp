@@ -164,10 +164,11 @@ static FailureOr<linalg::GenericOp> buildReplacement(
     ArrayRef<AffineMap> newIndexingMaps, ArrayRef<Attribute> newIteratorTypes,
     SmallVector<ArrayAttr> operandReassociationMaps) {
 
-  ArrayRef<Value> newInputs = newOperands.drop_back(genericOp.getNumOutputs());
-  ArrayRef<Value> newOutputs = newOperands.drop_front(genericOp.getNumInputs());
-  assert((int64_t)newInputs.size() == genericOp.getNumInputs());
-  assert((int64_t)newOutputs.size() == genericOp.getNumOutputs());
+  ArrayRef<Value> newInputs = newOperands.drop_back(genericOp.getNumDpsInits());
+  ArrayRef<Value> newOutputs =
+      newOperands.drop_front(genericOp.getNumDpsInputs());
+  assert((int64_t)newInputs.size() == genericOp.getNumDpsInputs());
+  assert((int64_t)newOutputs.size() == genericOp.getNumDpsInits());
 
   // XXX
   SmallVector<StringRef> iteratorsAsString;
@@ -178,7 +179,8 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   SmallVector<Type, 4> resultTypes;
   resultTypes.reserve(genericOp.getNumResults());
   for (unsigned i : llvm::seq<unsigned>(0, genericOp.getNumResults()))
-    resultTypes.push_back(newInputAndOutputTypes[i + genericOp.getNumInputs()]);
+    resultTypes.push_back(
+        newInputAndOutputTypes[i + genericOp.getNumDpsInputs()]);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, resultTypes, newInputs, newOutputs, newIndexingMaps,
       iteratorsAsString);
@@ -188,7 +190,7 @@ static FailureOr<linalg::GenericOp> buildReplacement(
   // if any results has modified shape, add an expand.
   SmallVector<Value> resultReplacements;
   for (const auto &result : llvm::enumerate(replacementOp.getResults())) {
-    unsigned index = result.index() + replacementOp.getNumInputs();
+    unsigned index = result.index() + replacementOp.getNumDpsInputs();
     Type origResultType = genericOp.getResult(result.index()).getType();
 
     FailureOr<Value> newResult =

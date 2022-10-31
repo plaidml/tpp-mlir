@@ -49,7 +49,7 @@ static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
 
 // Check if the operand is an input to linalgOp.
 static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
-  return operand.getOperandNumber() < linalgOp.getNumInputs();
+  return operand.getOperandNumber() < linalgOp.getNumDpsInputs();
 }
 
 // Check if the operand is an output to linalgOp.
@@ -116,17 +116,18 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                   linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
   assert(linalgOp->getNumOperands() == 3 &&
          "expect 3 input/output operands");
-  assert(linalgOp.getInputOperands().size() == 2 && "expect 2 input operands");
+  assert(linalgOp.getDpsInputOperands().size() == 2 &&
+         "expect 2 input operands");
 
   SmallVector<Value> slicedOperands;
-  for (OpOperand *operand : linalgOp.getInputOperands()) {
+  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
     FailureOr<Value> slicedOperand = utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 3);
     if (failed(slicedOperand))
       return failure();
     slicedOperands.push_back(*slicedOperand);
   }
-  for (OpOperand *operand : linalgOp.getOutputOperands()) {
+  for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
     FailureOr<Value> slicedOperand = utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedOperand))

@@ -259,7 +259,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
     if (libraryCall.compare("tpp.relu") == 0) {
-      if (linalgOp.getNumInputs() == 2)
+      if (linalgOp.getNumDpsInputs() == 2)
         rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
                                                  operands[1]);
       else
@@ -314,8 +314,8 @@ struct ConvertBrgemmToTpp
                                 PatternRewriter &rewriter) const override {
     if (!brMatmulOp.hasBufferSemantics())
       return rewriter.notifyMatchFailure(brMatmulOp, "expect buffer semantics");
-    SmallVector<Value> inputs = brMatmulOp.getInputOperands();
-    SmallVector<Value> outputs = brMatmulOp.getOutputOperands();
+    SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
+    SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
     return success();
   }
@@ -329,8 +329,8 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics())
       return rewriter.notifyMatchFailure(matmulOp, "expect buffer semantics");
-    SmallVector<Value> inputs = matmulOp.getInputOperands();
-    SmallVector<Value> outputs = matmulOp.getOutputOperands();
+    SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
+    SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
     return success();
   }
