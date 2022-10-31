@@ -98,19 +98,6 @@ static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
   return success();
 }
 
-static LogicalResult MapToBRGEMMOpPreconditions(linalg::LinalgOp linalgOp) {
-  if (!isa<linalg::GenericOp>(linalgOp))
-    return failure();
-
-  if (linalgOp.hasDynamicShape())
-    return failure();
-
-  if (failed(checkStructure(linalgOp)) ||
-      failed(checkAccessPatterns(linalgOp)) || failed(checkBody(linalgOp)))
-    return failure();
-  return success();
-}
-
 static FailureOr<SmallVector<Value>>
 getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                   linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
@@ -140,7 +127,23 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 FailureOr<SmallVector<Value>>
 mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
                              linalg::LinalgOp linalgOp) {
-  if (failed(MapToBRGEMMOpPreconditions(linalgOp)))
+
+  if (!isa<linalg::GenericOp>(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "expects a linalg.generic");
+
+  if (failed(checkStructure(linalgOp)))
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match structurally with BRGEMM");
+
+  if (failed(checkAccessPatterns(linalgOp)))
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match BRGEMM access patterns");
+
+  if (failed(checkBody(linalgOp)))
+    return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
+
+  // TODO: this should not be required.
+  if (linalgOp.hasDynamicShape())
     return failure();
 
   // materialize outer loops
@@ -163,7 +166,6 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
     FailureOr<SmallVector<Value>> maybeSlicedOperands =
         getSlicedOperands(builder, loc, localIvs, linalgOp, operandValuesToUse);
     if (failed(maybeSlicedOperands)) {
-      // TODO: is safe to just return{} ?
       assert(0 && "failed to generate loops");
       return {};
     }

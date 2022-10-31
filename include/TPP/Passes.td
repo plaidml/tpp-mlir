@@ -172,7 +172,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
 
 def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm", 
                                          "func::FuncOp"> {
-  let summary = "Decompose Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm (WIP)";
+  let summary = "Decompose Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
   let description = [{
     Rewrite a convolution to a matmul or brgemm operation.
   }];
@@ -234,10 +234,13 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   let summary = "Map a GEMM-like pattern to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
   let description = [{
-    Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
+    Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
     [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
     outermost parallel dimensions (as scf.for) and rewrite the body to a
-    linalg.brgemm. The pass works both a memref and tensor level.
+    linalg.brgemm. 
+
+    The pass works on any linalg.generic and attempts to map the innermost
+    loops to BRGEMM.  It works both a memref and tensor level.
   }];
 }
 
