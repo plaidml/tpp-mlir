@@ -1,14 +1,11 @@
 // RUN: tpp-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics -canonicalize %s | FileCheck %s
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.generalize %0
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
 }
 
 func.func @conv2d(%arg0: tensor<1x56x56x64xf32>, 
@@ -40,17 +37,14 @@ func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
-      %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
-      %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
-      %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
-      %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
-      transform.structured.map_to_brgemm %4
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
+    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+    %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+    %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    transform.structured.map_to_brgemm %4
 }
 
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
@@ -65,15 +59,12 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 
 // Expect the test to fail because we don't have [parallel, parallel, reduction]
 // as innermost loops - we did not interchnage.
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.generalize %0
-      // expected-error @below {{Could not map to matmul}}
-      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    // expected-error @below {{Could not map to matmul}}
+    transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
 }
 
 func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
@@ -88,16 +79,13 @@ func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
 // -----
 
 // Expect test to fail as the filter is out of bound.
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.generalize %0
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      // expected-error @below {{Could not map to matmul}}
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 100, filter_width_pos = 1)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    // expected-error @below {{Could not map to matmul}}
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 100, filter_width_pos = 1)
 }
 
 func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
@@ -110,15 +98,12 @@ func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
 }
 
 // -----
-
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-      %1 = transform.structured.generalize %0
-      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
-  }
+  
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %1 = transform.structured.generalize %0
+    transform.structured.map_conv_to_matmul %1 (filter_height_pos = 0, filter_width_pos = 1)
 }
 
 // Expect linalg.matmul: linalg.matmul -> linalg.generic -> linalg.matmul 
@@ -133,15 +118,12 @@ func.func @matmul(%arg0: tensor<58x64xf32>,
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-      %1 = transform.structured.generalize %0
-      // expected-error @below {{Could not map to matmul}}
-      transform.structured.map_conv_to_matmul %1 (filter_height_pos = 1, filter_width_pos = 0)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %1 = transform.structured.generalize %0
+    // expected-error @below {{Could not map to matmul}}
+    transform.structured.map_conv_to_matmul %1 (filter_height_pos = 1, filter_width_pos = 0)
 }
 
 // We don't expect a matmul here as filter_height_pos and filter_width_pos are invalid. 
@@ -157,15 +139,12 @@ func.func @matmul(%arg0: tensor<58x64xf32>,
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 2, filter_width_pos = 3)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 2, filter_width_pos = 3)
 }
 
 func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
@@ -217,16 +196,14 @@ func.func @conv2d(%arg0: tensor<1x56x56x64xf32>,
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 2, filter_width_pos = 3)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 2, filter_width_pos = 3)
 }
+
 
 func.func @conv2d(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
   %1 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>,
@@ -278,15 +255,12 @@ func.func @conv2d(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.generalize %0
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
 }
 
 func.func @conv2d(%arg0: tensor<?x?x?x?xf32>,
@@ -327,16 +301,13 @@ func.func @conv2d(%arg0: tensor<?x?x?x?xf32>,
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-      %1 = transform.structured.generalize %0
-      %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
-      // expected-error @below {{Could not map to matmul}}
-      transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    // expected-error @below {{Could not map to matmul}}
+    transform.structured.map_conv_to_matmul %2 (filter_height_pos = 0, filter_width_pos = 1)
 }
 
 func.func @conv2d(%arg0: tensor<?x?x?x?xf32>,

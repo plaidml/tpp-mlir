@@ -127,7 +127,7 @@ static bool hasOnlyYieldOp(Region &region) {
 bool hasCopySemantics(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
     return false;
-  if ((linalgOp.getNumInputsAndOutputs() != 2) ||
+  if ((linalgOp->getNumOperands() != 2) ||
       (linalgOp.getNumInputs() != 1))
     return false;
   return hasOnlyYieldOp(linalgOp->getRegion(0));

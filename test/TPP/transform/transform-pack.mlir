@@ -22,26 +22,20 @@ func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tenso
 }
 
 transform.sequence failures(propagate) {
-^bb0(%arg0: !pdl.operation):
-  sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
+  ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
     // expected-error @below {{Could not pack op}}
     %1 = transform.structured.pack %0 { blocking_factors = [2, 2, 2] }
     %2 = transform.structured.vectorize %1 {vectorize_padding}
-  }
 }
 
 // -----
 
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-      // expected-error @below {{Could not pack op:}}
-      %1 = transform.structured.pack %0 { blocking_factors = [200, 200, 200] }
-  }
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    // expected-error @below {{Could not pack op:}}
+    %1 = transform.structured.pack %0 { blocking_factors = [200, 200, 200] }
 }
 
 func.func @block_linalg_matmul(

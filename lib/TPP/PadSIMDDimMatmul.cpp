@@ -119,7 +119,7 @@ struct PadSIMDAndParallelDimensionForGemm
         loc, operands.c.getType(), ValueRange{operands.a, operands.b},
         ValueRange{operands.c}, linalgOp.getIndexingMapsArray(),
         llvm::to_vector(
-            linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
+            linalgOp.getIteratorTypes().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.matmul");
     rewriter.inlineRegionBefore(linalgOp.getRegion(), replacementOp.getRegion(),
                                 replacementOp.getRegion().begin());
@@ -256,7 +256,7 @@ struct SinkExtractSliceAfterRelu : public OpRewritePattern<linalg::GenericOp> {
         loc, sliceOperandType, ValueRange{slice.getSource()},
         ValueRange{reluBuffer}, linalgOp.getIndexingMapsArray(),
         llvm::to_vector(
-            linalgOp.iterator_types().template getAsValueRange<StringAttr>()),
+            linalgOp.getIteratorTypes().template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.relu");
     rewriter.inlineRegionBefore(linalgOp.getRegion(), newReluOp.getRegion(),
                                 newReluOp.getRegion().begin());
@@ -433,7 +433,7 @@ struct FoldInsertSliceIntoTppIdentity
     linalg::GenericOp newTppIdentityOp = rewriter.create<linalg::GenericOp>(
         loc, dest, ValueRange{tppIdentityOp.getOperand(0)}, ValueRange{init},
         tppIdentityOp.getIndexingMapsArray(),
-        llvm::to_vector<4>(tppIdentityOp.iterator_types()
+        llvm::to_vector<4>(tppIdentityOp.getIteratorTypes()
                                .template getAsValueRange<StringAttr>()),
         /*docs*/ "", /*library_call*/ "tpp.identity");
     // I think we cannot steal the old region but copy it as per PatternRewriter
