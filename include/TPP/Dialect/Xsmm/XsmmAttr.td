@@ -13,8 +13,8 @@ include "TPP/Dialect/Xsmm/XsmmDialect.td"
 def Xsmm_DataType: I64EnumAttr<
     "DataType", "",
     [
-      I64EnumAttrCase<"BF16", 0, "bf16">,
-      I64EnumAttrCase<"F32",  1, "f32">
+      I64EnumAttrCase<"F32",  1, "f32">,
+      I64EnumAttrCase<"BF16", 2, "bf16">
     ]>{
    let cppNamespace = "mlir::xsmm";
 }
