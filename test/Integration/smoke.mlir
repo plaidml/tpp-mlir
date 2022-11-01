@@ -1,10 +1,9 @@
 // RUN: tpp-opt %s \
-// RUN:   --linalg-generalize-named-ops --linalg-fuse-elementwise-ops \
-// RUN:   --sparsification --sparse-tensor-conversion \
-// RUN:   --linalg-bufferize --convert-linalg-to-loops \
+// RUN:   --linalg-generalize-named-ops \
+// RUN:   --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
+// RUN:   --convert-linalg-to-loops \
 // RUN:   --convert-vector-to-scf --convert-scf-to-cf \
-// RUN:   --func-bufferize --arith-bufferize --tensor-bufferize \
-// RUN:   --finalizing-bufferize --lower-affine | \
+// RUN:   --finalizing-bufferize | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
@@ -15,9 +14,8 @@ module {
   //
   // Computes C = A x B with all matrices dense.
   //
-  func.func @matmul1(%A: tensor<4x8xf64>,
-                %B: tensor<8x4xf64>) -> tensor<4x4xf64> {
-    %C = arith.constant dense<0.0> : tensor<4x4xf64>
+  func.func @matmul1(%A: tensor<4x8xf64>, %B: tensor<8x4xf64>,
+                     %C: tensor<4x4xf64>) -> tensor<4x4xf64> {
     %D = linalg.matmul
       ins(%A, %B: tensor<4x8xf64>, tensor<8x4xf64>)
          outs(%C: tensor<4x4xf64>) -> tensor<4x4xf64>
@@ -51,8 +49,9 @@ module {
     ]> : tensor<8x4xf64>
    
     // Call kernels with dense.
-    %0 = call @matmul1(%da, %db)
-       : (tensor<4x8xf64>, tensor<8x4xf64>) -> tensor<4x4xf64>
+    %C = arith.constant dense<0.0> : tensor<4x4xf64>
+    %0 = call @matmul1(%da, %db, %C)
+       : (tensor<4x8xf64>, tensor<8x4xf64>, tensor<4x4xf64>) -> tensor<4x4xf64>
         
     //
     // CHECK:    ( ( 388.76, 425.56, 462.36, 499.16 ),
@@ -60,8 +59,7 @@ module {
     // CHECK-SAME: ( 405.48, 443.88, 482.28, 520.68 ),
     // CHECK-SAME: ( 413.84, 453.04, 492.24, 531.44 ) )
     //
-    %m0 = bufferization.to_memref %0 : memref<4x4xf64>
-    %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<4x4xf64>, vector<4x4xf64>
+    %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf64>, vector<4x4xf64>
     vector.print %v0 : vector<4x4xf64>
 
     return
