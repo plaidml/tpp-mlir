@@ -601,12 +601,6 @@ struct PropagateThroughElementWiseOp
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  LogicalResult isElementwise(linalg::GenericOp linalgOp) const {
-    if (!linalg::isElementwise(linalgOp))
-      return failure();
-    return success();
-  }
-
   // Further restrict to identity or minor identity maps.
   bool hasMinorIdentityMaps(linalg::GenericOp linalgOp) const {
     return llvm::all_of(linalgOp.getIndexingMapsArray(),
@@ -614,19 +608,15 @@ struct PropagateThroughElementWiseOp
   }
 
   // Require operands to come from a single `unpack` operation.
-  LogicalResult hasOnlyOnePackedOperand(linalg::GenericOp linalgOp) const {
-    bool oneOf = false;
+  bool hasOnlyOnePackedOperand(linalg::GenericOp linalgOp) const {
+    unsigned count = 0;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
       linalgx::UnPackOp unpackOp =
           operand.get().getDefiningOp<linalgx::UnPackOp>();
-      if (unpackOp) {
-        if (oneOf)
-          return failure();
-        else
-          oneOf = true;
-      }
+      if (unpackOp)
+        count++;
     }
-    return success();
+    return count == 1;
   }
 
   Value getPackOperand(OpOperand *operand, linalg::GenericOp linalgOp,
@@ -685,7 +675,7 @@ struct PropagateThroughElementWiseOp
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (failed(isElementwise(linalgOp)))
+    if (!linalg::isElementwise(linalgOp))
       return rewriter.notifyMatchFailure(linalgOp,
                                          "expects an elementwise operation");
 
@@ -694,7 +684,7 @@ struct PropagateThroughElementWiseOp
           linalgOp, "expects all identity/minor identity maps");
 
     // Require only one operand to come from an `unpack` operation.
-    if (failed(hasOnlyOnePackedOperand(linalgOp)))
+    if (!hasOnlyOnePackedOperand(linalgOp))
       return rewriter.notifyMatchFailure(linalgOp,
                                          "expects a single packed operand");
 
