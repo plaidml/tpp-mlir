@@ -47,17 +47,6 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   ];
 }
 
-def PadSIMDDimensionForMatmulTpp : Pass<"pad-simd-dim-for-matmul", "func::FuncOp"> {
-  let summary = "Enforce padding for tpp matmul mapping on the SIMD dimension.";
-  let constructor = "mlir::tpp::createPasSIMDDimensionPass()";
-  let description = [{
-    Enforce some preconditions to efficiently map on tpp micro-kernels.
-    For tpp.matmul we pad the SIMD dimension (N) to be multiple of 16.
-  }];
-  let dependentDialects = ["linalg::LinalgDialect", 
-                           "memref::MemRefDialect"];
-}
-
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
   let constructor = "mlir::tpp::createConvertTppToLoopsPass()";

@@ -3,7 +3,6 @@ add_subdirectory(Dialect)
 add_mlir_library(MLIRTPP
   # Passes 
     LinalgMapToTpp.cpp
-    PadSIMDDimMatmul.cpp
     VectorizeCopy.cpp
     PreBufferization.cpp
     MainClosure.cpp

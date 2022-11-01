@@ -58,7 +58,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
-std::unique_ptr<OperationPass<func::FuncOp>> createPasSIMDDimensionPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
