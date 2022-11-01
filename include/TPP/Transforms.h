@@ -64,6 +64,6 @@ void populateTppToXsmmPatterns(RewritePatternSet &patterns);
 void populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                 bool useExtractMetaData);
 void populateCheckToFuncPatterns(RewritePatternSet &patterns);
-void populateSinkRelayoutPatterns(RewritePatternSet &patterns);
+void populateSinkPackPatterns(RewritePatternSet &patterns);
 } // namespace tpp
 } // namespace mlir

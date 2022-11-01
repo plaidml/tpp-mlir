@@ -425,7 +425,7 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkRelayoutPatterns(patterns);
+    mlir::tpp::populateSinkPackPatterns(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
@@ -466,7 +466,7 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkRelayoutPatterns(patterns);
+    mlir::tpp::populateSinkPackPatterns(patterns);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -506,7 +506,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkRelayoutPatterns(patterns);
+    mlir::tpp::populateSinkPackPatterns(patterns);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -766,7 +766,7 @@ struct PropagateThroughElementWiseOp
 
 } // end namespace
 
-void mlir::tpp::populateSinkRelayoutPatterns(RewritePatternSet &patterns) {
+void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   patterns.add<PropagateThroughElementWiseOp, PropagateThroughPadOp>(
       patterns.getContext());
 }
