@@ -779,8 +779,8 @@ struct PropagateThroughElementWiseOp
         unpackOutputs.push_back(unpackOp.getOutput());
     }
 
-    // XXX: innerDimsPos and outerDimsPerm must have been unsigned in the first
-    // place. `AffineMap::getPermutationMap` requires unsigned, convert.
+    // FIXME: innerDimsPos and outerDimsPerm must have been unsigned in the
+    // first place. `AffineMap::getPermutationMap` requires unsigned, convert.
     AffineMap permutationMap;
     if (!tileLoopPerms.empty()) {
       SmallVector<unsigned> interchangeVectorUInt;
