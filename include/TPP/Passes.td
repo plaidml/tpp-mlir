@@ -17,8 +17,9 @@ def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
     Attempt at matching tpp operations at the Linalg level. Operates on
     linalg.generic and named ops. If candidate are found, the linalg.generic is
     marked with the tpp operation detected. We basically write the libaray_call
-    StringAttr in the generic with the name of the tpp operation to call. For 
-    named ops we simply convert to the matching tpp operation.
+    StringAttr in the generic with the name of the tpp operation to call.
+    There are no optimizations just simple pattern-matching detection for basic
+    tpp operations.
   }];
   let constructor = "mlir::tpp::createMapLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
