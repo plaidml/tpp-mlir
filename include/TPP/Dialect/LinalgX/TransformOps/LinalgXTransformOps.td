@@ -39,7 +39,7 @@ def PackOp : Op<Transform_Dialect, "structured.pack",
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::linalg::LinalgOp target, 
         ::llvm::SmallVector<::mlir::Operation *> &results,
-        TransformState &state);
+        ::mlir::transform::TransformState &state);
   }];
 
   let hasVerifier = 1;
@@ -66,7 +66,7 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::linalg::LinalgOp target,
         ::llvm::SmallVector<::mlir::Operation *> &results,
-        TransformState &state);
+        ::mlir::transform::TransformState &state);
 
     // Get reassociation.
     SmallVector<ReassociationIndices, 4> getReassociationIndices();
@@ -100,7 +100,7 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::linalg::LinalgOp target,
         ::llvm::SmallVector<::mlir::Operation *> &results,
-        TransformState &state);
+        mlir::transform::TransformState &state);
   }];
 }
 
@@ -132,7 +132,7 @@ def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::linalg::LinalgOp target,
         ::llvm::SmallVector<::mlir::Operation *> &results,
-        TransformState &state);
+        ::mlir::transform::TransformState &state);
   }];
 }
 
