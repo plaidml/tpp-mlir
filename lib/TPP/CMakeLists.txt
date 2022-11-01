@@ -17,7 +17,6 @@ add_mlir_library(MLIRTPP
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
     MapConvToMatmul.cpp
-    LinalgXToLoops.cpp
 
   # Utils
     TransformUtils.cpp
@@ -25,6 +24,7 @@ add_mlir_library(MLIRTPP
   # Conversions
     ConvertTppToVector.cpp
     ConvertLinalgToTpp.cpp
+    ConvertLinalgXToLoops.cpp
     ConvertTppToLoops.cpp
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
