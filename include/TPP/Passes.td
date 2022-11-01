@@ -14,10 +14,11 @@ include "mlir/Pass/PassBase.td"
 def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Map linalg to tpp.";
   let description = [{
-    Attempt at matching tpp operations at the Linalg level. Operates only on
-    linalg.generic. If candidate are found, the linalg.generic is marked with the
-    tpp operation detected. We basically write the libaray_call StringAttr in the
-    generic with the name of the tpp operation to call.
+    Attempt at matching tpp operations at the Linalg level. Operates on
+    linalg.generic and named ops. If candidate are found, the linalg.generic is
+    marked with the tpp operation detected. We basically write the libaray_call
+    StringAttr in the generic with the name of the tpp operation to call. For 
+    named ops we simply convert to the matching tpp operation.
   }];
   let constructor = "mlir::tpp::createMapLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
@@ -26,14 +27,14 @@ def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
 def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Convert linalg to tpp.";
   let description = [{
-    Convert marked linalg.generic operation to tpp operations. Before mapping
-    to tpp the conversion makes sure to resize all the tensors to 2d by tiling all
-    but the two innermost dimensions. This pass runs at buffer level as we want to
-    preserve parallel semantics when tiling. We do an additional round of tiling to
-    select the best tpp for matmul - SIMD dimension multiple of 16 - 64 the
-    optimal, the other parallel dimension with a tile factor of 32 while we do not
-    tile the reduction dimension. We bail out if we cannot generate full tiles. 
-    The user can pass tile sizes using 'tile-sizes' options.
+    Convert marked linalg.generic (or named) operations to tpp operations.
+    Before mapping to tpp the conversion makes sure to resize all the tensors to 2d
+    by tiling all but the two innermost dimensions. This pass runs at buffer level
+    as we want to preserve parallel semantics when tiling. We do an additional
+    round of tiling to select the best tpp for matmul - SIMD dimension multiple of
+    16 - 64 the optimal, the other parallel dimension with a tile factor of 32
+    while we do not tile the reduction dimension. We bail out if we cannot generate
+    full tiles.  The user can pass tile sizes using 'tile-sizes' options.
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
@@ -79,7 +80,7 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let summary = "Convert tpp to xsmm";
   let constructor = "mlir::tpp::createConvertTppToXsmmPass()";
   let description = [{
-    Convert tpp operations to libXSMM function calls.
+    Convert tpp operations to XSMM operations.
   }];
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
@@ -88,7 +89,7 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
   let description = [{
-    Convert xsmm operations to libXSMM function calls.
+    Convert XSMM operations to libXSMM function calls.
   }];
   let options = [
     Option<"useExtractMetaData", "use-extract-metadata", "bool", "false",
@@ -203,9 +204,9 @@ def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
   let description = [{
     Block Conv2DNchwFchw as: [N][BK][P][Q][bk] += [N][BC][H][W][bc] * [BK][BC][R][S][bk][bc]
                              output            += image             * filter
-    Block the image's channel with a factor BC.
-    Block the filter's channels C and K with a factor of BC and BK.
-    Block the output's channel K with a factor BK.
+    Pack the image's channel with a block factor BC.
+    Pack the filter's channels C and K with a block factor of BC and BK.
+    Pack the output's channel K with a block factor BK.
   }];
   let options = [
     ListOption<"blockingFactors", "block-factors", "int64_t",
@@ -231,13 +232,14 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
 }
 
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
-  let summary = "Map a GEMM-like pattern to BRGEMM";
+  let summary = "Map a linalg.generic to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
   let description = [{
+    Map a linalg.generic to a linalg.batch_reduce_matmul.
     Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
     [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
     outermost parallel dimensions (as scf.for) and rewrite the body to a
-    linalg.brgemm. 
+    linalg.batch_reduce_matmul. 
 
     The pass works on any linalg.generic and attempts to map the innermost
     loops to BRGEMM.  It works both a memref and tensor level.
