@@ -149,11 +149,11 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
   let description = [{
     Propagate pack and unpack operation through element-wise operations and
     padding.  Internally, it applies a set of rewrite patterns, some of which
-    enable vectorization and some of which clean up the results. Therefore, it can
+    enable propagation and some of which clean up the results. Therefore, it can
     only be applied to an op with the "isolated from above property".
 
     Note that this transformation is invalidating the handles to any payload IR
-    operation that is contained inside the vectorization target.
+    operation that is contained inside the propagation target boundaries.
   }];
 
   let arguments = (ins PDL_Operation:$target);
