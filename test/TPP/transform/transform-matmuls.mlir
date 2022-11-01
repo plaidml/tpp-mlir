@@ -112,7 +112,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse the relu into the matmul. Fuse the 2 outermost loops
     %1, %loop:2 = transform.structured.fuse %0 { tile_sizes = [1, 1, 0, 0] }
-    // Get the prodcuer for the relu (aka the packed matmul)
+    // Get the producer for the relu (aka the packed matmul)
     %2 = get_producer_of_operand %1[0] : (!pdl.operation) -> !pdl.operation
     // Map the matmul to brgemm
     transform.structured.map_to_brgemm %2
