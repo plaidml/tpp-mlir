@@ -159,15 +159,13 @@ struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     if (producer.getNumParallelLoops() != tileSizes.size()) {
-      producer->emitRemark(
+      return rewriter.notifyMatchFailure(
+          producer,
           "expect tile sizes to be equal to number of parallel loops");
-      return failure();
     }
 
-    if (failed(tileDivideIterationDomain(linalgOp, tileSizes, rewriter))) {
-      linalgOp->emitRemark("wrong tile sizes");
-      return failure();
-    }
+    if (failed(tileDivideIterationDomain(linalgOp, tileSizes, rewriter)))
+      return rewriter.notifyMatchFailure(producer, "wrong tile sizes");
 
     // tile and fuse.
     scf::SCFTileAndFuseOptions options;
