@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -14,6 +15,7 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 
@@ -142,6 +144,31 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                 << "Could not map to matmul: " << target << "\n";
     diag.attachNote(target.getLoc()) << "when applied to this op";
   }
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===----------------------------------------------------------------------===//
+// PackingPropagationOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::PackingPropagationOp::applyToOne(Operation *target,
+                                            SmallVector<Operation *> &results,
+                                            TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    auto diag = this->emitOpError("requires isolated-from-above targets");
+    diag.attachNote(target->getLoc()) << "non-isolated target";
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+  MLIRContext *ctx = getContext();
+  RewritePatternSet patterns(ctx);
+  mlir::tpp::populateSinkPackPatterns(patterns);
+  mlir::linalgx::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  mlir::linalgx::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
   return DiagnosedSilenceableFailure(success());
 }
 

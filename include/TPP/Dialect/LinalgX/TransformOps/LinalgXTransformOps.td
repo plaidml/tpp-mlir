@@ -136,4 +136,39 @@ def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// PackingPropagationOp
+//===----------------------------------------------------------------------===//
+
+def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+
+  let description = [{
+    Propagate pack and unpack operation through element-wise operations and
+    padding.  Internally, it applies a set of rewrite patterns, some of which
+    enable vectorization and some of which clean up the results. Therefore, it can
+    only be applied to an op with the "isolated from above property".
+
+    Note that this transformation is invalidating the handles to any payload IR
+    operation that is contained inside the vectorization target.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $target attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // LINALG_TRANSFORM_OPS
