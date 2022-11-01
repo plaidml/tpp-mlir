@@ -4,12 +4,10 @@ add_mlir_library(MLIRTPP
   # Passes 
     LinalgMapToTpp.cpp
     PadSIMDDimMatmul.cpp
-    TppCompiler.cpp
     VectorizeCopy.cpp
     PreBufferization.cpp
     MainClosure.cpp
     UndoMainClosure.cpp
-    Bufferization.cpp
     TileConsumerAndFuseProducers.cpp
     DecomposeConvsToMatmulOrBrgemm.cpp
     ToBlockLayoutAndBack.cpp
@@ -22,7 +20,6 @@ add_mlir_library(MLIRTPP
     TransformUtils.cpp
 
   # Conversions
-    ConvertTppToVector.cpp
     ConvertLinalgToTpp.cpp
     ConvertLinalgXToLoops.cpp
     ConvertTppToLoops.cpp
