@@ -58,15 +58,6 @@ def PadSIMDDimensionForMatmulTpp : Pass<"pad-simd-dim-for-matmul", "func::FuncOp
                            "memref::MemRefDialect"];
 }
 
-def ConvertTppToVector : Pass<"convert-tpp-to-vector", "func::FuncOp"> {
-  let summary = "Convert tpp to the vector dialect";
-  let constructor = "mlir::tpp::createConvertTppToVectorPass()";
-  let description = [{
-    Convert tpp operations to the vector dialect. Currently WIP.
-  }];
-  let dependentDialects = ["vector::VectorDialect"];
-}
-
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
   let constructor = "mlir::tpp::createConvertTppToLoopsPass()";
@@ -119,15 +110,6 @@ def PreBufferization : Pass<"pre-bufferization", "func::FuncOp"> {
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
-def Bufferization : Pass<"bufferize", "ModuleOp"> {
-  let summary = "Bufferize (WIP)";
-  let description = [{
-    Work in progress pass to bufferize our flow using one-shot bufferization.
-    Do not use yet, prefer compilation string in the integration tests.
-  }];
-  let constructor = "mlir::tpp::createBufferizationPass()";
-}
-
 def MainClosure : Pass<"main-closure", "func::FuncOp"> {
   let summary = "Wrap main into a closure to hoist out constant computation.";
   let constructor = "mlir::tpp::createMainClosurePass()"; 
@@ -144,17 +126,6 @@ def UndoMainClosure : Pass<"undo-main-closure", "func::FuncOp"> {
   let summary = "Undo the main-closure pass";
   let constructor = "mlir::tpp::createUndoMainClosurePass()";
   let dependentDialects = ["func::FuncDialect"];
-}
-
-def TppCompilerPipeline : Pass<"tpp-compiler", "ModuleOp"> {
-  let summary = "Build tpp compiler pipeline - WIP do not use";
-  let constructor = "mlir::tpp::createTppCompilerPipeline()";
-  let options = [
-    Option<"enablePreconditions", "enable-tpp-preconditions", "bool", "false",
-           "Enable tpp precoditions for optimal mapping">,
-    Option<"enableXsmmConversion", "enable-xsmm-conversion", "bool", "false",
-           "Enable xsmm conversion">
-  ];
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
