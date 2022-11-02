@@ -11,6 +11,7 @@
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -188,6 +189,29 @@ transform::MapLinalgToTppOp::applyToOne(Operation *target,
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateMapLinalgToTppPatterns(patterns);
+
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===----------------------------------------------------------------------===//
+// FoldUnitExtentDimsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
+                                            SmallVector<Operation *> &results,
+                                            TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    auto diag = this->emitOpError("requires isolated-from-above targets");
+    diag.attachNote(target->getLoc()) << "non-isolated target";
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+  MLIRContext *ctx = getContext();
+  RewritePatternSet patterns(ctx);
+  mlir::linalg::populateFoldUnitExtentDimsPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
