@@ -553,6 +553,8 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     if (paddedDims.anyCommon(innerDims))
       return failure();
 
+    SmallVector<int64_t> outerDimsPerm =
+        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
     if (!outerDimsPerm.empty()) {
