@@ -21,19 +21,13 @@
 
 // TODO: here we want to have dispatch/invoke only for unary/binary and ternary.
 // matmul, brgemm are way too specific.
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_matmul_invoke_f32(int64_t, UnrankedMemRefType<float> *,
-                                    UnrankedMemRefType<float> *,
-                                    UnrankedMemRefType<float> *);
+extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_matmul_invoke(
+    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
+    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype, int64_t, int64_t,
                                   int64_t, int64_t, int64_t, int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_matmul_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
-                                     UnrankedMemRefType<bf16> *,
-                                     UnrankedMemRefType<bf16> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype, int64_t, int64_t,
@@ -48,39 +42,33 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t,
                                   int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke_f32(int64_t, UnrankedMemRefType<float> *,
-                                   UnrankedMemRefType<float> *);
+_mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype, int64_t,
+                               UnrankedMemRefType<char> *,
+                               UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
-                                    UnrankedMemRefType<bf16> *);
+_mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype, int64_t,
+                               UnrankedMemRefType<char> *,
+                               UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_binary_invoke(int64_t, UnrankedMemRefType<float> *,
-                                UnrankedMemRefType<float> *);
+_mlir_ciface_xsmm_binary_invoke(const libxsmm_datatype, int64_t,
+                                UnrankedMemRefType<char> *,
+                                UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_scalar_invoke_f32(int64_t, float,
-                                          UnrankedMemRefType<float> *);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_scalar_invoke_bf16(int64_t, bf16,
-                                           UnrankedMemRefType<bf16> *);
+_mlir_ciface_xsmm_unary_scalar_invoke(const libxsmm_datatype, int64_t, float,
+                                      UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_matrix_copy_NC_to_NCNC(UnrankedMemRefType<float> *,
                                     UnrankedMemRefType<float> *, int64_t,
                                     int64_t, int64_t, int64_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_brgemm_invoke_f32(int64_t, UnrankedMemRefType<float> *,
-                                    UnrankedMemRefType<float> *,
-                                    UnrankedMemRefType<float> *, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
+    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
+    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *, int64_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_brgemm_invoke_bf16(int64_t, UnrankedMemRefType<bf16> *,
-                                     UnrankedMemRefType<bf16> *,
-                                     UnrankedMemRefType<bf16> *, int64_t);
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//
