@@ -1,6 +1,6 @@
 // RUN: tpp-opt %s -convert-tpp-to-xsmm -convert-xsmm-to-func -split-input-file | FileCheck %s
 
-// CHECK: func.func private @xsmm_matmul_invoke_f32(i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
+// CHECK: func.func private @xsmm_matmul_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK: func.func private @xsmm_matmul_dispatch(i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 
 // CHECK-LABEL: func.func @tpp_matmul(

@@ -24,10 +24,13 @@ using namespace mlir::xsmm;
 namespace {
 
 // Cast memref to unranked memref and leave all the other operands as they are.
-static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands) {
+static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands,
+                                                   PatternRewriter &rewriter) {
   SmallVector<Type> results;
-  results.reserve(operands.size());
-
+  // One extra operand for datatype
+  results.reserve(operands.size() + 1);
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  results.push_back(integer64);
   for (Value operand : operands) {
     Type operandType = operand.getType();
     if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
@@ -40,10 +43,13 @@ static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands) {
   return results;
 }
 
-static SmallVector<Type> extractInvokeOperandTypesForMeta(OperandRange operands,
-                                                          IndexType indexType) {
+static SmallVector<Type>
+extractInvokeOperandTypesForMeta(OperandRange operands, IndexType indexType,
+                                 PatternRewriter &rewriter) {
   SmallVector<Type> results;
-
+  // One extra operand for datatype
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  results.push_back(integer64);
   for (Value operand : operands) {
     Type operandType = operand.getType();
     if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
@@ -63,9 +69,14 @@ static SmallVector<Type> extractInvokeOperandTypesForMeta(OperandRange operands,
 // are casted by introducing castOp. We cast the memref to clear the shape
 // and have a single function signature in the runtime.
 static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
-                                            ValueRange operands) {
+                                            ValueRange operands,
+                                            IntegerAttr typeAttr) {
   SmallVector<Value> res;
-  res.reserve(operands.size());
+  // One extra operand for datatype
+  res.reserve(operands.size() + 1);
+  IntegerType integer64 = IntegerType::get(b.getContext(), 64);
+  res.push_back(b.create<arith::ConstantOp>(loc, integer64, typeAttr));
+
   for (Value op : operands) {
     auto memrefType = op.getType().dyn_cast<MemRefType>();
     if (!memrefType)
@@ -83,8 +94,12 @@ static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
 
 static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
                                                          Location loc,
-                                                         ValueRange operands) {
+                                                         ValueRange operands,
+                                                         IntegerAttr typeAttr) {
   SmallVector<Value> res;
+  IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
+  res.push_back(builder.create<arith::ConstantOp>(loc, integer64, typeAttr));
+
   for (Value operand : operands) {
     auto memrefType = operand.getType().dyn_cast<MemRefType>();
     if (!memrefType) {
@@ -117,13 +132,15 @@ static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
 
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, bool useMeta,
-                                     PatternRewriter &rewriter) {
+                                     PatternRewriter &rewriter,
+                                     IntegerAttr typeAttr) {
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
-      (useMeta == false) ? extractInvokeOperandTypes(op->getOperands())
-                         : extractInvokeOperandTypesForMeta(
-                               op->getOperands(), rewriter.getIndexType()),
+      (useMeta == false)
+          ? extractInvokeOperandTypes(op->getOperands(), rewriter)
+          : extractInvokeOperandTypesForMeta(op->getOperands(),
+                                             rewriter.getIndexType(), rewriter),
       {});
 
   if (!module.lookupSymbol(fnName)) {
@@ -146,8 +163,9 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
   rewriter.create<func::CallOp>(
       loc, fnName.getValue(), TypeRange(),
       (useMeta == false)
-          ? getMemRefOperands(rewriter, loc, op->getOperands())
-          : getMemRefOperandsUsingMetadata(rewriter, loc, op->getOperands()));
+          ? getMemRefOperands(rewriter, loc, op->getOperands(), typeAttr)
+          : getMemRefOperandsUsingMetadata(rewriter, loc, op->getOperands(),
+                                           typeAttr));
   return success();
 }
 
@@ -158,11 +176,12 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    std::string funcName = "xsmm_" +
-                           stringifyEnum(ternaryOp.getCallee()).str() +
-                           "_invoke_" + ternaryOp.getOperandTypeAsString();
+    auto type = (uint64_t)ternaryOp.getDataType();
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    std::string funcName =
+        "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
-                                  useMeta, rewriter))) {
+                                  useMeta, rewriter, typeAttr))) {
       rewriter.eraseOp(ternaryOp);
       return success();
     }
@@ -184,12 +203,14 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // in MLIR (thus we need to change the function name from
     // "unary" to "unary_scalar"). We also don't want to convert
     // the scalar to a memref by using an alloc/alloca.
-    std::string funcName =
-        "xsmm_unary_invoke_" + unaryOp.getOperandTypeAsString();
+    auto type = (uint64_t)unaryOp.getDataType();
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+
+    std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
-      funcName = "xsmm_unary_scalar_invoke_" + unaryOp.getOperandTypeAsString();
+      funcName = "xsmm_unary_scalar_invoke";
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
-                                  rewriter))) {
+                                  rewriter, typeAttr))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
@@ -207,9 +228,12 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
+    auto type = (uint64_t)binaryOp.getDataType();
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+
     std::string funcName = "xsmm_binary_invoke";
     if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
-                                  useMeta, rewriter))) {
+                                  useMeta, rewriter, typeAttr))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }

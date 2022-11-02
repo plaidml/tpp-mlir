@@ -25,18 +25,19 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
   let summary = "ternary operation.";
   let description = [{
     Ternary operation. The operation kind carries information about the name of
-    the LIBXSMM function to invoke. Additionally, the operation takes four
-    operands. The first is an I64 type and must result from a dispatch operation
-    (it represents the function pointer to use during invocation). The other
-    operands are of Float types and represent the operands to use for computation.
-    For example, a matmul as the following signature: I64, memref<MxNxf32>,
+    the LIBXSMM function to invoke. Additionally, the operation takes five
+    operands. The first is an I64 type representing the datatype. The second must be 
+    an I64 type and must result from a dispatch operation (it represents the 
+    function pointer to use during invocation). The other operands are of Float
+    types and represent the operands to use for computation.
+    For example, a matmul has the following signature: dataType, I64, memref<MxNxf32>,
     memref<MxKxf32>, memref<KxNxf32>.
   }];
   
-  let arguments = (ins Xsmm_TernaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_TernaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
-    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+    $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{
@@ -46,14 +47,6 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
     }
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
-    std::string getOperandTypeAsString(){
-      auto operand = std::next(arg_operand_begin());
-      Type type = (*operand).getType().isa<MemRefType>()?(*operand).getType().cast<MemRefType>().getElementType(): (*operand).getType();
-      if(type.isBF16())
-        return "bf16";
-      assert(type.isF32() && "expect bf16 or f32");
-      return "f32";
-    }
   }];
 
   let hasVerifier = 1; 
@@ -70,10 +63,10 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
     difference is the number of operands for the computation is restricted to two. 
   }];
   
-  let arguments = (ins Xsmm_BinaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_BinaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
-    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+    $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
 
   let hasVerifier = 1; 
@@ -90,10 +83,10 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
     difference is the number of operands for the computation is restricted to one.
   }]; 
  
-  let arguments = (ins Xsmm_UnaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_UnaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
    
   let assemblyFormat = [{
-    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+    $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{
@@ -104,15 +97,6 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
       if (!operand.isa<ShapedType>())
         return true;
       return false;
-    }
-    std::string getOperandTypeAsString(){
-      Type operand = getInputs()[1].getType();
-      if(MemRefType type = operand.dyn_cast<MemRefType>())
-         operand = type.getElementType();
-      if(operand.isBF16())
-        return "bf16";
-      assert(operand.isF32() && "Element type neither bf16 nor f32");
-      return "f32";
     }
   }]; 
 

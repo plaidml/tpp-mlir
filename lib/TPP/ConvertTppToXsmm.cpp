@@ -90,7 +90,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     invokeOperands.push_back(dispatched);
     invokeOperands.append(matmulOp->getOperands().begin(),
                           matmulOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, attr,
+    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, dtype, attr,
                                                  invokeOperands);
     return success();
   }
@@ -157,7 +157,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     invokeOperands.append(brgemmOp->getOperands().begin(),
                           brgemmOp->getOperands().end());
     invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(brgemmOp, attr,
+    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(brgemmOp, dtype, attr,
                                                  invokeOperands);
     return success();
   }
@@ -303,7 +303,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     invokeOperands.append(identityOp->getOperands().begin(),
                           identityOp->getOperands().end());
 
-    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(identityOp, attr,
+    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(identityOp, dtype, attr,
                                                invokeOperands);
     return success();
   }
@@ -352,7 +352,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     invokeOperands.append(reluOp->getOperands().begin(),
                           reluOp->getOperands().end());
 
-    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(reluOp, attr, invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(reluOp, dtype, attr,
+                                               invokeOperands);
     return success();
   }
 };
@@ -410,7 +411,8 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     invokeOperands.push_back(dispatched);
     invokeOperands.append(addOp->getOperands().begin(),
                           addOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(addOp, attr, invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(addOp, dtype, attr,
+                                                invokeOperands);
     return success();
   }
 };
