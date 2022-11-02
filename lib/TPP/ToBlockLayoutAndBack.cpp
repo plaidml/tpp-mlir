@@ -543,12 +543,6 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     if (!unpackOp)
       return failure();
 
-    // no outer dim allowed.
-    SmallVector<int64_t> outerDimsPerm =
-        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
-    if (!outerDimsPerm.empty())
-      return failure();
-
     // bail out if one of the padded dimension is a tiled one.
     llvm::SmallBitVector paddedDims = padOp.getPaddedDims();
     SmallVector<int64_t> innerDimsPos =
@@ -561,6 +555,10 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
 
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+    if (!outerDimsPerm.empty()) {
+      lowPad = interchange<OpFoldResult>(lowPad, outerDimsPerm);
+      highPad = interchange<OpFoldResult>(highPad, outerDimsPerm);
+    }
     size_t innerDimsPosSize = innerDimsPos.size();
     lowPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
     highPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
@@ -585,7 +583,8 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
         padResultType.getElementType());
     Value replacement = toUnPackLayoutImpl(
         padOp.getLoc(), padOpRes, outputUnPack, unpackOp.getMixedTiles(),
-        innerDimsPos, /*outer_dims_perm=*/{}, rewriter);
+        innerDimsPos, extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm()),
+        rewriter);
 
     rewriter.replaceOp(padOp, replacement);
     return success();
