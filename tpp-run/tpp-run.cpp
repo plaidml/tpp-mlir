@@ -182,18 +182,15 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
     assert(memrefTy && "Unsupported argument type");
 
     // Global op properties
-    std::string name = "__wrapper_const_" + std::to_string(order++);
-    auto nameAttr = builder.getStringAttr(name);
-    auto typeAttr = TypeAttr::get(ty);
+    std::string name = "__wrapper_" + std::to_string(order++);
     // For some reason, memref global op needs dense tensor type
     // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
     auto tensorType = RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
     auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
-    auto constant = UnitAttr::get(ctx);
     auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
 
     // Create the global object in the module's region
-    builder.create<memref::GlobalOp>(loc, nameAttr, privAttr, typeAttr, floatInit, constant, alignment);
+    builder.create<memref::GlobalOp>(loc, StringRef(name), privAttr, memrefTy, floatInit, /*constant=*/false, alignment);
   }
 
   // Get those globals as arguments (function insertion point)
@@ -202,7 +199,7 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   order = 0;
   for (auto& ty: funcType.getInputs()) {
     // GetGlobal op properties
-    std::string name = "__wrapper_const_" + std::to_string(order++);
+    std::string name = "__wrapper_" + std::to_string(order++);
     auto nameAttr = builder.getStringAttr(name);
     auto getGlobal = builder.create<memref::GetGlobalOp>(loc, ty, nameAttr);
 
@@ -221,15 +218,31 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   }
 
   // Read into a vector and print output
+  // We don't want to alloc the whole tensor as a vector,
+  // so we pick the inner dimension and iterate through the outer ones.
+  auto outputType = dyn_cast_or_null<MemRefType>(result.getType());
+  assert(outputType && "Unsupported return type");
+  VectorType vecType;
+  auto lastDim = outputType.getRank() - 1;
+  ArrayRef<int64_t> outer_dims(1);
+  if (outputType.getRank() > 1) {
+    ArrayRef<int64_t> inner_dims(&outputType.getShape()[lastDim], 1);
+    vecType = VectorType::get(inner_dims, outputType.getElementType());
+    outer_dims = ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank()-1);
+  } else {
+    vecType = VectorType::get(outputType.getShape(), outputType.getElementType());
+  }
+
   APFloat vectorFloatValue = APFloat(-1.0F);
   auto minusOne = builder.create<arith::ConstantFloatOp>(loc, vectorFloatValue, builder.getF32Type());
   auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto outputType = dyn_cast_or_null<MemRefType>(result.getType());
-  assert(outputType && "Unsupported return type");
-  auto vecType = VectorType::get(outputType.getShape(), outputType.getElementType());
   auto indices = ValueRange{zeroIdx, zeroIdx};
-  auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result, indices, minusOne);
-  builder.create<vector::PrintOp>(loc, vector);
+  // TODO: Create a loop in IR
+  assert(outer_dims.size() == 1 && "Only supports 2D tensors for now");
+  for (int i=0; i<outer_dims[0]; i++) {
+    auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result, indices, minusOne);
+    builder.create<vector::PrintOp>(loc, vector);
+  }
 
   // Return void and add func to module
   builder.create<func::ReturnOp>(loc);
@@ -245,9 +258,7 @@ static std::unique_ptr<llvm::Module> buildLLVMModule(Operation *op, llvm::LLVMCo
   auto module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.module' op");
 
-  // Not sure what to do here...
-  // See SPIRV CPU runner as an example
-  // For now, this is just a copy of what the original function does
+  // FIXME: This should detect library paths for both MLIR and TPP libraries
   std::unique_ptr<llvm::Module> llvm = translateModuleToLLVMIR(module, context);
   return llvm;
 }
