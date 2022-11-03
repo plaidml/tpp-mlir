@@ -51,29 +51,3 @@ func.func @matmul_lowering(%arg0: memref<8x9xf32>,
                 outs(%arg2: memref<8x8xf32>)
   return
 }
-
-// -----
-
-#map5 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-
-// Make sure we detect a relu even if we don't have a tpp.mark.
-// CHECK-LABEL: func.func @relu(
-func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
-  // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
-  // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[sixtyfour:.*]] = arith.constant 64 : index
-  // CHECK: scf.parallel ([[i:.*]]) = (%[[zero]]) to (%[[sixtyfour]]) step (%[[one]]) {
-  // CHECK: %[[slice:.*]] = memref.subview
-  // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map>) out(%[[slice]] : memref<32x32xf32, #map>)
-  // CHECK: scf.yield
-  %c0 = arith.constant 0.0 : f32
-  linalg.generic {
-    indexing_maps = [#map5], 
-    iterator_types = ["parallel", "parallel", "parallel"]} 
-    outs(%arg3 : memref<64x32x32xf32>) {
-      ^bb0(%arg14: f32):
-        %13 = arith.maxf %arg14, %c0 : f32
-        linalg.yield %13 : f32
-  }
-  return %arg3 : memref<64x32x32xf32>
-}
