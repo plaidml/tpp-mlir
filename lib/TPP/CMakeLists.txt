@@ -35,7 +35,6 @@ add_mlir_library(MLIRTPP
 
     LINK_LIBS PUBLIC
     TPPLinalgXDialect
-    TPPMathxDialect
     TPPStdxDialect
     TPPTppDialect
     TPPXsmmDialect

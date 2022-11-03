@@ -35,11 +35,12 @@
 module {
 
   func.func @bigrelu(%B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
+    %c0 = arith.constant 0.0 : f32
     %O = linalg.generic { indexing_maps = [#map0],
                         iterator_types = ["parallel", "parallel"] }
      outs(%B: tensor<32x16xf32>) {
         ^bb0(%b: f32):
-          %0 = mathx.relu %b : f32
+          %0 = arith.maxf %b, %c0 : f32
           linalg.yield %0: f32
       } -> tensor<32x16xf32>
     return %O: tensor<32x16xf32>

@@ -19,11 +19,12 @@ module {
 
   func.func @relutpp(%A: tensor<9x6xf32>,
                      %B: tensor<9x6xf32>) -> tensor<9x6xf32> attributes {llvm.emit_c_interface} {
+    %c0 = arith.constant 0.0 : f32
     %O = linalg.generic { indexing_maps = [#map0, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<9x6xf32>) outs(%B: tensor<9x6xf32>) {
         ^bb0(%a: f32, %b: f32):
-          %0 = mathx.relu %a : f32
+          %0 = arith.maxf %a, %c0 : f32
           linalg.yield %0: f32
     } -> tensor<9x6xf32>
     return %O: tensor<9x6xf32>

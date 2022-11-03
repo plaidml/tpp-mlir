@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Mathx/MathxOps.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
@@ -106,7 +105,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
-    if (hasOnlyScalarElementwiseOp<mathx::ReluOp>(linalgOp.getRegion()) &&
+    if (hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion()) &&
         hasStaticShape(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
       rewriter.updateRootInPlace(
