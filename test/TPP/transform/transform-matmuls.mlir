@@ -78,9 +78,10 @@ func.func @matmul_and_relu(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32
   %0 = linalg.matmul  ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>)
                      outs(%arg2: tensor<128x128xf32>)
     -> tensor<128x128xf32>
+  %c0 = arith.constant 0.0 : f32
   %1 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%0: tensor<128x128xf32>) {
     ^bb0(%out: f32):
-      %2 = mathx.relu %out : f32
+      %2 = arith.maxf %out, %c0 : f32
       linalg.yield %2 : f32
     } -> tensor<128x128xf32>
   return %1 : tensor<128x128xf32>

@@ -3,9 +3,10 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @relu(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %c0 = arith.constant 0.0 : f32
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg0: tensor<128x128xf32>) {
     ^bb0(%out: f32):
-      %1 = mathx.relu %out : f32
+      %1 = arith.maxf %out, %c0 : f32
       linalg.yield %1 : f32
   } -> tensor<128x128xf32>
   return %0 : tensor<128x128xf32>
@@ -26,10 +27,11 @@ transform.sequence failures(propagate) {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @relu(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %c0 = arith.constant 0.0 : f32
   // expected-note @below {{non-isolated target}}
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"], library_call = "tpp.relu"} outs(%arg0: tensor<128x128xf32>) {
     ^bb0(%out: f32):
-      %1 = mathx.relu %out : f32
+      %1 = arith.maxf %out, %c0 : f32
       linalg.yield %1 : f32
   } -> tensor<128x128xf32>
   return %0 : tensor<128x128xf32>

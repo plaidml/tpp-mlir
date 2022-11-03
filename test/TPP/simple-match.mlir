@@ -25,9 +25,10 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
   %0 = tensor.empty() : tensor<1x512xf32>
   // CHECK: library_call = "tpp.relu"
+  %c0 = arith.constant 0.0 : f32
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
-      %2 = mathx.relu %arg2 : f32
+      %2 = arith.maxf %arg2, %c0 : f32
       linalg.yield %2 : f32
   } -> tensor<1x512xf32> 
   return %1 : tensor<1x512xf32>

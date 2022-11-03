@@ -4,9 +4,10 @@
 func.func @propagation(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
   %0 = tensor.empty() : tensor<12x56x56x64xf32>
   %1 = linalgx.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : (tensor<12x2x56x56x32xf32> tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
+  %c0 = arith.constant 0.0 : f32
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
-    %3 = mathx.relu %out : f32
+    %3 = arith.maxf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
@@ -32,9 +33,10 @@ transform.sequence failures(propagate) {
 func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
   %0 = tensor.empty() : tensor<12x56x56x64xf32>
   %1 = linalgx.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : (tensor<12x2x56x56x32xf32> tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
+  %c0 = arith.constant 0.0 : f32
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) { 
   ^bb0(%out: f32):
-    %3 = mathx.relu %out : f32
+    %3 = arith.maxf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
@@ -61,10 +63,11 @@ transform.sequence failures(propagate) {
 func.func @main(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
   %0 = tensor.empty() : tensor<12x56x56x64xf32>
   %1 = linalgx.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : (tensor<12x2x56x56x32xf32> tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
+  %c0 = arith.constant 0.0 : f32
   // expected-note @below {{non-isolated target}}
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) { 
   ^bb0(%out: f32):
-    %3 = mathx.relu %out : f32
+    %3 = arith.maxf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
