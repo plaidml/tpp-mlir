@@ -10,6 +10,7 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
+  // CHECK: linalg.batch_reduce_matmul
   %3 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg0 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%2 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -26,6 +27,7 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
+  // CHECK: linalg.matmul
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%6 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -66,6 +68,3 @@ transform.sequence failures(propagate) {
     %5 = transform.structured.interchange %4 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
     transform.structured.map_to_brgemm %5
 }
-
-// CHECK: linalg.matmul
-// CHECK: linalg.batch_reduce_matmul
