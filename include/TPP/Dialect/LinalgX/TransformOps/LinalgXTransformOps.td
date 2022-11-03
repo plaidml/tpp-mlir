@@ -207,4 +207,39 @@ def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// FoldUnitExtentDimsOp
+//===----------------------------------------------------------------------===//
+
+def FoldUnitExtentDimsOp : Op<Transform_Dialect, "structured.fold_unit_extent_dims", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+
+  let description = [{
+    Pattern to canonicalize unit-extent dims. It is a wrapper for
+    `populateFoldUnitExtentDimsPatterns`.  Internally, it applies a set of rewrite
+    patterns. Therefore, it can only be applied to an op with the "isolated from
+    above property".
+
+    Note that this transformation is invalidating the handles to any payload IR
+    operation contained in the target operation.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $target attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVector<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // LINALG_TRANSFORM_OPS

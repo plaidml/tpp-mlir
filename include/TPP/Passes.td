@@ -226,4 +226,9 @@ def LinalgExtToLoops :
   let constructor = "mlir::tpp::createLinalgXToLoopsPass()";
 }
 
+def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
+  let summary = "Drop the transform schedule";
+  let constructor = "mlir::tpp::createTransformDropSchedulePass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

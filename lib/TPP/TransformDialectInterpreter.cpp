@@ -38,9 +38,27 @@ struct TransformDialectInterpreter
   }
 };
 
+struct TransformDropSchedulePass
+    : TransformDropSchedulePassBase<TransformDropSchedulePass> {
+  void runOnOperation() override {
+    getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
+      if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
+        nestedOp->erase();
+        return WalkResult::skip();
+      }
+      return WalkResult::advance();
+    });
+  }
+};
+
 } // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createTransformDialectInterpreterPass() {
   return std::make_unique<TransformDialectInterpreter>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createTransformDropSchedulePass() {
+  return std::make_unique<TransformDropSchedulePass>();
 }
