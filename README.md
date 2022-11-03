@@ -73,17 +73,9 @@ cmake --build . --target mlir-doc
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
 
-## TODO:
-
-1. Align runtime with IREE see: https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Dialect/VMVX (You don't want to pass the memref to the runtime but the single pointer + offset + strides).
 
 ## Note:
 
-- https://libxsmm.readthedocs.io/en/latest/libxsmm_aux/#meta-image-file-io
 - Nice link for conv: https://d2l.ai/chapter_convolutional-neural-networks/padding-and-strides.html
 
 - in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
-
-- Set up bufferization options: https://github.com/llvm/llvm-project/commit/c66303c2870c9a77a0f2a8aa16fd0ea87b0358e6
-
-- https://reviews.llvm.org/D129217 See 'getMixedSizes'
