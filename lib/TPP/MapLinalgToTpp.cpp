@@ -105,6 +105,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
       return success();
     }
+    // TODO: make sure we have a max(x, 0).
     if (hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion()) &&
         hasStaticShape(linalgOp)) {
       StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
