@@ -67,5 +67,5 @@ transform.sequence failures(propagate) {
     transform.structured.map_to_brgemm %5
 }
 
-// CHECK-COUNT-1: linalg.matmul
-// CHECK-COUNT-1: linalg.batch_reduce_matmul
+// CHECK: linalg.matmul
+// CHECK: linalg.batch_reduce_matmul
