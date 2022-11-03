@@ -25,13 +25,14 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: %[[slice:.*]] = memref.subview
   // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map>) out(%[[slice]] : memref<32x32xf32, #map>)
   // CHECK: scf.yield
+  %c0 = arith.constant 0.0 : f32
   linalg.generic {
     indexing_maps = [#map5], 
     iterator_types = ["parallel", "parallel", "parallel"], 
     library_call = "tpp.relu"} 
     outs(%arg3 : memref<64x32x32xf32>) {
       ^bb0(%arg14: f32):
-        %13 = mathx.relu %arg14 : f32
+        %13 = arith.maxf %arg14, %c0: f32
         linalg.yield %13 : f32
   }
   return %arg3 : memref<64x32x32xf32>
@@ -65,12 +66,13 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: %[[slice:.*]] = memref.subview
   // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map>) out(%[[slice]] : memref<32x32xf32, #map>)
   // CHECK: scf.yield
+  %c0 = arith.constant 0.0 : f32
   linalg.generic {
     indexing_maps = [#map5], 
     iterator_types = ["parallel", "parallel", "parallel"]} 
     outs(%arg3 : memref<64x32x32xf32>) {
       ^bb0(%arg14: f32):
-        %13 = mathx.relu %arg14 : f32
+        %13 = arith.maxf %arg14, %c0 : f32
         linalg.yield %13 : f32
   }
   return %arg3 : memref<64x32x32xf32>

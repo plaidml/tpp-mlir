@@ -20,9 +20,10 @@ module @predict_function  {
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
     %10 = tensor.empty() : tensor<128x512xf32>
+    %c0 = arith.constant 0.0 : f32
     %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%10 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  
-      %16 = mathx.relu %arg9 : f32
+      %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x512xf32> 
     return %3 : tensor<128x512xf32>

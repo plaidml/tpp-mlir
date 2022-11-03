@@ -481,9 +481,10 @@ func.func @conv10(%arg0: tensor<64xf32>, %arg1: tensor<12x58x58x64xf32>, %arg2: 
       linalg.yield %in : f32
   } -> tensor<12x56x56x64xf32>
   %2 = linalg.conv_2d_nhwc_hwcf ins(%arg1, %arg2 : tensor<12x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%1 : tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
+  %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%2 : tensor<12x56x56x64xf32>) {
     ^bb0(%in: f32):
-      %4 = mathx.relu %in : f32
+      %4 = arith.maxf %in, %c0 : f32
       linalg.yield %4 : f32
     } -> tensor<12x56x56x64xf32>
   return %3 : tensor<12x56x56x64xf32> 

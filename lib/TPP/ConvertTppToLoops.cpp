@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Mathx/MathxOps.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -171,7 +170,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     Location loc = reluOp.getLoc();
     // handle scalar case.
     if (isScalarOp(reluOp)) {
-      Value scalarRelu = rewriter.create<mathx::ReluOp>(loc, reluOp.getInput());
+      Value scalarRelu = rewriter.create<arith::MaxFOp>(loc, reluOp.getInput());
       reluOp.getOutput().replaceAllUsesWith(scalarRelu);
       rewriter.eraseOp(reluOp);
       return success();

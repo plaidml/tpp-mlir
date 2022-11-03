@@ -23,11 +23,12 @@ func.func @matmul_static(
   %matmul = linalg.matmul ins(%A, %B : !A_tensor_t, !B_tensor_t)
                      outs(%expanded_bias : !C_tensor_t) -> !C_tensor_t
 
+  %c0 = arith.constant 0.0 : f32
   // ReLU has no "ins" operands.
   %res = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} 
       outs(%matmul : !C_tensor_t) {
     ^bb0(%arg9: f32):
-      %16 = mathx.relu %arg9 : f32
+      %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> !C_tensor_t
 
