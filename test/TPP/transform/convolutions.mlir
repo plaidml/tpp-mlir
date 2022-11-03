@@ -40,29 +40,35 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    // Blocks all the convs
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
+    // Propagate all the packs
     transform.structured.packing_propagation %2
 }
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg1
+    // Mark all the relu(s) with tpp.relu
     transform.structured.map_linalg_to_tpp %0
 }
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
+    // Fuse relu and conv on the three outermost loops
     %1, %loop:3 = transform.structured.fuse %0 { tile_sizes = [1, 1, 1, 0, 0] }
     %2 = get_producer_of_operand %1[0] : (!pdl.operation) -> !pdl.operation
     %convs:2 = split_handles %2 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
-   
-    // R = S = 3 for the second conv we map to linalg.matmul 
+  
+    // Map the conv to linalg.matmul 
+    // With R = S = 3 we map to linalg.matmul 
     %conv1 = transform.structured.interchange %convs#1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
     transform.structured.map_conv_to_matmul %conv1
 
-    // R = S = 1 for the first conv we map to linalg.batch_reduce_matmul
+    // Map the conv to linalg.batch_reduce_matmul
+    // With R = S = 1 we map to linalg.batch_reduce_matmul
     %3 = transform.structured.collapsing %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %4 = transform.structured.collapsing %3 [[0], [1], [2, 3], [4], [5], [6]]
     %5 = transform.structured.interchange %4 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
