@@ -78,6 +78,8 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 // the last and first dimension only.
 LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
                         bool useParallelLoops) {
+  if (!hasTppMark(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "Expect tpp mark");
   if (!linalgOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(linalgOp,
                                        "Expect linalgOp with buffer semantics");
