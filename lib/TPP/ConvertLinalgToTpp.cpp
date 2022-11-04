@@ -79,18 +79,18 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
                         bool useParallelLoops) {
   if (!linalgOp.hasBufferSemantics())
-    return linalgOp->emitError("Expect linalgOp with buffer semantics");
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "Expect linalgOp with buffer semantics");
 
-  // bail-out if we don't need to do tiling or all the dimensions
+  // Bail-out if we don't need to do tiling or all the dimensions
   // are not parallel.
-  // TODO: restrict to only the tiling ones.
   if (linalgOp.getNumLoops() <= 2)
-    return success();
+    return rewriter.notifyMatchFailure(linalgOp, "Expect at least two loops");
   SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
   if (!llvm::all_of(iteratorTypes, [](StringRef type) {
         return linalg::isParallelIterator(type);
       }))
-    return success();
+    return rewriter.notifyMatchFailure(linalgOp, "Expect all parallel loops");
 
   linalg::LinalgTilingOptions linalgTilingOptions;
   linalg::LinalgTilingLoopType loopsTypes =
@@ -110,12 +110,18 @@ LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
 /// Massages a linalg.generic for mapping to 2-D TPP library calls.
 /// This may introduce loops, at this point loops are forced to be sequential.
 struct ReshapeGenericOpForTpp : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  ReshapeGenericOpForTpp(MLIRContext *context, bool useParallelLoops,
+                         PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::GenericOp>(context, benefit),
+        useParallelLoops(useParallelLoops) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    return reshape2D(rewriter, linalgOp, /*useParallellLoops=*/false);
+    return reshape2D(rewriter, linalgOp, useParallelLoops);
   }
+
+private:
+  bool useParallelLoops = true;
 };
 
 // Tile sizes selection specific for matmul.
@@ -229,17 +235,19 @@ Value getOperandForTpp(Value operand, PatternRewriter &rewriter, Location loc) {
 }
 
 // Given an operand 'operand' check if it is a scalar
-// or a shape type with rank <= 2.
+// or a static shape type with rank <= 2.
 LogicalResult checkOperandForTpp(Value operand) {
   Type operandType = operand.getType();
   if (!operandType.isa<ShapedType>())
     return success();
-  if (operandType.isa<ShapedType>()) {
-    unsigned rank = operandType.cast<ShapedType>().getRank();
-    if (rank <= 2)
-      return success();
+  if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>()) {
+    if (!shapedType.hasStaticShape())
+      return failure();
+    unsigned rank = shapedType.getRank();
+    if (rank > 2)
+      return failure();
   }
-  return failure();
+  return success();
 }
 
 // Convert a linalg.generic to a tpp operation. Require the generic to be
@@ -377,8 +385,6 @@ void populateSubViewFoldingPatterns(RewritePatternSet &patterns) {
   patterns.add<SubViewOfSubViewWithUnitDims>(patterns.getContext());
 }
 
-// TODO: PatternRwriter does not work well with tiling. I suspect
-// because the builder is not properly propagated. But investigate more.
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
   ConvertLinalgToTpp(bool enabledPreconditions, bool useParallelLoops,
@@ -388,19 +394,13 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
     this->tileSizes = tileSizes;
   }
   void runOnOperation() override {
-    getOperation().walk([&](linalg::GenericOp linalgOp) {
-      OpBuilder builder(linalgOp);
-      IRRewriter rewriter(builder);
-      if (failed(reshape2D(rewriter, linalgOp, this->useParallelLoops)))
-        return signalPassFailure();
-    });
     if (enableTiling || tileSizes.size())
       getOperation().walk([&](linalg::GenericOp linalgOp) {
         (void)tileLinalgOp(linalgOp, tileSizes);
       });
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    tpp::populateConvertLinalgToTppPatterns(patterns);
+    tpp::populateConvertLinalgToTppPatterns(patterns, useParallelLoops);
     populateSubViewFoldingPatterns(patterns);
     linalg::populateFoldUnitExtentDimsPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
@@ -411,14 +411,13 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 
 } // end namespace
 
-void mlir::tpp::populateConvertLinalgToTppPatterns(
-    RewritePatternSet &patterns) {
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
+void mlir::tpp::populateConvertLinalgToTppPatterns(RewritePatternSet &patterns,
+                                                   bool useParallelLoops) {
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
-               ConvertMatmulToTpp,
-               ReshapeGenericOpForTpp>(patterns.getContext());
+               ConvertMatmulToTpp>(patterns.getContext());
+  patterns.add<ReshapeGenericOpForTpp>(patterns.getContext(), useParallelLoops);
   // clang-format on
 }
 
