@@ -26,7 +26,6 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
     // expected-error @below {{Could not pack op}}
     %1 = transform.structured.pack %0 { blocking_factors = [2, 2, 2] }
-    %2 = transform.structured.vectorize %1 {vectorize_padding}
 }
 
 // -----
