@@ -1,4 +1,140 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize | FileCheck %s
+// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize -split-input-file | FileCheck %s
+
+// Map a linalg.conv_2d_nhwc_hwcf to a matmul operation.
+// Unit filter.
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    //
+    // N        [parallel]
+    //  P       [parallel]
+    //   Q      [parallel]
+    //    K     [parallel]
+    //     R    [reduction]
+    //      S   [reduction]
+    //       C  [reduction]
+    //        output[N][P][Q][K] += image[N][H][W][C] * filter[R][S][C][K]
+    // 
+    // Expose a matmul by interchange
+    //
+    // N        [parallel]
+    //  P       [parallel]
+    //   R      [reduction]
+    //    S     [reduction]
+    //     Q    [parallel]
+    //      K   [parallel]
+    //       C  [reduction]
+    //        output[N][P][Q][K] += image[N][H][W][C] * filter[R][S][C][K]
+    //
+    // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
+    //
+    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    transform.structured.map_conv_to_matmul %2
+} 
+
+func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
+  linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: memref<1x4x4x3xf32>, memref<1x1x3x8xf32>) outs(%arg2: memref<1x4x4x8xf32>)
+  return
+}
+
+// CHECK: func.func @conv1(
+// CHECK-SAME:  %[[ARG0:[a-zA-Z0-9]+]]: memref<1x4x4x3xf32>,
+// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<1x1x3x8xf32>,
+// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: memref<1x4x4x8xf32>)
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][0, %[[ARG3]], 0, 0] [1, 1, 4, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<4x3xf32, strided<[3, 1], offset: ?>>
+// CHECK: %[[SUB0:.+]] = memref.subview %[[ARG1]][0, 0, 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<1x1x3x8xf32> to memref<3x8xf32, strided<[8, 1]>>
+// CHECK: %[[SUB1:.+]] = memref.subview %[[ARG2]][0, %[[ARG3]], 0, 0] [1, 1, 4, 8] [1, 1, 1, 1] : memref<1x4x4x8xf32> to memref<4x8xf32, strided<[8, 1], offset: ?>>
+// CHECK: linalg.matmul ins(%[[SUB]], %[[SUB0]] : memref<4x3xf32, strided<[3, 1], offset: ?>>, memref<3x8xf32, strided<[8, 1]>>) outs(%[[SUB1]] : memref<4x8xf32, strided<[8, 1], offset: ?>>)
+// CHECK: }
+// CHECK: return
+
+// -----
+
+// Map a linalg.conv_2d_nhwc_hwcf to a matmul operation.
+// Non-unit filter.
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0 
+    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    transform.structured.map_conv_to_matmul %2
+}
+
+func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: memref<1x3x3x8xf32>) {
+  linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: memref<1x4x4x3xf32>, memref<2x2x3x8xf32>) outs(%arg2: memref<1x3x3x8xf32>)
+  return 
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+// CHECK: func.func @conv2(
+// CHECK-SAME:  %[[ARG0:[a-zA-Z0-9]+]]: memref<1x4x4x3xf32>,
+// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<2x2x3x8xf32>,
+// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: memref<1x3x3x8xf32>)
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
+// CHECK: scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK: scf.for %[[ARG5:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]], %[[ARG4]])
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][0, %[[APPLY]], %[[ARG5]], 0] [1, 1, 3, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<3x3xf32, strided<[3, 1], offset: ?>> 
+// CHECK: %[[SUB0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], %[[ARG5]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<2x2x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
+// CHECK: %[[SUB1:.+]] = memref.subview %[[ARG2]][0, %[[ARG3]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<1x3x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
+// CHECK: linalg.matmul ins(%[[SUB]], %[[SUB0]] : memref<3x3xf32, strided<[3, 1], offset: ?>>, memref<3x8xf32, strided<[8, 1], offset: ?>>) outs(%[[SUB1]] : memref<3x8xf32, strided<[8, 1], offset: ?>>)
+// CHECK: }
+// CHECK: }
+// CHECK: }
+// CHECK: return
+
+// -----
+
+// Unit filter but non-static dims.
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %1 = transform.structured.generalize %0
+    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    transform.structured.map_conv_to_matmul %2
+}
+
+func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: memref<?x?x?x?xf32>) {
+  linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: memref<?x?x?x?xf32>, memref<1x1x?x?xf32>) outs(%arg2: memref<?x?x?x?xf32>)
+  return
+}
+
+// CHECK: func.func @conv3(
+// CHECK-SAME:  %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?x?xf32>,
+// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<1x1x?x?xf32>,
+// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: memref<?x?x?x?xf32>)
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]] : memref<?x?x?x?xf32>
+// CHECK: %[[DIM0:.+]] = memref.dim %[[ARG2]], %[[C1]] : memref<?x?x?x?xf32>
+// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[DIM]] step %[[C1]] {
+// CHECK: scf.for %[[ARG4:.+]] = %[[C0]] to %[[DIM0]] step %[[C1]] {
+// CHECK: %[[DIM1:.+]] = memref.dim %[[ARG2]], %[[C2]] : memref<?x?x?x?xf32>
+// CHECK: %[[DIM2:.+]] = memref.dim %[[ARG1]], %[[C2]] : memref<1x1x?x?xf32>
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[ARG3]], %[[ARG4]], 0, 0] [1, 1, %[[DIM1]], %[[DIM2]]] [1, 1, 1, 1] : memref<?x?x?x?xf32> to memref<?x?xf32, strided<[?, 1], offset: ?>>
+// CHECK: %[[DIM3:.+]] = memref.dim %[[ARG1]], %[[C2]] : memref<1x1x?x?xf32>
+// CHECK: %[[DIM4:.+]] = memref.dim %[[ARG1]], %[[C3]] : memref<1x1x?x?xf32>
+// CHECK: %[[SUB1:.+]] = memref.subview %[[ARG1]][0, 0, 0, 0] [1, 1, %[[DIM3]], %[[DIM4]]] [1, 1, 1, 1] : memref<1x1x?x?xf32> to memref<?x?xf32, strided<[?, 1], offset: ?>>
+// CHECK: %[[DIM6:.+]] = memref.dim %[[ARG2]], %[[C2]] : memref<?x?x?x?xf32>
+// CHECK: %[[DIM7:.+]] = memref.dim %[[ARG2]], %[[C3]] : memref<?x?x?x?xf32>
+// CHECK: %[[SUB2:.+]] = memref.subview %[[ARG2]][%[[ARG3]], %[[ARG4]], 0, 0] [1, 1, %[[DIM6]], %[[DIM7]]] [1, 1, 1, 1] : memref<?x?x?x?xf32> to memref<?x?xf32, strided<[?, 1], offset: ?>>
+// CHECK: linalg.matmul ins(%[[SUB]], %[[SUB1]] : memref<?x?xf32, strided<[?, 1], offset: ?>>, memref<?x?xf32, strided<[?, 1], offset: ?>>) outs(%[[SUB2]] : memref<?x?xf32, strided<[?, 1], offset: ?>>)
+// CHECK: }
+// CHECK: }
+// CHECK: return
+
+// -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
