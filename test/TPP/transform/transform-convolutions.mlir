@@ -200,22 +200,16 @@ transform.sequence failures(propagate) {
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate all the packs
     transform.structured.packing_propagation %2
-}
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %3 = transform.structured.match ops{["func.func"]} in %arg1
     // Mark all the relu(s) with tpp.relu
-    transform.structured.map_linalg_to_tpp %0
-}
+    transform.structured.map_linalg_to_tpp %3
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
+    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse relu and conv on the three outermost loops
-    %1, %loop:3 = transform.structured.fuse %0 { tile_sizes = [1, 1, 1, 0, 0] }
-    %2 = get_producer_of_operand %1[0] : (!pdl.operation) -> !pdl.operation
-    %convs:2 = split_handles %2 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+    %5, %loop:3 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 0, 0] }
+    %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
+    %convs:2 = split_handles %6 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
   
     // Map the conv to linalg.matmul 
     // With R = S = 3 we map to linalg.matmul 
@@ -224,8 +218,8 @@ transform.sequence failures(propagate) {
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
-    %3 = transform.structured.collapsing %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
-    %4 = transform.structured.collapsing %3 [[0], [1], [2, 3], [4], [5], [6]]
-    %5 = transform.structured.interchange %4 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
-    transform.structured.map_to_brgemm %5
+    %7 = transform.structured.collapsing %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+    %8 = transform.structured.collapsing %7 [[0], [1], [2, 3], [4], [5], [6]]
+    %9 = transform.structured.interchange %8 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    transform.structured.map_to_brgemm %9
 }
