@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -canonicalize -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-check-to-func -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf |\
+// RUN: tpp-opt %s -convert-check-to-func -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf |\
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
@@ -10,16 +10,15 @@
 
 module{
  
-  func.func private @generate_1D_memref(%arg0: index) -> memref<?xf32> {
-    %alloc = memref.alloc(%arg0) {alignment = 128 : i64} : memref<?xf32>
-    linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%alloc : memref<?xf32>) {
+  func.func private @generate_1D_memref(%arg0: index, %buff: memref<?xf32>) -> memref<?xf32> {
+    linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%buff : memref<?xf32>) {
     ^bb0(%out: f32):
       %0 = linalg.index 0 : index
       %1 = arith.index_cast %0 : index to i32
       %2 = arith.sitofp %1 : i32 to f32
       linalg.yield %2 : f32
     }
-    return %alloc : memref<?xf32>
+    return %buff : memref<?xf32>
   } 
 
   func.func @entry() {
@@ -30,7 +29,8 @@ module{
     %c2 = arith.constant 2: index
     %c12 = arith.constant 12: index
     %c56 = arith.constant 56: index
-    %const_memref = call @generate_1D_memref(%cst): (index) -> (memref<?xf32>)
+    %alloc = memref.alloc(%cst) {alignment = 128 : i64} : memref<?xf32>
+    %const_memref = call @generate_1D_memref(%cst, %alloc): (index, memref<?xf32>) -> (memref<?xf32>)
     %arg0 = memref.cast %const_memref: memref<?xf32> to memref<32xf32> 
     
     %alloc_0 = memref.alloc() {alignment = 128 : i64} : memref<12x2x56x56x32xf32>
@@ -66,6 +66,9 @@ module{
 
    %threshold = arith.constant 0.0:f32
    check.expect_almost_eq(%alloc_0, %alloc_1, %threshold): memref<12x2x56x56x32xf32>, memref<12x2x56x56x32xf32>, f32
+   memref.dealloc %alloc : memref<?xf32>
+   memref.dealloc %alloc_0 : memref<12x2x56x56x32xf32>
+   memref.dealloc %alloc_1 : memref<12x2x56x56x32xf32>
    return
  }
 
