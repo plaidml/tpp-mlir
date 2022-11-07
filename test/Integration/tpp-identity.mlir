@@ -8,8 +8,7 @@
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 module{
-func.func private @generate_1D_source(%width : index) -> tensor<64xf32> {
-  %init_source = arith.constant dense<0.0> : tensor<64xf32>
+func.func private @generate_1D_source(%width : index, %init_source : tensor<64xf32>) -> tensor<64xf32> {
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
@@ -25,7 +24,8 @@ func.func private @generate_1D_source(%width : index) -> tensor<64xf32> {
 
  func.func @entry(){
    %cst = arith.constant 64:index
-   %input_tensor = call @generate_1D_source(%cst): (index) -> (tensor<64xf32>)
+   %init_source = tensor.empty() : tensor<64xf32>
+   %input_tensor = call @generate_1D_source(%cst, %init_source): (index, tensor<64xf32>) -> (tensor<64xf32>)
    %1 = tensor.empty() : tensor<12x56x56x64xf32> 
    %2 = linalg.generic {indexing_maps=[#map,#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"], library_call = "tpp.identity"} ins(%input_tensor : tensor<64xf32> ) outs(%1 : tensor<12x56x56x64xf32>) {
       ^bb0(%in: f32, %out: f32):
