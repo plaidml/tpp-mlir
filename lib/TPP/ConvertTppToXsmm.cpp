@@ -316,7 +316,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
     // no conversion if the relu is a scalar operation.
-    Type outputType = reluOp.getOutput().getType();
+    Type outputType = reluOp.getOperand().getType();
     if (!outputType.isa<ShapedType>())
       return failure();
 

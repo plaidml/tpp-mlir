@@ -122,7 +122,7 @@ func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 
   // CHECK: xsmm.unary.dispatch relu [5, 6, 6, 6](broadcast none dataType f32)
   // CHECK: xsmm.unary relu
-  tpp.relu ins(%arg0: memref<5x6xf32>) out(%arg1: memref<5x6xf32>)
+  tpp.relu outs(%arg0: memref<5x6xf32>)
   return
 }
 

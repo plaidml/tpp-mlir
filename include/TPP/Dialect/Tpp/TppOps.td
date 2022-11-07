@@ -98,26 +98,24 @@ def Tpp_IdentityOp : Tpp_Op<"identity"> {
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_ReluOp : Tpp_Op<"relu", [SameTypeOperands]> {
-  let summary = "Applies a Rectified Linear Unit function.";
+def Tpp_ReluOp : Tpp_Op<"relu"> {
+  let summary = "Applies a Rectified Linear Unit function in place.";
   let description = [{
-    The `tpp.relu` applies a Rectified Linear Unit function.
-    Operands have the same type (i.e., memref or f32).
+    The `tpp.relu` applies a Rectified Linear Unit function in place.
     
     Example:
 
     ```mlir
  
-    tpp.relu ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
+    tpp.relu outs(%1: memref<2x2xf32>)
 
     ```
   }];
 
-  let arguments = (ins TppOperand:$input, TppOperand:$output);
+  let arguments = (outs TppOperand:$output);
 
   let assemblyFormat = [{
-      `ins` `(` $input `:` type($input) `)` 
-      `out` `(` $output `:` type($output) `)` attr-dict
+      `outs` `(` $output `:` type($output) `)`  attr-dict
   }];
 }
 

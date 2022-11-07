@@ -17,7 +17,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
 
 // -----
 
-func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
   // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
@@ -26,10 +26,10 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
   // CHECK:     %[[load:.*]] = memref.load %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:     %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
-  // CHECK:     memref.store %[[max]], %arg1[%[[i]], %[[j]]] : memref<3x3xf32>
+  // CHECK:     memref.store %[[max]], %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:   }
   // CHECK: }
-  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.relu outs(%arg0: memref<3x3xf32>)
   return 
 }
 

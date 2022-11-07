@@ -19,15 +19,6 @@ func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
 
 // -----
 
-func.func @tpp_relu_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x1xf32>) -> memref<2x1xf32> {
-
-  // expected-error @below {{'tpp.relu' op requires all operands to have the same type}}
-  tpp.relu ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x1xf32>)
-  return %arg1: memref<2x1xf32>
-}
-
-// -----
-
 func.func @tpp_identity_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) -> memref<1x2xf32> {
 
   // expected-error @below {{'tpp.identity' op fails to verify broadcasting rules}}
