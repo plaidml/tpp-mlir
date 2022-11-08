@@ -19,19 +19,19 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/ExecutionEngine/JitRunner.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/ExecutionEngine/JitRunner.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/ValueRange.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Target/LLVMIR/Dialect/All.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
-#include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Target/LLVMIR/Dialect/All.h"
+#include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
 using namespace mlir;
 
@@ -43,7 +43,7 @@ struct CmdLineOpts {
 
 static void locaCmdLineOptParsing(int argc, char **argv) {
   bool nextIsMain = false;
-  for (int i=0; i<argc; i++) {
+  for (int i = 0; i < argc; i++) {
     if (strncmp("-e", argv[i], 2) == 0)
       nextIsMain = true;
     else if (nextIsMain) {
@@ -99,14 +99,15 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
 
   // Find the kernel function and its arguments
   auto moduleRegions = module->getRegions();
-  auto& moduleBlock = moduleRegions.front().front();
-  auto& moduleOps = moduleBlock.getOperations();
+  auto &moduleBlock = moduleRegions.front().front();
+  auto &moduleOps = moduleBlock.getOperations();
 
   // If the module is already in the LLVM dialect, recomment mlir-cpu-runner
-  for (auto& op: moduleOps) {
+  for (auto &op : moduleOps) {
     LLVM::LLVMFuncOp llvmFunc = dyn_cast_or_null<LLVM::LLVMFuncOp>(op);
     if (llvmFunc)
-      return module.emitError("Module in LLVM Dialect already, use mlir-cpu-runner");
+      return module.emitError(
+          "Module in LLVM Dialect already, use mlir-cpu-runner");
   }
 
   // The kernel method
@@ -114,7 +115,7 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
 
   // If the user passed the entry point, use it
   if (!options.mainFuncName.empty()) {
-    for (auto& op: moduleOps) {
+    for (auto &op : moduleOps) {
       func::FuncOp func = dyn_cast_or_null<func::FuncOp>(op);
       if (!func)
         continue;
@@ -124,16 +125,17 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
       }
     }
     if (!kernel)
-      return module.emitError("Entry point " + options.mainFuncName + " not found");
+      return module.emitError("Entry point " + options.mainFuncName +
+                              " not found");
 
-  // Else, and there is only one function, use it
+    // Else, and there is only one function, use it
   } else if (moduleOps.size() == 1) {
     kernel = dyn_cast_or_null<func::FuncOp>(moduleOps.front());
     if (!kernel)
       return module.emitError("Entry point not in LLVM Dialect");
     options.mainFuncName = kernel.getName();
 
-  // If there is no entry function, and multiple functions, bail
+    // If there is no entry function, and multiple functions, bail
   } else {
     return module.emitError("No valid entry point, use mlir-cpu-runner");
   }
@@ -150,7 +152,7 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
     return module.emitError("Multiple return values, use mlir-cpu-runner");
 
   // Gets a builder on the module
-  auto* ctx = module.getContext();
+  auto *ctx = module.getContext();
   ctx->getOrLoadDialect<tensor::TensorDialect>();
   ctx->getOrLoadDialect<vector::VectorDialect>();
   OpBuilder builder(ctx);
@@ -176,33 +178,32 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   builder.setInsertionPointToStart(&moduleBlock);
   auto privAttr = builder.getStringAttr("private");
   int order = 0;
-  for (auto& ty: funcType.getInputs()) {
+  for (auto &ty : funcType.getInputs()) {
     // We really only support memrefs as arguments for now
     auto memrefTy = dyn_cast_or_null<MemRefType>(ty);
     assert(memrefTy && "Unsupported argument type");
 
     // Global op properties
-    std::string name = "__wrapper_const_" + std::to_string(order++);
-    auto nameAttr = builder.getStringAttr(name);
-    auto typeAttr = TypeAttr::get(ty);
+    std::string name = "__wrapper_" + std::to_string(order++);
     // For some reason, memref global op needs dense tensor type
     // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-    auto tensorType = RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
+    auto tensorType =
+        RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
     auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
-    auto constant = UnitAttr::get(ctx);
     auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
 
     // Create the global object in the module's region
-    builder.create<memref::GlobalOp>(loc, nameAttr, privAttr, typeAttr, floatInit, constant, alignment);
+    builder.create<memref::GlobalOp>(loc, StringRef(name), privAttr, memrefTy,
+                                     floatInit, /*constant=*/false, alignment);
   }
 
   // Get those globals as arguments (function insertion point)
   builder.setInsertionPointToStart(entryBlock);
   SmallVector<Value> args;
   order = 0;
-  for (auto& ty: funcType.getInputs()) {
+  for (auto &ty : funcType.getInputs()) {
     // GetGlobal op properties
-    std::string name = "__wrapper_const_" + std::to_string(order++);
+    std::string name = "__wrapper_" + std::to_string(order++);
     auto nameAttr = builder.getStringAttr(name);
     auto getGlobal = builder.create<memref::GetGlobalOp>(loc, ty, nameAttr);
 
@@ -221,15 +222,37 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   }
 
   // Read into a vector and print output
-  APFloat vectorFloatValue = APFloat(-1.0F);
-  auto minusOne = builder.create<arith::ConstantFloatOp>(loc, vectorFloatValue, builder.getF32Type());
-  auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
+  // We don't want to alloc the whole tensor as a vector,
+  // so we pick the inner dimension and iterate through the outer ones.
   auto outputType = dyn_cast_or_null<MemRefType>(result.getType());
   assert(outputType && "Unsupported return type");
-  auto vecType = VectorType::get(outputType.getShape(), outputType.getElementType());
-  auto indices = ValueRange{zeroIdx, zeroIdx};
-  auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result, indices, minusOne);
-  builder.create<vector::PrintOp>(loc, vector);
+  VectorType vecType;
+  auto lastDim = outputType.getRank() - 1;
+  ArrayRef<int64_t> outerDims(1);
+  if (outputType.getRank() > 1) {
+    ArrayRef<int64_t> innerDims(&outputType.getShape()[lastDim], 1);
+    vecType = VectorType::get(innerDims, outputType.getElementType());
+    outerDims =
+        ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank() - 1);
+  } else {
+    vecType =
+        VectorType::get(outputType.getShape(), outputType.getElementType());
+  }
+
+  APFloat vectorFloatValue = APFloat(-1.0F);
+  auto minusOne = builder.create<arith::ConstantFloatOp>(loc, vectorFloatValue,
+                                                         builder.getF32Type());
+  // TODO: Create a loop in IR
+  auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
+  assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
+  for (int i = 0; i < outerDims[0]; i++) {
+    auto beginIdx = builder.create<arith::ConstantIndexOp>(loc, i);
+
+    auto indices = ValueRange{beginIdx, zeroIdx};
+    auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result,
+                                                         indices, minusOne);
+    builder.create<vector::PrintOp>(loc, vector);
+  }
 
   // Return void and add func to module
   builder.create<func::ReturnOp>(loc);
@@ -241,13 +264,12 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
 
 // This function will be called at the end, to emit an LLVM Module.
 // It may not be necessary, but here just in case.
-static std::unique_ptr<llvm::Module> buildLLVMModule(Operation *op, llvm::LLVMContext& context) {
+static std::unique_ptr<llvm::Module>
+buildLLVMModule(Operation *op, llvm::LLVMContext &context) {
   auto module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.module' op");
 
-  // Not sure what to do here...
-  // See SPIRV CPU runner as an example
-  // For now, this is just a copy of what the original function does
+  // FIXME: This should detect library paths for both MLIR and TPP libraries
   std::unique_ptr<llvm::Module> llvm = translateModuleToLLVMIR(module, context);
   return llvm;
 }
