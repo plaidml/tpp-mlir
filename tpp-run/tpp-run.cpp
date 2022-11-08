@@ -228,11 +228,11 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   assert(outputType && "Unsupported return type");
   VectorType vecType;
   auto lastDim = outputType.getRank() - 1;
-  ArrayRef<int64_t> outer_dims(1);
+  ArrayRef<int64_t> outerDims(1);
   if (outputType.getRank() > 1) {
-    ArrayRef<int64_t> inner_dims(&outputType.getShape()[lastDim], 1);
-    vecType = VectorType::get(inner_dims, outputType.getElementType());
-    outer_dims =
+    ArrayRef<int64_t> innerDims(&outputType.getShape()[lastDim], 1);
+    vecType = VectorType::get(innerDims, outputType.getElementType());
+    outerDims =
         ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank() - 1);
   } else {
     vecType =
@@ -245,8 +245,8 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
   auto indices = ValueRange{zeroIdx, zeroIdx};
   // TODO: Create a loop in IR
-  assert(outer_dims.size() == 1 && "Only supports 2D tensors for now");
-  for (int i = 0; i < outer_dims[0]; i++) {
+  assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
+  for (int i = 0; i < outerDims[0]; i++) {
     auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result,
                                                          indices, minusOne);
     builder.create<vector::PrintOp>(loc, vector);
