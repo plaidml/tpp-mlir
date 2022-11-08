@@ -88,7 +88,9 @@ bool hasMatmulBody(linalg::LinalgOp linalgOp) {
   Region &region = linalgOp->getRegion(0);
   if (!region.hasOneBlock())
     return false;
-  return isAddMul<arith::AddFOp, arith::MulFOp>(region.front());
+  bool isFloat = isAddMul<arith::AddFOp, arith::MulFOp>(region.front());
+  bool isInt = isAddMul<arith::AddIOp, arith::MulIOp>(region.front());
+  return (isFloat || isInt);
 }
 
 bool hasStaticShape(linalg::LinalgOp linalgOp) {

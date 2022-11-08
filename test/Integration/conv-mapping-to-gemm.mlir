@@ -1,11 +1,11 @@
-// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 
-// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
@@ -13,6 +13,14 @@
 //
 
 module {
+
+  transform.sequence failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+      %1 = transform.structured.generalize %0
+      %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+      transform.structured.map_conv_to_matmul %2
+  }
 
   func.func @conv(%img: tensor<1x4x4x3xi64>, %filt: tensor<2x2x3x8xi64>,
                   %out: tensor<1x3x3x8xi64>) -> tensor<1x3x3x8xi64> {

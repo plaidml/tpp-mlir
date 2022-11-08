@@ -98,25 +98,19 @@ transform.sequence failures(propagate) {
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate the packing down through the relu
     transform.structured.packing_propagation %2
-}
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
     // Simply map linalg.generic to tpp.relu
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
-}
+    %3 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_linalg_to_tpp %3
 
-// Cooking recipe for relu
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
+    // Cooking recipe for relu
+    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse the relu into the matmul. Fuse the 2 outermost loops
-    %1, %loop:2 = transform.structured.fuse %0 { tile_sizes = [1, 1, 0, 0] }
+    %5, %loop:2 = transform.structured.fuse %4 { tile_sizes = [1, 1, 0, 0] }
     // Get the producer for the relu (aka the packed matmul)
-    %2 = get_producer_of_operand %1[0] : (!pdl.operation) -> !pdl.operation
+    %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     // Map the matmul to brgemm
-    transform.structured.map_to_brgemm %2
+    transform.structured.map_to_brgemm %6
 }
 
 // TODO: We need to clean up the extract slice. For example, SLICE2,3 and 4 should go away.

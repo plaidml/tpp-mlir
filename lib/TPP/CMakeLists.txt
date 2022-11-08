@@ -8,7 +8,6 @@ add_mlir_library(MLIRTPP
     MainClosure.cpp
     UndoMainClosure.cpp
     TileConsumerAndFuseProducers.cpp
-    DecomposeConvsToMatmulOrBrgemm.cpp
     ToBlockLayoutAndBack.cpp
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
