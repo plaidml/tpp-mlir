@@ -19,10 +19,9 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
-    %10 = tensor.empty() : tensor<128x512xf32>
     %c0 = arith.constant 0.0 : f32
-    %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%10 : tensor<128x512xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
+    %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
+    ^bb0(%arg9: f32):  
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x512xf32> 
@@ -39,6 +38,6 @@ module @predict_function  {
 // CHECK: %[[ARG3:[a-zA-Z0-9]+]] = memref.alloc() {alignment = 128 : i64} : memref<128x512xf32>
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: tpp.relu ins(%[[ARG3]] : memref<128x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
+// CHECK: tpp.relu outs(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: return
 // CHECK: } 

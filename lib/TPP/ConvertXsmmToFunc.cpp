@@ -76,7 +76,6 @@ static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
   res.reserve(operands.size() + 1);
   IntegerType integer64 = IntegerType::get(b.getContext(), 64);
   res.push_back(b.create<arith::ConstantOp>(loc, integer64, typeAttr));
-
   for (Value op : operands) {
     auto memrefType = op.getType().dyn_cast<MemRefType>();
     if (!memrefType)
@@ -205,10 +204,12 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // the scalar to a memref by using an alloc/alloca.
     auto type = (uint64_t)unaryOp.getDataType();
     IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
-
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
+    if (unaryOp.getCallee() == xsmm::UnaryKind::RELU) {
+      funcName = funcName + "_inline";
+    }
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
                                   rewriter, typeAttr))) {
       rewriter.eraseOp(unaryOp);

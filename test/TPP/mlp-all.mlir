@@ -24,8 +24,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
-    %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%ouput3 : tensor<128x512xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
+    %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
+    ^bb0(%arg9: f32):  
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x512xf32>
@@ -39,8 +39,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x1024xf32>
-    %7 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<128x1024xf32>) outs(%output2 : tensor<128x1024xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
+    %7 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%6 : tensor<128x1024xf32>)  {
+    ^bb0(%arg9: f32):  
       %16 = arith.maxf %arg9, %c0 : f32 
       linalg.yield %16 : f32
     } -> tensor<128x1024xf32>
@@ -54,8 +54,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x2048xf32>
-    %11 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%10 : tensor<128x2048xf32>) outs(%output1 : tensor<128x2048xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):  
+    %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%10 : tensor<128x2048xf32>) {
+    ^bb0(%arg9: f32):  
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x2048xf32>
@@ -69,8 +69,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x1000xf32>
-    %15 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<128x1000xf32>) outs(%output : tensor<128x1000xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
+    %15 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%14 : tensor<128x1000xf32>) {
+    ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32 
       linalg.yield %16 : f32
     } -> tensor<128x1000xf32>
@@ -94,14 +94,14 @@ module @predict_function  {
 // CHECK-SAME: %[[ARG12:[a-zA-Z0-9]+]]: memref<128x512xf32>
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) out(%[[ARG12]] : memref<128x512xf32>)
 // CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG12]] : memref<128x512xf32>)
-// CHECK: tpp.relu ins(%[[ARG12]] : memref<128x512xf32>) out(%[[ARG12]] : memref<128x512xf32>)
+// CHECK: tpp.relu outs(%[[ARG12]] : memref<128x512xf32>)
 // CHECK: tpp.identity ins(%[[ARG4]] : memref<1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
 // CHECK: tpp.matmul ins(%[[ARG12]] : memref<128x512xf32>, %[[ARG3]] : memref<512x1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
-// CHECK: tpp.relu ins(%[[ARG11]] : memref<128x1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
+// CHECK: tpp.relu outs(%[[ARG11]] : memref<128x1024xf32>)
 // CHECK: tpp.identity ins(%[[ARG6]] : memref<2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
 // CHECK: tpp.matmul ins(%[[ARG11]] : memref<128x1024xf32>, %[[ARG5]] : memref<1024x2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
-// CHECK: tpp.relu ins(%[[ARG10]] : memref<128x2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
+// CHECK: tpp.relu outs(%[[ARG10]] : memref<128x2048xf32>)
 // CHECK: tpp.identity ins(%[[ARG8]] : memref<1000xf32>) out(%[[ARG9]] : memref<128x1000xf32>)
 // CHECK: tpp.matmul ins(%[[ARG10]] : memref<128x2048xf32>, %[[ARG7]] : memref<2048x1000xf32>) out(%[[ARG9]] : memref<128x1000xf32>)
-// CHECK: tpp.relu ins(%[[ARG9]] : memref<128x1000xf32>) out(%[[ARG9]] : memref<128x1000xf32>)
+// CHECK: tpp.relu outs(%[[ARG9]] : memref<128x1000xf32>)
 // CHECK: return

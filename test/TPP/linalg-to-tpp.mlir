@@ -23,7 +23,7 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK-DAG: %[[sixtyfour:.*]] = arith.constant 64 : index
   // CHECK: scf.parallel ([[i:.*]]) = (%[[zero]]) to (%[[sixtyfour]]) step (%[[one]]) {
   // CHECK: %[[slice:.*]] = memref.subview
-  // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map>) out(%[[slice]] : memref<32x32xf32, #map>)
+  // CHECK: tpp.relu outs(%[[slice]] : memref<32x32xf32, #map>)
   // CHECK: scf.yield
   %c0 = arith.constant 0.0 : f32
   linalg.generic {

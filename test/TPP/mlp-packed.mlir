@@ -26,8 +26,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x512xf32>
-    %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%ouput3 : tensor<128x512xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
+    %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
+    ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x512xf32>
@@ -41,8 +41,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x1024xf32>
-    %7 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<128x1024xf32>) outs(%output2 : tensor<128x1024xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
+    %7 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%6 : tensor<128x1024xf32>) {
+    ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x1024xf32>
@@ -56,8 +56,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x2048xf32>
-    %11 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%10 : tensor<128x2048xf32>) outs(%output1 : tensor<128x2048xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
+    %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%10 : tensor<128x2048xf32>) {
+    ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x2048xf32>
@@ -71,8 +71,8 @@ module @predict_function  {
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
     } -> tensor<128x1024xf32>
-    %15 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<128x1024xf32>) outs(%output : tensor<128x1024xf32>) {
-    ^bb0(%arg9: f32, %arg10: f32):
+    %15 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%14 : tensor<128x1024xf32>) {
+    ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
     } -> tensor<128x1024xf32>
@@ -127,7 +127,7 @@ module @predict_function  {
 // CHECK:   }
 // CHECK:   scf.for %[[JJ:.+]] = %[[C0]] to %[[C16]] step %[[C1]] {
 // CHECK:     %[[SUB6_1:.+]] = memref.subview %[[ALLOC9]][%[[JJ]], 0, 0] [1, 32, 32] [1, 1, 1] : memref<16x32x32xf32> to memref<32x32xf32, #[[MAP]]>
-// CHECK:     tpp.relu ins(%[[SUB6_1]] : memref<32x32xf32, #[[MAP]]>) out(%[[SUB6_1]] : memref<32x32xf32, #[[MAP]]>)
+// CHECK:     tpp.relu outs(%[[SUB6_1]] : memref<32x32xf32, #[[MAP]]>)
 // CHECK:   }
 // CHECK:   %[[SUB10:.+]] = memref.subview %[[ALLOC4]][%[[I]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<4x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:   %[[ALLOC11:.+]] = memref.alloc() {alignment = 128 : i64} : memref<32x32x32xf32>
@@ -140,7 +140,7 @@ module @predict_function  {
 // CHECK:   }
 // CHECK:   scf.for %[[KK:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
 // CHECK:     %[[SUB15:.+]] = memref.subview %[[ALLOC11]][%[[KK]], 0, 0] [1, 32, 32] [1, 1, 1] : memref<32x32x32xf32> to memref<32x32xf32, #[[MAP]]>
-// CHECK:     tpp.relu ins(%[[SUB15]] : memref<32x32xf32, #[[MAP]]>) out(%[[SUB15]] : memref<32x32xf32, #[[MAP]]>)
+// CHECK:     tpp.relu outs(%[[SUB15]] : memref<32x32xf32, #[[MAP]]>) 
 // CHECK:   }
 // CHECK:   %[[SUB12:.+]] = memref.subview %[[ALLOC6]][%[[I]], 0, 0, 0] [1, 64, 32, 32] [1, 1, 1, 1] : memref<4x64x32x32xf32> to memref<64x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:   %[[ALLOC13:.+]] = memref.alloc() {alignment = 128 : i64} : memref<64x32x32xf32>
@@ -153,7 +153,7 @@ module @predict_function  {
 // CHECK:   }
 // CHECK:   scf.for %[[LL:.+]] = %[[C0]] to %[[C64]] step %[[C1]] {
 // CHECK:     %[[SUB15_2:.+]] = memref.subview %[[ALLOC13]][%[[LL]], 0, 0] [1, 32, 32] [1, 1, 1] : memref<64x32x32xf32> to memref<32x32xf32, #[[MAP]]>
-// CHECK:     tpp.relu ins(%[[SUB15_2]] : memref<32x32xf32, #[[MAP]]>) out(%[[SUB15_2]] : memref<32x32xf32, #[[MAP]]>)
+// CHECK:     tpp.relu outs(%[[SUB15_2]] : memref<32x32xf32, #[[MAP]]>)
 // CHECK:   }
 // CHECK:   %[[SUB14:.+]] = memref.subview %[[ALLOC8]][%[[I]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<4x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:   scf.for %[[E:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
@@ -164,7 +164,7 @@ module @predict_function  {
 // CHECK:   }
 // CHECK:   scf.for %[[EE:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
 // CHECK:    %[[SUB15_4:.+]] = memref.subview %[[SUB14]][%[[EE]], 0, 0] [1, 32, 32] [1, 1, 1] : memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>> to memref<32x32xf32, #[[MAP]]>
-// CHECK:    tpp.relu ins(%[[SUB15_4]] : memref<32x32xf32, #[[MAP]]>) out(%[[SUB15_4]] : memref<32x32xf32, #[[MAP]]>)
+// CHECK:    tpp.relu outs(%[[SUB15_4]] : memref<32x32xf32, #[[MAP]]>)
 // CHECK:   }
 // CHECK: }
 // CHECK: linalgx.unpack %[[ALLOC8]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG9]] : (memref<4x32x32x32xf32> memref<128x1024xf32>)

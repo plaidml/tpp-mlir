@@ -204,6 +204,13 @@ _mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
   kernel(&param);
 }
 
+extern "C" void
+_mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype dType,
+                                      int64_t addr,
+                                      UnrankedMemRefType<char> *input) {
+  _mlir_ciface_xsmm_unary_invoke(dType, addr, input, input);
+}
+
 extern "C" void _mlir_ciface_xsmm_binary_invoke(const libxsmm_datatype dType,
                                                 int64_t addr,
                                                 UnrankedMemRefType<char> *lhs,
