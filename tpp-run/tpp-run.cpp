@@ -242,11 +242,13 @@ static LogicalResult prepareMLIRKernel(Operation *op) {
   APFloat vectorFloatValue = APFloat(-1.0F);
   auto minusOne = builder.create<arith::ConstantFloatOp>(loc, vectorFloatValue,
                                                          builder.getF32Type());
-  auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto indices = ValueRange{zeroIdx, zeroIdx};
   // TODO: Create a loop in IR
+  auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
   assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
   for (int i = 0; i < outerDims[0]; i++) {
+    auto beginIdx = builder.create<arith::ConstantIndexOp>(loc, i);
+
+    auto indices = ValueRange{beginIdx, zeroIdx};
     auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result,
                                                          indices, minusOne);
     builder.create<vector::PrintOp>(loc, vector);
