@@ -66,40 +66,28 @@ module @predict_function  {
       %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
       // Propagate packing
       transform.structured.packing_propagation %2
-  }
-
-  transform.sequence failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["func.func"]} in %arg1
+  
+      %3 = transform.structured.match ops{["func.func"]} in %arg1
       // Annotate the relu(s)
-      transform.structured.map_linalg_to_tpp %0
-  }
-
-  transform.sequence failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
+      transform.structured.map_linalg_to_tpp %3
+  
       // Collect all the relus
-      %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
+      %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
       // Get the last one, and fuse the outermost dimensions with all the producers
-      %relus:4 = split_handles %0 in [4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-      %1, %loop = transform.structured.fuse %relus#3 { tile_sizes = [1, 0, 0, 0] }  
-  }
-
-  // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
-  transform.sequence failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):
-      %0 = transform.structured.match ops{["func.func"]} in %arg1
-      transform.structured.fold_unit_extent_dims %0
-      %1 = transform.structured.match ops{["func.func"]} in %arg1
-      transform.structured.map_linalg_to_tpp %1
-  }
-
-  transform.sequence failures(propagate) {
-    ^bb0(%arg1: !pdl.operation):  
-      %0 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
+      %relus:4 = split_handles %4 in [4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+      %5, %loop = transform.structured.fuse %relus#3 { tile_sizes = [1, 0, 0, 0] }  
+  
+      // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
+      %6 = transform.structured.match ops{["func.func"]} in %arg1
+      transform.structured.fold_unit_extent_dims %6
+      %7 = transform.structured.match ops{["func.func"]} in %arg1
+      transform.structured.map_linalg_to_tpp %7
+  
+      %8 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
       // Fuse matmul + relu and map the matmul to BRGEMM
-      %1, %loop = transform.structured.fuse %0 { tile_sizes = [1, 0, 0] }
-      %2 = get_producer_of_operand %1[0] : (!pdl.operation) -> !pdl.operation
-      transform.structured.map_to_brgemm %2
+      %9, %loop1 = transform.structured.fuse %8 { tile_sizes = [1, 0, 0] }
+      %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
+      transform.structured.map_to_brgemm %10
   }
 }
 

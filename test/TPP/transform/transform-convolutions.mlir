@@ -136,6 +136,79 @@ func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: 
 
 // -----
 
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
+    // Original layout: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
+    // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    // Collapse       : [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
+    %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+    %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+    //
+    // N        [parallel]
+    //  K'      [parallel]
+    //   P + Q  [parallel]
+    //    k     [parallel]
+    //     C'   [reduction]
+    //      c   [reduction]
+    //       output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    // 
+    // expose BRGEMM by interchange:
+    //
+    // N        [parallel]
+    //  K'      [parallel]
+    //   C'     [reduction - BRGEMM reduction dim]
+    //    P + Q [parallel]
+    //     k    [parallel]
+    //      c   [reduction]
+    //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    //
+    %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    transform.structured.map_to_brgemm %4
+}
+
+func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
+                %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>)
+                                outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+  return %0: tensor<14x1024x28x28xf32>
+}
+
+// CHECK: func.func @conv(
+// CHECK-SAME:  %[[ARG0:[a-zA-Z0-9]+]]: tensor<14x512x28x28xf32>,
+// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: tensor<1024x512x1x1xf32>,
+// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[BUF:.+]] = tensor.empty() : tensor<14x16x28x28x32xf32>
+// CHECK: %[[PACK:.+]] = linalgx.pack %[[ARG0]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF]] : (tensor<14x512x28x28xf32> tensor<14x16x28x28x32xf32>) -> tensor<14x16x28x28x32xf32>
+// CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<32x16x1x1x32x32xf32>
+// CHECK: %[[PACK0:.+]] = linalgx.pack %[[ARG1]] inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %[[BUF0]] : (tensor<1024x512x1x1xf32> tensor<32x16x1x1x32x32xf32>) -> tensor<32x16x1x1x32x32xf32>
+// CHECK: %[[BUF1:.+]] = tensor.empty() : tensor<14x32x28x28x32xf32>
+// CHECK: %[[PACK1:.+]] = linalgx.pack %[[ARG2]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF1]] : (tensor<14x1024x28x28xf32> tensor<14x32x28x28x32xf32>) -> tensor<14x32x28x28x32xf32>
+// CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[PACK0]] {{\[}}[0], [1, 2, 3], [4], [5]] : tensor<32x16x1x1x32x32xf32> into tensor<32x16x32x32xf32>
+// CHECK: %[[COLLAPSE0:.+]] = tensor.collapse_shape %[[PACK]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x16x28x28x32xf32> into tensor<14x16x784x32xf32>
+// CHECK: %[[COLLAPSE1:.+]] = tensor.collapse_shape %[[PACK1]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x28x28x32xf32> into tensor<14x32x784x32xf32>
+// CHECK: %[[LOOP0:.+]] = scf.for %[[ARG3]] = %[[C0]] to %[[C14]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[COLLAPSE1]]) -> (tensor<14x32x784x32xf32>) {
+// CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5]] = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<14x32x784x32xf32>) {
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSE0]][%[[ARG3]], 0, 0, 0] [1, 16, 784, 32] [1, 1, 1, 1] : tensor<14x16x784x32xf32> to tensor<16x784x32xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[COLLAPSE]][%[[ARG5]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<32x16x32x32xf32> to tensor<16x32x32xf32>
+// CHECK: %[[SLICE3:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 784, 32] [1, 1, 1, 1] : tensor<14x32x784x32xf32> to tensor<784x32xf32>
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE]], %[[SLICE2]] : tensor<16x784x32xf32>, tensor<16x32x32xf32>) outs(%[[SLICE3]] : tensor<784x32xf32>) -> tensor<784x32xf32>
+// CHECK: %[[INSERT:.+]] = tensor.insert_slice %[[GEMM]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 784, 32] [1, 1, 1, 1] : tensor<784x32xf32> into tensor<14x32x784x32xf32>
+// CHECK: scf.yield %[[INSERT]] : tensor<14x32x784x32xf32>
+// CHECK: }
+// CHECK: scf.yield %[[LOOP1]] : tensor<14x32x784x32xf32>
+// CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[LOOP0]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x784x32xf32> into tensor<14x32x28x28x32xf32>
+// CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[EXPAND]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : (tensor<14x32x28x28x32xf32> tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+// CHECK: return %[[UNPACK]] : tensor<14x1024x28x28xf32>
+
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
