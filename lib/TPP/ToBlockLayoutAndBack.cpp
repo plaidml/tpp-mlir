@@ -31,7 +31,7 @@ using namespace mlir::linalgx;
 // Utils
 //===----------------------------------------------------------------------===//
 
-/// Helper function to create the pack operation.
+// Helper function to create the pack operation.
 static Value toPackLayoutImpl(Location loc, Value input,
                               ArrayRef<OpFoldResult> tiles,
                               ArrayRef<int64_t> innerDimsPos,
@@ -59,7 +59,7 @@ static Value toPackLayoutImpl(Location loc, Value input,
       .getResults()[0];
 }
 
-/// Helper function to create the unpack operation.
+// Helper function to create the unpack operation.
 static Value toUnPackLayoutImpl(Location loc, Value input, Value output,
                                 ArrayRef<OpFoldResult> tiles,
                                 ArrayRef<int64_t> innerDimPos,
@@ -83,14 +83,14 @@ static Value handleLayoutNC_NCnc(Location loc, Value input, Value output,
                             builder);
 }
 
-/// Helper function to pack from NC to NCnc.
+// Helper function to pack from NC to NCnc.
 static Value toPackLayoutNC_NCnc(Location loc, Value input,
                                  ArrayRef<OpFoldResult> tiles,
                                  OpBuilder &builder, bool useAlloc = false) {
   return handleLayoutNC_NCnc(loc, input, nullptr, tiles, builder, useAlloc);
 }
 
-/// Helper function to unpack from NCnc to NC.
+// Helper function to unpack from NCnc to NC.
 static Value fromPackLayoutNCnc_NC(Location loc, Value input, Value output,
                                    ArrayRef<OpFoldResult> tiles,
                                    OpBuilder &builder) {
@@ -109,21 +109,21 @@ static Value handleLayoutNCHW_NCHWc(Location loc, Value input, Value output,
                             builder);
 }
 
-/// Helper function to pack from NCHW to NCHWc.
+// Helper function to pack from NCHW to NCHWc.
 static Value toPackLayoutNCHW_NCHWc(Location loc, Value input,
                                     ArrayRef<OpFoldResult> tiles,
                                     OpBuilder &builder, bool useAlloc = false) {
   return handleLayoutNCHW_NCHWc(loc, input, nullptr, tiles, builder, useAlloc);
 }
 
-/// Helper function to unpack from NCHWc to NCHW.
+// Helper function to unpack from NCHWc to NCHW.
 static Value fromPackLayoutNCHWc_NCHW(Location loc, Value input, Value output,
                                       ArrayRef<OpFoldResult> tiles,
                                       OpBuilder &builder) {
   return handleLayoutNCHW_NCHWc(loc, input, output, tiles, builder);
 }
 
-/// Helper function to pack from KC to CKkc.
+// Helper function to pack from KC to CKkc.
 static Value toPackLayoutKC_CKkc(Location loc, Value input,
                                  ArrayRef<OpFoldResult> tiles,
                                  OpBuilder &builder, bool useAlloc = false) {
@@ -147,21 +147,21 @@ static Value handleLayoutNPQK_NKPQk(Location loc, Value input, Value output,
                             outerDimsPerm, builder);
 }
 
-/// Helper function to pack NPQK to NKPQk.
+// Helper function to pack NPQK to NKPQk.
 static Value toPackLayoutNPQK_NKPQk(Location loc, Value input,
                                     ArrayRef<OpFoldResult> tiles,
                                     OpBuilder &builder, bool useAlloc = false) {
   return handleLayoutNPQK_NKPQk(loc, input, nullptr, tiles, builder, useAlloc);
 }
 
-/// Helper function to unpack NKPQk to NPQK.
+// Helper function to unpack NKPQk to NPQK.
 static Value fromPackLayoutNKPQk_NPQK(Location loc, Value input, Value output,
                                       ArrayRef<OpFoldResult> tiles,
                                       OpBuilder &builder) {
   return handleLayoutNPQK_NKPQk(loc, input, output, tiles, builder);
 }
 
-/// Helper function to pack from RSCK to KCRSck.
+// Helper function to pack from RSCK to KCRSck.
 static Value toPackLayoutRSCK_KCRSck(Location loc, Value input,
                                      ArrayRef<OpFoldResult> tiles,
                                      OpBuilder &builder) {
@@ -172,7 +172,7 @@ static Value toPackLayoutRSCK_KCRSck(Location loc, Value input,
                           builder);
 }
 
-/// Helper function to pack from KCRS to KCRSck.
+// Helper function to pack from KCRS to KCRSck.
 static Value toPackLayoutKCRS_KCRSck(Location loc, Value input,
                                      ArrayRef<OpFoldResult> tiles,
                                      OpBuilder &builder,
@@ -371,148 +371,6 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 }
 
 namespace {
-
-// Pack MatmulOp.
-struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
-  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
-               PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
-
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> packedMatmul = mlir::linalgx::packMatmulOp(
-        rewriter, matmulOp,
-        getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(packedMatmul))
-      return failure();
-    return success();
-  }
-
-private:
-  ArrayRef<int64_t> blockingFactors;
-};
-
-// From linalg.generic to linalg.matmul.
-struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasTensorSemantics())
-      return failure();
-    if (!tpp::isMarkedWithTpp(linalgOp, "tpp.matmul"))
-      return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
-        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
-    return success();
-  }
-};
-
-// Entry point for packing a matmul operation.
-// Pack MatmulOp as following:
-// [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
-// CB = batch reduce dimension.
-struct PackMatmul : public PackMatmulBase<PackMatmul> {
-  PackMatmul() = default;
-  PackMatmul(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
-
-  void runOnOperation() override {
-    if (blockingFactors.empty())
-      return;
-    MLIRContext *ctx = getOperation().getContext();
-    RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    patterns.add<DoItOnMatmul>(ctx, blockingFactors);
-    patterns.add<DeGeneralizeMatmul>(ctx);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
-struct DoItOnConv2DNchwFchw
-    : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  DoItOnConv2DNchwFchw(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
-                       PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
-
-  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> genericOp =
-        mlir::linalgx::packConv2DNchwFchwOp(
-            rewriter, linalgOp,
-            getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(genericOp))
-      return failure();
-    return success();
-  }
-
-private:
-  SmallVector<int64_t> blockingFactors;
-};
-
-struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
-  PackConv2DNchwFchw() = default;
-  PackConv2DNchwFchw(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
-
-  void runOnOperation() override {
-    if (blockingFactors.empty())
-      return;
-    MLIRContext *ctx = getOperation().getContext();
-    RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
-struct DoItOnConv2DNhwcHwcf
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
-  DoItOnConv2DNhwcHwcf(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
-                       PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::Conv2DNhwcHwcfOp>(context, benefit),
-        blockingFactors(blockingFactors) {}
-
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> maybeGeneric =
-        mlir::linalgx::packConv2DNhwcHwcfOp(
-            rewriter, linalgOp,
-            getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(maybeGeneric))
-      return failure();
-    return success();
-  }
-
-private:
-  SmallVector<int64_t> blockingFactors;
-};
-
-struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
-  PackConv2DNhwcHwcf() = default;
-  PackConv2DNhwcHwcf(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
-
-  void runOnOperation() override {
-    if (blockingFactors.empty())
-      return;
-    MLIRContext *ctx = getOperation().getContext();
-    RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // PropagateThroughPadOp
@@ -865,18 +723,4 @@ struct PropagateThroughElementWiseOp
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   patterns.add<PropagateThroughElementWiseOp, PropagateThroughPadOp>(
       patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
-  return std::make_unique<PackMatmul>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNchwFchwPass() {
-  return std::make_unique<PackConv2DNchwFchw>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNhwcHwcfPass() {
-  return std::make_unique<PackConv2DNhwcHwcf>();
 }

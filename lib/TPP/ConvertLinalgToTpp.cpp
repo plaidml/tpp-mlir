@@ -343,13 +343,51 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
 };
 
 // Given the following pattern:
-// %0 = memref.subview %i : memref<64x32x32> -> memref<1x32x32>
-// %1 = memref.subview %0 : memref<1x32x32> -> memref<32x32>
-// simplify to:
-// %0 = memref.subview %i : memref<64x32x32> -> memref<32x32>
+// %0 = memref.subview %something[%i, 0, 0][1, 32, 32][1, 1, 1] :
+// memref<32x32x32> to memref<1x32x32> %1 = memref.subview %0[0, 0, 0][1, 32,
+// 32][1, 1, 1] : memref<1x32x32> to memref<32x32> simplify to: %0 =
+// memref.subview %something[%i, 0, 0][1, 32, 32][1, 1, 1] memref<32x32x32> to
+// memref<32x32>
 struct SubViewOfSubViewWithUnitDims
     : public OpRewritePattern<memref::SubViewOp> {
   using OpRewritePattern<memref::SubViewOp>::OpRewritePattern;
+
+  bool areX(ArrayRef<OpFoldResult> valuesOrAttrs, int x) const {
+    if (llvm::all_of(valuesOrAttrs, [=](const OpFoldResult &valueOrAttr) {
+          Attribute attr = valueOrAttr.dyn_cast<Attribute>();
+          return attr && attr.cast<IntegerAttr>().getInt() == x;
+        }))
+      return true;
+    return false;
+  }
+
+  bool areOne(ArrayRef<OpFoldResult> valuesOrAttrs) const {
+    return areX(valuesOrAttrs, 1);
+  }
+
+  bool areZero(ArrayRef<OpFoldResult> valuesOrAttrs) const {
+    return areX(valuesOrAttrs, 0);
+  }
+
+  bool areSame(ArrayRef<OpFoldResult> valuesOrAttrsConsumer,
+               ArrayRef<OpFoldResult> valuesOrAttrsProducer) const {
+    if (valuesOrAttrsConsumer.size() != valuesOrAttrsProducer.size())
+      return false;
+    for (auto it : llvm::zip(valuesOrAttrsConsumer, valuesOrAttrsProducer)) {
+      OpFoldResult valueOrAttrConsumer = std::get<0>(it);
+      OpFoldResult valueOrAttrProducer = std::get<1>(it);
+      Attribute attrConsumer = valueOrAttrConsumer.dyn_cast<Attribute>();
+      if (!attrConsumer)
+        return false;
+      Attribute attrProducer = valueOrAttrProducer.dyn_cast<Attribute>();
+      if (!attrProducer)
+        return false;
+      if (attrConsumer.cast<IntegerAttr>().getInt() !=
+          attrProducer.cast<IntegerAttr>().getInt())
+        return false;
+    }
+    return true;
+  }
 
   LogicalResult matchAndRewrite(memref::SubViewOp subViewOp,
                                 PatternRewriter &rewriter) const override {
@@ -368,6 +406,25 @@ struct SubViewOfSubViewWithUnitDims
     // be another subview.
     memref::SubViewOp producer = source.getDefiningOp<memref::SubViewOp>();
     if (!producer)
+      return failure();
+
+    // check strides all ones.
+    SmallVector<OpFoldResult> stridesConsumer = subViewOp.getMixedStrides();
+    SmallVector<OpFoldResult> stridesProducer = producer.getMixedStrides();
+    if (stridesConsumer.size() != stridesProducer.size())
+      return failure();
+    if ((!areOne(stridesConsumer)) || (!areOne(stridesProducer)))
+      return failure();
+
+    // check sizes all equals.
+    SmallVector<OpFoldResult> sizesConsumer = subViewOp.getMixedSizes();
+    SmallVector<OpFoldResult> sizesProducer = producer.getMixedSizes();
+    if (!areSame(sizesConsumer, sizesProducer))
+      return failure();
+
+    // offset of consumer are all zeros.
+    SmallVector<OpFoldResult> offsetsConsumer = subViewOp.getMixedOffsets();
+    if (!areZero(offsetsConsumer))
       return failure();
 
     memref::SubViewOp rankReduced = rewriter.create<memref::SubViewOp>(

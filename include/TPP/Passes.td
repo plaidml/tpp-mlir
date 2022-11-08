@@ -132,51 +132,6 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   ];
 }
 
-def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
-  let summary = "Convert matmul to block layout and back";
-  let description = [{
-    Block Matmul as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
-    the Matmul has a relu operation as its consumer block also the relu operation.
-  }];
-  let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t", 
-               "Blocking factor for relayout">
-  ];
-  let constructor = "mlir::tpp::createPackMatmulPass()";
-}
-
-def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
-  let summary = "Convert Conv2DNchwFchw to block layout and back";
-  let description = [{
-    Block Conv2DNchwFchw as: [N][BK][P][Q][bk] += [N][BC][H][W][bc] * [BK][BC][R][S][bk][bc]
-                             output            += image             * filter
-    Pack the image's channel with a block factor BC.
-    Pack the filter's channels C and K with a block factor of BC and BK.
-    Pack the output's channel K with a block factor BK.
-  }];
-  let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t",
-               "Blocking factor for relayout">
-  ];
-  let constructor = "mlir::tpp::createPackConv2DNchwFchwPass()";
-}
-
-def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
-  let summary = "Pack and unpack Conv2DNhwcHwcf";
-  let description = [{
-    Pack Conv2DNhwcHwcf as [N][K'][P][Q][k] += [N][C'][H][W][c] * [K'][C'][R][S][c][k]
-                           output           += image            * filter
-    Pack the image and block the image's channel with a factor k.
-    Pack the filter and block the filter's channels with k and c.
-    Pack the output and block the output's channel with k.
-  }];
-  let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t",
-               "Blocking factor for pack and unpack operation">
-  ];
-  let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
-}
-
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   let summary = "Map a linalg.generic to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
