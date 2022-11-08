@@ -5,7 +5,7 @@
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
 
 func.func @conv(%arg0: tensor<1x4x4x3xi64>, %arg1: tensor<2x2x3x8xi64>, %arg2: tensor<1x3x3x8xi64>) -> tensor<1x3x3x8xi64> {
-    // CHECK: linalg.matmul
+  // CHECK: linalg.matmul
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<1x4x4x3xi64>, tensor<2x2x3x8xi64>) outs(%arg2 : tensor<1x3x3x8xi64>) {
   ^bb0(%in: i64, %in_0: i64, %out: i64):
     %1 = arith.muli %in, %in_0 : i64
