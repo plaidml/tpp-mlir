@@ -1,5 +1,5 @@
 // RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN:            -main-closure -pre-bufferization -pack-matmul="block-factors=2,2" -loop-invariant-code-motion -canonicalize -undo-main-closure \
+// RUN:            -pre-bufferization -pack-matmul="block-factors=2,2" -canonicalize \
 // RUN:            -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0" -canonicalize \
 // RUN:            -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize \
 // RUN:            -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
@@ -40,3 +40,4 @@ module @predict_function  {
   }
 }
 // CHECK-COUNT-4: ( 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9 )
+

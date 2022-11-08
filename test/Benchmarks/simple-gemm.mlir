@@ -1,5 +1,4 @@
 // RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN:            -pre-bufferization \
 // RUN:            -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN:            -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
 // RUN:            -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func | \
@@ -27,3 +26,4 @@ module {
   }
 }
 // CHECK-COUNT-4: ( 9, 9, 9, 9 )
+

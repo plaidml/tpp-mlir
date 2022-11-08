@@ -1,5 +1,4 @@
 // RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN:            -pre-bufferization \
 // RUN:            -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN:            -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
 // RUN:            -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func | \
@@ -25,3 +24,4 @@ func.func @entry(%A: tensor<12x9xf32>, %B: tensor<9x6xf32>,
   return %D : tensor<12x6xf32>
 }
 // CHECK-COUNT-12: ( 10, 10, 10, 10, 10, 10 )
+
