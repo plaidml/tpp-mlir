@@ -1,13 +1,19 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -pack-matmul="block-factors=32,32,32" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm | FileCheck %s
+// RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -transform-dialect-interpreter -transform-drop-schedule -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm | FileCheck %s
 
 // This test isn't working fully due to issues #95 and #96.
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module @predict_function  {
+  
+  transform.sequence failures(propagate) {
+    ^bb0(%arg1: !pdl.operation):
+     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+     %1 = transform.structured.pack %0 { blocking_factors = [32, 32, 32] }
+     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
+     transform.structured.packing_propagation %2
+  }
+  
   func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
                   %arg2: tensor<512xf32>, %arg3: tensor<512x1024xf32>,
                   %arg4: tensor<1024xf32>, %arg5: tensor<1024x2048xf32>,
@@ -20,12 +26,7 @@ module @predict_function  {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
     } -> tensor<128x512xf32>
-    %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x512xf32>
+    %2 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) -> tensor<128x512xf32>
     %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
@@ -35,12 +36,7 @@ module @predict_function  {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
     } -> tensor<128x1024xf32>
-    %6 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %arg3 : tensor<128x512xf32>, tensor<512x1024xf32>) outs(%5 : tensor<128x1024xf32>) attrs =  {iterator_ranges = [128, 1024, 512]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x1024xf32>
+    %6 = linalg.matmul ins(%3, %arg3 : tensor<128x512xf32>, tensor<512x1024xf32>) outs(%5 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
     %7 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%6 : tensor<128x1024xf32>) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
@@ -50,12 +46,7 @@ module @predict_function  {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
     } -> tensor<128x2048xf32>
-    %10 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%7, %arg5 : tensor<128x1024xf32>, tensor<1024x2048xf32>) outs(%9 : tensor<128x2048xf32>) attrs =  {iterator_ranges = [128, 2048, 1024]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x2048xf32>
+    %10 = linalg.matmul ins(%7, %arg5 : tensor<128x1024xf32>, tensor<1024x2048xf32>) outs(%9 : tensor<128x2048xf32>) -> tensor<128x2048xf32>
     %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%10 : tensor<128x2048xf32>) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
@@ -65,12 +56,7 @@ module @predict_function  {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
     } -> tensor<128x1024xf32>
-    %14 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%11, %arg7 : tensor<128x2048xf32>, tensor<2048x1024xf32>) outs(%13 : tensor<128x1024xf32>) attrs =  {iterator_ranges = [128, 1024, 2048]} {
-    ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
-      %16 = arith.mulf %arg9, %arg10 : f32
-      %17 = arith.addf %arg11, %16 : f32
-      linalg.yield %17 : f32
-    } -> tensor<128x1024xf32>
+    %14 = linalg.matmul ins(%11, %arg7 : tensor<128x2048xf32>, tensor<2048x1024xf32>) outs(%13 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
     %15 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%14 : tensor<128x1024xf32>) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32

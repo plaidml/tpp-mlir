@@ -78,3 +78,24 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 // CHECK: tpp.identity ins(%[[ARG0]] : memref<64xf32>) out(%[[SUB]] : memref<56x64xf32, #[[MAP]]>)
 // CHECK: scf.yield
 // CHECK: }
+
+// -----
+
+// Check pattern `SubViewOfSubViewWithUnitDims`. We should not trigger any errors. 
+func.func @main() -> memref<8x32x32x32xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %c32 = arith.constant 32 : index
+  %alloc = memref.alloc() {alignment = 128 : i64} : memref<8x32x32x32xf32>
+  scf.for %arg0 = %c0 to %c8 step %c1 {
+    // CHECK: memref.subview
+    %subview = memref.subview %alloc[%arg0, 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<1x32x32x32xf32, strided<[32768, 1024, 32, 1], offset: ?>>
+    scf.for %arg1 = %c0 to %c32 step %c1 {
+      // CHECK: memref.subview
+      %subview_0 = memref.subview %subview[0, %arg1, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<1x32x32x32xf32, strided<[32768, 1024, 32, 1], offset: ?>> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+      tpp.relu outs(%subview_0 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+    }
+  }
+  return %alloc : memref<8x32x32x32xf32>
+}
