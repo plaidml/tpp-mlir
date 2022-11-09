@@ -1,6 +1,6 @@
-// RUN: tpp-opt %s -split-input-file -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck %s
 
-// RUN: tpp-opt %s -split-input-file -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-linalg-to-tpp -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-linalg-to-tpp -convert-linalg-to-tpp | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
