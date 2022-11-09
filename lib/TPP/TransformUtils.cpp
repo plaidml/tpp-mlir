@@ -10,6 +10,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
@@ -126,7 +127,6 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                  unsigned desiredResultRank) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
-  assert(operandType.hasStaticShape() && "tensor must have static shape");
   size_t rank = operandType.getRank();
 
   SmallVector<OpFoldResult> offsets, sizes;
@@ -144,7 +144,8 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   for (size_t idx = 0, e = rank - desiredResultRank; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(1));
   for (size_t idx = rank - desiredResultRank, e = rank; idx < e; idx++)
-    sizes.push_back(builder.getIndexAttr(operandType.getShape()[idx]));
+    sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
+                                              operandToUse, idx));
 
   // strides are assumed to be always 1.
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
