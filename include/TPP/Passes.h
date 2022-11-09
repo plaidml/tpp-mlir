@@ -54,8 +54,11 @@ class XsmmDialect;
 namespace mlir {
 namespace tpp {
 
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
@@ -63,14 +66,17 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToLoopsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizeCopyPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
+// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
-std::unique_ptr<OperationPass<ModuleOp>> createTransformDialectInterpreterPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createIteratorCollapsingPass();
+std::unique_ptr<OperationPass<ModuleOp>>
+createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 
