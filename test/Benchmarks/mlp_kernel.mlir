@@ -3,7 +3,7 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
-// RUN: -loop-invariant-code-motion -convert-xsmm-to-func | \
+// RUN: -convert-xsmm-to-func | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
