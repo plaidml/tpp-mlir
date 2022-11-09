@@ -185,3 +185,35 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
   } -> tensor<16x32x32xf32>
   return %0 : tensor<16x32x32xf32>
 }
+
+// -----
+
+#map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map6 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map7 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    transform.structured.map_to_brgemm %0
+}
+
+func.func @blocked_matmul(%arg0: tensor<?x32x32xf32>, %arg1: tensor<?x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  %0 = linalg.generic {indexing_maps = [#map5, #map6, #map7], iterator_types = ["reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<?x32x32xf32>, tensor<?x32x32xf32>) outs(%arg2 : tensor<32x32xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32, %arg5:f32):
+    %m = arith.mulf %arg3, %arg4 : f32
+    %a = arith.addf %arg5, %m : f32
+    linalg.yield %a : f32
+  } -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}
+
+// CHECK: func.func @blocked_matmul(
+// CHECK-SAME: %[[ARG0:.+]]: tensor<?x32x32xf32>, %[[ARG1:.+]]: tensor<?x32x32xf32>, %[[ARG2:.+]]: tensor<32x32xf32>)
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x32x32xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG0]][0, 0, 0] [%[[DIM]], 32, 32] [1, 1, 1] : tensor<?x32x32xf32> to tensor<?x32x32xf32>
+// CHECK: %[[DIM1:.+]] = tensor.dim %[[ARG1]], %[[C0]] : tensor<?x32x32xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[ARG1]][0, 0, 0] [%[[DIM1]], 32, 32] [1, 1, 1] : tensor<?x32x32xf32> to tensor<?x32x32xf32>
+// CHECK: %[[MUL:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE1]], %[[SLICE2]] : tensor<?x32x32xf32>, tensor<?x32x32xf32>) outs(%[[ARG2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: return %[[MUL]] : tensor<32x32xf32>

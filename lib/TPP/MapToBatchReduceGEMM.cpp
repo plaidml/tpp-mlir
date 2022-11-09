@@ -142,10 +142,6 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
-  // TODO: this should not be required.
-  if (linalgOp.hasDynamicShape())
-    return failure();
-
   // materialize outer loops
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
   FailureOr<SmallVector<Range>> maybeLoopRanges =
