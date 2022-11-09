@@ -63,7 +63,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizeCopyPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createPreBufferizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
