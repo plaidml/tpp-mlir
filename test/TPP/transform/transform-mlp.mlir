@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -canonicalize -one-shot-bufferize="bufferize-function-boundaries" -split-input-file -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -canonicalize -split-input-file | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -104,9 +104,16 @@ transform.sequence failures(propagate) {
     // Detect relus and identity
     %3 = transform.structured.match ops{["func.func"]} in %arg1
     transform.structured.map_linalg_to_tpp %3
+
+    transform.bufferization.one_shot_bufferize %arg1 {
+        target_is_module = true,
+        bufferize_function_boundaries = true }
  
     %4 = transform.structured.match ops{["linalg.generic"]} in %arg1
     transform.structured.map_to_brgemm %4
+
+    %5 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %5
 }
 
 func.func @mlp_single_layer_no_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {
@@ -166,9 +173,22 @@ transform.sequence failures(propagate) {
     %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     %5, %loop = transform.structured.fuse %4 { tile_sizes = [1, 0, 0, 0] }
 
+    // clean-up IR after fusion
+    %6 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.canonicalize %6
+
+    // bufferize
+    transform.bufferization.one_shot_bufferize %arg1 {
+        target_is_module = true,
+        bufferize_function_boundaries = true }
+
     // map a packed matmul to a brgemm
-    %6 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    transform.structured.map_to_brgemm %6
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    transform.structured.map_to_brgemm %7
+
+    // convert linalg to tpp
+    %8 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %8
 }
 
 func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {

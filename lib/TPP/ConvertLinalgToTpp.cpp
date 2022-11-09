@@ -473,6 +473,7 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(RewritePatternSet &patterns,
                ConvertBrgemmToTpp,
                ConvertMatmulToTpp>(patterns.getContext());
   patterns.add<ReshapeGenericOpForTpp>(patterns.getContext(), useParallelLoops);
+  populateSubViewFoldingPatterns(patterns);
   // clang-format on
 }
 
