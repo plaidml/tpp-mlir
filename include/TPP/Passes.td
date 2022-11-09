@@ -94,12 +94,6 @@ def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
   let dependentDialects = ["memref::MemRefDialect"];
 }
 
-def PreBufferization : Pass<"pre-bufferization", "func::FuncOp"> {
-  let summary = "Prepare IR for bufferization";
-  let constructor = "mlir::tpp::createPreBufferizationPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-}
-
 def MainClosure : Pass<"main-closure", "func::FuncOp"> {
   let summary = "Wrap main into a closure to hoist out constant computation.";
   let constructor = "mlir::tpp::createMainClosurePass()"; 
