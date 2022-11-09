@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize | FileCheck %s
 
 !A_tensor_t = tensor<256x512xf32>
 !B_tensor_t = tensor<512x1024xf32>
@@ -26,7 +26,7 @@ transform.sequence failures(propagate) {
     transform.structured.map_to_brgemm %3
 
     %4 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %4
+    transform.structured.map_and_convert_linalg_to_tpp %4
 }
 
 func.func @matmul_static(
