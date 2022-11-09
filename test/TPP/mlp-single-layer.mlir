@@ -37,6 +37,6 @@ module @predict_function  {
 // CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: memref<128x512xf32>
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: tpp.relu outs(%[[ARG3]] : memref<128x512xf32>)
+// CHECK: tpp.relu out(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: return
 // CHECK: } 

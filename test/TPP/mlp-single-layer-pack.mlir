@@ -54,7 +54,7 @@ module @predict_function  {
 // CHECK: %[[sub_arg1:.*]] = memref.subview %[[rel_arg1]][%[[j]], 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<16x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK: %[[sub_sub_arg3:.*]] = memref.subview %[[sub_arg3]][%[[j]], 0, 0] [1, 32, 32] [1, 1, 1] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>> to memref<32x32xf32, strided<[32, 1], offset: ?>>
 // CHECK: linalg.batch_reduce_matmul ins(%[[sub_arg0]], %[[sub_arg1]] : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[sub_sub_arg3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-// CHECK: tpp.relu outs(%[[sub_sub_arg3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+// CHECK: tpp.relu out(%[[sub_sub_arg3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
 // CHECK: }
 // CHECK: }
 // CHECK: linalgx.unpack %[[rel_arg3]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[arg3]] : (memref<4x16x32x32xf32> memref<128x512xf32>)

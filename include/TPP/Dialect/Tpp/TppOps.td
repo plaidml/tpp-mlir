@@ -107,7 +107,7 @@ def Tpp_ReluOp : Tpp_Op<"relu"> {
 
     ```mlir
  
-    tpp.relu outs(%1: memref<2x2xf32>)
+    tpp.relu out(%1: memref<2x2xf32>)
 
     ```
   }];
@@ -115,7 +115,7 @@ def Tpp_ReluOp : Tpp_Op<"relu"> {
   let arguments = (outs TppOperand:$output);
 
   let assemblyFormat = [{
-      `outs` `(` $output `:` type($output) `)`  attr-dict
+      `out` `(` $output `:` type($output) `)`  attr-dict
   }];
 }
 

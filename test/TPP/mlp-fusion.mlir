@@ -46,4 +46,4 @@ module @predict_function  {
 // CHECK: %[[slicearg3:.*]] = memref.subview %[[ARG3]][%[[outer]], %[[inner]]] [32, 32] [1, 1] : memref<128x512xf32> to memref<32x32xf32, strided<[512, 1], offset: ?>>
 // CHECK: tpp.identity ins(%[[slicearg2]] : memref<32xf32, strided<[1], offset: ?>>) out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
 // CHECK: tpp.matmul ins(%[[slicearg0]] : memref<32x256xf32, strided<[256, 1], offset: ?>>, %[[slicearg1]] : memref<256x32xf32, strided<[512, 1], offset: ?>>) out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
-// CHECK: tpp.relu outs(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+// CHECK: tpp.relu out(%[[slicearg3]] : memref<32x32xf32, strided<[512, 1], offset: ?>>)
