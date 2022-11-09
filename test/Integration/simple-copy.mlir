@@ -1,3 +1,4 @@
+// Conversion to loop
 // RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
@@ -5,13 +6,7 @@
 // RUN: FileCheck %s
 //
 
-// RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf | \
-// RUN: tpp-run \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
+// Conversion to XSMM
 // RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
@@ -19,12 +14,16 @@
 // RUN: FileCheck %s
 //
 
+// Make sure we map to TPP
+// RUN: tpp-opt %s -map-linalg-to-tpp -pre-bufferization -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
 module {
 
   func.func @copytpp(%A: tensor<4x4xf32>, 
                      %B:tensor<4x4xf32> ) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
+    // TPP: tpp.identity
     %O = linalg.generic { indexing_maps = [#map0, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<4x4xf32>) outs(%B: tensor<4x4xf32>) {
