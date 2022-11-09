@@ -22,7 +22,7 @@
 
 func.func @relutpp(%A: tensor<9x6xf32>) -> tensor<9x6xf32> attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0.0 : f32
-  // TPP: tpp.relu outs({{.*}} : {{.*}})
+  // TPP: tpp.relu out({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0],
                           iterator_types = ["parallel", "parallel"] }
        outs(%A: tensor<9x6xf32>) {

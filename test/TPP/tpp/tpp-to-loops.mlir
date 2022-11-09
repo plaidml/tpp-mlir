@@ -29,7 +29,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK:     memref.store %[[max]], %arg0[%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:   }
   // CHECK: }
-  tpp.relu outs(%arg0: memref<3x3xf32>)
+  tpp.relu out(%arg0: memref<3x3xf32>)
   return 
 }
 

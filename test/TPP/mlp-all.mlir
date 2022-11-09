@@ -94,14 +94,14 @@ module @predict_function  {
 // CHECK-SAME: %[[ARG12:[a-zA-Z0-9]+]]: memref<128x512xf32>
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) out(%[[ARG12]] : memref<128x512xf32>)
 // CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG12]] : memref<128x512xf32>)
-// CHECK: tpp.relu outs(%[[ARG12]] : memref<128x512xf32>)
+// CHECK: tpp.relu out(%[[ARG12]] : memref<128x512xf32>)
 // CHECK: tpp.identity ins(%[[ARG4]] : memref<1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
 // CHECK: tpp.matmul ins(%[[ARG12]] : memref<128x512xf32>, %[[ARG3]] : memref<512x1024xf32>) out(%[[ARG11]] : memref<128x1024xf32>)
-// CHECK: tpp.relu outs(%[[ARG11]] : memref<128x1024xf32>)
+// CHECK: tpp.relu out(%[[ARG11]] : memref<128x1024xf32>)
 // CHECK: tpp.identity ins(%[[ARG6]] : memref<2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
 // CHECK: tpp.matmul ins(%[[ARG11]] : memref<128x1024xf32>, %[[ARG5]] : memref<1024x2048xf32>) out(%[[ARG10]] : memref<128x2048xf32>)
-// CHECK: tpp.relu outs(%[[ARG10]] : memref<128x2048xf32>)
+// CHECK: tpp.relu out(%[[ARG10]] : memref<128x2048xf32>)
 // CHECK: tpp.identity ins(%[[ARG8]] : memref<1000xf32>) out(%[[ARG9]] : memref<128x1000xf32>)
 // CHECK: tpp.matmul ins(%[[ARG10]] : memref<128x2048xf32>, %[[ARG7]] : memref<2048x1000xf32>) out(%[[ARG9]] : memref<128x1000xf32>)
-// CHECK: tpp.relu outs(%[[ARG9]] : memref<128x1000xf32>)
+// CHECK: tpp.relu out(%[[ARG9]] : memref<128x1000xf32>)
 // CHECK: return

@@ -14,10 +14,10 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
   tpp.identity ins(%arg3: f32) out(%arg2: memref<2x2xf32>) 
 
   // CHECK: tpp.relu
-  tpp.relu outs(%arg0: memref<2x2xf32>)
+  tpp.relu out(%arg0: memref<2x2xf32>)
 
   // CHECK: tpp.relu
-  tpp.relu outs(%arg3: f32)
+  tpp.relu out(%arg3: f32)
 
   // CHECK: tpp.matmul
   tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>)
