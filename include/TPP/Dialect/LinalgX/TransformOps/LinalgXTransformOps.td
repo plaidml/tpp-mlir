@@ -178,36 +178,32 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
 // MapLinalgToTppOp
 //===----------------------------------------------------------------------===//
 
-// TODO: this does not compose as it invalidate all the handles.
 def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
-    TransformEachOpTrait, 
+    TransformEachOpTrait,
     TransformOpInterface]> {
   
   let description = [{
     Pattern match a linalg.generic and map it to tpp operations. On success,
     the resulting operation will still be a linalg.generic with the library_call
-    set with the name of the tpp operation detected. Internally, it applies a set
-    of rewrite patterns. Therefore, it can only be applied to an op with the
-    "isolated from above property".
+    set with the name of the tpp operation detected.
 
-    Note that this transformation is invalidating the handles to any payload IR
-    operation contained in the target operation.
+    `filter` allows to select a subset of the detected operations. 
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs);
+  let arguments = (ins PDL_Operation:$target,
+                       OptionalAttr<StrArrayAttr>:$filter);
+  let results = (outs PDL_Operation:$collapsed_linalg_op);
 
   let assemblyFormat = [{
-    $target attr-dict
+     (`filter` `{` $filter^ `}`)? `in` $target attr-dict
   }];
 
   let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::Operation *target,
-        ::llvm::SmallVector<::mlir::Operation *> &results,
-        ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state); 
   }];
 }
 

@@ -274,11 +274,10 @@ transform.sequence failures(propagate) {
     // Propagate all the packs
     transform.structured.packing_propagation %2
 
-    %3 = transform.structured.match ops{["func.func"]} in %arg1
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
     // Mark all the relu(s) with tpp.relu
-    transform.structured.map_linalg_to_tpp %3
+    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
-    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse relu and conv on the three outermost loops
     %5, %loop:3 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 0, 0] }
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation

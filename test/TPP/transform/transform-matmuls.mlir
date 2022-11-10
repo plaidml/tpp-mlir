@@ -100,11 +100,10 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
 
     // Simply map linalg.generic to tpp.relu
-    %3 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
     // Cooking recipe for relu
-    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse the relu into the matmul. Fuse the 2 outermost loops
     %5, %loop:2 = transform.structured.fuse %4 { tile_sizes = [1, 1, 0, 0] }
     // Get the producer for the relu (aka the packed matmul)

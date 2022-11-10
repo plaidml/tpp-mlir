@@ -178,21 +178,34 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::MapLinalgToTppOp::applyToOne(Operation *target,
-                                        SmallVector<Operation *> &results,
-                                        TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
+transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
+                                   transform::TransformState &state) {
+  llvm::StringSet<> strs;
+  if (getFilter().has_value())
+    strs.insert(getFilter()->getAsValueRange<StringAttr>().begin(),
+                getFilter()->getAsValueRange<StringAttr>().end());
+
+  SmallVector<Operation *> res;
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
+    if (!currentTarget) {
+      auto diag = this->emitOpError()
+                  << "Could not map non-generic op to tpp: " << *op << "\n";
+      diag.attachNote(op->getLoc()) << "when applied to this op";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    SimpleRewriter rewriter(currentTarget->getContext());
+    FailureOr<linalg::GenericOp> annotatedOp =
+        mlir::linalgx::mapLinalgToTpp(rewriter, currentTarget);
+    if (succeeded(annotatedOp)) {
+      if (getFilter().has_value() &&
+          !strs.contains((*annotatedOp).getLibraryCallName()))
+        continue;
+      res.push_back(*annotatedOp);
+    }
   }
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
-
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-
+  results.set(getResult().cast<OpResult>(), res);
   return DiagnosedSilenceableFailure(success());
 }
 
