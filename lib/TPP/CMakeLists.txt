@@ -3,7 +3,6 @@ add_subdirectory(Dialect)
 add_mlir_library(MLIRTPP
   # Passes 
     MapLinalgToTpp.cpp
-    VectorizeCopy.cpp
     MainClosure.cpp
     UndoMainClosure.cpp
     TileConsumerAndFuseProducers.cpp
