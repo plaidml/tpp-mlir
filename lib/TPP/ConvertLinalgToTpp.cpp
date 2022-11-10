@@ -444,7 +444,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
   ConvertLinalgToTpp(bool enabledPreconditions, bool useParallelLoops,
                      ArrayRef<int64_t> tileSizes) {
-    this->enableTiling = enableTiling;
+    this->enableTiling = enabledPreconditions;
     this->useParallelLoops = useParallelLoops;
     this->tileSizes = tileSizes;
   }
