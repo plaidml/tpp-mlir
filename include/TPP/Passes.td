@@ -97,12 +97,6 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
-  let summary = "Vectorize copy operation using Linalg";
-  let constructor = "mlir::tpp::createVectorizeCopyPass()";
-  let dependentDialects = ["memref::MemRefDialect"];
-}
-
 def MainClosure : Pass<"main-closure", "func::FuncOp"> {
   let summary = "Wrap main into a closure to hoist out constant computation.";
   let constructor = "mlir::tpp::createMainClosurePass()"; 
