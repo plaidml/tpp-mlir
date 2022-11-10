@@ -1,16 +1,36 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -split-input-file | FileCheck -check-prefix=MATCH %s
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -split-input-file -verify-diagnostics | FileCheck -check-prefix=MATCH %s
 
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -split-input-file | FileCheck -check-prefix=MATCHANDREPLACE %s
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -split-input-file -verify-diagnostics | FileCheck -check-prefix=MATCHANDREPLACE %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
-// TODO: make map_linalg_to_tpp return an handle instead of
-// just wrapping passes #149.
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    // expected-error @below {{Could not map non-generic op to tpp}}
+    %1 = transform.structured.map_linalg_to_tpp in %0
+}
+
+// expected-note @below {{when applied to this op}}
+func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
+  %0 = tensor.empty() : tensor<1x512xf32>
+  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      linalg.yield %arg2 : f32
+  } -> tensor<1x512xf32> 
+  return %1 : tensor<1x512xf32>
+}
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @identity
@@ -31,8 +51,8 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @relu
@@ -55,8 +75,8 @@ func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @add
@@ -78,8 +98,8 @@ func.func @add(%arg1: tensor<256x256xf32>, %arg2: tensor<256x256xf32>) -> tensor
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @gemm
@@ -103,8 +123,8 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @gemm
@@ -127,8 +147,8 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @identity
@@ -148,8 +168,8 @@ func.func @identity(%arg1: tensor<32x32x32x32xf32>) -> tensor<32x32x32x32xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
 // MATCH-LABEL: func.func @add

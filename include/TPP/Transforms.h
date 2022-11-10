@@ -55,6 +55,12 @@ FailureOr<linalg::GenericOp>
 collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
                   ArrayRef<SmallVector<int64_t, 2>> reassociation);
 
+// Annotate a linalg.generic with a possible mapping for tpp operations.
+// The annotation uses the library_call attribute in linalg.generic.
+// TODO: We may not want to fail here.
+FailureOr<linalg::GenericOp> mapLinalgToTpp(RewriterBase &rewriter,
+                                            linalg::GenericOp linalgOp);
+
 } // namespace linalgx
 
 namespace tpp {

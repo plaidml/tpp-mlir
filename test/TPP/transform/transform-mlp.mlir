@@ -58,12 +58,10 @@ transform.sequence failures(propagate) {
     // Propagate packing
     transform.structured.packing_propagation %2
   
-    %3 = transform.structured.match ops{["func.func"]} in %arg1
-    // Annotate the relu(s)
-    transform.structured.map_linalg_to_tpp %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    // Annotate and collect relu(s)
+    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
   
-    // Collect all the relus
-    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Get the last one, and fuse the outermost dimensions with all the producers
     %relus:4 = split_handles %4 in [4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
     %5, %loop = transform.structured.fuse %relus#3 { tile_sizes = [1, 0, 0, 0] }  
@@ -71,10 +69,9 @@ transform.sequence failures(propagate) {
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
     %6 = transform.structured.match ops{["func.func"]} in %arg1
     transform.structured.fold_unit_extent_dims %6
-    %7 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %7
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %8 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %7
   
-    %8 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     // Fuse matmul + relu and map the matmul to BRGEMM
     %9, %loop1 = transform.structured.fuse %8 { tile_sizes = [1, 0, 0] }
     %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
@@ -100,10 +97,6 @@ transform.sequence failures(propagate) {
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32, 32] }
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
-
-    // Detect relus and identity
-    %3 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %3
 
     transform.bufferization.one_shot_bufferize %arg1 {
         target_is_module = true,
@@ -166,11 +159,10 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
  
     // Detect relus and identity
-    %3 = transform.structured.match ops{["func.func"]} in %arg1
-    transform.structured.map_linalg_to_tpp %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
     // Fuse relu with matmul
-    %4 = transform.structured.match ops{["linalg.generic"]} attributes{library_call = "tpp.relu"} in %arg1
     %5, %loop = transform.structured.fuse %4 { tile_sizes = [1, 0, 0, 0] }
 
     // clean-up IR after fusion
