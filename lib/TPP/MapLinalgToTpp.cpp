@@ -123,6 +123,7 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
 
 namespace {
 
+// TODO: remove me. For now we need to keep it around.
 struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -137,15 +138,6 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct MapToTpp : public LinalgMapToTppBase<MapToTpp> {
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateMapLinalgToTppPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
 } // end namespace
 
 FailureOr<linalg::GenericOp>
@@ -156,9 +148,4 @@ mlir::linalgx::mapLinalgToTpp(RewriterBase &rewriter,
 
 void mlir::tpp::populateMapLinalgToTppPatterns(RewritePatternSet &patterns) {
   patterns.add<MapGenericOpToTpp>(patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createMapLinalgToTppPass() {
-  return std::make_unique<MapToTpp>();
 }

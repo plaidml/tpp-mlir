@@ -208,10 +208,76 @@ def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
 }
 
 //===----------------------------------------------------------------------===//
+// Reshape2dOp
+//===----------------------------------------------------------------------===//
+
+def Reshape2dOp : Op<Transform_Dialect, "structured.reshape_2d", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+  
+  let description = [{
+    Given a linalg.generic operaiton reshape it as a 2-dimensional operation by
+    tiling out all but the two innermost loops. Only the handle to the tiled
+    operation is returned. use_parallel_loops allows to materialize parallel
+    loops (at the memref abstraction) if the loop is parallel.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<BoolAttr, "false">:$use_parallel_loops);
+  let results = (outs PDL_Operation:$tiled_linalg_op);
+
+  let assemblyFormat = [{
+     `in` $target attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state); 
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// CollapseTo2dOp
+//===----------------------------------------------------------------------===//
+
+def CollapseTo2dOp : Op<Transform_Dialect, "structured.collapse_to_2d", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+  
+  let description = [{
+    Given a linalg.generic operation make it a 2-dimensional by collapsing
+    outer dimensions.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$collapsed_linalg_op);
+
+  let assemblyFormat = [{
+     `in` $target attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state); 
+  
+    // Get reassociation for 2d collapsing.
+    SmallVector<ReassociationIndices, 4> 
+      getReassociationIndices(linalg::GenericOp linalgOp);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // FoldUnitExtentDimsOp
 //===----------------------------------------------------------------------===//
 
 // TODO: this does not compose as it invalidate all the handles.
+// TODO: retire this and use reshape2d
 def FoldUnitExtentDimsOp : Op<Transform_Dialect, "structured.fold_unit_extent_dims", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,

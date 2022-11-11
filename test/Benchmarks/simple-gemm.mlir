@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
+// RUN: tpp-opt %s -transform-dialect-interpreter \
+// RUN: -transform-drop-schedule -finalizing-bufferize \
+// RUN: -cse -canonicalize \
+// RUN: -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
@@ -9,11 +9,22 @@
 // RUN: FileCheck %s
 //
 
-// RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \ 
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -transform-dialect-interpreter \
+// RUN: -transform-drop-schedule -finalizing-bufferize \
+// RUN: -cse -canonicalize | FileCheck -check-prefix=TPP %s
 //
+
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    transform.bufferization.one_shot_bufferize %arg1 {
+        target_is_module = true,
+        bufferize_function_boundaries = true,
+        function_boundary_type_conversion = "identity-layout-map"
+    }
+    // TODO: make map_and_convert_linalg_to_tpp composable.
+    %1 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %1
+}
 
 func.func @entry(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {

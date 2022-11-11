@@ -1,24 +1,25 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf | \
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -finalizing-bufferize -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf | \
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 
-#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
- 
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    // arg1 is a moduleOp, bufferize the entire module.
+    transform.bufferization.one_shot_bufferize %arg1 {
+        target_is_module = true,
+        bufferize_function_boundaries = true
+    }
+    // TODO: make map_and_convert_linalg_to_tpp composable.
+    %1 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %1
+}
+
 func.func @matmultpp(%A: tensor<4x8xbf16>, 
                   %B: tensor<8x4xbf16>, %C: tensor<4x4xbf16>) -> tensor<4x4xbf16> attributes {llvm.emit_c_interface} {
-  %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
-                         iterator_types = ["parallel", "parallel", "reduction"]} 
-    ins(%A, %B: tensor<4x8xbf16>, tensor<8x4xbf16>) outs(%C: tensor<4x4xbf16>) {
-      ^bb0(%a: bf16, %b: bf16, %c: bf16):
-        %0 = arith.mulf %a, %b : bf16
-        %1 = arith.addf %c, %0 : bf16
-        linalg.yield %1 : bf16
-  } -> tensor<4x4xbf16>
+  %D = linalg.matmul ins(%A, %B: tensor<4x8xbf16>, tensor<8x4xbf16>) outs(%C: tensor<4x4xbf16>) -> tensor<4x4xbf16>
   return %D : tensor<4x4xbf16>
 }
 

@@ -10,6 +10,7 @@
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -229,6 +230,119 @@ transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===----------------------------------------------------------------------===//
+// CollapseTo2dOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::CollapseTo2dOp::apply(transform::TransformResults &results,
+                                 transform::TransformState &state) {
+  SmallVector<Operation *> collapsed;
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
+    if (!currentTarget) {
+      auto diag = this->emitOpError()
+                  << "Could not collapse non-generic: " << *op << "\n";
+      diag.attachNote(op->getLoc()) << "when applied to this op";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    SimpleRewriter rewriter(currentTarget->getContext());
+    rewriter.setInsertionPoint(currentTarget);
+    FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
+        rewriter, currentTarget, getReassociationIndices(currentTarget));
+    if (failed(collapsedOp))
+      return DiagnosedSilenceableFailure::definiteFailure();
+    collapsed.append(1, *collapsedOp);
+  }
+  results.set(getCollapsedLinalgOp().cast<OpResult>(), collapsed);
+  return DiagnosedSilenceableFailure(success());
+}
+
+SmallVector<ReassociationIndices, 4>
+transform::CollapseTo2dOp::getReassociationIndices(linalg::GenericOp linalgOp) {
+  SmallVector<ReassociationIndices, 4> reassociationIndices;
+  int64_t numLoops = linalgOp.getNumLoops();
+  int64_t outerLoop = 0;
+  SmallVector<int64_t, 2> outerReassociation;
+  while (outerLoop <= numLoops - 2) {
+    outerReassociation.push_back(outerLoop++);
+  }
+  reassociationIndices.push_back(outerReassociation);
+  while (outerLoop < numLoops) {
+    reassociationIndices.push_back({outerLoop++});
+  }
+  return reassociationIndices;
+}
+
+//===----------------------------------------------------------------------===//
+// Reshape2dOp
+//===----------------------------------------------------------------------===//
+
+// Tiling function to remove all but the zero and first dimension.
+// Tile of zero means no tiling on this dimension. The other
+// dimensions are materialized as loops by tiling with a factor
+// of 1.
+static SmallVector<Value, 4> getTileSizes(OpBuilder &builder,
+                                          linalg::LinalgOp linalgOp) {
+  SmallVector<Value, 4> tppTiles;
+  size_t numberOfLoops = linalgOp.getNumLoops();
+  for (size_t i = 0; i < numberOfLoops; i++)
+    tppTiles.push_back(
+        builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 1));
+  Value zeroVal =
+      builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 0);
+  tppTiles[numberOfLoops - 1] = zeroVal;
+  tppTiles[numberOfLoops - 2] = zeroVal;
+  return tppTiles;
+}
+
+DiagnosedSilenceableFailure
+transform::Reshape2dOp::apply(transform::TransformResults &results,
+                              transform::TransformState &state) {
+  // TODO: surface option.
+  bool useParallelLoops = false;
+
+  SmallVector<Operation *> tiled;
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
+    if (!currentTarget) {
+      auto diag = this->emitOpError()
+                  << "Could not reshape non-generic: " << *op << "\n";
+      diag.attachNote(op->getLoc()) << "when applied to this op";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    if (currentTarget.getNumLoops() <= 2) {
+      DiagnosedSilenceableFailure diag = emitSilenceableError()
+                                         << "expect at least 2 loops";
+      diag.attachNote(op->getLoc()) << "when applied to this op";
+      return diag;
+    }
+
+    linalg::LinalgTilingOptions linalgTilingOptions;
+    linalg::LinalgTilingLoopType loopsTypes =
+        (useParallelLoops) ? linalg::LinalgTilingLoopType::ParallelLoops
+                           : linalg::LinalgTilingLoopType::Loops;
+    linalgTilingOptions.setLoopType(loopsTypes)
+        .setTileSizeComputationFunction(getTileSizes);
+    SimpleRewriter rewriter(currentTarget->getContext());
+    FailureOr<linalg::TiledLinalgOp> tiledOp =
+        linalg::tileLinalgOp(rewriter, currentTarget, linalgTilingOptions);
+    if (failed(tiledOp))
+      return DiagnosedSilenceableFailure::definiteFailure();
+
+    if (currentTarget.hasBufferSemantics())
+      rewriter.eraseOp(currentTarget);
+    else
+      rewriter.replaceOp(currentTarget, tiledOp->tensorResults);
+
+    tiled.append(1, tiledOp->op);
+  }
+  results.set(getTiledLinalgOp().cast<OpResult>(), tiled);
   return DiagnosedSilenceableFailure(success());
 }
 

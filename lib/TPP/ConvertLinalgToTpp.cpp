@@ -441,30 +441,6 @@ void populateSubViewFoldingPatterns(RewritePatternSet &patterns) {
   patterns.add<SubViewOfSubViewWithUnitDims>(patterns.getContext());
 }
 
-struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
-  ConvertLinalgToTpp() = default;
-  ConvertLinalgToTpp(bool enabledPreconditions, bool useParallelLoops,
-                     ArrayRef<int64_t> tileSizes) {
-    this->enableTiling = enabledPreconditions;
-    this->useParallelLoops = useParallelLoops;
-    this->tileSizes = tileSizes;
-  }
-  void runOnOperation() override {
-    if (enableTiling || tileSizes.size())
-      getOperation().walk([&](linalg::GenericOp linalgOp) {
-        (void)tileLinalgOp(linalgOp, tileSizes);
-      });
-    MLIRContext *ctx = getOperation().getContext();
-    RewritePatternSet patterns(ctx);
-    tpp::populateConvertLinalgToTppPatterns(patterns, useParallelLoops);
-    populateSubViewFoldingPatterns(patterns);
-    linalg::populateFoldUnitExtentDimsPatterns(patterns);
-    memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
 } // end namespace
 
 void mlir::tpp::populateConvertLinalgToTppPatterns(RewritePatternSet &patterns,
@@ -475,18 +451,7 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(RewritePatternSet &patterns,
                ConvertMatmulToTpp>(patterns.getContext());
   patterns.add<ReshapeGenericOpForTpp>(patterns.getContext(), useParallelLoops);
   populateSubViewFoldingPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  memref::SubViewOp::getCanonicalizationPatterns(patterns, patterns.getContext());
   // clang-format on
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass() {
-  return std::make_unique<ConvertLinalgToTpp>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass(bool enableTiling,
-                                        bool useParallelLoops,
-                                        ArrayRef<int64_t> tileSizes) {
-  return std::make_unique<ConvertLinalgToTpp>(enableTiling, useParallelLoops,
-                                              tileSizes);
 }
