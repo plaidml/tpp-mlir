@@ -115,21 +115,6 @@ def UndoMainClosure : Pass<"undo-main-closure", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
-  let summary = "Map a linalg.generic to BRGEMM";
-  let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
-  let description = [{
-    Map a linalg.generic to a linalg.batch_reduce_matmul.
-    Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
-    [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
-    outermost parallel dimensions (as scf.for) and rewrite the body to a
-    linalg.batch_reduce_matmul. 
-
-    The pass works on any linalg.generic and attempts to map the innermost
-    loops to BRGEMM.  It works both a memref and tensor level.
-  }];
-}
-
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";

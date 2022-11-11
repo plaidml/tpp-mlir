@@ -67,8 +67,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToLoopsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
-// RETIRE
-std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
