@@ -142,7 +142,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
       dtype =
           xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
     else {
-      assert(memrefC.getElementType().isF32() ||
+      assert(memrefC.getElementType().isF32() &&
              "Element type neither bf16 nor f32");
       dtype =
           xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);

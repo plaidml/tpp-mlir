@@ -40,7 +40,7 @@ extern "C" void _mlir_ciface_expect_almost_equals(UnrankedMemRefType<float> *A,
     }
   }
   for (int i = 0; i < matrixSize; i++) {
-    assert(abs(addr_a[i] - addr_b[i]) <= C && "Result mismatch");
+    assert(std::abs(addr_a[i] - addr_b[i]) <= C && "Result mismatch");
   }
 }
 
