@@ -6,12 +6,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Dialect/Tpp/TppUtils.h"
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Transforms/SideEffectUtils.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 namespace mlir {
 namespace tpp {
+
+// Prototypes
+static bool isZeroTensor(Value op);
+static bool isZeroTensor(Operation *defOp);
 
 // taken from LinalgInterfaces.cpp
 // Return true if the use-def chain from `v` to `from` consists of 0 or more
@@ -134,5 +147,107 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp) {
   return hasOnlyYieldOp(linalgOp->getRegion(0));
 }
 
-} // end namespace tpp
-} // end namespace mlir
+// Return the closest earlier user of a given operation op relative
+// to an another op user currentUser.
+// If there are no earlier users or the specified currentUser is invalid
+// e.g., it does not belong the def-use chain of op, return nullptr instead.
+static Operation *getPrevUser(Operation *op, Operation *currentUser) {
+  if (!op || !currentUser)
+    return nullptr;
+
+  // Iterate over the op users to find the given current user.
+  auto userIt = op->user_begin();
+  while (userIt != op->user_end()) {
+    if (*userIt == currentUser) {
+      // Given that the user_iterator visits the op users from the last to
+      // the first user, simply return the next user after the current user
+      // i.e. an earlier/previous operation.
+      const auto nextUser = ++userIt;
+      return nextUser != op->user_end() ? *nextUser : nullptr;
+    }
+
+    ++userIt;
+  }
+
+  return nullptr;
+}
+
+// Return true if the value is a constant float or integer.
+static bool isValConstZero(Value val) {
+  return matchPattern(val, m_AnyZeroFloat()) || matchPattern(val, m_Zero());
+}
+
+// Return true if the value represents a zero filled tensor.
+static bool isZeroTensor(Value op) { return isZeroTensor(op.getDefiningOp()); }
+
+// Return true if the operation represents a zero filled tensor
+static bool isZeroTensor(Operation *defOp) {
+  if (!defOp)
+    return false;
+
+  // TODO: add more possible sources of zero filled tensors
+  // TODO: propagate operands of other operations that do not modify underlying
+  //       data values
+  return TypeSwitch<Operation *, bool>(defOp)
+      .Case<linalg::FillOp>([&](auto op) {
+        auto inputs = op.getInputs();
+        return inputs.size() == 1 ? isValConstZero(inputs[0]) : false;
+      })
+      .Case<linalg::CopyOp>([&](auto op) {
+        auto inputs = op.getInputs();
+        return inputs.size() == 1 &&
+               (isZeroTensor(inputs[0]) ||
+                isZeroTensor(
+                    getPrevUser(inputs[0].getDefiningOp(), op.getOperation())));
+      })
+      .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
+            tensor::ExtractSliceOp>([&](auto op) {
+        return isZeroTensor(op.getSource()) ||
+               isZeroTensor(getPrevUser(op.getSource().getDefiningOp(),
+                                        op.getOperation()));
+      })
+      .Default([&](Operation *op) { return false; });
+}
+
+bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
+  if (!isa<linalg::GenericOp>(linalgOp))
+    return false;
+
+  auto genOp = cast<linalg::GenericOp>(linalgOp);
+  if (!genOp.getRegion().hasOneBlock())
+    return false;
+
+  for (Operation &op : genOp.getRegion().front()) {
+    if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
+      // Only check rhs for const value as this should be sufficient
+      // for the op's canonical form.
+      // Otherwise, check both operands if either one is a zero filled tensor.
+      if (isValConstZero(maxfOp.getRhs()) || isZeroTensor(maxfOp.getLhs()) ||
+          isZeroTensor(maxfOp.getRhs())) {
+        return true;
+      }
+
+      // Check if maxf directly uses one of the linalg.generic operands.
+      for (auto arg : genOp.getRegion().getArguments()) {
+        if (arg != maxfOp.getLhs() && arg != maxfOp.getRhs())
+          continue;
+
+        if (auto argOp = genOp.getMatchingOpOperand(arg)) {
+          // Check the operand itself and the operand's def-use chain to
+          // detect more indirect dependencies such as a copy of a zero
+          // tensor into this operand.
+          if (isZeroTensor(argOp->get()) ||
+              isZeroTensor(getPrevUser(argOp->get().getDefiningOp(),
+                                       genOp.getOperation()))) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+} // namespace tpp
+} // namespace mlir

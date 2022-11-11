@@ -36,6 +36,9 @@ bool hasMatmulBody(linalg::LinalgOp linalgOp);
 // Return true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
 
+// Return true if linalg generic region contains a maxf(x, 0) operation.
+bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
+
 } // namespace tpp
 } // namespace mlir
 
