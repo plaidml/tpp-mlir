@@ -5,7 +5,6 @@ add_mlir_library(MLIRTPP
     MapLinalgToTpp.cpp
     MainClosure.cpp
     UndoMainClosure.cpp
-    TileConsumerAndFuseProducers.cpp
     ToBlockLayoutAndBack.cpp
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
