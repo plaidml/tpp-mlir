@@ -115,20 +115,6 @@ def UndoMainClosure : Pass<"undo-main-closure", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
-                                        "func::FuncOp"> {
-  let summary = "Tile consumers and fuse producers";
-  let description = [{
-    The pass uses `TileConsumerAndFuseProducersUsingSCFForOp` to tile
-    the consumer and fuse the consumer with the producers. We restrict
-    the pattern to relu operations whose producers are matmul or conv.
-  }];
-  let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
-  let options = [
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
-  ];
-}
-
 def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
   let summary = "Map a linalg.generic to BRGEMM";
   let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
