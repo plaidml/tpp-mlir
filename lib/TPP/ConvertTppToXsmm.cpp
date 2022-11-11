@@ -32,6 +32,11 @@ static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
   int64_t offset;
   if (failed(getStridesAndOffset(memref, strides, offset)))
     return failure();
+  // fail if the strides are non-constant
+  if (llvm::any_of(strides, [](int64_t stride) {
+        return stride == ShapedType::kDynamicStrideOrOffset;
+      }))
+    return failure();
   return strides[pos];
 }
 
@@ -50,23 +55,23 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     int64_t k = memrefA.getShape()[1];
     auto ldaDim = getLeadingDim(memrefA);
     if (failed(ldaDim))
-      return failure();
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
     if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 3) {
       auto divLdaDim = getLeadingDim(memrefA, 1);
       if (failed(divLdaDim))
-        return failure();
+        return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
       lda = lda / (*divLdaDim);
     }
 
     auto ldbDim = getLeadingDim(memrefB);
     if (failed(ldbDim))
-      return failure();
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
-      return failure();
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
 
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -113,23 +118,23 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
 
     auto ldaDim = getLeadingDim(memrefA, 1);
     if (failed(ldaDim))
-      return failure();
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
     //If the tensor is in bf16 packed format, ignore the packing dimension
     if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 4) {
       auto divLdaDim = getLeadingDim(memrefA, 2);
       if (failed(divLdaDim))
-        return failure();
+        return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
       lda = lda / (*divLdaDim);
     }
     auto ldbDim = getLeadingDim(memrefB, 1);
     if (failed(ldbDim))
-      return failure();
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
-      return failure();
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
 
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -318,7 +323,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     // no conversion if the relu is a scalar operation.
     Type outputType = reluOp.getOperand().getType();
     if (!outputType.isa<ShapedType>())
-      return failure();
+      return rewriter.notifyMatchFailure(reluOp,
+                                         "Expected a non-scalar operation");
 
     MemRefType outputMemRef = outputType.cast<MemRefType>();
     int64_t m = outputMemRef.getShape()[0];
@@ -374,17 +380,17 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     int64_t n = outputMemRef.getShape()[1];
     auto ldiLhsDim = getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
     if (failed(ldiLhsDim))
-      return failure();
+      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on lhs");
     int64_t ldiLhs = *ldiLhsDim;
 
     auto ldiRhsDim = getLeadingDim(addOp.getRhs().getType().cast<MemRefType>());
     if (failed(ldiRhsDim))
-      return failure();
+      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on rhs");
     int64_t ldiRhs = *ldiRhsDim;
 
     auto ldoDim = getLeadingDim(outputMemRef);
     if (failed(ldoDim))
-      return failure();
+      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
     int64_t ldo = *ldoDim;
 
     xsmm::BinaryFlags bCast = xsmm::BinaryFlags::NONE;
