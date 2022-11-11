@@ -7,6 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "MLIRBench.h"
+
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
@@ -35,225 +37,51 @@
 
 using namespace mlir;
 
-// Lowers to LLVM Dialect
-static LogicalResult lowerToLLVMDialect(ModuleOp module) {
-  // Minimal passes to make it work
-  // We don't want TPP passes here, as that's the job of tpp-opt
-  // The IR here should be free of TPP/XSMM or any TPP extensions
-  PassManager passManager(module.getContext());
-  applyPassManagerCLOptions(passManager);
-
-  // Bufferization, if needed
-  passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
-
-  // Partial Lowering
-  passManager.addPass(createConvertTensorToLinalgPass());
-  passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(arith::createArithExpandOpsPass());
-  passManager.addPass(createConvertVectorToSCFPass());
-  passManager.addPass(createConvertSCFToCFPass());
-
-  // Lower to LLVM
-  passManager.addPass(createConvertVectorToLLVMPass());
-  passManager.addPass(createConvertFuncToLLVMPass());
-  passManager.addPass(createMemRefToLLVMConversionPass());
-  passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addPass(createReconcileUnrealizedCastsPass());
-
-  auto result = passManager.run(module);
-  if (failed(result)) {
-    llvm::errs() << "ERROR: Failed to lower module to LLVM dialect\n";
-    module.dump();
-  }
-
-  return result;
-}
+// TODO: Enable this variable and create a loop for calling the kernel,
+// counting timers, doing statistics, etc.
+// Number of loops for benchmarks
+//llvm::cl::opt<unsigned>
+//    numLoops("n", llvm::cl::desc("Number of loops for benchmarks"),
+//             llvm::cl::value_desc("int"), llvm::cl::init(1));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
-static LogicalResult prepareMLIRKernel(Operation *op, JitRunnerOptions& options) {
-  auto module = dyn_cast<ModuleOp>(op);
-  if (!module)
-    return op->emitOpError("expected a 'builtin.module' op");
+static LogicalResult prepareMLIRKernel(Operation *Op,
+                                       JitRunnerOptions &Options) {
+  MLIRBench Bench(Op);
 
-  // Find the kernel function and its arguments
-  auto moduleRegions = module->getRegions();
-  auto &moduleBlock = moduleRegions.front().front();
-  auto &moduleOps = moduleBlock.getOperations();
+  if (Options.mainFuncType != "void")
+     return Bench.emitError("Main function has to be 'void', even if the kernel return's a value, because that's the type of the wrapper we create here");
 
-  // If the module is already in the LLVM dialect, recomment mlir-cpu-runner
-  for (auto &op : moduleOps) {
-    LLVM::LLVMFuncOp llvmFunc = dyn_cast_or_null<LLVM::LLVMFuncOp>(op);
-    if (llvmFunc)
-      return module.emitError(
-          "Module in LLVM Dialect already, use mlir-cpu-runner");
-  }
+  if (failed(Bench.findKernel(Options.mainFuncName)))
+    return Bench.emitError("Cannot find kernel '" + Options.mainFuncName + "'");
 
-  // The kernel method
-  func::FuncOp kernel;
+  if (failed(Bench.checkKernelSignature()))
+    return Bench.finalize();
 
-  // If the user passed the entry point, use it
-  if (!options.mainFuncName.empty()) {
-    for (auto &op : moduleOps) {
-      func::FuncOp func = dyn_cast_or_null<func::FuncOp>(op);
-      if (!func)
-        continue;
-      if (func.getName().equals(options.mainFuncName)) {
-        kernel = func;
-        break;
-      }
-    }
-    if (!kernel)
-      return module.emitError("Entry point " + options.mainFuncName +
-                              " not found");
+  if (failed(Bench.renameKernel()))
+    return Bench.emitError("Cannot rename kernel function");
 
-    // Else, and there is only one function, use it
-  } else if (moduleOps.size() == 1) {
-    kernel = dyn_cast_or_null<func::FuncOp>(moduleOps.front());
-    if (!kernel)
-      return module.emitError("Entry point not in LLVM Dialect");
-    options.mainFuncName = kernel.getName();
+  if (failed(Bench.createMainWrapper()))
+    return Bench.emitError("Cannot create main wrapper");
 
-    // If there is no entry function, and multiple functions, bail
-  } else {
-    return module.emitError("No valid entry point, use mlir-cpu-runner");
-  }
+  SmallVector<llvm::StringRef> GlobalList;
+  if (failed(Bench.createGlobals(GlobalList)))
+    return Bench.emitError("Cannot create the global memrefs");
 
-  // If the function has no args or return values, just run it as is
-  auto funcType = kernel.getFunctionType();
-  if (funcType.getNumInputs() == 0 && funcType.getNumResults() == 0) {
-    module.emitRemark("Entry point already created, just running the IR");
-    return lowerToLLVMDialect(module);
-  }
+  // TODO: Insert the benchmark loop here
+  auto Return = Bench.callKernel(GlobalList);
+  if (!Return)
+    return Bench.emitError("Cannot generate a call to the kernel");
 
-  // Also ignore functions that return more than one result
-  if (funcType.getNumResults() > 1)
-    return module.emitError("Multiple return values, use mlir-cpu-runner");
+  // TODO: Insert the statistics here
 
-  // Gets a builder on the module
-  auto *ctx = module.getContext();
-  ctx->getOrLoadDialect<tensor::TensorDialect>();
-  ctx->getOrLoadDialect<vector::VectorDialect>();
-  OpBuilder builder(ctx);
-  Location loc = builder.getUnknownLoc();
-
-  // Rename the entry point to something else and make the main the entry point
-  // This is required because we can't change the original options.mainFuncName
-  auto name = kernel.getName();
-  auto newName = builder.getStringAttr("_" + name);
-  kernel.setName(newName);
-
-  // Add a `main` function (with no args/rets) to handle init/tear down
-  auto newFuncType = builder.getFunctionType({}, {});
-  auto main = func::FuncOp::create(loc, name, newFuncType);
-  main.setVisibility(SymbolTable::Visibility::Public);
-  auto entryBlock = main.addEntryBlock();
-
-  // Initialise the inputs as global constants
-  // TODO: Use some random initialiser
-  APFloat floatValue = APFloat(1.0F);
-
-  // Create global dense memrefs (module insertion point)
-  builder.setInsertionPointToStart(&moduleBlock);
-  auto privAttr = builder.getStringAttr("private");
-  int order = 0;
-  for (auto &ty : funcType.getInputs()) {
-    // We really only support memrefs as arguments for now
-    auto memrefTy = dyn_cast_or_null<MemRefType>(ty);
-    assert(memrefTy && "Unsupported argument type");
-
-    // Global op properties
-    std::string name = "__wrapper_" + std::to_string(order++);
-    // For some reason, memref global op needs dense tensor type
-    // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-    auto tensorType =
-        RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
-    auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
-    auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
-
-    // Create the global object in the module's region
-    builder.create<memref::GlobalOp>(loc, StringRef(name), privAttr, memrefTy,
-                                     floatInit, /*constant=*/false, alignment);
-  }
-
-  // Get those globals as arguments (function insertion point)
-  builder.setInsertionPointToStart(entryBlock);
-  SmallVector<Value> args;
-  order = 0;
-  for (auto &ty : funcType.getInputs()) {
-    // GetGlobal op properties
-    std::string name = "__wrapper_" + std::to_string(order++);
-    auto nameAttr = builder.getStringAttr(name);
-    auto getGlobal = builder.create<memref::GetGlobalOp>(loc, ty, nameAttr);
-
-    // Add argument to list
-    args.push_back(getGlobal);
-  }
-
-  // Call the kernel
-  Value result;
-  if (funcType.getNumResults() == 0) {
-    builder.create<func::CallOp>(loc, kernel, args);
-    result = args.back();
-  } else {
-    auto call = builder.create<func::CallOp>(loc, kernel, args);
-    result = call->getOpResult(0);
-  }
-
-  // Read into a vector and print output
-  // We don't want to alloc the whole tensor as a vector,
-  // so we pick the inner dimension and iterate through the outer ones.
-  auto outputType = dyn_cast_or_null<MemRefType>(result.getType());
-  assert(outputType && "Unsupported return type");
-  VectorType vecType;
-  auto lastDim = outputType.getRank() - 1;
-  ArrayRef<int64_t> outerDims(1);
-  if (outputType.getRank() > 1) {
-    ArrayRef<int64_t> innerDims(&outputType.getShape()[lastDim], 1);
-    vecType = VectorType::get(innerDims, outputType.getElementType());
-    outerDims =
-        ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank() - 1);
-  } else {
-    vecType =
-        VectorType::get(outputType.getShape(), outputType.getElementType());
-  }
-
-  APFloat vectorFloatValue = APFloat(-1.0F);
-  auto minusOne = builder.create<arith::ConstantFloatOp>(loc, vectorFloatValue,
-                                                         builder.getF32Type());
-  // TODO: Create a loop in IR
-  auto zeroIdx = builder.create<arith::ConstantIndexOp>(loc, 0);
-  assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
-  for (int i = 0; i < outerDims[0]; i++) {
-    auto beginIdx = builder.create<arith::ConstantIndexOp>(loc, i);
-
-    auto indices = ValueRange{beginIdx, zeroIdx};
-    auto vector = builder.create<vector::TransferReadOp>(loc, vecType, result,
-                                                         indices, minusOne);
-    builder.create<vector::PrintOp>(loc, vector);
-  }
-
-  // Return void and add func to module
-  builder.create<func::ReturnOp>(loc);
-  module.push_back(main);
+  // TODO: We may not want to print on benchmark runs...
+  if (failed(Bench.printMemRef(Return)))
+    return Bench.emitError("Cannot print result memref");
 
   // Finally lower to LLVM Dialect
-  return lowerToLLVMDialect(module);
-}
-
-// This function will be called at the end, to emit an LLVM Module.
-// It may not be necessary, but here just in case.
-static std::unique_ptr<llvm::Module>
-buildLLVMModule(Operation *op, llvm::LLVMContext &context) {
-  auto module = dyn_cast<ModuleOp>(op);
-  assert(module && "expected a 'builtin.module' op");
-
-  // FIXME: This should detect library paths for both MLIR and TPP libraries
-  std::unique_ptr<llvm::Module> llvm = translateModuleToLLVMIR(module, context);
-  return llvm;
+  return Bench.finalize();
 }
 
 int main(int argc, char **argv) {
@@ -273,7 +101,6 @@ int main(int argc, char **argv) {
   // This is how we integrate with the pipeline
   JitRunnerConfig config;
   config.mlirTransformer = prepareMLIRKernel;
-  config.llvmModuleBuilder = buildLLVMModule;
 
   // Call the main JIT function
   return JitRunnerMain(argc, argv, registry, config);
