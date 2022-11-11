@@ -27,7 +27,8 @@ using namespace mlir;
 
 // Look for [p ... p] brgemm[r p p r]
 static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
-  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() < 4)
     return failure();
   size_t size = iteratorTypes.size() - 1;

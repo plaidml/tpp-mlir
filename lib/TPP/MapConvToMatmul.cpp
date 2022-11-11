@@ -211,7 +211,8 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
 static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
   if (!tpp::hasMatmulBody(linalgOp))
     return false;
-  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() < 3)
     return false;
   size_t size = iteratorTypes.size() - 1;

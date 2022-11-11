@@ -249,12 +249,12 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, packedOutput.getType(), packedInputs, ValueRange{packedOutput},
       ArrayRef<AffineMap>{mapImg, mapFil, mapOut},
-      ArrayRef<StringRef>{
-          getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-          getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-          getParallelIteratorTypeName(), getReductionIteratorTypeName(),
-          getReductionIteratorTypeName(), getReductionIteratorTypeName(),
-          getReductionIteratorTypeName()},
+      ArrayRef<utils::IteratorType>{
+          utils::IteratorType::parallel, utils::IteratorType::parallel,
+          utils::IteratorType::parallel, utils::IteratorType::parallel,
+          utils::IteratorType::parallel, utils::IteratorType::reduction,
+          utils::IteratorType::reduction, utils::IteratorType::reduction,
+          utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
@@ -353,10 +353,10 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, packMatrixC.getType(), packedInputs, ValueRange{packMatrixC},
       ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<StringRef>{
-          getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-          getReductionIteratorTypeName(), getParallelIteratorTypeName(),
-          getParallelIteratorTypeName(), getReductionIteratorTypeName()},
+      ArrayRef<utils::IteratorType>{
+          utils::IteratorType::parallel, utils::IteratorType::parallel,
+          utils::IteratorType::reduction, utils::IteratorType::parallel,
+          utils::IteratorType::parallel, utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
@@ -685,8 +685,8 @@ struct PropagateThroughElementWiseOp
       newMaps.push_back(newMap);
     }
 
-    SmallVector<StringRef> newIteratorTypes(linalgOp.getNumLoops() + packedDims,
-                                            getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> newIteratorTypes(
+        linalgOp.getNumLoops() + packedDims, utils::IteratorType::parallel);
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         linalgOp.getLoc(), packedOutputTypes, packedInputOperands,

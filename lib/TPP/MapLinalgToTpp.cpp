@@ -52,7 +52,8 @@ template <typename OP> static bool hasOnlyScalarElementwiseOp(Region &region) {
 // Return true if the linalg.generic maps to a tpp.gemm.
 static bool isTPPGemm(linalg::GenericOp linalgOp) {
   // structural and access pattern.
-  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() != 3)
     return false;
   if (!(linalg::isParallelIterator(iteratorTypes[0]) &&
