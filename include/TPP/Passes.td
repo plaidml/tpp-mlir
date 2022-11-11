@@ -88,6 +88,15 @@ def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
+def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {  
+  let summary = "Convert check to loops";
+  let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";
+  let description = [{
+    Convert check operations to SCF loops.
+  }];
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
 def VectorizeCopy : Pass<"vectorize-copy-op", "func::FuncOp"> {
   let summary = "Vectorize copy operation using Linalg";
   let constructor = "mlir::tpp::createVectorizeCopyPass()";

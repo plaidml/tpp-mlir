@@ -23,6 +23,7 @@ add_mlir_library(MLIRTPP
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
     ConvertCheckToFunc.cpp
+    ConvertCheckToLoops.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
