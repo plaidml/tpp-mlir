@@ -21,14 +21,7 @@
 
 func.func @entry(%A: tensor<64x64xf32>, %B: tensor<64x64xf32>,
                   %C: tensor<64x64xf32>) -> tensor<64x64xf32> {
-  %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
-                         iterator_types = ["parallel", "parallel", "reduction"]}
-    ins(%A, %B: tensor<64x64xf32>, tensor<64x64xf32>) outs(%C: tensor<64x64xf32>) {
-      ^bb0(%a: f32, %b: f32, %c: f32):
-        %0 = arith.mulf %a, %b : f32
-        %1 = arith.addf %c, %0 : f32
-        linalg.yield %1 : f32
-    } -> tensor<64x64xf32>
+  %D = linalg.matmul ins(%A, %B: tensor<64x64xf32>, tensor<64x64xf32>) outs(%C: tensor<64x64xf32>) -> tensor<64x64xf32>
   return %D : tensor<64x64xf32>
 }
 // CHECK-COUNT-64: ( 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65 )
