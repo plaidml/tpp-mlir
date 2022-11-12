@@ -158,22 +158,19 @@ insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
   return reshapedOperands;
 }
 
-static FailureOr<linalg::GenericOp> buildReplacement(
-    RewriterBase &rewriter, linalg::GenericOp genericOp,
-    ArrayRef<Value> newOperands, ArrayRef<Type> newInputAndOutputTypes,
-    ArrayRef<AffineMap> newIndexingMaps, ArrayRef<Attribute> newIteratorTypes,
-    SmallVector<ArrayAttr> operandReassociationMaps) {
+static FailureOr<linalg::GenericOp>
+buildReplacement(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                 ArrayRef<Value> newOperands,
+                 ArrayRef<Type> newInputAndOutputTypes,
+                 ArrayRef<AffineMap> newIndexingMaps,
+                 ArrayRef<utils::IteratorType> newIteratorTypes,
+                 SmallVector<ArrayAttr> operandReassociationMaps) {
 
   ArrayRef<Value> newInputs = newOperands.drop_back(genericOp.getNumDpsInits());
   ArrayRef<Value> newOutputs =
       newOperands.drop_front(genericOp.getNumDpsInputs());
   assert((int64_t)newInputs.size() == genericOp.getNumDpsInputs());
   assert((int64_t)newOutputs.size() == genericOp.getNumDpsInits());
-
-  // XXX
-  SmallVector<StringRef> iteratorsAsString;
-  for (Attribute attr : newIteratorTypes)
-    iteratorsAsString.push_back(attr.cast<StringAttr>().getValue());
 
   Location loc = genericOp.getLoc();
   SmallVector<Type, 4> resultTypes;
@@ -183,7 +180,7 @@ static FailureOr<linalg::GenericOp> buildReplacement(
         newInputAndOutputTypes[i + genericOp.getNumDpsInputs()]);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, resultTypes, newInputs, newOutputs, newIndexingMaps,
-      iteratorsAsString);
+      newIteratorTypes);
   rewriter.inlineRegionBefore(genericOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 
@@ -247,7 +244,8 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   SmallVector<AffineMap, 4> indexingMaps = genericOp.getIndexingMapsArray();
   if (indexingMaps.empty())
     return failure();
-  ArrayAttr iteratorTypes = genericOp.getIteratorTypes();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      genericOp.getIteratorTypesArray();
 
   if (!isValidReassociationForOp(reassociation, genericOp))
     return failure();
@@ -255,14 +253,14 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   DenseSet<unsigned> collapsedDims;
   unsigned numIterationDims = indexingMaps.front().getNumDims();
   unsigned numSymbols = indexingMaps.front().getNumSymbols();
-  SmallVector<AffineExpr, 4> dimReplacements;
+  SmallVector<AffineExpr> dimReplacements;
   dimReplacements.reserve(numIterationDims);
 
-  SmallVector<AffineMap, 4> newIndexingMaps;
+  SmallVector<AffineMap> newIndexingMaps;
   newIndexingMaps.reserve(indexingMaps.size());
-  SmallVector<Attribute, 4> newIteratorTypes;
+  SmallVector<utils::IteratorType> newIteratorTypes;
   newIteratorTypes.reserve(genericOp.getNumLoops() - reassociation.size());
-  SmallVector<Type, 4> newInputOutputTypes;
+  SmallVector<Type> newInputOutputTypes;
   SmallVector<ArrayAttr> operandsReassociationMaps;
 
   unsigned numKeptDims = 0;
@@ -422,8 +420,8 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     for (AffineMap map : newIndexingMaps)
       llvm::errs() << map << "\n";
     llvm::errs() << "#iteratortypes: " << newIteratorTypes.size() << "\n";
-    for (Attribute attr : newIteratorTypes)
-      llvm::errs() << attr << "\n";
+    for (utils::IteratorType it : newIteratorTypes)
+      llvm::errs() << it << "\n";
     llvm::errs() << "--------------------------\n";
   });
 

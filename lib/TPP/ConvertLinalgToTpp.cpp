@@ -88,8 +88,9 @@ LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   // are not parallel.
   if (linalgOp.getNumLoops() <= 2)
     return rewriter.notifyMatchFailure(linalgOp, "Expect at least two loops");
-  SmallVector<StringRef> iteratorTypes = linalgOp.getIteratorTypesArray();
-  if (!llvm::all_of(iteratorTypes, [](StringRef type) {
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  if (!llvm::all_of(iteratorTypes, [](utils::IteratorType type) {
         return linalg::isParallelIterator(type);
       }))
     return rewriter.notifyMatchFailure(linalgOp, "Expect all parallel loops");
