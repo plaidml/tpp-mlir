@@ -3,7 +3,7 @@
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1], [2], [3, 4]]
+    %1 = transform.structured.collapse %0 [[0, 1], [2], [3, 4]]
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -31,7 +31,7 @@ func.func @parallel(%arg0: tensor<5x5x4x3x3xf32>, %arg1: tensor<5x5x4x3x3xf32>) 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
+    %1 = transform.structured.collapse %0 [[0, 1], [2]]
 }
 
 // CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d1, d0)>
@@ -62,7 +62,7 @@ func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tenso
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1, 2]]
+    %1 = transform.structured.collapse %0 [[0, 1, 2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -86,7 +86,7 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1]]
+    %1 = transform.structured.collapse %0 [[0, 1]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -109,7 +109,7 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
+    %1 = transform.structured.collapse %0 [[0, 1], [2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j, k)>
@@ -133,7 +133,7 @@ func.func @parallel(%arg0: tensor<3x3x3xf32> , %arg1: tensor<3x3x3xf32>) -> tens
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    %1 = transform.structured.collapsing %0 [[0, 1], [2]]
+    %1 = transform.structured.collapse %0 [[0, 1], [2]]
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>

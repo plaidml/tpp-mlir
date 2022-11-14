@@ -143,8 +143,8 @@ transform.sequence failures(propagate) {
     // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
     // Collapse       : [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
-    %2 = transform.structured.collapsing %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
-    %3 = transform.structured.collapsing %2 [[0], [1], [2, 3], [4], [5], [6]]
+    %2 = transform.structured.collapse %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+    %3 = transform.structured.collapse %2 [[0], [1], [2, 3], [4], [5], [6]]
     //
     // N        [parallel]
     //  K'      [parallel]
@@ -290,8 +290,8 @@ transform.sequence failures(propagate) {
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
-    %7 = transform.structured.collapsing %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
-    %8 = transform.structured.collapsing %7 [[0], [1], [2, 3], [4], [5], [6]]
+    %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+    %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
     %9 = transform.structured.interchange %8 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
     transform.structured.map_to_brgemm %9
 }

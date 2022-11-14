@@ -51,7 +51,7 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
 // CollapseOp
 //===----------------------------------------------------------------------===//
 
-def CollapseOp : Op<Transform_Dialect, "structured.collapsing", [
+def CollapseOp : Op<Transform_Dialect, "structured.collapse", [
     FunctionalStyleTransformOpTrait, 
     MemoryEffectsOpInterface,
     TransformOpInterface, 
