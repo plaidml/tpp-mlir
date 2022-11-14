@@ -94,7 +94,7 @@ func.func @add(%arg0: tensor<5xf32>, %arg1: tensor<5xf32>) -> tensor<5xf32> {
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    // expected-error @below {{Could not reshape non-generic:}}
+    // expected-error @below {{Cannot reshape non-generic:}}
     %1 = transform.structured.reshape_2d in %0
 }
 

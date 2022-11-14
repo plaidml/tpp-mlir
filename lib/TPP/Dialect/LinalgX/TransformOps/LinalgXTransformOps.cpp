@@ -361,7 +361,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
     if (!currentTarget) {
       auto diag = this->emitOpError()
-                  << "Cannot not reshape non-generic: " << *op << "\n";
+                  << "Cannot reshape non-generic: " << *op << "\n";
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }

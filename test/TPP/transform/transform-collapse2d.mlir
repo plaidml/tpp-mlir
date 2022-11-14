@@ -36,10 +36,9 @@ func.func @additions(%arg0: memref<2x5x6xf32>, %arg1: memref<2x5x6xf32>) -> memr
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func.func @additions(
 // CHECK:  %[[ARG0:.+]]: memref<2x5x6xf32>, %[[ARG1:.+]]: memref<2x5x6xf32>) -> memref<2x5x6xf32> {
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CEHCK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-
 // CHECK: scf.for %[[ARG2:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[ARG2]], 0, 0] [1, 5, 6] [1, 1, 1] : memref<2x5x6xf32> to memref<1x5x6xf32, strided<[30, 6, 1], offset: ?>>
 // CHECK: %[[SUB1:.+]] = memref.subview %[[ARG1]][%[[ARG2]], 0, 0] [1, 5, 6] [1, 1, 1] : memref<2x5x6xf32> to memref<1x5x6xf32, strided<[30, 6, 1], offset: ?>>
@@ -47,7 +46,6 @@ func.func @additions(%arg0: memref<2x5x6xf32>, %arg1: memref<2x5x6xf32>) -> memr
 // CHECK: %[[COLLAPSE1:.+]] = memref.collapse_shape %[[SUB1]] {{\[}}[0, 1], [2]] : memref<1x5x6xf32, strided<[30, 6, 1], offset: ?>> into memref<5x6xf32, strided<[6, 1], offset: ?>>
 // CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel"]} ins(%[[COLLAPSE]] : memref<5x6xf32, strided<[6, 1], offset: ?>>) outs(%[[COLLAPSE1]] : memref<5x6xf32, strided<[6, 1], offset: ?>>
 // CHECK: }
-
 // CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: %[[SUB2:.+]] = memref.subview %[[ARG0]][%[[ARG3]], 0, 0] [1, 5, 6] [1, 1, 1] : memref<2x5x6xf32> to memref<1x5x6xf32, strided<[30, 6, 1], offset: ?>>
 // CHECK: %[[SUB3:.+]] = memref.subview %[[ARG1]][%[[ARG3]], 0, 0] [1, 5, 6] [1, 1, 1] : memref<2x5x6xf32> to memref<1x5x6xf32, strided<[30, 6, 1], offset: ?>>
