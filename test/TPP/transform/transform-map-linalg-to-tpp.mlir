@@ -8,7 +8,7 @@
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg1
-    // expected-error @below {{Could not map non-generic op to tpp}}
+    // expected-error @below {{Cannot map non-generic op to tpp}}
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
