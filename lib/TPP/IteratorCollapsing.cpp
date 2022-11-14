@@ -333,7 +333,6 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   // Now compute the operand type and reassociations based on the new maps.
   unsigned currentMapIdx = 0;
   for (OpOperand &opOperand : genericOp->getOpOperands()) {
-    ArrayRef<int64_t> shape = genericOp.getShape(&opOperand);
     AffineMap currentMap = newIndexingMaps[currentMapIdx];
     ArrayRef<AffineExpr> resultExprs = currentMap.getResults();
     SmallVector<Attribute> operandReassociationMaps;
@@ -365,10 +364,8 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     while (pos < origRank) {
       currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
       if (isCollapsedDim(pos)) {
-        int64_t collapsedSize = shape[pos];
         while (pos + 1 < origRank && isCollapsedDim(pos + 1)) {
           ++pos;
-          collapsedSize *= shape[pos];
           currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
         }
       } else {
