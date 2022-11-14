@@ -102,9 +102,8 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
     return linalgOp;
   }
 
-  // TODO: make sure we have a max(x, 0).
   if (hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion()) &&
-      hasStaticShape(linalgOp)) {
+      hasStaticShape(linalgOp) && hasMaxfZeroOp(linalgOp)) {
     StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
     rewriter.updateRootInPlace(
         linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
