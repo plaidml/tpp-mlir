@@ -21,9 +21,11 @@ include "mlir/IR/OpBase.td"
 // PackOp
 //===----------------------------------------------------------------------===//
 
-def PackOp : Op<Transform_Dialect, "structured.pack",
-              [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-               TransformOpInterface, TransformEachOpTrait]> {
+def PackOp : Op<Transform_Dialect, "structured.pack", [
+    FunctionalStyleTransformOpTrait, 
+    MemoryEffectsOpInterface,
+    TransformOpInterface, 
+    TransformEachOpTrait]> {
 
   let description = [{ 
     Block the target operation. Currently supports matmul and convolutions.
@@ -49,9 +51,11 @@ def PackOp : Op<Transform_Dialect, "structured.pack",
 // CollapseOp
 //===----------------------------------------------------------------------===//
 
-def CollapseOp : Op<Transform_Dialect, "structured.collapsing",
-                 [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-                  TransformOpInterface, TransformEachOpTrait]> {
+def CollapseOp : Op<Transform_Dialect, "structured.collapsing", [
+    FunctionalStyleTransformOpTrait, 
+    MemoryEffectsOpInterface,
+    TransformOpInterface, 
+    TransformEachOpTrait]> {
 
   let description = [{
     Collapse the iterators target operation using the given reassociation.
