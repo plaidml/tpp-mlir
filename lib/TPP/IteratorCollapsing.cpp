@@ -67,17 +67,6 @@ static bool isValidReassociation(ArrayRef<ReassociationIndices> reassociation) {
   return true;
 }
 
-static Type getNewOperandType(Type type, ArrayRef<int64_t> shape) {
-  Type elementType = getElementTypeOrSelf(type);
-  if (elementType == type)
-    return type;
-  else if (type.isa<RankedTensorType>())
-    return RankedTensorType::get(shape, elementType);
-  else if (type.isa<MemRefType>())
-    return MemRefType::get(shape, elementType);
-  assert(false && "unexpected type");
-}
-
 static SmallVector<ReassociationExprs, 2>
 convertAffineMapArrayToExprs(ArrayAttr affineMapArrayAttr) {
   SmallVector<ReassociationExprs, 2> reassociationExprs;
@@ -87,10 +76,44 @@ convertAffineMapArrayToExprs(ArrayAttr affineMapArrayAttr) {
   return reassociationExprs;
 }
 
-static FailureOr<Value> collapseOperand(Value operand, Type newOperandType,
+static Type inferNewOperandType(Type oldType,
+                                ArrayRef<ReassociationIndices> reassociation) {
+  if (oldType.isa<MemRefType>())
+    return memref::CollapseShapeOp::computeCollapsedType(
+        oldType.cast<MemRefType>(), reassociation);
+  else if (oldType.isa<RankedTensorType>()) {
+    SmallVector<int64_t> newTensorShape;
+    ArrayRef<int64_t> oldTypeShape =
+        oldType.cast<RankedTensorType>().getShape();
+    for (const ReassociationIndices &reassoc : reassociation) {
+      ArrayRef<int64_t> currentReassoc = llvm::makeArrayRef(reassoc);
+      bool hasDynamicDim = false;
+      int64_t currentReassocShape = 1;
+      for (int64_t currentReassocIdx : currentReassoc) {
+        if (!ShapedType::isDynamic(oldTypeShape[currentReassocIdx]))
+          currentReassocShape *= oldTypeShape[currentReassocIdx];
+        else
+          hasDynamicDim = true;
+      }
+      if (hasDynamicDim)
+        newTensorShape.push_back(ShapedType::kDynamicSize);
+      else
+        newTensorShape.push_back(currentReassocShape);
+    }
+    return RankedTensorType::get(
+        newTensorShape, oldType.cast<RankedTensorType>().getElementType());
+  }
+  assert(false && "expect memref or rankedTensorType");
+}
+
+static FailureOr<Value> collapseOperand(Value operand,
                                         ArrayAttr reassociationMap,
                                         Location loc, RewriterBase &rewriter) {
   Type operandType = operand.getType();
+  Type newOperandType = inferNewOperandType(
+      operandType,
+      convertReassociationMapsToIndices(
+          rewriter, convertAffineMapArrayToExprs(reassociationMap)));
   if (operandType == newOperandType)
     return operand;
   if (operandType.isa<MemRefType>())
@@ -131,29 +154,19 @@ static FailureOr<Value> insertExpand(Value operand, Type newOperandType,
 
 static FailureOr<SmallVector<Value>>
 insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
-               ArrayRef<Type> newOperandTypes,
                ArrayRef<ArrayAttr> operandsReassociationMaps) {
-  assert(newOperandTypes.size() == operandsReassociationMaps.size());
   auto operands = genericOp->getOpOperands();
-  assert(operands.size() == newOperandTypes.size());
+  assert(operands.size() == operandsReassociationMaps.size());
 
   Location loc = genericOp.getLoc();
   SmallVector<Value> reshapedOperands;
   unsigned idx = 0;
   for (OpOperand &operand : operands) {
-    Type currentOperandType = operand.get().getType();
-    if (currentOperandType == newOperandTypes[idx]) {
-      reshapedOperands.push_back(operand.get());
-    } else {
-      // insert a reshape.
-      FailureOr<Value> reshaped =
-          collapseOperand(operand.get(), newOperandTypes[idx],
-                          operandsReassociationMaps[idx], loc, rewriter);
-      if (failed(reshaped))
-        return failure();
-      reshapedOperands.push_back(*reshaped);
-    }
-    idx++;
+    FailureOr<Value> reshaped = collapseOperand(
+        operand.get(), operandsReassociationMaps[idx++], loc, rewriter);
+    if (failed(reshaped))
+      return failure();
+    reshapedOperands.push_back(*reshaped);
   }
   return reshapedOperands;
 }
@@ -161,7 +174,6 @@ insertReshapes(RewriterBase &rewriter, linalg::GenericOp genericOp,
 static FailureOr<linalg::GenericOp>
 buildReplacement(RewriterBase &rewriter, linalg::GenericOp genericOp,
                  ArrayRef<Value> newOperands,
-                 ArrayRef<Type> newInputAndOutputTypes,
                  ArrayRef<AffineMap> newIndexingMaps,
                  ArrayRef<utils::IteratorType> newIteratorTypes,
                  SmallVector<ArrayAttr> operandReassociationMaps) {
@@ -177,7 +189,7 @@ buildReplacement(RewriterBase &rewriter, linalg::GenericOp genericOp,
   resultTypes.reserve(genericOp.getNumResults());
   for (unsigned i : llvm::seq<unsigned>(0, genericOp.getNumResults()))
     resultTypes.push_back(
-        newInputAndOutputTypes[i + genericOp.getNumDpsInputs()]);
+        newOperands[i + genericOp.getNumDpsInputs()].getType());
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, resultTypes, newInputs, newOutputs, newIndexingMaps,
       newIteratorTypes);
@@ -260,7 +272,6 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   newIndexingMaps.reserve(indexingMaps.size());
   SmallVector<utils::IteratorType> newIteratorTypes;
   newIteratorTypes.reserve(genericOp.getNumLoops() - reassociation.size());
-  SmallVector<Type> newInputOutputTypes;
   SmallVector<ArrayAttr> operandsReassociationMaps;
 
   unsigned numKeptDims = 0;
@@ -323,7 +334,6 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   unsigned currentMapIdx = 0;
   for (OpOperand &opOperand : genericOp->getOpOperands()) {
     ArrayRef<int64_t> shape = genericOp.getShape(&opOperand);
-    SmallVector<int64_t> newShape;
     AffineMap currentMap = newIndexingMaps[currentMapIdx];
     ArrayRef<AffineExpr> resultExprs = currentMap.getResults();
     SmallVector<Attribute> operandReassociationMaps;
@@ -361,11 +371,9 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
           collapsedSize *= shape[pos];
           currentOperandReassociation.push_back(getAffineDimExpr(pos, context));
         }
-        newShape.push_back(collapsedSize);
       } else {
         // No reassociation, reassociation is valid.
         isValidGroupReass = true;
-        newShape.push_back(shape[pos]);
       }
 
       // Exit if the current reassociation for the operand is not valid. A
@@ -392,9 +400,6 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
       map = map.dropResult(pos);
     }
     newIndexingMaps[currentMapIdx] = map;
-    Type newOperandType =
-        getNewOperandType(opOperand.get().getType(), newShape);
-    newInputOutputTypes.push_back(newOperandType);
     operandsReassociationMaps.push_back(
         ArrayAttr::get(context, operandReassociationMaps));
     currentMapIdx++;
@@ -407,9 +412,6 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
 
   LLVM_DEBUG({
     llvm::errs() << "--- per operand info ---\n";
-    llvm::errs() << "#types: " << newInputOutputTypes.size() << "\n";
-    for (Type t : newInputOutputTypes)
-      llvm::errs() << t << "\n";
     llvm::errs() << "#operand reassociation maps: "
                  << operandsReassociationMaps.size() << "\n";
     for (ArrayAttr attr : operandsReassociationMaps)
@@ -426,17 +428,17 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
   });
 
   // if any operand type change insert a reshape.
-  FailureOr<SmallVector<Value>> reshapedOperands = insertReshapes(
-      rewriter, genericOp, newInputOutputTypes, operandsReassociationMaps);
+  FailureOr<SmallVector<Value>> reshapedOperands =
+      insertReshapes(rewriter, genericOp, operandsReassociationMaps);
   if (failed(reshapedOperands))
     return failure();
 
   assert(reshapedOperands->size() ==
          genericOp->getNumOperands());
 
-  FailureOr<linalg::GenericOp> replacement = buildReplacement(
-      rewriter, genericOp, *reshapedOperands, newInputOutputTypes,
-      newIndexingMaps, newIteratorTypes, operandsReassociationMaps);
+  FailureOr<linalg::GenericOp> replacement =
+      buildReplacement(rewriter, genericOp, *reshapedOperands, newIndexingMaps,
+                       newIteratorTypes, operandsReassociationMaps);
   if (failed(replacement))
     return failure();
   return replacement;
