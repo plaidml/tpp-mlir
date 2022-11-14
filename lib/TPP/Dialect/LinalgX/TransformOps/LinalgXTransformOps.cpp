@@ -192,7 +192,7 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
     linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
     if (!currentTarget) {
       auto diag = this->emitOpError()
-                  << "Could not map non-generic op to tpp: " << *op << "\n";
+                  << "Cannot map non-generic op to tpp: " << *op << "\n";
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
@@ -284,7 +284,7 @@ DiagnosedSilenceableFailure transform::MapAndConvertLinalgToTpp::applyToOne(
 }
 
 //===----------------------------------------------------------------------===//
-// CollapseTo2dOp
+// CollapseTo2DOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
@@ -296,7 +296,7 @@ transform::CollapseTo2dOp::apply(transform::TransformResults &results,
     linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
     if (!currentTarget) {
       auto diag = this->emitOpError()
-                  << "Could not collapse non-generic: " << *op << "\n";
+                  << "Cannot collapse non-generic: " << *op << "\n";
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
@@ -361,7 +361,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
     if (!currentTarget) {
       auto diag = this->emitOpError()
-                  << "Could not reshape non-generic: " << *op << "\n";
+                  << "Cannot not reshape non-generic: " << *op << "\n";
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }

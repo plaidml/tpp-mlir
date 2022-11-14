@@ -318,7 +318,7 @@ def MapAndConvertLinalgToTpp : Op<Transform_Dialect,
 }
 
 //===----------------------------------------------------------------------===//
-// Reshape2dOp
+// Reshape2DOp
 //===----------------------------------------------------------------------===//
 
 def Reshape2dOp : Op<Transform_Dialect, "structured.reshape_2d", [
@@ -328,7 +328,7 @@ def Reshape2dOp : Op<Transform_Dialect, "structured.reshape_2d", [
     TransformOpInterface]> {
 
   let description = [{
-    Given a linalg.generic operaiton reshape it as a 2-dimensional operation by
+    Given a linalg.generic operation reshape it as a 2-dimensional operation by
     tiling out all but the two innermost loops. Only the handle to the tiled
     operation is returned. use_parallel_loops allows to materialize parallel
     loops (at the memref abstraction) if the loop is parallel.

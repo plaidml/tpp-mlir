@@ -6,6 +6,8 @@ transform.sequence failures(propagate) {
     %1 = transform.structured.collapse_to_2d in %0
 }
 
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
 func.func @additions(%arg0: memref<2x5x6xf32>, %arg1: memref<2x5x6xf32>) -> memref<2x5x6xf32> {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
