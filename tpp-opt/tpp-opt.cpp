@@ -24,7 +24,6 @@
 #include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
-#include "TPP/Dialect/Stdx/StdxDialect.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/Passes.h"
@@ -35,7 +34,6 @@ int main(int argc, char **argv) {
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();
-  registry.insert<mlir::stdx::StdxDialect>();
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::linalgx::LinalgXDialect>();
   registry.insert<mlir::check::CheckDialect>();

@@ -97,24 +97,6 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def MainClosure : Pass<"main-closure", "func::FuncOp"> {
-  let summary = "Wrap main into a closure to hoist out constant computation.";
-  let constructor = "mlir::tpp::createMainClosurePass()"; 
-  let description = [{
-    Wrap main into a closure. A closure takes n-inputs and 1 output. Inputs of
-    the closure are non-constant tensors (tensors without stdx.const or stdx.res
-    attributes). This allows to move operations that operate on constant tensors
-    outside the closure and isolate the `hot` loops in the main.
-  }];
-  let dependentDialects = ["func::FuncDialect"];
-}
-
-def UndoMainClosure : Pass<"undo-main-closure", "func::FuncOp"> {
-  let summary = "Undo the main-closure pass";
-  let constructor = "mlir::tpp::createUndoMainClosurePass()";
-  let dependentDialects = ["func::FuncDialect"];
-}
-
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";

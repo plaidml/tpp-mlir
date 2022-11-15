@@ -3,8 +3,6 @@ add_subdirectory(Dialect)
 add_mlir_library(MLIRTPP
   # Passes 
     MapLinalgToTpp.cpp
-    MainClosure.cpp
-    UndoMainClosure.cpp
     ToBlockLayoutAndBack.cpp
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
@@ -32,7 +30,6 @@ add_mlir_library(MLIRTPP
 
     LINK_LIBS PUBLIC
     TPPLinalgXDialect
-    TPPStdxDialect
     TPPTppDialect
     TPPXsmmDialect
 

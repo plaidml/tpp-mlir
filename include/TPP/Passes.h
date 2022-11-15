@@ -66,8 +66,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToLoopsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createMainClosurePass();
-std::unique_ptr<OperationPass<func::FuncOp>> createUndoMainClosurePass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
