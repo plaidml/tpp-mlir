@@ -79,8 +79,6 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
   return true;
 }
 
-// XXX: Changing the op semantics based on the type is so bad and brittle.
-// We don't want to do this. This BF16 packing need to be revisited.
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
   MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
