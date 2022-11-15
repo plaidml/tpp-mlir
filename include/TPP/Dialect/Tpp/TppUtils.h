@@ -18,6 +18,7 @@ class LinalgOp;
 } // end namespace linalg
 
 namespace tpp {
+namespace utils {
 
 // Return true if all the operands of the linalg operation have static
 // dimensions.
@@ -39,6 +40,7 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp);
 // Return true if linalg generic region contains a maxf(x, 0) operation.
 bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
 
+} // namespace utils
 } // namespace tpp
 } // namespace mlir
 

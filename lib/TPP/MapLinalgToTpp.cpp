@@ -18,7 +18,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -67,7 +66,7 @@ static bool isTPPGemm(linalg::GenericOp linalgOp) {
   if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
     return false;
   // operations and operands.
-  return hasMatmulBody(linalgOp);
+  return tpp::utils::hasMatmulBody(linalgOp);
 }
 
 // Return true if the operation as 1 input and 1 output.
@@ -78,7 +77,7 @@ static bool hasOneInputOneOutput(linalg::GenericOp linalgOp) {
 
 static FailureOr<linalg::GenericOp>
 mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
-  if (!hasStaticShape(linalgOp))
+  if (!tpp::utils::hasStaticShape(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "shape is not static");
 
   if (linalgOp.getLibraryCallAttr())
@@ -95,7 +94,8 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
   if (!linalg::isElementwise(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "unmatched Linalg op");
 
-  if (hasCopySemantics(linalgOp) && hasStaticShape(linalgOp)) {
+  if (tpp::utils::hasCopySemantics(linalgOp) &&
+      tpp::utils::hasStaticShape(linalgOp)) {
     StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
     rewriter.updateRootInPlace(
         linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
@@ -103,7 +103,8 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
   }
 
   if (hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion()) &&
-      hasStaticShape(linalgOp) && hasMaxfZeroOp(linalgOp)) {
+      tpp::utils::hasStaticShape(linalgOp) &&
+      tpp::utils::hasMaxfZeroOp(linalgOp)) {
     StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
     rewriter.updateRootInPlace(
         linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
@@ -111,7 +112,7 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
   }
 
   if (hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()) &&
-      hasStaticShape(linalgOp) && hasOneInputOneOutput(linalgOp)) {
+      tpp::utils::hasStaticShape(linalgOp) && hasOneInputOneOutput(linalgOp)) {
     StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
     rewriter.updateRootInPlace(
         linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
@@ -139,7 +140,7 @@ struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 struct MapToTpp : public LinalgMapToTppBase<MapToTpp> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateMapLinalgToTppPatterns(patterns);
+    tpp::populateMapLinalgToTppPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

@@ -20,6 +20,7 @@
 
 namespace mlir {
 namespace tpp {
+namespace utils {
 
 // Prototypes
 static bool isZeroTensor(Value op);
@@ -248,5 +249,6 @@ bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   return false;
 }
 
+} // namespace utils
 } // namespace tpp
 } // namespace mlir

@@ -19,7 +19,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -78,7 +77,7 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
 // the last and first dimension only.
 LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
                         bool useParallelLoops) {
-  if (!hasTppMark(linalgOp))
+  if (!tpp::utils::hasTppMark(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "Expect tpp mark");
   if (!linalgOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(linalgOp,
@@ -188,7 +187,7 @@ getTileSizesForOptimalMappingImpl(OpBuilder &builder,
 // Try to select optimal tile sizes.
 static SmallVector<Value>
 getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
-  if (isMarkedWithTpp(linalgOp, "tpp.matmul"))
+  if (tpp::utils::isMarkedWithTpp(linalgOp, "tpp.matmul"))
     return getTileSizesForOptimalMappingMatmulImpl(builder, linalgOp);
   return getTileSizesForOptimalMappingImpl(builder, linalgOp);
 }
@@ -198,7 +197,7 @@ LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
                            ArrayRef<int64_t> tileSizes) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
-  if (!hasTppMark(linalgOp))
+  if (!tpp::utils::hasTppMark(linalgOp))
     return failure();
 
   OpBuilder builder(linalgOp);
@@ -292,7 +291,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasBufferSemantics())
       return rewriter.notifyMatchFailure(linalgOp, "expect buffer semantics");
-    if (!linalgOp.getLibraryCallAttr() || !hasTppMark(linalgOp))
+    if (!linalgOp.getLibraryCallAttr() || !tpp::utils::hasTppMark(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "not enough information to map to tpps");
 
