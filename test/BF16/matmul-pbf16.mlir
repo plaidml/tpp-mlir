@@ -7,7 +7,7 @@
 
 func.func @matmultpp(%A: memref<2x8x2xbf16>, 
           %B: memref<8x4xbf16>, %C: memref<4x4xbf16>) attributes {llvm.emit_c_interface} {
-  tpp.matmul ins(%A: memref<2x8x2xbf16>, %B: memref<8x4xbf16>)
+  tpp.vnni_matmul ins(%A: memref<2x8x2xbf16>, %B: memref<8x4xbf16>)
              out(%C: memref<4x4xbf16>)
   return
 }

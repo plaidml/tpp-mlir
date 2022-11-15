@@ -60,28 +60,23 @@ LogicalResult IdentityOp::verify() {
 //===----------------------------------------------------------------------===//
 
 static bool verifyMatmulShape(MemRefType memrefA, MemRefType memrefB,
-                              MemRefType memrefC, bool isPackedBF16) {
-  if (memrefB.getRank() != 2 || memrefC.getRank() != 2)
-    return false;
-  if (isPackedBF16 && memrefA.getRank() != 3)
-    return false;
-  if (!isPackedBF16 && memrefA.getRank() != 2)
+                              MemRefType memrefC) {
+  if (memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
+      memrefA.getRank() != 2)
     return false;
   return true;
 }
 
 static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
                                      ArrayRef<int64_t> shapeB,
-                                     ArrayRef<int64_t> shapeC,
-                                     bool isPackedBF16) {
+                                     ArrayRef<int64_t> shapeC) {
   int64_t m = shapeC[0];
   int64_t n = shapeC[1];
   int64_t k = shapeA[1];
   // Verify C(m, n) = A(m, k) B(k, n)
-  if (shapeB[0] != k || shapeB[1] != n)
+  if (shapeB[0] != k || shapeB[1] != n || shapeA[0] != m)
     return false;
-  return ((isPackedBF16 && shapeA[0] * shapeA[2] == m) ||
-          (!isPackedBF16 && (shapeA[0] == m) && (shapeA[1] == k)));
+  return true;
 }
 
 // XXX: Changing the op semantics based on the type is so bad and brittle.
@@ -91,12 +86,10 @@ LogicalResult MatmulOp::verify() {
   MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
   MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
   MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
-  bool isPackedBF16 =
-      memrefA.getElementType().isBF16() && memrefA.getRank() == 3;
-  if (!verifyMatmulShape(memrefA, memrefB, memrefC, isPackedBF16))
+  if (!verifyMatmulShape(memrefA, memrefB, memrefC))
     return emitOpError("fails to verify operands shapes");
   if (!verifyMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
-                                memrefC.getShape(), isPackedBF16))
+                                memrefC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
@@ -111,12 +104,9 @@ void MatmulOp::build(OpBuilder &builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 
 static bool verifyBRGemmShape(MemRefType memrefA, MemRefType memrefB,
-                              MemRefType memrefC, bool isPackedBF16) {
-  if (memrefB.getRank() != 3 || memrefC.getRank() != 2)
-    return false;
-  if (!isPackedBF16 && memrefA.getRank() != 3)
-    return false;
-  if (isPackedBF16 && memrefA.getRank() != 4)
+                              MemRefType memrefC) {
+  if (memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
+      memrefA.getRank() != 3)
     return false;
   return true;
 }
@@ -127,21 +117,15 @@ LogicalResult BrgemmOp::verify() {
   MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
   MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
   MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
-  bool isPackedBF16 =
-      tensorA.getElementType().isBF16() && tensorA.getRank() == 4;
-  if (!verifyBRGemmShape(tensorA, tensorB, matrixC, isPackedBF16))
+  if (!verifyBRGemmShape(tensorA, tensorB, matrixC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.
-  if (!isPackedBF16 && tensorA.getShape()[0] != tensorB.getShape()[0])
-    return emitOpError("fails to verify operands dimensions mismatch");
-  if (isPackedBF16 &&
-      tensorA.getShape()[0] * tensorA.getShape()[3] != tensorB.getShape()[0])
+  if (tensorA.getShape()[0] != tensorB.getShape()[0])
     return emitOpError("fails to verify operands dimensions mismatch");
   // Check all others that must be 'matmul' like.
-  if (!isPackedBF16 &&
-      !verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
+  if (!verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
                                 tensorB.getShape().drop_front(),
-                                matrixC.getShape(), isPackedBF16))
+                                matrixC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
@@ -164,4 +148,74 @@ LogicalResult AddOp::verify() {
   if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()))
     return emitOpError("expects both operands to be shaped type");
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// VNNI_MatmulOp
+//===----------------------------------------------------------------------===//
+
+static bool verifyVNNIMatmulShape(MemRefType memrefA, MemRefType memrefB,
+                                  MemRefType memrefC) {
+  if (memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
+      memrefA.getRank() != 3)
+    return false;
+  return true;
+}
+
+static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
+                                         ArrayRef<int64_t> shapeB,
+                                         ArrayRef<int64_t> shapeC) {
+  int64_t m = shapeC[0];
+  int64_t n = shapeC[1];
+  int64_t k = shapeA[1];
+  if (shapeB[0] != k || shapeB[1] != n || shapeA[0] * shapeA[2] != m)
+    return false;
+  return true;
+}
+
+LogicalResult VNNI_MatmulOp::verify() {
+  MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
+  MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
+  MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
+  assert(memrefA.getElementType().isBF16() && memrefA.getRank() == 3);
+  if (!verifyVNNIMatmulShape(memrefA, memrefB, memrefC))
+    return emitOpError("fails to verify operands shapes");
+  if (!verifyVNNIMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
+                                    memrefC.getShape()))
+    return emitOpError("fails to verify operands dimensions mismatch");
+  return success();
+}
+
+void VNNI_MatmulOp::build(OpBuilder &builder, OperationState &state,
+                          ValueRange inputs, Value output) {
+  VNNI_MatmulOp::build(builder, state, inputs[0], inputs[1], output);
+}
+
+//===----------------------------------------------------------------------===//
+// BrgemmOp
+//===----------------------------------------------------------------------===//
+
+static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
+                                  MemRefType memrefC) {
+  if (memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
+      memrefA.getRank() != 4)
+    return false;
+  return true;
+}
+
+LogicalResult VNNI_BrgemmOp::verify() {
+  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
+  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
+  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
+  if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
+    return emitOpError("fails to verify operands shapes");
+  // Check batch dimension.
+  if (tensorA.getShape()[0] * tensorA.getShape()[3] != tensorB.getShape()[0])
+    return emitOpError("fails to verify operands dimensions mismatch");
+  return success();
+}
+
+void VNNI_BrgemmOp::build(OpBuilder &builder, OperationState &state,
+                          ValueRange inputs, Value output) {
+  VNNI_BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
 }

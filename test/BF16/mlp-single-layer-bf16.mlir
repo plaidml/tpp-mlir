@@ -17,7 +17,7 @@ func.func @entry(){
   tpp.identity ins(%arg2 : memref<512xbf16>) out(%arg3 : memref<128x512xbf16>)
   %wt = memref.alloc():memref<64x256x2xbf16>
   linalgx.pack %arg0 inner_dims_pos=[0] inner_tiles=[2] into %wt: (memref<128x256xbf16> memref<64x256x2xbf16>)
-  tpp.matmul ins(%wt : memref<64x256x2xbf16>, %arg1 : memref<256x512xbf16>) out(%arg3 : memref<128x512xbf16>)
+  tpp.vnni_matmul ins(%wt : memref<64x256x2xbf16>, %arg1 : memref<256x512xbf16>) out(%arg3 : memref<128x512xbf16>)
   tpp.relu out(%arg3 : memref<128x512xbf16>)
   return
 }

@@ -57,12 +57,6 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     if (failed(ldaDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
-    if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 3) {
-      auto divLdaDim = getLeadingDim(memrefA, 1);
-      if (failed(divLdaDim))
-        return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
-      lda = lda / (*divLdaDim);
-    }
 
     auto ldbDim = getLeadingDim(memrefB);
     if (failed(ldbDim))
@@ -79,15 +73,60 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
         matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
-    xsmm::DataTypeAttr dtype;
-    if (memrefC.getElementType().isBF16())
-      dtype =
-          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
-    else {
-      assert(memrefC.getElementType().isF32());
-      dtype =
-          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
-    }
+    xsmm::DataTypeAttr dtype =
+        xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
+    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
+        loc, integer64, attr, dims, dtype);
+
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(matmulOp->getOperands().begin(),
+                          matmulOp->getOperands().end());
+    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, dtype, attr,
+                                                 invokeOperands);
+    return success();
+  }
+};
+
+struct ConvertTpp_VNNI_MatmulOp : public OpRewritePattern<VNNI_MatmulOp> {
+  using OpRewritePattern<VNNI_MatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(VNNI_MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = matmulOp.getLoc();
+
+    MemRefType memrefC = matmulOp.getMatrixCType();
+    MemRefType memrefA = matmulOp.getMatrixAType();
+    MemRefType memrefB = matmulOp.getMatrixBType();
+    int64_t m = memrefC.getShape()[0];
+    int64_t n = memrefC.getShape()[1];
+    int64_t k = memrefA.getShape()[1];
+    auto ldaDim = getLeadingDim(memrefA);
+    if (failed(ldaDim))
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
+    int64_t lda = *ldaDim;
+    auto divLdaDim = getLeadingDim(memrefA, 1);
+    if (failed(divLdaDim))
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
+    lda = lda / (*divLdaDim);
+
+    auto ldbDim = getLeadingDim(memrefB);
+    if (failed(ldbDim))
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
+    int64_t ldb = *ldbDim;
+
+    auto ldcDim = getLeadingDim(memrefC);
+    if (failed(ldcDim))
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
+    int64_t ldc = *ldcDim;
+
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
+    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
+        matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
+    xsmm::DataTypeAttr dtype =
+        xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
     Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
         loc, integer64, attr, dims, dtype);
 
@@ -120,13 +159,6 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     if (failed(ldaDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
-    //If the tensor is in bf16 packed format, ignore the packing dimension
-    if (memrefA.getElementType().isBF16() && memrefA.getShape().size() == 4) {
-      auto divLdaDim = getLeadingDim(memrefA, 2);
-      if (failed(divLdaDim))
-        return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-      lda = lda / (*divLdaDim);
-    }
     auto ldbDim = getLeadingDim(memrefB, 1);
     if (failed(ldbDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
@@ -142,16 +174,65 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
         brgemmOp.getContext(), xsmm::TernaryKind::BRGEMM);
-    xsmm::DataTypeAttr dtype;
-    if (memrefC.getElementType().isBF16())
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
-    else {
-      assert(memrefC.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
-    }
+    xsmm::DataTypeAttr dtype =
+        xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
+
+    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
+        loc, integer64, attr, dims, dtype);
+    Value batchDim = rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(brgemmOp->getOperands().begin(),
+                          brgemmOp->getOperands().end());
+    invokeOperands.push_back(batchDim);
+    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(brgemmOp, dtype, attr,
+                                                 invokeOperands);
+    return success();
+  }
+};
+
+struct ConvertTpp_VNNI_BrgemmOp : public OpRewritePattern<VNNI_BrgemmOp> {
+  using OpRewritePattern<VNNI_BrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(VNNI_BrgemmOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = brgemmOp.getLoc();
+
+    MemRefType memrefC = brgemmOp.getMatrixCType();
+    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
+    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
+    int64_t m = memrefC.getShape()[0];
+    int64_t n = memrefC.getShape()[1];
+    int64_t k = memrefA.getShape()[2];
+    int64_t batchSize = memrefB.getShape()[0];
+
+    auto ldaDim = getLeadingDim(memrefA, 1);
+    if (failed(ldaDim))
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
+    int64_t lda = *ldaDim;
+    auto divLdaDim = getLeadingDim(memrefA, 2);
+    if (failed(divLdaDim))
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
+    lda = lda / (*divLdaDim);
+
+    auto ldbDim = getLeadingDim(memrefB, 1);
+    if (failed(ldbDim))
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
+    int64_t ldb = *ldbDim;
+
+    auto ldcDim = getLeadingDim(memrefC);
+    if (failed(ldcDim))
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
+    int64_t ldc = *ldcDim;
+
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
+    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
+        brgemmOp.getContext(), xsmm::TernaryKind::BRGEMM);
+    xsmm::DataTypeAttr dtype =
+        xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
 
     Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
         loc, integer64, attr, dims, dtype);
@@ -440,7 +521,9 @@ void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
                ConvertTppReluOp,
                ConvertTppAddOp,
                ConvertTppMatmulOp,
-               ConvertTppBrgemmOp>(patterns.getContext());
+	       ConvertTpp_VNNI_MatmulOp,
+               ConvertTppBrgemmOp,
+	       ConvertTpp_VNNI_BrgemmOp>(patterns.getContext());
   // clang-format on
 }
 
