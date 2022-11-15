@@ -15,13 +15,13 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace mlir {
-  class ModuleOp;
-  class MemRefType;
-  class Operation;
-  class Value;
-  namespace func {
-    class FuncOp;
-  } // namespace func
+class ModuleOp;
+class MemRefType;
+class Operation;
+class Value;
+namespace func {
+class FuncOp;
+} // namespace func
 
 /// MLIRBench - Creates wrapper for calling kernel methods.
 ///
@@ -58,11 +58,11 @@ class MLIRBench {
   mlir::MemRefType getGlobalType(llvm::StringRef Name);
 
   /// Gets module's main block
-  mlir::Block& getModuleBlock();
+  mlir::Block &getModuleBlock();
 
 public:
   /// Creates context, builder
-  MLIRBench(mlir::Operation* Op);
+  MLIRBench(mlir::Operation *Op);
 
   /// Finds the kernel method, checks correct name and shape
   mlir::LogicalResult findKernel(llvm::StringRef Name);
@@ -79,11 +79,11 @@ public:
 
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order
-  mlir::LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef>& List);
+  mlir::LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &List);
 
   /// Calls the kernel, returns the result, which is either
   /// the return value (if any) or the last argument (outs).
-  mlir::Value callKernel(llvm::SmallVector<llvm::StringRef>& List);
+  mlir::Value callKernel(llvm::SmallVector<llvm::StringRef> &List);
 
   /// Prints the memref as a vector read + print
   mlir::LogicalResult printMemRef(mlir::Value MemRef);

@@ -37,13 +37,6 @@
 
 using namespace mlir;
 
-// TODO: Enable this variable and create a loop for calling the kernel,
-// counting timers, doing statistics, etc.
-// Number of loops for benchmarks
-//llvm::cl::opt<unsigned>
-//    numLoops("n", llvm::cl::desc("Number of loops for benchmarks"),
-//             llvm::cl::value_desc("int"), llvm::cl::init(1));
-
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *Op,
@@ -51,7 +44,9 @@ static LogicalResult prepareMLIRKernel(Operation *Op,
   MLIRBench Bench(Op);
 
   if (Options.mainFuncType != "void")
-     return Bench.emitError("Main function has to be 'void', even if the kernel return's a value, because that's the type of the wrapper we create here");
+    return Bench.emitError(
+        "Main function has to be 'void', even if the kernel return's a value, "
+        "because that's the type of the wrapper we create here");
 
   if (failed(Bench.findKernel(Options.mainFuncName)))
     return Bench.emitError("Cannot find kernel '" + Options.mainFuncName + "'");

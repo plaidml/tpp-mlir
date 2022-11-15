@@ -28,7 +28,7 @@
 using namespace mlir;
 
 // Number of loops for benchmarks
-//llvm::cl::opt<unsigned>
+// llvm::cl::opt<unsigned>
 //    numLoops("n", llvm::cl::desc("Number of loops for benchmarks"),
 //             llvm::cl::value_desc("int"), llvm::cl::init(1));
 
@@ -42,9 +42,9 @@ MLIRBench::MLIRBench(mlir::Operation *Op)
 }
 
 LogicalResult MLIRBench::findKernel(StringRef Name) {
-  // If the user passed the entry point, use it
   auto &ModuleOps = getModuleBlock().getOperations();
   if (!Name.empty()) {
+    // If the user passed the entry point, use it
     for (auto &Op : ModuleOps) {
       func::FuncOp Func = dyn_cast_or_null<func::FuncOp>(Op);
       if (Func && Func.getName().equals(Name)) {
@@ -57,14 +57,14 @@ LogicalResult MLIRBench::findKernel(StringRef Name) {
       return Module.emitError("Entry point " + Name +
                               " not found as a func.func");
 
-  // Else, and there is only one function, use it
   } else if (ModuleOps.size() == 1) {
+    // Else, and there is only one function, use it
     Kernel = dyn_cast_or_null<func::FuncOp>(ModuleOps.front());
     if (!Kernel)
       return Module.emitError("Single function not in Func Dialect");
 
-  // If there is no entry function, and multiple functions, bail
   } else {
+    // If there is no entry function, and multiple functions, bail
     return Module.emitError("No valid entry point, use mlir-cpu-runner");
   }
 
@@ -105,7 +105,8 @@ LogicalResult MLIRBench::createMainWrapper() {
   return success();
 }
 
-LogicalResult MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef>& List) {
+LogicalResult
+MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &List) {
   // Create global dense memrefs (Module insertion point)
   Builder.setInsertionPointToStart(&getModuleBlock());
   auto FuncType = Kernel.getFunctionType();
@@ -117,7 +118,7 @@ LogicalResult MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef>& List)
   return success();
 }
 
-Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef>& List) {
+Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &List) {
   // Get those globals as arguments (function insertion point)
   Builder.setInsertionPointToEnd(&Main.getBlocks().front());
   SmallVector<Value> Args;
@@ -125,7 +126,8 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef>& List) {
     // GetGlobal op properties
     auto NameAttr = Builder.getStringAttr(Name);
     auto Type = getGlobalType(Name);
-    auto GetGlobal = Builder.create<memref::GetGlobalOp>(UnkLoc, Type, NameAttr);
+    auto GetGlobal =
+        Builder.create<memref::GetGlobalOp>(UnkLoc, Type, NameAttr);
 
     // Add argument to list
     Args.push_back(GetGlobal);
@@ -145,7 +147,6 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef>& List) {
 
   return Result;
 }
-
 
 LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
   // Read into a vector and print output
@@ -167,8 +168,8 @@ LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
   }
 
   APFloat vectorFloatValue = APFloat(-1.0F);
-  auto minusOne = Builder.create<arith::ConstantFloatOp>(UnkLoc, vectorFloatValue,
-                                                         Builder.getF32Type());
+  auto minusOne = Builder.create<arith::ConstantFloatOp>(
+      UnkLoc, vectorFloatValue, Builder.getF32Type());
   // TODO: Create a loop in IR
   auto zeroIdx = Builder.create<arith::ConstantIndexOp>(UnkLoc, 0);
   assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
@@ -176,15 +177,14 @@ LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
     auto beginIdx = Builder.create<arith::ConstantIndexOp>(UnkLoc, i);
 
     auto indices = ValueRange{beginIdx, zeroIdx};
-    auto vector = Builder.create<vector::TransferReadOp>(UnkLoc, vecType, MemRef,
-                                                         indices, minusOne);
+    auto vector = Builder.create<vector::TransferReadOp>(
+        UnkLoc, vecType, MemRef, indices, minusOne);
     Builder.create<vector::PrintOp>(UnkLoc, vector);
   }
 
   // Finally lower to LLVM Dialect
   return success();
 }
-
 
 LogicalResult MLIRBench::finalize() {
   // If we created a main at all...
@@ -271,7 +271,7 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef Name) {
   return MemRefTy;
 }
 
-Block& MLIRBench::getModuleBlock() {
+Block &MLIRBench::getModuleBlock() {
   return Module->getRegions().front().front();
 }
 
