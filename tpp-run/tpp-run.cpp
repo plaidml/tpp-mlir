@@ -35,24 +35,6 @@
 
 using namespace mlir;
 
-// This is a hack, to parse the command-line options locally
-// FIXME: Find a way to grab the options from the JitRunner
-struct CmdLineOpts {
-  std::string mainFuncName;
-} options;
-
-static void locaCmdLineOptParsing(int argc, char **argv) {
-  bool nextIsMain = false;
-  for (int i = 0; i < argc; i++) {
-    if (strncmp("-e", argv[i], 2) == 0)
-      nextIsMain = true;
-    else if (nextIsMain) {
-      options.mainFuncName = argv[i];
-      break;
-    }
-  }
-}
-
 // Lowers to LLVM Dialect
 static LogicalResult lowerToLLVMDialect(ModuleOp module) {
   // Minimal passes to make it work
@@ -92,7 +74,7 @@ static LogicalResult lowerToLLVMDialect(ModuleOp module) {
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
-static LogicalResult prepareMLIRKernel(Operation *op) {
+static LogicalResult prepareMLIRKernel(Operation *op, JitRunnerOptions& options) {
   auto module = dyn_cast<ModuleOp>(op);
   if (!module)
     return op->emitOpError("expected a 'builtin.module' op");
@@ -292,9 +274,6 @@ int main(int argc, char **argv) {
   JitRunnerConfig config;
   config.mlirTransformer = prepareMLIRKernel;
   config.llvmModuleBuilder = buildLLVMModule;
-
-  // Hack
-  locaCmdLineOptParsing(argc, argv);
 
   // Call the main JIT function
   return JitRunnerMain(argc, argv, registry, config);
