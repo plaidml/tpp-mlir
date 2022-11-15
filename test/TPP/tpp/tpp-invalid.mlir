@@ -67,7 +67,7 @@ func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>
 func.func @tpp_matmul_invalid(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>,
                               %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
   // expected-error @below {{'tpp.matmul' op fails to verify operands dimensions mismatch}}
-  tpp.matmul ins(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xbf16>)
+  tpp.vnni_matmul ins(%arg0: memref<3x5x1xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xbf16>)
   return %arg2: memref<6x6xbf16>
 }
 

@@ -53,7 +53,7 @@ func.func @testBrgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
 func.func @testGemmWithBf16(%arg0: memref<3x5x2xbf16>, %arg1: memref<5x6xbf16>, 
                             %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
   // CHECK: tpp.matmul
-  tpp.matmul ins(%arg0: memref<3x5x2xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xbf16>)
+  tpp.vnni_matmul ins(%arg0: memref<3x5x2xbf16>, %arg1: memref<5x6xbf16>) out(%arg2: memref<6x6xbf16>)
   return %arg2: memref<6x6xbf16>
 }
 
@@ -61,6 +61,6 @@ func.func @testGemmWithBf16(%arg0: memref<3x5x2xbf16>, %arg1: memref<5x6xbf16>,
 func.func @testBrgemmWithBf16(%arg0: memref<32x4x4x2xbf16>, %arg1: memref<64x4x4xbf16>, 
                               %arg2: memref<4x4xbf16>) -> memref<4x4xbf16> {
   // CHECK: tpp.brgemm
-  tpp.brgemm ins(%arg0: memref<32x4x4x2xbf16>, %arg1: memref<64x4x4xbf16>) out(%arg2: memref<4x4xbf16>)
+  tpp.vnni_brgemm ins(%arg0: memref<32x4x4x2xbf16>, %arg1: memref<64x4x4xbf16>) out(%arg2: memref<4x4xbf16>)
   return %arg2: memref<4x4xbf16>
 }
