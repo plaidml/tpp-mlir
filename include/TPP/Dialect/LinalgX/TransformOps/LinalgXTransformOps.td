@@ -191,7 +191,8 @@ def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
   let description = [{
     Pattern match a linalg.generic and map it to tpp operations. On success,
     the resulting operation will still be a linalg.generic with the library_call
-    set with the name of the tpp operation detected.
+    set with the name of the tpp operation detected. The patter does not fail
+    and operations that cannot be mapped to tpp are discared in return.
 
     `filter` allows to select a subset of the detected operations. 
   }];
@@ -283,12 +284,11 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
 }
 
 //===----------------------------------------------------------------------===//
-// MapAndConvertLinalgToTpp
+// ConvertLinalgToTpp
 //===----------------------------------------------------------------------===//
 
-// TODO: this does not compose as it invalidate all the handles.
-def MapAndConvertLinalgToTpp : Op<Transform_Dialect, 
-                                  "structured.map_and_convert_linalg_to_tpp", [
+def ConvertLinalgToTpp : Op<Transform_Dialect, 
+                            "structured.convert_linalg_to_tpp", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
     TransformEachOpTrait,
@@ -303,18 +303,17 @@ def MapAndConvertLinalgToTpp : Op<Transform_Dialect,
   }];
 
   let arguments = (ins PDL_Operation:$target);
-  let results = (outs);
+  let results = (outs PDL_Operation:$converted_op);
 
   let assemblyFormat = [{
     $target attr-dict
   }];
 
   let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::Operation *target,
-        ::llvm::SmallVector<::mlir::Operation *> &results,
-        ::mlir::transform::TransformState &state);
-  }];
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state);
+  }]; 
 }
 
 //===----------------------------------------------------------------------===//

@@ -2,7 +2,6 @@ add_subdirectory(Dialect)
 
 add_mlir_library(MLIRTPP
   # Passes 
-    MapLinalgToTpp.cpp
     ToBlockLayoutAndBack.cpp
     MapToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
@@ -13,7 +12,6 @@ add_mlir_library(MLIRTPP
     TransformUtils.cpp
 
   # Conversions
-    ConvertLinalgToTpp.cpp
     ConvertLinalgXToLoops.cpp
     ConvertTppToLoops.cpp
     ConvertTppToXsmm.cpp

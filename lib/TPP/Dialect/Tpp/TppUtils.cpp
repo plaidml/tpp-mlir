@@ -10,6 +10,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
@@ -247,6 +248,80 @@ bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   }
 
   return false;
+}
+
+bool hasOneInputOneOutput(linalg::GenericOp linalgOp) {
+  return ((linalgOp.getNumDpsInputs() == 1) &&
+          (linalgOp.getNumDpsInits() == 1));
+}
+
+bool isTPPGemm(linalg::GenericOp linalgOp) {
+  // structural and access pattern.
+  SmallVector<mlir::utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  if (iteratorTypes.size() != 3)
+    return false;
+  if (!(linalg::isParallelIterator(iteratorTypes[0]) &&
+        linalg::isParallelIterator(iteratorTypes[1]) &&
+        linalg::isReductionIterator(iteratorTypes[2])))
+    return false;
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr i, j, k;
+  bindDims(linalgOp.getContext(), i, j, k);
+  if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
+    return false;
+  // operations and operands.
+  return hasMatmulBody(linalgOp);
+}
+
+// Return true if: 1) the region has a single block. 2) The block has two
+// operations only (linalg.YieldOp and OP). 3) The operation result types are
+// int or float.
+// TODO: For now we assume the region to have only two operations: The YieldOp
+// and the 'OP', meaning that the entire linalg.generic will map to a single
+// tpp operation. If we do element-wise fusion at the linalg level this
+// assumption does not hold anymore as now a linalg.generic can map to n tpp
+// operations. If we support 1:n matching what should we do if the entire
+// linalg.op cannot be replace by tpp operations?
+template <typename OP> static bool hasOnlyScalarElementwiseOp(Region &region) {
+  if (!region.hasOneBlock())
+    return false;
+  if (std::distance(region.front().begin(), region.front().end()) != 2)
+    return false;
+  for (Operation &op : region.front()) {
+    if (!isa<OP, linalg::YieldOp>(op) ||
+        llvm::any_of(op.getResultTypes(),
+                     [](Type type) { return !type.isIntOrFloat(); }))
+      return false;
+  }
+  return true;
+}
+
+bool isMappableToTpp(linalg::GenericOp linalgOp) {
+  if (!hasStaticShape(linalgOp))
+    return false;
+  unsigned tppLoops = 2;
+  return (linalg::isElementwise(linalgOp) &&
+          linalgOp.getNumLoops() <= tppLoops);
+}
+
+bool isTPPRelu(linalg::GenericOp linalgOp) {
+  if (!hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion()))
+    return false;
+  if (linalgOp.getNumDpsInits() != 1 || linalgOp.getNumDpsInputs() != 0)
+    return false;
+  return isMappableToTpp(linalgOp) && hasMaxfZeroOp(linalgOp);
+}
+
+bool isTPPIdentity(linalg::GenericOp linalgOp) {
+  return hasCopySemantics(linalgOp) && isMappableToTpp(linalgOp);
+}
+
+bool isTPPAdd(linalg::GenericOp linalgOp) {
+  if (!hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion()))
+    return false;
+  return isMappableToTpp(linalgOp) && hasOneInputOneOutput(linalgOp);
 }
 
 } // namespace utils

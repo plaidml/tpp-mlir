@@ -15,6 +15,7 @@ namespace mlir {
 
 namespace linalg {
 class LinalgOp;
+class GenericOp;
 } // end namespace linalg
 
 namespace tpp {
@@ -37,8 +38,24 @@ bool hasMatmulBody(linalg::LinalgOp linalgOp);
 // Return true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
 
-// Return true if linalg generic region contains a maxf(x, 0) operation.
+// Return true if the linalg generic region contains a maxf(x, 0) operation.
 bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
+
+// Return true if the linalg generic has 1 input 1 output.
+bool hasOneInputOneOutput(linalg::GenericOp);
+
+// Return true if the linalg generic can be mapped to a tpp.matmul (aka Gemm)
+// operation.
+bool isTPPGemm(linalg::GenericOp genericOp);
+
+// Return true if the linalg generic can be mapped to a tpp.relu.
+bool isTPPRelu(linalg::GenericOp genericOp);
+
+// Return true if the linalg generic can be mapped to a tpp.add.
+bool isTPPAdd(linalg::GenericOp genericOp);
+
+// Return true if the linalg generic can be mapped to a tpp.identity.
+bool isTPPIdentity(linalg::GenericOp genericOp);
 
 } // namespace utils
 } // namespace tpp

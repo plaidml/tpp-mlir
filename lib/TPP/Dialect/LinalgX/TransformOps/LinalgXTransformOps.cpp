@@ -8,6 +8,8 @@
 
 #include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
+#include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -178,6 +180,45 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
 // MapLinalgToTppOp
 //===----------------------------------------------------------------------===//
 
+static FailureOr<linalg::GenericOp> mapLinalgToTpp(SimpleRewriter &rewriter,
+                                                   linalg::GenericOp linalgOp) {
+  if (!tpp::utils::hasStaticShape(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "shape is not static");
+
+  if (linalgOp.getLibraryCallAttr())
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "library_call attr already set");
+
+  if (tpp::utils::isTPPGemm(linalgOp)) {
+    StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
+    rewriter.updateRootInPlace(
+        linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
+    return linalgOp;
+  }
+
+  if (tpp::utils::isTPPIdentity(linalgOp)) {
+    StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.identity");
+    rewriter.updateRootInPlace(
+        linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
+    return linalgOp;
+  }
+
+  if (tpp::utils::isTPPRelu(linalgOp)) {
+    StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.relu");
+    rewriter.updateRootInPlace(
+        linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
+    return linalgOp;
+  }
+
+  if (tpp::utils::isTPPAdd(linalgOp)) {
+    StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.add");
+    rewriter.updateRootInPlace(
+        linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
+    return linalgOp;
+  }
+  return rewriter.notifyMatchFailure(linalgOp, "unmatched linalg op");
+}
+
 DiagnosedSilenceableFailure
 transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
                                    transform::TransformState &state) {
@@ -198,7 +239,7 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
     }
     SimpleRewriter rewriter(currentTarget->getContext());
     FailureOr<linalg::GenericOp> annotatedOp =
-        mlir::linalgx::mapLinalgToTpp(rewriter, currentTarget);
+        mapLinalgToTpp(rewriter, currentTarget);
     if (succeeded(annotatedOp)) {
       if (getFilter().has_value() &&
           !strs.contains((*annotatedOp).getLibraryCallName()))
@@ -260,26 +301,75 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
 }
 
 //===----------------------------------------------------------------------===//
-// MapAndConvertLinalgToTpp
+// ConvertLinalgToTpp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure transform::MapAndConvertLinalgToTpp::applyToOne(
-    Operation *target, SmallVector<Operation *> &results,
-    TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
+FailureOr<Operation *> convertToTpp(linalg::GenericOp genericOp,
+                                    SimpleRewriter &rewriter) {
+  SmallVector<Value> inputs = genericOp.getDpsInputOperands();
+  SmallVector<Value> outputs = genericOp.getDpsInitOperands();
+  Location loc = genericOp.getLoc();
+  if (tpp::utils::isTPPGemm(genericOp))
+    return rewriter.create<tpp::MatmulOp>(loc, inputs, outputs[0])
+        .getOperation();
+  if (tpp::utils::isTPPRelu(genericOp))
+    return rewriter.create<tpp::ReluOp>(loc, outputs[0]).getOperation();
+  if (tpp::utils::isTPPAdd(genericOp))
+    return rewriter.create<tpp::AddOp>(loc, inputs[0], outputs[0])
+        .getOperation();
+  if (tpp::utils::isTPPIdentity(genericOp))
+    return rewriter.create<tpp::IdentityOp>(loc, inputs[0], outputs[0])
+        .getOperation();
+  return failure();
+}
+
+DiagnosedSilenceableFailure
+transform::ConvertLinalgToTpp::apply(transform::TransformResults &results,
+                                     transform::TransformState &state) {
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  SmallVector<Operation *> res;
+  for (Operation *op : payloadOps) {
+    if (!llvm::isa_and_nonnull<linalg::LinalgOp>(op))
+      return DiagnosedSilenceableFailure::definiteFailure();
+    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+    if (!linalgOp.hasBufferSemantics()) {
+      auto diag =
+          this->emitOpError()
+          << "Cannot convert linalg operation at tensor level to tpp, this op: "
+          << *op << "\n";
+      diag.attachNote(op->getLoc());
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    SimpleRewriter rewriter(linalgOp->getContext());
+    rewriter.setInsertionPoint(linalgOp);
+
+    TypeSwitch<Operation *>(linalgOp)
+        .Case([&](linalg::MatmulOp matmulOp) {
+          SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
+          Value output = matmulOp.getDpsInitOperands()[0]->get();
+          tpp::MatmulOp tppMatmulOp =
+              rewriter.create<tpp::MatmulOp>(matmulOp.getLoc(), inputs, output);
+          res.push_back(tppMatmulOp);
+          rewriter.eraseOp(matmulOp);
+        })
+        .Case([&](linalg::BatchReduceMatmulOp brgemmOp) {
+          SmallVector<Value> inputs = brgemmOp.getDpsInputOperands();
+          Value output = brgemmOp.getDpsInitOperands()[0]->get();
+          tpp::BrgemmOp tppBrgemmOp =
+              rewriter.create<tpp::BrgemmOp>(brgemmOp.getLoc(), inputs, output);
+          res.push_back(tppBrgemmOp);
+          rewriter.eraseOp(brgemmOp);
+        })
+        .Case([&](linalg::GenericOp genericOp) {
+          FailureOr<Operation *> converted = convertToTpp(genericOp, rewriter);
+          if (succeeded(converted)) {
+            res.push_back(*converted);
+            rewriter.eraseOp(genericOp);
+          }
+        })
+        .Default([&](Operation *op) {});
   }
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  mlir::tpp::populateConvertLinalgToTppPatterns(patterns,
-                                                /*useParallelLoops=*/true);
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
-
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-
+  results.set(getConvertedOp().cast<OpResult>(), res);
   return DiagnosedSilenceableFailure(success());
 }
 

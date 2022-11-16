@@ -54,13 +54,6 @@ class XsmmDialect;
 namespace mlir {
 namespace tpp {
 
-// RETIRE
-std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
-// RETIRE
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
-// RETIRE
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToFuncPass();
