@@ -259,6 +259,7 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
     dialect->getCanonicalizationPatterns(patterns);
   for (RegisteredOperationName op : ctx->getRegisteredOperations())
     op.getCanonicalizationPatterns(patterns, ctx);
+  tpp::populateTensorSliceFoldingPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
