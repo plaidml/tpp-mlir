@@ -4,7 +4,7 @@
 // RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run \
+// RUN: tpp-run -n 2 \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -34,7 +34,10 @@ func.func @entry(%arg0: tensor<4x8xf32>, %arg1: tensor<8x16xf32>, %arg2: tensor<
   } -> tensor<4x16xf32>
   return %3 : tensor<4x16xf32>
 }
+// Output
 // CHECK-COUNT-4: ( 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9 )
+// Stats
+// CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
 
 // TPP: func.func @entry(
 // TPP-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,

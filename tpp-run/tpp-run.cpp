@@ -37,46 +37,70 @@
 
 using namespace mlir;
 
+// Number of loops for benchmarks
+llvm::cl::opt<unsigned>
+    benchNumLoops("n", llvm::cl::desc("Number of loops for benchmarks"),
+                  llvm::cl::value_desc("int"), llvm::cl::init(1));
+
+// Print result
+llvm::cl::opt<bool>
+    printResultMemRef("print", llvm::cl::desc("Print result memref"),
+                  llvm::cl::value_desc("true/false"), llvm::cl::init(true));
+
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
-static LogicalResult prepareMLIRKernel(Operation *Op,
-                                       JitRunnerOptions &Options) {
-  MLIRBench Bench(Op);
+static LogicalResult prepareMLIRKernel(Operation *op,
+                                       JitRunnerOptions &options) {
+  MLIRBench bench(op);
 
-  if (Options.mainFuncType != "void")
-    return Bench.emitError(
+  // Basic checks
+  if (options.mainFuncType != "void")
+    return bench.emitError(
         "Main function has to be 'void', even if the kernel return's a value, "
         "because that's the type of the wrapper we create here");
 
-  if (failed(Bench.findKernel(Options.mainFuncName)))
-    return Bench.emitError("Cannot find kernel '" + Options.mainFuncName + "'");
+  if (failed(bench.findKernel(options.mainFuncName)))
+    return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
 
-  if (failed(Bench.checkKernelSignature()))
-    return Bench.finalize();
+  if (failed(bench.checkKernelSignature()))
+    return bench.finalize();
 
-  if (failed(Bench.renameKernel()))
-    return Bench.emitError("Cannot rename kernel function");
+  // Move the kernel to a local name, so we can create `main` with the same
+  // name as the pre-defined entry point (since we can't change it)
+  if (failed(bench.renameKernel()))
+    return bench.emitError("Cannot rename kernel function");
 
-  if (failed(Bench.createMainWrapper()))
-    return Bench.emitError("Cannot create main wrapper");
+  // Creates the inputs for the kernel as dense globals
+  SmallVector<llvm::StringRef> globalList;
+  if (failed(bench.createGlobals(globalList)))
+    return bench.emitError("Cannot create the global memrefs");
 
-  SmallVector<llvm::StringRef> GlobalList;
-  if (failed(Bench.createGlobals(GlobalList)))
-    return Bench.emitError("Cannot create the global memrefs");
+  // Creates the main wrapper
+  if (failed(bench.createMainWrapper()))
+    return bench.emitError("Cannot create main wrapper");
 
-  // TODO: Insert the benchmark loop here
-  auto Return = Bench.callKernel(GlobalList);
-  if (!Return)
-    return Bench.emitError("Cannot generate a call to the kernel");
+  // Call kernel once, to bootstrap (JIT compile, warm up caches)
+  auto ret = bench.callKernel(globalList);
+  if (!ret)
+    return bench.emitError("Cannot generate a call to the kernel");
 
-  // TODO: Insert the statistics here
+  // Print the result of the warming up, should be the same as any other
+  if (printResultMemRef && failed(bench.printMemRef(ret)))
+    return bench.emitError("Cannot print result memref");
 
-  // TODO: We may not want to print on benchmark runs...
-  if (failed(Bench.printMemRef(Return)))
-    return Bench.emitError("Cannot print result memref");
+  // This is the main loop, if N > 1
+  if (benchNumLoops > 1) {
+    auto acc = bench.createTimerLoop(globalList, benchNumLoops);
+    if (!acc)
+      return bench.emitError("Cannot create timer loop");
+    auto stats = bench.getTimerStats(acc);
+    if (!stats)
+      return bench.emitError("Cannot get timer stats");
+    bench.printVector(stats);
+  }
 
   // Finally lower to LLVM Dialect
-  return Bench.finalize();
+  return bench.finalize();
 }
 
 int main(int argc, char **argv) {

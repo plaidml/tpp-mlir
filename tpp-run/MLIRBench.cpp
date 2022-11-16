@@ -10,9 +10,11 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -27,60 +29,59 @@
 
 using namespace mlir;
 
-// Number of loops for benchmarks
-// llvm::cl::opt<unsigned>
-//    numLoops("n", llvm::cl::desc("Number of loops for benchmarks"),
-//             llvm::cl::value_desc("int"), llvm::cl::init(1));
+MLIRBench::MLIRBench(mlir::Operation *op)
+    : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
+  module = dyn_cast<ModuleOp>(op);
+  assert(module && "expected a 'builtin.Module' op");
+  auto *ctx = module->getContext();
+  ctx->getOrLoadDialect<tensor::TensorDialect>();
+  ctx->getOrLoadDialect<vector::VectorDialect>();
+  ctx->getOrLoadDialect<scf::SCFDialect>();
 
-MLIRBench::MLIRBench(mlir::Operation *Op)
-    : Builder(Op->getContext()), UnkLoc(Builder.getUnknownLoc()) {
-  Module = dyn_cast<ModuleOp>(Op);
-  assert(Module && "expected a 'builtin.Module' op");
-  auto *Ctx = Module->getContext();
-  Ctx->getOrLoadDialect<tensor::TensorDialect>();
-  Ctx->getOrLoadDialect<vector::VectorDialect>();
+  // TODO: Remove this once we use the perf dialect
+  declareGlobalFunctions();
 }
 
-LogicalResult MLIRBench::findKernel(StringRef Name) {
-  auto &ModuleOps = getModuleBlock().getOperations();
-  if (!Name.empty()) {
+LogicalResult MLIRBench::findKernel(StringRef name) {
+  auto &moduleOps = getModuleBlock().getOperations();
+  if (!name.empty()) {
     // If the user passed the entry point, use it
-    for (auto &Op : ModuleOps) {
-      func::FuncOp Func = dyn_cast_or_null<func::FuncOp>(Op);
-      if (Func && Func.getName().equals(Name)) {
-        Kernel = Func;
+    for (auto &op : moduleOps) {
+      func::FuncOp func = dyn_cast_or_null<func::FuncOp>(op);
+      if (func && func.getName().equals(name)) {
+        kernel = func;
         break;
       }
     };
     // Needs to be in the func dialect, not LLVM
-    if (!Kernel)
-      return Module.emitError("Entry point " + Name +
+    if (!kernel)
+      return module.emitError("Entry point " + name +
                               " not found as a func.func");
 
-  } else if (ModuleOps.size() == 1) {
+  } else if (moduleOps.size() == 1) {
     // Else, and there is only one function, use it
-    Kernel = dyn_cast_or_null<func::FuncOp>(ModuleOps.front());
-    if (!Kernel)
-      return Module.emitError("Single function not in Func Dialect");
+    kernel = dyn_cast_or_null<func::FuncOp>(moduleOps.front());
+    if (!kernel)
+      return module.emitError("Single function not in Func Dialect");
 
   } else {
     // If there is no entry function, and multiple functions, bail
-    return Module.emitError("No valid entry point, use mlir-cpu-runner");
+    return module.emitError("No valid entry point, use mlir-cpu-runner");
   }
 
   // Ignore functions that return more than one result
-  auto FuncType = Kernel.getFunctionType();
-  if (FuncType.getNumResults() > 1)
-    return Module.emitError("Multiple return values, use mlir-cpu-runner");
+  auto funcType = kernel.getFunctionType();
+  if (funcType.getNumResults() > 1)
+    return module.emitError("Multiple return values, use mlir-cpu-runner");
 
   return success();
 }
 
 LogicalResult MLIRBench::checkKernelSignature() {
   // If the function has no args or return values, just run it as is
-  auto FuncType = Kernel.getFunctionType();
-  if (FuncType.getNumInputs() == 0 && FuncType.getNumResults() == 0)
-    return Module.emitError("Entry point already created, use mlir-cpu-runner");
+  auto funcType = kernel.getFunctionType();
+  if (funcType.getNumInputs() == 0 && funcType.getNumResults() == 0)
+    return module.emitError("Entry point already created, use mlir-cpu-runner");
 
   return success();
 }
@@ -88,71 +89,150 @@ LogicalResult MLIRBench::checkKernelSignature() {
 LogicalResult MLIRBench::renameKernel() {
   // Rename the entry point to something else and make the main the entry point
   // This is required because we can't change the original Name
-  MainName = Kernel.getName();
-  auto NewName = Builder.getStringAttr("_" + MainName);
-  Kernel.setName(NewName);
+  mainName = kernel.getName();
+  auto newName = builder.getStringAttr("_" + mainName);
+  kernel.setName(newName);
+
+  return success();
+}
+
+LogicalResult
+MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
+  // Create global dense memrefs (Module insertion point)
+  builder.setInsertionPointToStart(&getModuleBlock());
+  auto funcType = kernel.getFunctionType();
+  for (auto &ty : funcType.getInputs()) {
+    auto memRefTy = dyn_cast_or_null<MemRefType>(ty);
+    list.push_back(createGlobal(memRefTy));
+  }
 
   return success();
 }
 
 LogicalResult MLIRBench::createMainWrapper() {
   // Add a `main` function (with no args/rets) to handle init/tear down
-  auto FuncType = Builder.getFunctionType({}, {});
-  Main = func::FuncOp::create(UnkLoc, MainName, FuncType);
-  Main.setVisibility(SymbolTable::Visibility::Public);
-  Main.addEntryBlock();
+  auto funcType = builder.getFunctionType({}, {});
+  main = func::FuncOp::create(unkLoc, mainName, funcType);
+  main.setVisibility(SymbolTable::Visibility::Public);
+  auto* entryBlock = main.addEntryBlock();
+  builder.setInsertionPointToEnd(entryBlock);
+  module.push_back(main);
 
   return success();
 }
 
-LogicalResult
-MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &List) {
-  // Create global dense memrefs (Module insertion point)
-  Builder.setInsertionPointToStart(&getModuleBlock());
-  auto FuncType = Kernel.getFunctionType();
-  for (auto &Ty : FuncType.getInputs()) {
-    auto MemRefTy = dyn_cast_or_null<MemRefType>(Ty);
-    List.push_back(createGlobal(MemRefTy));
-  }
-
-  return success();
-}
-
-Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &List) {
+Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
   // Get those globals as arguments (function insertion point)
-  Builder.setInsertionPointToEnd(&Main.getBlocks().front());
-  SmallVector<Value> Args;
-  for (auto &Name : List) {
-    // GetGlobal op properties
-    auto NameAttr = Builder.getStringAttr(Name);
-    auto Type = getGlobalType(Name);
-    auto GetGlobal =
-        Builder.create<memref::GetGlobalOp>(UnkLoc, Type, NameAttr);
+  // Cache locally, so we can avoid doing it again inside the loop
+  if (kernelArgs.empty()) {
+    for (auto &name : list) {
+      // GetGlobal op properties
+      auto nameAttr = builder.getStringAttr(name);
+      auto type = getGlobalType(name);
+      auto getGlobal =
+          builder.create<memref::GetGlobalOp>(unkLoc, type, nameAttr);
 
-    // Add argument to list
-    Args.push_back(GetGlobal);
+      // Add argument to list
+      kernelArgs.push_back(getGlobal);
+    }
   }
 
   // Call the Kernel, making sure to set the result to either the return value
   // or the last argument, if the return is void.
-  Value Result;
-  auto FuncType = Main.getFunctionType();
-  if (FuncType.getNumResults() == 0) {
-    Builder.create<func::CallOp>(UnkLoc, Kernel, Args);
-    Result = Args.back();
+  Value result;
+  auto funcType = main.getFunctionType();
+  if (funcType.getNumResults() == 0) {
+    builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
+    result = kernelArgs.back();
   } else {
-    auto Call = Builder.create<func::CallOp>(UnkLoc, Kernel, Args);
-    Result = Call->getOpResult(0);
+    auto call = builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
+    result = call->getOpResult(0);
   }
 
-  return Result;
+  return result;
 }
 
-LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
+Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
+                                 unsigned n) {
+  ValueRange emptyArgs;
+
+  // Allocates the vector for results
+  auto callAlloc = builder.create<func::CallOp>(unkLoc, timer.alloc, emptyArgs);
+  auto acc = callAlloc.getResult(0);
+
+  // Create a SCF loop, set insertion to inside loop
+  auto indexType = builder.getIndexType();
+  auto countAttr = builder.getIntegerAttr(indexType, n);
+  auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
+  auto zeroAttr = builder.getIntegerAttr(indexType, 0);
+  auto zero = builder.create<arith::ConstantOp>(unkLoc, indexType, zeroAttr);
+  auto oneAttr = builder.getIntegerAttr(indexType, 1);
+  auto one = builder.create<arith::ConstantOp>(unkLoc, indexType, oneAttr);
+  auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
+  builder.setInsertionPointToStart(loop.getBody());
+
+  // Call timer_now()
+  auto callStart = builder.create<func::CallOp>(unkLoc, timer.now, emptyArgs);
+  Value start = callStart->getOpResult(0);
+
+  // Call the kernel, ignore output
+  callKernel(list);
+
+  // Call timer_now() again
+  auto callEnd = builder.create<func::CallOp>(unkLoc, timer.now, emptyArgs);
+  Value end = callEnd->getOpResult(0);
+
+  // Calculate the difference
+  Value diff = builder.create<arith::SubFOp>(unkLoc, end, start);
+
+  // Accumulate (with acc ID and value)
+  ValueRange args {acc, diff};
+  builder.create<func::CallOp>(unkLoc, timer.accumulate, args);
+
+  // Revert insertion point and return the accumulation ID
+  builder.setInsertionPointAfter(loop);
+  return acc;
+}
+
+Value MLIRBench::getTimerStats(Value acc) {
+  // Get stats (this is done once, but we can get values in separate)
+  ValueRange args{acc};
+  auto callMean = builder.create<func::CallOp>(unkLoc, timer.average, args);
+  auto mean = callMean.getResult(0);
+  auto callDev = builder.create<func::CallOp>(unkLoc, timer.deviation, args);
+  auto dev = callDev.getResult(0);
+
+  // Create a vector<2xf64> so we can print
+  auto zeroFAttr = builder.getFloatAttr(builder.getF64Type(), 0.0);
+  auto zeroF = builder.create<arith::ConstantOp>(unkLoc, builder.getF64Type(),
+                                                 zeroFAttr);
+  auto vectorType = VectorType::get({2}, builder.getF64Type());
+  auto stats = builder.create<vector::SplatOp>(unkLoc, vectorType, zeroF);
+
+  // Insert mean, dev (as a chain) into vector, return end of chain
+  auto zeroIAttr = builder.getIntegerAttr(builder.getI64Type(), 0);
+  auto zeroI = builder.create<arith::ConstantOp>(unkLoc, builder.getI64Type(),
+                                                 zeroIAttr);
+  auto insMean =
+      builder.create<vector::InsertElementOp>(unkLoc, mean, stats, zeroI);
+  auto oneIAttr = builder.getIntegerAttr(builder.getI64Type(), 1);
+  auto oneI =
+      builder.create<arith::ConstantOp>(unkLoc, builder.getI64Type(), oneIAttr);
+  auto insDev =
+      builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
+
+  return insDev;
+}
+
+void MLIRBench::printVector(Value vector) {
+  builder.create<vector::PrintOp>(unkLoc, vector);
+}
+
+LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
-  auto outputType = dyn_cast_or_null<MemRefType>(MemRef.getType());
+  auto outputType = dyn_cast_or_null<MemRefType>(memRef.getType());
   assert(outputType && "Unsupported return type");
   VectorType vecType;
   auto lastDim = outputType.getRank() - 1;
@@ -166,21 +246,33 @@ LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
     vecType =
         VectorType::get(outputType.getShape(), outputType.getElementType());
   }
-
-  APFloat vectorFloatValue = APFloat(-1.0F);
-  auto minusOne = Builder.create<arith::ConstantFloatOp>(
-      UnkLoc, vectorFloatValue, Builder.getF32Type());
-  // TODO: Create a loop in IR
-  auto zeroIdx = Builder.create<arith::ConstantIndexOp>(UnkLoc, 0);
   assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
-  for (int i = 0; i < outerDims[0]; i++) {
-    auto beginIdx = Builder.create<arith::ConstantIndexOp>(UnkLoc, i);
 
-    auto indices = ValueRange{beginIdx, zeroIdx};
-    auto vector = Builder.create<vector::TransferReadOp>(
-        UnkLoc, vecType, MemRef, indices, minusOne);
-    Builder.create<vector::PrintOp>(UnkLoc, vector);
-  }
+  // Vector undefined value
+  APFloat vectorFloatValue = APFloat(-1.0F);
+  auto minusOne = builder.create<arith::ConstantFloatOp>(
+      unkLoc, vectorFloatValue, builder.getF32Type());
+
+  // Loop through memref, transfer each dim to vector
+  auto indexType = builder.getIndexType();
+  auto countAttr = builder.getIntegerAttr(indexType, outerDims[0]);
+  auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
+  auto zeroAttr = builder.getIntegerAttr(indexType, 0);
+  auto zero = builder.create<arith::ConstantOp>(unkLoc, indexType, zeroAttr);
+  auto oneAttr = builder.getIntegerAttr(indexType, 1);
+  auto one = builder.create<arith::ConstantOp>(unkLoc, indexType, oneAttr);
+  auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
+  builder.setInsertionPointToStart(loop.getBody());
+
+  // Loop body
+  auto beginIdx = loop.getInductionVar();
+  auto indices = ValueRange{beginIdx, zero};
+  auto vector = builder.create<vector::TransferReadOp>(unkLoc, vecType, memRef,
+                                                       indices, minusOne);
+  printVector(vector);
+
+  // Back to main
+  builder.setInsertionPointAfter(loop);
 
   // Finally lower to LLVM Dialect
   return success();
@@ -189,92 +281,138 @@ LogicalResult MLIRBench::printMemRef(mlir::Value MemRef) {
 LogicalResult MLIRBench::finalize() {
   // If we created a main at all...
   // return void and add func to Module
-  if (Main) {
-    Builder.create<func::ReturnOp>(UnkLoc);
-    Module.push_back(Main);
+  if (main) {
+    builder.create<func::ReturnOp>(unkLoc);
   }
 
   // Minimal passes to make it work
   // We don't want TPP passes here, as that's the job of tpp-opt
   // The IR here should be free of TPP/XSMM or any TPP extensions
-  PassManager PassManager(Module->getContext());
-  applyPassManagerCLOptions(PassManager);
+  PassManager passManager(module->getContext());
+  applyPassManagerCLOptions(passManager);
 
   // Bufferization, if needed
-  PassManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
-  PassManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
-  PassManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
+  passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
+  passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
+  passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
 
   // Partial Lowering
-  PassManager.addPass(createConvertTensorToLinalgPass());
-  PassManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  PassManager.addPass(arith::createArithExpandOpsPass());
-  PassManager.addPass(createConvertVectorToSCFPass());
-  PassManager.addPass(createConvertSCFToCFPass());
+  passManager.addPass(createConvertTensorToLinalgPass());
+  passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  passManager.addPass(arith::createArithExpandOpsPass());
+  passManager.addPass(createConvertVectorToSCFPass());
+  passManager.addPass(createConvertSCFToCFPass());
 
   // Lower to LLVM
-  PassManager.addPass(createConvertVectorToLLVMPass());
-  PassManager.addPass(createConvertFuncToLLVMPass());
-  PassManager.addPass(createMemRefToLLVMConversionPass());
-  PassManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
-  PassManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  PassManager.addPass(createReconcileUnrealizedCastsPass());
+  passManager.addPass(createConvertVectorToLLVMPass());
+  passManager.addPass(createConvertFuncToLLVMPass());
+  passManager.addPass(createMemRefToLLVMConversionPass());
+  passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addPass(createReconcileUnrealizedCastsPass());
 
-  auto Result = PassManager.run(Module);
-  if (failed(Result)) {
+  auto result = passManager.run(module);
+  if (failed(result)) {
     llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
-    Module->dump();
+    module->dump();
   }
 
-  return Result;
+  return result;
 }
 
 //----------------------- Helpers & private methods
 
-llvm::StringRef MLIRBench::createGlobal(MemRefType Type) {
+llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   // Simple auto increment
-  static unsigned Order = 0;
+  static unsigned order = 0;
 
   // TODO: Use some random initialiser
-  APFloat FloatValue = APFloat(1.0F);
+  APFloat floatValue = APFloat(1.0F);
 
   // Create global dense memrefs (Module insertion point)
-  auto PrivAttr = Builder.getStringAttr("private");
+  auto privAttr = builder.getStringAttr("private");
 
   // We really only support memrefs as arguments for now
-  auto MemrefTy = dyn_cast_or_null<MemRefType>(Type);
-  assert(MemrefTy && "Unsupported argument type");
+  auto memrefTy = dyn_cast_or_null<MemRefType>(type);
+  assert(memrefTy && "Unsupported argument type");
 
   // Auto incremental naming system
-  std::string Name = "__wrapper_" + std::to_string(Order++);
+  std::string name = "__wrapper_" + std::to_string(order++);
 
   // For some reason, memref global op needs dense tensor type
   // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-  auto TensorType =
-      RankedTensorType::get(MemrefTy.getShape(), MemrefTy.getElementType());
-  auto FloatInit = mlir::DenseElementsAttr::get(TensorType, FloatValue);
-  auto Alignment = Builder.getIntegerAttr(Builder.getI64Type(), 128);
+  auto tensorType =
+      RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
+  auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
+  auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
 
   // Create the global object in the Module's region
-  auto Global = Builder.create<memref::GlobalOp>(UnkLoc, StringRef(Name),
-                                                 PrivAttr, MemrefTy, FloatInit,
-                                                 /*constant=*/false, Alignment);
+  auto global = builder.create<memref::GlobalOp>(unkLoc, StringRef(name),
+                                                 privAttr, memrefTy, floatInit,
+                                                 /*constant=*/false, alignment);
 
-  return Global.getName();
+  return global.getName();
 }
 
-MemRefType MLIRBench::getGlobalType(llvm::StringRef Name) {
-  auto Op = Module.lookupSymbol<memref::GlobalOp>(Name);
-  assert(Op && "memref::Global not found");
-  auto MemRefTy = dyn_cast_or_null<MemRefType>(Op.getType());
-  assert(MemRefTy && "memref::Global type not a memref?");
-  return MemRefTy;
+void MLIRBench::declareGlobalFunctions() {
+  // Common function attributes
+  auto cifaceAttr = LLVM::LLVMDialect::getEmitCWrapperAttrName();
+  auto unitAttr = UnitAttr::get(module->getContext());
+  auto visAttr = builder.getStringAttr("sym_visibility");
+  auto privAttr = builder.getStringAttr("private");
+  // Data types
+  auto f64 = builder.getF64Type();
+  auto i64 = builder.getIntegerType(64);
+
+  // Alloc
+  timer.alloc = func::FuncOp::create(unkLoc, "timer_alloc",
+                                   builder.getFunctionType({}, {i64}));
+  timer.alloc->setAttr(cifaceAttr, unitAttr);
+  timer.alloc->setAttr(visAttr, privAttr);
+  module.push_back(timer.alloc);
+
+  // Now
+  timer.now = func::FuncOp::create(unkLoc, "timer_now",
+                                   builder.getFunctionType({}, {f64}));
+  timer.now->setAttr(cifaceAttr, unitAttr);
+  timer.now->setAttr(visAttr, privAttr);
+  module.push_back(timer.now);
+
+  // Accumulate
+  timer.accumulate =
+      func::FuncOp::create(unkLoc, "timer_accumulate",
+                           builder.getFunctionType({i64, f64}, {}));
+  timer.accumulate->setAttr(cifaceAttr, unitAttr);
+  timer.accumulate->setAttr(visAttr, privAttr);
+  module.push_back(timer.accumulate);
+
+  // Average
+  timer.average = func::FuncOp::create(
+      unkLoc, "timer_average", builder.getFunctionType({i64}, {f64}));
+  timer.average->setAttr(cifaceAttr, unitAttr);
+  timer.average->setAttr(visAttr, privAttr);
+  module.push_back(timer.average);
+
+  // Deviation
+  timer.deviation = func::FuncOp::create(
+      unkLoc, "timer_deviation", builder.getFunctionType({i64}, {f64}));
+  timer.deviation->setAttr(cifaceAttr, unitAttr);
+  timer.deviation->setAttr(visAttr, privAttr);
+  module.push_back(timer.deviation);
+}
+
+MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
+  auto op = module.lookupSymbol<memref::GlobalOp>(name);
+  assert(op && "memref::Global not found");
+  auto memRefTy = dyn_cast_or_null<MemRefType>(op.getType());
+  assert(memRefTy && "memref::Global type not a memref?");
+  return memRefTy;
 }
 
 Block &MLIRBench::getModuleBlock() {
-  return Module->getRegions().front().front();
+  return module->getRegions().front().front();
 }
 
-LogicalResult MLIRBench::emitError(llvm::Twine Desc) {
-  return Module.emitError(Desc);
+LogicalResult MLIRBench::emitError(llvm::Twine desc) {
+  return module.emitError(desc);
 }

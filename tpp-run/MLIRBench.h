@@ -1,3 +1,6 @@
+#ifndef TPP_RUN_MLIRBENCH_H
+#define TPP_RUN_MLIRBENCH_H
+
 //===- MLIRBench.h - MLIR Benchmark Producer ------------------------------===//
 //
 // Producer for benchmark wrapper methods. Upon selecting a kernel to run, maps
@@ -31,68 +34,95 @@ class FuncOp;
 /// API design, with time.
 class MLIRBench {
   /// MLIR OpBulder
-  mlir::OpBuilder Builder;
+  OpBuilder builder;
 
   /// Unknown location, since all this code is auto-generated
-  mlir::Location UnkLoc;
+  Location unkLoc;
 
   /// Main module
-  mlir::ModuleOp Module;
+  ModuleOp module;
 
   /// Kernel function, if found
-  mlir::func::FuncOp Kernel;
+  func::FuncOp kernel;
+
+  /// Values of the kernel arguments (no need to declare every time)
+  llvm::SmallVector<Value> kernelArgs;
 
   /// Main wrapper function, calls kernel
-  mlir::func::FuncOp Main;
+  func::FuncOp main;
 
   /// Local cache of the main name
-  llvm::StringRef MainName;
+  llvm::StringRef mainName;
 
   /// Global variables for all arguments (in order)
-  llvm::SmallVector<llvm::StringRef> Globals;
+  llvm::SmallVector<llvm::StringRef> globals;
 
   /// Create a random global based on the memref type
-  llvm::StringRef createGlobal(mlir::MemRefType Type);
+  llvm::StringRef createGlobal(MemRefType);
 
-  /// Create a random global based on the memref type
-  mlir::MemRefType getGlobalType(llvm::StringRef Name);
+  /// Declare some required global functions
+  /// TODO: This won't be needed after the perf dialect is used
+  void declareGlobalFunctions();
+  struct {
+    func::FuncOp alloc;
+    func::FuncOp now;
+    func::FuncOp accumulate;
+    func::FuncOp average;
+    func::FuncOp deviation;
+  } timer;
+
+  /// Get a global memref by name
+  MemRefType getGlobalType(llvm::StringRef);
 
   /// Gets module's main block
-  mlir::Block &getModuleBlock();
+  Block &getModuleBlock();
 
 public:
   /// Creates context, builder
-  MLIRBench(mlir::Operation *Op);
+  MLIRBench(Operation *op);
 
   /// Finds the kernel method, checks correct name and shape
-  mlir::LogicalResult findKernel(llvm::StringRef Name);
+  LogicalResult findKernel(llvm::StringRef);
 
   /// Check if the kernel is already an entry point
   /// Find the kernel first with findKernel.
-  mlir::LogicalResult checkKernelSignature();
+  LogicalResult checkKernelSignature();
 
   /// Renames the kernel to _name, so that we can create the wrapper
-  mlir::LogicalResult renameKernel();
-
-  /// Create main wrapper function, sets insertion point
-  mlir::LogicalResult createMainWrapper();
+  LogicalResult renameKernel();
 
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order
-  mlir::LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &List);
+  LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &);
+
+  /// Create main wrapper function, sets insertion point
+  LogicalResult createMainWrapper();
 
   /// Calls the kernel, returns the result, which is either
   /// the return value (if any) or the last argument (outs).
-  mlir::Value callKernel(llvm::SmallVector<llvm::StringRef> &List);
+  Value callKernel(llvm::SmallVector<llvm::StringRef> &);
+
+  /// Create a loop with a timer around the kernel call
+  /// Returns the memref containing the timings
+  /// TODO: Move this to create a perf.timer op
+  Value createTimerLoop(llvm::SmallVector<llvm::StringRef> &, unsigned);
+
+  /// Get the timer average/deviation (from the vector accumulation)
+  Value getTimerStats(Value);
+
+  /// Prints a float value (used for mean/dev)
+  void printVector(Value);
 
   /// Prints the memref as a vector read + print
-  mlir::LogicalResult printMemRef(mlir::Value MemRef);
+  LogicalResult printMemRef(Value);
 
   /// Terminates the function, issuing a return, lower to LLVM
-  mlir::LogicalResult finalize();
+  LogicalResult finalize();
 
   /// Reports error on the current module's location
-  mlir::LogicalResult emitError(llvm::Twine Desc);
+  LogicalResult emitError(llvm::Twine);
 };
 
 } // namespace mlir
+
+#endif
