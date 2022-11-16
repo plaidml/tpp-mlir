@@ -25,7 +25,9 @@ set(LLVM_LINK_COMPONENTS
   native
   )
 
-add_llvm_executable(tpp-run tpp-run.cpp)
+add_llvm_executable(tpp-run
+  MLIRBench.cpp
+  tpp-run.cpp)
 
 llvm_update_compile_flags(tpp-run)
 
