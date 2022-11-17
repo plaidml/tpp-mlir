@@ -230,7 +230,7 @@ struct TensorExtractSliceOfSlice
     for (size_t i = 0; i < consOffsets.size(); ++i)
       combinedOffsets.push_back(makeComposedFoldedAffineApply(
           b, loc, s0 * s1 + s2,
-          {prodOffsets[i], consStrides[i], consOffsets[i]}));
+          {prodStrides[i], consOffsets[i], prodOffsets[i]}));
 
     // Create a single direct extract slice op mapping:
     // producer input -> consumer output
