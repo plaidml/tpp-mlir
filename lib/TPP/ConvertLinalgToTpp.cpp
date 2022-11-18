@@ -73,26 +73,40 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
       loc, resultType, input, subViewOffsets, subViewSizes, subViewStrides);
 }
 
+bool isAlreadyReshaped(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
+  assert(linalgOp.getNumLoops() > 2 && "expect two or more loops");
+  SmallVector<Range> domain = cast<TilingInterface>(linalgOp.getOperation())
+                                  .getIterationDomain(rewriter);
+  for (size_t loopIdx = 0; loopIdx < linalgOp.getNumLoops() - 2; loopIdx++) {
+    Range &loopRange = domain[loopIdx];
+    Optional<int64_t> constantUb = getConstantIntValue(loopRange.size);
+    if (constantUb && *constantUb != 1)
+      return false;
+  }
+  return true;
+}
+
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
 LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
                         bool useParallelLoops) {
-  if (!tpp::utils::hasTppMark(linalgOp))
-    return rewriter.notifyMatchFailure(linalgOp, "Expect tpp mark");
   if (!linalgOp.hasBufferSemantics())
-    return rewriter.notifyMatchFailure(linalgOp,
-                                       "Expect linalgOp with buffer semantics");
+    return failure();
 
   // Bail-out if we don't need to do tiling or all the dimensions
   // are not parallel.
   if (linalgOp.getNumLoops() <= 2)
-    return rewriter.notifyMatchFailure(linalgOp, "Expect at least two loops");
+    return failure();
+
+  if (isAlreadyReshaped(rewriter, linalgOp))
+    return failure();
+
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
   if (!llvm::all_of(iteratorTypes, [](utils::IteratorType type) {
         return linalg::isParallelIterator(type);
       }))
-    return rewriter.notifyMatchFailure(linalgOp, "Expect all parallel loops");
+    return failure();
 
   linalg::LinalgTilingOptions linalgTilingOptions;
   linalg::LinalgTilingLoopType loopsTypes =
@@ -261,24 +275,23 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
                                ArrayRef<Value> operands,
                                PatternRewriter &rewriter) const {
-    std::string libraryCall = linalgOp.getLibraryCallName();
-    if (libraryCall.compare("tpp.identity") == 0) {
+    if (tpp::utils::isTppIdentity(linalgOp)) {
       assert(operands.size() == 2 && "Expect two operands");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
     }
-    if (libraryCall.compare("tpp.relu") == 0) {
+    if (tpp::utils::isTppRelu(linalgOp)) {
       assert(linalgOp.getNumDpsInits() == 1);
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0]);
       return success();
     }
-    if (libraryCall.compare("tpp.add") == 0) {
+    if (tpp::utils::isTppAdd(linalgOp)) {
       rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
                                               operands[1]);
       return success();
     }
-    if (libraryCall.compare("tpp.matmul") == 0) {
+    if (tpp::utils::isTppMatmul(linalgOp)) {
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(linalgOp, operands[0],
                                                  operands[1], operands[2]);
       return success();
@@ -294,9 +307,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (!tpp::utils::hasStaticShape(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");
-    if (!linalgOp.getLibraryCallAttr() || !tpp::utils::hasTppMark(linalgOp))
-      return rewriter.notifyMatchFailure(
-          linalgOp, "Not enough information to map to tpp");
 
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;

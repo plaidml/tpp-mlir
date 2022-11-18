@@ -42,7 +42,33 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp);
 bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg generic is a tpp.matmul.
+// 1. Buffer semantics.
+// 2. One output and two inputs.
+// 3. A single region with a an add and a mul operation
+// 4. Loops are: [parallel, parallel, reduction]
+// 5. Access pattern is [i, j] -> [i, k] [k, j]
 bool isTppMatmul(linalg::GenericOp linalgOp);
+
+// Returns true if the linalg generic is a tpp.add.
+// 1. Buffer semantics.
+// 2. One output and one input.
+// 3. A single region with an add operation.
+// 4. All loops are parallel and the number of loops is less than or equal to 2.
+bool isTppAdd(linalg::GenericOp linalgOp);
+
+// Returns true if the linalg.generic is a tpp.identity
+// 1. Buffer semantics.
+// 2. One output and one input.
+// 3. A single region with a yield operation.
+// 4. All loops are parallel and the number of loops is less than or equal to 2.
+bool isTppIdentity(linalg::GenericOp linalgOp);
+
+// Returns true if the linalg.generic is a tpp.relu:
+// 1. Buffer semantics.
+// 2. One output and zero input.
+// 3. A single region with a maxf operation.
+// 4. All loops are parallel and the number of loops is less than or equal to 2.
+bool isTppRelu(linalg::GenericOp linalgOp);
 
 // Returns true if the linalg generic can be mapped to a tpp.identity.
 bool canMapToTppIdentity(linalg::GenericOp linalgOp);

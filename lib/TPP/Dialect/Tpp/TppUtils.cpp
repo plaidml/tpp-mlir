@@ -308,6 +308,17 @@ bool canMapToTppAdd(linalg::GenericOp linalgOp) {
   return hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
+// TODO: check access pattern using affine map.
+bool isTppAdd(linalg::GenericOp linalgOp) {
+  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+    return false;
+  if ((linalgOp.getNumDpsInputs() != 1) || (linalgOp.getNumDpsInits() != 1))
+    return false;
+  if (linalgOp.hasTensorSemantics())
+    return false;
+  return hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
+}
+
 bool canMapToTppRelu(linalg::GenericOp linalgOp) {
   if (!linalg::isElementwise(linalgOp))
     return false;
@@ -316,10 +327,33 @@ bool canMapToTppRelu(linalg::GenericOp linalgOp) {
   return hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
 }
 
+// TODO: check access pattern using affine map.
+bool isTppRelu(linalg::GenericOp linalgOp) {
+  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+    return false;
+  if ((linalgOp.getNumDpsInputs() != 0) || (linalgOp.getNumDpsInits() != 1))
+    return false;
+  if (linalgOp.hasTensorSemantics())
+    return false;
+  return hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
+}
+
 bool canMapToTppIdentity(linalg::GenericOp linalgOp) {
   if (!linalg::isElementwise(linalgOp))
     return false;
   return (hasStaticShape(linalgOp) && hasCopySemantics(linalgOp));
+}
+
+// TODO: check access pattern using affine map. We need to take into account
+// broadcasting too.
+bool isTppIdentity(linalg::GenericOp linalgOp) {
+  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+    return false;
+  if ((linalgOp.getNumDpsInputs() != 1) || (linalgOp.getNumDpsInits() != 1))
+    return false;
+  if (linalgOp.hasTensorSemantics())
+    return false;
+  return hasCopySemantics(linalgOp);
 }
 
 } // namespace utils
