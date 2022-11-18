@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
+#include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -54,7 +55,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
   SmallVector<OpFoldResult> blockingFactors = getAsOpFoldResult(
       rewriter.getI64ArrayAttr(extractFromI64ArrayAttr(getBlockingFactors())));
   Operation *currentTarget = target;
-  FailureOr<linalg::GenericOp> packedOp = failure();
+  FailureOr<Operation *> packedOp = failure();
   TypeSwitch<Operation *>(currentTarget)
       .Case([&](linalg::Conv2DNchwFchwOp convOp) {
         packedOp = mlir::linalgx::packConv2DNchwFchwOp(rewriter, convOp,
@@ -65,8 +66,14 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
                                                        blockingFactors);
       })
       .Case([&](linalg::MatmulOp matmulOp) {
-        packedOp =
-            mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
+        int useVnniFlag = this->getUseVnni();
+        if (useVnniFlag) {
+          packedOp = mlir::linalgx::packVNNIMatmulOp(rewriter, matmulOp,
+                                                     blockingFactors);
+        } else {
+          packedOp =
+              mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
+        }
       })
       .Default([&](Operation *op) { packedOp = failure(); });
   if (succeeded(packedOp)) {

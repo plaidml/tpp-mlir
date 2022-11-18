@@ -32,6 +32,7 @@ add_mlir_library(MLIRTPP
     TPPLinalgXDialect
     TPPTppDialect
     TPPXsmmDialect
+    TPPVNNIDialect
 
     MLIRIR
     MLIRInferTypeOpInterface

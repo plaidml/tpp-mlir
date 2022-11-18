@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -23,6 +23,7 @@
 
 using namespace mlir;
 using namespace mlir::linalgx;
+using namespace mlir::vnni;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -83,11 +84,30 @@ static Value handleLayoutNC_NCnc(Location loc, Value input, Value output,
                             builder);
 }
 
+static Value handleLayout_VNNI(Location loc, Value input, Value output,
+                               ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
+                               bool useAlloc = false) {
+  assert(tiles.size() == 1 && "expect 1 block for VNNI");
+  SmallVector<int64_t> innerDimPos = {0};
+  if (!output)
+    return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
+                            useAlloc);
+  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, {},
+                            builder);
+}
+
 // Helper function to pack from NC to NCnc.
 static Value toPackLayoutNC_NCnc(Location loc, Value input,
                                  ArrayRef<OpFoldResult> tiles,
                                  OpBuilder &builder, bool useAlloc = false) {
   return handleLayoutNC_NCnc(loc, input, nullptr, tiles, builder, useAlloc);
+}
+
+// Helper function to pack from NC to NCnc.
+static Value toPackLayout_VNNI(Location loc, Value input,
+                               ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
+                               bool useAlloc = false) {
+  return handleLayout_VNNI(loc, input, nullptr, tiles, builder, useAlloc);
 }
 
 // Helper function to unpack from NCnc to NC.
@@ -367,6 +387,33 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   Value outReplacement = fromPackLayoutNCnc_NC(
       loc, outPackTensor, outUnPackTensor, tilesOnC, rewriter);
   rewriter.replaceOp(matmulOp, outReplacement);
+  return replacementOp;
+}
+
+FailureOr<vnni::MatmulOp>
+mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
+                                linalg::MatmulOp matmulOp,
+                                ArrayRef<OpFoldResult> tiles) {
+  if (tiles.size() != 1)
+    return rewriter.notifyMatchFailure(matmulOp, "require 1 blocking factor");
+
+  if (matmulOp.hasDynamicShape())
+    return rewriter.notifyMatchFailure(matmulOp, "require static shape");
+
+  if (matmulOp.hasBufferSemantics())
+    return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
+
+  OpFoldResult tileOnI = tiles[0];
+  SmallVector<OpFoldResult, 1> tilesOnA = {tileOnI};
+
+  Location loc = matmulOp.getLoc();
+  // reshape input A.
+  Value packedMatrixA =
+      toPackLayout_VNNI(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
+  auto replacementOp =
+      rewriter.create<vnni::MatmulOp>(loc, matmulOp.getOutputs()[0].getType(),
+                                      packedMatrixA, matmulOp.getInputs()[1]);
+  rewriter.replaceOp(matmulOp, replacementOp.getResult());
   return replacementOp;
 }
 
