@@ -284,8 +284,8 @@ transform.sequence failures(propagate) {
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
-// MATCHANDREPLACE-LABEL: func.func @gemm
-func.func @gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2: memref<1x512xf32>) {
+// MATCHANDREPLACE-LABEL: func.func @not_gemm
+func.func @not_gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2: memref<1x512xf32>) {
   // MATCHANDREPLACE-NOT: tpp.matmul
   linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1: memref<1x256xf32>, memref<256x512xf32>) outs(%arg2: memref<1x512xf32>) {
   ^bb0(%arg5: f32, %arg3: f32, %arg4: f32):
@@ -318,6 +318,30 @@ func.func @identity(%arg1: memref<32x33x34x35xf32>) {
   linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : memref<32x33x34x35xf32>) outs(%1 : memref<32x33x34x35xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
+  }
+  return
+}
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %0
+}
+
+// MATCHANDREPLACE-LABEL: func.func @dyn_gemm
+func.func @dyn_gemm(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>) {
+  // MATCHANDREPLACE-NOT: tpp.matmul
+  linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1: memref<?x?xf32>, memref<?x?xf32>) outs(%arg2: memref<?x?xf32>) {
+  ^bb0(%arg5: f32, %arg3: f32, %arg4: f32):
+    %2 = arith.mulf %arg5, %arg3 : f32
+    %3 = arith.addf %arg4, %2 : f32
+    linalg.yield %3 : f32
   }
   return
 }

@@ -60,7 +60,7 @@ static MemRefType dropUnitDims(MemRefType inputType, ArrayRef<int64_t> offsets,
 static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
                                                  Location loc, Value input) {
   MemRefType inputType = input.getType().cast<MemRefType>();
-  assert(inputType.hasStaticShape() && "expect static shape");
+  assert(inputType.hasStaticShape() && "Expect static shape");
   SmallVector<int64_t> subViewOffsets(inputType.getRank(), 0);
   SmallVector<int64_t> subViewStrides(inputType.getRank(), 1);
   ArrayRef<int64_t> subViewSizes = inputType.getShape();
@@ -290,21 +290,21 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(linalgOp, "expect buffer semantics");
+      return rewriter.notifyMatchFailure(linalgOp, "Expect buffer semantics");
+    if (!tpp::utils::hasStaticShape(linalgOp))
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Expect static shape when mapping to tpp");
     if (!linalgOp.getLibraryCallAttr() || !tpp::utils::hasTppMark(linalgOp))
       return rewriter.notifyMatchFailure(
-          linalgOp, "not enough information to map to tpps");
-
-    if (linalgOp->getNumResults() != 0)
-      return rewriter.notifyMatchFailure(linalgOp, "expect at least 1 result");
+          linalgOp, "Not enough information to map to tpp");
 
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
       Value newOperand = getOperandForTpp(operand, rewriter, loc);
       if (failed(checkOperandForTpp(newOperand)))
-        return rewriter.notifyMatchFailure(linalgOp,
-                                           "expect scalar or rank 2 memref");
+        return rewriter.notifyMatchFailure(
+            linalgOp, "Expect scalar or rank 2 memref when mapping to tpp");
       newOperands.push_back(newOperand);
     }
     return rewriteToTppOp(linalgOp, newOperands, rewriter);
@@ -319,7 +319,11 @@ struct ConvertBrgemmToTpp
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!brMatmulOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(brMatmulOp, "expect buffer semantics");
+      return rewriter.notifyMatchFailure(
+          brMatmulOp, "Expect buffer semantics when mapping to tpp");
+    if (!tpp::utils::hasStaticShape(brMatmulOp))
+      return rewriter.notifyMatchFailure(
+          brMatmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
     SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
@@ -334,7 +338,11 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(matmulOp, "expect buffer semantics");
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Expect buffer semantics when mapping to tpp");
+    if (!tpp::utils::hasStaticShape(matmulOp))
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
     SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
