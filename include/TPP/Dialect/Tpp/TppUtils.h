@@ -42,7 +42,7 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp);
 bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg generic is a tpp.matmul.
-bool isTPPGemm(linalg::GenericOp linalgOp);
+bool isTppMatmul(linalg::GenericOp linalgOp);
 
 // Returns true if the linalg generic can be mapped to a tpp.identity.
 bool canMapToTppIdentity(linalg::GenericOp linalgOp);

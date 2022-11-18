@@ -33,7 +33,7 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
     return rewriter.notifyMatchFailure(linalgOp,
                                        "library_call attr already set");
 
-  if (tpp::utils::isTPPGemm(linalgOp)) {
+  if (tpp::utils::isTppMatmul(linalgOp)) {
     StringAttr tppMicroKernelName = rewriter.getStringAttr("tpp.matmul");
     rewriter.updateRootInPlace(
         linalgOp, [&]() { linalgOp.setLibraryCallAttr(tppMicroKernelName); });
