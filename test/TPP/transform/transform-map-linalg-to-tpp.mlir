@@ -331,12 +331,12 @@ func.func @identity(%arg1: memref<32x33x34x35xf32>) {
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg1
+    // expected-error @below {{failed to apply}}
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
-// MATCHANDREPLACE-LABEL: func.func @dyn_gemm
+// expected-note @below {{attempted to apply to this op}}
 func.func @dyn_gemm(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>) {
-  // MATCHANDREPLACE-NOT: tpp.matmul
   linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1: memref<?x?xf32>, memref<?x?xf32>) outs(%arg2: memref<?x?xf32>) {
   ^bb0(%arg5: f32, %arg3: f32, %arg4: f32):
     %2 = arith.mulf %arg5, %arg3 : f32
@@ -344,4 +344,26 @@ func.func @dyn_gemm(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memre
     linalg.yield %3 : f32
   }
   return
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+transform.sequence failures(propagate) {
+  ^bb0(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    transform.structured.map_and_convert_linalg_to_tpp %0
+}
+
+// MATCHANDREPLACE-LABEL: func.func @identity_mapping(
+func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<1x1x56x64xf32> {
+  %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x1x56x64xf32>
+  // MATCHANDREPLACE: tpp.identity
+  linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : memref<64xf32>) outs(%alloc : memref<1x1x56x64xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  return %alloc : memref<1x1x56x64xf32>
 }
