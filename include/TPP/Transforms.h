@@ -1,3 +1,6 @@
+#ifndef TPP_TRANSFORMS_H
+#define TPP_TRANSFORMS_H
+
 //===- Transforms.h ----------------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -74,3 +77,5 @@ void populateCheckToFuncPatterns(RewritePatternSet &patterns);
 void populateSinkPackPatterns(RewritePatternSet &patterns);
 } // namespace tpp
 } // namespace mlir
+
+#endif

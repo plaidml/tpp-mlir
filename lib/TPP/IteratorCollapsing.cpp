@@ -81,7 +81,7 @@ static Type inferNewOperandType(Type oldType,
   if (oldType.isa<MemRefType>())
     return memref::CollapseShapeOp::computeCollapsedType(
         oldType.cast<MemRefType>(), reassociation);
-  else if (oldType.isa<RankedTensorType>()) {
+  if (oldType.isa<RankedTensorType>()) {
     SmallVector<int64_t> newTensorShape;
     ArrayRef<int64_t> oldTypeShape =
         oldType.cast<RankedTensorType>().getShape();

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CHECK_TPP_OPS_H
-#define CHECK_TPP_OPS_H
+#ifndef TPP_DIALECT_CHECK_CHECKOPS_H
+#define TPP_DIALECT_CHECK_CHECKOPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -17,4 +17,4 @@
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Check/CheckOps.h.inc"
 
-#endif // CHECK_TPP_OPS_H
+#endif // TPP_DIALECT_CHECK_CHECKOPS_H

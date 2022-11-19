@@ -1,3 +1,6 @@
+#ifndef TPP_TRANSFORMUTILS_H
+#define TPP_TRANSFORMUTILS_H
+
 //===- TransformUtils.cpp ----------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -17,7 +20,7 @@ class RewriterBase;
 
 namespace linalg {
 class LinalgOp;
-}
+} // namespace linalg
 
 namespace utils {
 
@@ -54,3 +57,5 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
 } // namespace utils
 
 } // namespace mlir
+
+#endif

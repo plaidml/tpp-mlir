@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LINALGX_TPP_OPS_H
-#define LINALGX_TPP_OPS_H
+#ifndef TPP_DIALECT_LINALGX_LINALGXOPS_H
+#define TPP_DIALECT_LINALGX_LINALGXOPS_H
 
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,4 +21,4 @@
 #define GET_OP_CLASSES
 #include "TPP/Dialect/LinalgX/LinalgXOps.h.inc"
 
-#endif // LINALGX_TPP_OPS_H
+#endif // TPP_DIALECT_LINALGX_LINALGXOPS_H

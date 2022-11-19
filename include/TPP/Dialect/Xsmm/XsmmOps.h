@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef XSMM_TPP_OPS_H
-#define XSMM_TPP_OPS_H
+#ifndef TPP_DIALECT_XSMM_XSMMOPS_H
+#define TPP_DIALECT_XSMM_XSMMOPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -34,4 +34,4 @@ class DataTypeAttr;
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOps.h.inc"
 
-#endif // XSMM_TPP_OPS_H
+#endif // TPP_DIALECT_XSMM_XSMMOPS_H

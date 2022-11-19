@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TPP_OPS_H
-#define TPP_TPP_OPS_H
+#ifndef TPP_DIALECT_TPP_TPPOPS_H
+#define TPP_DIALECT_TPP_TPPOPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -18,4 +18,4 @@
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Tpp/TppOps.h.inc"
 
-#endif // TPP_TPP_OPS_H
+#endif // TPP_DIALECT_TPP_TPPOPS_H

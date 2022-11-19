@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_UTILS_H
-#define TPP_UTILS_H
+#ifndef TPP_DIALECT_TPP_TPPUTILS_H
+#define TPP_DIALECT_TPP_TPPUTILS_H
 
 #include <string>
 
@@ -83,4 +83,4 @@ bool canMapToTppAdd(linalg::GenericOp linalgOp);
 } // namespace tpp
 } // namespace mlir
 
-#endif // TPP_UTILS_H
+#endif // TPP_DIALECT_TPP_TPPUTILS_H

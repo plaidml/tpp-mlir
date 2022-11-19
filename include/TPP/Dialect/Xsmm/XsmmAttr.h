@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef XSMM_ATTRIBUTES_H
-#define XSMM_ATTRIBUTES_H
+#ifndef TPP_DIALECT_XSMM_XSMMATTR_H
+#define TPP_DIALECT_XSMM_XSMMATTR_H
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -15,4 +15,4 @@
 #define GET_ATTRDEF_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmAttr.h.inc"
 
-#endif // XSMM_ATTRIBUTES_H
+#endif // TPP_DIALECT_XSMM_XSMMATTR_H
