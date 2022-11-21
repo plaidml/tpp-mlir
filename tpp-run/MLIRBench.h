@@ -65,8 +65,8 @@ class MLIRBench {
   void declareGlobalFunctions();
   struct {
     func::FuncOp alloc;
-    func::FuncOp now;
-    func::FuncOp accumulate;
+    func::FuncOp start;
+    func::FuncOp stop;
     func::FuncOp average;
     func::FuncOp deviation;
   } timer;

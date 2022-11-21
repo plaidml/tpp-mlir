@@ -170,21 +170,13 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
   builder.setInsertionPointToStart(loop.getBody());
 
   // Call timer_now()
-  auto callStart = builder.create<func::CallOp>(unkLoc, timer.now, ValueRange());
-  Value start = callStart->getOpResult(0);
+  builder.create<func::CallOp>(unkLoc, timer.start, ValueRange(acc));
 
   // Call the kernel, ignore output
   callKernel(list);
 
   // Call timer_now() again
-  auto callEnd = builder.create<func::CallOp>(unkLoc, timer.now, ValueRange());
-  Value end = callEnd->getOpResult(0);
-
-  // Calculate the difference
-  Value diff = builder.create<arith::SubFOp>(unkLoc, end, start);
-
-  // Accumulate (with acc ID and value)
-  builder.create<func::CallOp>(unkLoc, timer.accumulate, ValueRange{acc, diff});
+  builder.create<func::CallOp>(unkLoc, timer.stop, ValueRange(acc));
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
@@ -366,20 +358,19 @@ void MLIRBench::declareGlobalFunctions() {
   timer.alloc->setAttr(visAttr, privAttr);
   module.push_back(timer.alloc);
 
-  // Now
-  timer.now = func::FuncOp::create(unkLoc, "timer_now",
-                                   builder.getFunctionType({}, {f64}));
-  timer.now->setAttr(cifaceAttr, unitAttr);
-  timer.now->setAttr(visAttr, privAttr);
-  module.push_back(timer.now);
+  // Start
+  timer.start = func::FuncOp::create(unkLoc, "timer_start",
+                                     builder.getFunctionType({i64}, {}));
+  timer.start->setAttr(cifaceAttr, unitAttr);
+  timer.start->setAttr(visAttr, privAttr);
+  module.push_back(timer.start);
 
-  // Accumulate
-  timer.accumulate =
-      func::FuncOp::create(unkLoc, "timer_accumulate",
-                           builder.getFunctionType({i64, f64}, {}));
-  timer.accumulate->setAttr(cifaceAttr, unitAttr);
-  timer.accumulate->setAttr(visAttr, privAttr);
-  module.push_back(timer.accumulate);
+  // Stop
+  timer.stop = func::FuncOp::create(unkLoc, "timer_stop",
+                                    builder.getFunctionType({i64}, {}));
+  timer.stop->setAttr(cifaceAttr, unitAttr);
+  timer.stop->setAttr(visAttr, privAttr);
+  module.push_back(timer.stop);
 
   // Average
   timer.average = func::FuncOp::create(
