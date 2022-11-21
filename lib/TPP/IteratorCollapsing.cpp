@@ -96,7 +96,7 @@ static Type inferNewOperandType(Type oldType,
           hasDynamicDim = true;
       }
       if (hasDynamicDim)
-        newTensorShape.push_back(ShapedType::kDynamicSize);
+        newTensorShape.push_back(ShapedType::kDynamic);
       else
         newTensorShape.push_back(currentReassocShape);
     }

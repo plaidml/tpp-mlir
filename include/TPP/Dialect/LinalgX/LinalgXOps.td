@@ -85,7 +85,7 @@ def PackOp : LinalgX_Op<"pack", [
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
-                             "ShapedType::kDynamicSize")
+                             "ShapedType::kDynamic")
     `into` $output `:` `(` type($input) type($output) `)`
      (`->` type($results)^)?
   }];
@@ -187,7 +187,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
-                             "ShapedType::kDynamicSize")
+                             "ShapedType::kDynamic")
     `into` $output `:` `(` type($input) type($output) `)`
      (`->` type($results)^)?
   }];

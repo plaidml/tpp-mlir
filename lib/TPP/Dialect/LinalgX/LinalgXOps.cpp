@@ -134,7 +134,7 @@ void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   if (!outerDimPerm.size())
     build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
           innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles),
@@ -154,7 +154,7 @@ void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   Type typeOutput = output.getType();
   if (outerDimPerm.empty())
     build(builder, result, typeOutput, input, output,
@@ -174,7 +174,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   Type typeOutput = output.getType();
   if (outerDimsPerm.empty())
     build(builder, result, typeOutput, input, output, /*output_dims_pos=*/{},
@@ -193,7 +193,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   if (!outerDimPerm.size())
     build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
           innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles));
@@ -275,7 +275,7 @@ static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
                             DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (inputShape[dim] == ShapedType::kDynamicSize)
+    if (inputShape[dim] == ShapedType::kDynamic)
       continue;
     if (dimAndTileMapping.count(dim)) {
       Optional<int64_t> constantTile =
@@ -366,14 +366,14 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
 }
 
 /// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
-/// `kDynamicSize` is introduced at that position in the returned vector.
+/// `kDynamic` is introduced at that position in the returned vector.
 template <typename OpTy> static SmallVector<int64_t> getStaticTiles(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   return staticTiles;
 }
 
@@ -458,7 +458,7 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
     if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
       continue;
     if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
-      resultShape[tiledDim.value()] = ShapedType::kDynamicSize;
+      resultShape[tiledDim.value()] = ShapedType::kDynamic;
       continue;
     }
     resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],

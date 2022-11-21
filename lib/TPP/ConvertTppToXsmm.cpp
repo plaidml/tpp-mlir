@@ -34,7 +34,7 @@ static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
     return failure();
   // fail if the strides are non-constant
   if (llvm::any_of(strides, [](int64_t stride) {
-        return stride == ShapedType::kDynamicStrideOrOffset;
+        return stride == ShapedType::kDynamic;
       }))
     return failure();
   return strides[pos];

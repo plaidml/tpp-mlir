@@ -40,7 +40,7 @@ static Value toPackLayoutImpl(Location loc, Value input,
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   ShapedType result = PackOp::getPackedType(input.getType(), staticTiles,
                                             innerDimsPos, outerDimsPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();
