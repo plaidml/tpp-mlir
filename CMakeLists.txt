@@ -66,16 +66,6 @@ include(sanitizers)
 include(xsmm)
 message (STATUS ${XSMM_INCLUDE_DIRS})
 
-# Unit test
-set(LLVM_MAIN_SRC_DIR ${LLVM_MAIN_INCLUDE_DIR}/../)
-message(STATUS "Using LLVM: ${LLVM_MAIN_SRC_DIR}")
-add_custom_target(TPPUnitTests)
-if (EXISTS ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include/gtest/gtest.h)
-  add_subdirectory(unittests)
-else()
-  message(WARNING "gtest not found, unittests will not be available")
-endif()
-
 add_subdirectory(include)
 add_subdirectory(lib)
 # Atm, IREE needs the tpp-rt library to call into libxsmm.
