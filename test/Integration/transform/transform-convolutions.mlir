@@ -105,11 +105,11 @@ func.func @entry() {
   %bcast = tensor.empty() : tensor<1x1x8x8xf32>
   %input_tensor_bcast_one = linalg.broadcast ins(%input_tensor: tensor<8xf32>) 
                                              outs(%bcast: tensor<1x1x8x8xf32>)
-                                             dimensions = [3]
+                                             dimensions = [0, 1, 2]
   %bcast_one = tensor.empty() : tensor<3x3x8x8xf32>
   %input_tensor_bcast_two = linalg.broadcast ins(%input_tensor: tensor<8xf32>)
                                              outs(%bcast_one: tensor<3x3x8x8xf32>)
-                                             dimensions = [3]
+                                             dimensions = [0, 1, 2]
   %conv_out = arith.constant dense<0.0> : tensor<1x6x6x8xf32>
   %result = call @walk(%input_tensor_bcast_one, %input_tensor_bcast_two, %input_tensor, %input_tensor, %conv_out)
     : (tensor<1x1x8x8xf32>, tensor<3x3x8x8xf32>, tensor<8xf32>, tensor<8xf32>, tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32>
