@@ -154,10 +154,8 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
 
 Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
                                  unsigned n) {
-  ValueRange emptyArgs;
-
   // Allocates the vector for results
-  auto callAlloc = builder.create<func::CallOp>(unkLoc, timer.alloc, emptyArgs);
+  auto callAlloc = builder.create<func::CallOp>(unkLoc, timer.alloc, ValueRange());
   auto acc = callAlloc.getResult(0);
 
   // Create a SCF loop, set insertion to inside loop
@@ -172,22 +170,21 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
   builder.setInsertionPointToStart(loop.getBody());
 
   // Call timer_now()
-  auto callStart = builder.create<func::CallOp>(unkLoc, timer.now, emptyArgs);
+  auto callStart = builder.create<func::CallOp>(unkLoc, timer.now, ValueRange());
   Value start = callStart->getOpResult(0);
 
   // Call the kernel, ignore output
   callKernel(list);
 
   // Call timer_now() again
-  auto callEnd = builder.create<func::CallOp>(unkLoc, timer.now, emptyArgs);
+  auto callEnd = builder.create<func::CallOp>(unkLoc, timer.now, ValueRange());
   Value end = callEnd->getOpResult(0);
 
   // Calculate the difference
   Value diff = builder.create<arith::SubFOp>(unkLoc, end, start);
 
   // Accumulate (with acc ID and value)
-  ValueRange args {acc, diff};
-  builder.create<func::CallOp>(unkLoc, timer.accumulate, args);
+  builder.create<func::CallOp>(unkLoc, timer.accumulate, ValueRange{acc, diff});
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
@@ -265,9 +262,8 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
 
   // Loop body
   auto beginIdx = loop.getInductionVar();
-  auto indices = ValueRange{beginIdx, zero};
-  auto vector = builder.create<vector::TransferReadOp>(unkLoc, vecType, memRef,
-                                                       indices, minusOne);
+  auto vector = builder.create<vector::TransferReadOp>(
+      unkLoc, vecType, memRef, ValueRange{beginIdx, zero}, minusOne);
   printVector(vector);
 
   // Back to main
