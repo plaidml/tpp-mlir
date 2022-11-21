@@ -196,10 +196,9 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
 
 Value MLIRBench::getTimerStats(Value acc) {
   // Get stats (this is done once, but we can get values in separate)
-  ValueRange args{acc};
-  auto callMean = builder.create<func::CallOp>(unkLoc, timer.average, args);
+  auto callMean = builder.create<func::CallOp>(unkLoc, timer.average, ValueRange{acc});
   auto mean = callMean.getResult(0);
-  auto callDev = builder.create<func::CallOp>(unkLoc, timer.deviation, args);
+  auto callDev = builder.create<func::CallOp>(unkLoc, timer.deviation, ValueRange{acc});
   auto dev = callDev.getResult(0);
 
   // Create a vector<2xf64> so we can print
