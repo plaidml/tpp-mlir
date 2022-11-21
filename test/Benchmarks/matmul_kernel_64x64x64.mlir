@@ -3,7 +3,7 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run \
+// RUN: tpp-run -n 2000\
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -24,7 +24,10 @@ func.func @entry(%A: tensor<64x64xf32>, %B: tensor<64x64xf32>,
   %D = linalg.matmul ins(%A, %B: tensor<64x64xf32>, tensor<64x64xf32>) outs(%C: tensor<64x64xf32>) -> tensor<64x64xf32>
   return %D : tensor<64x64xf32>
 }
+// Output
 // CHECK-COUNT-64: ( 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65 )
+// Stats
+// CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
 
 // TPP: func.func @entry(
 // TPP-SAME:  %[[ARG0:.+]]: memref<64x64xf32>, %[[ARG1:.+]]: memref<64x64xf32>, %[[ARG2:.+]]: memref<64x64xf32>)

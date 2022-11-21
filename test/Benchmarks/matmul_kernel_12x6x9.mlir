@@ -3,7 +3,7 @@
 // RUN: -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
 // RUN: -convert-linalg-to-tpp="enable-tiling" -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run \
+// RUN: tpp-run -n 2000\
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -20,7 +20,10 @@ func.func @entry(%A: tensor<12x9xf32>, %B: tensor<9x6xf32>,
   %D = linalg.matmul ins(%A, %B: tensor<12x9xf32>, tensor<9x6xf32>) outs(%C: tensor<12x6xf32>) -> tensor<12x6xf32>
   return %D : tensor<12x6xf32>
 }
+// Output
 // CHECK-COUNT-12: ( 10, 10, 10, 10, 10, 10 )
+// Stats
+// CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
 
 // TPP: func.func @entry(
 // TPP-SAME:  %[[ARG0:.+]]: memref<12x9xf32>,

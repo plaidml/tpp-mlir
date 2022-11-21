@@ -3,7 +3,7 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run \
+// RUN: tpp-run -n 2000\
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -27,7 +27,10 @@ func.func @entry(%I: tensor<6x9xf32>, %O: tensor<6x9xf32>) -> tensor<6x9xf32> {
     } -> tensor<6x9xf32>
   return %OO: tensor<6x9xf32>
 }
+// Output
 // CHECK-COUNT-1: ( 1, 1, 1, 1, 1, 1, 1, 1, 1 )
+// Stats
+// CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
 
 // TPP: func.func @entry(
 // TPP-SAME:  %[[ARG0:.+]]: memref<6x9xf32>,

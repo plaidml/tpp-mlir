@@ -3,6 +3,7 @@ if (NOT TPP_INSIDE_IREE)
     SHARED
     XsmmRunnerUtils.cpp
     CheckRunnerUtils.cpp
+    PerfRunnerUtils.cpp
 
     LINK_LIBS PUBLIC
     xsmm
@@ -14,6 +15,7 @@ else()
     STATIC
     XsmmRunnerUtils.cpp
     CheckRunnerUtils.cpp
+    PerfRunnerUtils.cpp
   )
   target_link_libraries(tpp_c_runner_utils xsmm)
 endif()
