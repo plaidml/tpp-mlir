@@ -4,7 +4,7 @@
 // RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run -n 2 \
+// RUN: tpp-run -n 2000\
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
