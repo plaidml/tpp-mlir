@@ -84,7 +84,6 @@ void populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                 bool useExtractMetaData);
 void populateCheckToFuncPatterns(RewritePatternSet &patterns);
 void populateSinkPackPatterns(RewritePatternSet &patterns);
-void populateTensorSliceFoldingPatterns(RewritePatternSet &patterns);
 } // namespace tpp
 } // namespace mlir
 
