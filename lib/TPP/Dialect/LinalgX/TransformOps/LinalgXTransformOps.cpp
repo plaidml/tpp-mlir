@@ -66,7 +66,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
                                                        blockingFactors);
       })
       .Case([&](linalg::MatmulOp matmulOp) {
-        int useVnniFlag = this->getUseVnni();
+        auto useVnniFlag = getUseVnni();
         if (useVnniFlag) {
           packedOp = mlir::linalgx::packVNNIMatmulOp(rewriter, matmulOp,
                                                      blockingFactors);

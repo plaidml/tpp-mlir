@@ -410,9 +410,9 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   // reshape input A.
   Value packedMatrixA =
       toPackLayout_VNNI(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
-  auto replacementOp =
-      rewriter.create<vnni::MatmulOp>(loc, matmulOp.getOutputs()[0].getType(),
-                                      packedMatrixA, matmulOp.getInputs()[1]);
+  auto replacementOp = rewriter.create<vnni::MatmulOp>(
+      loc, matmulOp.getOutputs()[0].getType(), packedMatrixA,
+      matmulOp.getInputs()[1], matmulOp.getOutputs()[0]);
   rewriter.replaceOp(matmulOp, replacementOp.getResult());
   return replacementOp;
 }

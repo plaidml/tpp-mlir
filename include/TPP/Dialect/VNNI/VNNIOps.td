@@ -1,9 +1,14 @@
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
+//===- VNNIOps.td - VNNI dialect ops -----------------------*- tablegen -*-===//
+//
+// This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 
-#ifndef CHECK_DIALECT_CHECK_OPS
-#define CHECK_DIALECT_CHECK_OPS
+
+#ifndef VNNI_DIALECT_VNNI_OPS
+#define VNNI_DIALECT_VNNI_OPS
 
 include "mlir/IR/OpBase.td"
 
@@ -15,19 +20,25 @@ def VNNI_Dialect : Dialect {
   }];
 }
 
-def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul"> {
-  let summary = [{Matmul operation with VNNI format of the first operand}];
+def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [TypesMatchWith<"result type matches type of dest",
+                   "dest", "matrixC",
+                   "$_self">]> {
+  let summary = [{Matmul operation with VNNI format of the first operand with block
+                  size specified.}];
   let description = [{
-    Matmul Operation with VNNI format of the first operand..
+    Matmul Operation with VNNI format of the first operand.
+    For example, the operation performed is
+    C[i][j] += A[i/2][k][2]* B[k][j] with the first operand A's layout being
+    blocked by size 2.
 
     ```mlir
-    vnni.matmul(%arg0, %arg1): memref<2x4x2xbf16>, memref<4x6xbf16>, memref<4x6xbf16>
+    vnni.matmul(%arg0: memref<3x4x2xbf16>, %arg1: memref<4x6xbf16>)-> %arg2: memref<6x6xbf16>
     ```
   }];
 
-  let arguments = (ins BF16Tensor:$matrixA, BF16Tensor:$matrixB);
-  let results = (outs BF16Tensor:$matrixC);
-  let assemblyFormat = "`(` $matrixA `,` $matrixB `)`  attr-dict `:` type($matrixA) `,` type($matrixB) `,` type($matrixC) ";
+  let arguments = (ins BF16Tensor:$matrixA, BF16Tensor:$matrixB, BF16Tensor:$matrixC);
+  let results = (outs BF16Tensor:$dest);
+  let assemblyFormat = "`(` $matrixA `,` $matrixB  `)` `->`  $matrixC  attr-dict `:` `(` type($matrixA) `,` type($matrixB) `)` `->`  type($dest) ";
 }
 
 #endif

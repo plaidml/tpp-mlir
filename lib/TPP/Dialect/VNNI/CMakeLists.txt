@@ -1,5 +1,5 @@
 add_mlir_dialect_library(TPPVNNIDialect
-    # Ops and dialects
+    # Ops and dialect
     VNNIDialect.cpp
     VNNIOps.cpp
 

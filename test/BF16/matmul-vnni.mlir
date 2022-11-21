@@ -13,7 +13,7 @@
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    %1 = transform.structured.pack %0 { use_vnni=1, blocking_factors = [2] }
+    %1 = transform.structured.pack %0 { use_vnni=true, blocking_factors = [2] }
 }
 
 // CHECK-LABEL: func.func @matmul_static(
@@ -24,7 +24,7 @@ func.func @matmul_static(
     %A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) -> !C_tensor_t {
 // CHECK: %[[pack:.+]] = tensor.empty() : tensor<128x512x2xbf16>
 // CHECK: %[[matrixA:.+]] = linalgx.pack %arg0 inner_dims_pos = [0] inner_tiles = [2] into %[[pack]] : (tensor<256x512xbf16> tensor<128x512x2xbf16>) -> tensor<128x512x2xbf16>
-// CHECK: %[[matrixC:.+]] = vnni.matmul(%[[matrixA]], %arg1) : tensor<128x512x2xbf16>, tensor<512x1024xbf16>, tensor<256x1024xbf16> 
+// CHECK: %[[matrixC:.+]] = vnni.matmul(%[[matrixA]], %[[ARG1]]) -> %[[ARG2]]  : (tensor<128x512x2xbf16>, tensor<512x1024xbf16>) -> tensor<256x1024xbf16> 
    %matmul = linalg.matmul ins(%A, %B : !A_tensor_t, !B_tensor_t)
                      outs(%C: !C_tensor_t) -> !C_tensor_t
 // CHECK: return %[[matrixC]]
