@@ -16,7 +16,8 @@ def VNNI_Dialect : Dialect {
   let name = "vnni";
   let cppNamespace = "::mlir::vnni";
   let summary = [{
-    A dialect implementing vnni operations.
+    A dialect implementing Intel Vector Neural Network Instructions operations.
+    https://www.intel.com/content/www/us/en/artificial-intelligence/deep-learning-boost.html
   }];
 }
 
