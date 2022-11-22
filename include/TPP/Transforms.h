@@ -25,6 +25,10 @@ class Conv2DNhwcHwcfOp;
 class MatmulOp;
 } // namespace linalg
 
+namespace vnni {
+class MatmulOp;
+}
+
 namespace linalgx {
 
 // Attempt to map the current linalgOp to a BRGEMM.
@@ -52,6 +56,11 @@ packConv2DNhwcHwcfOp(RewriterBase &rewriter, linalg::Conv2DNhwcHwcfOp linalgOp,
 FailureOr<linalg::GenericOp> packMatmulOp(RewriterBase &rewriter,
                                           linalg::MatmulOp linalgOp,
                                           ArrayRef<OpFoldResult> tiles);
+
+// Attempt to block a MatmulOp to VNNI format.
+FailureOr<vnni::MatmulOp> packVNNIMatmulOp(RewriterBase &rewriter,
+                                           linalg::MatmulOp linalgOp,
+                                           ArrayRef<OpFoldResult> tiles);
 
 // Collapse iterators in a linalg.generic based on 'reassociation'.
 FailureOr<linalg::GenericOp>

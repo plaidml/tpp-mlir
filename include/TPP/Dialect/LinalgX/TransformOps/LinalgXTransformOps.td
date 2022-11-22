@@ -34,7 +34,8 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
   let assemblyFormat = "$target attr-dict";
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors,
+		   DefaultValuedAttr<I1Attr, "0">:$use_vnni);
   let results = (outs PDL_Operation:$packed_linalg_op);
 
   let extraClassDeclaration = [{
