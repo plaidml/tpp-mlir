@@ -268,7 +268,9 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
     operation contained in the target operation.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (
+    ins PDL_Operation:$target,
+    DefaultValuedAttr<BoolAttr, "false">:$merge_tensor_slices);
   let results = (outs);
 
   let assemblyFormat = [{

@@ -260,7 +260,10 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
     dialect->getCanonicalizationPatterns(patterns);
   for (RegisteredOperationName op : ctx->getRegisteredOperations())
     op.getCanonicalizationPatterns(patterns, ctx);
-  tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+
+  // Process canonicalization options
+  if (getMergeTensorSlices())
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));

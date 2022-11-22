@@ -112,7 +112,8 @@ transform.sequence failures(propagate) {
     transform.structured.map_to_brgemm %6
 
     // Clean-up IR after transformations
-    transform.structured.canonicalize %arg1
+    transform.structured.canonicalize %arg1 {
+      merge_tensor_slices = true }
 }
 
 // CHECK: func.func @matmul_and_relu(
