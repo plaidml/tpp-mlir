@@ -1,12 +1,15 @@
-# TPP Sandbox
+# TPP MLIR
 
-This is an experiment in using MLIR to automatically select the best [Tensor Processing Primitives](https://arxiv.org/abs/2104.05755) for ML models.
+This is an experiment in using MLIR to automatically select the best [Tensor Processing Primitives](https://arxiv.org/abs/2104.05755) for linear algebra.
 
-This repository contains an out-of-tree [MLIR](https://mlir.llvm.org/) dialect as well as an `opt`-like tool to operate on that dialect.
+This repository contains an out-of-tree [MLIR](https://mlir.llvm.org/) dialect as well as an `opt`-like tool to operate on that dialect and a `runner`-like tool to execute and benchmark MLIR kernels.
 
 It also contains the recipes to use [LIBXSMM](https://github.com/libxsmm/libxsmm) from inside MLIR and can be used by other tools to drive our passes.
 
-There's [work in progress](https://github.com/iree-org/iree/tree/tpp) inside [IREE](https://iree-org.github.io/iree/) to use this sandbox's work on their pipeline.
+There's [work in progress](https://github.com/iree-org/iree/tree/tpp) inside [IREE](https://iree-org.github.io/iree/) to use this work on their pipeline.
+
+This repository was previously called `tpp-sandbox`.
+If you have a checkout with the previous name, please follow [these instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository) to rename the remote locally.
 
 ## Build Status
 
@@ -42,15 +45,15 @@ ninja
 popd
 ```
 
-## How to build
+## How to build TPP MLIR
 
 This setup assumes that you have built LLVM and MLIR in `$CUSTOM_LLVM_ROOT` as above.
 
 ```sh
 # Clone
-git clone https://github.com/plaidml/tpp-sandbox.git
-mkdir tpp-sandbox/build
-pushd tpp-sandbox/build
+git clone https://github.com/plaidml/tpp-mlir.git
+mkdir tpp-mlir/build
+pushd tpp-mlir/build
 
 # Build & test
 cmake -G Ninja .. \

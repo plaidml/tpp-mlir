@@ -1,8 +1,8 @@
-# How to contribute to tpp-sandbox
+# How to contribute to TPP MLIR
 
 # Open an issue
 
-If you found a bug, wants some feature implemented or just want to discuss implementation details, just open an [issue](https://github.com/plaidml/tpp-sandbox/issues).
+If you found a bug, wants some feature implemented or just want to discuss implementation details, just open an [issue](https://github.com/plaidml/tpp-mlir/issues).
 
 In this case:
  * Write a summary of the problem, with as much information as you can (error messages, code, etc)
@@ -24,14 +24,14 @@ _Note: Don't use "Fixes #NN" on interim PRs as that'll close the issue. Just ref
 
 Everyone, including core developers, should work on their own fork.
 
-To submit a [PR](https://github.com/plaidml/tpp-sandbox/pulls), create a branch on your fork, push to your origin and submit a PR from that fork/branch. Avoid using your `main` branch, or you'll only be able to contribute with one change at a time.
+To submit a [PR](https://github.com/plaidml/tpp-mlir/pulls), create a branch on your fork, push to your origin and submit a PR from that fork/branch. Avoid using your `main` branch, or you'll only be able to contribute with one change at a time.
 
 Standard Git process apply:
  * Work locally on your fork, creating at least one branch with the code you want pulled
  * When ready, create a pull request, referencing an issue (if any)
  * This may trigger a CI loop
    * If it doesn't, ask a core developer to trigger it
-   * This situation will improve with [Github Actions](https://github.com/plaidml/tpp-sandbox/issues/57), where all PRs will be tested
+   * This situation will improve with [Github Actions](https://github.com/plaidml/tpp-mlir/issues/57), where all PRs will be tested
  * Wait for the CI to be green, fixing any issues to get there
  * Wait for code review, and approval
    * Once you implement the changes requested, mark conversations as _"resolved"_ to indicate completion
@@ -48,7 +48,7 @@ If other tools use our code, they should have a fork of this repository, where t
 
 Core developers of this repository should pull or cherry-pick code from those repositories if/when needed, create a PR and follow the CI process.
 
-It's up to the developers of the other tools and the core developers of the sandbox interested in the integration to synchronise.
+It's up to the developers of the other tools and the core developers of tpp-mlir interested in the integration to synchronise.
 
 This is required to make sure every change is tested with our local CI, as well as other external ones.
 
