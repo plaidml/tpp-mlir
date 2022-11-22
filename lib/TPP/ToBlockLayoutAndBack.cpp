@@ -103,7 +103,7 @@ static Value toPackLayoutNC_NCnc(Location loc, Value input,
   return handleLayoutNC_NCnc(loc, input, nullptr, tiles, builder, useAlloc);
 }
 
-// Helper function to pack from NC to NCnc.
+// Helper function to pack from NC to [N/2][C][2].
 static Value toPackLayout_VNNI(Location loc, Value input,
                                ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
                                bool useAlloc = false) {

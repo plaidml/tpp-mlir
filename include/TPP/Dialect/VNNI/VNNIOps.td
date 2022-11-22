@@ -21,9 +21,9 @@ def VNNI_Dialect : Dialect {
   }];
 }
 
-def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [TypesMatchWith<"result type matches type of dest",
-                   "dest", "matrixC",
-                   "$_self">]> {
+def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", 
+                    [TypesMatchWith<"result type matches type of dest",
+                    "dest", "matrixC", "$_self">]> {
   let summary = [{Matmul operation with VNNI format of the first operand with block
                   size specified.}];
   let description = [{
