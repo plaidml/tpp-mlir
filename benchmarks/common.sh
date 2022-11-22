@@ -9,7 +9,7 @@ if [ ! "$TPP_COMPILER" ]; then
   fi
 fi
 
-# This assumes the sandbox was built as described in the readme.
+# This assumes the project was built as described in the readme.
 LIB_PATH=$TPP_COMPILER/lib
 BIN_PATH=$TPP_COMPILER/bin
 
