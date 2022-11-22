@@ -33,13 +33,13 @@ def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [TypesMatchWith<"result type matc
     blocked by size 2.
 
     ```mlir
-    vnni.matmul(%arg0: memref<3x4x2xbf16>, %arg1: memref<4x6xbf16>)-> %arg2: memref<6x6xbf16>
+    vnni.matmul ins(%arg0: memref<3x4x2xbf16>, %arg1: memref<4x6xbf16>) out(%arg2: memref<6x6xbf16>)
     ```
   }];
 
   let arguments = (ins BF16Tensor:$matrixA, BF16Tensor:$matrixB, BF16Tensor:$matrixC);
   let results = (outs BF16Tensor:$dest);
-  let assemblyFormat = "`(` $matrixA `,` $matrixB  `)` `->`  $matrixC  attr-dict `:` `(` type($matrixA) `,` type($matrixB) `)` `->`  type($dest) ";
+  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($dest) `)` attr-dict";
 }
 
 #endif
