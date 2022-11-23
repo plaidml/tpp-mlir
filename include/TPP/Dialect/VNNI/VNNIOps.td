@@ -12,6 +12,8 @@
 
 include "mlir/IR/OpBase.td"
 
+def VNNIOperand : AnyTypeOf<[BF16Tensor, BF16MemRef]>;
+
 def VNNI_Dialect : Dialect {
   let name = "vnni";
   let cppNamespace = "::mlir::vnni";
@@ -37,8 +39,8 @@ def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul",
     ```
   }];
 
-  let arguments = (ins BF16Tensor:$matrixA, BF16Tensor:$matrixB, BF16Tensor:$matrixC);
-  let results = (outs BF16Tensor:$dest);
+  let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
+  let results = (outs VNNIOperand:$dest);
   let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($dest) `)` attr-dict";
 }
 
