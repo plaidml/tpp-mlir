@@ -23,7 +23,7 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/LinalgX/LinalgXDialect.h"
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/VNNI/VNNIDialect.h"

@@ -26,7 +26,7 @@ class LinalgOp;
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h.inc"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h.inc"
 
 namespace mlir {
 namespace linalgx {

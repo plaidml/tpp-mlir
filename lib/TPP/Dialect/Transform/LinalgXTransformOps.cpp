@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"

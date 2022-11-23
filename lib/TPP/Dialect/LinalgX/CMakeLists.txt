@@ -1,5 +1,3 @@
-add_subdirectory(TransformOps)
-
 add_mlir_dialect_library(TPPLinalgXDialect
   # Ops and dialects
     BufferizableOpInterfaceImpl.cpp
