@@ -7,7 +7,7 @@
 // RUN: -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext | \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 

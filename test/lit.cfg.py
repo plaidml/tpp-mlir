@@ -31,7 +31,7 @@ config.test_exec_root = os.path.join(config.tpp_obj_root, 'test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%shlibext', config.llvm_shlib_ext))
-config.substitutions.append(('%llvmlirdir', config.llvm_lib_dir))
+config.substitutions.append(('%llvmlibdir', config.llvm_lib_dir))
 config.substitutions.append(('%tpplibdir', config.tpp_obj_root + "/lib/"))
 
 llvm_config.with_system_environment(

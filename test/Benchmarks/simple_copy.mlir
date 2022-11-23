@@ -5,7 +5,7 @@
 // RUN: -convert-xsmm-to-func | \
 // RUN: tpp-run -n 2000\
 // RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlirdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 
