@@ -19,7 +19,7 @@ class FileCheckParser(object):
     """Parsers IR files for FileCheck lines to extract informatio
        about the execution of the kernel"""
 
-    def __init__(self, logger=None):
+    def __init__(self, logger):
         self.logger = logger
         # FileCheck line style
         self.runRE = re.compile("^\/\/\s*RUN: (.*)$");

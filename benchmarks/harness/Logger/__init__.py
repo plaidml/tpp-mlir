@@ -21,7 +21,7 @@ class Logger(object):
         self.logger = logging.getLogger(name)
 
         # Default level is WARNING (no output other than warnings and errors)
-        start = 30
+        start = logging.WARNING
         silent = min(verbosity*10, 20)
         coloredlogs.install(level=start-silent, logger=self.logger)
         self.parser = parser

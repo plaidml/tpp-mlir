@@ -11,7 +11,7 @@ import subprocess
 class Execute(object):
     """Executes commands, returns out/err"""
 
-    def __init__(self, logger=None):
+    def __init__(self, logger):
         self.logger = logger
 
     def run(self, program, input=''):
