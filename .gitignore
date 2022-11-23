@@ -10,3 +10,4 @@ lib/.DS_Store
 lib/TPP/.DS_Store
 compile_commands.json
 *.swp
+__pycache__
