@@ -276,9 +276,15 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
   };
 
   Location loc = linalgOp.getLoc();
-  linalg::GenerateLoopNest<scf::ForOp>::doit(
-      rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypesArray(),
-      gemmBuilder);
+  if (linalgOp.hasBufferSemantics()) {
+    linalg::GenerateLoopNest<scf::ParallelOp>::doit(
+        rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypesArray(),
+        gemmBuilder);
+  } else {
+    linalg::GenerateLoopNest<scf::ForOp>::doit(
+        rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypesArray(),
+        gemmBuilder);
+  }
 
   // see: `Tiling.cpp` in Linalg/Transforms
   // Gather the newly created loops and return them with the new op.
