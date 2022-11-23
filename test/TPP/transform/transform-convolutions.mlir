@@ -45,13 +45,11 @@ func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: 
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
+// CHECK: scf.parallel (%[[ARG3:.+]]) = (%[[C0]]) to (%[[C4]]) step (%[[C1]]) {
 // CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][0, %[[ARG3]], 0, 0] [1, 1, 4, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<4x3xf32, strided<[3, 1], offset: ?>>
 // CHECK: %[[SUB0:.+]] = memref.subview %[[ARG1]][0, 0, 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<1x1x3x8xf32> to memref<3x8xf32, strided<[8, 1]>>
 // CHECK: %[[SUB1:.+]] = memref.subview %[[ARG2]][0, %[[ARG3]], 0, 0] [1, 1, 4, 8] [1, 1, 1, 1] : memref<1x4x4x8xf32> to memref<4x8xf32, strided<[8, 1], offset: ?>>
 // CHECK: linalg.matmul ins(%[[SUB]], %[[SUB0]] : memref<4x3xf32, strided<[3, 1], offset: ?>>, memref<3x8xf32, strided<[8, 1]>>) outs(%[[SUB1]] : memref<4x8xf32, strided<[8, 1], offset: ?>>)
-// CHECK: }
-// CHECK: return
 
 // -----
 
@@ -79,7 +77,7 @@ func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: 
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
-// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
+// CHECK: scf.parallel (%[[ARG3:.+]]) = (%[[C0]]) to (%[[C3]]) step (%[[C1]]) {
 // CHECK: scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: scf.for %[[ARG5:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]], %[[ARG4]])
@@ -87,10 +85,6 @@ func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: 
 // CHECK: %[[SUB0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], %[[ARG5]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<2x2x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
 // CHECK: %[[SUB1:.+]] = memref.subview %[[ARG2]][0, %[[ARG3]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<1x3x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
 // CHECK: linalg.matmul ins(%[[SUB]], %[[SUB0]] : memref<3x3xf32, strided<[3, 1], offset: ?>>, memref<3x8xf32, strided<[8, 1], offset: ?>>) outs(%[[SUB1]] : memref<3x8xf32, strided<[8, 1], offset: ?>>)
-// CHECK: }
-// CHECK: }
-// CHECK: }
-// CHECK: return
 
 // -----
 
@@ -118,8 +112,7 @@ func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: 
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[DIM:.+]] = memref.dim %[[ARG0]], %[[C0]] : memref<?x?x?x?xf32>
 // CHECK: %[[DIM0:.+]] = memref.dim %[[ARG2]], %[[C1]] : memref<?x?x?x?xf32>
-// CHECK: scf.for %[[ARG3:.+]] = %[[C0]] to %[[DIM]] step %[[C1]] {
-// CHECK: scf.for %[[ARG4:.+]] = %[[C0]] to %[[DIM0]] step %[[C1]] {
+// CHECK: scf.parallel (%[[ARG3:.+]], %[[ARG4:.+]]) = (%[[C0]], %[[C0]]) to (%[[DIM]], %[[DIM0]]) step (%[[C1]], %[[C1]]) {
 // CHECK: %[[DIM1:.+]] = memref.dim %[[ARG2]], %[[C2]] : memref<?x?x?x?xf32>
 // CHECK: %[[DIM2:.+]] = memref.dim %[[ARG1]], %[[C2]] : memref<1x1x?x?xf32>
 // CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[ARG3]], %[[ARG4]], 0, 0] [1, 1, %[[DIM1]], %[[DIM2]]] [1, 1, 1, 1] : memref<?x?x?x?xf32> to memref<?x?xf32, strided<[?, 1], offset: ?>>
@@ -130,9 +123,6 @@ func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: 
 // CHECK: %[[DIM7:.+]] = memref.dim %[[ARG2]], %[[C3]] : memref<?x?x?x?xf32>
 // CHECK: %[[SUB2:.+]] = memref.subview %[[ARG2]][%[[ARG3]], %[[ARG4]], 0, 0] [1, 1, %[[DIM6]], %[[DIM7]]] [1, 1, 1, 1] : memref<?x?x?x?xf32> to memref<?x?xf32, strided<[?, 1], offset: ?>>
 // CHECK: linalg.matmul ins(%[[SUB]], %[[SUB1]] : memref<?x?xf32, strided<[?, 1], offset: ?>>, memref<?x?xf32, strided<[?, 1], offset: ?>>) outs(%[[SUB2]] : memref<?x?xf32, strided<[?, 1], offset: ?>>)
-// CHECK: }
-// CHECK: }
-// CHECK: return
 
 // -----
 
