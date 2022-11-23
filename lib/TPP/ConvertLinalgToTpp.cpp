@@ -371,12 +371,10 @@ struct SubViewOfSubViewWithUnitDims
   using OpRewritePattern<memref::SubViewOp>::OpRewritePattern;
 
   bool areX(ArrayRef<OpFoldResult> valuesOrAttrs, int x) const {
-    if (llvm::all_of(valuesOrAttrs, [=](const OpFoldResult &valueOrAttr) {
-          Attribute attr = valueOrAttr.dyn_cast<Attribute>();
-          return attr && attr.cast<IntegerAttr>().getInt() == x;
-        }))
-      return true;
-    return false;
+    return llvm::all_of(valuesOrAttrs, [=](const OpFoldResult &valueOrAttr) {
+      Attribute attr = valueOrAttr.dyn_cast<Attribute>();
+      return attr && attr.cast<IntegerAttr>().getInt() == x;
+    });
   }
 
   bool areOne(ArrayRef<OpFoldResult> valuesOrAttrs) const {

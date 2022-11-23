@@ -136,10 +136,9 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
-      (useMeta == false)
-          ? extractInvokeOperandTypes(op->getOperands(), rewriter)
-          : extractInvokeOperandTypesForMeta(op->getOperands(),
-                                             rewriter.getIndexType(), rewriter),
+      (!useMeta) ? extractInvokeOperandTypes(op->getOperands(), rewriter)
+                 : extractInvokeOperandTypesForMeta(
+                       op->getOperands(), rewriter.getIndexType(), rewriter),
       {});
 
   if (!module.lookupSymbol(fnName)) {
@@ -161,10 +160,9 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
 
   rewriter.create<func::CallOp>(
       loc, fnName.getValue(), TypeRange(),
-      (useMeta == false)
-          ? getMemRefOperands(rewriter, loc, op->getOperands(), typeAttr)
-          : getMemRefOperandsUsingMetadata(rewriter, loc, op->getOperands(),
-                                           typeAttr));
+      (!useMeta) ? getMemRefOperands(rewriter, loc, op->getOperands(), typeAttr)
+                 : getMemRefOperandsUsingMetadata(rewriter, loc,
+                                                  op->getOperands(), typeAttr));
   return success();
 }
 

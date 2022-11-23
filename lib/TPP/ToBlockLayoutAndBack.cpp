@@ -219,7 +219,7 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
     return rewriter.notifyMatchFailure(convOp, "require tensor semantics");
 
   bool isConv2DNhwcHwcfOp =
-      (std::is_same<OpTy, linalg::Conv2DNhwcHwcfOp>::value) ? true : false;
+      static_cast<bool>(std::is_same<OpTy, linalg::Conv2DNhwcHwcfOp>::value);
 
   Location loc = convOp.getLoc();
   MLIRContext *ctx = convOp.getContext();

@@ -106,7 +106,7 @@ static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   size_t rank = operandType.getRank();
-  bool isImage = (operand->getOperandNumber() == 0) ? true : false;
+  bool isImage = operand->getOperandNumber() == 0;
   unsigned desiredResultRank = 2;
 
   SmallVector<OpFoldResult> offsets, sizes;
