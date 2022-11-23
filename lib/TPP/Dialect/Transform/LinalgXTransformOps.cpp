@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.h"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
@@ -423,14 +423,14 @@ public:
   void init() {
     registerTransformOps<
 #define GET_OP_LIST
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp.inc"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.cpp.inc"
         >();
   }
 };
 } // namespace
 
 #define GET_OP_CLASSES
-#include "TPP/Dialect/LinalgX/TransformOps/LinalgXTransformOps.cpp.inc"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.cpp.inc"
 
 void mlir::linalgx::registerTransformDialectExtension(
     DialectRegistry &registry) {
