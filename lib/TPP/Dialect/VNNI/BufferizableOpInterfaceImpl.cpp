@@ -25,8 +25,7 @@ struct MatmulLayoutInterface
                                                     vnni::MatmulOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return opOperand.getOperandNumber() == 0 ||
-           opOperand.getOperandNumber() == 1;
+    return true;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -36,12 +35,12 @@ struct MatmulLayoutInterface
 
   bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
                             const AnalysisState &state) const {
-    return false;
+    return true;
   }
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
-    if (opOperand.getOperandNumber() < 1)
+    if (opOperand.getOperandNumber() < 2)
       return {};
     return {op->getResult(0)};
   }
