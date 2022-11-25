@@ -103,8 +103,6 @@ static bool verifyBRGemmShape(MemRefType memrefA, MemRefType memrefB,
            memrefA.getRank() != 3);
 }
 
-// XXX: Changing the op semantics based on the type is so bad and brittle.
-// We don't want to do this. This BF16 packing need to be revisited.
 LogicalResult BrgemmOp::verify() {
   MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
   MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
