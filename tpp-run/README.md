@@ -4,18 +4,13 @@ This is basically a copy of `mlir-cpu-runner`, using `JitRunnerMain` and its cal
 
 The main difference is that we add a wrapper function to call the kernel (entry) function to allow for benchmarking.
 
-However, we'll need to add:
+TODO:
  * Random initialization of input tensors (and control the seed, for stable reproduction)
- * Timing strategy (perhaps with a timer dialect?) to only check kernel times
- * Repeat functionality, to run just the kernel many times, for statistical significance
- * Warm-up calls, to allow for JIT compilation to finish before we start timing
-
-We may have to create new callbacks and change LLVM upstream to do that, though.
+ * Use our `perf` dialect whenever it's ready
 
 ## Functionality
 
 The main function of this modified TPP runner is to:
- * (TODO) Automatically find the TPP, LIBXSMM and OpenMP libraries (now is via cmd-line)
  * Find the kernel function and:
    * Discover its arguments (input and output)
    * Allocate memrefs for all and random-initialise the inputs
@@ -24,6 +19,8 @@ The main function of this modified TPP runner is to:
  * Run the kernel function, passing those tensors as arguments
    * Run multiple times and output statistics in benchmark mode
  * Run the `return` function to print/cleanup the results
+
+Note: We're using a new benchmark harness (in `benchmarks/harness`) to discover paths, args, etc.
 
 ## Implementation
 
