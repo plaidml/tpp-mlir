@@ -61,10 +61,8 @@ LogicalResult IdentityOp::verify() {
 
 static bool verifyMatmulShape(MemRefType memrefA, MemRefType memrefB,
                               MemRefType memrefC) {
-  if (memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
-      memrefA.getRank() != 2)
-    return false;
-  return true;
+  return !(memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 2);
 }
 
 static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
@@ -74,9 +72,7 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
   int64_t n = shapeC[1];
   int64_t k = shapeA[1];
   // Verify C(m, n) = A(m, k) B(k, n)
-  if (shapeB[0] != k || shapeB[1] != n || shapeA[0] != m)
-    return false;
-  return true;
+  return !(shapeB[0] != k || shapeB[1] != n || shapeA[0] != m);
 }
 
 // Check that op to be 2d matmul in row-major.
@@ -103,10 +99,8 @@ void MatmulOp::build(OpBuilder &builder, OperationState &state,
 
 static bool verifyBRGemmShape(MemRefType memrefA, MemRefType memrefB,
                               MemRefType memrefC) {
-  if (memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
-      memrefA.getRank() != 3)
-    return false;
-  return true;
+  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 3);
 }
 
 // XXX: Changing the op semantics based on the type is so bad and brittle.
@@ -154,10 +148,8 @@ LogicalResult AddOp::verify() {
 
 static bool verifyVNNIMatmulShape(MemRefType memrefA, MemRefType memrefB,
                                   MemRefType memrefC) {
-  if (memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
-      memrefA.getRank() != 3)
-    return false;
-  return true;
+  return !(memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 3);
 }
 
 static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
@@ -166,9 +158,7 @@ static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
   int64_t m = shapeC[0];
   int64_t n = shapeC[1];
   int64_t k = shapeA[1];
-  if (shapeB[0] != k || shapeB[1] != n || shapeA[0] * shapeA[2] != m)
-    return false;
-  return true;
+  return !(shapeB[0] != k || shapeB[1] != n || shapeA[0] * shapeA[2] != m);
 }
 
 LogicalResult VNNI_MatmulOp::verify() {
@@ -195,10 +185,8 @@ void VNNI_MatmulOp::build(OpBuilder &builder, OperationState &state,
 
 static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
                                   MemRefType memrefC) {
-  if (memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
-      memrefA.getRank() != 4)
-    return false;
-  return true;
+  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 4);
 }
 
 LogicalResult VNNI_BrgemmOp::verify() {
