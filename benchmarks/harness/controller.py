@@ -53,6 +53,8 @@ class BenchmarkController(object):
         self.output = ''
         self.mean = 0.0
         self.stdev = 0.0
+        # Output is always in seconds, we need to convert anyway
+        self.unit = "ms" # or 'gflops'
 
     def _findGitRoot(self, path):
         """ Find the git root directory, if any, or return the input """
@@ -140,6 +142,9 @@ class BenchmarkController(object):
             self.args.mean = fileArgs['mean']
         if (not self.args.stdev and 'stdev' in fileArgs):
             self.args.stdev = fileArgs['stdev']
+        if (not self.args.flops and 'flops' in fileArgs):
+            self.args.flops = fileArgs['flops']
+            self.unit = "gflops"
         if (not self.args.opt_args and 'opt-args' in fileArgs):
             self.args.opt_args = fileArgs['opt-args']
 
@@ -221,15 +226,24 @@ class BenchmarkController(object):
             self.logger.error("Benchmark produced no output, can't verify results")
             return False
 
-        # Parse results
+        # Parse results (always in seconds, as per timer)
         m = re.search("([\d\.\-e]+), ([\d\.\-e]+)", self.output)
         if m:
             self.mean = float(m.group(1))
             self.stdev = float(m.group(2))
-            self.logger.info("Mean time: " + str(self.mean) + "s (" + str(self.stdev) + "s)")
+            self.logger.info("Mean time: " + str(self.mean*1000) + " ms +- " + str(self.stdev*1000) + " ms")
         else:
             self.logger.error("Cannot find mean/stdev in output")
             return False
+
+        # If we asked for flops, we need to convert
+        # WARNING: If the model has a flops line, MEAN/STDEV are expected to be in flops too
+        if self.args.flops:
+            mean = self.args.flops / self.mean
+            stdev = self.args.flops * self.stdev / (self.mean * self.mean)
+            self.mean = mean
+            self.stdev = stdev
+            self.logger.debug("Mean flops: " + str(self.mean) + " flops +- " + str(self.stdev) + " flops")
 
         # Check against expected output, if any
         self.logger.info("Validate statistics against expected values")
@@ -245,6 +259,15 @@ class BenchmarkController(object):
             if self.stdev > es:
                 self.logger.error("Result deviation too large: " + str(self.stdev) + " > " + str(es))
                 return False
+
+        if self.args.flops:
+            # We annotate in flops (easier to calculate / compare) but we display in Gflops
+            self.mean /= 1e9
+            self.stdev /= 1e9
+        else:
+            # Output is in seconds, bu we display in milliseconds
+            self.mean *= 1000
+            self.stdev *= 1000
 
         return True
 
@@ -262,6 +285,8 @@ if __name__ == '__main__':
                         help='Expected mean to compare to (checks BENCH_EXPECTED_MEAN line)')
     parser.add_argument('-stdev', type=float,
                         help='Expected stdev to compare to (checks BENCH_EXPECTED_STDEV line)')
+    parser.add_argument('-flops', type=float,
+                        help='Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)')
     parser.add_argument('-entry', type=str,
                         help='Name of the entry point (checks RUN line)')
     parser.add_argument('-shared-libs', type=str,
@@ -272,6 +297,8 @@ if __name__ == '__main__':
                         help='The verbosity of logging output')
     parser.add_argument('-q', '--quiet', action='count', default=0,
                         help='Suppress warnings')
+    parser.add_argument('-x', '--xsmm', action='count', default=1,
+                        help='Turn on TPP optimizations (default)')
     args = parser.parse_args()
 
     # Creates the logger object
@@ -296,5 +323,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Success prints basic stats
-    print(f'{args.benchmark_name}: {(controller.mean*1000):3.6f} ms ({(controller.stdev*1000):3.6f} ms)')
+    if args.flops:
+        print(f'{(controller.mean):6.3f} +- {(controller.stdev):6.3f} {controller.unit}')
+    else:
+        print(f'{(controller.mean):3.6f} +- {(controller.stdev):3.6f} {controller.unit}')
 

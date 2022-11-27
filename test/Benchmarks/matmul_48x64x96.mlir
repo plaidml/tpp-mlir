@@ -14,22 +14,22 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
+// Total flops = O(n*k*m) = 48x96x64 = 294912
+// BENCH_TOTAL_FLOPS: 294912
 
-#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-func.func @entry(%A: tensor<64x64xf32>, %B: tensor<64x64xf32>,
-                  %C: tensor<64x64xf32>) -> tensor<64x64xf32> {
-  %D = linalg.matmul ins(%A, %B: tensor<64x64xf32>, tensor<64x64xf32>) outs(%C: tensor<64x64xf32>) -> tensor<64x64xf32>
-  return %D : tensor<64x64xf32>
+func.func @entry(%A: tensor<48x96xf32>, %B: tensor<96x64xf32>,
+                  %C: tensor<48x64xf32>) -> tensor<48x64xf32> {
+  %D = linalg.matmul ins(%A, %B: tensor<48x96xf32>, tensor<96x64xf32>) outs(%C: tensor<48x64xf32>) -> tensor<48x64xf32>
+  return %D : tensor<48x64xf32>
 }
 // Output
-// CHECK-COUNT-64: ( 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65 )
+// CHECK-COUNT-48: ( 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97 )
 // Stats
 // CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
 
 // TPP: func.func @entry(
-// TPP-SAME:  %[[ARG0:.+]]: memref<64x64xf32>, %[[ARG1:.+]]: memref<64x64xf32>, %[[ARG2:.+]]: memref<64x64xf32>)
-// TPP: tpp.matmul ins(%[[ARG0]] : memref<64x64xf32>, %[[ARG1]] : memref<64x64xf32>) out(%[[ARG2]] : memref<64x64xf32>)
+// TPP-SAME:  %[[ARG0:.+]]: memref<48x96xf32>,
+// TPP-SAME:  %[[ARG1:.+]]: memref<96x64xf32>,
+// TPP-SAME:  %[[ARG2:.+]]: memref<48x64xf32>)
+// TPP: tpp.matmul ins(%[[ARG0]] : memref<48x96xf32>, %[[ARG1]] : memref<96x64xf32>) out(%[[ARG2]] : memref<48x64xf32>)
 // TPP: return

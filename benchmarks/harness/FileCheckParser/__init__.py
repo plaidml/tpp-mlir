@@ -11,6 +11,7 @@
     - 'libs': Shared library argument, from a RUN line
     - 'expected_mean': From a BENCH_EXPECTED_MEAN line
     - 'expected_stdev': From a BENCH_EXPECTED_STDEV line
+    - 'flops': From a BENCH_TOTAL_FLOPS line
 """
 
 import re
@@ -25,6 +26,7 @@ class FileCheckParser(object):
         self.runRE = re.compile("^\/\/\s*RUN: (.*)$");
         self.expectMeanRE = re.compile("^\/\/\s*BENCH_EXPECT_MEAN: ([\d\.\-e]+)")
         self.expectStdevRE = re.compile("^\/\/\s*BENCH_EXPECT_STDEV: ([\d\.\-e]+)")
+        self.flopsRE = re.compile("^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")
         # Arguments in the RUN lines for tpp-opt
         self.optArgs = re.compile("tpp-opt (%\w+)\s+(.*?)\s*\|")
         # Arguments in the RUN lines for tpp-run
@@ -39,13 +41,14 @@ class FileCheckParser(object):
 
         runLine = ""
         for line in file.readlines():
-            # First the easy ones: mean/stdev
+            # First the easy ones: mean/stdev/flops
             m = self.expectMeanRE.match(line)
             if m:
                 self.logger.debug("MEAN line detected: " + m.group(1))
                 if 'mean' in self.result:
                     self.logger.warning("Multiple mean lines detected, using last one")
                 self.result['mean'] = float(m.group(1))
+                continue
 
             m = self.expectStdevRE.match(line)
             if m:
@@ -53,6 +56,15 @@ class FileCheckParser(object):
                 if 'stdev' in self.result:
                     self.logger.warning("Multiple stdev lines detected, using last one")
                 self.result['stdev'] = float(m.group(1))
+                continue
+
+            m = self.flopsRE.match(line)
+            if m:
+                self.logger.debug("FLOPS line detected: " + m.group(1))
+                if 'flops' in self.result:
+                    self.logger.warning("Multiple flops lines detected, using last one")
+                self.result['flops'] = float(m.group(1))
+                continue
 
             # Now, concatenate all RUN lines, to make sure we can match
             # arguments through line breaks
@@ -63,7 +75,9 @@ class FileCheckParser(object):
         # If we found any RUN line, clean it up
         if runLine:
             runLine = re.sub('\\\\', '', runLine)
-        self.logger.debug("RUN line detected: " + runLine)
+            self.logger.debug("RUN line detected: " + runLine)
+        else:
+            self.logger.warning("No RUN line detected")
 
         # Now we match the remaining args in the RUN lines
         m = self.optArgs.search(runLine)

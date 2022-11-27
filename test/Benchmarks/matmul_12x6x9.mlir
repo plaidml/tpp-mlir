@@ -14,6 +14,8 @@
 // RUN: -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize \
 // RUN: -convert-linalg-to-tpp="enable-tiling" | FileCheck -check-prefix=TPP %s
 //
+// Total flops = O(n*k*m) = 12x9x6 = 648
+// BENCH_TOTAL_FLOPS: 648
 
 func.func @entry(%A: tensor<12x9xf32>, %B: tensor<9x6xf32>,
                   %C: tensor<12x6xf32>) -> tensor<12x6xf32> {
