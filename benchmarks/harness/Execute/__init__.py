@@ -23,7 +23,7 @@ class Execute(object):
             raise ValueError("Need program arguments to execute")
 
         if self.logger:
-            self.logger.debug('Executing: %s' % repr(program))
+            self.logger.debug(f"Executing: {' '.join(program)}")
 
         # Call the program, capturing stdout/stderr
         result = subprocess.run(program,

@@ -9,8 +9,7 @@
     - 'iters': Iterations, from a RUN line
     - 'entry': Kernel function name, from a RUN line
     - 'libs': Shared library argument, from a RUN line
-    - 'expected_mean': From a BENCH_EXPECTED_MEAN line
-    - 'expected_stdev': From a BENCH_EXPECTED_STDEV line
+    - 'flops': From a BENCH_TOTAL_FLOPS line
 """
 
 import re
@@ -23,8 +22,7 @@ class FileCheckParser(object):
         self.logger = logger
         # FileCheck line style
         self.runRE = re.compile("^\/\/\s*RUN: (.*)$");
-        self.expectMeanRE = re.compile("^\/\/\s*BENCH_EXPECT_MEAN: ([\d\.\-e]+)")
-        self.expectStdevRE = re.compile("^\/\/\s*BENCH_EXPECT_STDEV: ([\d\.\-e]+)")
+        self.flopsRE = re.compile("^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")
         # Arguments in the RUN lines for tpp-opt
         self.optArgs = re.compile("tpp-opt (%\w+)\s+(.*?)\s*\|")
         # Arguments in the RUN lines for tpp-run
@@ -39,20 +37,14 @@ class FileCheckParser(object):
 
         runLine = ""
         for line in file.readlines():
-            # First the easy ones: mean/stdev
-            m = self.expectMeanRE.match(line)
+            # First the easy one: flops
+            m = self.flopsRE.match(line)
             if m:
-                self.logger.debug("MEAN line detected: " + m.group(1))
-                if 'mean' in self.result:
-                    self.logger.warning("Multiple mean lines detected, using last one")
-                self.result['mean'] = float(m.group(1))
-
-            m = self.expectStdevRE.match(line)
-            if m:
-                self.logger.debug("STDEV line detected: " + m.group(1))
-                if 'stdev' in self.result:
-                    self.logger.warning("Multiple stdev lines detected, using last one")
-                self.result['stdev'] = float(m.group(1))
+                self.logger.debug(f"FLOPS line detected: {m.group(1)}")
+                if 'flops' in self.result:
+                    self.logger.warning("Multiple flops lines detected, using last one")
+                self.result['flops'] = float(m.group(1))
+                continue
 
             # Now, concatenate all RUN lines, to make sure we can match
             # arguments through line breaks
@@ -63,32 +55,34 @@ class FileCheckParser(object):
         # If we found any RUN line, clean it up
         if runLine:
             runLine = re.sub('\\\\', '', runLine)
-        self.logger.debug("RUN line detected: " + runLine)
+            self.logger.debug(f"RUN line detected: {runLine}")
+        else:
+            self.logger.warning("No RUN line detected")
 
         # Now we match the remaining args in the RUN lines
         m = self.optArgs.search(runLine)
         if m:
             self.result['opt-args'] = m.group(2)
-            self.logger.debug("Opt args detected: " + m.group(2))
+            self.logger.debug(f"Opt args detected: {m.group(2)}")
 
         m = self.entryRE.search(runLine)
         if m:
             self.result['entry'] = m.group(1)
-            self.logger.debug("Entry point detected: " + m.group(1))
+            self.logger.debug(f"Entry point detected: {m.group(1)}")
         else:
             self.logger.info("Did not find the entry point argument in RUN lines")
 
         m = self.itersRE.search(runLine)
         if m:
             self.result['iters'] = int(m.group(1))
-            self.logger.debug("Number of iterations detected: " + m.group(1))
+            self.logger.debug(f"Number of iterations detected: {m.group(1)}")
         else:
             self.logger.info("Did not find the iterations argument in RUN lines")
 
         m = self.libsRE.search(runLine)
         if m:
             self.result['shared-libs'] = m.group(1)
-            self.logger.debug("Shared libraries detected: " + m.group(1))
+            self.logger.debug(f"Shared libraries detected: {m.group(1)}")
         else:
             self.logger.info("Did not find the shared libs argument in RUN lines")
 
@@ -99,16 +93,16 @@ class FileCheckParser(object):
             with open(filename) as file:
                 self._parseLines(file)
         except IOError as err:
-            self.logger.error("Cannot open file '" + filename + "': " + err.strerror)
+            self.logger.error("Cannot open file '{filename}': {err.strerror}")
             return {}
         except ValueError as err:
-            self.logger.error("Cannot convert string into int/float: " + err.strerror)
+            self.logger.error("Cannot convert string into int/float: {err.strerror}")
             return {}
         except NameError as err:
-            self.logger.error("Name error while parsing IR file: " + err.args)
+            self.logger.error("Name error while parsing IR file: {err.args}")
             return {}
         except Exception as err:
-            self.logger.error("Uncaught error while parsing IR file: " + err.strerror)
+            self.logger.error("Uncaught error while parsing IR file: {err.strerror}")
             return {}
 
         # Return

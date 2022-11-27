@@ -1,0 +1,71 @@
+[
+  {
+  "simple_copy": {
+    "ref": {
+      "type": "C++",
+      "source": "simple_copy/simple_copy.cc",
+      "iters": "1000",
+      "flags": ""
+    },
+    "mlir": {
+      "type": "MLIR",
+      "source": "../test/Benchmarks/simple_copy.mlir",
+      "iters": "1000",
+      "flags": ""
+    }
+  }},
+  {
+  "mlp": {
+    "ref": {
+      "type": "C++",
+      "source": "mlp/mlp.cc",
+      "iters": "10",
+      "flags": ""
+    },
+    "mlir": {
+      "type": "MLIR",
+      "source": "../test/Benchmarks/mlp.mlir",
+      "iters": "10",
+      "flags": ""
+    }
+  }},
+  {
+  "matmul": {
+    "ref_48x64x96": {
+      "type": "C++",
+      "source": "matmul/matmul.cc",
+      "iters": "10",
+      "flags": "48x64x96"
+    },
+    "mlir_48x64x96": {
+      "type": "MLIR",
+      "source": "../test/Benchmarks/matmul_48x64x96.mlir",
+      "iters": "10",
+      "flags": ""
+    },
+    "ref_64x48x96": {
+      "type": "C++",
+      "source": "matmul/matmul.cc",
+      "iters": "10",
+      "flags": "64x48x96"
+    },
+    "mlir_64x48x96": {
+      "type": "MLIR",
+      "source": "../test/Benchmarks/matmul_64x48x96.mlir",
+      "iters": "10",
+      "flags": ""
+    },
+    "ref_64x64x64": {
+      "type": "C++",
+      "source": "matmul/matmul.cc",
+      "iters": "10",
+      "flags": "64x64x64"
+    },
+    "mlir_64x64x64": {
+      "type": "MLIR",
+      "source": "../test/Benchmarks/matmul_64x64x64.mlir",
+      "iters": "10",
+      "flags": ""
+    }
+  }}
+]
