@@ -64,3 +64,15 @@ func.func @testBrgemmWithBf16(%arg0: memref<32x4x4x2xbf16>, %arg1: memref<64x4x4
   tpp.vnni_brgemm ins(%arg0: memref<32x4x4x2xbf16>, %arg1: memref<64x4x4xbf16>) out(%arg2: memref<4x4xbf16>)
   return %arg2: memref<4x4xbf16>
 }
+
+// CHECK-LABEL: func.func @brgemmWithOffset(
+func.func @brgemmWithOffset(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>,
+                            %arg2: memref<2x2xf32>) -> memref<2x2xf32> {
+  // CHECK: tpp.offset_brgemm
+  tpp.offset_brgemm ins(%arg0 : memref<4x4xf32>, %arg1: memref<4x4xf32>) 
+                    out(%arg2 : memref<2x2xf32>)  { offsetsA = [0, 2, 8, 10] 
+                                                    offsetsB = [0, 2, 8, 10]  
+                                                    ldims = [2, 4, 4]
+                                                    dims = [2, 2, 4] }
+  return %arg2: memref<2x2xf32>
+}

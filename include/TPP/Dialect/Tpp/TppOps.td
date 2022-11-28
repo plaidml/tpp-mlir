@@ -316,4 +316,40 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let hasVerifier = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// Brgemm with offset
+//===----------------------------------------------------------------------===//
+
+def Tpp_OffsetBrgemmOp : Tpp_Op<"offset_brgemm", [SameOperandsElementType]> {
+  let summary = [{ 
+  
+  }];
+
+  let description = [{
+    The tpp.offset_brgemm multiplies to sub-blocks of tensor A and B and reduce
+    the partial result to a block of C. The sub-blocks in A and B are identified
+    using offsets. `offsetsA` for tensor A and `offsetsB` for tensor B. `ldims`
+    represents the leading dimension of the sub-blocks to be multipled that will
+    be 2 dimensional. `dims` represents M, N and K.
+  }];
+
+  let arguments = (ins AnyStaticShapeMemRef:$memrefA, 
+                       AnyStaticShapeMemRef:$memrefB,
+                       AnyStaticShapeMemRef:$memrefC,
+                       DenseI64ArrayAttr:$offsetsA,
+                       DenseI64ArrayAttr:$offsetsB,
+                       DenseI64ArrayAttr:$ldims,
+                       DenseI64ArrayAttr:$dims);
+  let assemblyFormat = [{
+    `ins` `(` $memrefA `:` type($memrefA) `,`
+              $memrefB `:` type($memrefB) `)`
+    `out` `(` $memrefC `:` type($memrefC) `)` 
+    `{` `offsetsA` `=` $offsetsA 
+    `offsetsB` `=` $offsetsB
+    `ldims` `=` $ldims
+    `dims` `=` $dims `}`
+    attr-dict
+  }];
+}
+
 #endif // TPP_TPP_OPS

@@ -13,6 +13,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -253,6 +254,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   }
 };
 
+// Convert brgemm to loops.
 struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   using OpRewritePattern<BrgemmOp>::OpRewritePattern;
 
@@ -297,12 +299,65 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   }
 };
 
+// Convert offset brgemm to loops.
+struct ConvertTppOffsetBrgemmOp : public OpRewritePattern<OffsetBrgemmOp> {
+  using OpRewritePattern<OffsetBrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OffsetBrgemmOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    ArrayRef<int64_t> offsetsInA = brgemmOp.getOffsetsA();
+    ArrayRef<int64_t> offsetsInB = brgemmOp.getOffsetsB();
+    assert(offsetsInA.size() != offsetsInB.size() &&
+           "expect same size for offsets");
+
+    ArrayRef<int64_t> leadingDims = brgemmOp.getLdims();
+    ArrayRef<int64_t> dims = brgemmOp.getDims();
+
+    Location loc = brgemmOp.getLoc();
+    Value basePtrA = rewriter.create<memref::ExtractAlignedPointerAsIndexOp>(
+        loc, brgemmOp.getMemrefA());
+    Value basePtrB = rewriter.create<memref::ExtractAlignedPointerAsIndexOp>(
+        loc, brgemmOp.getMemrefB());
+    Value basePtrC = rewriter.create<memref::ExtractAlignedPointerAsIndexOp>(
+        loc, brgemmOp.getMemrefC());
+    for (int idxInOffsets = 0, sizeOffsets = offsetsInA.size();
+         idxInOffsets < sizeOffsets; idxInOffsets++) {
+      
+      // Create constant from offsets.
+      Value ctsOffsetInA = rewriter.create<arith::ConstantIndexOp>(
+          loc, offsetsInA[idxInOffsets]); 
+      Value ctsOffsetInB = rewriter.create<arith::ConstantIndexOp>(
+          loc, offsetsInB[idxInOffsets]);
+
+      // Add constants to base pointers.
+      basePtrA = rewriter.create<arith::AddIOp>(loc, basePtrA, ctsOffsetInA);
+      basePtrB = rewriter.create<arith::AddIOp>(loc, basePtrB, ctsOffsetInB);
+
+      // Cast Index tp i64.
+      Value castedOffsetInA = rewriter.create<arith::IndexCastOp>(loc, rewriter.getI64Type(), ctsOffsetInA);
+      Value castedOffsetInB = rewriter.create<arith::IndexCastOp>(loc, rewriter.getI64Type(), ctsOffsetInB);
+      
+      // Create llvm.inttoptr using memref element type.
+      Type basePtrType =
+          LLVM::LLVMPointerType::get(brgemmOp.getMemrefA().getType().getElementType());
+      Value baseLLVMPtrA = rewriter.create<LLVM::IntToPtrOp>(loc, basePtrType, castedOffsetInA);
+      Value baseLLVMPtrB = rewriter.create<LLVM::IntToPtrOp>(loc, basePtrType, castedOffsetInB);
+
+      // Call a naive matmul.
+      
+    
+    }
+    return failure();
+  }
+};
+
 void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
                ConvertTppMatmulOp,
                ConvertTppBrgemmOp,
+               ConvertTppOffsetBrgemmOp,
                ConvertTppReluOp>(patterns.getContext());
   // clang-format on
 }
