@@ -3,7 +3,7 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run -n 2000\
+// RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -14,8 +14,8 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
-// Total flops = O(n*k*m) = 64x96x48 = 294912
-// BENCH_TOTAL_FLOPS: 294912
+// Total flops = O(2*n*k*m) = 2*64x96x48 = 589824
+// BENCH_TOTAL_FLOPS: 589824
 
 func.func @entry(%A: tensor<64x96xf32>, %B: tensor<96x48xf32>,
                   %C: tensor<64x48xf32>) -> tensor<64x48xf32> {

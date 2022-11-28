@@ -3,7 +3,7 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
-// RUN: tpp-run -n 2000\
+// RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
@@ -14,8 +14,8 @@
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
-// Total flops = O(n*k*m) = 64x64x64 = 262144
-// BENCH_TOTAL_FLOPS: 262144
+// Total flops = O(2*n*k*m) = 2*64x64x64 = 524288
+// BENCH_TOTAL_FLOPS: 524288
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>

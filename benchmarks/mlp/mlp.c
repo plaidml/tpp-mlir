@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
   }
-  double gflops = (double)((n*m) + (n*m*k) + (n*m)) / 1e9;
+  double gflops = (double)((n*m) + (2*n*m*k) + (n*m)) / 1e9;
   if (verbose) {
     printf("Kernel version: %s\n", (kernel == mlp_ref) ? "ref" : "xsmm");
     printf("[ %d, %d ] = [ %d, %d ] x [ %d, %d ] (%dx)\n", m, n, m, k, k, n, iter);

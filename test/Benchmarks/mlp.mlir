@@ -17,9 +17,9 @@
 // RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
 
-// Total flops = broadcast O(n*m) + matmul O(n*m*k) + ReLU (O(n*m)
-// 128x512x2 (131072) + 128x256x512 (16777216) = 16908288
-// BENCH_TOTAL_FLOPS: 16908288
+// Total flops = broadcast O(n*m) + matmul O(2*n*m*k) + ReLU (O(n*m)
+// 2*128x512 (131072) + 2*128x256x512 (33554432) = 33685504
+// BENCH_TOTAL_FLOPS: 33685504
 
 #map0 = affine_map<(d0, d1) -> (0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>

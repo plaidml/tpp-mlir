@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Dims argument must be format MxNxK, not '%s'\n", argv[argc-1]);
     exit(1);
   }
-  double gflops = (double)(n*m*k) / 1e9;
+  double gflops = (double)(2*n*m*k) / 1e9;
   if (verbose) {
     printf("Kernel version: %s\n", (kernel == matmul_ref) ? "ref" : "xsmm");
     printf("[ %d, %d ] = [ %d, %d ] x [ %d, %d ] (%dx)\n", m, n, m, k, k, n, iter);
