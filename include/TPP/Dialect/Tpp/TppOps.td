@@ -29,7 +29,7 @@ def TppBRGEMMVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [4]>;
 
 // Tpp operands is a scalar float or a static memref with rank 1 or 2.
 def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
-
+// Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
@@ -280,8 +280,8 @@ def Tpp_VNNI_BrgemmOp : Tpp_Op<"vnni_brgemm"> {
   
     ```mlir
     
-      tpp.brgemm ins(%1: memref<3x3x4x2xf32>, %2: memref<3x4x5xf32>) 
-                 out(%3: memref<6x5xf32>)
+      tpp.vnni_brgemm ins(%1: memref<3x3x4x2xf32>, %2: memref<3x4x5xf32>) 
+                      out(%3: memref<6x5xf32>)
     ```
     }];
 
