@@ -20,7 +20,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -40,10 +39,10 @@ static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
   return strides[pos];
 }
 
-struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
-  using OpRewritePattern<MatmulOp>::OpRewritePattern;
+struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
+  using OpRewritePattern<tpp::MatmulOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(tpp::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
@@ -88,10 +87,10 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   }
 };
 
-struct ConvertTpp_VNNI_MatmulOp : public OpRewritePattern<VNNI_MatmulOp> {
-  using OpRewritePattern<VNNI_MatmulOp>::OpRewritePattern;
+struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
+  using OpRewritePattern<tpp::VNNIMatmulOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(VNNI_MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(tpp::VNNIMatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
@@ -140,10 +139,10 @@ struct ConvertTpp_VNNI_MatmulOp : public OpRewritePattern<VNNI_MatmulOp> {
   }
 };
 
-struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
-  using OpRewritePattern<BrgemmOp>::OpRewritePattern;
+struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
+  using OpRewritePattern<tpp::BrgemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
+  LogicalResult matchAndRewrite(tpp::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
 
@@ -192,10 +191,10 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   }
 };
 
-struct ConvertTpp_VNNI_BrgemmOp : public OpRewritePattern<VNNI_BrgemmOp> {
-  using OpRewritePattern<VNNI_BrgemmOp>::OpRewritePattern;
+struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
+  using OpRewritePattern<tpp::VNNIBrgemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(VNNI_BrgemmOp brgemmOp,
+  LogicalResult matchAndRewrite(tpp::VNNIBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
 
@@ -249,8 +248,8 @@ struct ConvertTpp_VNNI_BrgemmOp : public OpRewritePattern<VNNI_BrgemmOp> {
   }
 };
 
-struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
-  using OpRewritePattern<IdentityOp>::OpRewritePattern;
+struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
+  using OpRewritePattern<tpp::IdentityOp>::OpRewritePattern;
 
   // Examples:
   // If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
@@ -287,8 +286,8 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 
   // Return ldi and bCast.
-  std::pair<int64_t, xsmm::UnaryFlags> getLdiAndBCast(IdentityOp identityOp,
-                                                      int64_t ldo) const {
+  std::pair<int64_t, xsmm::UnaryFlags>
+  getLdiAndBCast(tpp::IdentityOp identityOp, int64_t ldo) const {
     Type inputType = identityOp.getInput().getType();
 
     // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
@@ -337,7 +336,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     assert(false && "failed to get ldi and bCast for identity");
   }
 
-  LogicalResult matchAndRewrite(IdentityOp identityOp,
+  LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = identityOp.getLoc();
     // no conversion if identity is a scalar operation.
@@ -358,7 +357,6 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     int64_t m = outputMemRefType.getShape()[0];
     int64_t n = outputMemRefType.getShape()[1];
     int64_t ldo = outputStrides.front();
-    // TODO: ldi is probably broken atm since it does not look at strides.
     std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
         getLdiAndBCast(identityOp, ldo);
     int64_t ldi = ldiAndBCast.first;
@@ -395,10 +393,10 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 };
 
-struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
-  using OpRewritePattern<ReluOp>::OpRewritePattern;
+struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
+  using OpRewritePattern<tpp::ReluOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(ReluOp reluOp,
+  LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
     // no conversion if the relu is a scalar operation.
@@ -445,10 +443,10 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   }
 };
 
-struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
-  using OpRewritePattern<AddOp>::OpRewritePattern;
+struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
+  using OpRewritePattern<tpp::AddOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AddOp addOp,
+  LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = addOp.getLoc();
     // no conversion if the add is a scalar operation.
@@ -521,9 +519,9 @@ void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
                ConvertTppReluOp,
                ConvertTppAddOp,
                ConvertTppMatmulOp,
-	       ConvertTpp_VNNI_MatmulOp,
+	             ConvertTppVNNIMatmulOp,
                ConvertTppBrgemmOp,
-	       ConvertTpp_VNNI_BrgemmOp>(patterns.getContext());
+	             ConvertTppVNNIBrgemmOp>(patterns.getContext());
   // clang-format on
 }
 

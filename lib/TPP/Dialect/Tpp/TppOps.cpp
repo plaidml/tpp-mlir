@@ -141,7 +141,7 @@ LogicalResult AddOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// VNNI_MatmulOp
+// VNNIMatmulOp
 //===----------------------------------------------------------------------===//
 
 static bool verifyVNNIMatmulShape(MemRefType memrefA, MemRefType memrefB,
@@ -159,7 +159,7 @@ static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
   return !(shapeB[0] != k || shapeB[1] != n || shapeA[0] * shapeA[2] != m);
 }
 
-LogicalResult VNNI_MatmulOp::verify() {
+LogicalResult VNNIMatmulOp::verify() {
   MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
   MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
   MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
@@ -172,13 +172,13 @@ LogicalResult VNNI_MatmulOp::verify() {
   return success();
 }
 
-void VNNI_MatmulOp::build(OpBuilder &builder, OperationState &state,
-                          ValueRange inputs, Value output) {
-  VNNI_MatmulOp::build(builder, state, inputs[0], inputs[1], output);
+void VNNIMatmulOp::build(OpBuilder &builder, OperationState &state,
+                         ValueRange inputs, Value output) {
+  VNNIMatmulOp::build(builder, state, inputs[0], inputs[1], output);
 }
 
 //===----------------------------------------------------------------------===//
-// BrgemmOp
+// VNNIBrgemmOp
 //===----------------------------------------------------------------------===//
 
 static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
@@ -187,7 +187,7 @@ static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
            memrefA.getRank() != 4);
 }
 
-LogicalResult VNNI_BrgemmOp::verify() {
+LogicalResult VNNIBrgemmOp::verify() {
   MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
   MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
   MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
@@ -199,7 +199,7 @@ LogicalResult VNNI_BrgemmOp::verify() {
   return success();
 }
 
-void VNNI_BrgemmOp::build(OpBuilder &builder, OperationState &state,
-                          ValueRange inputs, Value output) {
-  VNNI_BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
+void VNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
+                         ValueRange inputs, Value output) {
+  VNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], output);
 }

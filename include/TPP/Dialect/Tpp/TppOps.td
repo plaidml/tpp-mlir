@@ -169,7 +169,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
 // VNNI_MatmulOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_VNNI_MatmulOp : Tpp_Op<"vnni_matmul"> {
+def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
   let summary = [{
     Performs matrix multiplication of two inputs with first 
     operand in VNNI format.}];
@@ -230,7 +230,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
       tpp.brgemm ins(%1: memref<3x5x4xf32>, %2: memref<3x4x5xf32>) 
                  out(%3: memref<5x5xf32>)
     ```
-    }];
+  }];
 
   let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA, 
                        TppBRGEMMemrefInput:$batchMatrixB,
@@ -268,7 +268,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
 // VNNI_BrgemmOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_VNNI_BrgemmOp : Tpp_Op<"vnni_brgemm"> {
+def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let summary = [{
     Performs batch reduced matrix multiplication of two inputs with first 
     input in VNNI format}];
@@ -283,7 +283,7 @@ def Tpp_VNNI_BrgemmOp : Tpp_Op<"vnni_brgemm"> {
       tpp.vnni_brgemm ins(%1: memref<3x3x4x2xf32>, %2: memref<3x4x5xf32>) 
                       out(%3: memref<6x5xf32>)
     ```
-    }];
+  }];
 
   let arguments = (ins TppBRGEMMVNNIMemrefInput:$batchMatrixA, 
                        TppBRGEMMemrefInput:$batchMatrixB,
@@ -315,6 +315,5 @@ def Tpp_VNNI_BrgemmOp : Tpp_Op<"vnni_brgemm"> {
   
   let hasVerifier = 1;
 }
-
 
 #endif // TPP_TPP_OPS
