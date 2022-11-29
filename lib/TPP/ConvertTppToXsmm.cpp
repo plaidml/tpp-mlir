@@ -514,15 +514,9 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 } // namespace
 
 void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  patterns.add<ConvertTppIdentityOp,
-               ConvertTppReluOp,
-               ConvertTppAddOp,
-               ConvertTppMatmulOp,
-	             ConvertTppVNNIMatmulOp,
-               ConvertTppBrgemmOp,
-	             ConvertTppVNNIBrgemmOp>(patterns.getContext());
-  // clang-format on
+  patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppAddOp,
+               ConvertTppMatmulOp, ConvertTppVNNIMatmulOp, ConvertTppBrgemmOp,
+               ConvertTppVNNIBrgemmOp>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
