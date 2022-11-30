@@ -30,7 +30,7 @@ class FileCheckParser(object):
         # Arguments in the RUN lines for tpp-run
         self.entryRE = re.compile("-e\s+(\w+)\s")
         self.itersRE = re.compile("-n\s+(\d+)\s")
-        self.libsRE = re.compile("-shared-libs=([^\s]+)\s")
+        self.libsRE = re.compile("-shared-libs=([^\s]+)")
         # All matches
         self.result = {}
 
