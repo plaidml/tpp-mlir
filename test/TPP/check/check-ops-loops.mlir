@@ -15,11 +15,11 @@ func.func @entry() {
     ]> : tensor<4x4xf32>
 
   %threshold = arith.constant 0.1: f32
-  // CHECK: %[[c4:.+]] = arith.constant 4 : index 
+  // CHECK: %[[c4:.+]] = arith.constant 4 : index
   // CHECK: %[[c0:.+]] = arith.constant 0 : index
   // CHECK: %[[c1:.+]] = arith.constant 1 : index
   // CHECK: %[[cst:.+]] = arith.constant 1.000000e-01 : f32
-  // CHECK: %[[l0:.+]] = memref.get_global 
+  // CHECK: %[[l0:.+]] = memref.get_global
   // CHECK: %[[l1:.+]] = memref.get_global
   // CHECK: scf.for %[[arg0:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
   // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {

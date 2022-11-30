@@ -48,12 +48,12 @@ module {
         [ 10.7, 11.7, 12.7, 13.7 ],
         [ 10.8, 11.8, 12.8, 13.8 ]
     ]> : tensor<8x4xf64>
-   
+
     // Call kernels with dense.
     %C = arith.constant dense<0.0> : tensor<4x4xf64>
     %0 = call @matmul1(%da, %db, %C)
        : (tensor<4x8xf64>, tensor<8x4xf64>, tensor<4x4xf64>) -> tensor<4x4xf64>
-        
+
     //
     // CHECK:    ( ( 388.76, 425.56, 462.36, 499.16 ),
     // CHECK-SAME: ( 397.12, 434.72, 472.32, 509.92 ),

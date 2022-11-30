@@ -3,10 +3,10 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
- func.func @matmultpp(%A: tensor<4x8xf64>, 
+ func.func @matmultpp(%A: tensor<4x8xf64>,
           %B: tensor<8x4xf64>, %C: tensor<4x4xf64> {linalg.inplaceable = true}) -> tensor<4x4xf64> {
-    %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
-                         iterator_types = ["parallel", "parallel", "reduction"]} 
+    %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
+                         iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%A, %B: tensor<4x8xf64>, tensor<8x4xf64>) outs(%C: tensor<4x4xf64>) {
       ^bb0(%a: f64, %b: f64, %c: f64):
         %0 = arith.mulf %a, %b : f64
@@ -43,7 +43,7 @@ module {
     %C = arith.constant dense<0.0> : tensor<4x4xf64>
     %0 = call @matmultpp(%da, %db, %C)
        : (tensor<4x8xf64>, tensor<8x4xf64>, tensor<4x4xf64>) -> tensor<4x4xf64>
- 
+
     %m0 = bufferization.to_memref %0 : memref<4x4xf64>
     %v0 = vector.transfer_read %m0[%c0, %c0], %d1 : memref<4x4xf64>, vector<4x4xf64>
     vector.print %v0 : vector<4x4xf64>

@@ -39,7 +39,7 @@ func.func @conv(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<8xf32>, %conv_out: ten
       linalg.yield %in : f32
   } -> tensor<1x6x6x8xf32>
   // IR: linalg.batch_reduce_matmul
-  %3 = linalg.conv_2d_nhwc_hwcf ins(%2, %arg0 : tensor<1x6x6x8xf32>, tensor<1x1x8x8xf32>) outs(%conv_out : tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32> 
+  %3 = linalg.conv_2d_nhwc_hwcf ins(%2, %arg0 : tensor<1x6x6x8xf32>, tensor<1x1x8x8xf32>) outs(%conv_out : tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32>
   return %3 : tensor<1x6x6x8xf32>
 }
 
@@ -54,7 +54,7 @@ transform.sequence failures(propagate) {
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
     // Here we match the generic ops in the entire module. The conv is the last one.
-    %generic:3 = split_handles %3 in [3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation) 
+    %generic:3 = split_handles %3 in [3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
     %4 = transform.structured.collapse %generic#2 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %5 = transform.structured.collapse %4 [[0], [1], [2, 3], [4], [5], [6]]
     %6 = transform.structured.interchange %5 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
@@ -65,97 +65,97 @@ func.func @entry() {
   %cst = arith.constant 8 : index
   %init_source = tensor.empty() : tensor<8xf32>
 
-  // create input tensors.  
+  // create input tensors.
   %input_tensor = call @generate_1D_source(%init_source) : (tensor<8xf32>) -> (tensor<8xf32>)
   %bcast = tensor.empty() : tensor<1x1x8x8xf32>
-  %input_tensor_bcast = linalg.broadcast ins(%input_tensor: tensor<8xf32>) 
+  %input_tensor_bcast = linalg.broadcast ins(%input_tensor: tensor<8xf32>)
                                              outs(%bcast: tensor<1x1x8x8xf32>)
                                              dimensions = [0, 1, 2]
   %conv_out = arith.constant dense<0.0> : tensor<1x6x6x8xf32>
   %result = call @conv(%input_tensor_bcast, %input_tensor, %conv_out)
     : (tensor<1x1x8x8xf32>, tensor<8xf32>, tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32>
-  
+
   %c0 = arith.constant 0 : index
   %d1 = arith.constant -1.0 : f32
   %v0 = vector.transfer_read %result[%c0, %c0, %c0, %c0], %d1 : tensor<1x6x6x8xf32>, vector<1x6x6x8xf32>
-  
+
   //
-  // LINALG: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
+  // LINALG: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // LINALG-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
   // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
   //
 
   //
-  // TRANSFORM: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM -SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
+  // TRANSFORM: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM -SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // TRANSFORM-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
   // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
   //
   vector.print %v0 : vector<1x6x6x8xf32>
-  return 
+  return
 }

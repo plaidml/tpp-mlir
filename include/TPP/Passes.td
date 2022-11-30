@@ -66,7 +66,7 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
 
-def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {  
+def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
   let description = [{
@@ -79,7 +79,7 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {  
+def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {
   let summary = "Convert check to func";
   let constructor = "mlir::tpp::createConvertCheckToFuncPass()";
   let description = [{
@@ -88,7 +88,7 @@ def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {  
+def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
   let summary = "Convert check to loops";
   let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";
   let description = [{

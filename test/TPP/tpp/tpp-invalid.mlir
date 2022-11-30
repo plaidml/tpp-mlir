@@ -1,6 +1,6 @@
-// RUN: tpp-opt %s -split-input-file -verify-diagnostics 
+// RUN: tpp-opt %s -split-input-file -verify-diagnostics
 
-func.func @tpp_add_invalid(%arg0: memref<1x2xf32>, 
+func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
                            %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
@@ -14,7 +14,7 @@ func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
   // expected-error @below {{'tpp.add' op expects both operands to be shaped type}}
   tpp.add ins(%arg0: f32) out(%arg1: f32)
   return
-} 
+}
 
 
 // -----
@@ -45,7 +45,7 @@ func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) 
 
 // -----
 
-func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, 
+func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
                               %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
   // expected-error @below {{'tpp.matmul' op fails to verify operands dimensions mismatch}}
   tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>) out(%arg2: memref<5x5xf32>)
@@ -55,7 +55,7 @@ func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
 // -----
 
 // The batch dimension must agree in both arg0 and arg1.
-func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>, 
+func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>,
                               %arg2: memref<2x2xf32>) -> memref<2x2xf32> {
   // expected-error @below {{'tpp.brgemm' op fails to verify operands dimensions mismatch}}
   tpp.brgemm ins(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>) out(%arg2: memref<2x2xf32>)

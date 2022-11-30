@@ -3,8 +3,8 @@
 // CHECK-LABEL: func.func @brgemm_lowering(
 // CHECK-SAME: %[[arg0:.*]]: memref<3x5x4xf32>,
 // CHECK-SAME: %[[arg1:.*]]: memref<3x4x5xf32>,
-// CHECK-SAME: %[[arg2:.*]]: memref<5x5xf32>) { 
-func.func @brgemm_lowering(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, 
+// CHECK-SAME: %[[arg2:.*]]: memref<5x5xf32>) {
+func.func @brgemm_lowering(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
                           %arg2: memref<5x5xf32>) {
   // CHECK: tpp.brgemm ins(%[[arg0]] : memref<3x5x4xf32>, %[[arg1]] : memref<3x4x5xf32>) out(%[[arg2]] : memref<5x5xf32>)
   linalg.batch_reduce_matmul ins(%arg0, %arg1: memref<3x5x4xf32>, memref<3x4x5xf32>)
@@ -27,9 +27,9 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: scf.yield
   %c0 = arith.constant 0.0 : f32
   linalg.generic {
-    indexing_maps = [#map5], 
-    iterator_types = ["parallel", "parallel", "parallel"], 
-    library_call = "tpp.relu"} 
+    indexing_maps = [#map5],
+    iterator_types = ["parallel", "parallel", "parallel"],
+    library_call = "tpp.relu"}
     outs(%arg3 : memref<64x32x32xf32>) {
       ^bb0(%arg14: f32):
         %13 = arith.maxf %arg14, %c0: f32
@@ -43,11 +43,11 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
 // CHECK-LABEL: func.func @matmul_lowering(
 // CHECK-SAME: %[[arg0:.*]]: memref<8x9xf32>,
 // CHECK-SAME: %[[arg1:.*]]: memref<9x8xf32>,
-// CHECK-SAME: %[[arg2:.*]]: memref<8x8xf32>) { 
-func.func @matmul_lowering(%arg0: memref<8x9xf32>, 
+// CHECK-SAME: %[[arg2:.*]]: memref<8x8xf32>) {
+func.func @matmul_lowering(%arg0: memref<8x9xf32>,
                            %arg1: memref<9x8xf32>, %arg2: memref<8x8xf32>) {
   // CHECK: tpp.matmul ins(%[[arg0]] : memref<8x9xf32>, %[[arg1]] : memref<9x8xf32>) out(%[[arg2]] : memref<8x8xf32>)
-  linalg.matmul ins(%arg0, %arg1: memref<8x9xf32>, memref<9x8xf32>) 
+  linalg.matmul ins(%arg0, %arg1: memref<8x9xf32>, memref<9x8xf32>)
                 outs(%arg2: memref<8x8xf32>)
   return
 }
@@ -81,7 +81,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 
 // -----
 
-// Check pattern `SubViewOfSubViewWithUnitDims`. We should not trigger any errors. 
+// Check pattern `SubViewOfSubViewWithUnitDims`. We should not trigger any errors.
 func.func @main() -> memref<8x32x32x32xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

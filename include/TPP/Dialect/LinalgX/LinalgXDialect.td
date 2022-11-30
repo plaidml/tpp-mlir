@@ -17,7 +17,7 @@ include "mlir/IR/OpBase.td"
 
 def LinalgX_Dialect : Dialect {
     let name = "linalgx";
-    let summary = "Linalg extension."; 
+    let summary = "Linalg extension.";
     let cppNamespace = "::mlir::linalgx";
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }

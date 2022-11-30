@@ -22,12 +22,12 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 def PackOp : Op<Transform_Dialect, "structured.pack", [
-    FunctionalStyleTransformOpTrait, 
+    FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
-    TransformOpInterface, 
+    TransformOpInterface,
     TransformEachOpTrait]> {
 
-  let description = [{ 
+  let description = [{
     Block the target operation. Currently supports matmul and convolutions.
   }];
 
@@ -40,7 +40,7 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::linalg::LinalgOp target, 
+        ::mlir::linalg::LinalgOp target,
         ::llvm::SmallVector<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -53,9 +53,9 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
 //===----------------------------------------------------------------------===//
 
 def CollapseOp : Op<Transform_Dialect, "structured.collapse", [
-    FunctionalStyleTransformOpTrait, 
+    FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
-    TransformOpInterface, 
+    TransformOpInterface,
     TransformEachOpTrait]> {
 
   let description = [{
@@ -89,13 +89,13 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
     TransformEachOpTrait]> {
 
   let description = [{
-    Check if a linalg.generic maps to brgemm. If so materialize loops (if needed) 
+    Check if a linalg.generic maps to brgemm. If so materialize loops (if needed)
     and replace the linalg.generic with a linalg.batch_reduce_matmul.
 
     This transform never returns anything and could be made to return the brgemm
     operation if needed.
   }];
-  
+
   let arguments = (ins PDL_Operation:$target);
   let results = (outs);
 
@@ -114,9 +114,9 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
 //===----------------------------------------------------------------------===//
 
 def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
-    FunctionalStyleTransformOpTrait, 
+    FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
-    TransformOpInterface, 
+    TransformOpInterface,
     TransformEachOpTrait]> {
 
   let description = [{
@@ -145,7 +145,7 @@ def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
 // PackingPropagationOp
 //===----------------------------------------------------------------------===//
 
-// TODO: this does not compose as it invalidate all the handles. Generally we 
+// TODO: this does not compose as it invalidate all the handles. Generally we
 // need a better way to run transfomr and canonicalization. `CanonicalizedSequenceOp`
 // in IREE goes in this direction.
 def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation", [
@@ -188,13 +188,13 @@ def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
     MemoryEffectsOpInterface,
     TransformEachOpTrait,
     TransformOpInterface]> {
-  
+
   let description = [{
     Pattern match a linalg.generic and map it to tpp operations. On success,
     the resulting operation will still be a linalg.generic with the library_call
     set with the name of the tpp operation detected.
 
-    `filter` allows to select a subset of the detected operations. 
+    `filter` allows to select a subset of the detected operations.
   }];
 
   let arguments = (ins PDL_Operation:$target,
@@ -208,7 +208,7 @@ def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
       ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state); 
+      ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -290,7 +290,7 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
 //===----------------------------------------------------------------------===//
 
 // TODO: this does not compose as it invalidate all the handles.
-def MapAndConvertLinalgToTpp : Op<Transform_Dialect, 
+def MapAndConvertLinalgToTpp : Op<Transform_Dialect,
                                   "structured.map_and_convert_linalg_to_tpp", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
@@ -298,7 +298,7 @@ def MapAndConvertLinalgToTpp : Op<Transform_Dialect,
     TransformOpInterface]> {
 
   let description = [{
-    Wrapper around `populateConvertLinalgToTppPatterns` and 
+    Wrapper around `populateConvertLinalgToTppPatterns` and
     `populateMapLinalgToTppPatterns`.
 
     Note that this transformation is invalidating the handles to any payload IR
@@ -348,7 +348,7 @@ def Reshape2dOp : Op<Transform_Dialect, "structured.reshape_2d", [
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
       ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state); 
+      ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -377,10 +377,10 @@ def CollapseTo2dOp : Op<Transform_Dialect, "structured.collapse_to_2d", [
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
       ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state); 
+      ::mlir::transform::TransformState &state);
 
     // Get reassociation for 2d collapsing.
-    SmallVector<ReassociationIndices, 4> 
+    SmallVector<ReassociationIndices, 4>
       getReassociationIndices(linalg::GenericOp linalgOp);
   }];
 }

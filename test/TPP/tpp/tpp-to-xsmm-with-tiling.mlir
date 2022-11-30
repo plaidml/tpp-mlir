@@ -31,7 +31,7 @@ func.func @matmul(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>, %arg2: mem
 func.func @matmul(%arg0: memref<64x32xf32>, %arg1: memref<32x64xf32>, %arg2: memref<64x64xf32>) {
   // xsmm.ternary.dispatch matmul [ M N K LDA LDB LDC ]
   // CONFIG1: xsmm.ternary.dispatch matmul [32, 32, 32, 32, 64, 64]
-  // CONFIG2: xsmm.ternary.dispatch matmul [64, 32, 32, 32, 64, 64] 
+  // CONFIG2: xsmm.ternary.dispatch matmul [64, 32, 32, 32, 64, 64]
   // CONFIG3: xsmm.ternary.dispatch matmul [64, 64, 32, 32, 64, 64]
   linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], library_call = "tpp.matmul"} ins(%arg0, %arg1 : memref<64x32xf32>, memref<32x64xf32>) outs(%arg2 : memref<64x64xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):

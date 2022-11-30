@@ -5,7 +5,7 @@
 // RUN: FileCheck %s
 //
 
-func.func @matmultpp(%A: memref<2x8x2xbf16>, 
+func.func @matmultpp(%A: memref<2x8x2xbf16>,
           %B: memref<8x4xbf16>, %C: memref<4x4xbf16>) attributes {llvm.emit_c_interface} {
   tpp.vnni_matmul ins(%A: memref<2x8x2xbf16>, %B: memref<8x4xbf16>)
              out(%C: memref<4x4xbf16>)
@@ -21,7 +21,7 @@ func.func @entry() {
   linalg.fill ins(%f0:bf16) outs (%db:memref<8x4xbf16>)
   // Call kernel.
   %0 = memref.alloc() : memref<2x8x2xbf16>
-  linalgx.pack %da inner_dims_pos = [0] inner_tiles = [2] into %0 : (memref<4x8xbf16> memref<2x8x2xbf16>)    
+  linalgx.pack %da inner_dims_pos = [0] inner_tiles = [2] into %0 : (memref<4x8xbf16> memref<2x8x2xbf16>)
   %D = memref.alloc() : memref<4x4xbf16>
   %zero = arith.constant 0.0 : bf16
   linalg.fill ins(%zero : bf16) outs(%D:memref<4x4xbf16>)

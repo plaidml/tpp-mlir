@@ -34,7 +34,7 @@ module @predict_function  {
     } -> tensor<128x1024xf32>
     %7 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<128x1024xf32>) outs(%4 : tensor<128x1024xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  // no predecessors
-      %16 = mathx.relu %arg9 : f32 
+      %16 = mathx.relu %arg9 : f32
       linalg.yield %16 : f32
     } -> tensor<128x1024xf32>
     %8 = linalg.init_tensor [128, 2048] : tensor<128x2048xf32>
@@ -66,7 +66,7 @@ module @predict_function  {
     } -> tensor<128x1000xf32>
     %15 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<128x1000xf32>) outs(%12 : tensor<128x1000xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):  // no predecessors
-      %16 = mathx.relu %arg9 : f32 
+      %16 = mathx.relu %arg9 : f32
       linalg.yield %16 : f32
     } -> tensor<128x1000xf32>
     return %15 : tensor<128x1000xf32>

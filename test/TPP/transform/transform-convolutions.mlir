@@ -15,7 +15,7 @@ transform.sequence failures(propagate) {
     //      S   [reduction]
     //       C  [reduction]
     //        output[N][P][Q][K] += image[N][H][W][C] * filter[R][S][C][K]
-    // 
+    //
     // Expose a matmul by interchange
     //
     // N        [parallel]
@@ -31,7 +31,7 @@ transform.sequence failures(propagate) {
     //
     %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
     transform.structured.map_conv_to_matmul %2
-} 
+}
 
 func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
   linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: memref<1x4x4x3xf32>, memref<1x1x3x8xf32>) outs(%arg2: memref<1x4x4x8xf32>)
@@ -58,14 +58,14 @@ func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-    %1 = transform.structured.generalize %0 
+    %1 = transform.structured.generalize %0
     %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
     transform.structured.map_conv_to_matmul %2
 }
 
 func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: memref<1x3x3x8xf32>) {
   linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: memref<1x4x4x3xf32>, memref<2x2x3x8xf32>) outs(%arg2: memref<1x3x3x8xf32>)
-  return 
+  return
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
@@ -81,7 +81,7 @@ func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: 
 // CHECK: scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: scf.for %[[ARG5:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]], %[[ARG4]])
-// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][0, %[[APPLY]], %[[ARG5]], 0] [1, 1, 3, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<3x3xf32, strided<[3, 1], offset: ?>> 
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][0, %[[APPLY]], %[[ARG5]], 0] [1, 1, 3, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<3x3xf32, strided<[3, 1], offset: ?>>
 // CHECK: %[[SUB0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], %[[ARG5]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<2x2x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
 // CHECK: %[[SUB1:.+]] = memref.subview %[[ARG2]][0, %[[ARG3]], 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<1x3x3x8xf32> to memref<3x8xf32, strided<[8, 1], offset: ?>>
 // CHECK: linalg.matmul ins(%[[SUB]], %[[SUB0]] : memref<3x3xf32, strided<[3, 1], offset: ?>>, memref<3x8xf32, strided<[8, 1], offset: ?>>) outs(%[[SUB1]] : memref<3x8xf32, strided<[8, 1], offset: ?>>)
@@ -143,7 +143,7 @@ transform.sequence failures(propagate) {
     //     C'   [reduction]
     //      c   [reduction]
     //       output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
-    // 
+    //
     // expose BRGEMM by interchange:
     //
     // N        [parallel]
@@ -272,9 +272,9 @@ transform.sequence failures(propagate) {
     %5, %loop:3 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 0, 0] }
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     %convs:2 = split_handles %6 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
-  
-    // Map the conv to linalg.matmul 
-    // With R = S = 3 we map to linalg.matmul 
+
+    // Map the conv to linalg.matmul
+    // With R = S = 3 we map to linalg.matmul
     %conv1 = transform.structured.interchange %convs#1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
     transform.structured.map_conv_to_matmul %conv1
 

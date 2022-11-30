@@ -144,8 +144,8 @@ def PackOp : LinalgX_Op<"pack", [
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$input, "Value":$output, 
-      "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos, 
+    OpBuilder<(ins "Value":$input, "Value":$output,
+      "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos,
       "ArrayRef<OpFoldResult>":$tiles)>,
 
     OpBuilder<(ins "Value":$input, "Value":$output,
@@ -169,7 +169,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
      "getLoopIteratorTypes",
      "generateScalarImplementation"]>
 ]>{
-  let summary = "unpack operation";  
+  let summary = "unpack operation";
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
@@ -232,7 +232,7 @@ def UnPackOp : LinalgX_Op<"unpack", [
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
- 
+
   let builders = [
     OpBuilder<(ins "Value":$input, "Value":$output,
       "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos,

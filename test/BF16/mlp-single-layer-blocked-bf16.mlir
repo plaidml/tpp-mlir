@@ -8,7 +8,7 @@
 func.func @entry(){
   %arg0 = memref.alloc(): memref<128x256xbf16>
   %arg1 = memref.alloc(): memref<256x512xbf16>
-  %arg2 = memref.alloc(): memref<512xbf16> 
+  %arg2 = memref.alloc(): memref<512xbf16>
   %arg3 = memref.alloc(): memref<128x512xbf16>
   %f0 = arith.constant 1.0:bf16
   linalg.fill ins(%f0:bf16) outs(%arg0:memref<128x256xbf16>)
@@ -39,7 +39,7 @@ func.func @entry(){
       %d1 = arith.constant -1.0 : bf16
       %v0 = vector.transfer_read %subview_4[%c0, %c0], %d1 : memref<4x4xbf16, strided<[4,1], offset:?>>, vector<4x4xbf16>
       %f1 = arith.extf %v0:vector<4x4xbf16> to vector<4x4xf32>
-        
+
       //
       // CHECK:( ( 256, 256, 256, 256 ), ( 256, 256, 256, 256 ), ( 256, 256, 256, 256 ), ( 256, 256, 256, 256 ) )
       //

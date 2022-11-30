@@ -10,7 +10,7 @@
 //
 
 // RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \ 
+// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
@@ -30,4 +30,4 @@ func.func @entry(%A: tensor<64x96xf32>, %B: tensor<96x48xf32>,
 // TPP-SAME:  %[[ARG1:.+]]: memref<96x48xf32>,
 // TPP-SAME:  %[[ARG2:.+]]: memref<64x48xf32>)
 // TPP: tpp.matmul ins(%[[ARG0]] : memref<64x96xf32>, %[[ARG1]] : memref<96x48xf32>) out(%[[ARG2]] : memref<64x48xf32>)
-// TPP: return 
+// TPP: return

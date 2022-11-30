@@ -2,7 +2,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
-// 
+//
 
 // Make sure we map to tpp
 // RUN: tpp-opt %s -canonicalize -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
@@ -28,17 +28,17 @@ func.func @entry(){
   %init_source = tensor.empty() : tensor<64xf32>
   %input_tensor = call @generate_1D_source(%init_source) : (tensor<64xf32>) -> (tensor<64xf32>)
   %1 = tensor.empty() : tensor<12x56x56x64xf32>
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}}) 
-  %2 = linalg.generic {indexing_maps=[#map,#map1], 
-                       iterator_types = ["parallel", "parallel", "parallel", "parallel"], 
-                       library_call = "tpp.identity"} 
+  // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
+  %2 = linalg.generic {indexing_maps=[#map,#map1],
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel"],
+                       library_call = "tpp.identity"}
     ins(%input_tensor : tensor<64xf32> ) outs(%1 : tensor<12x56x56x64xf32>) {
       ^bb0(%in: f32, %out: f32):
         linalg.yield %in : f32
   } -> tensor<12x56x56x64xf32>
   %3 = tensor.empty() : tensor<12x56x56x64xf32>
-  %4 = linalg.generic {indexing_maps = [#map, #map1], 
-                       iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+  %4 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     ins(%input_tensor : tensor<64xf32> ) outs(%3 : tensor<12x56x56x64xf32>) {
       ^bb0(%in: f32, %out: f32):
         linalg.yield %in : f32
@@ -46,5 +46,5 @@ func.func @entry(){
 
   %threshold = arith.constant 0.0: f32
   check.expect_almost_eq(%2, %4, %threshold) : tensor<12x56x56x64xf32>, tensor<12x56x56x64xf32>, f32
-  return 
+  return
 }

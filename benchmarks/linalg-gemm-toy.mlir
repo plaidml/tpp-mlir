@@ -69,7 +69,7 @@ module @predict_function  {
         %16 = mathx.relu %arg9 : f32
         linalg.yield %16 : f32
       } -> tensor<1x1000xf32>
-    
+
     return %14 : tensor<1x1000xf32>
   }
 }

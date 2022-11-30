@@ -49,7 +49,7 @@ def Xsmm_UnaryKind : I64EnumAttr<
 }
 
 def Xsmm_UnaryFlags : I64EnumAttr<
-    "UnaryFlags", "",  
+    "UnaryFlags", "",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"BCAST_ROW", 2, "row">,

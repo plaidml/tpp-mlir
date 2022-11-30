@@ -21,7 +21,7 @@
 
 module {
 
-  func.func @copytpp(%A: tensor<4x4xf32>, 
+  func.func @copytpp(%A: tensor<4x4xf32>,
                      %B:tensor<4x4xf32> ) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
     // TPP: tpp.identity
     %O = linalg.generic { indexing_maps = [#map0, #map0],
@@ -48,7 +48,7 @@ module {
 
     %B = arith.constant dense<0.0> : tensor<4x4xf32>
     %0 = call @copytpp(%da, %B) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-   
+
     //
     // CHECK:      ( ( 1.1, 2.1, 3.1, 4.1 ),
     // CHECK-SAME:   ( 1.2, 2.2, 3.2, 4.2 ),
@@ -57,7 +57,7 @@ module {
     //
     %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
     vector.print %v0 : vector<4x4xf32>
-    return 
+    return
   }
 
 }

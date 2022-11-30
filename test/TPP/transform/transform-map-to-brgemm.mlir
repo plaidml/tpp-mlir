@@ -53,9 +53,9 @@ transform.sequence failures(propagate) {
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<4x16x32x32xf32>, 
-// CHECK-SAME:  %[[ARG1:.+]]: memref<8x16x32x32xf32>, 
-// CHECK-SAME:  %[[ARG2:.+]]: memref<4x8x32x32xf32>) -> memref<4x8x32x32xf32> { 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<4x16x32x32xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<8x16x32x32xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<4x8x32x32xf32>) -> memref<4x8x32x32xf32> {
 func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) -> memref<4x8x32x32xf32> {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index

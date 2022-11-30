@@ -52,17 +52,17 @@ func.func @entry() {
   %B = arith.constant dense<0.0> : tensor<9x6xf32>
   %0 = call @relutpp(%da) : (tensor<9x6xf32>) -> tensor<9x6xf32>
 
-  // 
-  // CHECK:       ( ( 1.1, 2.1, 3.1, 4.1, 5.1, 6.1 ), 
-  // CHECK-SAME:    ( 1.2, 2.2, 3.2, 4.2, 5.2, 6.2 ), 
-  // CHECK-SAME:    ( 1.3, 2.3, 3.3, 4.3, 5.3, 6.3 ), 
-  // CHECK-SAME:    ( 1.4, 0, 0, 0, 5.4, 6.6 ), 
-  // CHECK-SAME:    ( 1.5, 0, 0, 0, 5.5, 6.5 ), 
-  // CHECK-SAME:    ( 1.6, 0, 0, 0, 5.6, 6.6 ), 
-  // CHECK-SAME:    ( 1.7, 2.7, 3.7, 4.7, 5.7, 6.7 ), 
-  // CHECK-SAME:    ( 1.8, 2.8, 3.8, 4.8, 5.8, 6.8 ), 
+  //
+  // CHECK:       ( ( 1.1, 2.1, 3.1, 4.1, 5.1, 6.1 ),
+  // CHECK-SAME:    ( 1.2, 2.2, 3.2, 4.2, 5.2, 6.2 ),
+  // CHECK-SAME:    ( 1.3, 2.3, 3.3, 4.3, 5.3, 6.3 ),
+  // CHECK-SAME:    ( 1.4, 0, 0, 0, 5.4, 6.6 ),
+  // CHECK-SAME:    ( 1.5, 0, 0, 0, 5.5, 6.5 ),
+  // CHECK-SAME:    ( 1.6, 0, 0, 0, 5.6, 6.6 ),
+  // CHECK-SAME:    ( 1.7, 2.7, 3.7, 4.7, 5.7, 6.7 ),
+  // CHECK-SAME:    ( 1.8, 2.8, 3.8, 4.8, 5.8, 6.8 ),
   // CHECK-SAME:    ( 1.9, 2.9, 3.9, 4.9, 5.9, 6.9 ) )
-  //  
+  //
 
   %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
   vector.print %v0 : vector<9x6xf32>

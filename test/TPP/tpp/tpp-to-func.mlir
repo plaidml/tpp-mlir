@@ -11,5 +11,5 @@ func.func @tpp_matmul(%arg0: memref<3x6xf32>, %arg1: memref<6x3xf32>, %arg2: mem
   // CHECK: memref.cast
   // CHECK: call @xsmm_matmul_invoke
   tpp.matmul ins(%arg0: memref<3x6xf32>, %arg1: memref<6x3xf32>) out(%arg2: memref<3x3xf32>)
-  return 
+  return
 }

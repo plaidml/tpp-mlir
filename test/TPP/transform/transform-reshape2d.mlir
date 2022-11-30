@@ -42,13 +42,13 @@ transform.sequence failures(propagate) {
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 func.func @add(%arg0: tensor<5x5x4xf32>, %arg1: tensor<5x5x4xf32>) -> tensor<5x5x4xf32> {
-  %0 = linalg.generic { indexing_maps = [#map, #map], 
+  %0 = linalg.generic { indexing_maps = [#map, #map],
                         iterator_types = ["parallel", "parallel", "parallel"]}
     ins(%arg0: tensor<5x5x4xf32>) outs(%arg1: tensor<5x5x4xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
         %1 = arith.addf %arg2, %arg3 : f32
         linalg.yield %1 : f32
-  } -> tensor<5x5x4xf32>     
+  } -> tensor<5x5x4xf32>
   return %0: tensor<5x5x4xf32>
 }
 
@@ -78,13 +78,13 @@ transform.sequence failures(propagate) {
 #map = affine_map<(d0) -> (d0)>
 func.func @add(%arg0: tensor<5xf32>, %arg1: tensor<5xf32>) -> tensor<5xf32> {
   // expected-note @below {{when applied to this op}}
-  %0 = linalg.generic { indexing_maps = [#map, #map], 
+  %0 = linalg.generic { indexing_maps = [#map, #map],
                         iterator_types = ["parallel"]}
     ins(%arg0: tensor<5xf32>) outs(%arg1: tensor<5xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
         %1 = arith.addf %arg2, %arg3 : f32
         linalg.yield %1 : f32
-  } -> tensor<5xf32>     
+  } -> tensor<5xf32>
   return %0: tensor<5xf32>
 }
 

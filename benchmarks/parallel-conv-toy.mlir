@@ -14,9 +14,9 @@ module @predict_function  {
     %0 = linalg.init_tensor [1, 112, 112, 64] : tensor<1x112x112x64xf32>
     %1 = linalg.init_tensor [1, 56, 56, 256] : tensor<1x56x56x256xf32>
     %2 = linalg.init_tensor [2, 8, 1, 1, 32, 32] : tensor<2x8x1x1x32x32xf32>
-    %3 = linalgx.copy(%arg2, %2) {inputMap = #map0, outputMap = #map1} : tensor<1x1x64x256xf32>, tensor<2x8x1x1x32x32xf32> -> tensor<2x8x1x1x32x32xf32> 
+    %3 = linalgx.copy(%arg2, %2) {inputMap = #map0, outputMap = #map1} : tensor<1x1x64x256xf32>, tensor<2x8x1x1x32x32xf32> -> tensor<2x8x1x1x32x32xf32>
     %4 = linalg.init_tensor [2, 8, 3, 3, 32, 32] : tensor<2x8x3x3x32x32xf32>
-    %5 = linalgx.copy(%arg4, %4) {inputMap = #map0, outputMap = #map1} : tensor<3x3x64x256xf32>, tensor<2x8x3x3x32x32xf32> -> tensor<2x8x3x3x32x32xf32> 
+    %5 = linalgx.copy(%arg4, %4) {inputMap = #map0, outputMap = #map1} : tensor<3x3x64x256xf32>, tensor<2x8x3x3x32x32xf32> -> tensor<2x8x3x3x32x32xf32>
     stdx.closure(%arg6: tensor<1x224x224x3xf32>) -> tensor<1x56x56x256xf32> {
       %6 = linalg.pad_tensor %arg6 low[0, 2, 2, 0] high[0, 3, 3, 0]  {
       ^bb0(%arg7: index, %arg8: index, %arg9: index, %arg10: index):  // no predecessors

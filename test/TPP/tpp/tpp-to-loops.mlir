@@ -12,7 +12,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK: }
   %cst = arith.constant 0.000000e+00 : f32
   tpp.identity ins(%cst: f32) out(%arg0: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -30,7 +30,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK:   }
   // CHECK: }
   tpp.relu out(%arg0: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -48,7 +48,7 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK:   }
   // CHECK: }
   tpp.add ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -64,7 +64,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
   // CHECK:   }
   // CHECK: }
   tpp.identity ins(%arg1: memref<3xf32>) out(%arg0: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -145,5 +145,5 @@ func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %
   // CHECK: %[[add:.*]] = arith.addf %[[mc]], %[[mul]] : f32
   // CHECK: memref.store %[[add]], %arg2[%[[i]], %[[j]]] : memref<3x3xf32>
   tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
-  return 
+  return
 }

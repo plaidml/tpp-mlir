@@ -14,11 +14,11 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>) {
   // output_type = 1 (F32)
   // compute_type = 1 (F32)
   // b_cast = 3 (bcast scalar)
- 
+
   // CHECK: xsmm.unary.dispatch identity [3, 3, 1, 3](broadcast scalar dataType f32)
   // CHECK: xsmm.unary identity
   tpp.identity ins(%cst: f32) out(%arg0: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -39,7 +39,7 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: xsmm.unary.dispatch identity [3, 3, 3, 3](broadcast none dataType f32)
   // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -59,7 +59,7 @@ func.func @identity_to_xsmm(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
   // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast row dataType f32)
   // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
-  return 
+  return
 }
 
 // -----
@@ -79,7 +79,7 @@ func.func @identity_to_xsmm(%arg0: memref<1x5xf32>, %arg1: memref<5x5xf32>) {
   // CHECK: xsmm.unary.dispatch identity [5, 5, 5, 5](broadcast col dataType f32)
   // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<1x5xf32>) out(%arg1: memref<5x5xf32>)
-  return 
+  return
 }
 
 // -----
@@ -90,7 +90,7 @@ func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2:
   // CHECK: %[[dispatch:.*]] = xsmm.ternary.dispatch matmul [3, 3, 3, 3, 3, 3]
   // CHECK: xsmm.ternary matmul(dataType f32, %[[dispatch]], %[[arg_zero]], %[[arg_one]], %[[arg_two]]) : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
   tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -110,7 +110,7 @@ func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
 func.func @identity_to_xsmm(%arg0: memref<1x1xf32>, %arg1: memref<5x6xf32>) {
 
   // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast scalar dataType f32)
-  // CHECK: xsmm.unary identity 
+  // CHECK: xsmm.unary identity
   tpp.identity ins(%arg0: memref<1x1xf32>) out(%arg1: memref<5x6xf32>)
   return
 }
@@ -132,7 +132,7 @@ func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 func.func @brgemm_to_xsmm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
                           %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
   // CHECK: xsmm.ternary.dispatch brgemm [5, 5, 4, 4, 5, 5]
-  // CHECK: xsmm.ternary brgemm 
+  // CHECK: xsmm.ternary brgemm
   tpp.brgemm ins(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>)
              out(%arg2: memref<5x5xf32>)
   return %arg2: memref<5x5xf32>
@@ -141,12 +141,12 @@ func.func @brgemm_to_xsmm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 // -----
 
 // Strides are non-constant expect to fail.
-func.func @tpp_matmul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,  
-                      %arg1: memref<9x6xf32, strided<[?, ?], offset: ?>>, 
+func.func @tpp_matmul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
+                      %arg1: memref<9x6xf32, strided<[?, ?], offset: ?>>,
                       %arg2: memref<12x6xf32, strided<[?, ?], offset: ?>>) {
   // CHECK-NOT: xsmm.ternary matmul
-  tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>, 
-                 %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>) 
+  tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
+                 %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>)
              out(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
-  return 
+  return
 }

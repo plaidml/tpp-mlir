@@ -13,11 +13,11 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
- func.func @matmultpp(%A: memref<4x8xf32>, 
+ func.func @matmultpp(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) attributes {llvm.emit_c_interface} {
     // TPP: tpp.matmul
-    linalg.generic {indexing_maps = [#map0, #map1, #map2], 
-                         iterator_types = ["parallel", "parallel", "reduction"]} 
+    linalg.generic {indexing_maps = [#map0, #map1, #map2],
+                         iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%A, %B: memref<4x8xf32>, memref<8x4xf32>) outs(%C: memref<4x4xf32>) {
       ^bb0(%a: f32, %b: f32, %c: f32):
         %0 = arith.mulf %a, %b : f32
@@ -51,18 +51,18 @@ module {
 
 
     //
-    // CHECK:       [16,   16,   16,   16], 
-    // CHECK-NEXT:  [16,   16,   16,   16], 
-    // CHECK-NEXT:  [16,   16,   16,   16], 
+    // CHECK:       [16,   16,   16,   16],
+    // CHECK-NEXT:  [16,   16,   16,   16],
+    // CHECK-NEXT:  [16,   16,   16,   16],
     // CHECK-NEXT:  [16,   16,   16,   16]
     //
-    call @printMemrefF32(%result) : (memref<*xf32>) -> () 
-   
+    call @printMemrefF32(%result) : (memref<*xf32>) -> ()
+
     memref.dealloc %da : memref<4x8xf32>
     memref.dealloc %db : memref<8x4xf32>
     memref.dealloc %C : memref<4x4xf32>
- 
+
     return
   }
   func.func private @printMemrefF32(%ptr : memref<*xf32>) attributes {llvm.emit_c_interface}
-}    
+}

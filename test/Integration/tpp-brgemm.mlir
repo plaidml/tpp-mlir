@@ -23,7 +23,7 @@ func.func @brgemmtpp(%A: tensor<1x4x8xf32>,
 func.func @entry() {
   %c0 = arith.constant 0 : index
   %d1 = arith.constant -1.0 : f32
-    
+
   // Initialize various tensors.
   %da = arith.constant dense<[[
         [ 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1 ],
@@ -47,7 +47,7 @@ func.func @entry() {
   %C = arith.constant dense<0.0> : tensor<4x4xf32>
   %0 = call @brgemmtpp(%da, %db, %C)
       : (tensor<1x4x8xf32>, tensor<1x8x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  
+
   //
   // CHECK:    ( ( 388.76, 425.56, 462.36, 499.16 ),
   // CHECK-SAME: ( 397.12, 434.72, 472.32, 509.92 ),
@@ -57,5 +57,5 @@ func.func @entry() {
   %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
   vector.print %v0 : vector<4x4xf32>
 
-  return 
+  return
 }

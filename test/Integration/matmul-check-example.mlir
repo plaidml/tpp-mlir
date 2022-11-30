@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-check-to-func -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts |\ 
+// RUN: tpp-opt %s -map-linalg-to-tpp -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-check-to-func -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -convert-vector-to-llvm -convert-func-to-llvm -convert-memref-to-llvm -canonicalize -reconcile-unrealized-casts |\
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
@@ -8,10 +8,10 @@
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-func.func @matmultpp(%A: tensor<4x8xf32>, 
+func.func @matmultpp(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
-  %D = linalg.generic {indexing_maps = [#map0, #map1, #map2], 
-                         iterator_types = ["parallel", "parallel", "reduction"]} 
+  %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
+                         iterator_types = ["parallel", "parallel", "reduction"]}
   ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) {
       ^bb0(%a: f32, %b: f32, %c: f32):
         %0 = arith.mulf %a, %b : f32
@@ -55,4 +55,4 @@ func.func @entry() {
   %threshold = arith.constant 0.001: f32
   check.expect_almost_eq(%result, %0, %threshold): tensor<4x4xf32>, tensor<4x4xf32>, f32
   return
-}    
+}

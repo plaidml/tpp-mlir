@@ -17,10 +17,10 @@ transform.sequence failures(propagate) {
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32, 32] }
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
- 
+
     transform.bufferization.one_shot_bufferize %arg1 {
         target_is_module = true,
-        bufferize_function_boundaries = true } 
+        bufferize_function_boundaries = true }
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
     transform.structured.map_to_brgemm %3
@@ -32,7 +32,7 @@ transform.sequence failures(propagate) {
 func.func @matmul_static(
     %A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {
   // Expanding bias beforehand may be easier to fuse and completely fold away than post-hoc addBias to matmul.
-  %expanded_bias = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} 
+  %expanded_bias = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]}
       ins(%Bias : !Bias_tensor_t) outs(%C : !C_tensor_t) {
         ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
@@ -43,7 +43,7 @@ func.func @matmul_static(
 
   %c0 = arith.constant 0.0 : f32
   // ReLU has no "ins" operands.
-  %res = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} 
+  %res = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]}
       outs(%matmul : !C_tensor_t) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32

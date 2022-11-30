@@ -14,7 +14,7 @@ transform.sequence failures(propagate) {
 // CHECK-SAME: %[[TB:[0-9a-z]+]]: tensor<5x5x4x3x3xf32>
 // CHECK-SAME: -> tensor<5x5x4x3x3xf32> {
 func.func @parallel(%arg0: tensor<5x5x4x3x3xf32>, %arg1: tensor<5x5x4x3x3xf32>) -> tensor<5x5x4x3x3xf32> {
-  // CHECK: %[[CA:.*]] = tensor.collapse_shape %[[TA]] {{\[}}[0, 1], [2], [3, 4]] : tensor<5x5x4x3x3xf32> into tensor<25x4x9xf32> 
+  // CHECK: %[[CA:.*]] = tensor.collapse_shape %[[TA]] {{\[}}[0, 1], [2], [3, 4]] : tensor<5x5x4x3x3xf32> into tensor<25x4x9xf32>
   // CHECK: %[[CB:.*]] = tensor.collapse_shape %[[TB]] {{\[}}[0, 1], [2], [3, 4]] : tensor<5x5x4x3x3xf32> into tensor<25x4x9xf32>
   // CHECK: %[[res:.*]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[CA]] : tensor<25x4x9xf32>) outs(%[[CB]] : tensor<25x4x9xf32>)
   // CHECK: %[[CC:.*]] = tensor.expand_shape %[[res]] {{\[}}[0, 1], [2], [3, 4]] : tensor<25x4x9xf32> into tensor<5x5x4x3x3xf32>
@@ -120,7 +120,7 @@ transform.sequence failures(propagate) {
 func.func @parallel(%arg0: tensor<3x3x3xf32> , %arg1: tensor<3x3x3xf32>) -> tensor<3x3x3xf32> {
   // CHECK: %[[ta:.*]] = tensor.collapse_shape %[[arg0]] {{\[}}[0, 1], [2]] : tensor<3x3x3xf32> into tensor<9x3xf32>
   // CHECK: %[[tb:.*]] = tensor.collapse_shape %[[arg1]] {{\[}}[0, 1], [2]] : tensor<3x3x3xf32> into tensor<9x3xf32>
-  // CHECK: linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP0]]], iterator_types = ["parallel", "parallel"]} ins(%[[ta]] : tensor<9x3xf32>) outs(%[[tb]] : tensor<9x3xf32>) 
+  // CHECK: linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP0]]], iterator_types = ["parallel", "parallel"]} ins(%[[ta]] : tensor<9x3xf32>) outs(%[[tb]] : tensor<9x3xf32>)
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: tensor<3x3x3xf32>) outs(%arg1: tensor<3x3x3xf32>) {
   ^bb0(%arg3: f32, %arg4: f32):
     linalg.yield %arg3: f32

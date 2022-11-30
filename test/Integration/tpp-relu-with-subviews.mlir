@@ -11,7 +11,7 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 
- 
+
 func.func private @generate_1D_memref(%arg0: index, %buff: memref<?xf32>) -> memref<?xf32> {
   linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%buff : memref<?xf32>) {
   ^bb0(%out: f32):
@@ -21,7 +21,7 @@ func.func private @generate_1D_memref(%arg0: index, %buff: memref<?xf32>) -> mem
     linalg.yield %2 : f32
   }
   return %buff : memref<?xf32>
-} 
+}
 
 func.func @entry() {
   %cst = arith.constant 32: index
@@ -33,14 +33,14 @@ func.func @entry() {
   %c56 = arith.constant 56: index
   %alloc = memref.alloc(%cst) {alignment = 128 : i64} : memref<?xf32>
   %const_memref = call @generate_1D_memref(%cst, %alloc): (index, memref<?xf32>) -> (memref<?xf32>)
-  %arg0 = memref.cast %const_memref: memref<?xf32> to memref<32xf32> 
-    
+  %arg0 = memref.cast %const_memref: memref<?xf32> to memref<32xf32>
+
   %alloc_0 = memref.alloc() {alignment = 128 : i64} : memref<12x2x56x56x32xf32>
   linalg.generic {indexing_maps=[#map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : memref<32xf32> ) outs(%alloc_0 : memref<12x2x56x56x32xf32>) {
       ^bb0(%in: f32, %out: f32):
         linalg.yield %in : f32
   }
-    
+
   scf.for %arg3 = %c0 to %c12 step %c1 {
     scf.for %arg4 = %c0 to %c2 step %c1 {
       scf.for %arg5 = %c0 to %c56 step %c1 {

@@ -18,7 +18,7 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
-  } -> tensor<1x512xf32> 
+  } -> tensor<1x512xf32>
   return %1 : tensor<1x512xf32>
 }
 
@@ -40,7 +40,7 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x512xf32>) outs(%0 : tensor<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
-  } -> tensor<1x512xf32> 
+  } -> tensor<1x512xf32>
   return %1 : tensor<1x512xf32>
 }
 
@@ -64,7 +64,7 @@ func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
     ^bb0(%arg2: f32, %arg3: f32):
       %2 = arith.maxf %arg2, %c0 : f32
       linalg.yield %2 : f32
-  } -> tensor<1x512xf32> 
+  } -> tensor<1x512xf32>
   return %1 : tensor<1x512xf32>
 }
 
@@ -104,14 +104,14 @@ transform.sequence failures(propagate) {
 
 // MATCH-LABEL: func.func @gemm
 func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<1x512xf32> {
-  %0 = tensor.empty() : tensor<1x512xf32> 
+  %0 = tensor.empty() : tensor<1x512xf32>
   // MATCH: library_call = "tpp.matmul"
   %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1: tensor<1x256xf32>, tensor<256x512xf32>) outs(%0: tensor<1x512xf32>) {
   ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
     %2 = arith.mulf %arg2, %arg3 : f32
     %3 = arith.addf %arg4, %2 : f32
     linalg.yield %3 : f32
-  } -> tensor<1x512xf32> 
+  } -> tensor<1x512xf32>
   return %1 : tensor<1x512xf32>
 }
 
@@ -129,14 +129,14 @@ transform.sequence failures(propagate) {
 
 // MATCH-LABEL: func.func @gemm
 func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<1x512xf32> {
-  %0 = tensor.empty() : tensor<1x512xf32> 
+  %0 = tensor.empty() : tensor<1x512xf32>
   // MATCH-NOT: library_call = "tpp.matmul"
   %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1: tensor<1x256xf32>, tensor<256x512xf32>) outs(%0: tensor<1x512xf32>) {
   ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
     %2 = arith.addf %arg2, %arg3 : f32
     %3 = arith.addf %arg4, %2 : f32
     linalg.yield %3 : f32
-  } -> tensor<1x512xf32> 
+  } -> tensor<1x512xf32>
   return %1 : tensor<1x512xf32>
 }
 
@@ -158,7 +158,7 @@ func.func @identity(%arg1: tensor<32x32x32x32xf32>) -> tensor<32x32x32x32xf32> {
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<32x32x32x32xf32>) outs(%0 : tensor<32x32x32x32xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
-  } -> tensor<32x32x32x32xf32> 
+  } -> tensor<32x32x32x32xf32>
   return %1 : tensor<32x32x32x32xf32>
 }
 
@@ -223,7 +223,7 @@ func.func @relu(%arg1: memref<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       %2 = arith.maxf %arg2, %c0 : f32
       linalg.yield %2 : f32
-  } 
+  }
   return
 }
 
@@ -268,7 +268,7 @@ func.func @gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2: mem
     %2 = arith.mulf %arg5, %arg3 : f32
     %3 = arith.addf %arg4, %2 : f32
     linalg.yield %3 : f32
-  } 
+  }
   return
 }
 
@@ -292,7 +292,7 @@ func.func @not_gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2:
     %2 = arith.addf %arg5, %arg3 : f32
     %3 = arith.addf %arg4, %2 : f32
     linalg.yield %3 : f32
-  } 
+  }
   return
 }
 

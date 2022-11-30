@@ -24,7 +24,7 @@
 #map4 = affine_map<(d0, d1) -> (0, 0)>
 
 
-func.func @copytpp(%A: tensor<9x6xf32>, 
+func.func @copytpp(%A: tensor<9x6xf32>,
                     %B:tensor<9x6xf32> ) -> tensor<9x6xf32> attributes {llvm.emit_c_interface} {
   // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0, #map0],
@@ -36,7 +36,7 @@ func.func @copytpp(%A: tensor<9x6xf32>,
   return %O: tensor<9x6xf32>
 }
 
-func.func @copytppbrcast(%A: tensor<1x6xf32>, 
+func.func @copytppbrcast(%A: tensor<1x6xf32>,
                            %B: tensor<9x6xf32>) -> tensor<9x6xf32> attributes {llvm.emit_c_interface} {
   // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map1, #map0],
@@ -60,14 +60,14 @@ func.func @copytppbrcastother(%A: tensor<6x1xf32>,
   return %O: tensor<6x9xf32>
 }
 
-func.func @copyscalar(%A: f32, 
+func.func @copyscalar(%A: f32,
                         %B: tensor<6x9xf32>) -> tensor<6x9xf32> attributes {llvm.emit_c_interface} {
   // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map3, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: f32) outs(%B: tensor<6x9xf32>) {
         ^bb0(%a: f32, %b: f32):
-          linalg.yield %a: f32  
+          linalg.yield %a: f32
   } -> tensor<6x9xf32>
   return %O: tensor<6x9xf32>
 }
@@ -75,7 +75,7 @@ func.func @copyscalar(%A: f32,
 func.func @copyscalarother(%A: tensor<1x1xf32>,
                              %B: tensor<6x9xf32>) -> tensor<6x9xf32> attributes {llvm.emit_c_interface} {
   // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
-  %O = linalg.generic { indexing_maps = [#map4, #map0], 
+  %O = linalg.generic { indexing_maps = [#map4, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<1x1xf32>) outs(%B: tensor<6x9xf32>) {
         ^bb0(%a: f32, %b: f32):
@@ -115,14 +115,14 @@ func.func @entry() {
   // CHECK-SAME:  ( 1.8, 2.8, 3.8, 4.8, 5.8, 6.8 ),
   // CHECK-SAME:  ( 1.9, 2.9, 3.9, 4.9, 5.9, 6.9 ) )
   //
-   
+
   %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
   vector.print %v0 : vector<9x6xf32>
 
   %bcastrow = arith.constant dense<[
       [ 1.1, 2.1, 3.1, 4.1, 5.1, 6.1 ]
   ]> : tensor<1x6xf32>
-    
+
   %C = arith.constant dense<0.0> : tensor<9x6xf32>
   %1 = call @copytppbrcast(%bcastrow, %C) : (tensor<1x6xf32>, tensor<9x6xf32>) -> tensor<9x6xf32>
 
@@ -154,16 +154,16 @@ func.func @entry() {
   %2 = call @copytppbrcastother(%bcastcol, %D) : (tensor<6x1xf32>, tensor<6x9xf32>) -> tensor<6x9xf32>
 
   //
-  // CHECK:     ( ( 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1 ), 
+  // CHECK:     ( ( 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1 ),
   // CHECK-SAME:  ( 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1 ),
-  // CHECK-SAME:  ( 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1 ), 
-  // CHECK-SAME:  ( 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1 ), 
-  // CHECK-SAME:  ( 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1 ), 
+  // CHECK-SAME:  ( 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1 ),
+  // CHECK-SAME:  ( 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1, 4.1 ),
+  // CHECK-SAME:  ( 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1 ),
   // CHECK-SAME:  ( 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1, 6.1 ) )
-  // 
+  //
 
   %v2 = vector.transfer_read %2[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
-  vector.print %v2 : vector<6x9xf32> 
+  vector.print %v2 : vector<6x9xf32>
 
   %s = arith.constant 23.1 : f32
   %E = arith.constant dense<0.0> : tensor<6x9xf32>
@@ -187,7 +187,7 @@ func.func @entry() {
 
   %F = arith.constant dense<0.0> : tensor<6x9xf32>
   %4 = call @copyscalarother(%ss, %F) : (tensor<1x1xf32>, tensor<6x9xf32>) -> tensor<6x9xf32>
-    
+
   //
   // CHECK:     ( ( 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1 ),
   // CHECK-SAME:  ( 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1 ),
@@ -196,9 +196,9 @@ func.func @entry() {
   // CHECK-SAME:  ( 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1 ),
   // CHECK-SAME:  ( 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1, 43.1 ) )
   //
-    
+
   %v4 = vector.transfer_read %4[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
   vector.print %v4 : vector<6x9xf32>
-  
-  return 
+
+  return
 }

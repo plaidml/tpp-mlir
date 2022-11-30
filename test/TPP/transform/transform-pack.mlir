@@ -1,7 +1,7 @@
 // RUN: tpp-opt -transform-dialect-interpreter -verify-diagnostics -split-input-file %s | FileCheck %s
 
 transform.sequence failures(propagate) {
-^bb1(%arg0: !pdl.operation): 
+^bb1(%arg0: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0
   // CHECK: transform.structured.pack
   %1 = transform.structured.pack %0 { blocking_factors = [2, 2, 2] }
@@ -55,7 +55,7 @@ transform.sequence failures(propagate) {
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
 }
 
-func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>, 
+func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
                 %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
   %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>) outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
   return %0: tensor<14x1024x28x28xf32>
@@ -167,7 +167,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 // CHECK: func.func @matmul(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<128x512xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<128x512xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<512x256xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<128x256xf32>) -> tensor<128x256xf32> {
 // CHECK: %[[BUFF0:.+]] = tensor.empty() : tensor<4x16x32x32xf32>

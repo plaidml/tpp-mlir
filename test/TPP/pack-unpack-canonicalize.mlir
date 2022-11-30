@@ -41,7 +41,7 @@ func.func @packUnPack(%arg0: tensor<1x2x58x58x32xf32>) -> tensor<1x2x58x58x32xf3
 // -----
 
 func.func @packOneDTensor(%arg0: tensor<256xf32>) -> tensor<8x32xf32> {
-  %alloc = tensor.empty() : tensor<8x32xf32>  
+  %alloc = tensor.empty() : tensor<8x32xf32>
   %0 = linalgx.pack %arg0 inner_dims_pos = [0] inner_tiles = [32] into %alloc : (tensor<256xf32> tensor<8x32xf32>) -> tensor<8x32xf32>
   return %0 : tensor<8x32xf32>
 }

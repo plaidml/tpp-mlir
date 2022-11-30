@@ -12,7 +12,7 @@ func.func @propagation(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
 }
-  
+
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg0
@@ -34,13 +34,13 @@ func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64x
   %0 = tensor.empty() : tensor<12x56x56x64xf32>
   %1 = linalgx.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : (tensor<12x2x56x56x32xf32> tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
   %c0 = arith.constant 0.0 : f32
-  %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) { 
+  %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
     %3 = arith.maxf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
-} 
+}
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
@@ -65,13 +65,13 @@ func.func @main(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
   %1 = linalgx.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : (tensor<12x2x56x56x32xf32> tensor<12x56x56x64xf32>) -> tensor<12x56x56x64xf32>
   %c0 = arith.constant 0.0 : f32
   // expected-note @below {{non-isolated target}}
-  %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) { 
+  %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
     %3 = arith.maxf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
-} 
+}
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
@@ -108,7 +108,7 @@ transform.sequence failures(propagate) {
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: func.func @matmul(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<128x512xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<128x512xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<512x256xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<128x256xf32>) -> tensor<128x256xf32> {
 // CHECK: %[[BUFF0:.+]] = tensor.empty() : tensor<4x16x32x32xf32>
@@ -259,7 +259,7 @@ transform.sequence failures(propagate) {
 
 func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %arg2: tensor<1x56x56x64xf32>, %arg3: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
   %0 = linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     ins(%0, %arg3 : tensor<1x56x56x64xf32>, tensor<64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32, %in_1: f32, %out: f32):
       %168 = arith.addf %in, %in_1 : f32
@@ -306,7 +306,7 @@ transform.sequence failures(propagate) {
 
 func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %arg2: tensor<1x56x56x64xf32>, %arg3: tensor<56x64xf32>) -> tensor<1x56x56x64xf32> {
   %0 = linalg.conv_2d_nhwc_hwcf ins(%arg0, %arg1: tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     ins(%0, %arg3 : tensor<1x56x56x64xf32>, tensor<56x64xf32>) outs(%arg2: tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32, %in_1: f32, %out: f32):
       %168 = arith.addf %in, %in_1 : f32
@@ -327,7 +327,7 @@ transform.sequence failures(propagate) {
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)> 
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 // CHECK: func.func @conv(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]*]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9]*]]: tensor<1x1x64x64xf32>,
@@ -391,7 +391,7 @@ transform.sequence failures(propagate) {
 // CONV: %[[PACK2:.+]] = linalgx.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2]] : (tensor<1x56x56x64xf32> tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
 // CONV: %[[VAL:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]} ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) outs(%[[PACK2]] : tensor<1x2x56x56x32xf32>)
 // CONV: %[[VAL1:.+]] = linalg.generic {indexing_maps = [#[[MAP3]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%[[VAL]] : tensor<1x2x56x56x32xf32>)
-// CONV: %[[PADDED:.+]] = tensor.pad %[[VAL1]] low[0, 0, 1, 1, 0] high[0, 0, 1, 1, 0] 
+// CONV: %[[PADDED:.+]] = tensor.pad %[[VAL1]] low[0, 0, 1, 1, 0] high[0, 0, 1, 1, 0]
 // CONV: %[[OUT:.+]] = tensor.empty() : tensor<1x58x58x64xf32>
 // CONV: %[[UNPACK:.+]] = linalgx.unpack %[[PADDED]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[OUT]] : (tensor<1x2x58x58x32xf32> tensor<1x58x58x64xf32>) -> tensor<1x58x58x64xf32>
-// CONV: return %[[UNPACK]] : tensor<1x58x58x64xf32> 
+// CONV: return %[[UNPACK]] : tensor<1x58x58x64xf32>

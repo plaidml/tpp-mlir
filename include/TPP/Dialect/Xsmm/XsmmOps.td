@@ -26,16 +26,16 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
   let description = [{
     Ternary operation. The operation kind carries information about the name of
     the LIBXSMM function to invoke. Additionally, the operation takes five
-    operands. The first is an I64 type representing the datatype. The second must be 
-    an I64 type and must result from a dispatch operation (it represents the 
+    operands. The first is an I64 type representing the datatype. The second must be
+    an I64 type and must result from a dispatch operation (it represents the
     function pointer to use during invocation). The other operands are of Float
     types and represent the operands to use for computation.
     For example, a matmul has the following signature: dataType, I64, memref<MxNxf32>,
     memref<MxKxf32>, memref<KxNxf32>.
   }];
-  
+
   let arguments = (ins Xsmm_DataType:$dataType, Xsmm_TernaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
-   
+
   let assemblyFormat = [{
     $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
@@ -49,7 +49,7 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
     operand_iterator arg_operand_end() { return operand_end(); }
   }];
 
-  let hasVerifier = 1; 
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -60,16 +60,16 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
   let summary = "binary operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
-    difference is the number of operands for the computation is restricted to two. 
+    difference is the number of operands for the computation is restricted to two.
   }];
-  
+
   let arguments = (ins Xsmm_DataType:$dataType, Xsmm_BinaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
-   
+
   let assemblyFormat = [{
     $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
 
-  let hasVerifier = 1; 
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,10 +81,10 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
     difference is the number of operands for the computation is restricted to one.
-  }]; 
- 
+  }];
+
   let arguments = (ins Xsmm_DataType:$dataType, Xsmm_UnaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
-   
+
   let assemblyFormat = [{
     $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
   }];
@@ -98,7 +98,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
         return true;
       return false;
     }
-  }]; 
+  }];
 
   let hasVerifier = 1;
 }
@@ -115,14 +115,14 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
     dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
     the pointer to call as I64.
   }];
-  
-  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs, 
+
+  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs,
                        Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `dataType` $dataType `)` attr-dict 
-  }]; 
+    $kind $inputs `(` `dataType` $dataType `)` attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -134,14 +134,14 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
   let description = [{
     See 'ternary.dispatch'.
   }];
-  
+
   let arguments = (ins Xsmm_BinaryKind:$kind, DenseI64ArrayAttr:$inputs,
                        Xsmm_BinaryFlags:$flags, Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict 
-  }]; 
+    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -153,14 +153,14 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
   let description = [{
     See 'ternary.dispatch'.
   }];
-  
-  let arguments = (ins Xsmm_UnaryKind:$kind, DenseI64ArrayAttr:$inputs, 
+
+  let arguments = (ins Xsmm_UnaryKind:$kind, DenseI64ArrayAttr:$inputs,
                        Xsmm_UnaryFlags:$flags, Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict 
-  }]; 
+    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
+  }];
 }
 
 #endif // TPP_XSMM_OPS

@@ -63,13 +63,13 @@ module {
     }
     %8 = memref.load %0[] : memref<vector<1x2x2x8xf32>>
 
-    // 
-    // CHECK:     ( ( ( ( 38, 38, 38, 38, 38, 38, 38, 38 ), 
-    // CHECK-SAME:      ( 38, 38, 38, 38, 38, 38, 38, 38 ) ), 
-    // CHECK-SAME:    ( ( 38, 38, 38, 38, 38, 38, 38, 38 ), 
+    //
+    // CHECK:     ( ( ( ( 38, 38, 38, 38, 38, 38, 38, 38 ),
+    // CHECK-SAME:      ( 38, 38, 38, 38, 38, 38, 38, 38 ) ),
+    // CHECK-SAME:    ( ( 38, 38, 38, 38, 38, 38, 38, 38 ),
     // CHECK-SAME:      ( 38, 38, 38, 38, 38, 38, 38, 38 ) ) ) )
     //
-    
+
     vector.print %8 : vector<1x2x2x8xf32>
     memref.dealloc %4 : memref<1x2x2x8xf32>
 
@@ -88,10 +88,10 @@ module {
     //
     // CHECK:     ( ( ( ( 38, 38, 38, 38, 38, 38, 38, 38 ),
     // CHECK-SAME:      ( 38, 38, 38, 38, 38, 38, 38, 38 ) ),
-    // CHECK-SAME:    ( ( 38, 38, 38, 38, 38, 38, 38, 38 ), 
+    // CHECK-SAME:    ( ( 38, 38, 38, 38, 38, 38, 38, 38 ),
     // CHECK-SAME:      ( 38, 38, 38, 38, 38, 38, 38, 38 ) ) ) )
     //
-  
+
     vector.print %11 : vector<1x2x2x8xf32>
     memref.dealloc %9 : memref<1x2x2x8xf32>
 
