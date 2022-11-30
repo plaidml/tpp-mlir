@@ -11,6 +11,7 @@
 #define VNNI_DIALECT_VNNI_OPS
 
 include "mlir/IR/OpBase.td"
+include "TPP/Dialect/VNNI/VNNIInterfaces.td"
 
 def VNNIOperand : AnyTypeOf<[BF16Tensor, BF16MemRef]>;
 
@@ -23,9 +24,7 @@ def VNNI_Dialect : Dialect {
   }];
 }
 
-def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul",
-                    [TypesMatchWith<"result type matches type of dest",
-                    "dest", "matrixC", "$_self">]> {
+def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [VNNI_MatmulInterface]> {
   let summary = [{Matmul operation with VNNI format of the first operand with block
                   size specified.}];
   let description = [{
@@ -40,8 +39,8 @@ def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul",
   }];
 
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
-  let results = (outs VNNIOperand:$dest);
-  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($dest) `)` attr-dict";
+  let results = (outs Variadic<VNNIOperand>:$dest);
+  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict";
 }
 
 #endif

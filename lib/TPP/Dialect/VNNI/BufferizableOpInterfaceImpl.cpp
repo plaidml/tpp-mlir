@@ -72,8 +72,8 @@ struct MatmulLayoutInterface
       return failure();
     Value srcBufferB = *maybeSrcBufferB;
 
-    rewriter.create<vnni::MatmulOp>(op->getLoc(), destBuffer.getType(),
-                                    srcBufferA, srcBufferB, destBuffer);
+    rewriter.create<vnni::MatmulOp>(op->getLoc(), TypeRange{}, srcBufferA,
+                                    srcBufferB, destBuffer);
     replaceOpWithBufferizedValues(rewriter, op, destBuffer);
     return success();
   }
