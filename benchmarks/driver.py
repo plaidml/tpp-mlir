@@ -124,7 +124,7 @@ class CPPRun(BaseRun):
         BaseRun.__init__(self, name, env, json, logger)
         assert(json["type"] == "C++")
         source_dir = os.path.dirname(self.source)
-        self.binary = os.path.join(source_dir, name)
+        self.binary = os.path.join(source_dir, f"bench_{name}.bin")
 
     def compile(self):
         command = [
