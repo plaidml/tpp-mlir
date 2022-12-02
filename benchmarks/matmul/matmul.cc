@@ -46,6 +46,10 @@ void matmul_xsmm(DECL_VEC2D_FUNC_IN_ARGS(a, float),
 }
 */
 
+void matmul_xsmm(const float *A, const float* B, float* O, int m, int n, int k) {
+  assert(0 && "Not implemented yet");
+}
+
 int main(int argc, char *argv[]) {
   float* A;
   float* B;
@@ -66,7 +70,7 @@ int main(int argc, char *argv[]) {
         iter = atoi(optarg);
         break;
       case 'x':
-        //kernel = matmul_xsmm;
+        kernel = matmul_xsmm;
         break;
       case 'v':
         verbose++;
