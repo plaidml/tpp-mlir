@@ -90,6 +90,9 @@ class Environment(object):
         if args.verbose > 0:
             for v in range(args.verbose - args.quiet):
                 self.extra_args.append("-v")
+        # Set environment variables for dynamic loading (Linux and Mac)
+        os.putenv("LD_LIBRARY_PATH", f"{self.lib_dir}:{os.getenv('LD_LIBRARY_PATH')}")
+        os.putenv("DYLDLIBRARY_PATH", f"{self.lib_dir}:{os.getenv('DYLDLIBRARY_PATH')}")
 
 class BaseRun(object):
     """ Base class for all runs """
@@ -133,8 +136,8 @@ class CPPRun(BaseRun):
                 f"-I{self.env.inc_path}",
                 f"-I{self.env.lib_inc_path}",
                 f"-L{self.env.lib_dir}",
-                os.path.join(self.env.build_dir, "libxsmm.a"),
                 "-lm",
+                "-ltpp_c_runner_utils",
                 self.source,
                 "-o",
                 self.binary]

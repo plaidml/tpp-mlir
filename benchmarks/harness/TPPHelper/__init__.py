@@ -35,7 +35,7 @@ class TPPHelper(object):
         programs = { 'tpp-opt': '', 'tpp-run': '' }
         found = 0
         maxProgs = len(programs.keys())
-        for root, dirs, files in os.walk(baseDir):
+        for root, dirs, files in os.walk(baseDir, followlinks=True):
             for prog in programs.keys():
                 if prog in files:
                     programs[prog] = os.path.join(root, prog)
@@ -68,7 +68,7 @@ class TPPHelper(object):
         variables.update(nonConfig)
         maxMatches = len(variables.keys()) - len(nonConfig.keys())
         matches = 0
-        for root, dirs, files in os.walk(baseDir):
+        for root, dirs, files in os.walk(baseDir, followlinks=True):
             if "lit.site.cfg.py" in files:
                 filename = os.path.join(root, "lit.site.cfg.py")
                 with open(filename) as file:
