@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    TPP-MLIR Benchmark Driver
+    TPP-MLIR Benchmark Controller
 
     Runs an MLIR kernel multiple times and takes the statistics, comparing to
     a known-good result, checking if any difference is statistically significant.
@@ -11,8 +11,6 @@
      * filename: kernel to run on
      * -n N: Number of times to run (default 1000)
      * -e ENTRY: Entry point name (default "entry")
-     * -mean MEAN: Expected mean
-     * -stdev STDEV: Expected standard deviation
      * -shared-libs=PATH: MLIR/TPP runtime paths
 
     Like LLVM's FileCheck, we try to get information from comments on the MLIR
@@ -22,8 +20,7 @@
     point, shared-libs, tpp-opt args.
 
     We also support new ones:
-     * BENCH_EXPECTED_MEAN: FP -> Expected value for mean
-     * BENCH_EXPECTED_STDIV: FP -> Expected value for standard deviation
+     * BENCH_TOTAL_FLOPS: Number of FP ops in the kernel
 
     Much of the code was shamelessly stolen from my previous harness:
     https://github.com/Linaro/benchmark_harness/
@@ -38,6 +35,7 @@ import argparse
 from Logger import Logger
 from Execute import Execute
 from FileCheckParser import FileCheckParser
+from TPPHelper import TPPHelper
 
 class BenchmarkController(object):
     """ Entry point of the benchmark harness"""
@@ -45,82 +43,17 @@ class BenchmarkController(object):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
+        self.helper = TPPHelper(logger)
         # If we're in a git repo, find the base dir, otherwise, this is the base dir
-        self.baseDir = self._findGitRoot(os.path.dirname(__file__))
-        self.logger.debug("Base dir: " + self.baseDir)
-        self.programs = self._findTPPProgs()
-        self.variables = self._getLLVMVariables(self.baseDir)
+        self.baseDir = self.helper.findGitRoot(os.path.dirname(__file__))
+        self.logger.debug(f"Base dir: {self.baseDir}")
+        self.programs = self.helper.findTPPProgs(self.baseDir)
+        self.variables = self.helper.getLLVMVariables(self.programs, self.baseDir)
         self.output = ''
         self.mean = 0.0
         self.stdev = 0.0
-
-    def _findGitRoot(self, path):
-        """ Find the git root directory, if any, or return the input """
-
-        temp = path
-        while temp:
-            if (os.path.exists(os.path.join(temp, ".git"))):
-                return temp
-            temp = os.path.abspath(os.path.join(temp, os.pardir))
-        return path
-
-    def _findTPPProgs(self):
-        """ Find the necessary TPP programs to run the benchmarks """
-
-        programs = { 'tpp-opt': '', 'tpp-run': '' }
-        found = 0
-        maxProgs = len(programs.keys())
-        for root, dirs, files in os.walk(self.baseDir):
-            for prog in programs.keys():
-                if prog in files:
-                    programs[prog] = os.path.join(root, prog)
-                    self.logger.debug(prog + ": " + programs[prog])
-                    found += 1
-            if found == maxProgs:
-                break
-
-        if found < maxProgs:
-            self.logger.error("Cannot find all TPP programs")
-            self.logger.error("Found: " + programs)
-            return {}
-        return programs
-
-    def _getLLVMVariables(self, path):
-        """ Find config values in the LIT config in the build dir """
-
-        # Some variables are not in the LIT config and are known
-        nonConfig = {}
-        if 'tpp-run' in self.programs:
-            nonConfig['tpplibdir'] = os.path.abspath(
-                                        os.path.join(
-                                        os.path.dirname(
-                                            self.programs['tpp-run']),
-                                            '../lib'))
-        # Others we need to find in the config in the build dir
-        variables = { 'llvmlibdir': 'config.llvm_lib_dir',
-                      'shlibext': 'config.llvm_shlib_ext' }
-        # Merge the two and count how many we need to match
-        variables.update(nonConfig)
-        maxMatches = len(variables.keys()) - len(nonConfig.keys())
-        matches = 0
-        for root, dirs, files in os.walk(self.baseDir):
-            if "lit.site.cfg.py" in files:
-                filename = os.path.join(root, "lit.site.cfg.py")
-                with open(filename) as file:
-                    for line in file.readlines():
-                        for key, val in variables.items():
-                            # Skip the ones found already
-                            if not val.startswith('config.'):
-                                continue
-                            # Find the config and replace with the value
-                            m = re.match(val + " = \"([^\\\"]+)\"", line)
-                            if m:
-                                variables[key] = m.group(1)
-                                self.logger.debug("Found " + key + ": " + variables[key])
-                                matches += 1
-                        # Leave if found everything
-                        if matches == maxMatches:
-                            return variables
+        # Output is always in seconds, we need to convert anyway
+        self.unit = "ms" # or 'gflops'
 
     def verifyArgs(self):
         """ Verify cmd-line and IR file arguments, update defaults, etc """
@@ -136,10 +69,9 @@ class BenchmarkController(object):
             self.args.entry = fileArgs['entry']
         if (not self.args.shared_libs and 'shared-libs' in fileArgs):
             self.args.shared_libs = fileArgs['shared-libs']
-        if (not self.args.mean and 'mean' in fileArgs):
-            self.args.mean = fileArgs['mean']
-        if (not self.args.stdev and 'stdev' in fileArgs):
-            self.args.stdev = fileArgs['stdev']
+        if (not self.args.flops and 'flops' in fileArgs):
+            self.args.flops = fileArgs['flops']
+            self.unit = "gflops"
         if (not self.args.opt_args and 'opt-args' in fileArgs):
             self.args.opt_args = fileArgs['opt-args']
 
@@ -161,17 +93,13 @@ class BenchmarkController(object):
             if m:
                 for key, val in self.variables.items():
                     self.args.shared_libs = re.sub("%" + key, val, self.args.shared_libs)
-                self.logger.debug("Shared libraries updated: " + self.args.shared_libs)
+                self.logger.debug(f"Shared libraries updated: {self.args.shared_libs}")
 
             # Check again, to make sure we replaced everything
             m = re.search("%", self.args.shared_libs)
             if m:
                 self.logger.error("Shared libs argument contain %variables, won't be able to resolve")
                 return False
-
-        # We don't need mean/stdev for running, but we also can't judge results without them
-        if (not self.args.mean or not self.args.stdev):
-            self.logger.warning("Need both mean/stdev to compare against a known good value")
 
         return True
 
@@ -190,7 +118,7 @@ class BenchmarkController(object):
             # Run tpp-opt and capture the output IR
             optResult = executor.run(optCmd)
             if optResult.stderr:
-                self.logger.error("Error executing tpp-opt: " + optResult.stderr)
+                self.logger.error(f"Error executing tpp-opt: {optResult.stderr}")
                 return False
             irContents = optResult.stdout
         else:
@@ -208,7 +136,7 @@ class BenchmarkController(object):
                   ]
         runResult = executor.run(runCmd, irContents)
         if runResult.stderr:
-            self.logger.error("Error executing tpp-run: " + runResult.stderr)
+            self.logger.error(f"Error executing tpp-run: {runResult.stderr}")
             return False
         self.output = runResult.stdout
 
@@ -221,30 +149,29 @@ class BenchmarkController(object):
             self.logger.error("Benchmark produced no output, can't verify results")
             return False
 
-        # Parse results
+        # Parse results (always in seconds, as per timer)
         m = re.search("([\d\.\-e]+), ([\d\.\-e]+)", self.output)
         if m:
             self.mean = float(m.group(1))
             self.stdev = float(m.group(2))
-            self.logger.info("Mean time: " + str(self.mean) + "s (" + str(self.stdev) + "s)")
+            self.logger.info(f"Mean time: {self.mean*1000} ms +- {self.stdev*1000} ms")
         else:
             self.logger.error("Cannot find mean/stdev in output")
             return False
 
-        # Check against expected output, if any
-        self.logger.info("Validate statistics against expected values")
-        if self.args.mean and self.args.stdev:
-            em = float(self.args.mean)
-            es = float(self.args.stdev)
-            if self.mean > (em - es) and self.mean < (em + es):
-                self.logger.info("Result mean compatible with expected")
-            else:
-                self.logger.error("Result mean not compatible with expected")
-                return False
-
-            if self.stdev > es:
-                self.logger.error("Result deviation too large: " + str(self.stdev) + " > " + str(es))
-                return False
+        # If we asked for flops, we need to convert
+        if self.args.flops:
+            mean = self.args.flops / self.mean
+            stdev = self.args.flops * self.stdev / (self.mean * self.mean)
+            self.mean = mean
+            self.stdev = stdev
+            # We annotate in flops (easier to calculate / compare) but we display in Gflops
+            self.mean /= 1e9
+            self.stdev /= 1e9
+        else:
+            # Output is in seconds, but we display in milliseconds
+            self.mean *= 1000
+            self.stdev *= 1000
 
         return True
 
@@ -257,11 +184,9 @@ if __name__ == '__main__':
 
     # Required, but auto-detected if omitted
     parser.add_argument('-n', type=int,
-                        help='Number of times to execute the kernel (checks BENCH_N line)')
-    parser.add_argument('-mean', type=float,
-                        help='Expected mean to compare to (checks BENCH_EXPECTED_MEAN line)')
-    parser.add_argument('-stdev', type=float,
-                        help='Expected stdev to compare to (checks BENCH_EXPECTED_STDEV line)')
+                        help='Number of times to execute the kernel (checks RUN line)')
+    parser.add_argument('-flops', type=float,
+                        help='Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)')
     parser.add_argument('-entry', type=str,
                         help='Name of the entry point (checks RUN line)')
     parser.add_argument('-shared-libs', type=str,
@@ -272,6 +197,8 @@ if __name__ == '__main__':
                         help='The verbosity of logging output')
     parser.add_argument('-q', '--quiet', action='count', default=0,
                         help='Suppress warnings')
+    parser.add_argument('-x', '--xsmm', action='count', default=1,
+                        help='Turn on TPP optimizations (default)')
     args = parser.parse_args()
 
     # Creates the logger object
@@ -296,5 +223,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Success prints basic stats
-    print(f'{args.benchmark_name}: {(controller.mean*1000):3.6f} ms ({(controller.stdev*1000):3.6f} ms)')
+    if args.flops:
+        print(f'{(controller.mean):9.3f} +- {(controller.stdev):9.3f} {controller.unit}')
+    else:
+        print(f'{(controller.mean):3.9f} +- {(controller.stdev):3.9f} {controller.unit}')
 
