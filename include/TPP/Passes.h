@@ -70,6 +70,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
+std::unique_ptr<OperationPass<ModuleOp>> createDefaultSchedulePass();
 
 } // namespace tpp
 } // namespace mlir

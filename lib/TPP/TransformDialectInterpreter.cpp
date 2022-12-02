@@ -13,8 +13,11 @@
 
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -38,8 +41,8 @@ struct TransformDialectInterpreter
   }
 };
 
-struct TransformDropSchedulePass
-    : TransformDropSchedulePassBase<TransformDropSchedulePass> {
+struct TransformDropSchedule
+    : TransformDropScheduleBase<TransformDropSchedule> {
   void runOnOperation() override {
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
       if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
@@ -48,6 +51,35 @@ struct TransformDropSchedulePass
       }
       return WalkResult::advance();
     });
+  }
+};
+
+struct DefaultSchedule : DefaultScheduleBase<DefaultSchedule> {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+    auto builder =
+        ImplicitLocOpBuilder::atBlockEnd(module->getLoc(), module.getBody());
+    OperationState opState(module->getLoc(), "transform.sequence");
+    opState.addRegion();
+    opState.addAttribute(
+        "failure_propagation_mode",
+        transform::FailurePropagationModeAttr::get(
+            builder.getContext(), transform::FailurePropagationMode::Suppress));
+    Region *region = opState.regions.back().get();
+    Type pdlType = pdl::OperationType::get(builder.getContext());
+    opState.addTypes({pdlType});
+    Operation *created = builder.create(opState);
+    transform::SequenceOp sequence = cast<transform::SequenceOp>(created);
+    // WHY?
+    region = &sequence.getBody();
+    Block *bodyBlock = new Block();
+    bodyBlock->addArguments(TypeRange{pdlType}, {module->getLoc()});
+    region->push_back(bodyBlock);
+    bodyBlock->dump();
+
+    builder.setInsertionPointToStart(bodyBlock);
+    builder.create<transform::YieldOp>(module->getLoc(),
+                                       region->getArguments());
   }
 };
 
@@ -60,5 +92,10 @@ mlir::tpp::createTransformDialectInterpreterPass() {
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createTransformDropSchedulePass() {
-  return std::make_unique<TransformDropSchedulePass>();
+  return std::make_unique<TransformDropSchedule>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createDefaultSchedulePass() {
+  return std::make_unique<DefaultSchedule>();
 }

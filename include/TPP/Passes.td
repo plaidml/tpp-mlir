@@ -111,9 +111,14 @@ def LinalgExtToLoops :
   let constructor = "mlir::tpp::createLinalgXToLoopsPass()";
 }
 
-def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
+def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
+}
+
+def DefaultSchedule : Pass<"create-default-schedule", "ModuleOp"> {
+  let summary = "Create default transform schedule";
+  let constructor = "mlir::tpp::createDefaultSchedulePass()";
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
