@@ -13,6 +13,7 @@ add_mlir_dialect_library(TPPVNNIDialect
   DEPENDS
     # add_mlir_dialect macro force-prefixes with MLIR
     MLIRVNNIOpsIncGen
+    MLIRVNNIInterfacesIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR
