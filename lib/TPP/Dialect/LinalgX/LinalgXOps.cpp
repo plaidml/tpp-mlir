@@ -129,26 +129,9 @@ LogicalResult UnPackOp::canonicalize(UnPackOp unpackOp,
 //===----------------------------------------------------------------------===//
 
 void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
-                   Value output, ArrayAttr outerDimPerm, ArrayAttr innerDimsPos,
-                   ArrayRef<OpFoldResult> tiles, Value padding) {
-  SmallVector<Value> innerTiles;
-  SmallVector<int64_t> staticInnerTiles;
-  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamic);
-  if (!outerDimPerm.size())
-    build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
-          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles),
-          padding);
-  else
-    build(builder, result, llvm::None, input, output, outerDimPerm,
-          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles),
-          padding);
-}
-
-void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
                    Value output, ArrayRef<int64_t> innerDimPos,
-                   ArrayRef<int64_t> outerDimPerm,
-                   ArrayRef<OpFoldResult> tiles) {
+                   ArrayRef<OpFoldResult> tiles, Optional<Value> paddingValue,
+                   ArrayRef<int64_t> outerDimPerm) {
   assert(!innerDimPos.empty() && "expect innerDimPos to be non empty");
   assert(!tiles.empty() && "expect tiles to be non empty");
   SmallVector<Value> innerTiles;
@@ -156,15 +139,33 @@ void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
                              ShapedType::kDynamic);
   Type typeOutput = output.getType();
-  if (outerDimPerm.empty())
-    build(builder, result, typeOutput, input, output,
-          /*outerDimPerm=*/{}, builder.getI64ArrayAttr(innerDimPos), innerTiles,
-          builder.getI64ArrayAttr(staticInnerTiles), /*padding_value=*/{});
-  else
-    build(builder, result, typeOutput, input, output,
-          builder.getI64ArrayAttr(outerDimPerm),
-          builder.getI64ArrayAttr(innerDimPos), innerTiles,
-          builder.getI64ArrayAttr(staticInnerTiles), /*padding_value=*/{});
+  if (typeOutput.isa<MemRefType>()) {
+    if (outerDimPerm.empty())
+      build(builder, result, TypeRange{}, input, output,
+            /*outerDimPerm=*/nullptr, builder.getDenseI64ArrayAttr(innerDimPos),
+            innerTiles, builder.getDenseI64ArrayAttr(staticInnerTiles),
+            /*padding_value=*/nullptr);
+    else
+      build(builder, result, TypeRange{}, input, output,
+            builder.getDenseI64ArrayAttr(outerDimPerm),
+            builder.getDenseI64ArrayAttr(innerDimPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles),
+            /*padding_value=*/{});
+
+  } else {
+    assert(typeOutput.isa<RankedTensorType>() && "expect ranked tensor type");
+    if (outerDimPerm.empty())
+      build(builder, result, typeOutput, input, output,
+            /*outerDimPerm=*/nullptr, builder.getDenseI64ArrayAttr(innerDimPos),
+            innerTiles, builder.getDenseI64ArrayAttr(staticInnerTiles),
+            /*padding_value=*/nullptr);
+    else
+      build(builder, result, typeOutput, input, output,
+            builder.getDenseI64ArrayAttr(outerDimPerm),
+            builder.getDenseI64ArrayAttr(innerDimPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles),
+            /*padding_value=*/{});
+  }
 }
 
 void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
@@ -176,30 +177,31 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
   dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
                              ShapedType::kDynamic);
   Type typeOutput = output.getType();
-  if (outerDimsPerm.empty())
-    build(builder, result, typeOutput, input, output, /*output_dims_pos=*/{},
-          builder.getI64ArrayAttr(innerDimsPos), innerTiles,
-          builder.getI64ArrayAttr(staticInnerTiles));
-  else
-    build(builder, result, typeOutput, input, output,
-          builder.getI64ArrayAttr(outerDimsPerm),
-          builder.getI64ArrayAttr(innerDimsPos), innerTiles,
-          builder.getI64ArrayAttr(staticInnerTiles));
-}
+  if (typeOutput.isa<MemRefType>()) {
+    if (outerDimsPerm.empty())
+      build(builder, result, TypeRange{}, input, output,
+            /*outerDimPerm=*/nullptr,
+            builder.getDenseI64ArrayAttr(innerDimsPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles));
+    else
+      build(builder, result, TypeRange{}, input, output,
+            builder.getDenseI64ArrayAttr(outerDimsPerm),
+            builder.getDenseI64ArrayAttr(innerDimsPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles));
 
-void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
-                     Value output, ArrayAttr outerDimPerm,
-                     ArrayAttr innerDimsPos, ArrayRef<OpFoldResult> tiles) {
-  SmallVector<Value> innerTiles;
-  SmallVector<int64_t> staticInnerTiles;
-  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamic);
-  if (!outerDimPerm.size())
-    build(builder, result, llvm::None, input, output, /*outerDimPerm=*/{},
-          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles));
-  else
-    build(builder, result, llvm::None, input, output, outerDimPerm,
-          innerDimsPos, innerTiles, builder.getI64ArrayAttr(staticInnerTiles));
+  } else {
+    assert(typeOutput.isa<RankedTensorType>() && "expect ranked tensor type");
+    if (outerDimsPerm.empty())
+      build(builder, result, typeOutput, input, output,
+            /*outerDimPerm=*/nullptr,
+            builder.getDenseI64ArrayAttr(innerDimsPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles));
+    else
+      build(builder, result, typeOutput, input, output,
+            builder.getDenseI64ArrayAttr(outerDimsPerm),
+            builder.getDenseI64ArrayAttr(innerDimsPos), innerTiles,
+            builder.getDenseI64ArrayAttr(staticInnerTiles));
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -350,15 +352,15 @@ computeInterchangeFromDimPos(ArrayRef<int64_t> innerDimsPos,
 /// OpFoldResults.
 // TODO: interface or base class in .td
 template <typename OpTy>
-static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
+static SmallVector<OpFoldResult> getMixedTilesImpl(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
+  Builder builder(op);
   SmallVector<OpFoldResult> mixedInnerTiles;
   unsigned dynamicValIndex = 0;
-  for (Attribute attr : op.getStaticInnerTiles()) {
-    auto tileAttr = attr.cast<IntegerAttr>();
-    if (!ShapedType::isDynamic(tileAttr.getInt()))
-      mixedInnerTiles.push_back(tileAttr);
+  for (int64_t staticTile : op.getStaticInnerTiles()) {
+    if (!ShapedType::isDynamic(staticTile))
+      mixedInnerTiles.push_back(builder.getI64IntegerAttr(staticTile));
     else
       mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
   }
@@ -385,8 +387,7 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-  SmallVector<int64_t> dimsToBlock =
-      extractFromI64ArrayAttr(op.getInnerDimsPos());
+  ArrayRef<int64_t> dimsToBlock = op.getInnerDimsPos();
   SmallVector<OpFoldResult> tiles = op.getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
@@ -427,10 +428,8 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   int64_t rank = (std::is_same<OpTy, PackOp>::value)
                      ? packOrUnPack.getInputRank()
                      : packOrUnPack.getOutputRank();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
-  SmallVector<int64_t> outerDimsPerm =
-      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
+  ArrayRef<int64_t> innerDimsPos = packOrUnPack.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = packOrUnPack.getOuterDimsPerm();
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
@@ -484,8 +483,7 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
+  ArrayRef<int64_t> innerDimsPos = getInnerDimsPos();
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
@@ -512,8 +510,7 @@ LogicalResult PackOp::verify() {
                          "supported when padding_value is not set");
   }
   // Verify result type against inferred type.
-  SmallVector<int64_t> outerDimsPerm =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> outerDimsPerm = getOuterDimsPerm();
   ShapedType expectedOutputType = getPackedType(
       getInputType(), getStaticTiles(), innerDimsPos, outerDimsPerm);
   if (!isCompatible(expectedOutputType, getOutputType())) {
@@ -534,7 +531,7 @@ LogicalResult PackOp::verify() {
 
 /// Get the tile sizes as `OpFoldResult`.
 SmallVector<OpFoldResult> PackOp::getMixedTiles() {
-  return ::getMixedTiles(*this);
+  return ::getMixedTilesImpl(*this);
 }
 
 SmallVector<int64_t> PackOp::getStaticTiles() {
@@ -568,10 +565,8 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   // the point loop? However, if we interchange `ivs` once more to go to the
   // canonical blocking format: ABCabc, this connection becomes trivial: Each
   // point loop is pointLoopsOffset + inputRank away from the tiled loop.
-  SmallVector<int64_t> dimsToInnerBlock =
-      extractFromI64ArrayAttr(packOp.getInnerDimsPos());
-  SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(packOp.getOuterDimsPerm());
+  ArrayRef<int64_t> dimsToInnerBlock = packOp.getInnerDimsPos();
+  ArrayRef<int64_t> dimsToOuterBlock = packOp.getOuterDimsPerm();
 
   SmallVector<Value> interchangedIvs = ivs;
   SmallVector<int64_t> interchangeVector =
@@ -743,7 +738,7 @@ void PackOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
-  return ::getMixedTiles(*this);
+  return ::getMixedTilesImpl(*this);
 }
 
 SmallVector<int64_t> UnPackOp::getStaticTiles() {
@@ -793,14 +788,14 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   assert(inputIvsPointLoops.size() + inputIvs.size() == getInputRank() &&
          "expect same number of iduction variables equals to input rank");
   // interchange the point loops induction variables based on `inner_dim_pos`.
-  SmallVector<int64_t> innerDims = extractFromI64ArrayAttr(getInnerDimsPos());
+  ArrayRef<int64_t> innerDims = getInnerDimsPos();
   SmallVector<int64_t> interchangeVector =
       computeInterchangeFromDimPos(innerDims, getOutputRank());
   SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
   // interchange the tiled loops induction variables based on `outer_dims_pos`.
-  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> outerDims = getOuterDimsPerm();
   if (!outerDims.empty()) {
     inputIvs = interchange<Value>(inputIvs, outerDims, /*offset=*/0);
   }
@@ -851,8 +846,7 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 LogicalResult UnPackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
+  ArrayRef<int64_t> innerDimsPos = getInnerDimsPos();
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
@@ -872,8 +866,7 @@ LogicalResult UnPackOp::verify() {
 
   // Verify input type against inferred type. The check includes the cases for
   // incompilete tiles. We allow to `undo` the padding done in the pack.
-  SmallVector<int64_t> outerDimsPerm =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> outerDimsPerm = getOuterDimsPerm();
   ShapedType expectedInputType = PackOp::getPackedType(
       getOutputType(), getStaticTiles(), innerDimsPos, outerDimsPerm);
   if (!isCompatible(expectedInputType, getInputType())) {
