@@ -14,12 +14,14 @@
 
 import re
 
+from Logger import Logger
+
 class FileCheckParser(object):
     """Parsers IR files for FileCheck lines to extract informatio
        about the execution of the kernel"""
 
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, loglevel):
+        self.logger = Logger("filecheck.parser", loglevel)
         # FileCheck line style
         self.runRE = re.compile("^\/\/\s*RUN: (.*)$");
         self.flopsRE = re.compile("^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")

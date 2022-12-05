@@ -67,8 +67,9 @@ from Execute import Execute
 from TPPHelper import TPPHelper
 
 class Environment(object):
-    def __init__(self, args, logger):
-        helper = TPPHelper(logger)
+    def __init__(self, args, loglevel):
+        self.logger = Logger("driver.env", loglevel)
+        helper = TPPHelper(loglevel)
         self.base_dir = os.path.realpath(os.path.dirname(__file__))
         self.root_dir = helper.findGitRoot(".")
         programs = helper.findTPPProgs(self.root_dir)
@@ -97,14 +98,13 @@ class Environment(object):
 class BaseRun(object):
     """ Base class for all runs """
 
-    def __init__(self, name, env, json, logger):
-        self.logger = logger
+    def __init__(self, name, env, json, loglevel):
         self.name = name
         self.env = env
         self.source = json["source"]
         self.iters = json["iters"]
         self.flags = json["flags"]
-        self.runner = Execute(logger)
+        self.runner = Execute(loglevel)
         self.stdout = ""
         self.stderr = ""
 
@@ -123,8 +123,9 @@ class BaseRun(object):
 class CPPRun(BaseRun):
     """ C++ runs """
 
-    def __init__(self, name, env, json, logger):
-        BaseRun.__init__(self, name, env, json, logger)
+    def __init__(self, name, env, json, loglevel):
+        self.logger = Logger("driver.cpprun", loglevel)
+        BaseRun.__init__(self, name, env, json, loglevel)
         assert(json["type"] == "C++")
         source_dir = os.path.dirname(self.source)
         self.binary = os.path.join(source_dir, f"bench_{name}.bin")
@@ -168,8 +169,9 @@ class CPPRun(BaseRun):
         return True
 
 class MLIRRun(BaseRun):
-    def __init__(self, name, env, json, logger):
-        BaseRun.__init__(self, name, env, json, logger)
+    def __init__(self, name, env, json, loglevel):
+        self.logger = Logger("driver.mlirrun", loglevel)
+        BaseRun.__init__(self, name, env, json, loglevel)
         assert(json["type"] == "MLIR")
 
     def run(self):
@@ -189,19 +191,19 @@ class MLIRRun(BaseRun):
 class Benchmark(object):
     """ A collection of runs """
 
-    def __init__(self, name, env, logger):
+    def __init__(self, name, env, loglevel):
         self.name = name
         self.env = env
-        self.logger = logger
+        self.logger = Logger("driver.bench", loglevel)
         self.runs = list()
 
     def addRun(self, name, json):
         runType = json["type"]
         self.logger.debug(f"Adding {runType} run {name} for {self.name}")
         if runType == "C++":
-            self.runs.append(CPPRun(name, self.env, json, logger))
+            self.runs.append(CPPRun(name, self.env, json, loglevel))
         elif runType == "MLIR":
-            self.runs.append(MLIRRun(name, self.env, json, logger))
+            self.runs.append(MLIRRun(name, self.env, json, loglevel))
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False
@@ -223,9 +225,10 @@ class Benchmark(object):
 class BenchmarkDriver(object):
     """ Detects and runs benchmarks based on JSON configurations """
 
-    def __init__(self, args, logger):
-        self.logger = logger
-        self.env = Environment(args, logger)
+    def __init__(self, args, loglevel):
+        self.logger = Logger("driver.bench.driver", loglevel)
+        self.env = Environment(args, loglevel)
+        self.loglevel = loglevel
         self.config = args.config
         if not os.path.exists(self.config):
             self.logger.error(f"JSON config '{self.config}' does not exist")
@@ -248,7 +251,7 @@ class BenchmarkDriver(object):
 
             name = list(cfg.keys())[0]
             runs = cfg[name]
-            benchs = Benchmark(name, self.env, self.logger)
+            benchs = Benchmark(name, self.env, self.loglevel)
             for key, run in runs.items():
                 if not benchs.addRun(key, run):
                     return False
@@ -311,14 +314,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Creates the logger object
-    logger = Logger(__name__, parser, args.verbose - (args.quiet > 0))
+    loglevel = args.verbose - (args.quiet > 0)
+    logger = Logger("driver", loglevel)
 
     # Creates a controller from command line arguments
-    driver = BenchmarkDriver(args, logger)
+    driver = BenchmarkDriver(args, loglevel)
 
     # Detects all benchmarks to run, validates files / args
     if (not driver.scanBenchmarks()):
-        logger.error("Error finding benchmarks", print_help=True)
+        logger.error("Error finding benchmarks")
+        print('\n\n')
+        parser.print_help()
         sys.exit(1)
 
     # Runs all benchmarks

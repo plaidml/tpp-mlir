@@ -13,11 +13,13 @@ import re
 import shlex
 import argparse
 
+from Logger import Logger
+
 class TPPHelper(object):
     """ Detects paths, libraries, executables, LLVM variables, etc. """
 
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, loglevel):
+        self.logger = Logger("tpp.helper", loglevel)
 
     def findGitRoot(self, path):
         """ Find the git root directory, if any, or return the input """
