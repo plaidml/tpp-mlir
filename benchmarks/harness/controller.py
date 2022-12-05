@@ -40,10 +40,11 @@ from TPPHelper import TPPHelper
 class BenchmarkController(object):
     """ Entry point of the benchmark harness"""
 
-    def __init__(self, args, logger):
+    def __init__(self, args, loglevel):
         self.args = args
-        self.logger = logger
-        self.helper = TPPHelper(logger)
+        self.logger = Logger("controller.bench.controller", loglevel)
+        self.helper = TPPHelper(loglevel)
+        self.loglevel = loglevel
         # If we're in a git repo, find the base dir, otherwise, this is the base dir
         self.baseDir = self.helper.findGitRoot(os.path.dirname(__file__))
         self.logger.debug(f"Base dir: {self.baseDir}")
@@ -60,7 +61,7 @@ class BenchmarkController(object):
 
         # Parse the IR file for user arguments
         self.logger.info("Parsing FileCheck lines, updating arguments")
-        fileArgs = FileCheckParser(self.logger).parse(args.benchmark_name)
+        fileArgs = FileCheckParser(self.loglevel).parse(args.benchmark_name)
 
         # Command line arguments have preference
         if (not self.args.n and 'iters' in fileArgs):
@@ -107,7 +108,7 @@ class BenchmarkController(object):
         """ Run tpp-opt and tpp-run to get the timings """
 
         irContents = ""
-        executor = Execute(self.logger)
+        executor = Execute(self.loglevel)
 
         # Only run tpp-opt if we have the arguments
         if self.args.opt_args:
@@ -202,14 +203,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Creates the logger object
-    logger = Logger(__name__, parser, args.verbose - (args.quiet > 0))
+    loglevel = args.verbose - (args.quiet > 0)
+    logger = Logger("controller", loglevel)
 
     # Creates a controller from command line arguments
-    controller = BenchmarkController(args, logger)
+    controller = BenchmarkController(args, loglevel)
 
     # Checks all parameters are good
     if (not controller.verifyArgs()):
-        logger.error("Argument verification error", print_help=True)
+        logger.error("Argument verification error")
+        print('\n\n')
+        parser.print_help()
         sys.exit(1)
 
     # Runs the benchmark

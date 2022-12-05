@@ -8,11 +8,13 @@
 
 import subprocess
 
+from Logger import Logger
+
 class Execute(object):
     """Executes commands, returns out/err"""
 
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self, loglevel):
+        self.logger = Logger("execute", loglevel)
 
     def run(self, program, input=''):
         """Execute Commands, return out/err"""
