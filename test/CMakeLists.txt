@@ -11,10 +11,10 @@ set(TPP_OPT_TEST_DEPENDS
         tpp-run
         )
 
-add_lit_testsuite(check-tpp-opt "Running the tpp-opt regression tests"
+add_lit_testsuite(check-all "Running the tpp-opt regression tests"
         ${CMAKE_CURRENT_BINARY_DIR}
         DEPENDS ${TPP_OPT_TEST_DEPENDS}
         )
-set_target_properties(check-tpp-opt PROPERTIES FOLDER "Tests")
+set_target_properties(check-all PROPERTIES FOLDER "Tests")
 
 add_lit_testsuites(TPP_OPT ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${TPP_OPT_TEST_DEPENDS})
