@@ -70,13 +70,13 @@ def PackOp : LinalgX_Op<"pack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
-    I64ArrayAttr:$inner_dims_pos,
+    DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
+    DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
-    I64ArrayAttr:$static_inner_tiles,
+    DenseI64ArrayAttr:$static_inner_tiles,
     Optional<AnyType>:$padding_value);
 
-  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let results = (outs Variadic<AnyShaped>:$results);
   let assemblyFormat = [{
     attr-dict
     $input
@@ -145,12 +145,10 @@ def PackOp : LinalgX_Op<"pack", [
 
   let builders = [
     OpBuilder<(ins "Value":$input, "Value":$output,
-      "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos,
-      "ArrayRef<OpFoldResult>":$tiles)>,
-
-    OpBuilder<(ins "Value":$input, "Value":$output,
-      "ArrayAttr":$outerDimPerm, "ArrayAttr":$innerDimPerm,
-      "ArrayRef<OpFoldResult>":$tiles, "Value":$padding)>
+      "ArrayRef<int64_t>":$innerDimPos, 
+      "ArrayRef<OpFoldResult>":$innerTiles,
+      CArg<"Optional<Value>", "llvm::None">:$paddingValue,
+      CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
 
   let hasVerifier = 1;
@@ -173,12 +171,12 @@ def UnPackOp : LinalgX_Op<"unpack", [
 
   let arguments = (ins AnyShaped:$input,
     AnyShaped:$output,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
-    I64ArrayAttr:$inner_dims_pos,
+    DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
+    DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
-    I64ArrayAttr:$static_inner_tiles);
+    DenseI64ArrayAttr:$static_inner_tiles);
 
-  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let results = (outs Variadic<AnyShaped>:$results);
   let assemblyFormat = [{
     attr-dict
     $input
@@ -237,10 +235,6 @@ def UnPackOp : LinalgX_Op<"unpack", [
     OpBuilder<(ins "Value":$input, "Value":$output,
       "ArrayRef<int64_t>":$innerDimPos, "ArrayRef<int64_t>":$outerDimPos,
       "ArrayRef<OpFoldResult>":$tiles)>,
-
-    OpBuilder<(ins "Value":$input, "Value":$output,
-      "ArrayAttr":$outerDimPerm, "ArrayAttr":$innerDimPerm,
-      "ArrayRef<OpFoldResult>":$tiles)>
   ];
 
   let hasCanonicalizeMethod = 1;

@@ -16,14 +16,13 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Traits.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
-using namespace mlir::linalgx;
-using namespace mlir::vnni;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -42,8 +41,8 @@ static Value toPackLayoutImpl(Location loc, Value input,
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
                              ShapedType::kDynamic);
-  ShapedType result = PackOp::getPackedType(input.getType(), staticTiles,
-                                            innerDimsPos, outerDimsPerm);
+  ShapedType result = linalgx::PackOp::getPackedType(
+      input.getType(), staticTiles, innerDimsPos, outerDimsPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();
   ArrayRef<int64_t> shape = result.getShape();
   Value output;
@@ -55,8 +54,8 @@ static Value toPackLayoutImpl(Location loc, Value input,
     output =
         builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
   return builder
-      .create<linalgx::PackOp>(loc, input, output, innerDimsPos, outerDimsPerm,
-                               tiles)
+      .create<linalgx::PackOp>(loc, input, output, innerDimsPos, tiles,
+                               /*paddingValue=*/llvm::None, outerDimsPerm)
       .getResults()[0];
 }
 
@@ -450,16 +449,14 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
 
     // bail out if one of the padded dimension is a tiled one.
     llvm::SmallBitVector paddedDims = padOp.getPaddedDims();
-    SmallVector<int64_t> innerDimsPos =
-        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
     llvm::SmallBitVector innerDims(paddedDims.size());
     for (int64_t dim : innerDimsPos)
       paddedDims.flip(dim);
     if (paddedDims.anyCommon(innerDims))
       return failure();
 
-    SmallVector<int64_t> outerDimsPerm =
-        extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
+    ArrayRef<int64_t> outerDimsPerm = unpackOp.getOuterDimsPerm();
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
     if (!outerDimsPerm.empty()) {
@@ -490,8 +487,7 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
         padResultType.getElementType());
     Value replacement = toUnPackLayoutImpl(
         padOp.getLoc(), padOpRes, outputUnPack, unpackOp.getMixedTiles(),
-        innerDimsPos, extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm()),
-        rewriter);
+        innerDimsPos, unpackOp.getOuterDimsPerm(), rewriter);
 
     rewriter.replaceOp(padOp, replacement);
     return success();
@@ -540,8 +536,8 @@ struct PropagateThroughElementWiseOp
     // infer them from `dimsAndTileMapping`.
     if (unpackOp) {
       tiles = unpackOp.getMixedTiles();
-      innerDimsPos = extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
-      outerDimsPerm = extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
+      innerDimsPos = llvm::to_vector(unpackOp.getInnerDimsPos());
+      outerDimsPerm = llvm::to_vector(unpackOp.getOuterDimsPerm());
     } else {
       AffineMap mapOperand = linalgOp.getMatchingIndexingMap(operand);
       for (unsigned pos = 0; pos < mapOperand.getNumResults(); pos++) {
@@ -611,22 +607,20 @@ struct PropagateThroughElementWiseOp
       // Handle outer dims perm. If the given tensor dimension is permuted get
       // the domain dimension and use it to infer which co-domain dimension is
       // permuted in `getPackedOperand`.
-      SmallVector<int64_t> outerDimsPerm =
-          extractFromI64ArrayAttr(unpackOp.getOuterDimsPerm());
+      ArrayRef<int64_t> outerDimsPerm = unpackOp.getOuterDimsPerm();
       if (!outerDimsPerm.empty()) {
-        tileLoopPerms = outerDimsPerm;
-        interchangeVector = outerDimsPerm;
+        tileLoopPerms = llvm::to_vector(outerDimsPerm);
+        interchangeVector = llvm::to_vector(outerDimsPerm);
         // tileLoopPerms represents the new permutation of the tiled loops and
         // need to cover all the current loop index range, and must be a valid
         // permutation.
         if (tileLoopPerms.size() != linalgOp.getNumLoops())
           return failure();
-        if (!linalg::isPermutation(tileLoopPerms))
+        if (!isPermutationVector(tileLoopPerms))
           return failure();
       }
 
-      SmallVector<int64_t> innerDimsPos =
-          extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+      ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
       assert(innerDimsPos.size() && "expect non-empty");
       for (int64_t dimPos : innerDimsPos) {
         interchangeVector.push_back(dimPos + innerDimsPos.size());
@@ -657,7 +651,7 @@ struct PropagateThroughElementWiseOp
 
     // Bail out if `interchangeVector` is not a valid permutation. We need to
     // transpose only if `tileLoopPerms` is not empty.
-    if (!tileLoopPerms.empty() && !linalg::isPermutation(interchangeVector)) {
+    if (!tileLoopPerms.empty() && !isPermutationVector(interchangeVector)) {
       return failure();
     }
 
@@ -750,15 +744,13 @@ struct PropagateThroughElementWiseOp
       if (unpackOutputs.empty())
         outReplacements.push_back(toUnPackLayoutImpl(
             linalgOp.getLoc(), result, linalgOp.getOutputs()[idx++],
-            packOp.getMixedTiles(),
-            extractFromI64ArrayAttr(packOp.getInnerDimsPos()),
-            extractFromI64ArrayAttr(packOp.getOuterDimsPerm()), rewriter));
+            packOp.getMixedTiles(), packOp.getInnerDimsPos(),
+            packOp.getOuterDimsPerm(), rewriter));
       else
-        outReplacements.push_back(toUnPackLayoutImpl(
-            linalgOp.getLoc(), result, unpackOutputs[idx++],
-            packOp.getMixedTiles(),
-            extractFromI64ArrayAttr(packOp.getInnerDimsPos()),
-            extractFromI64ArrayAttr(packOp.getOuterDimsPerm()), rewriter));
+        outReplacements.push_back(
+            toUnPackLayoutImpl(linalgOp.getLoc(), result, unpackOutputs[idx++],
+                               packOp.getMixedTiles(), packOp.getInnerDimsPos(),
+                               packOp.getOuterDimsPerm(), rewriter));
     }
     rewriter.replaceOp(linalgOp, outReplacements);
     return success();

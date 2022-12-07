@@ -22,7 +22,6 @@ def Xsmm_Dialect : Dialect {
         see: https://github.com/libxsmm/libxsmm
     }];
     let cppNamespace = "::mlir::xsmm";
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 //===----------------------------------------------------------------------===//
