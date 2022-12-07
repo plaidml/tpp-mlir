@@ -41,6 +41,11 @@ def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [VNNI_MatmulInterface]> {
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
   let results = (outs Variadic<VNNIOperand>:$dest);
   let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins "Value":$matrixA, "Value":$matrixB, "Value":$matrixC)>
+  ];
+
 }
 
 #endif

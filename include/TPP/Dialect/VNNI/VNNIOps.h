@@ -12,8 +12,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "TPP/Dialect/VNNI/VNNIInterfaces.h.inc"
 

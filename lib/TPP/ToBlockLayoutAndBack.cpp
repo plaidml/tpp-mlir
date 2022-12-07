@@ -387,15 +387,15 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
   OpFoldResult tileOnI = tiles[0];
-  SmallVector<OpFoldResult, 1> tilesOnA = {tileOnI};
+  SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
 
   Location loc = matmulOp.getLoc();
-  // reshape input A.
-  Value packedMatrixA =
-      toPackLayout_VNNI(rewriter, loc, matmulOp.getInputs()[0], tilesOnA);
+  // reshape input B.
+  Value packedMatrixB =
+      toPackLayout_VNNI(rewriter, loc, matmulOp.getInputs()[1], tilesOnB);
   auto replacementOp = rewriter.create<vnni::MatmulOp>(
-      loc, matmulOp.getOutputs()[0].getType(), packedMatrixA,
-      matmulOp.getInputs()[1], matmulOp.getOutputs()[0]);
+      loc, matmulOp.getOutputs()[0].getType(), matmulOp.getInputs()[0],
+      packedMatrixB, matmulOp.getOutputs()[0]);
   rewriter.replaceOp(matmulOp, replacementOp.getResult(0));
   return replacementOp;
 }

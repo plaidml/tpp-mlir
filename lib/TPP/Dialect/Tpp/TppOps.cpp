@@ -146,8 +146,8 @@ LogicalResult AddOp::verify() {
 
 static bool verifyVNNIMatmulShape(MemRefType memrefA, MemRefType memrefB,
                                   MemRefType memrefC) {
-  return !(memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 3);
+  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 2);
 }
 
 static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
@@ -156,14 +156,14 @@ static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
   int64_t m = shapeC[0];
   int64_t n = shapeC[1];
   int64_t k = shapeA[1];
-  return !(shapeB[0] != k || shapeB[1] != n || shapeA[0] * shapeA[2] != m);
+  return !(shapeB[0] * shapeB[2] != k || shapeB[1] != n || shapeA[0] != m);
 }
 
 LogicalResult VNNIMatmulOp::verify() {
   MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
   MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
   MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
-  assert(memrefA.getElementType().isBF16() && memrefA.getRank() == 3);
+  assert(memrefB.getElementType().isBF16() && memrefB.getRank() == 3);
   if (!verifyVNNIMatmulShape(memrefA, memrefB, memrefC))
     return emitOpError("fails to verify operands shapes");
   if (!verifyVNNIMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
@@ -183,8 +183,8 @@ void VNNIMatmulOp::build(OpBuilder &builder, OperationState &state,
 
 static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
                                   MemRefType memrefC) {
-  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 4);
+  return !(memrefB.getRank() != 4 || memrefC.getRank() != 2 ||
+           memrefA.getRank() != 3);
 }
 
 LogicalResult VNNIBrgemmOp::verify() {
@@ -194,7 +194,7 @@ LogicalResult VNNIBrgemmOp::verify() {
   if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.
-  if (tensorA.getShape()[0] * tensorA.getShape()[3] != tensorB.getShape()[0])
+  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[1])
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
