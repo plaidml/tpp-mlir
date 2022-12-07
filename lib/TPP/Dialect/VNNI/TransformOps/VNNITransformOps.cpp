@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -46,37 +47,33 @@ public:
 };
 } // namespace
 
-namespace {
-// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
-public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-} // namespace
-
 DiagnosedSilenceableFailure
 transform::MapVNNIToTppOp::applyToOne(Operation *target,
                                       SmallVector<Operation *> &results,
                                       TransformState &state) {
-  if (auto matmulOp = dyn_cast<vnni::MatmulOp>(target)) {
-    if (!matmulOp.hasBufferSemantics()) {
-      auto diag =
-          this->emitOpError("Expect buffer semantics when mapping to tpp");
-      diag.attachNote(target->getLoc()) << "when applied to this op";
-      return DiagnosedSilenceableFailure::definiteFailure();
+  if (!dyn_cast<vnni::MatmulOp>(target)) {
+    auto diag = this->emitOpError("Expect matmul op when mapping to tpp");
+    diag.attachNote(target->getLoc()) << "when applied to this op";
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+  auto matmulOp = dyn_cast<vnni::MatmulOp>(target);
+  if (!matmulOp.hasBufferSemantics()) {
+    auto diag =
+        this->emitOpError("Expect buffer semantics when mapping to tpp");
+    diag.attachNote(target->getLoc()) << "when applied to this op";
+    return DiagnosedSilenceableFailure::definiteFailure();
     }
     if (matmulOp.hasDynamicShape()) {
       auto diag = this->emitOpError("Expect static shape when mapping to tpp");
       diag.attachNote(target->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
-    SimpleRewriter rewriter(target->getContext());
+    TrivialPatternRewriter rewriter(target->getContext());
     rewriter.setInsertionPoint(target);
 
     rewriter.replaceOpWithNewOp<tpp::VNNIMatmulOp>(
         matmulOp, matmulOp.getMatrixA(), matmulOp.getMatrixB(),
         matmulOp.getMatrixC());
-  }
   return DiagnosedSilenceableFailure(success());
 }
 
