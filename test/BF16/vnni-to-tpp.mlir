@@ -3,13 +3,7 @@
 module {
   transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["matmul_static"]} in %arg0
-    transform.structured.map_vnni_to_tpp %0
-  }
-
-  transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg0
+    %0 = transform.structured.match ops{["vnni.matmul"]} in %arg0
     transform.structured.map_vnni_to_tpp %0
   }
 

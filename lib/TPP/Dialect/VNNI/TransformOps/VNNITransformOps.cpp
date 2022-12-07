@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/VNNI/TransformOps/VNNITransformOps.h"
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
@@ -20,7 +21,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
-#include "TPP/Dialect/Tpp/TppOps.h"
 
 using namespace mlir;
 using namespace mlir::transform;
@@ -54,42 +54,28 @@ public:
 };
 } // namespace
 
-//===----------------------------------------------------------------------===//
-// MapAndConvertLinalgToTpp
-//===----------------------------------------------------------------------===//
+DiagnosedSilenceableFailure
+transform::MapVNNIToTppOp::applyToOne(Operation *target,
+                                      SmallVector<Operation *> &results,
+                                      TransformState &state) {
+  if (auto matmulOp = dyn_cast<vnni::MatmulOp>(target)) {
+    if (!matmulOp.hasBufferSemantics()) {
+      auto diag =
+          this->emitOpError("Expect buffer semantics when mapping to tpp");
+      diag.attachNote(target->getLoc()) << "when applied to this op";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    if (matmulOp.hasDynamicShape()) {
+      auto diag = this->emitOpError("Expect static shape when mapping to tpp");
+      diag.attachNote(target->getLoc()) << "when applied to this op";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+    SimpleRewriter rewriter(target->getContext());
+    rewriter.setInsertionPoint(target);
 
-// Convert a vnni.matmul to a tpp.vnni_matmul.
-struct MapVNNIMatmulToTpp : public OpRewritePattern<vnni::MatmulOp> {
-  using OpRewritePattern<vnni::MatmulOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vnni::MatmulOp matmulOp,
-                                PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(
-          matmulOp, "Expect buffer semantics when mapping to tpp");
-    if (matmulOp.hasDynamicShape())
-      return rewriter.notifyMatchFailure(
-          matmulOp, "Expect static shape when mapping to tpp");
     rewriter.replaceOpWithNewOp<tpp::VNNIMatmulOp>(
         matmulOp, matmulOp.getMatrixA(), matmulOp.getMatrixB(),
         matmulOp.getMatrixC());
-    return success();
-  }
-};
-
-  
-DiagnosedSilenceableFailure transform::MapVNNIToTppOp::applyToOne(
-    Operation *target, SmallVector<Operation *> &results,
-    TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
-  }
-  RewritePatternSet patterns(getContext());
-  patterns.add<MapVNNIMatmulToTpp>(patterns.getContext());
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))){
-	 return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
   return DiagnosedSilenceableFailure(success());
 }
