@@ -62,7 +62,7 @@ transform::MapVNNIToTppOp::applyToOne(Operation *target,
         this->emitOpError("Expect buffer semantics when mapping to tpp");
     diag.attachNote(target->getLoc()) << "when applied to this op";
     return DiagnosedSilenceableFailure::definiteFailure();
-    }
+  }
     if (matmulOp.hasDynamicShape()) {
       auto diag = this->emitOpError("Expect static shape when mapping to tpp");
       diag.attachNote(target->getLoc()) << "when applied to this op";
