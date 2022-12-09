@@ -32,11 +32,10 @@ using namespace mlir;
 //===----------------------------------------------------------------------===//
 
 // Helper function to create the pack operation.
-static Value toPackLayoutImpl(Location loc, Value input,
+static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                               ArrayRef<OpFoldResult> tiles,
                               ArrayRef<int64_t> innerDimsPos,
-                              ArrayRef<int64_t> outerDimsPerm,
-                              OpBuilder &builder, bool useAlloc = false) {
+                              ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
@@ -45,14 +44,8 @@ static Value toPackLayoutImpl(Location loc, Value input,
       input.getType(), staticTiles, innerDimsPos, outerDimsPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();
   ArrayRef<int64_t> shape = result.getShape();
-  Value output;
-  if (useAlloc)
-    output = builder.create<bufferization::AllocTensorOp>(
-        loc, RankedTensorType::get(shape, inputType.getElementType()),
-        ValueRange{});
-  else
-    output =
-        builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
+  Value output =
+      builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
   return builder
       .create<linalgx::PackOp>(loc, input, output, innerDimsPos, tiles,
                                /*paddingValue=*/llvm::None, outerDimsPerm)
@@ -60,146 +53,137 @@ static Value toPackLayoutImpl(Location loc, Value input,
 }
 
 // Helper function to create the unpack operation.
-static Value toUnPackLayoutImpl(Location loc, Value input, Value output,
-                                ArrayRef<OpFoldResult> tiles,
+static Value toUnPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
+                                Value output, ArrayRef<OpFoldResult> tiles,
                                 ArrayRef<int64_t> innerDimPos,
-                                ArrayRef<int64_t> outerDimsPerm,
-                                OpBuilder &builder) {
+                                ArrayRef<int64_t> outerDimsPerm) {
   return builder
       .create<linalgx::UnPackOp>(loc, input, output, innerDimPos, outerDimsPerm,
                                  tiles)
       .getResults()[0];
 }
 
-static Value handleLayoutNC_NCnc(Location loc, Value input, Value output,
-                                 ArrayRef<OpFoldResult> tiles,
-                                 OpBuilder &builder, bool useAlloc = false) {
+static Value handleLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
+                                 Value output, ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 2 && "expect two tile sizes for NC_NCnc");
   SmallVector<int64_t> innerDimPos = {0, 1};
   if (!output)
-    return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
-                            useAlloc);
-  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, {},
-                            builder);
+    return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
+  return toUnPackLayoutImpl(builder, loc, input, output, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
 }
 
-static Value handleLayout_VNNI(Location loc, Value input, Value output,
-                               ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
-                               bool useAlloc = false) {
+static Value handleLayout_VNNI(OpBuilder &builder, Location loc, Value input,
+                               Value output, ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 1 && "expect 1 block for VNNI");
   SmallVector<int64_t> innerDimPos = {0};
   if (!output)
-    return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
-                            useAlloc);
-  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, {},
-                            builder);
+    return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
+  return toUnPackLayoutImpl(builder, loc, input, output, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
 }
 
 // Helper function to pack from NC to NCnc.
-static Value toPackLayoutNC_NCnc(Location loc, Value input,
-                                 ArrayRef<OpFoldResult> tiles,
-                                 OpBuilder &builder, bool useAlloc = false) {
-  return handleLayoutNC_NCnc(loc, input, nullptr, tiles, builder, useAlloc);
+static Value toPackLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
+                                 ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNC_NCnc(builder, loc, input, nullptr, tiles);
 }
 
 // Helper function to pack from NC to [N/2][C][2].
-static Value toPackLayout_VNNI(Location loc, Value input,
-                               ArrayRef<OpFoldResult> tiles, OpBuilder &builder,
-                               bool useAlloc = false) {
-  return handleLayout_VNNI(loc, input, nullptr, tiles, builder, useAlloc);
+static Value toPackLayout_VNNI(OpBuilder &builder, Location loc, Value input,
+                               ArrayRef<OpFoldResult> tiles) {
+  return handleLayout_VNNI(builder, loc, input, nullptr, tiles);
 }
 
 // Helper function to unpack from NCnc to NC.
-static Value fromPackLayoutNCnc_NC(Location loc, Value input, Value output,
-                                   ArrayRef<OpFoldResult> tiles,
-                                   OpBuilder &builder) {
-  return handleLayoutNC_NCnc(loc, input, output, tiles, builder);
+static Value fromPackLayoutNCnc_NC(OpBuilder &builder, Location loc,
+                                   Value input, Value output,
+                                   ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNC_NCnc(builder, loc, input, output, tiles);
 }
 
-static Value handleLayoutNCHW_NCHWc(Location loc, Value input, Value output,
-                                    ArrayRef<OpFoldResult> tiles,
-                                    OpBuilder &builder, bool useAlloc = false) {
+static Value handleLayoutNCHW_NCHWc(OpBuilder &builder, Location loc,
+                                    Value input, Value output,
+                                    ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 1 && "expect one tile size for NCHW_NCHWc");
   SmallVector<int64_t> innerDimPos = {1};
   if (!output)
-    return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
-                            useAlloc);
-  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimPos, {},
-                            builder);
+    return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
+  return toUnPackLayoutImpl(builder, loc, input, output, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
 }
 
 // Helper function to pack from NCHW to NCHWc.
-static Value toPackLayoutNCHW_NCHWc(Location loc, Value input,
-                                    ArrayRef<OpFoldResult> tiles,
-                                    OpBuilder &builder, bool useAlloc = false) {
-  return handleLayoutNCHW_NCHWc(loc, input, nullptr, tiles, builder, useAlloc);
+static Value toPackLayoutNCHW_NCHWc(OpBuilder &builder, Location loc,
+                                    Value input, ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNCHW_NCHWc(builder, loc, input, nullptr, tiles);
 }
 
 // Helper function to unpack from NCHWc to NCHW.
-static Value fromPackLayoutNCHWc_NCHW(Location loc, Value input, Value output,
-                                      ArrayRef<OpFoldResult> tiles,
-                                      OpBuilder &builder) {
-  return handleLayoutNCHW_NCHWc(loc, input, output, tiles, builder);
+static Value fromPackLayoutNCHWc_NCHW(OpBuilder &builder, Location loc,
+                                      Value input, Value output,
+                                      ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNCHW_NCHWc(builder, loc, input, output, tiles);
 }
 
 // Helper function to pack from KC to CKkc.
-static Value toPackLayoutKC_CKkc(Location loc, Value input,
-                                 ArrayRef<OpFoldResult> tiles,
-                                 OpBuilder &builder, bool useAlloc = false) {
+static Value toPackLayoutKC_CKkc(OpBuilder &builder, Location loc, Value input,
+                                 ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 2 && "expect two tiles size for KC_CKkc");
   SmallVector<int64_t> innerDimPos = {0, 1};
   SmallVector<int64_t> outerDimPerm = {1, 0};
-  return toPackLayoutImpl(loc, input, tiles, innerDimPos, outerDimPerm, builder,
-                          useAlloc);
+  return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                          outerDimPerm);
 }
 
-static Value handleLayoutNPQK_NKPQk(Location loc, Value input, Value output,
-                                    ArrayRef<OpFoldResult> tiles,
-                                    OpBuilder &builder, bool useAlloc = false) {
+static Value handleLayoutNPQK_NKPQk(OpBuilder &builder, Location loc,
+                                    Value input, Value output,
+                                    ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 1 && "expect one tile size for NPQK_NKPQk");
   SmallVector<int64_t> innerDimsPos = {3};
   SmallVector<int64_t> outerDimsPerm = {0, 3, 1, 2};
   if (!output)
-    return toPackLayoutImpl(loc, input, tiles, innerDimsPos, outerDimsPerm,
-                            builder, useAlloc);
-  return toUnPackLayoutImpl(loc, input, output, tiles, innerDimsPos,
-                            outerDimsPerm, builder);
+    return toPackLayoutImpl(builder, loc, input, tiles, innerDimsPos,
+                            outerDimsPerm);
+  return toUnPackLayoutImpl(builder, loc, input, output, tiles, innerDimsPos,
+                            outerDimsPerm);
 }
 
 // Helper function to pack NPQK to NKPQk.
-static Value toPackLayoutNPQK_NKPQk(Location loc, Value input,
-                                    ArrayRef<OpFoldResult> tiles,
-                                    OpBuilder &builder, bool useAlloc = false) {
-  return handleLayoutNPQK_NKPQk(loc, input, nullptr, tiles, builder, useAlloc);
+static Value toPackLayoutNPQK_NKPQk(OpBuilder &builder, Location loc,
+                                    Value input, ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNPQK_NKPQk(builder, loc, input, nullptr, tiles);
 }
 
 // Helper function to unpack NKPQk to NPQK.
-static Value fromPackLayoutNKPQk_NPQK(Location loc, Value input, Value output,
-                                      ArrayRef<OpFoldResult> tiles,
-                                      OpBuilder &builder) {
-  return handleLayoutNPQK_NKPQk(loc, input, output, tiles, builder);
+static Value fromPackLayoutNKPQk_NPQK(OpBuilder &builder, Location loc,
+                                      Value input, Value output,
+                                      ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNPQK_NKPQk(builder, loc, input, output, tiles);
 }
 
 // Helper function to pack from RSCK to KCRSck.
-static Value toPackLayoutRSCK_KCRSck(Location loc, Value input,
-                                     ArrayRef<OpFoldResult> tiles,
-                                     OpBuilder &builder) {
+static Value toPackLayoutRSCK_KCRSck(OpBuilder &builder, Location loc,
+                                     Value input,
+                                     ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 2 && "expect two tiles for RSCK_KCRSck");
   SmallVector<int64_t> innerDimsPos = {2, 3};
   SmallVector<int64_t> outerDimsPerm = {3, 2, 0, 1};
-  return toPackLayoutImpl(loc, input, tiles, innerDimsPos, outerDimsPerm,
-                          builder);
+  return toPackLayoutImpl(builder, loc, input, tiles, innerDimsPos,
+                          outerDimsPerm);
 }
 
 // Helper function to pack from KCRS to KCRSck.
-static Value toPackLayoutKCRS_KCRSck(Location loc, Value input,
-                                     ArrayRef<OpFoldResult> tiles,
-                                     OpBuilder &builder,
-                                     bool useAlloc = false) {
+static Value toPackLayoutKCRS_KCRSck(OpBuilder &builder, Location loc,
+                                     Value input,
+                                     ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 2 && "expect two tiles size for KCRS_KCRSck");
   SmallVector<int64_t> innerDimPos = {1, 0};
-  return toPackLayoutImpl(loc, input, tiles, innerDimPos, {}, builder,
-                          useAlloc);
+  return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                          /*outerDimsPerm=*/{});
 }
 
 template <typename OpTy>
@@ -230,21 +214,21 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   Value image = inputOperands[0];
   Value packedImage =
       (isConv2DNhwcHwcfOp)
-          ? toPackLayoutNPQK_NKPQk(loc, image, tiles[0], rewriter)
-          : toPackLayoutNCHW_NCHWc(loc, image, tiles[0], rewriter);
+          ? toPackLayoutNPQK_NKPQk(rewriter, loc, image, tiles[0])
+          : toPackLayoutNCHW_NCHWc(rewriter, loc, image, tiles[0]);
   Value filter = inputOperands[1];
   Value packedFilter =
       (isConv2DNhwcHwcfOp)
-          ? toPackLayoutRSCK_KCRSck(loc, filter, tiles, rewriter)
-          : toPackLayoutKCRS_KCRSck(loc, filter, tiles, rewriter);
+          ? toPackLayoutRSCK_KCRSck(rewriter, loc, filter, tiles)
+          : toPackLayoutKCRS_KCRSck(rewriter, loc, filter, tiles);
   SmallVector<Value, 2> packedInputs = {packedImage, packedFilter};
 
   // pack the output.
   Value output = outputOperands[0];
   Value packedOutput =
       (isConv2DNhwcHwcfOp)
-          ? toPackLayoutNPQK_NKPQk(loc, output, tiles[0], rewriter)
-          : toPackLayoutNCHW_NCHWc(loc, output, tiles[0], rewriter);
+          ? toPackLayoutNPQK_NKPQk(rewriter, loc, output, tiles[0])
+          : toPackLayoutNCHW_NCHWc(rewriter, loc, output, tiles[0]);
 
   SmallVector<int64_t, 2> strides = {1, 1};
   if (DenseIntElementsAttr stridesAttr = convOp.getStrides()) {
@@ -283,10 +267,10 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   Value outUnPackedTensor = outputOperands[0];
   Value outReplacement =
       (isConv2DNhwcHwcfOp)
-          ? fromPackLayoutNKPQk_NPQK(loc, outPackedTensor, outUnPackedTensor,
-                                     tiles[0], rewriter)
-          : fromPackLayoutNCHWc_NCHW(loc, outPackedTensor, outUnPackedTensor,
-                                     tiles[0], rewriter);
+          ? fromPackLayoutNKPQk_NPQK(rewriter, loc, outPackedTensor,
+                                     outUnPackedTensor, tiles[0])
+          : fromPackLayoutNCHWc_NCHW(rewriter, loc, outPackedTensor,
+                                     outUnPackedTensor, tiles[0]);
   rewriter.replaceOp(convOp, outReplacement);
   return replacementOp;
 }
@@ -350,14 +334,14 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   Location loc = matmulOp.getLoc();
   // reshape input A and B.
   Value packedMatrixA =
-      toPackLayoutNC_NCnc(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
+      toPackLayoutNC_NCnc(rewriter, loc, matmulOp.getInputs()[0], tilesOnA);
   Value packedMatrixB =
-      toPackLayoutKC_CKkc(loc, matmulOp.getInputs()[1], tilesOnB, rewriter);
+      toPackLayoutKC_CKkc(rewriter, loc, matmulOp.getInputs()[1], tilesOnB);
   SmallVector<Value> packedInputs = {packedMatrixA, packedMatrixB};
 
   // reshape output C.
   Value packMatrixC =
-      toPackLayoutNC_NCnc(loc, matmulOp.getOutputs()[0], tilesOnC, rewriter);
+      toPackLayoutNC_NCnc(rewriter, loc, matmulOp.getOutputs()[0], tilesOnC);
 
   // swap linalg.matmul with a linalg.generic.
   MLIRContext *ctx = matmulOp.getContext();
@@ -383,8 +367,8 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   // convert back from pack layout.
   Value outPackTensor = replacementOp.getResult(0);
   Value outUnPackTensor = matmulOp.getOutputs()[0];
-  Value outReplacement = fromPackLayoutNCnc_NC(
-      loc, outPackTensor, outUnPackTensor, tilesOnC, rewriter);
+  Value outReplacement = fromPackLayoutNCnc_NC(rewriter, loc, outPackTensor,
+                                               outUnPackTensor, tilesOnC);
   rewriter.replaceOp(matmulOp, outReplacement);
   return replacementOp;
 }
@@ -408,7 +392,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   Location loc = matmulOp.getLoc();
   // reshape input A.
   Value packedMatrixA =
-      toPackLayout_VNNI(loc, matmulOp.getInputs()[0], tilesOnA, rewriter);
+      toPackLayout_VNNI(rewriter, loc, matmulOp.getInputs()[0], tilesOnA);
   auto replacementOp = rewriter.create<vnni::MatmulOp>(
       loc, matmulOp.getOutputs()[0].getType(), packedMatrixA,
       matmulOp.getInputs()[1], matmulOp.getOutputs()[0]);
@@ -486,8 +470,8 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
         padOp.getLoc(), padResultType.getShape(),
         padResultType.getElementType());
     Value replacement = toUnPackLayoutImpl(
-        padOp.getLoc(), padOpRes, outputUnPack, unpackOp.getMixedTiles(),
-        innerDimsPos, unpackOp.getOuterDimsPerm(), rewriter);
+        rewriter, padOp.getLoc(), padOpRes, outputUnPack,
+        unpackOp.getMixedTiles(), innerDimsPos, unpackOp.getOuterDimsPerm());
 
     rewriter.replaceOp(padOp, replacement);
     return success();
@@ -570,17 +554,15 @@ struct PropagateThroughElementWiseOp
     }
     // save the outer perm for later, when we compute the map.
     outerPerms.push_back(outerDimsPerm);
-    return toPackLayoutImpl(linalgOp.getLoc(), operand->get(), tiles,
-                            innerDimsPos, outerDimsPerm, rewriter);
+    return toPackLayoutImpl(rewriter, linalgOp.getLoc(), operand->get(), tiles,
+                            innerDimsPos, outerDimsPerm);
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-
     if (!linalg::isElementwise(linalgOp))
       return rewriter.notifyMatchFailure(linalgOp,
                                          "expects an elementwise operation");
-
     if (!hasMinorIdentityMaps(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "expects all identity/minor identity maps");
@@ -679,16 +661,12 @@ struct PropagateThroughElementWiseOp
         unpackOutputs.push_back(unpackOp.getOutput());
     }
 
-    // FIXME: innerDimsPos and outerDimsPerm must have been unsigned in the
-    // first place. `AffineMap::getPermutationMap` requires unsigned, convert.
     AffineMap permutationMap;
     if (!tileLoopPerms.empty()) {
-      SmallVector<unsigned> interchangeVectorUInt;
-      for (int64_t i : interchangeVector)
-        interchangeVectorUInt.push_back(
-            static_cast<std::make_unsigned<unsigned>::type>(i));
       permutationMap = inversePermutation(AffineMap::getPermutationMap(
-          interchangeVectorUInt, linalgOp.getContext()));
+          SmallVector<unsigned>(interchangeVector.begin(),
+                                interchangeVector.end()),
+          linalgOp.getContext()));
     }
     assert(outerPermsForMaps.size() == linalgOp->getNumOperands());
 
@@ -743,14 +721,14 @@ struct PropagateThroughElementWiseOp
       Value result = replacementOp.getTiedOpResult(operand);
       if (unpackOutputs.empty())
         outReplacements.push_back(toUnPackLayoutImpl(
-            linalgOp.getLoc(), result, linalgOp.getOutputs()[idx++],
+            rewriter, linalgOp.getLoc(), result, linalgOp.getOutputs()[idx++],
             packOp.getMixedTiles(), packOp.getInnerDimsPos(),
-            packOp.getOuterDimsPerm(), rewriter));
+            packOp.getOuterDimsPerm()));
       else
-        outReplacements.push_back(
-            toUnPackLayoutImpl(linalgOp.getLoc(), result, unpackOutputs[idx++],
-                               packOp.getMixedTiles(), packOp.getInnerDimsPos(),
-                               packOp.getOuterDimsPerm(), rewriter));
+        outReplacements.push_back(toUnPackLayoutImpl(
+            rewriter, linalgOp.getLoc(), result, unpackOutputs[idx++],
+            packOp.getMixedTiles(), packOp.getInnerDimsPos(),
+            packOp.getOuterDimsPerm()));
     }
     rewriter.replaceOp(linalgOp, outReplacements);
     return success();
