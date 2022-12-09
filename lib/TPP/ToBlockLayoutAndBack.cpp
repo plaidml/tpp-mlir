@@ -412,7 +412,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   auto replacementOp = rewriter.create<vnni::MatmulOp>(
       loc, matmulOp.getOutputs()[0].getType(), packedMatrixA,
       matmulOp.getInputs()[1], matmulOp.getOutputs()[0]);
-  rewriter.replaceOp(matmulOp, replacementOp.getResult());
+  rewriter.replaceOp(matmulOp, replacementOp.getResult(0));
   return replacementOp;
 }
 
