@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -25,14 +26,6 @@
 
 using namespace mlir;
 using namespace mlir::transform;
-
-namespace {
-// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
-public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-} // namespace
 
 //===----------------------------------------------------------------------===//
 // PackOp
@@ -51,7 +44,7 @@ DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
                               SmallVector<Operation *> &results,
                               transform::TransformState &state) {
-  SimpleRewriter rewriter(target->getContext());
+  TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   SmallVector<OpFoldResult> blockingFactors = getAsOpFoldResult(
       rewriter.getI64ArrayAttr(extractFromI64ArrayAttr(getBlockingFactors())));
@@ -97,7 +90,7 @@ transform::CollapseOp::applyToOne(linalg::LinalgOp target,
                                   transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  SimpleRewriter rewriter(target->getContext());
+  TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
       rewriter, cast<linalg::GenericOp>(target), getReassociationIndices());
@@ -128,7 +121,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
                                      transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
-  SimpleRewriter rewriter(target->getContext());
+  TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops =
       mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
@@ -145,7 +138,7 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                                          transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  SimpleRewriter rewriter(target->getContext());
+  TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul =
       mlir::linalgx::mapConvToMatmul(rewriter, cast<linalg::GenericOp>(target));
@@ -204,7 +197,7 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
-    SimpleRewriter rewriter(currentTarget->getContext());
+    TrivialPatternRewriter rewriter(currentTarget->getContext());
     FailureOr<linalg::GenericOp> annotatedOp =
         mlir::linalgx::mapLinalgToTpp(rewriter, currentTarget);
     if (succeeded(annotatedOp)) {
@@ -312,7 +305,7 @@ transform::CollapseTo2dOp::apply(transform::TransformResults &results,
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
-    SimpleRewriter rewriter(currentTarget->getContext());
+    TrivialPatternRewriter rewriter(currentTarget->getContext());
     rewriter.setInsertionPoint(currentTarget);
     FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
         rewriter, currentTarget, getReassociationIndices(currentTarget));
@@ -391,7 +384,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
                            : linalg::LinalgTilingLoopType::Loops;
     linalgTilingOptions.setLoopType(loopsTypes)
         .setTileSizeComputationFunction(getTileSizes);
-    SimpleRewriter rewriter(currentTarget->getContext());
+    TrivialPatternRewriter rewriter(currentTarget->getContext());
     FailureOr<linalg::TiledLinalgOp> tiledOp =
         linalg::tileLinalgOp(rewriter, currentTarget, linalgTilingOptions);
     if (failed(tiledOp))
