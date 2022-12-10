@@ -104,15 +104,15 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     if (failed(ldaDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
-    auto divLdaDim = getLeadingDim(memrefA, 1);
-    if (failed(divLdaDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
-    lda = lda / (*divLdaDim);
 
     auto ldbDim = getLeadingDim(memrefB);
     if (failed(ldbDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
+    auto divLdbDim = getLeadingDim(memrefB, 1);
+    if (failed(divLdbDim))
+      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
+    ldb = ldb / (*divLdbDim);
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
@@ -210,15 +210,15 @@ struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
     if (failed(ldaDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
     int64_t lda = *ldaDim;
-    auto divLdaDim = getLeadingDim(memrefA, 2);
-    if (failed(divLdaDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-    lda = lda / (*divLdaDim);
 
     auto ldbDim = getLeadingDim(memrefB, 1);
     if (failed(ldbDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
+    auto divLdbDim = getLeadingDim(memrefB, 2);
+    if (failed(divLdbDim))
+      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
+    ldb = ldb / (*divLdbDim);
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))

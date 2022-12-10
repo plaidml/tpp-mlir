@@ -32,9 +32,9 @@ module @predict_function {
     %arg12 = memref.alloc():memref<128x512xbf16>
     
     tpp.identity ins(%arg2 : memref<512xbf16>) out(%arg12 : memref<128x512xbf16>)
-    %relayout_arg0 = memref.alloc():memref<64x256x2xbf16>
-    linalgx.pack %arg0 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg0:(memref<128x256xbf16> memref<64x256x2xbf16>)
-    tpp.vnni_matmul ins(%relayout_arg0 : memref<64x256x2xbf16>, %arg1 : memref<256x512xbf16>) out(%arg12 : memref<128x512xbf16>)
+    %relayout_arg0 = memref.alloc():memref<128x512x2xbf16>
+    linalgx.pack %arg1 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg0:(memref<256x512xbf16> memref<128x512x2xbf16>)
+    tpp.vnni_matmul ins(%arg0 : memref<128x256xbf16>, %relayout_arg0 : memref<128x512x2xbf16>) out(%arg12 : memref<128x512xbf16>)
     tpp.relu out(%arg12 : memref<128x512xbf16>)
     %c1 = arith.constant 256.0: bf16
     %interim1 = memref.alloc(): memref<128x512xbf16>
@@ -43,9 +43,9 @@ module @predict_function {
     check.expect_almost_eq(%interim1, %arg12, %threshold): memref<128x512xbf16>, memref<128x512xbf16>, bf16
  
     tpp.identity ins(%arg4 : memref<1024xbf16>) out(%arg11 : memref<128x1024xbf16>)
-    %relayout_arg12 = memref.alloc():memref<64x512x2xbf16>
-    linalgx.pack %arg12 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg12:(memref<128x512xbf16> memref<64x512x2xbf16>)
-    tpp.vnni_matmul ins(%relayout_arg12 : memref<64x512x2xbf16>, %arg3 : memref<512x1024xbf16>) out(%arg11 : memref<128x1024xbf16>)
+    %relayout_arg12 = memref.alloc():memref<256x1024x2xbf16>
+    linalgx.pack %arg3 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg12:(memref<512x1024xbf16> memref<256x1024x2xbf16>)
+    tpp.vnni_matmul ins(%arg12 : memref<128x512xbf16>, %relayout_arg12 : memref<256x1024x2xbf16>) out(%arg11 : memref<128x1024xbf16>)
     tpp.relu out(%arg11 : memref<128x1024xbf16>)
     %c2 = arith.constant 131360.0: bf16
     %interim2 = memref.alloc(): memref<128x1024xbf16>
@@ -53,9 +53,9 @@ module @predict_function {
     check.expect_almost_eq(%interim2, %arg11, %threshold): memref<128x1024xbf16>, memref<128x1024xbf16>, bf16
 
     tpp.identity ins(%arg6 : memref<2048xbf16>) out(%arg10 : memref<128x2048xbf16>)
-    %relayout_arg11 = memref.alloc():memref<64x1024x2xbf16>
-    linalgx.pack %arg11 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg11:(memref<128x1024xbf16> memref<64x1024x2xbf16>)
-    tpp.vnni_matmul ins(%relayout_arg11 : memref<64x1024x2xbf16>, %arg5 : memref<1024x2048xbf16>) out(%arg10 : memref<128x2048xbf16>)
+    %relayout_arg11 = memref.alloc():memref<512x2048x2xbf16>
+    linalgx.pack %arg5 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg11:(memref<1024x2048xbf16> memref<512x2048x2xbf16>)
+    tpp.vnni_matmul ins(%arg11 : memref<128x1024xbf16>, %relayout_arg11 : memref<512x2048x2xbf16>) out(%arg10 : memref<128x2048xbf16>)
     tpp.relu out(%arg10 : memref<128x2048xbf16>)
     %c3 = arith.constant 1.34533e+08: bf16
     %interim3 = memref.alloc(): memref<128x2048xbf16>
@@ -63,9 +63,9 @@ module @predict_function {
     check.expect_almost_eq(%interim3, %arg10, %threshold): memref<128x2048xbf16>, memref<128x2048xbf16>, bf16
 
     tpp.identity ins(%arg8 : memref<1000xbf16>) out(%arg9 : memref<128x1000xbf16>)
-    %relayout_arg10 = memref.alloc():memref<64x2048x2xbf16>
-    linalgx.pack %arg10 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg10:(memref<128x2048xbf16> memref<64x2048x2xbf16>)
-    tpp.vnni_matmul ins(%relayout_arg10 : memref<64x2048x2xbf16>, %arg7 : memref<2048x1000xbf16>) out(%arg9 : memref<128x1000xbf16>)
+    %relayout_arg10 = memref.alloc():memref<1024x1000x2xbf16>
+    linalgx.pack %arg7 inner_dims_pos = [0] inner_tiles = [2] into %relayout_arg10:(memref<2048x1000xbf16> memref<1024x1000x2xbf16>)
+    tpp.vnni_matmul ins(%arg10 : memref<128x2048xbf16>, %relayout_arg10 : memref<1024x1000x2xbf16>) out(%arg9 : memref<128x1000xbf16>)
     tpp.relu out(%arg9 : memref<128x1000xbf16>)
     %c4 = arith.constant 2.7557e+11: bf16
     %interim4 = memref.alloc(): memref<128x1000xbf16>

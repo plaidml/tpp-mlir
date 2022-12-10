@@ -92,7 +92,13 @@ _mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype dtype, int64_t m,
   libxsmm_blasint k_int = k;
 
   libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_flags;
+  if (dtype == LIBXSMM_DATATYPE_BF16) {
+    // Set VNNI Flag to the first operand if datatype is bf16
+    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
+  } else {
+    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  }
   libxsmm_bitfield l_prefetch_flags = 0;
 
   // See:
@@ -360,7 +366,13 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   libxsmm_blasint stride_b = ldb * k * typeSize;
 
   libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_flags;
+  if (dtype == LIBXSMM_DATATYPE_BF16) {
+    // Set VNNI Flag to the first operand if datatype is bf16
+    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
+  } else {
+    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  }
   libxsmm_bitfield l_prefetch_flags = 0;
   libxsmm_gemm_batch_reduce_config l_brconfig;
 

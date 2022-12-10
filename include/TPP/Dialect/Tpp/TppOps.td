@@ -181,13 +181,13 @@ def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
 
     ```mlir
 
-    tpp.vnni_matmul ins(%1: memref<2x2x2xf32>, %2: memref<2x2xf32>)
+    tpp.vnni_matmul ins(%1: memref<4x4xf32>, %2: memref<2x2x2xf32>)
     		       out(%3: memref<4x2xf32>)
 
     ```
   }];
 
-  let arguments = (ins TppVNNIOperand:$matrixA, TppOperand:$matrixB,
+  let arguments = (ins TppOperand:$matrixA, TppVNNIOperand:$matrixB,
                        TppOperand:$matrixC);
 
   let assemblyFormat = [{
@@ -280,13 +280,13 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
 
     ```mlir
 
-      tpp.vnni_brgemm ins(%1: memref<3x3x4x2xf32>, %2: memref<3x4x5xf32>)
+      tpp.vnni_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x2x5x2xf32>)
                       out(%3: memref<6x5xf32>)
     ```
   }];
 
-  let arguments = (ins TppBRGEMMVNNIMemrefInput:$batchMatrixA,
-                       TppBRGEMMemrefInput:$batchMatrixB,
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
+                       TppBRGEMMVNNIMemrefInput:$batchMatrixB,
                        TppMemRef:$matrixC);
 
   let assemblyFormat = [{
