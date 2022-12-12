@@ -203,6 +203,12 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg2: tensor<64xf32>, %arg3: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+  // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+  // CHECK-DAG: %[[C56:.+]] = arith.constant 56 : index
   %0 = tensor.empty() : tensor<1x56x56x64xf32>
   %1 = tensor.empty() : tensor<1x56x56x64xf32>
   // CHECK: linalg.generic {{.*}}library_call = "tpp.identity"}
@@ -211,13 +217,13 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
   // CHECK-NOT: {{.*}} = linalg.conv_2d_nhwc_hwcf
-  // CHECK: scf.for {{.*}}{
-  // CHECK:   scf.for {{.*}}{
+  // CHECK: scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
+  // CHECK-NEXT:   scf.for %{{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
+  // CHECK-NEXT:    scf.for %{{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
+  // CHECK-NEXT:      scf.for %{{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
   // CHECK:     linalg.batch_reduce_matmul
   %3 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg0 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%2 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK:     linalg.generic {{.*}}library_call = "tpp.relu"}
-  // CHECK:   }
-  // CHECK: }
+  // CHECK:     linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs({{.*}} : tensor<1x1x1x1x1xf32>)
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -236,17 +242,16 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
   // CHECK-NOT: {{.*}} = linalg.conv_2d_nhwc_hwcf
-  // CHECK: scf.for {{.*}}{
-  // CHECK:   scf.for
-  // CHECK:     scf.for {{.*}}{
-  // CHECK:       scf.for
-  // CHECK:         scf.for
+  // CHECK: scf.for {{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
+  // CHECK-NEXT:   scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
+  // CHECK-NEXT:     scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
+  // CHECK-NEXT:       scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
+  // CHECK:               scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
+  // CHECK-NEXT:            scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
+  // CHECK-NEXT:              scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK:           linalg.matmul
-  // CHECK:     }
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%6 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK:     linalg.generic {{.*}}library_call = "tpp.relu"}
-  // CHECK: }
-  // CHECK-NOT: {{.*}} = linalg.conv_2d_nhwc_hwcf
+  // CHECK:     linalg.generic {{.*}}, iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
       %10 = arith.maxf %out, %c0 : f32
@@ -269,7 +274,7 @@ transform.sequence failures(propagate) {
     %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
     // Fuse relu and conv on the three outermost loops
-    %5, %loop:3 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 0, 0] }
+    %5, %loop:5 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 1, 1] }
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     %convs:2 = split_handles %6 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 
