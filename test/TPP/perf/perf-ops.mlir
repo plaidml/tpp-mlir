@@ -65,20 +65,6 @@ func.func @perf_timer(%a: i32, %b: i32, %n: i64) -> i32 {
 
 // -----
 
-// CHECK-LABEL: @perf_timer
-func.func @perf_timer(%a: i32, %b: i32, %n: i64) -> i32 {
-  // CHECK: perf.start_timer
-  %t = perf.start_timer : i64
-  // CHECK: arith.addi
-  %c = arith.addi %a, %b : i32
-  // CHECK: perf.stop_timer
-  perf.stop_timer(%t : i64) : f64
-
-  return %c : i32
-}
-
-// -----
-
 // CHECK-LABEL: @perf_mean
 func.func @perf_mean(%arg0: memref<?xf64>) -> f64 {
   // CHECK: perf.mean
