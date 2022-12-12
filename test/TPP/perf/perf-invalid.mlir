@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -split-input-file -verify-diagnostics
 
 func.func @perf_no_yield(%n: i64) {
-  // expected-error @below {{'perf.yield' op operand types do not match the types returned from the parent BenchOp}}
+  // expected-error @below {{'perf.bench' op failed to verify that result type matches type of dest}}
   %deltas, %val = perf.bench (%n) {
     perf.do_not_opt(%n) : i64
   } -> memref<?xf64>, i64
@@ -11,9 +11,9 @@ func.func @perf_no_yield(%n: i64) {
 // -----
 
 func.func @perf_invalid_yield_types(%a: i32, %b: i32, %n: i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that result type matches type of dest}}
   %deltas, %val = perf.bench (%n) {
     %c = arith.addi %a, %b : i32
-    // expected-error @below {{'perf.yield' op operand types do not match the types returned from the parent BenchOp}}
     perf.yield %c : i32
   } -> memref<?xf64>, i64
   return
@@ -22,9 +22,9 @@ func.func @perf_invalid_yield_types(%a: i32, %b: i32, %n: i64) {
 // -----
 
 func.func @perf_invalid_yield_order(%a: i32, %b: i32, %n: i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that result type matches type of dest}}
   %deltas, %val, %val1 = perf.bench (%n) {
     %c = arith.addi %a, %b : i32
-    // expected-error @below {{'perf.yield' op operand types do not match the types returned from the parent BenchOp}}
     perf.yield %n, %c : i64, i32
   } -> memref<?xf64>, i32, i64
   return

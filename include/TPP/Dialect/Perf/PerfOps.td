@@ -20,7 +20,11 @@ def PerfTimer : AnyTypeOf<[I64]>;
 // BenchOp
 //===----------------------------------------------------------------------===//
 def Perf_BenchOp : Perf_Op<"bench",
-    [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">]> {
+    [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
+     RangedTypesMatchWith<"result type matches type of dest",
+                          "$_self",
+                          "bodyResults",
+                          "getYieldOp().getOperandTypes()">]> {
   let summary = "Benchmark the enclosed code.";
   let description = [{
     The `perf.bench` operation generates benchmarking code
@@ -55,6 +59,10 @@ def Perf_BenchOp : Perf_Op<"bench",
     $region attr-dict
     `->` type($deltas) (`,` type($bodyResults)^)?
   }];
+
+  let extraClassDeclaration = [{
+    YieldOp getYieldOp();
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,8 +89,6 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
 
   let assemblyFormat =
     [{  attr-dict ($results^ `:` type($results))? }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -245,7 +251,7 @@ def Perf_DoNotOptOp : Perf_Op<"do_not_opt", [ConditionallySpeculatable]> {
 
   let extraClassDeclaration = [{
     ::mlir::Speculation::Speculatability getSpeculatability() {
-    return ::mlir::Speculation::NotSpeculatable;
+      return ::mlir::Speculation::NotSpeculatable;
     }
   }];
 }

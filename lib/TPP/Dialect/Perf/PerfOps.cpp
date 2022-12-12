@@ -32,19 +32,6 @@ LogicalResult StopTimerOp::verify() {
   return success();
 }
 
-LogicalResult YieldOp::verify() {
-  // Get the parent operation to check its return values.
-  auto benchOp = (*this)->getParentOfType<BenchOp>();
-  if (!benchOp)
-    return emitOpError("invalid parent operation");
-
-  // Check that body results match the yield operands.
-  auto types =
-      llvm::map_range(benchOp.getBodyResults(),
-                      [](const OpResult &result) { return result.getType(); });
-  if (getOperandTypes() != types)
-    return emitOpError("operand types do not match the types returned from "
-                       "the parent BenchOp");
-
-  return success();
+YieldOp BenchOp::getYieldOp() {
+  return cast<perf::YieldOp>(getRegion().front().getTerminator());
 }
