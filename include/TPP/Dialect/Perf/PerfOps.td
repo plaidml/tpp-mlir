@@ -1,4 +1,4 @@
-//===- TppOps.td - Tpp dialect ops -------------------------*- tablegen -*-===//
+//===- PerfOps.td - Perf dialect ops -----------------------*- tablegen -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -31,23 +31,15 @@ def Perf_BenchOp : Perf_Op<"bench",
     The operation allocates memory to store the results.
     The lifetime of the returned results has to be managed by the user.
 
+    If no extra return values are defined, then the yield terminator may be
+    left out in the custom syntax and the builders will insert one implicitly.
+
     Example:
 
     ```mlir
 
     %deltas = perf.bench (%n) {
       ... // ops under measurement
-    } -> memref<?xf64>
-
-    ```
-
-    Optionally, a yield op can be added:
-
-    ```mlir
-
-    %deltas = perf.bench (%n) {
-      ... // ops under measurement
-      perf.yield
     } -> memref<?xf64>
 
     ```

@@ -20,17 +20,22 @@ namespace mlir {
 namespace perf {
 namespace {
 
-// TODO: bufferization interface for check ops
 struct DoNotOptLayoutInterface
     : public BufferizableOpInterface::ExternalModel<DoNotOptLayoutInterface,
                                                     perf::DoNotOptOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
+    // The operation should only prevent some compiler optimizations.
+    // It is assumed that there are no memory side effects to avoid potential
+    // out-of-place bufferization.
     return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
+    // The operation should only prevent some compiler optimizations.
+    // It is assumed that there are no memory side effects to avoid potential
+    // out-of-place bufferization.
     return false;
   }
 
@@ -58,7 +63,7 @@ struct DoNotOptLayoutInterface
     if (failed(srcBuffer))
       return failure();
 
-    // Swap the current op with a new one using buffered operand
+    // Swap the current op with a new one using buffered operand.
     rewriter.replaceOpWithNewOp<perf::DoNotOptOp>(doNotOptOp, *srcBuffer);
     return success();
   }

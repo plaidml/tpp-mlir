@@ -20,6 +20,7 @@ LogicalResult StopTimerOp::verify() {
   if (!timerSrc || !isa<StartTimerOp>(timerSrc))
     return emitOpError("invalid timer input");
 
+  // Any timer can only be stopped once. It is unusable afterwards.
   int numStopTimers = 0;
   for (auto user : timerSrc->getUsers()) {
     if (isa<StopTimerOp>(*user))
@@ -32,12 +33,12 @@ LogicalResult StopTimerOp::verify() {
 }
 
 LogicalResult YieldOp::verify() {
-  // Get the parent operation to check its return values
+  // Get the parent operation to check its return values.
   auto benchOp = (*this)->getParentOfType<BenchOp>();
   if (!benchOp)
     return emitOpError("invalid parent operation");
 
-  // Check that body results match the yield operands
+  // Check that body results match the yield operands.
   auto types =
       llvm::map_range(benchOp.getBodyResults(),
                       [](const OpResult &result) { return result.getType(); });
