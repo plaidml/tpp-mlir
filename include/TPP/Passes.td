@@ -79,15 +79,6 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def ConvertCheckToFunc : Pass<"convert-check-to-func", "ModuleOp"> {
-  let summary = "Convert check to func";
-  let constructor = "mlir::tpp::createConvertCheckToFuncPass()";
-  let description = [{
-    Convert check operations to function calls.
-  }];
-  let dependentDialects = ["func::FuncDialect"];
-}
-
 def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
   let summary = "Convert check to loops";
   let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";

@@ -18,7 +18,6 @@ add_mlir_library(MLIRTPP
     ConvertTppToLoops.cpp
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
-    ConvertCheckToFunc.cpp
     ConvertCheckToLoops.cpp
 
     ADDITIONAL_HEADER_DIRS
