@@ -32,6 +32,21 @@ func.func @perf_invalid_yield_order(%a: i32, %b: i32, %n: i64) {
 
 // -----
 
+func.func @perf_invalid_yield_parent(%a: i32) -> i32 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %out = scf.for %it = %c0 to %c4 step %c1 iter_args(%arg0 = %a) -> i32 {
+    %val = arith.index_cast %it : index to i32
+    %res = arith.addi %arg0, %val : i32
+    // expected-error @below {{'perf.yield' op expects parent op 'perf.bench'}}
+    perf.yield %res : i32
+  }
+  return %out : i32
+}
+
+// -----
+
 func.func @perf_timer_multi_stop() {
   %t = perf.start_timer : i64
   // expected-error @below {{'perf.stop_timer' op timer stopped multiple times}}
