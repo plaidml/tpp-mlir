@@ -11,13 +11,14 @@ func.func @perf_matmul_bench(%A: tensor<4x8xf32>,
     perf.do_not_opt(%D) : tensor<4x4xf32>
   } -> memref<?xf64>
 
+  memref.dealloc %deltas : memref<?xf64>
   return
 }
 
 // -----
 
-// CHECK-LABEL: @perf_yield
-func.func @perf_yield(%a: i32, %b: i32, %n: i64) {
+// CHECK-LABEL: @perf_yield_empty
+func.func @perf_yield_empty(%a: i32, %b: i32, %n: i64) {
   // CHECK: perf.bench
   %deltas = perf.bench (%n) {
     // CHECK: arith.addi
@@ -27,7 +28,25 @@ func.func @perf_yield(%a: i32, %b: i32, %n: i64) {
     perf.yield
   } -> memref<?xf64>
 
+  memref.dealloc %deltas : memref<?xf64>
   return
+}
+
+// -----
+
+// CHECK-LABEL: @perf_yield_result
+func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
+  // CHECK: %[[deltas:.*]], %[[out:.*]] = perf.bench
+  %deltas, %out = perf.bench (%n) {
+    // CHECK: %[[c:.*]] = arith.addi
+    %c = arith.addi %a, %b : i32
+    // CHECK: perf.yield %[[c]]
+    perf.yield %c : i32
+  } -> memref<?xf64>, i32
+
+  memref.dealloc %deltas : memref<?xf64>
+  // CHECK: return %[[out]]
+  return %out : i32
 }
 
 // -----
@@ -103,5 +122,6 @@ func.func @perf_matmul_loops(%A: tensor<4x8xf32>,
   // CHECK: perf.stdev
   %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
 
+  memref.dealloc %deltas : memref<?xf64>
   return
 }
