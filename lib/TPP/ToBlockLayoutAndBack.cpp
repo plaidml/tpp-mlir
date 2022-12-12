@@ -48,7 +48,7 @@ static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
       builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
   return builder
       .create<linalgx::PackOp>(loc, input, output, innerDimsPos, tiles,
-                               /*paddingValue=*/llvm::None, outerDimsPerm)
+                               /*paddingValue=*/std::nullopt, outerDimsPerm)
       .getResults()[0];
 }
 
