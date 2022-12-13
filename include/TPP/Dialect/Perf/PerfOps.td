@@ -16,6 +16,71 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 
 //===----------------------------------------------------------------------===//
+// StartTimerOp
+//===----------------------------------------------------------------------===//
+
+def Perf_StartTimerOp : Perf_Op<"start_timer", []> {
+  let summary = "Start a timer.";
+  let description = [{
+    The `perf.start_timer` operation creates a new timer
+    which begins time measurement.
+
+    See `perf.stop_timer` for timer termination.
+
+    Example:
+
+    ```mlir
+
+    %timer = perf.start_timer : !perf.timer
+    ... // ops under measurement
+
+    ```
+  }];
+
+  let arguments = (ins);
+  let results = (outs Perf_TimerType:$timer);
+
+  let assemblyFormat = [{
+    attr-dict `:` type($timer)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// StopTimerOp
+//===----------------------------------------------------------------------===//
+
+def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
+  let summary = "Stops a timer.";
+  let description = [{
+    The `perf.stop_timer` operation stops the specified
+    timer and returns elapsed time delta.
+    Once a timer is stopped, it cannot be used again.
+
+    See `perf.start_timer` for timer creation.
+
+    Example:
+
+    ```mlir
+
+    %timer = perf.start_timer : !perf.timer
+    ... // ops under measurement
+    %delta = perf.stop_timer(%timer : !perf.timer) : f64
+
+    ```
+  }];
+
+  let arguments = (ins Perf_TimerType:$timer);
+  let results = (outs F64:$delta);
+
+  let assemblyFormat = [{
+    `(` $timer `:` type($timer) `)` attr-dict
+    `:` type($delta)
+  }];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // BenchOp
 //===----------------------------------------------------------------------===//
 def Perf_BenchOp : Perf_Op<"bench",
@@ -41,7 +106,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     If no extra return values are defined, then the yield terminator may be
     left out in the custom syntax and the builders will insert one implicitly.
 
-    Simple benchmarking example:
+    For example - a simple benchmark:
 
     ```mlir
     %deltas = memref.alloc(%size) : memref<?xf64>
@@ -57,7 +122,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     The types of the arguments and the results must match, and the benchmarking
     region must be terminated with a matching `perf.yield` operation.
 
-    Example of a benchmark with an output:
+    An example of a benchmark with an output result:
 
     ```mlir
     %sum = perf.bench (%n, %deltas : memref<?xf64>) args(%val : i32) {
@@ -141,70 +206,6 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
 
   let assemblyFormat =
     [{  attr-dict ($results^ `:` type($results))? }];
-}
-
-//===----------------------------------------------------------------------===//
-// StartTimerOp
-//===----------------------------------------------------------------------===//
-
-def Perf_StartTimerOp : Perf_Op<"start_timer", []> {
-  let summary = "Start a timer.";
-  let description = [{
-    The `perf.start_timer` operation creates a new timer
-    which begins time measurement.
-
-    See `perf.stop_timer` for timer termination.
-
-    Example:
-
-    ```mlir
-
-    %timer = perf.start_timer : i64
-    ... // ops under measurement
-
-    ```
-  }];
-
-  let arguments = (ins);
-  let results = (outs Perf_TimerType:$timer);
-
-  let assemblyFormat = [{
-    attr-dict `:` type($timer)
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// StopTimerOp
-//===----------------------------------------------------------------------===//
-
-def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
-  let summary = "Stops a timer.";
-  let description = [{
-    The `perf.stop_timer` operation stops the specified
-    timer and returns elapsed time delta.
-
-    See `perf.start_timer` for timer creation.
-
-    Example:
-
-    ```mlir
-
-    %timer = perf.start_timer : i64
-    ... // ops under measurement
-    %delta = perf.stop_timer(%timer : i64) : f64
-
-    ```
-  }];
-
-  let arguments = (ins Perf_TimerType:$timer);
-  let results = (outs F64:$delta);
-
-  let assemblyFormat = [{
-    `(` $timer `:` type($timer) `)` attr-dict
-    `:` type($delta)
-  }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
