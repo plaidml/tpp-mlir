@@ -35,13 +35,16 @@ func.func @perf_stdev(%arg0: memref<?xf64>, %mean: f64) -> f64 {
 /// CHECK-LABEL: @perf_matmul_bench
 func.func @perf_matmul_bench(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) {
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+
   // CHECK: perf.bench
-  %deltas = perf.bench (%n) {
+  perf.bench (%n, %deltas : memref<?xf64>) {
     // CHECK: linalg.matmul
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
     // CHECK: perf.do_not_opt
     perf.do_not_opt(%D) : tensor<4x4xf32>
-  } -> memref<?xf64>
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -82,14 +85,17 @@ func.func @perf_matmul_loops(%A: tensor<4x8xf32>,
 
 // CHECK-LABEL: @perf_yield_empty
 func.func @perf_yield_empty(%a: i32, %b: i32, %n: i64) {
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+
   // CHECK: perf.bench
-  %deltas = perf.bench (%n) {
+  perf.bench (%n, %deltas : memref<?xf64>) {
     // CHECK: arith.addi
     %c = arith.addi %a, %b : i32
     // CHECK: perf.do_not_opt
     perf.do_not_opt(%c) : i32
     perf.yield
-  } -> memref<?xf64>
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -99,13 +105,17 @@ func.func @perf_yield_empty(%a: i32, %b: i32, %n: i64) {
 
 // CHECK-LABEL: @perf_yield_result
 func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
-  // CHECK: %[[deltas:.*]], %[[out:.*]] = perf.bench
-  %deltas, %out = perf.bench (%n) {
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+  %bench_res = arith.constant 0 : i32
+
+  // CHECK: %[[out:.*]] = perf.bench
+  %out = perf.bench (%n, %deltas : memref<?xf64>) args(%bench_res : i32) {
     // CHECK: %[[c:.*]] = arith.addi
     %c = arith.addi %a, %b : i32
     // CHECK: perf.yield %[[c]]
     perf.yield %c : i32
-  } -> memref<?xf64>, i32
+  } -> i32
 
   memref.dealloc %deltas : memref<?xf64>
   // CHECK: return %[[out]]

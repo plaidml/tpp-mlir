@@ -21,7 +21,11 @@ def PerfTimer : AnyTypeOf<[I64]>;
 //===----------------------------------------------------------------------===//
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
-     RangedTypesMatchWith<"result type matches type of dest",
+     RangedTypesMatchWith<"result types match types of args",
+                          "args",
+                          "bodyResults",
+                          "$_self">,
+     RangedTypesMatchWith<"result types match types of yield",
                           "$_self",
                           "bodyResults",
                           "getYieldOp().getOperandTypes()">]> {
@@ -29,35 +33,84 @@ def Perf_BenchOp : Perf_Op<"bench",
   let description = [{
     The `perf.bench` operation generates benchmarking code
     around the enclosed region.
-    The performance results are gathered over the specified
-    number of iterations.
 
-    The operation allocates memory to store the results.
-    The lifetime of the returned results has to be managed by the user.
+    The performance results are gathered over the specified
+    number of iterations and stored in the user provided memory.
+    The operation assumes that the provided memory space is large
+    enough to store results from all benchmarking iterations.
 
     If no extra return values are defined, then the yield terminator may be
     left out in the custom syntax and the builders will insert one implicitly.
 
-    Example:
+    Simple benchmarking example:
 
     ```mlir
+    %deltas = memref.alloc(%size) : memref<?xf64>
+    perf.bench (%n, %deltas : memref<?xf64>) {
+      ... // body - ops under measurement
+    }
+    ```
 
-    %deltas = perf.bench (%n) {
-      ... // ops under measurement
-    } -> memref<?xf64>
+    `perf.bench` also accepts optional arguments. The initial argument values
+    are bound to the benchmarked region and the their values are carried over
+    between benchmarking iterations. On the last iteration, their final values
+    are passed to the `perf.bench` results.
+    The types of the arguments and the results must match, and the benchmarking
+    region must be terminated with a matching `perf.yield` operation.
 
+    Example of a benchmark with an output:
+
+    ```mlir
+    %sum = perf.bench (%n, %deltas : memref<?xf64>) args(%val : i32) {
+      %sum_next = arith.addi %val, %cst : i32
+      perf.yield %sum_next : i32
+    } -> i32
+    memref.store %sum, %buff[] : memref<i32>
+    ```
+
+    `perf.bench` is essentially a utility operation that generates
+    a benchmarking loop.
+    For example, the following input:
+    ```mlir
+    %res, ... = perf.bench (%n, %deltas : memref<?xf64>) args(%x, ... : ...) {
+      ... // body - ops under measurement
+
+      // Yield current iteration values to the next iteration args (%x, ...)
+      // or to the bench op results (%res, ...) if it is the final iteration.
+      perf.yield %x, ...
+    } -> type(%res), ...
+    ```
+    is materialized as:
+    ```mlir
+    %res, ... = loop %iv from 0 to %n step 1
+        iter_args(%x, ...) -> type(%res), ... {
+      // Begin time measurement.
+      start_timer
+      ... // body - ops under measurement
+      // Capture elapsed time.
+      %delta = stop_timer
+
+      // Store measured time delta.
+      store %delta, %deltas[%iv]
+
+      // Yield current iteration values to the next iteration args (%x, ...)
+      // or to the loop results (%res, ...) if it is the final iteration.
+      yield %x, ...
+    }
     ```
   }];
 
-  let arguments = (ins I64:$numIters);
-  let results = (outs RankedOrUnrankedMemRefOf<[F64]>:$deltas,
-            Variadic<AnyType>:$bodyResults);
+  let arguments = (ins I64:$numIters,
+                       RankedOrUnrankedMemRefOf<[F64]>:$deltas,
+                       Variadic<AnyType>:$args);
+  let results = (outs Variadic<AnyType>:$bodyResults);
   let regions = (region SizedRegion<1>:$region);
 
   let assemblyFormat = [{
-    `(` $numIters `)`
+    `(` $numIters `,` $deltas `:` type($deltas) `)`
+    (`args` `(` $args^ `:` type($args) `)`)?
     $region attr-dict
-    `->` type($deltas) (`,` type($bodyResults)^)?
+    (`->` type($bodyResults)^)?
   }];
 
   let extraClassDeclaration = [{
