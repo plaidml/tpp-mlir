@@ -24,17 +24,45 @@ def VNNI_Dialect : Dialect {
   }];
 }
 
-def VNNI_MatmulOp : Op<VNNI_Dialect, "matmul", [VNNI_MatmulInterface]> {
-  let summary = [{Matmul operation with VNNI format of the first operand with block
+
+class VNNI_Op<string mnemonic, list<Trait> traits = [VNNI_MatmulInterface]> :
+        Op<VNNI_Dialect, mnemonic, traits>;
+
+def VNNI_MatmulOp : VNNI_Op<"matmul"> {
+  let summary = [{Matmul operation with VNNI format of the second operand with block
                   size specified.}];
   let description = [{
-    Matmul Operation with VNNI format of the first operand.
+    Matmul Operation with VNNI format of the second operand.
     For example, the operation performed is
-    C[i][j] += A[i/2][k][2]* B[k][j] with the first operand A's layout being
+    C[i][j] += A[i][k]* B[k/2][j][2] with the second operand B's layout being
     blocked by size 2.
 
     ```mlir
-    vnni.matmul ins(%arg0: memref<3x4x2xbf16>, %arg1: memref<4x6xbf16>) out(%arg2: memref<6x6xbf16>)
+    vnni.matmul ins(%arg0: memref<6x4xbf16>, %arg1: memref<2x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
+    ```
+  }];
+
+  let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
+  let results = (outs Variadic<VNNIOperand>:$dest);
+  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins "Value":$matrixA, "Value":$matrixB, "Value":$matrixC)>
+  ];
+
+}
+
+def VNNI_BRGemmOp : VNNI_Op<"brgemm"> {
+  let summary = [{BRGemm operation with VNNI format of the second operand with block
+                  size specified.}];
+  let description = [{
+    BRGemm Operation with VNNI format of the second operand.
+    For example, the operation performed is
+    C[i][j] = (A[n][i][k]* B[n][k/2][j][2]) with the second operand B's layout being
+    blocked by size 2.
+
+    ```mlir
+    vnni.brgemm ins(%arg0: memref<3x6x4xbf16>, %arg1: memref<3x2x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
     ```
   }];
 

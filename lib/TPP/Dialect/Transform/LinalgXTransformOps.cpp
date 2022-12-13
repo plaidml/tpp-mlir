@@ -10,6 +10,7 @@
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
+#include "iostream"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,7 +24,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
-
 using namespace mlir;
 using namespace mlir::transform;
 
@@ -68,6 +68,13 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
           packedOp =
               mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
         }
+      })
+      .Case([&](linalg::BatchReduceMatmulOp brgemmOp) {
+        auto useVnniFlag = getUseVnni();
+        assert(useVnniFlag &&
+               "No form of packing other than VNNI supported for BRGEMM");
+        packedOp = mlir::linalgx::packVNNIBRGemmOp(rewriter, brgemmOp,
+                                                   blockingFactors);
       })
       .Default([&](Operation *op) { packedOp = failure(); });
   if (succeeded(packedOp)) {

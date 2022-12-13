@@ -1,5 +1,3 @@
-add_subdirectory(TransformOps)
-
 add_mlir_dialect_library(TPPVNNIDialect
     # Ops and dialect
     BufferizableOpInterfaceImpl.cpp

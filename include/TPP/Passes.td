@@ -88,6 +88,14 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
+def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "ModuleOp"> {
+  let summary = "Convert VNNI to TPP";
+  let constructor = "mlir::tpp::createConvertVNNIToTppPass()";
+  let description = [{
+    Convert VNNI dialect to TPP dialect.
+  }];
+}
+
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
