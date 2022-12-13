@@ -22,7 +22,7 @@ namespace {
 
 struct DoNotOptLayoutInterface
     : public BufferizableOpInterface::ExternalModel<DoNotOptLayoutInterface,
-                                                    perf::DoNotOptOp> {
+                                                    perf::Sink> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // The operation should only prevent some compiler optimizations.
@@ -56,15 +56,14 @@ struct DoNotOptLayoutInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto doNotOptOp = cast<perf::DoNotOptOp>(op);
+    auto Sink = cast<perf::Sink>(op);
 
-    FailureOr<Value> srcBuffer =
-        getBuffer(rewriter, doNotOptOp.getInput(), options);
+    FailureOr<Value> srcBuffer = getBuffer(rewriter, Sink.getInput(), options);
     if (failed(srcBuffer))
       return failure();
 
     // Swap the current op with a new one using buffered operand.
-    rewriter.replaceOpWithNewOp<perf::DoNotOptOp>(doNotOptOp, *srcBuffer);
+    rewriter.replaceOpWithNewOp<perf::Sink>(Sink, *srcBuffer);
     return success();
   }
 };
@@ -76,6 +75,6 @@ struct DoNotOptLayoutInterface
 void mlir::perf::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, perf::PerfDialect *dialect) {
-    DoNotOptOp::attachInterface<perf::DoNotOptLayoutInterface>(*ctx);
+    Sink::attachInterface<perf::DoNotOptLayoutInterface>(*ctx);
   });
 }

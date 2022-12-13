@@ -273,13 +273,13 @@ def Perf_StdevOp : Perf_Op<"stdev", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// DoNotOptOp
+// Sink
 //===----------------------------------------------------------------------===//
 
-def Perf_DoNotOptOp : Perf_Op<"do_not_opt", [ConditionallySpeculatable]> {
+def Perf_Sink : Perf_Op<"sink", [ConditionallySpeculatable]> {
   let summary = "Prevent removal of unused values.";
   let description = [{
-    The `perf.do_not_opt` operation acts as a dummy, not speculatable
+    The `perf.sink` operation acts as a dummy, not speculatable
     operation that prevents removal of unused values and their defining ops
     by optimization passes.
 
@@ -289,7 +289,7 @@ def Perf_DoNotOptOp : Perf_Op<"do_not_opt", [ConditionallySpeculatable]> {
 
     %deltas = perf.bench (%n) {
       %a = arith.addi %b, %c : i64
-      perf.do_not_opt(%a) : i64 // make sure that 'addi' is not optimized away
+      perf.sink(%a) : i64 // make sure that 'addi' is not optimized away
     } -> memref<?xf64>
 
     ```

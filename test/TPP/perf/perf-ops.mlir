@@ -42,8 +42,8 @@ func.func @perf_matmul_bench(%A: tensor<4x8xf32>,
   perf.bench (%n, %deltas : memref<?xf64>) {
     // CHECK: linalg.matmul
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
-    // CHECK: perf.do_not_opt
-    perf.do_not_opt(%D) : tensor<4x4xf32>
+    // CHECK: perf.sink
+    perf.sink(%D) : tensor<4x4xf32>
   }
 
   memref.dealloc %deltas : memref<?xf64>
@@ -65,8 +65,8 @@ func.func @perf_matmul_loops(%A: tensor<4x8xf32>,
     %t = perf.start_timer : !perf.timer
     // CHECK: linalg.matmul
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
-    // CHECK: perf.do_not_opt
-    perf.do_not_opt(%D) : tensor<4x4xf32>
+    // CHECK: perf.sink
+    perf.sink(%D) : tensor<4x4xf32>
     // CHECK: perf.stop_timer
     %del = perf.stop_timer(%t : !perf.timer) : f64
     memref.store %del, %deltas[%arg0] : memref<?xf64>
@@ -92,8 +92,8 @@ func.func @perf_yield_empty(%a: i32, %b: i32, %n: i64) {
   perf.bench (%n, %deltas : memref<?xf64>) {
     // CHECK: arith.addi
     %c = arith.addi %a, %b : i32
-    // CHECK: perf.do_not_opt
-    perf.do_not_opt(%c) : i32
+    // CHECK: perf.sink
+    perf.sink(%c) : i32
     perf.yield
   }
 

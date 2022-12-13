@@ -7,7 +7,7 @@ func.func @perf_no_outs(%n: i64) {
 
   // expected-error @below {{'perf.bench' op failed to verify that result types match types of args}}
   %val = perf.bench (%n, %deltas : memref<?xf64>) {
-    perf.do_not_opt(%n) : i64
+    perf.sink(%n) : i64
   } -> i64
 
   memref.dealloc %deltas : memref<?xf64>
@@ -58,7 +58,7 @@ func.func @perf_no_yield(%n: i64) {
 
   // expected-error @below {{'perf.bench' op failed to verify that result types match types of yield}}
   %val = perf.bench (%n, %deltas : memref<?xf64>) args(%out : i64) {
-    perf.do_not_opt(%n) : i64
+    perf.sink(%n) : i64
   } -> i64
 
   memref.dealloc %deltas : memref<?xf64>
