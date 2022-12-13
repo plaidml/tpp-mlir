@@ -9,6 +9,7 @@
 #ifndef TPP_DIALECT_PERF_PERFOPS_H
 #define TPP_DIALECT_PERF_PERFOPS_H
 
+#include "TPP/Dialect/Perf/PerfTypes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

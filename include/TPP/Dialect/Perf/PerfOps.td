@@ -9,12 +9,11 @@
 #ifndef TPP_PERF_OPS
 #define TPP_PERF_OPS
 
-include "PerfDialect.td"
+include "TPP/Dialect/Perf/PerfDialect.td"
+include "TPP/Dialect/Perf/PerfTypes.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
-
-def PerfTimer : AnyTypeOf<[I64]>;
 
 //===----------------------------------------------------------------------===//
 // BenchOp
@@ -167,7 +166,7 @@ def Perf_StartTimerOp : Perf_Op<"start_timer", []> {
   }];
 
   let arguments = (ins);
-  let results = (outs PerfTimer:$timer);
+  let results = (outs Perf_TimerType:$timer);
 
   let assemblyFormat = [{
     attr-dict `:` type($timer)
@@ -197,7 +196,7 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
     ```
   }];
 
-  let arguments = (ins PerfTimer:$timer);
+  let arguments = (ins Perf_TimerType:$timer);
   let results = (outs F64:$delta);
 
   let assemblyFormat = [{

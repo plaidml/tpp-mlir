@@ -21,6 +21,10 @@ void PerfDialect::initialize() {
 #define GET_OP_LIST
 #include "TPP/Dialect/Perf/PerfOps.cpp.inc"
       >();
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "TPP/Dialect/Perf/PerfOpsTypes.cpp.inc"
+      >();
 }
 
 #include "TPP/Dialect/Perf/PerfOpsDialect.cpp.inc"

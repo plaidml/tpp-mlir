@@ -118,18 +118,18 @@ func.func @perf_invalid_yield_parent(%a: i32) -> i32 {
 // -----
 
 func.func @perf_timer_multi_stop() {
-  %t = perf.start_timer : i64
+  %t = perf.start_timer : !perf.timer
   // expected-error @below {{'perf.stop_timer' op timer stopped multiple times}}
-  %del = perf.stop_timer(%t : i64) : f64
-  %del1 = perf.stop_timer(%t : i64) : f64
+  %del = perf.stop_timer(%t : !perf.timer) : f64
+  %del1 = perf.stop_timer(%t : !perf.timer) : f64
   return
 }
 
 // -----
 
-func.func @perf_invalid_timer(%n: i64) {
+func.func @perf_invalid_timer(%n: !perf.timer) {
   // expected-error @below {{'perf.stop_timer' op invalid timer input}}
-  %del = perf.stop_timer(%n : i64) : f64
+  %del = perf.stop_timer(%n : !perf.timer) : f64
   return
 }
 
@@ -137,7 +137,7 @@ func.func @perf_invalid_timer(%n: i64) {
 
 func.func @perf_invalid_timer_1() {
   %c0 = arith.constant 0 : i64
-  // expected-error @below {{'perf.stop_timer' op invalid timer input}}
+  // expected-error @below {{custom op 'perf.stop_timer' invalid kind of type specified}}
   %del = perf.stop_timer(%c0 : i64) : f64
   return
 }

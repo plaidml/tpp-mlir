@@ -8,9 +8,14 @@
 
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "mlir/IR/DialectImplementation.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Perf/PerfOps.cpp.inc"
+
+#define GET_TYPEDEF_CLASSES
+#include "TPP/Dialect/Perf/PerfOpsTypes.cpp.inc"
 
 using namespace mlir;
 using namespace mlir::perf;
