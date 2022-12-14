@@ -56,14 +56,14 @@ struct DoNotOptLayoutInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto Sink = cast<perf::Sink>(op);
+    auto sink = cast<perf::Sink>(op);
 
-    FailureOr<Value> srcBuffer = getBuffer(rewriter, Sink.getInput(), options);
+    FailureOr<Value> srcBuffer = getBuffer(rewriter, sink.getInput(), options);
     if (failed(srcBuffer))
       return failure();
 
     // Swap the current op with a new one using buffered operand.
-    rewriter.replaceOpWithNewOp<perf::Sink>(Sink, *srcBuffer);
+    rewriter.replaceOpWithNewOp<perf::Sink>(sink, *srcBuffer);
     return success();
   }
 };
