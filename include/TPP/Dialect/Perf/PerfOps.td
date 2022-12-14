@@ -286,10 +286,10 @@ def Perf_StdevOp : Perf_Op<"stdev", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// Sink
+// SinkOp
 //===----------------------------------------------------------------------===//
 
-def Perf_Sink : Perf_Op<"sink", [ConditionallySpeculatable]> {
+def Perf_SinkOp : Perf_Op<"sink", [ConditionallySpeculatable]> {
   let summary = "Prevent removal of unused values.";
   let description = [{
     The `perf.sink` operation acts as a dummy, not speculatable

@@ -20,9 +20,9 @@ namespace mlir {
 namespace perf {
 namespace {
 
-struct DoNotOptLayoutInterface
-    : public BufferizableOpInterface::ExternalModel<DoNotOptLayoutInterface,
-                                                    perf::Sink> {
+struct SinkLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<SinkLayoutInterface,
+                                                    perf::SinkOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // The operation should only prevent some compiler optimizations.
@@ -56,14 +56,14 @@ struct DoNotOptLayoutInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto sink = cast<perf::Sink>(op);
+    auto sink = cast<perf::SinkOp>(op);
 
     FailureOr<Value> srcBuffer = getBuffer(rewriter, sink.getInput(), options);
     if (failed(srcBuffer))
       return failure();
 
     // Swap the current op with a new one using buffered operand.
-    rewriter.replaceOpWithNewOp<perf::Sink>(sink, *srcBuffer);
+    rewriter.replaceOpWithNewOp<perf::SinkOp>(sink, *srcBuffer);
     return success();
   }
 };
@@ -75,6 +75,6 @@ struct DoNotOptLayoutInterface
 void mlir::perf::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, perf::PerfDialect *dialect) {
-    Sink::attachInterface<perf::DoNotOptLayoutInterface>(*ctx);
+    SinkOp::attachInterface<perf::SinkLayoutInterface>(*ctx);
   });
 }
