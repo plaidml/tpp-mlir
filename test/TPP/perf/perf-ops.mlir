@@ -129,7 +129,7 @@ func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
 
 // -----
 
-// An example of perf dialect usage
+// An example of perf dialect usage.
 // CHECK-LABEL: @perf_example
 func.func @perf_example(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
@@ -164,7 +164,7 @@ func.func @perf_example(%A: tensor<4x8xf32>,
 
 // -----
 
-// Intended lowering of the perf dialect based on the above example
+// Intended lowering of the perf dialect based on the above example.
 func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
 func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
 func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
