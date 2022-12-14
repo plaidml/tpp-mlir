@@ -23,15 +23,18 @@ struct ConvertMatmulOp : public OpRewritePattern<vnni::MatmulOp> {
 
   LogicalResult matchAndRewrite(vnni::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (matmulOp.hasBufferSemantics() && !matmulOp.hasDynamicShape()) {
-      rewriter.replaceOpWithNewOp<tpp::VNNIMatmulOp>(
-          matmulOp, matmulOp.getMatrixA(), matmulOp.getMatrixB(),
-          matmulOp.getMatrixC());
-      return success();
+    if (!matmulOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Cannot lower vnni matmul to tpp, op not bufferized");
     }
-    return rewriter.notifyMatchFailure(matmulOp,
-                                       "Cannot lower vnni matmul to tpp");
-    ;
+    if (matmulOp.hasDynamicShape()) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Cannot lower vnni matmul to tpp, op has dynamic shape");
+    }
+    rewriter.replaceOpWithNewOp<tpp::VNNIMatmulOp>(
+        matmulOp, matmulOp.getMatrixA(), matmulOp.getMatrixB(),
+        matmulOp.getMatrixC());
+    return success();
   }
 };
 
@@ -41,15 +44,18 @@ struct ConvertBRGemmOp : public OpRewritePattern<vnni::BRGemmOp> {
   LogicalResult matchAndRewrite(vnni::BRGemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (brgemmOp.hasBufferSemantics() && !brgemmOp.hasDynamicShape()) {
-      rewriter.replaceOpWithNewOp<tpp::VNNIBrgemmOp>(
-          brgemmOp, brgemmOp.getMatrixA(), brgemmOp.getMatrixB(),
-          brgemmOp.getMatrixC());
-      return success();
+    if (!brgemmOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Cannot lower vnni brgemm to tpp, op not bufferized");
     }
-    return rewriter.notifyMatchFailure(brgemmOp,
-                                       "Cannot lower vnni brgemm to tpp");
-    ;
+    if (brgemmOp.hasDynamicShape()) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Cannot lower vnni brgemm to tpp, op has dynamic shape");
+    }
+    rewriter.replaceOpWithNewOp<tpp::VNNIBrgemmOp>(
+        brgemmOp, brgemmOp.getMatrixA(), brgemmOp.getMatrixB(),
+        brgemmOp.getMatrixC());
+    return success();
   }
 };
 
