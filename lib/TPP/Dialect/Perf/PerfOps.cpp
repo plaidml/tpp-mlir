@@ -20,6 +20,10 @@
 using namespace mlir;
 using namespace mlir::perf;
 
+//===----------------------------------------------------------------------===//
+// StopTimerOp
+//===----------------------------------------------------------------------===//
+
 LogicalResult StopTimerOp::verify() {
   auto timerSrc = getTimer().getDefiningOp();
   if (!timerSrc || !isa<StartTimerOp>(timerSrc))
@@ -35,6 +39,33 @@ LogicalResult StopTimerOp::verify() {
     return emitOpError("timer stopped multiple times");
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BenchOp
+//===----------------------------------------------------------------------===//
+
+void BenchOp::build(OpBuilder &builder, OperationState &result, Value numIters,
+                    Value deltas, ValueRange args) {
+  result.addOperands({numIters, deltas});
+  result.addOperands(args);
+
+  // Results have to match the input arguments
+  for (Value v : args)
+    result.addTypes(v.getType());
+
+  Region *bodyRegion = result.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+
+  // Create the default terminator if the arguments are not provided.
+  // Otherwise, leave this to the caller because we don't know which values to
+  // return from the body.
+  if (args.empty()) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&bodyBlock);
+    builder.create<perf::YieldOp>(result.location);
+  }
 }
 
 YieldOp BenchOp::getYieldOp() {

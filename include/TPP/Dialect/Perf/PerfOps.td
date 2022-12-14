@@ -22,7 +22,7 @@ include "mlir/IR/OpAsmInterface.td"
 def Perf_StartTimerOp : Perf_Op<"start_timer", []> {
   let summary = "Start a timer.";
   let description = [{
-    The `perf.start_timer` operation creates a new timer
+    The `perf.start_timer` operation creates a new unique timer
     which begins time measurement.
 
     See `perf.stop_timer` for timer termination.
@@ -83,6 +83,7 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 //===----------------------------------------------------------------------===//
 // BenchOp
 //===----------------------------------------------------------------------===//
+
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
      RangedTypesMatchWith<"result types match types of args",
@@ -121,6 +122,11 @@ def Perf_BenchOp : Perf_Op<"bench",
     are passed to the `perf.bench` results.
     The types of the arguments and the results must match, and the benchmarking
     region must be terminated with a matching `perf.yield` operation.
+
+    When arguments are present, the region must terminate with `perf.yield`.
+    Note, that in this case, calling BenchOp::build will not insert the terminator
+    implicitly. The caller must insert `perf.yield` separately with intended
+    return values.
 
     An example of a benchmark with an output result:
 
@@ -176,6 +182,12 @@ def Perf_BenchOp : Perf_Op<"bench",
     $region attr-dict
     (`->` type($bodyResults)^)?
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$numIters, "Value":$deltas,
+      CArg<"ValueRange", "std::nullopt">:$args)>
+  ];
 
   let extraClassDeclaration = [{
     YieldOp getYieldOp();
