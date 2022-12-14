@@ -46,6 +46,11 @@ func.func @perf_matmul_bench(%A: tensor<4x8xf32>,
     perf.sink(%D) : tensor<4x4xf32>
   }
 
+  // CHECK: perf.mean
+  %mean = perf.mean(%deltas : memref<?xf64>) : f64
+  // CHECK: perf.stdev
+  %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
+
   memref.dealloc %deltas : memref<?xf64>
   return
 }
@@ -120,4 +125,96 @@ func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
   memref.dealloc %deltas : memref<?xf64>
   // CHECK: return %[[out]]
   return %out : i32
+}
+
+// -----
+
+// CHECK-LABEL: @perf_example
+func.func @perf_example(%A: tensor<4x8xf32>,
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+  %output = arith.constant 0 : i64
+
+  // CHECK: %[[res:.*]] = perf.bench
+  %res = perf.bench (%n, %deltas : memref<?xf64>) args(%output : i64) {
+    // CHECK: %[[mulres:.*]] = linalg.matmul
+    // CHECK: perf.sink(%[[mulres]])
+    %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
+                       outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
+    perf.sink(%D) : tensor<4x4xf32>
+
+    // CHECK: %[[sum:.*]] = arith.addi
+    %sum = arith.addi %n, %n : i64
+
+    // CHECK: perf.yield %[[sum]]
+    perf.yield %sum : i64
+  } -> i64
+
+  // CHECK: %[[mean:.*]] = perf.mean
+  // CHECK: %[[stdev:.*]] = perf.stdev
+  %mean = perf.mean(%deltas : memref<?xf64>) : f64
+  %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
+
+  memref.dealloc %deltas : memref<?xf64>
+  // CHECK: return %[[mean]], %[[stdev]], %[[res]]
+  return %mean, %stdev, %res : f64, f64, i64
+}
+
+// -----
+
+func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
+func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
+func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
+func.func private @perf_mean(memref<*xf64>) -> f64 attributes {llvm.emit_c_interface}
+func.func private @perf_stdev(memref<*xf64>, f64) -> f64 attributes {llvm.emit_c_interface}
+
+// CHECK-LABEL: @perf_example_lowered
+func.func @perf_example_lowered(%A: tensor<4x8xf32>,
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  %size = arith.index_cast %n : i64 to index
+  // CHECK: %[[buff:.*]] = memref.alloc
+  %deltas = memref.alloc(%size) : memref<?xf64>
+  %output = arith.constant 0 : i64
+
+  %iters = arith.index_cast %n : i64 to index
+  // CHECK: %[[res:.*]] = scf.for
+  %res = scf.for %iv = %c0 to %iters step %c1
+      iter_args(%arg0 = %output) -> i64 {
+    // CHECK: %[[timer:.*]] = func.call @perf_start_timer
+    %t = func.call @perf_start_timer() : () -> i64
+
+    // CHECK: %[[mulres:.*]] = linalg.matmul
+    // CHECK: %[[mulcast:.*]] = tensor.cast %[[mulres]]
+    // CHECK: func.call @perf_sink_tensor_f32(%[[mulcast]])
+    %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
+                       outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
+    %Dcast = tensor.cast %D : tensor<4x4xf32> to tensor<*xf32>
+    func.call @perf_sink_tensor_f32(%Dcast) : (tensor<*xf32>) -> ()
+
+    // CHECK: %[[sum:.*]] = arith.addi
+    %sum = arith.addi %n, %n : i64
+
+    // CHECK: %[[delta:.*]] = func.call @perf_stop_timer(%[[timer]])
+    // CHECK: memref.store %[[delta]], %[[buff]]
+    %delta = func.call @perf_stop_timer(%t) : (i64) -> f64
+    memref.store %delta, %deltas[%iv] : memref<?xf64>
+
+    // CHECK: scf.yield %[[sum]]
+    scf.yield %sum : i64
+  }
+
+  // CHECK: %[[memcast:.*]] = memref.cast %[[buff]]
+  // CHECK: %[[mean:.*]] = call @perf_mean(%[[memcast]])
+  // CHECK: %[[stdev:.*]] = call @perf_stdev(%[[memcast]], %[[mean]])
+  %memcast = memref.cast %deltas : memref<?xf64> to memref<*xf64>
+  %mean = func.call @perf_mean(%memcast) : (memref<*xf64>) -> f64
+  %stdev = func.call @perf_stdev(%memcast, %mean) : (memref<*xf64>, f64) -> f64
+
+  memref.dealloc %deltas : memref<?xf64>
+  // CHECK: return %[[mean]], %[[stdev]], %[[res]]
+  return %mean, %stdev, %res : f64, f64, i64
 }
