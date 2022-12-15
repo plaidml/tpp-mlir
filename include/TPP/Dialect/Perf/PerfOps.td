@@ -213,11 +213,11 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
     yielded.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$results);
+  let arguments = (ins Variadic<AnyType>:$operands);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat =
-    [{  attr-dict ($results^ `:` type($results))? }];
+    [{  attr-dict ($operands^ `:` type($operands))? }];
 }
 
 //===----------------------------------------------------------------------===//
