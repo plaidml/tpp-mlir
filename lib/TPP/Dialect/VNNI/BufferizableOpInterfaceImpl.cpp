@@ -79,6 +79,65 @@ struct MatmulLayoutInterface
   }
 };
 
+struct BRGemmLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<BRGemmLayoutInterface,
+                                                    vnni::BRGemmOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return opOperand.getOperandNumber() == 2;
+  }
+
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) const {
+    return true;
+  }
+
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    if (opOperand.getOperandNumber() < 2)
+      return {};
+    return {op->getResult(0)};
+  }
+
+  BufferRelation bufferRelation(Operation *op, OpResult opResult,
+                                const AnalysisState &state) const {
+    return BufferRelation::Equivalent;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    vnni::BRGemmOp matmulOp = cast<vnni::BRGemmOp>(op);
+
+    FailureOr<Value> maybeDestBuffer =
+        getBuffer(rewriter, matmulOp.getMatrixC(), options);
+    if (failed(maybeDestBuffer))
+      return failure();
+    Value destBuffer = *maybeDestBuffer;
+
+    FailureOr<Value> maybeSrcBufferA =
+        getBuffer(rewriter, matmulOp.getMatrixA(), options);
+    if (failed(maybeSrcBufferA))
+      return failure();
+    Value srcBufferA = *maybeSrcBufferA;
+
+    FailureOr<Value> maybeSrcBufferB =
+        getBuffer(rewriter, matmulOp.getMatrixB(), options);
+    if (failed(maybeSrcBufferB))
+      return failure();
+    Value srcBufferB = *maybeSrcBufferB;
+
+    rewriter.create<vnni::BRGemmOp>(op->getLoc(), TypeRange{}, srcBufferA,
+                                    srcBufferB, destBuffer);
+    replaceOpWithBufferizedValues(rewriter, op, destBuffer);
+    return success();
+  }
+};
+
 } // namespace
 } // namespace vnni
 } // namespace mlir
@@ -87,5 +146,6 @@ void mlir::vnni::registerBufferizableOpInterfaceExternalModels(
     DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, vnni::VNNIDialect *dialect) {
     MatmulOp::attachInterface<vnni::MatmulLayoutInterface>(*ctx);
+    BRGemmOp::attachInterface<vnni::BRGemmLayoutInterface>(*ctx);
   });
 }

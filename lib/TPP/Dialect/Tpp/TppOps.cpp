@@ -194,7 +194,7 @@ LogicalResult VNNIBrgemmOp::verify() {
   if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.
-  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[1])
+  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[2])
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }

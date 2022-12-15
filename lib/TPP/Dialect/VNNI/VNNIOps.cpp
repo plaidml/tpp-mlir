@@ -21,3 +21,8 @@ void MatmulOp::build(OpBuilder &builder, OperationState &state, Value matrixA,
                      Value matrixB, Value matrixC) {
   MatmulOp::build(builder, state, TypeRange{}, matrixA, matrixB, matrixC);
 }
+
+void BRGemmOp::build(OpBuilder &builder, OperationState &state, Value matrixA,
+                     Value matrixB, Value matrixC) {
+  BRGemmOp::build(builder, state, TypeRange{}, matrixA, matrixB, matrixC);
+}

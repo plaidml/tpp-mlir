@@ -85,6 +85,14 @@ static Value handleLayout_VNNI(OpBuilder &builder, Location loc, Value input,
                             /*outerDimsPerm=*/{});
 }
 
+static Value handleBRGemmLayout_VNNI(OpBuilder &builder, Location loc,
+                                     Value input,
+                                     ArrayRef<OpFoldResult> tiles) {
+  assert(tiles.size() == 1 && "expect 1 block for VNNI");
+  SmallVector<int64_t> innerDimPos = {1};
+  return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+                            /*outerDimsPerm=*/{});
+}
 // Helper function to pack from NC to NCnc.
 static Value toPackLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
                                  ArrayRef<OpFoldResult> tiles) {
@@ -95,6 +103,13 @@ static Value toPackLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
 static Value toPackLayout_VNNI(OpBuilder &builder, Location loc, Value input,
                                ArrayRef<OpFoldResult> tiles) {
   return handleLayout_VNNI(builder, loc, input, nullptr, tiles);
+}
+
+// Helper function to pack from [N][K][C] to [N][K/2][C][2].
+static Value toPackBRGemmLayout_VNNI(OpBuilder &builder, Location loc,
+                                     Value input,
+                                     ArrayRef<OpFoldResult> tiles) {
+  return handleBRGemmLayout_VNNI(builder, loc, input, tiles);
 }
 
 // Helper function to unpack from NCnc to NC.
@@ -400,6 +415,32 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   return replacementOp;
 }
 
+FailureOr<vnni::BRGemmOp>
+mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
+                                linalg::BatchReduceMatmulOp brgemmOp,
+                                ArrayRef<OpFoldResult> tiles) {
+  if (tiles.size() != 1)
+    return rewriter.notifyMatchFailure(brgemmOp, "require 1 blocking factor");
+
+  if (brgemmOp.hasDynamicShape())
+    return rewriter.notifyMatchFailure(brgemmOp, "require static shape");
+
+  if (brgemmOp.hasBufferSemantics())
+    return rewriter.notifyMatchFailure(brgemmOp, "require tensor semantics");
+
+  OpFoldResult tileOnI = tiles[0];
+  SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
+
+  Location loc = brgemmOp.getLoc();
+  // reshape input B.
+  Value packedMatrixB =
+      toPackBRGemmLayout_VNNI(rewriter, loc, brgemmOp.getInputs()[1], tilesOnB);
+  auto replacementOp = rewriter.create<vnni::BRGemmOp>(
+      loc, brgemmOp.getOutputs()[0].getType(), brgemmOp.getInputs()[0],
+      packedMatrixB, brgemmOp.getOutputs()[0]);
+  rewriter.replaceOp(brgemmOp, replacementOp.getResult(0));
+  return replacementOp;
+}
 namespace {
 
 //===----------------------------------------------------------------------===//
