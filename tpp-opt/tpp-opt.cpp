@@ -28,10 +28,6 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
-<<<<<<< HEAD
-#include "TPP/Dialect/VNNI/TransformOps/VNNITransformOps.h"
-=======
->>>>>>> VNNI to TPP lowering pass for brgemm and matmul
 #include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/Passes.h"
