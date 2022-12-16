@@ -43,7 +43,7 @@ class PerfResults {
   }
 
   /// Zero a time_point
-  void zero(std::chrono::high_resolution_clock::time_point& point) {
+  void zero(std::chrono::high_resolution_clock::time_point &point) {
     point = std::chrono::high_resolution_clock::time_point();
   }
 
@@ -56,7 +56,7 @@ public:
   }
 
   /// Stops the timer, accumulates, clears state
-  void stopTimer() {
+  double stopTimer() {
     assert(!locked && "Stop called after stats produced");
     assert(!isZero(start) && "Stop called before start");
     assert(isZero(stop) && "Stop called twice");
@@ -67,6 +67,8 @@ public:
     timings.push_back(val);
     zero(start);
     zero(stop);
+
+    return val;
   }
 
   /// Get mean of timings. Locks the timer, only calculate stats once.
