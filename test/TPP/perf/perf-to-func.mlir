@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -convert-perf-to-func -split-input-file -canonicalize | FileCheck %s
+// RUN: tpp-opt %s -convert-perf-to-loops -convert-perf-to-func -split-input-file -canonicalize | FileCheck %s
 
 // CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} attributes {llvm.emit_c_interface}
 // CHECK-LABEL: @func_start_timer
@@ -74,4 +74,52 @@ func.func @func_sink(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
   perf.sink(%arg7) : f16
 
   return
+}
+
+// -----
+
+// An example of perf dialect usage.
+// CHECK-DAG: func.func private @perf_stdev(memref<*xf64>, f64) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_mean(memref<*xf64>) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
+// CHECK-LABEL: @perf_example
+func.func @perf_example(%A: tensor<4x8xf32>,
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[output:.*]] = arith.constant 0 : i64
+  // CHECK: %[[deltas:.*]] = memref.alloc
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+  %output = arith.constant 0 : i64
+
+  // CHECK: %[[ub:.*]] = arith.index_cast %arg3 : i64 to index
+  // CHECK: %[[res:.*]] = scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] iter_args(%[[iarg0:.*]] = %[[output]]) -> (i64) {
+  // CHECK:   %[[timer:.*]] = func.call @perf_start_timer()
+  // CHECK:   %[[mulres:.*]] = linalg.matmul
+  // CHECK:   %[[sum:.*]] = arith.addi
+  // CHECK:   %[[delta:.*]] = func.call @perf_stop_timer(%[[timer]])
+  // CHECK:   %[[tcast0:.*]] = tensor.cast %[[mulres]]
+  // CHECK:   func.call @perf_sink_tensor_f32(%[[tcast0]])
+  // CHECK:   memref.store %[[delta]], %[[deltas]][%[[i]]]
+  // CHECK:   scf.yield %[[sum]]
+  // CHECK: }
+  %res = perf.bench (%n, %deltas : memref<?xf64>) args(%output : i64) {
+    %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
+                       outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
+    perf.sink(%D) : tensor<4x4xf32>
+    %sum = arith.addi %n, %n : i64
+    perf.yield %sum : i64
+  } -> i64
+
+  // CHECK: %[[mean:.*]] = call @perf_mean({{.*}})
+  // CHECK: %[[stdev:.*]] = call @perf_stdev({{.*}}, %[[mean]])
+  %mean = perf.mean(%deltas : memref<?xf64>) : f64
+  %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
+
+  memref.dealloc %deltas : memref<?xf64>
+  // CHECK: return %[[mean]], %[[stdev]], %[[res]]
+  return %mean, %stdev, %res : f64, f64, i64
 }
