@@ -126,7 +126,7 @@ func.func @add(%arga: tensor<32xf32>, %argb: tensor<32xf32>) -> tensor<32xf32> {
 // CHECK-LABEL: func.func @identity
 func.func @identity(%arg1: memref<1x512xf32>) {
   %0 = memref.alloc() : memref<1x512xf32>
-  // CHECK: tpp.identity
+  // CHECK: library_call = "tpp.identity"
   linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%arg1 : memref<1x512xf32>) outs(%0 : memref<1x512xf32>) {
     ^bb0(%arg2: f32, %arg3: f32):
       linalg.yield %arg2 : f32
