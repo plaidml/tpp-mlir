@@ -61,6 +61,7 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
                                                  Location loc, Value input) {
   MemRefType inputType = input.getType().cast<MemRefType>();
   assert(inputType.hasStaticShape() && "Expect static shape");
+  assert(inputType.getRank() > 2 && "Expect rank > 2");
   SmallVector<int64_t> subViewOffsets(inputType.getRank(), 0);
   SmallVector<int64_t> subViewStrides(inputType.getRank(), 1);
   ArrayRef<int64_t> subViewSizes = inputType.getShape();
@@ -260,7 +261,7 @@ LogicalResult checkOperandForTpp(Value operand) {
     if (!shapedType.hasStaticShape())
       return failure();
     unsigned rank = shapedType.getRank();
-    if (rank > 2)
+    if (rank == 0 || rank > 2)
       return failure();
   }
   return success();
