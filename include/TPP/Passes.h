@@ -73,6 +73,14 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 
+std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createTileConsumerAndFuseProducersPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createDecomposeConvToMatmulOrBrgemmPass();
 } // namespace tpp
 } // namespace mlir
 

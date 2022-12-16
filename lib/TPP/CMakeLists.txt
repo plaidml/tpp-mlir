@@ -8,6 +8,8 @@ add_mlir_library(MLIRTPP
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
     MapConvToMatmul.cpp
+    TileConsumerAndFuseProducers.cpp
+    DecomposeConvsToMatmulOrBrgemm.cpp
 
   # Utils
     TransformUtils.cpp

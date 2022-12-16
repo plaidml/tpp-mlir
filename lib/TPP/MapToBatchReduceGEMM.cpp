@@ -217,3 +217,46 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
                                              : tensorResults);
   return outermostLoop ? outermostLoop->getResults() : tensorResults;
 }
+
+//===----------------------------------------------------------------------===//
+// Passes
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  // Map a generic operation to BRGEMM. The following conditions apply:
+  // 1. The generic has a single region. The region performs a scalar GEMM
+  // operation.
+  // 2. The innermost dimensions for the generic must be [r, p, p, r]. r =
+  // reduction p = parallel. Outermost dimensions must be parallel.
+  // 3. Access pattern must be [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
+  // 4. The generic has static shape.
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
+        mlir::linalgx::mapToBRGEMMOp(rewriter, linalgOp);
+    if (failed(maybeLoopsOrGenericRes))
+      return failure();
+    return success();
+  }
+};
+
+struct MapToBatchReduceGEMM
+    : public MapToBatchReduceGEMMBase<MapToBatchReduceGEMM> {
+  void runOnOperation() override {
+    RewritePatternSet patterns(getOperation().getContext());
+    patterns.add<DoItOnGeneric>(patterns.getContext());
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
+} // end namespace
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createMapToBatchReduceGEMMPass() {
+  return std::make_unique<MapToBatchReduceGEMM>();
+}

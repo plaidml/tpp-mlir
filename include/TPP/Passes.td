@@ -124,4 +124,93 @@ def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
 }
 
+def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
+  let summary = "Convert matmul to block layout and back";
+  let description = [{
+    Block Matmul as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
+    the Matmul has a relu operation as its consumer block also the relu operation.
+  }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t", 
+               "Blocking factor for relayout">
+  ];
+  let constructor = "mlir::tpp::createPackMatmulPass()";
+}
+
+def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
+  let summary = "Convert Conv2DNchwFchw to block layout and back";
+  let description = [{
+    Block Conv2DNchwFchw as: [N][BK][P][Q][bk] += [N][BC][H][W][bc] * [BK][BC][R][S][bk][bc]
+                             output            += image             * filter
+    Pack the image's channel with a block factor BC.
+    Pack the filter's channels C and K with a block factor of BC and BK.
+    Pack the output's channel K with a block factor BK.
+  }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for relayout">
+  ];
+  let constructor = "mlir::tpp::createPackConv2DNchwFchwPass()";
+}
+
+def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
+  let summary = "Pack and unpack Conv2DNhwcHwcf";
+  let description = [{
+    Pack Conv2DNhwcHwcf as [N][K'][P][Q][k] += [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+                           output           += image            * filter
+    Pack the image and block the image's channel with a factor k.
+    Pack the filter and block the filter's channels with k and c.
+    Pack the output and block the output's channel with k.
+  }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for pack and unpack operation">
+  ];
+  let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
+}
+
+def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
+  let summary = "Map a linalg.generic to BRGEMM";
+  let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
+  let description = [{
+    Map a linalg.generic to a linalg.batch_reduce_matmul.
+    Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
+    [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
+    outermost parallel dimensions (as scf.for) and rewrite the body to a
+    linalg.batch_reduce_matmul. 
+
+    The pass works on any linalg.generic and attempts to map the innermost
+    loops to BRGEMM.  It works both a memref and tensor level.
+  }];
+}
+
+def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
+                                        "func::FuncOp"> {
+  let summary = "Tile consumers and fuse producers";
+  let description = [{
+    The pass uses `TileConsumerAndFuseProducersUsingSCFForOp` to tile
+    the consumer and fuse the consumer with the producers. We restrict
+    the pattern to relu operations whose producers are matmul or conv.
+  }];
+  let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
+  let options = [
+    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
+  ];
+}
+
+def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm", 
+                                         "func::FuncOp"> {
+  let summary = "Decompose Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
+  let description = [{
+    Rewrite a convolution to a matmul or brgemm operation.
+  }];
+  let options = [
+    Option<"enableBrgemm", "enable-brgemm", "bool", "false",
+           "Map convolution to BRGEMM if possible">,
+    ListOption<"blockingFactors", "block-factors", "int64_t",
+               "Blocking factor for relayout">
+  ];
+  let constructor = "mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
