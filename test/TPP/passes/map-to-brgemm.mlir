@@ -1,14 +1,8 @@
 // RUN: tpp-opt %s -map-to-brgemm | FileCheck %s
 
-#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
-#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
-#map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
-
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    transform.structured.map_to_brgemm %0
-}
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
 // CHECK-LABEL: func.func @blocked_matmul(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<4x16x32x32xf32>,
@@ -31,7 +25,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
   // CHECK: scf.yield %[[INNER]] : tensor<4x8x32x32xf32>
   // CHECK: }
   // CHECK: return %[[OUTER]] : tensor<4x8x32x32xf32>
-  %1 = linalg.generic {indexing_maps = [#map3, #map4, #map5], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
+  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
     ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
       %8 = arith.mulf %arg3, %arg4 : f32
       %9 = arith.addf %arg5, %8 : f32
