@@ -131,7 +131,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1
     // Original layout: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
     // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
-    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %1 = transform.structured.pack %0 blocking_factors = [32, 32] 
     // Collapse       : [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
     %2 = transform.structured.collapse %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %3 = transform.structured.collapse %2 [[0], [1], [2, 3], [4], [5], [6]]
@@ -264,7 +264,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     // Blocks all the convs
-    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %1 = transform.structured.pack %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate all the packs
     transform.structured.packing_propagation %2
@@ -333,7 +333,7 @@ func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x2
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
-    %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
+    %1 = transform.structured.pack %0 blocking_factors = [32, 32]
     %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %2
 }

@@ -30,23 +30,14 @@ using namespace mlir::transform;
 // PackOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult transform::PackOp::verify() {
-  SmallVector<int64_t> factors = extractFromI64ArrayAttr(getBlockingFactors());
-  if (any_of(factors, [](int64_t factor) { return factor <= 0; }))
-    return emitOpError()
-           << "expects blocking factors to be positive integers, found "
-           << getBlockingFactors();
-  return success();
-}
-
 DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
                               ApplyToEachResultList &results,
                               transform::TransformState &state) {
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  SmallVector<OpFoldResult> blockingFactors = getAsOpFoldResult(
-      rewriter.getI64ArrayAttr(extractFromI64ArrayAttr(getBlockingFactors())));
+  SmallVector<OpFoldResult> blockingFactors =
+      getAsOpFoldResult(rewriter.getI64ArrayAttr(getBlockingFactors()));
   Operation *currentTarget = target;
   FailureOr<Operation *> packedOp = failure();
   TypeSwitch<Operation *>(currentTarget)

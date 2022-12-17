@@ -39,7 +39,7 @@ func.func @tile_linalg_matmul(
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    %1 = transform.structured.pack %0 { blocking_factors = [32, 32, 32] }
+    %1 = transform.structured.pack %0 blocking_factors = [32, 32, 32] 
 }
 
 func.func @block_linalg_matmul(
@@ -93,7 +93,7 @@ transform.sequence failures(propagate) {
     // Get the matmul
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
     // Pack the matmul with blocking factors of 32 along i, j and k
-    %1 = transform.structured.pack %0 { blocking_factors = [32, 32, 32] }
+    %1 = transform.structured.pack %0 blocking_factors = [32, 32, 32] 
     // Get parent operation (aka func.func)
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate the packing down through the relu

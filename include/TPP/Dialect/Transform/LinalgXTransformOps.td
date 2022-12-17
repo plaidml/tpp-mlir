@@ -31,11 +31,16 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
     Block the target operation. Currently supports matmul and convolutions.
   }];
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    (`blocking_factors` `=` $blocking_factors^)? 
+    (`use_vnni` `=` $use_vnni^)? attr-dict
+  }];
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$blocking_factors,
-		   DefaultValuedAttr<I1Attr, "0">:$use_vnni);
+                   ConfinedAttr<DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">,
+                                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$blocking_factors,
+		               DefaultValuedAttr<I1Attr, "0">:$use_vnni);
   let results = (outs PDL_Operation:$packed_linalg_op);
 
   let extraClassDeclaration = [{
@@ -44,8 +49,6 @@ def PackOp : Op<Transform_Dialect, "structured.pack", [
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
