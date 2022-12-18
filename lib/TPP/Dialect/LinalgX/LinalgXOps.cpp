@@ -297,7 +297,7 @@ static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
 static bool isCompatible(ShapedType a, ShapedType b) {
   if (a.getRank() != b.getRank())
     return false;
-  for (auto it : llvm::zip(a.getShape(), b.getShape())) {
+  for (auto it : llvm::zip_equal(a.getShape(), b.getShape())) {
     auto aDim = std::get<0>(it);
     auto bDim = std::get<1>(it);
     if (!ShapedType::isDynamic(aDim) && !ShapedType::isDynamic(bDim) &&

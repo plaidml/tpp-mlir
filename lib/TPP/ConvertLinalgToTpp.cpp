@@ -390,7 +390,8 @@ struct SubViewOfSubViewWithUnitDims
                ArrayRef<OpFoldResult> valuesOrAttrsProducer) const {
     if (valuesOrAttrsConsumer.size() != valuesOrAttrsProducer.size())
       return false;
-    for (auto it : llvm::zip(valuesOrAttrsConsumer, valuesOrAttrsProducer)) {
+    for (auto it :
+         llvm::zip_equal(valuesOrAttrsConsumer, valuesOrAttrsProducer)) {
       OpFoldResult valueOrAttrConsumer = std::get<0>(it);
       OpFoldResult valueOrAttrProducer = std::get<1>(it);
       Attribute attrConsumer = valueOrAttrConsumer.dyn_cast<Attribute>();
