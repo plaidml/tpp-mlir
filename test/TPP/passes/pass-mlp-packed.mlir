@@ -1,6 +1,14 @@
 // RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -map-linalg-to-tpp -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0,0" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,0,0" -canonicalize -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
 
-// This test isn't working fully due to issues #95.
+// This test isn't working fully due to issues #95 and #96.  
+
+// The problem is: `-tile-consumer-and-fuse-producers="tile-sizes=1,0,0"`. `1`
+// here means takes the entire outer loop dimension as tile size. This work if all
+// the mlp layers have the same outermost loop dim, this is not the case for this
+// second stage of fusion:
+// Solution 1. Use a callback to control what we fuse.
+// Solution 2. Use another driver
+// Solution 3. Use a tile size that divides all the mlp layers.
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>

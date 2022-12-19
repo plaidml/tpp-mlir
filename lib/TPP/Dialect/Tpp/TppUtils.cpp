@@ -352,9 +352,6 @@ bool isUnaryOp(linalg::GenericOp linalgOp) {
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.relu.
-// TODO: check input arguments:
-// 1. Single input, single output as long as the output bbarg is not used
-// 2. Single output.
 bool isTppRelu(linalg::GenericOp linalgOp) {
   if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
     return false;
