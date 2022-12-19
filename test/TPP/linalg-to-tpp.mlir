@@ -266,3 +266,51 @@ func.func @add_mapping(%arg0: memref<10x1x1xf32>, %arg1: memref<10x1x1xf32>) {
 // CHECK: %[[SUB_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:  [0, 0, 0] [10, 1, 1] [1, 1, 1] : memref<10x1x1xf32> to memref<10xf32, strided<[1]>>
 // CHECK: tpp.add ins(%[[SUB_ARG0]] : memref<10xf32, strided<[1]>>) out(%[[SUB_ARG1]] : memref<10xf32, strided<[1]>>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @relu_mapping(%arg0: memref<10x10xf32>) {
+  %c0 = arith.constant 0.0 : f32
+  linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg0: memref<10x10xf32>) {
+    ^bb0(%out : f32):
+      %0 = arith.maxf %out, %c0 : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
+
+// CHECK: func.func @relu_mapping(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>)
+// CHECK: tpp.relu out(%[[ARG0]] : memref<10x10xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
+  %c0 = arith.constant 0.0 : f32
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1: memref<10x10xf32>) outs(%arg0: memref<10x10xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %0 = arith.maxf %in, %c0 : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
+
+// CHECK: func.func @relu_mapping(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<10x10xf32>)
+// CHECK: tpp.relu out(%[[ARG1]] : memref<10x10xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
+  // CHECK-NOT: tpp.relu
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1: memref<10x10xf32>) outs(%arg0: memref<10x10xf32>) {
+    ^bb0(%in : f32, %out : f32):
+      %0 = arith.maxf %in, %out : f32
+      linalg.yield %0 : f32
+  }
+  return
+}

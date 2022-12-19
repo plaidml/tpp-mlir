@@ -336,11 +336,26 @@ bool canMapToTppRelu(linalg::GenericOp linalgOp) {
   return hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
 }
 
+// Return true if the operation is unary.
+bool isUnaryOp(linalg::GenericOp linalgOp) {
+  if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1))
+    return true;
+  // If we have 1 input 1 output, the output must have no users.
+  if ((linalgOp.getNumDpsInputs() == 1) && (linalgOp.getNumDpsInits() == 1)) {
+    Value outArg = linalgOp.getRegionOutputArgs()[0];
+    SmallVector<Operation *> users(outArg.getUsers().begin(),
+                                   outArg.getUsers().end());
+    if (users.size() == 0)
+      return true;
+  }
+  return false;
+}
+
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp) {
   if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
     return false;
-  if ((linalgOp.getNumDpsInputs() != 0) || (linalgOp.getNumDpsInits() != 1))
+  if (!isUnaryOp(linalgOp))
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
