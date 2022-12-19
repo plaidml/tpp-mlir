@@ -29,6 +29,8 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = benchOp.getLoc();
     auto benchYield = benchOp.getRegion().front().getTerminator();
+    assert(dyn_cast_or_null<perf::YieldOp>(benchYield) &&
+           "expect perf.yield in perf.bench");
 
     auto numIters = rewriter.create<arith::IndexCastOp>(
         loc, rewriter.getIndexType(), benchOp.getNumIters());
@@ -68,9 +70,11 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
 
     // Replace uses of bench args within the benchmark body with their
     // equivalent loop-carried variables.
-    for (auto pair : llvm::zip(benchOp.getArgs(), loop.getRegionIterArgs()))
-      replaceAllUsesInRegionWith(std::get<0>(pair), std::get<1>(pair),
-                                 loop.getRegion());
+    assert((benchOp.getArgs().size() == loop.getRegionIterArgs().size()) &&
+           "expect equal number of loop-carried variables");
+    for (auto [benchArg, loopArg] :
+         llvm::zip(benchOp.getArgs(), loop.getRegionIterArgs()))
+      replaceAllUsesInRegionWith(benchArg, loopArg, loop.getRegion());
 
     // Pass perf.yield values through the scf.yield.
     rewriter.setInsertionPointToEnd(loop.getBody());
@@ -78,8 +82,11 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     rewriter.eraseOp(benchYield);
 
     // Swap bench results with loop results.
-    for (auto pair : llvm::zip(benchOp.getBodyResults(), loop.getResults()))
-      std::get<0>(pair).replaceAllUsesWith(std::get<1>(pair));
+    assert((benchOp.getBodyResults().size() == loop.getResults().size()) &&
+           "expect equal number of loop-carried variables");
+    for (auto [benchRes, loopRes] :
+         llvm::zip(benchOp.getBodyResults(), loop.getResults()))
+      benchRes.replaceAllUsesWith(loopRes);
 
     rewriter.eraseOp(benchOp);
     return success();
