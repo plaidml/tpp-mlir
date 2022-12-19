@@ -20,6 +20,7 @@ add_mlir_library(MLIRTPP
     ConvertXsmmToFunc.cpp
     ConvertCheckToLoops.cpp
     ConvertVNNIToTpp.cpp
+    ConvertPerfToLoops.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
@@ -33,6 +34,7 @@ add_mlir_library(MLIRTPP
     TPPTppDialect
     TPPXsmmDialect
     TPPVNNIDialect
+    TPPPerfDialect
 
     MLIRIR
     MLIRInferTypeOpInterface

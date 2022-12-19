@@ -93,7 +93,7 @@ def Perf_BenchOp : Perf_Op<"bench",
      RangedTypesMatchWith<"result types match types of yield",
                           "$_self",
                           "bodyResults",
-                          "getYieldOp().getOperandTypes()">]> {
+                          "getRegion().front().getTerminator()->getOperandTypes()">]> {
   let summary = "Benchmark the enclosed code.";
   let description = [{
     The `perf.bench` operation generates benchmarking code
@@ -192,6 +192,8 @@ def Perf_BenchOp : Perf_Op<"bench",
   let extraClassDeclaration = [{
     YieldOp getYieldOp();
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -213,11 +215,11 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
     yielded.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$results);
+  let arguments = (ins Variadic<AnyType>:$operands);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let assemblyFormat =
-    [{  attr-dict ($results^ `:` type($results))? }];
+    [{  attr-dict ($operands^ `:` type($operands))? }];
 }
 
 //===----------------------------------------------------------------------===//

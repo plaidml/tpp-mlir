@@ -110,6 +110,15 @@ def LinalgExtToLoops :
   let constructor = "mlir::tpp::createLinalgXToLoopsPass()";
 }
 
+def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "ModuleOp"> {
+  let summary = "Convert perf to loops";
+  let constructor = "mlir::tpp::createConvertPerfToLoopsPass()";
+  let description = [{
+    Convert perf operations to SCF loops.
+  }];
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
 def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";

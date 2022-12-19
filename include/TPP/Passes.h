@@ -18,6 +18,7 @@ class ModuleOp;
 namespace mlir {
 namespace func {
 class FuncOp;
+class FuncDialect;
 } // namespace func
 } // namespace mlir
 
@@ -69,6 +70,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 
 } // namespace tpp
