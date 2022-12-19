@@ -71,3 +71,15 @@ void BenchOp::build(OpBuilder &builder, OperationState &result, Value numIters,
 YieldOp BenchOp::getYieldOp() {
   return cast<perf::YieldOp>(getRegion().front().getTerminator());
 }
+
+LogicalResult BenchOp::verify() {
+  Operation *terminator = getRegion().front().getTerminator();
+  if (!dyn_cast_or_null<perf::YieldOp>(terminator)) {
+    auto diag = emitOpError("expects region to terminate with 'perf.yield'");
+    if (terminator)
+      diag.attachNote(terminator->getLoc()) << "terminator here";
+    return failure();
+  }
+
+  return success();
+}

@@ -67,6 +67,24 @@ func.func @perf_no_yield(%n: i64) {
 
 // -----
 
+func.func @perf_invalid_yield_op(%a: i32, %b: i32, %n: i64) {
+  %size = arith.index_cast %n : i64 to index
+  %deltas = memref.alloc(%size) : memref<?xf64>
+  %out = arith.constant 0 : i32
+
+  // expected-error @below {{perf.bench' op expects region to terminate with 'perf.yield'}}
+  %val = perf.bench (%n, %deltas : memref<?xf64>) args(%out : i32) {
+    %c = arith.addi %a, %b : i32
+    // expected-note @below {{terminator here}}
+    scf.yield %c : i32
+  } -> i32
+
+  memref.dealloc %deltas : memref<?xf64>
+  return
+}
+
+// -----
+
 func.func @perf_invalid_yield_types(%a: i32, %b: i32, %n: i64) {
   %size = arith.index_cast %n : i64 to index
   %deltas = memref.alloc(%size) : memref<?xf64>
