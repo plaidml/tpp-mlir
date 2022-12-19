@@ -8,10 +8,12 @@
 
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -101,6 +103,60 @@ static void applyTypeMangling(std::string &name, Type type) {
       .Default([&](Type t) { mangledName << "_" << t; });
 }
 
+// Generate function implementation for perf.mean operation.
+static void buildPerfMeanFunc(Location loc, func::FuncOp func, Operation *op,
+                              PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  // Create function body
+  Block *block = func.addEntryBlock();
+  rewriter.setInsertionPointToEnd(block);
+
+  // Check assumptions on function arguments.
+  auto argTypes = func.getFunctionType().getInputs();
+  assert((argTypes.size() == 1) && "expect only 1 function argument");
+  assert((argTypes[0].isa<UnrankedMemRefType>()) &&
+         "expect unranked memref argument");
+
+  // Cast the buffer to something directly iteratable.
+  auto buff = block->getArguments()[0];
+  auto memRefType = MemRefType::get(
+      ShapedType::kDynamic,
+      buff.getType().cast<UnrankedMemRefType>().getElementType());
+  auto deltas = rewriter.create<memref::CastOp>(loc, memRefType, buff);
+
+  // Iterate over the whole buffer and sum up all time delta values.
+  // Implemented directly as scf to keep further lowering simple.
+  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  auto len = rewriter.create<memref::DimOp>(loc, deltas, zero);
+  auto floatType = rewriter.getF64Type();
+  auto result = rewriter.create<arith::ConstantFloatOp>(
+      loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
+
+  auto loopNest = scf::buildLoopNest(
+      rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
+      /*steps=*/ValueRange{one}, ValueRange{result},
+      [&](OpBuilder &b, Location loc, ValueRange localIvs,
+          ValueRange iterArgs) -> scf::ValueVector {
+        auto delta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
+        auto sum = rewriter.create<arith::AddFOp>(loc, delta, iterArgs[0]);
+
+        return scf::ValueVector({sum});
+      });
+  assert((loopNest.results.size() == 1) && "expect only 1 loop result");
+
+  // Compute average delta value.
+  auto lenInt = rewriter.create<arith::IndexCastOp>(
+      loc, rewriter.getIntegerType(64), len);
+  auto size = rewriter.create<arith::SIToFPOp>(loc, floatType, lenInt);
+  auto mean =
+      rewriter.create<arith::DivFOp>(loc, floatType, loopNest.results[0], size);
+
+  // Return the computed mean value.
+  rewriter.create<func::ReturnOp>(loc, ValueRange{mean});
+}
+
 // Creates function prototypes and insert calls to the perf runtime functions.
 static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
                                        Operation *op,
@@ -112,9 +168,6 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
 
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
-  auto libFnType = rewriter.getFunctionType(
-      extractNormalizedTypes(rewriter, op->getOperands()),
-      extractNormalizedTypes(rewriter, op->getResults()));
 
   // Create function prototype if it is not available yet.
   if (!module.lookupSymbol(fnName.getAttr())) {
@@ -122,16 +175,28 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
     // Insert before module terminator.
     rewriter.setInsertionPoint(module.getBody(),
                                std::prev(module.getBody()->end()));
+
+    auto libFnType = rewriter.getFunctionType(
+        extractNormalizedTypes(rewriter, op->getOperands()),
+        extractNormalizedTypes(rewriter, op->getResults()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                    UnitAttr::get(rewriter.getContext()));
     funcOp.setPrivate();
+
+    TypeSwitch<Operation *>(op)
+        .Case<perf::MeanOp>([&](Operation *op) {
+          buildPerfMeanFunc(loc, funcOp, op, rewriter);
+        })
+        .Default([&](Operation *op) {
+          funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                          UnitAttr::get(rewriter.getContext()));
+        });
   }
 
   // Insert a function call to the perf runtime.
   auto funcCall = rewriter.create<func::CallOp>(
-      loc, fnName.getValue(), libFnType.getResults(),
+      loc, fnName.getValue(),
+      extractNormalizedTypes(rewriter, op->getResults()),
       getNormalizedOperands(rewriter, loc, op->getOperands()));
   op->replaceAllUsesWith(funcCall.getResults());
 
