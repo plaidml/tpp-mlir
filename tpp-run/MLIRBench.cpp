@@ -114,7 +114,7 @@ LogicalResult MLIRBench::createMainWrapper() {
   auto funcType = builder.getFunctionType({}, {});
   main = func::FuncOp::create(unkLoc, mainName, funcType);
   main.setVisibility(SymbolTable::Visibility::Public);
-  auto* entryBlock = main.addEntryBlock();
+  auto *entryBlock = main.addEntryBlock();
   builder.setInsertionPointToEnd(entryBlock);
   module.push_back(main);
 
@@ -155,7 +155,8 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
 Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
                                  unsigned n) {
   // Allocates the vector for results
-  auto callAlloc = builder.create<func::CallOp>(unkLoc, timer.alloc, ValueRange());
+  auto callAlloc =
+      builder.create<func::CallOp>(unkLoc, timer.alloc, ValueRange());
   auto acc = callAlloc.getResult(0);
 
   // Create a SCF loop, set insertion to inside loop
@@ -185,9 +186,11 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
 
 Value MLIRBench::getTimerStats(Value acc) {
   // Get stats (this is done once, but we can get values in separate)
-  auto callMean = builder.create<func::CallOp>(unkLoc, timer.average, ValueRange{acc});
+  auto callMean =
+      builder.create<func::CallOp>(unkLoc, timer.average, ValueRange{acc});
   auto mean = callMean.getResult(0);
-  auto callDev = builder.create<func::CallOp>(unkLoc, timer.deviation, ValueRange{acc});
+  auto callDev =
+      builder.create<func::CallOp>(unkLoc, timer.deviation, ValueRange{acc});
   auto dev = callDev.getResult(0);
 
   // Create a vector<2xf64> so we can print
@@ -213,7 +216,14 @@ Value MLIRBench::getTimerStats(Value acc) {
 }
 
 void MLIRBench::printVector(Value vector) {
-  builder.create<vector::PrintOp>(unkLoc, vector);
+  auto op = vector;
+  auto vectorValue = vector.getType().dyn_cast<VectorType>();
+  if (vectorValue.getElementType().isBF16()) {
+    VectorType vecType =
+        VectorType::get(vectorValue.getShape(), builder.getF32Type());
+    op = builder.create<arith::ExtFOp>(unkLoc, vecType, vector, std::nullopt);
+  }
+  builder.create<vector::PrintOp>(unkLoc, op);
 }
 
 LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
@@ -238,8 +248,18 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
 
   // Vector undefined value
   APFloat vectorFloatValue = APFloat(-1.0F);
-  auto minusOne = builder.create<arith::ConstantFloatOp>(
-      unkLoc, vectorFloatValue, builder.getF32Type());
+  Value minusOne;
+  if (outputType.getElementType().isBF16()) {
+    bool ignored;
+    vectorFloatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
+                             &ignored);
+
+    minusOne = builder.create<arith::ConstantFloatOp>(
+        unkLoc, vectorFloatValue, FloatType::getBF16(builder.getContext()));
+  } else {
+    minusOne = builder.create<arith::ConstantFloatOp>(unkLoc, vectorFloatValue,
+                                                      builder.getF32Type());
+  }
 
   // Loop through memref, transfer each dim to vector
   auto indexType = builder.getIndexType();
@@ -314,8 +334,13 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   static unsigned order = 0;
 
   // TODO: Use some random initialiser
-  APFloat floatValue = APFloat(1.0F);
+  auto floatValue = APFloat(1.0F);
 
+  if (type.getElementType().isBF16()) {
+    bool ignored;
+    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
+                       &ignored);
+  }
   // Create global dense memrefs (Module insertion point)
   auto privAttr = builder.getStringAttr("private");
 
@@ -353,7 +378,7 @@ void MLIRBench::declareGlobalFunctions() {
 
   // Alloc
   timer.alloc = func::FuncOp::create(unkLoc, "timer_alloc",
-                                   builder.getFunctionType({}, {i64}));
+                                     builder.getFunctionType({}, {i64}));
   timer.alloc->setAttr(cifaceAttr, unitAttr);
   timer.alloc->setAttr(visAttr, privAttr);
   module.push_back(timer.alloc);
@@ -373,15 +398,15 @@ void MLIRBench::declareGlobalFunctions() {
   module.push_back(timer.stop);
 
   // Average
-  timer.average = func::FuncOp::create(
-      unkLoc, "timer_average", builder.getFunctionType({i64}, {f64}));
+  timer.average = func::FuncOp::create(unkLoc, "timer_average",
+                                       builder.getFunctionType({i64}, {f64}));
   timer.average->setAttr(cifaceAttr, unitAttr);
   timer.average->setAttr(visAttr, privAttr);
   module.push_back(timer.average);
 
   // Deviation
-  timer.deviation = func::FuncOp::create(
-      unkLoc, "timer_deviation", builder.getFunctionType({i64}, {f64}));
+  timer.deviation = func::FuncOp::create(unkLoc, "timer_deviation",
+                                         builder.getFunctionType({i64}, {f64}));
   timer.deviation->setAttr(cifaceAttr, unitAttr);
   timer.deviation->setAttr(visAttr, privAttr);
   module.push_back(timer.deviation);
