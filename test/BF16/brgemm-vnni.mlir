@@ -1,11 +1,5 @@
-// RUN: tpp-opt -transform-dialect-interpreter %s | FileCheck %s
+// RUN: tpp-opt -pack-vnni="block-factors=2" %s | FileCheck %s
 
-transform.sequence failures(propagate) {
- ^bb0(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["linalg.batch_reduce_matmul"]} in %arg1
-    transform.structured.pack %0 { use_vnni=true, blocking_factors = [2] }
-}
-    
 func.func @matmul(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
 // CHECK: %[[pack:.+]] = tensor.empty() : tensor<32x2x4x2xbf16>
 // CHECK: %[[matrixB:.+]] = linalgx.pack %arg1 inner_dims_pos = [1] inner_tiles = [2] into %[[pack]] : (tensor<32x4x4xbf16> tensor<32x2x4x2xbf16>) -> tensor<32x2x4x2xbf16> 

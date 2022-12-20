@@ -124,6 +124,20 @@ def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
 }
 
+def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
+  let summary = "Convert matmul/brgemm to vnni layout";
+  let description = [{
+    VNNI Matmul as: C[M][N]=A[M][K]*B[K/b][N][b]
+    VNNI BRGemm as: C[M][N]=A[R][M][K]*B[R][K/b][N][b]
+  }];
+  let options = [
+    ListOption<"blockingFactors", "block-factors", "int64_t", 
+               "Blocking factor for vnni layout">
+  ];
+  let constructor = "mlir::tpp::createPackVNNIPass()";
+}
+
+
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   let summary = "Convert matmul to block layout and back";
   let description = [{
@@ -136,6 +150,7 @@ def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   ];
   let constructor = "mlir::tpp::createPackMatmulPass()";
 }
+
 
 def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
   let summary = "Convert Conv2DNchwFchw to block layout and back";
