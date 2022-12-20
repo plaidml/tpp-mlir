@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize | FileCheck %s
+// RUN: tpp-opt %s -pack-vnni="block-factors=2"  -canonicalize | FileCheck %s
 
 !A_tensor_t = tensor<256x512xbf16>
 !B_tensor_t = tensor<512x1024xbf16>
@@ -9,12 +9,6 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    %1 = transform.structured.pack %0 { use_vnni=true, blocking_factors = [2] }
-}
 
 // CHECK-LABEL: func.func @matmul_static(
 // CHECK:  %[[ARG0:.+]]: tensor<256x512xbf16>,

@@ -53,6 +53,12 @@ class XsmmDialect;
 } // namespace mlir
 
 namespace mlir {
+namespace vnni {
+class VNNIDialect;
+} // namespace vnni
+} // namespace mlir
+
+namespace mlir {
 namespace tpp {
 
 // RETIRE
@@ -73,6 +79,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 
+std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();

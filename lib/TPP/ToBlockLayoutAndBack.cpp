@@ -91,7 +91,7 @@ static Value handleBRGemmLayout_VNNI(OpBuilder &builder, Location loc,
   assert(tiles.size() == 1 && "expect 1 block for VNNI");
   SmallVector<int64_t> innerDimPos = {1};
   return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
-                            /*outerDimsPerm=*/{});
+                          /*outerDimsPerm=*/{});
 }
 // Helper function to pack from NC to NCnc.
 static Value toPackLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
@@ -922,6 +922,66 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
   }
 };
 
+// Pack MatmulOp to VNNI
+struct VNNIOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
+  VNNIOnMatmul(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+               PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
+        blockingFactors(blockingFactors) {}
+  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<vnni::MatmulOp> packedMatmul = mlir::linalgx::packVNNIMatmulOp(
+        rewriter, matmulOp,
+        getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
+    if (failed(packedMatmul))
+      return failure();
+    return success();
+  }
+
+private:
+  ArrayRef<int64_t> blockingFactors;
+};
+
+// Pack BRGemmOp to VNNI
+struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
+  VNNIOnBRGemm(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+               PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::BatchReduceMatmulOp>(context, benefit),
+        blockingFactors(blockingFactors) {}
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<vnni::BRGemmOp> packedBRGemm = mlir::linalgx::packVNNIBRGemmOp(
+        rewriter, brgemmOp,
+        getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
+    if (failed(packedBRGemm))
+      return failure();
+    return success();
+  }
+
+private:
+  ArrayRef<int64_t> blockingFactors;
+};
+
+// Entry point for packing a matmul/brgemm operation to vnni format.
+struct PackVNNI : public PackVNNIBase<PackVNNI> {
+  PackVNNI() = default;
+  PackVNNI(ArrayRef<int64_t> blockingFactors) {
+    this->blockingFactors = blockingFactors;
+  }
+
+  void runOnOperation() override {
+    if (blockingFactors.empty())
+      return;
+    MLIRContext *ctx = getOperation().getContext();
+    RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkPackPatterns(patterns);
+    patterns.add<VNNIOnMatmul>(ctx, blockingFactors);
+    patterns.add<VNNIOnBRGemm>(ctx, blockingFactors);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
 } // end namespace
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
@@ -941,4 +1001,8 @@ mlir::tpp::createPackConv2DNchwFchwPass() {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createPackConv2DNhwcHwcfPass() {
   return std::make_unique<PackConv2DNhwcHwcf>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {
+  return std::make_unique<PackVNNI>();
 }
