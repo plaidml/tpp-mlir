@@ -12,6 +12,7 @@
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -157,6 +158,67 @@ static void buildPerfMeanFunc(Location loc, func::FuncOp func, Operation *op,
   rewriter.create<func::ReturnOp>(loc, ValueRange{mean});
 }
 
+// Generate function implementation for perf.stdev operation.
+static void buildPerfStdevFunc(Location loc, func::FuncOp func, Operation *op,
+                               PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  // Create function body
+  Block *block = func.addEntryBlock();
+  rewriter.setInsertionPointToEnd(block);
+
+  // Check assumptions on function arguments.
+  auto argTypes = func.getFunctionType().getInputs();
+  assert((argTypes.size() == 2) && "expect only 2 function argument");
+  assert((argTypes[0].isa<UnrankedMemRefType>()) &&
+         "expect unranked memref as the first argument");
+  assert((argTypes[1].isa<FloatType>()) &&
+         "expect float value as the second argument");
+
+  // Cast the buffer to something directly iteratable.
+  auto buff = block->getArguments()[0];
+  auto memRefType = MemRefType::get(
+      ShapedType::kDynamic,
+      buff.getType().cast<UnrankedMemRefType>().getElementType());
+  auto deltas = rewriter.create<memref::CastOp>(loc, memRefType, buff);
+
+  // Iterate over the whole buffer and compute the standard deviation of the
+  // measured time delta values.
+  // Implemented directly as scf to keep further lowering simple.
+  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  auto len = rewriter.create<memref::DimOp>(loc, deltas, zero);
+  auto floatType = rewriter.getF64Type();
+  auto result = rewriter.create<arith::ConstantFloatOp>(
+      loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
+  auto mean = block->getArguments()[1];
+
+  auto loopNest = scf::buildLoopNest(
+      rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
+      /*steps=*/ValueRange{one}, ValueRange{result},
+      [&](OpBuilder &b, Location loc, ValueRange localIvs,
+          ValueRange iterArgs) -> scf::ValueVector {
+        auto meas = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
+        auto delta = rewriter.create<arith::SubFOp>(loc, meas, mean);
+        auto deltaSqr = rewriter.create<arith::MulFOp>(loc, delta, delta);
+        auto sum = rewriter.create<arith::AddFOp>(loc, deltaSqr, iterArgs[0]);
+
+        return scf::ValueVector({sum});
+      });
+  assert((loopNest.results.size() == 1) && "expect only 1 loop result");
+
+  // Compute standard deviation.
+  auto lenInt = rewriter.create<arith::IndexCastOp>(
+      loc, rewriter.getIntegerType(64), len);
+  auto size = rewriter.create<arith::SIToFPOp>(loc, floatType, lenInt);
+  auto variance =
+      rewriter.create<arith::DivFOp>(loc, floatType, loopNest.results[0], size);
+  auto stdev = rewriter.create<math::SqrtOp>(loc, variance);
+
+  // Return the computed stdev value.
+  rewriter.create<func::ReturnOp>(loc, ValueRange{stdev});
+}
+
 // Creates function prototypes and insert calls to the perf runtime functions.
 static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
                                        Operation *op,
@@ -186,6 +248,9 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
     TypeSwitch<Operation *>(op)
         .Case<perf::MeanOp>([&](Operation *op) {
           buildPerfMeanFunc(loc, funcOp, op, rewriter);
+        })
+        .Case<perf::StdevOp>([&](Operation *op) {
+          buildPerfStdevFunc(loc, funcOp, op, rewriter);
         })
         .Default([&](Operation *op) {
           funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
