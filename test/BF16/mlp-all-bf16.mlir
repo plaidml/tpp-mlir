@@ -42,6 +42,7 @@ module @predict_function {
     %threshold = arith.constant 0.75:bf16
     check.expect_almost_eq(%interim1, %arg12, %threshold): memref<128x512xbf16>, memref<128x512xbf16>, bf16
     memref.dealloc %interim1: memref<128x512xbf16>
+    memref.dealloc %relayout_arg0: memref<128x512x2xbf16>
 
     tpp.identity ins(%arg4 : memref<1024xbf16>) out(%arg11 : memref<128x1024xbf16>)
     %relayout_arg12 = memref.alloc():memref<256x1024x2xbf16>
@@ -52,7 +53,8 @@ module @predict_function {
     %interim2 = memref.alloc(): memref<128x1024xbf16>
     linalg.fill ins(%c2:bf16) outs(%interim2: memref<128x1024xbf16>)
     check.expect_almost_eq(%interim2, %arg11, %threshold): memref<128x1024xbf16>, memref<128x1024xbf16>, bf16
-    memref.dealloc %interim2: memref<128x1024xbf16>   
+    memref.dealloc %interim2: memref<128x1024xbf16>  
+    memref.dealloc %relayout_arg12: memref<256x1024x2xbf16>
 
     tpp.identity ins(%arg6 : memref<2048xbf16>) out(%arg10 : memref<128x2048xbf16>)
     %relayout_arg11 = memref.alloc():memref<512x2048x2xbf16>
@@ -64,6 +66,7 @@ module @predict_function {
     linalg.fill ins(%c3:bf16) outs(%interim3: memref<128x2048xbf16>)
     check.expect_almost_eq(%interim3, %arg10, %threshold): memref<128x2048xbf16>, memref<128x2048xbf16>, bf16
     memref.dealloc %interim3: memref<128x2048xbf16>
+    memref.dealloc %relayout_arg11: memref<512x2048x2xbf16>
 
     tpp.identity ins(%arg8 : memref<1000xbf16>) out(%arg9 : memref<128x1000xbf16>)
     %relayout_arg10 = memref.alloc():memref<1024x1000x2xbf16>
@@ -75,6 +78,7 @@ module @predict_function {
     linalg.fill ins(%c4:bf16) outs(%interim4: memref<128x1000xbf16>)
     check.expect_almost_eq(%interim4, %arg9, %threshold): memref<128x1000xbf16>, memref<128x1000xbf16>, bf16    
     memref.dealloc %interim4: memref<128x1000xbf16>
+    memref.dealloc %relayout_arg10: memref<1024x1000x2xbf16>
 
     return
   }
