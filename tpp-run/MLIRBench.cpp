@@ -217,15 +217,11 @@ Value MLIRBench::getTimerStats(Value acc) {
 
 void MLIRBench::printVector(Value vector) {
   auto op = vector;
-  if (vector.getType().dyn_cast<VectorType>().getElementType().isBF16()) {
-    SmallVector<int64_t> dims;
-    for (int i = 0; i < vector.getType().dyn_cast<VectorType>().getRank();
-         i++) {
-      dims.push_back(vector.getType().dyn_cast<VectorType>().getShape()[i]);
-    }
-    VectorType vecType = VectorType::get(dims, builder.getF32Type());
+  auto vectorValue = vector.getType().dyn_cast<VectorType>();
+  if (vectorValue.getElementType().isBF16()) {
+    VectorType vecType =
+        VectorType::get(vectorValue.getShape(), builder.getF32Type());
     op = builder.create<arith::ExtFOp>(unkLoc, vecType, vector, std::nullopt);
-    op.dump();
   }
   builder.create<vector::PrintOp>(unkLoc, op);
 }
@@ -265,7 +261,7 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
                                                       builder.getF32Type());
   }
 
-  // Vector undefined value
+  // Loop through memref, transfer each dim to vector
   auto indexType = builder.getIndexType();
   auto countAttr = builder.getIntegerAttr(indexType, outerDims[0]);
   auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
@@ -338,9 +334,10 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   static unsigned order = 0;
 
   // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0);
-  bool Ignored;
+  auto floatValue = APFloat(1.0F);
+
   if (type.getElementType().isBF16()) {
+    bool Ignored;
     floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
                        &Ignored);
   }
@@ -359,8 +356,7 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   auto tensorType =
       RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
   auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
-  auto floatType = IntegerType::get(builder.getContext(), 64);
-  auto alignment = builder.getIntegerAttr(floatType, 128);
+  auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
 
   // Create the global object in the Module's region
   auto global = builder.create<memref::GlobalOp>(unkLoc, StringRef(name),
