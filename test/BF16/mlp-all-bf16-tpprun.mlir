@@ -39,10 +39,11 @@
     tpp.relu out(%arg12 : memref<128x1000xbf16>)
 
     %threshold = arith.constant 1.0 : bf16
-    %c4 = arith.constant 2.7557e+11: bf16
+    %c4 = arith.constant 2.74878e+11: bf16
     %interim4 = memref.alloc(): memref<128x1000xbf16>
     linalg.fill ins(%c4:bf16) outs(%interim4: memref<128x1000xbf16>)
     check.expect_almost_eq(%interim4, %arg12, %threshold): memref<128x1000xbf16>, memref<128x1000xbf16>, bf16
+    memref.dealloc interim4: memref<128x1000xbf16>
 
     return
   }
