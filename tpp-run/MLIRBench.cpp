@@ -250,9 +250,9 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
   APFloat vectorFloatValue = APFloat(-1.0F);
   Value minusOne;
   if (outputType.getElementType().isBF16()) {
-    bool Ignored;
+    bool ignored;
     vectorFloatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                             &Ignored);
+                             &ignored);
 
     minusOne = builder.create<arith::ConstantFloatOp>(
         unkLoc, vectorFloatValue, FloatType::getBF16(builder.getContext()));
@@ -337,9 +337,9 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   auto floatValue = APFloat(1.0F);
 
   if (type.getElementType().isBF16()) {
-    bool Ignored;
+    bool ignored;
     floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &Ignored);
+                       &ignored);
   }
   // Create global dense memrefs (Module insertion point)
   auto privAttr = builder.getStringAttr("private");
