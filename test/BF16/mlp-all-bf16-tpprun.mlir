@@ -43,7 +43,7 @@
     %interim4 = memref.alloc(): memref<128x1000xbf16>
     linalg.fill ins(%c4:bf16) outs(%interim4: memref<128x1000xbf16>)
     check.expect_almost_eq(%interim4, %arg12, %threshold): memref<128x1000xbf16>, memref<128x1000xbf16>, bf16
-    memref.dealloc interim4: memref<128x1000xbf16>
+    memref.dealloc %interim4: memref<128x1000xbf16>
 
     return
   }
