@@ -23,7 +23,7 @@ func.func @func_stop_timer() {
 
 // -----
 
-// CHECK-DAG: func.func private @perf_mean(memref<*xf64>) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_mean({{.*}}: memref<*xf64>) -> f64
 // CHECK-LABEL: @func_mean
 func.func @func_mean(%arg0: memref<?xf64>) {
   // CHECK: call @perf_mean({{.*}})
@@ -33,7 +33,7 @@ func.func @func_mean(%arg0: memref<?xf64>) {
 
 // -----
 
-// CHECK-DAG: func.func private @perf_stdev(memref<*xf64>, f64) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_stdev({{.*}}: memref<*xf64>, {{.*}}: f64) -> f64
 // CHECK-LABEL: @func_stdev
 func.func @func_stdev(%arg0: memref<?xf64>, %mean: f64) {
   // CHECK: call @perf_stdev({{.*}})
@@ -79,8 +79,8 @@ func.func @func_sink(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
 // -----
 
 // An example of perf dialect usage.
-// CHECK-DAG: func.func private @perf_stdev(memref<*xf64>, f64) -> f64 attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_mean(memref<*xf64>) -> f64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_stdev({{.*}}: memref<*xf64>, {{.*}}: f64) -> f64
+// CHECK-DAG: func.func private @perf_mean({{.*}}: memref<*xf64>) -> f64
 // CHECK-DAG: func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
