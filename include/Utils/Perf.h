@@ -56,7 +56,7 @@ public:
   }
 
   /// Stops the timer, accumulates, clears state
-  double stopTimer() {
+  void stopTimer() {
     assert(!locked && "Stop called after stats produced");
     assert(!isZero(start) && "Stop called before start");
     assert(isZero(stop) && "Stop called twice");
@@ -67,8 +67,6 @@ public:
     timings.push_back(val);
     zero(start);
     zero(stop);
-
-    return val;
   }
 
   /// Get mean of timings. Locks the timer, only calculate stats once.

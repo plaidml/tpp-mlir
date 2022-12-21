@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include <chrono>
-#include <cmath>
 #include <ctime>
 
 #include "PerfRunnerUtils.h"
@@ -77,8 +76,8 @@ double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
 
 // A generic sink function.
 // Its aim is to ensure that the passed data and its producers cannot be
-// optimized away to ensure that the time measured by a benchmark loop
-// represents the full workload correctly.
+// optimized away such that the time measured by a benchmark loop correctly
+// represents the full workload.
 static void __attribute__((optnone)) perf_sink(void *data) { (void)data; }
 
 /*

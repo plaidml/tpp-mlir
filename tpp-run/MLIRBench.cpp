@@ -290,8 +290,8 @@ LogicalResult MLIRBench::finalize() {
   // Minimal passes to make it work
   // We don't want TPP passes here, as that's the job of tpp-opt
   // The IR here should be free of TPP/XSMM or any TPP extensions
-  // Perf passes are an exception as they provide necessary generic lowering
-  // to materialize benchmarking code
+  // Perf passes are an exception as they provide necessary generic
+  // lowering to materialize benchmarking code
   PassManager passManager(module->getContext());
   applyPassManagerCLOptions(passManager);
 
