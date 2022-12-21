@@ -96,8 +96,6 @@ static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
       extractNormalizedTypes(rewriter, op->getOperands()),
       extractNormalizedTypes(rewriter, op->getResults()));
 
-  // Create a perf runtime function prototype.
-  // The function implementation has to be provided by a user.
   auto funcOp =
       rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
   funcOp.setPrivate();
@@ -147,8 +145,8 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
       /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
       [&](OpBuilder &b, Location loc, ValueRange localIvs,
           ValueRange iterArgs) -> scf::ValueVector {
-        auto delta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
-        auto sum = rewriter.create<arith::AddFOp>(loc, delta, iterArgs[0]);
+        auto timeDelta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
+        auto sum = rewriter.create<arith::AddFOp>(loc, timeDelta, iterArgs[0]);
 
         return scf::ValueVector({sum});
       });
@@ -214,8 +212,8 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
       /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
       [&](OpBuilder &b, Location loc, ValueRange localIvs,
           ValueRange iterArgs) -> scf::ValueVector {
-        auto meas = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
-        auto delta = rewriter.create<arith::SubFOp>(loc, meas, mean);
+        auto timeDelta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
+        auto delta = rewriter.create<arith::SubFOp>(loc, timeDelta, mean);
         auto deltaSqr = rewriter.create<arith::MulFOp>(loc, delta, delta);
         auto sum = rewriter.create<arith::AddFOp>(loc, deltaSqr, iterArgs[0]);
 
@@ -236,6 +234,8 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
   return success();
 }
 
+// Create a perf runtime function prototype.
+// The function implementation has to be provided externally by the end user.
 static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
                                           Operation *op,
                                           PatternRewriter &rewriter) {
@@ -246,7 +246,9 @@ static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
   return success();
 }
 
-// Creates function prototypes and insert calls to the perf runtime functions.
+// Insert calls to functions implementing corresponding perf op functionality.
+// If a function is unavailable in the current module, the function's builder
+// is called.
 static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
                                        Operation *op,
                                        PatternRewriter &rewriter) {
