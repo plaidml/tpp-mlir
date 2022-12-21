@@ -45,7 +45,7 @@ llvm::cl::opt<unsigned>
 // Print result
 llvm::cl::opt<bool>
     printResultMemRef("print", llvm::cl::desc("Print result memref"),
-                  llvm::cl::value_desc("true/false"), llvm::cl::init(true));
+                  llvm::cl::value_desc("true/false"), llvm::cl::init(false));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
