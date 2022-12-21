@@ -35,6 +35,9 @@
 #include "mlir/Target/LLVMIR/Dialect/All.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
+#include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Perf/PerfDialect.h"
+
 using namespace mlir;
 
 // Number of loops for benchmarks
@@ -43,9 +46,10 @@ llvm::cl::opt<unsigned>
                   llvm::cl::value_desc("int"), llvm::cl::init(1));
 
 // Print result
-llvm::cl::opt<bool>
-    printResultMemRef("print", llvm::cl::desc("Print result memref"),
-                  llvm::cl::value_desc("true/false"), llvm::cl::init(false));
+llvm::cl::opt<bool> printResultMemRef("print",
+                                      llvm::cl::desc("Print result memref"),
+                                      llvm::cl::value_desc("true/false"),
+                                      llvm::cl::init(false));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
@@ -114,6 +118,8 @@ int main(int argc, char **argv) {
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated
   DialectRegistry registry;
+  registry.insert<mlir::perf::PerfDialect>();
+  mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
   registerAllDialects(registry);
   registerAllToLLVMIRTranslations(registry);
 

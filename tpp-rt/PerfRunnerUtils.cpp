@@ -73,31 +73,6 @@ double _mlir_ciface_perf_stop_timer(int64_t timer) {
   return perfResults.stopTimer();
 }
 
-double _mlir_ciface_perf_mean(UnrankedMemRefType<double> *deltasBuff) {
-  auto deltas = DynamicMemRefType<double>(*deltasBuff);
-  assert(deltas.rank == 1 && "Invalid deltas buffer");
-
-  const int size = deltas.sizes[0];
-  double sum = 0.0;
-  for (auto it = deltas.begin(); it != deltas.end(); ++it)
-    sum += *it;
-  return sum / size;
-}
-
-double _mlir_ciface_perf_stdev(UnrankedMemRefType<double> *deltasBuff,
-                               double mean) {
-  auto deltas = DynamicMemRefType<double>(*deltasBuff);
-  assert(deltas.rank == 1 && "Invalid deltas buffer");
-
-  const int size = deltas.sizes[0];
-  double sum = 0.0;
-  for (auto it = deltas.begin(); it != deltas.end(); ++it) {
-    double delta = *it - mean;
-    sum += delta * delta;
-  }
-  return std::sqrt(sum / size);
-}
-
 static void __attribute__((optnone)) perf_sink(void *data) { (void)data; }
 
 void _mlir_ciface_perf_sink_memref_i8(UnrankedMemRefType<int8_t> *val) {

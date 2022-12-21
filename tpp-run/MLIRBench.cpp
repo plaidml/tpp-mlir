@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -27,6 +28,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
+#include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Perf/PerfOps.h"
+#include "TPP/Passes.h"
+
 using namespace mlir;
 
 MLIRBench::MLIRBench(mlir::Operation *op)
@@ -37,9 +42,8 @@ MLIRBench::MLIRBench(mlir::Operation *op)
   ctx->getOrLoadDialect<tensor::TensorDialect>();
   ctx->getOrLoadDialect<vector::VectorDialect>();
   ctx->getOrLoadDialect<scf::SCFDialect>();
-
-  // TODO: Remove this once we use the perf dialect
-  declareGlobalFunctions();
+  ctx->getOrLoadDialect<math::MathDialect>();
+  ctx->getOrLoadDialect<perf::PerfDialect>();
 }
 
 LogicalResult MLIRBench::findKernel(StringRef name) {
@@ -154,30 +158,19 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
 
 Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
                                  unsigned n) {
-  // Allocates the vector for results
-  auto callAlloc =
-      builder.create<func::CallOp>(unkLoc, timer.alloc, ValueRange());
-  auto acc = callAlloc.getResult(0);
+  // Allocates buffer for results
+  auto i64Type = builder.getI64Type();
+  auto count = builder.create<arith::ConstantOp>(
+      unkLoc, i64Type, builder.getIntegerAttr(i64Type, n));
+  auto memrefType = MemRefType::get({n}, builder.getF64Type());
+  auto acc = builder.create<memref::AllocOp>(unkLoc, memrefType);
 
-  // Create a SCF loop, set insertion to inside loop
-  auto indexType = builder.getIndexType();
-  auto countAttr = builder.getIntegerAttr(indexType, n);
-  auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
-  auto zeroAttr = builder.getIntegerAttr(indexType, 0);
-  auto zero = builder.create<arith::ConstantOp>(unkLoc, indexType, zeroAttr);
-  auto oneAttr = builder.getIntegerAttr(indexType, 1);
-  auto one = builder.create<arith::ConstantOp>(unkLoc, indexType, oneAttr);
-  auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
+  // Create perf benchmarking region, set insertion to inside the body
+  auto loop = builder.create<perf::BenchOp>(unkLoc, count, acc);
   builder.setInsertionPointToStart(loop.getBody());
-
-  // Call timer_now()
-  builder.create<func::CallOp>(unkLoc, timer.start, ValueRange(acc));
 
   // Call the kernel, ignore output
   callKernel(list);
-
-  // Call timer_now() again
-  builder.create<func::CallOp>(unkLoc, timer.stop, ValueRange(acc));
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
@@ -185,13 +178,12 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
 }
 
 Value MLIRBench::getTimerStats(Value acc) {
-  // Get stats (this is done once, but we can get values in separate)
   auto callMean =
-      builder.create<func::CallOp>(unkLoc, timer.average, ValueRange{acc});
-  auto mean = callMean.getResult(0);
+      builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
+  auto mean = callMean.getMean();
   auto callDev =
-      builder.create<func::CallOp>(unkLoc, timer.deviation, ValueRange{acc});
-  auto dev = callDev.getResult(0);
+      builder.create<perf::StdevOp>(unkLoc, builder.getF64Type(), acc, mean);
+  auto dev = callDev.getStdev();
 
   // Create a vector<2xf64> so we can print
   auto zeroFAttr = builder.getFloatAttr(builder.getF64Type(), 0.0);
@@ -211,6 +203,9 @@ Value MLIRBench::getTimerStats(Value acc) {
       builder.create<arith::ConstantOp>(unkLoc, builder.getI64Type(), oneIAttr);
   auto insDev =
       builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
+
+  // Clean up results buffer
+  builder.create<memref::DeallocOp>(unkLoc, acc);
 
   return insDev;
 }
@@ -295,6 +290,8 @@ LogicalResult MLIRBench::finalize() {
   // Minimal passes to make it work
   // We don't want TPP passes here, as that's the job of tpp-opt
   // The IR here should be free of TPP/XSMM or any TPP extensions
+  // Perf passes are an exception as they provide necessary generic lowering
+  // to materialize benchmarking code
   PassManager passManager(module->getContext());
   applyPassManagerCLOptions(passManager);
 
@@ -304,6 +301,8 @@ LogicalResult MLIRBench::finalize() {
   passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
 
   // Partial Lowering
+  passManager.addPass(tpp::createConvertPerfToLoopsPass());
+  passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addPass(arith::createArithExpandOpsPass());
@@ -314,6 +313,7 @@ LogicalResult MLIRBench::finalize() {
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addPass(createMemRefToLLVMConversionPass());
+  passManager.addPass(createConvertMathToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
@@ -364,52 +364,6 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
                                                  /*constant=*/false, alignment);
 
   return global.getName();
-}
-
-void MLIRBench::declareGlobalFunctions() {
-  // Common function attributes
-  auto cifaceAttr = LLVM::LLVMDialect::getEmitCWrapperAttrName();
-  auto unitAttr = UnitAttr::get(module->getContext());
-  auto visAttr = builder.getStringAttr("sym_visibility");
-  auto privAttr = builder.getStringAttr("private");
-  // Data types
-  auto f64 = builder.getF64Type();
-  auto i64 = builder.getIntegerType(64);
-
-  // Alloc
-  timer.alloc = func::FuncOp::create(unkLoc, "timer_alloc",
-                                     builder.getFunctionType({}, {i64}));
-  timer.alloc->setAttr(cifaceAttr, unitAttr);
-  timer.alloc->setAttr(visAttr, privAttr);
-  module.push_back(timer.alloc);
-
-  // Start
-  timer.start = func::FuncOp::create(unkLoc, "timer_start",
-                                     builder.getFunctionType({i64}, {}));
-  timer.start->setAttr(cifaceAttr, unitAttr);
-  timer.start->setAttr(visAttr, privAttr);
-  module.push_back(timer.start);
-
-  // Stop
-  timer.stop = func::FuncOp::create(unkLoc, "timer_stop",
-                                    builder.getFunctionType({i64}, {}));
-  timer.stop->setAttr(cifaceAttr, unitAttr);
-  timer.stop->setAttr(visAttr, privAttr);
-  module.push_back(timer.stop);
-
-  // Average
-  timer.average = func::FuncOp::create(unkLoc, "timer_average",
-                                       builder.getFunctionType({i64}, {f64}));
-  timer.average->setAttr(cifaceAttr, unitAttr);
-  timer.average->setAttr(visAttr, privAttr);
-  module.push_back(timer.average);
-
-  // Deviation
-  timer.deviation = func::FuncOp::create(unkLoc, "timer_deviation",
-                                         builder.getFunctionType({i64}, {f64}));
-  timer.deviation->setAttr(cifaceAttr, unitAttr);
-  timer.deviation->setAttr(visAttr, privAttr);
-  module.push_back(timer.deviation);
 }
 
 MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
