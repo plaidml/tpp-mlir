@@ -87,10 +87,15 @@ static SmallVector<Value> getNormalizedOperands(OpBuilder &b, Location loc,
 }
 
 // Create a perf function prototype.
-// Assumes that the current insertion point is in the correct place.
 static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
                                             Operation *op,
                                             PatternRewriter &rewriter) {
+  // Insert before module terminator.
+  ModuleOp module = op->getParentOfType<ModuleOp>();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(module.getBody(),
+                             std::prev(module.getBody()->end()));
+
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   auto libFnType = rewriter.getFunctionType(
       extractNormalizedTypes(rewriter, op->getOperands()),
@@ -107,11 +112,11 @@ static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
 static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
                                        Operation *op,
                                        PatternRewriter &rewriter) {
-  OpBuilder::InsertionGuard guard(rewriter);
   auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
   // Create function body
   Block *block = funcOp.addEntryBlock();
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
 
   // Check assumptions on function arguments.
@@ -168,11 +173,11 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
 static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
                                         Operation *op,
                                         PatternRewriter &rewriter) {
-  OpBuilder::InsertionGuard guard(rewriter);
   auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
   // Create function body
   Block *block = funcOp.addEntryBlock();
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
 
   // Check assumptions on function arguments.
@@ -262,12 +267,6 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
 
   // If a function is not available yet, call its builder.
   if (!module.lookupSymbol(fnName.getAttr())) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    // Insert before module terminator.
-    rewriter.setInsertionPoint(module.getBody(),
-                               std::prev(module.getBody()->end()));
-
-    // Build the missing function.
     auto res = TypeSwitch<Operation *, LogicalResult>(op)
                    .Case<perf::MeanOp>([&](Operation *op) {
                      return buildPerfMeanFunc(loc, funcName, op, rewriter);
