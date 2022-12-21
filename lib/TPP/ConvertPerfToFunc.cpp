@@ -114,7 +114,7 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
                                        PatternRewriter &rewriter) {
   auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
-  // Create function body
+  // Create function body.
   Block *block = funcOp.addEntryBlock();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
@@ -175,7 +175,7 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
                                         PatternRewriter &rewriter) {
   auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
-  // Create function body
+  // Create function body.
   Block *block = funcOp.addEntryBlock();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
@@ -239,6 +239,31 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
   return success();
 }
 
+// Generate function implementation for perf.sink operation.
+static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
+                                       Operation *op,
+                                       PatternRewriter &rewriter) {
+  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
+
+  // Add function attributes which ensure that the passed data and its producers
+  // operations cannot be optimized away such that the time measured by a
+  // benchmark loop correctly represents the full workload.
+  auto ctx = rewriter.getContext();
+  funcOp->setAttr("passthrough",
+                  rewriter.getArrayAttr({StringAttr::get(ctx, "optnone"),
+                                         StringAttr::get(ctx, "noinline")}));
+
+  // Create function body.
+  Block *block = funcOp.addEntryBlock();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToEnd(block);
+
+  // Insert empty return.
+  rewriter.create<func::ReturnOp>(loc, ValueRange{});
+
+  return success();
+}
+
 // Create a perf runtime function prototype.
 // The function implementation has to be provided externally by the end user.
 static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
@@ -273,6 +298,9 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
                    })
                    .Case<perf::StdevOp>([&](Operation *op) {
                      return buildPerfStdevFunc(loc, funcName, op, rewriter);
+                   })
+                   .Case<perf::SinkOp>([&](Operation *op) {
+                     return buildPerfSinkFunc(loc, funcName, op, rewriter);
                    })
                    .Default([&](Operation *op) {
                      return buildPerfRuntimeFunc(loc, funcName, op, rewriter);
