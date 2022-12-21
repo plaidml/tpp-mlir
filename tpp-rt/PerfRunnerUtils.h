@@ -15,16 +15,12 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_timer_alloc();
+//===----------------------------------------------------------------------===//
+// Perf dialect utils
+//===----------------------------------------------------------------------===//
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_start(int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_perf_start_timer();
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_stop(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_accumulate(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_timer_average(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_timer_deviation(int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_perf_stop_timer(int64_t);
 
 #endif // TPP_EXECUTIONENGINE_PERFRUNNERUTILS_H
