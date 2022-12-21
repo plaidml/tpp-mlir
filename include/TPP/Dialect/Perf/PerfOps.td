@@ -43,6 +43,12 @@ def Perf_StartTimerOp : Perf_Op<"start_timer", []> {
   let assemblyFormat = [{
     attr-dict `:` type($timer)
   }];
+
+  let extraClassDeclaration = [{
+    static std::string getLibraryCallName() {
+      return "perf_start_timer";
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,6 +81,12 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
   let assemblyFormat = [{
     `(` $timer `:` type($timer) `)` attr-dict
     `:` type($delta)
+  }];
+
+  let extraClassDeclaration = [{
+    static std::string getLibraryCallName() {
+      return "perf_stop_timer";
+    }
   }];
 
   let hasVerifier = 1;
@@ -252,6 +264,12 @@ def Perf_MeanOp : Perf_Op<"mean", []> {
     `(` $input `:` type($input) `)` attr-dict
     `:` type($mean)
   }];
+
+  let extraClassDeclaration = [{
+    static std::string getLibraryCallName() {
+      return "perf_mean";
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -285,6 +303,12 @@ def Perf_StdevOp : Perf_Op<"stdev", []> {
     `(` $input `:` type($input) `,` $mean `:` type($mean) `)` attr-dict
     `:` type($stdev)
   }];
+
+  let extraClassDeclaration = [{
+    static std::string getLibraryCallName() {
+      return "perf_stdev";
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -317,6 +341,12 @@ def Perf_SinkOp : Perf_Op<"sink", [ConditionallySpeculatable]> {
   }];
 
   let extraClassDeclaration = [{
+    static std::string applyTypeMangling(std::string name, Type type);
+
+    std::string getLibraryCallName() {
+      return applyTypeMangling("perf_sink", getInput().getType());
+    }
+
     ::mlir::Speculation::Speculatability getSpeculatability() {
       return ::mlir::Speculation::NotSpeculatable;
     }
