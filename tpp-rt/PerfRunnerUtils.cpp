@@ -60,23 +60,30 @@ double _mlir_ciface_timer_deviation(int64_t acc) {
 // Perf dialect utils
 //===----------------------------------------------------------------------===//
 
-// Return current timestamp.
+// Return the current timestamp.
 int64_t _mlir_ciface_perf_start_timer() {
   auto timestamp = std::chrono::high_resolution_clock::now();
   return timestamp.time_since_epoch().count();
 }
 
 // Compute time delta between the starting time and now.
-double _mlir_ciface_perf_stop_timer(int64_t timestamp) {
+double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
   auto stop = std::chrono::high_resolution_clock::now();
   std::chrono::system_clock::time_point start{
-      std::chrono::system_clock::duration{timestamp}};
+      std::chrono::system_clock::duration{startTimestamp}};
   return std::chrono::duration_cast<std::chrono::duration<double>>(stop - start)
       .count();
 }
 
+// A generic sink function.
+// Its aim is to ensure that the passed data and its producers cannot be
+// optimized away to ensure that the time measured by a benchmark loop
+// represents the full workload correctly.
 static void __attribute__((optnone)) perf_sink(void *data) { (void)data; }
 
+/*
+  Perf dialect runtime bindings for common perf.sink op argument types.
+*/
 void _mlir_ciface_perf_sink_memref_i8(UnrankedMemRefType<int8_t> *val) {
   perf_sink((void *)&val);
 }
