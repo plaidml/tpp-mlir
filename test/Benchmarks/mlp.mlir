@@ -9,14 +9,6 @@
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
-
-// RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \ 
-// RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
-// RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
-//
-
 // Total flops = broadcast O(n*m) + matmul O(2*n*m*k) + ReLU (O(n*m)
 // 2*128x512 (131072) + 2*128x256x512 (33554432) = 33685504
 // BENCH_TOTAL_FLOPS: 33685504
@@ -43,13 +35,3 @@ func.func @entry(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: 
 
 // Stats
 // CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
-
-// TPP: func.func @entry(
-// TPP-SAME:  %[[ARG0:.+]]: memref<128x256xf32>,
-// TPP-SAME:  %[[ARG1:.+]]: memref<256x512xf32>,
-// TPP-SAME:  %[[ARG2:.+]]: memref<1x512xf32>,
-// TPP-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
-// TPP: tpp.identity ins(%[[ARG2]] : memref<1x512xf32>) out(%[[ARG3:.+]] : memref<128x512xf32>)
-// TPP: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
-// TPP: tpp.relu out(%[[ARG3]] : memref<128x512xf32>)
-// TPP: return
