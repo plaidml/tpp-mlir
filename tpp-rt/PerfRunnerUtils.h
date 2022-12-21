@@ -16,22 +16,6 @@
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 //===----------------------------------------------------------------------===//
-// Benchamrk perf utils
-//===----------------------------------------------------------------------===//
-
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_timer_alloc();
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_start(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_stop(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_timer_accumulate(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_timer_average(int64_t);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_timer_deviation(int64_t);
-
-//===----------------------------------------------------------------------===//
 // Perf dialect utils
 //===----------------------------------------------------------------------===//
 
