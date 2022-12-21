@@ -86,35 +86,38 @@ static SmallVector<Value> getNormalizedOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-// Apply custom function name mangling for various data types.
-// It is assumed that all relevant perf operations accept only unranked memory
-// types. This allows for simpler name mangling and leaner perf runtime.
-static void applyTypeMangling(std::string &name, Type type) {
-  llvm::raw_string_ostream mangledName(name);
+// Create a perf function prototype.
+// Assumes that the current insertion point is in the correct place.
+static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
+                                            Operation *op,
+                                            PatternRewriter &rewriter) {
+  FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
+  auto libFnType = rewriter.getFunctionType(
+      extractNormalizedTypes(rewriter, op->getOperands()),
+      extractNormalizedTypes(rewriter, op->getResults()));
 
-  TypeSwitch<Type>(type)
-      .Case<MemRefType>([&](Type t) {
-        mangledName << "_memref"
-                    << "_" << cast<MemRefType>(t).getElementType();
-      })
-      .Case<TensorType>([&](Type t) {
-        mangledName << "_tensor"
-                    << "_" << cast<TensorType>(t).getElementType();
-      })
-      .Default([&](Type t) { mangledName << "_" << t; });
+  // Create a perf runtime function prototype.
+  // The function implementation has to be provided by a user.
+  auto funcOp =
+      rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
+  funcOp.setPrivate();
+
+  return funcOp;
 }
 
 // Generate function implementation for perf.mean operation.
-static void buildPerfMeanFunc(Location loc, func::FuncOp func, Operation *op,
-                              PatternRewriter &rewriter) {
+static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
+                                       Operation *op,
+                                       PatternRewriter &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
+  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
   // Create function body
-  Block *block = func.addEntryBlock();
+  Block *block = funcOp.addEntryBlock();
   rewriter.setInsertionPointToEnd(block);
 
   // Check assumptions on function arguments.
-  auto argTypes = func.getFunctionType().getInputs();
+  auto argTypes = funcOp.getFunctionType().getInputs();
   assert((argTypes.size() == 1) && "expect only 1 function argument");
   assert((argTypes[0].isa<UnrankedMemRefType>()) &&
          "expect unranked memref argument");
@@ -156,19 +159,23 @@ static void buildPerfMeanFunc(Location loc, func::FuncOp func, Operation *op,
 
   // Return the computed mean value.
   rewriter.create<func::ReturnOp>(loc, ValueRange{mean});
+
+  return success();
 }
 
 // Generate function implementation for perf.stdev operation.
-static void buildPerfStdevFunc(Location loc, func::FuncOp func, Operation *op,
-                               PatternRewriter &rewriter) {
+static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
+                                        Operation *op,
+                                        PatternRewriter &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
+  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
 
   // Create function body
-  Block *block = func.addEntryBlock();
+  Block *block = funcOp.addEntryBlock();
   rewriter.setInsertionPointToEnd(block);
 
   // Check assumptions on function arguments.
-  auto argTypes = func.getFunctionType().getInputs();
+  auto argTypes = funcOp.getFunctionType().getInputs();
   assert((argTypes.size() == 2) && "expect only 2 function argument");
   assert((argTypes[0].isa<UnrankedMemRefType>()) &&
          "expect unranked memref as the first argument");
@@ -217,6 +224,18 @@ static void buildPerfStdevFunc(Location loc, func::FuncOp func, Operation *op,
 
   // Return the computed stdev value.
   rewriter.create<func::ReturnOp>(loc, ValueRange{stdev});
+
+  return success();
+}
+
+static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
+                                          Operation *op,
+                                          PatternRewriter &rewriter) {
+  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
+  funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                  UnitAttr::get(rewriter.getContext()));
+
+  return success();
 }
 
 // Creates function prototypes and insert calls to the perf runtime functions.
@@ -231,34 +250,29 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
 
-  // Create function prototype if it is not available yet.
+  // If a function is not available yet, call its builder.
   if (!module.lookupSymbol(fnName.getAttr())) {
     OpBuilder::InsertionGuard guard(rewriter);
     // Insert before module terminator.
     rewriter.setInsertionPoint(module.getBody(),
                                std::prev(module.getBody()->end()));
 
-    auto libFnType = rewriter.getFunctionType(
-        extractNormalizedTypes(rewriter, op->getOperands()),
-        extractNormalizedTypes(rewriter, op->getResults()));
-    func::FuncOp funcOp =
-        rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    funcOp.setPrivate();
-
-    TypeSwitch<Operation *>(op)
-        .Case<perf::MeanOp>([&](Operation *op) {
-          buildPerfMeanFunc(loc, funcOp, op, rewriter);
-        })
-        .Case<perf::StdevOp>([&](Operation *op) {
-          buildPerfStdevFunc(loc, funcOp, op, rewriter);
-        })
-        .Default([&](Operation *op) {
-          funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                          UnitAttr::get(rewriter.getContext()));
-        });
+    // Build the missing function.
+    auto res = TypeSwitch<Operation *, LogicalResult>(op)
+                   .Case<perf::MeanOp>([&](Operation *op) {
+                     return buildPerfMeanFunc(loc, funcName, op, rewriter);
+                   })
+                   .Case<perf::StdevOp>([&](Operation *op) {
+                     return buildPerfStdevFunc(loc, funcName, op, rewriter);
+                   })
+                   .Default([&](Operation *op) {
+                     return buildPerfRuntimeFunc(loc, funcName, op, rewriter);
+                   });
+    if (failed(res))
+      return res;
   }
 
-  // Insert a function call to the perf runtime.
+  // Insert a function call.
   auto funcCall = rewriter.create<func::CallOp>(
       loc, fnName.getValue(),
       extractNormalizedTypes(rewriter, op->getResults()),
@@ -273,7 +287,8 @@ struct ConvertStartTimerOp : public OpRewritePattern<perf::StartTimerOp> {
 
   LogicalResult matchAndRewrite(perf::StartTimerOp startTimerOp,
                                 PatternRewriter &rewriter) const override {
-    auto res = buildPerfFuncCall(startTimerOp.getLoc(), "perf_start_timer",
+    auto res = buildPerfFuncCall(startTimerOp.getLoc(),
+                                 startTimerOp.getLibraryCallName(),
                                  startTimerOp, rewriter);
     if (succeeded(res))
       rewriter.eraseOp(startTimerOp);
@@ -286,8 +301,9 @@ struct ConvertStopTimerOp : public OpRewritePattern<perf::StopTimerOp> {
 
   LogicalResult matchAndRewrite(perf::StopTimerOp stopTimerOp,
                                 PatternRewriter &rewriter) const override {
-    auto res = buildPerfFuncCall(stopTimerOp.getLoc(), "perf_stop_timer",
-                                 stopTimerOp, rewriter);
+    auto res = buildPerfFuncCall(stopTimerOp.getLoc(),
+                                 stopTimerOp.getLibraryCallName(), stopTimerOp,
+                                 rewriter);
     if (succeeded(res))
       rewriter.eraseOp(stopTimerOp);
     return res;
@@ -299,8 +315,8 @@ struct ConvertMeanOp : public OpRewritePattern<perf::MeanOp> {
 
   LogicalResult matchAndRewrite(perf::MeanOp meanOp,
                                 PatternRewriter &rewriter) const override {
-    auto res =
-        buildPerfFuncCall(meanOp.getLoc(), "perf_mean", meanOp, rewriter);
+    auto res = buildPerfFuncCall(meanOp.getLoc(), meanOp.getLibraryCallName(),
+                                 meanOp, rewriter);
     if (succeeded(res))
       rewriter.eraseOp(meanOp);
     return res;
@@ -312,8 +328,8 @@ struct ConvertStdevOp : public OpRewritePattern<perf::StdevOp> {
 
   LogicalResult matchAndRewrite(perf::StdevOp stdevOp,
                                 PatternRewriter &rewriter) const override {
-    auto res =
-        buildPerfFuncCall(stdevOp.getLoc(), "perf_stdev", stdevOp, rewriter);
+    auto res = buildPerfFuncCall(stdevOp.getLoc(), stdevOp.getLibraryCallName(),
+                                 stdevOp, rewriter);
     if (succeeded(res))
       rewriter.eraseOp(stdevOp);
     return res;
@@ -325,14 +341,13 @@ struct ConvertSinkOp : public OpRewritePattern<perf::SinkOp> {
 
   LogicalResult matchAndRewrite(perf::SinkOp sinkOp,
                                 PatternRewriter &rewriter) const override {
-    std::string funcName("perf_sink");
+
     // perf.sink relies on the perf runtime to prevent complier from
     // optimizing away marked data. Name mangling is required as the op
     // accepts any kind of data. For simplicity, the mangling makes some
     // assumptions on data types supported by the perf dialect.
-    applyTypeMangling(funcName, sinkOp.getInput().getType());
-
-    auto res = buildPerfFuncCall(sinkOp.getLoc(), funcName, sinkOp, rewriter);
+    auto res = buildPerfFuncCall(sinkOp.getLoc(), sinkOp.getLibraryCallName(),
+                                 sinkOp, rewriter);
     if (succeeded(res))
       rewriter.eraseOp(sinkOp);
     return res;
