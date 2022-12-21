@@ -76,16 +76,27 @@ func.func @func_stdev(%arg0: memref<?xf64>, %mean: f64) {
 
 // -----
 
-// CHECK-DAG: func.func private @perf_sink_memref_i64(memref<*xi64>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_memref_i32(memref<*xi32>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_tensor_f64(tensor<*xf64>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_i32(i32) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_i16(i16) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_f32(f32) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_sink_f16(f16) attributes {llvm.emit_c_interface}
-// CHECK-LABEL: @func_sink
-func.func @func_sink(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
+// CHECK: func.func private @perf_sink_memref_f64({{.*}}: memref<*xf64>) attributes {passthrough = ["optnone", "noinline"]} {
+// CHECK:   return
+// CHECK: }
+func.func @func_sink(%arg0: memref<?xf64>) {
+  // CHECK: call @perf_sink_memref_f64({{.*}})
+  perf.sink(%arg0) : memref<?xf64>
+  return
+}
+
+// -----
+
+// CHECK-DAG: func.func private @perf_sink_memref_i64({{.*}}: memref<*xi64>) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_memref_i32({{.*}}: memref<*xi32>) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_tensor_f64({{.*}}: tensor<*xf64>) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_tensor_f32({{.*}}: tensor<*xf32>) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_i32({{.*}}: i32) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_i16({{.*}}: i16) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_f32({{.*}}: f32) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-DAG: func.func private @perf_sink_f16({{.*}}: f16) attributes {passthrough = ["optnone", "noinline"]}
+// CHECK-LABEL: @func_sink_variants
+func.func @func_sink_variants(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
                             %arg2: tensor<?xf64>, %arg3: tensor<?xf32>,
                             %arg4: i32, %arg5: i16,
                             %arg6: f32, %arg7: f16 ) {
@@ -114,7 +125,7 @@ func.func @func_sink(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
 // An example of perf dialect usage.
 // CHECK-DAG: func.func private @perf_stdev({{.*}}: memref<*xf64>, {{.*}}: f64) -> f64
 // CHECK-DAG: func.func private @perf_mean({{.*}}: memref<*xf64>) -> f64
-// CHECK-DAG: func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_sink_tensor_f32({{.*}}: tensor<*xf32>) attributes {passthrough = ["optnone", "noinline"]}
 // CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
 // CHECK-LABEL: @perf_example
