@@ -8,8 +8,8 @@
 
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-//#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-//#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -21,7 +21,6 @@ using namespace mlir;
 
 namespace {
 
-#if 0
 struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -65,8 +64,9 @@ struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
       return failure();
     ShapedType sourceType = unPackOp.getSourceType();
     int64_t destRank = unPackOp.getDestType().getRank();
-    SmallVector<int64_t> tiles =
-        llvm::to_vector(sourceType.getShape().take_back(destRank));
+    //SmallVector<int64_t> tiles =
+    //    llvm::to_vector(sourceType.getShape().take_back(destRank));
+    SmallVector<int64_t> tiles(destRank, 1);
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tiles);
     FailureOr<scf::SCFTilingResult> tilingResult =
@@ -77,14 +77,6 @@ struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
     return success();
   }
 };
-
-void populateGeneralizeTensorPackAndUnPack(RewritePatternSet &patterns) {
-  patterns.insert<TilePackToUnitDims, TileUnPackToUnitDims,
-                  mlir::linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                  mlir::linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(
-      patterns.getContext());
-}
-#endif
 
 struct SwapWithLinalgxPack : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -110,9 +102,13 @@ struct SwapWithLinalgxUnPack : OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-void populateGeneralizeTensorPackAndUnPack(RewritePatternSet &patterns) {
-  patterns.insert<SwapWithLinalgxPack, SwapWithLinalgxUnPack>(
-      patterns.getContext());
+void populateGeneralizeTensorPackAndUnPack(RewritePatternSet &patterns, bool convertToLinalg) {
+  if (!convertToLinalg)
+    patterns.insert<SwapWithLinalgxPack, SwapWithLinalgxUnPack>(
+        patterns.getContext());
+  else 
+    patterns.insert<TilePackToUnitDims, TileUnPackToUnitDims, mlir::linalg::GeneralizeOuterUnitDimsPackOpPattern,
+        mlir::linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(patterns.getContext());
 }
 
 struct GeneralizeTensorPackAndUnPack
@@ -121,7 +117,7 @@ struct GeneralizeTensorPackAndUnPack
 
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
-    populateGeneralizeTensorPackAndUnPack(patterns);
+    populateGeneralizeTensorPackAndUnPack(patterns, convertToLinalg);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

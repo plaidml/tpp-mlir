@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s --pack-vnni="block-factors=2"  --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize  --linalg-ext-to-loops --convert-linalg-to-tpp --convert-check-to-loops --convert-vnni-to-tpp --convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf  --convert-math-to-llvm --lower-affine --reconcile-unrealized-casts |\
+// RUN: tpp-opt %s -pack-vnni="block-factors=2"  -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize  --linalg-ext-to-loops --convert-check-to-loops --convert-vnni-to-tpp --convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf  --convert-math-to-llvm --lower-affine --reconcile-unrealized-casts |\
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void
 //
