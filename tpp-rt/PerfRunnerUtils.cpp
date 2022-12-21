@@ -34,33 +34,3 @@ double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(stop - start)
       .count();
 }
-
-// A generic sink function.
-// Its aim is to ensure that the passed data and its producers cannot be
-// optimized away such that the time measured by a benchmark loop correctly
-// represents the full workload.
-static void __attribute__((optnone)) perf_sink(void *data) { (void)data; }
-
-/*
-  Perf dialect runtime bindings for common perf.sink op argument types.
-*/
-void _mlir_ciface_perf_sink_memref_i8(UnrankedMemRefType<int8_t> *val) {
-  perf_sink((void *)&val);
-}
-void _mlir_ciface_perf_sink_memref_i16(UnrankedMemRefType<int16_t> *val) {
-  perf_sink((void *)&val);
-}
-void _mlir_ciface_perf_sink_memref_i32(UnrankedMemRefType<int32_t> *val) {
-  perf_sink((void *)&val);
-}
-void _mlir_ciface_perf_sink_memref_i64(UnrankedMemRefType<int64_t> *val) {
-  perf_sink((void *)&val);
-}
-
-void _mlir_ciface_perf_sink_i8(int8_t val) { perf_sink((void *)&val); }
-void _mlir_ciface_perf_sink_i16(int16_t val) { perf_sink((void *)&val); }
-void _mlir_ciface_perf_sink_i32(int32_t val) { perf_sink((void *)&val); }
-void _mlir_ciface_perf_sink_i64(int64_t val) { perf_sink((void *)&val); }
-
-void _mlir_ciface_perf_sink_f32(float val) { perf_sink((void *)&val); }
-void _mlir_ciface_perf_sink_f64(double val) { perf_sink((void *)&val); }
