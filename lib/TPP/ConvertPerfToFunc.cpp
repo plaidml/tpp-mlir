@@ -118,9 +118,13 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
 
   // Check assumptions on function arguments.
   auto argTypes = funcOp.getFunctionType().getInputs();
-  assert((argTypes.size() == 1) && "expect only 1 function argument");
-  assert((argTypes[0].isa<UnrankedMemRefType>()) &&
-         "expect unranked memref argument");
+  if (argTypes.size() != 1)
+    return op->emitError("expected only 1 function argument, but received ")
+           << argTypes.size();
+  if (!argTypes[0].isa<UnrankedMemRefType>())
+    return op->emitError(
+               "expected unranked memref function argument, but received ")
+           << argTypes[0];
 
   // Cast the buffer to something directly iteratable.
   auto buff = block->getArguments()[0];
@@ -140,7 +144,7 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
 
   auto loopNest = scf::buildLoopNest(
       rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
-      /*steps=*/ValueRange{one}, ValueRange{result},
+      /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
       [&](OpBuilder &b, Location loc, ValueRange localIvs,
           ValueRange iterArgs) -> scf::ValueVector {
         auto delta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
@@ -148,7 +152,6 @@ static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
 
         return scf::ValueVector({sum});
       });
-  assert((loopNest.results.size() == 1) && "expect only 1 loop result");
 
   // Compute average delta value.
   auto lenInt = rewriter.create<arith::IndexCastOp>(
@@ -176,11 +179,17 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
 
   // Check assumptions on function arguments.
   auto argTypes = funcOp.getFunctionType().getInputs();
-  assert((argTypes.size() == 2) && "expect only 2 function argument");
-  assert((argTypes[0].isa<UnrankedMemRefType>()) &&
-         "expect unranked memref as the first argument");
-  assert((argTypes[1].isa<FloatType>()) &&
-         "expect float value as the second argument");
+  if (argTypes.size() != 2)
+    return op->emitError("expected only 2 function argument, but received ")
+           << argTypes.size();
+  if (!argTypes[0].isa<UnrankedMemRefType>())
+    return op->emitError("expected unranked memref as the first function "
+                         "argument, but received ")
+           << argTypes[0];
+  if (!argTypes[1].isa<FloatType>())
+    return op->emitError("expected unranked memref as the second function "
+                         "argument, but received ")
+           << argTypes[1];
 
   // Cast the buffer to something directly iteratable.
   auto buff = block->getArguments()[0];
@@ -202,7 +211,7 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
 
   auto loopNest = scf::buildLoopNest(
       rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
-      /*steps=*/ValueRange{one}, ValueRange{result},
+      /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
       [&](OpBuilder &b, Location loc, ValueRange localIvs,
           ValueRange iterArgs) -> scf::ValueVector {
         auto meas = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
@@ -212,7 +221,6 @@ static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
 
         return scf::ValueVector({sum});
       });
-  assert((loopNest.results.size() == 1) && "expect only 1 loop result");
 
   // Compute standard deviation.
   auto lenInt = rewriter.create<arith::IndexCastOp>(
