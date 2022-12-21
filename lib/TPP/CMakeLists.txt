@@ -23,6 +23,7 @@ add_mlir_library(MLIRTPP
     ConvertCheckToLoops.cpp
     ConvertVNNIToTpp.cpp
     ConvertPerfToLoops.cpp
+    ConvertPerfToFunc.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

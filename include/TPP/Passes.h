@@ -77,6 +77,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToLoopsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();

@@ -83,3 +83,27 @@ LogicalResult BenchOp::verify() {
 
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// SinkOp
+//===----------------------------------------------------------------------===//
+
+// Apply custom function name mangling for various data types.
+// It is assumed that all relevant perf operations accept only unranked memory
+// types. This allows for simpler name mangling and leaner perf runtime.
+std::string SinkOp::applyTypeMangling(std::string name, Type type) {
+  llvm::raw_string_ostream mangledName(name);
+
+  TypeSwitch<Type>(type)
+      .Case<MemRefType>([&](Type t) {
+        mangledName << "_memref"
+                    << "_" << cast<MemRefType>(t).getElementType();
+      })
+      .Case<TensorType>([&](Type t) {
+        mangledName << "_tensor"
+                    << "_" << cast<TensorType>(t).getElementType();
+      })
+      .Default([&](Type t) { mangledName << "_" << t; });
+
+  return mangledName.str();
+}
