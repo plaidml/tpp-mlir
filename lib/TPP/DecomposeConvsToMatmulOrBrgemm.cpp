@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 
 using namespace mlir;
 
@@ -617,6 +618,7 @@ struct DecomposeConvToMatmulOrBrgemm
     populateConv2DNhwcHwcfOpDecomposePatterns(patterns);
     populateconv2DNchwFchwOpDecomposePatterns(patterns, blockingFactors,
                                               enableBrgemm);
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

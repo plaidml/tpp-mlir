@@ -1,3 +1,5 @@
+// Make sure that packing plus propagation give us the same results.
+
 // RUN: tpp-opt %s -transform-drop-schedule -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
@@ -6,14 +8,12 @@
 //
 
 
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -linalg-ext-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -pack-matmul="block-factors=2,2,2" -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -linalg-ext-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s -check-prefix=TRANSFORM
 //
-
-// RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
 !A_tensor_t = tensor<4x8xf32>
 !B_tensor_t = tensor<8x16xf32>
@@ -37,7 +37,6 @@ func.func @matmul_static(
       linalg.yield %arg9 : f32
   } -> !C_tensor_t
 
-  // IR: linalg.batch_reduce_matmul
   %matmul = linalg.matmul ins(%A, %B : !A_tensor_t, !B_tensor_t)
                      outs(%expanded_bias : !C_tensor_t) -> !C_tensor_t
 
@@ -51,17 +50,6 @@ func.func @matmul_static(
   } -> !C_tensor_t
 
   return %res : !C_tensor_t
-}
-
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    %1 = transform.structured.pack %0 { blocking_factors = [2, 2, 2] }
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
-
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    transform.structured.map_to_brgemm %3
 }
 
 func.func @entry() {

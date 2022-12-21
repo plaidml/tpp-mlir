@@ -47,13 +47,12 @@ func.func @matmul_static(
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK: tpp.identity ins(%[[ARG3]] : memref<1024xf32, strided<[?], offset: ?>>) out(%[[ARG2]] : memref<256x1024xf32, strided<[?, ?], offset: ?>>)
+// Pack allocations.
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x16x32x32xf32
-// CHECK: linalgx.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC]] : (memref<256x512xf32, strided<[?, ?], offset: ?>> memref<8x16x32x32xf32>)
 // CHECK: %[[ALLOC1:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32x16x32x32xf32>
-// CHECK: linalgx.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC1]] : (memref<512x1024xf32, strided<[?, ?], offset: ?>> memref<32x16x32x32xf32>)
 // CHECK: %[[ALLOC2:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xf32>
-// CHECK: linalgx.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ALLOC2]] : (memref<256x1024xf32, strided<[?, ?], offset: ?>> memref<8x32x32x32xf32>)
-// CHECK: scf.parallel (%[[I:.+]], %[[J:.+]]) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]]) {
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
 // CHECK:     %[[SUBV:.+]] = memref.subview %[[ALLOC]][%[[I]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:     %[[SUBV1:.+]] = memref.subview %[[ALLOC1]][%[[J]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<32x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:     %[[SUBV2:.+]] = memref.subview %[[ALLOC2]][%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
@@ -64,4 +63,3 @@ func.func @matmul_static(
 // CHECK:   tpp.relu ins(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>) out(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>)
 // CHECK:   scf.yield
 // CHECK: }
-// CHECK: linalgx.unpack %[[ALLOC2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : (memref<8x32x32x32xf32> memref<256x1024xf32, strided<[?, ?], offset: ?>>)

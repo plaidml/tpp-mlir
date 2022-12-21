@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
 #include "iostream"
@@ -173,8 +172,9 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateSinkPackPatterns(patterns);
-  mlir::linalgx::PackOp::getCanonicalizationPatterns(patterns, ctx);
-  mlir::linalgx::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+  mlir::tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  // TODO: re-enable me.
+  // mlir::tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return emitDefaultDefiniteFailure(target);

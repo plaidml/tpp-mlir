@@ -174,11 +174,11 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 // CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUF:.+]] = tensor.empty() : tensor<14x16x28x28x32xf32>
-// CHECK: %[[PACK:.+]] = linalgx.pack %[[ARG0]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF]] : (tensor<14x512x28x28xf32> tensor<14x16x28x28x32xf32>) -> tensor<14x16x28x28x32xf32>
+// CHECK: %[[PACK:.+]] = tensor.pack %[[ARG0]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF]] : tensor<14x512x28x28xf32> -> tensor<14x16x28x28x32xf32>
 // CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<32x16x1x1x32x32xf32>
-// CHECK: %[[PACK0:.+]] = linalgx.pack %[[ARG1]] inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %[[BUF0]] : (tensor<1024x512x1x1xf32> tensor<32x16x1x1x32x32xf32>) -> tensor<32x16x1x1x32x32xf32>
+// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %[[BUF0]] : tensor<1024x512x1x1xf32> -> tensor<32x16x1x1x32x32xf32>
 // CHECK: %[[BUF1:.+]] = tensor.empty() : tensor<14x32x28x28x32xf32>
-// CHECK: %[[PACK1:.+]] = linalgx.pack %[[ARG2]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF1]] : (tensor<14x1024x28x28xf32> tensor<14x32x28x28x32xf32>) -> tensor<14x32x28x28x32xf32>
+// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF1]] : tensor<14x1024x28x28xf32> -> tensor<14x32x28x28x32xf32>
 // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[PACK0]] {{\[}}[0], [1, 2, 3], [4], [5]] : tensor<32x16x1x1x32x32xf32> into tensor<32x16x32x32xf32>
 // CHECK: %[[COLLAPSE0:.+]] = tensor.collapse_shape %[[PACK]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x16x28x28x32xf32> into tensor<14x16x784x32xf32>
 // CHECK: %[[COLLAPSE1:.+]] = tensor.collapse_shape %[[PACK1]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x28x28x32xf32> into tensor<14x32x784x32xf32>
@@ -193,7 +193,7 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 // CHECK: }
 // CHECK: scf.yield %[[LOOP1]] : tensor<14x32x784x32xf32>
 // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[LOOP0]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x784x32xf32> into tensor<14x32x28x28x32xf32>
-// CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[EXPAND]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : (tensor<14x32x28x28x32xf32> tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+// CHECK: %[[UNPACK:.+]] = tensor.unpack %[[EXPAND]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : tensor<14x32x28x28x32xf32> -> tensor<14x1024x28x28xf32>
 // CHECK: return %[[UNPACK]] : tensor<14x1024x28x28xf32>
 
 

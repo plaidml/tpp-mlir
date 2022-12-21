@@ -11,6 +11,7 @@ add_mlir_library(MLIRTPP
     TileConsumerAndFuseProducers.cpp
     DecomposeConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp
+    GeneralizeTensorPackAndUnPack.cpp
 
   # Utils
     TransformUtils.cpp
