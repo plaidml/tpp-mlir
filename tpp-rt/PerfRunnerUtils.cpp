@@ -60,17 +60,19 @@ double _mlir_ciface_timer_deviation(int64_t acc) {
 // Perf dialect utils
 //===----------------------------------------------------------------------===//
 
+// Return current timestamp.
 int64_t _mlir_ciface_perf_start_timer() {
-  auto timer = _mlir_ciface_timer_alloc();
-  _mlir_ciface_timer_start(timer);
-  return timer;
+  auto timestamp = std::chrono::high_resolution_clock::now();
+  return timestamp.time_since_epoch().count();
 }
 
-double _mlir_ciface_perf_stop_timer(int64_t timer) {
-  assert(timer >= 0 && (int64_t)timerResults.size() > timer &&
-         "Invalid timer ID");
-  auto &perfResults = timerResults[timer];
-  return perfResults.stopTimer();
+// Compute time delta between the starting time and now.
+double _mlir_ciface_perf_stop_timer(int64_t timestamp) {
+  auto stop = std::chrono::high_resolution_clock::now();
+  std::chrono::system_clock::time_point start{
+      std::chrono::system_clock::duration{timestamp}};
+  return std::chrono::duration_cast<std::chrono::duration<double>>(stop - start)
+      .count();
 }
 
 static void __attribute__((optnone)) perf_sink(void *data) { (void)data; }
