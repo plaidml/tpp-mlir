@@ -89,6 +89,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposeConvToMatmulOrBrgemmPass();
+
+ModulePass *createDefaultTppPass();
 } // namespace tpp
 } // namespace mlir
 

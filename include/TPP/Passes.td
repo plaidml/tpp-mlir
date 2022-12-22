@@ -237,4 +237,14 @@ def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm",
   let constructor = "mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass()";
 }
 
+def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
+  let summary = "Convert perf to loops";
+  let constructor = "mlir::tpp::createDefaultTppPass()";
+  let description = [{
+    A collection of passes that lower everything TPP-related
+    to standard low-level dialects.
+  }];
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
