@@ -171,6 +171,17 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return perm;
   }
 
+  Optional<SmallVector<ReassociationIndices>> getReassociation(ArrayRef<int64_t> innerDimsPos) const {
+    SmallVector<ReassociationIndices> reassociations;
+    int64_t prevReassociation = 0;
+    for (int64_t innerDim : innerDimsPos) {
+      ReassociationIndices reassociation = {prevReassociation * 2, prevReassociation * 2 + 1};
+      reassociations.push_back(reassociation);
+      prevReassociation++;
+    }
+    return reassociations;
+  }
+
   // Get the inverse permutation of outer and perm for inner.
   SmallVector<int64_t> getOuterDimsPerm(tensor::UnPackOp unPackOp) const {
 
@@ -204,6 +215,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
   LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = unPackOp.getLoc();
+    
     SmallVector<int64_t> outerInnerPerm = getOuterDimsPerm(unPackOp);
     SmallVector<int64_t> canonicalPerm = getCanonicalPerm(unPackOp);
 
@@ -222,9 +234,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     Value transposed =
         buildTranspose(rewriter, loc, transposeOuterInner, canonicalPerm);
 
-    auto reassoc = getReassociationIndicesForCollapse(
-        transposed.getType().cast<ShapedType>().getShape(),
-        unPackOp.getDestType().getShape());
+    auto reassoc = getReassociation(unPackOp.getInnerDimsPos());
     if (!reassoc)
       return failure();
 
@@ -232,7 +242,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
         loc, unPackOp.getDestType().getShape(),
         unPackOp.getDestType().getElementType());
     auto collapsed = rewriter.create<tensor::CollapseShapeOp>(
-        loc, unPackOp.getDestType(), transposed, *reassoc);
+        loc, transposed, *reassoc);
 
     SmallVector<OpFoldResult> extractSizes =
         getShapeDimSizes(rewriter, loc, unPackOp.getDest());
