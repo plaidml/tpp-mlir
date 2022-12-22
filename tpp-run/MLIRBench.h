@@ -60,9 +60,6 @@ class MLIRBench {
   /// Create a random global based on the memref type
   llvm::StringRef createGlobal(MemRefType);
 
-  /// Declare some required global functions
-  /// TODO: This won't be needed after the perf dialect is used
-  void declareGlobalFunctions();
   struct {
     func::FuncOp alloc;
     func::FuncOp start;
@@ -102,12 +99,11 @@ public:
   /// the return value (if any) or the last argument (outs).
   Value callKernel(llvm::SmallVector<llvm::StringRef> &);
 
-  /// Create a loop with a timer around the kernel call
-  /// Returns the memref containing the timings
-  /// TODO: Move this to create a perf.timer op
+  /// Create a benchmarking region around the kernel call
+  /// Returns the memref containing measured time deltas
   Value createTimerLoop(llvm::SmallVector<llvm::StringRef> &, unsigned);
 
-  /// Get the timer average/deviation (from the vector accumulation)
+  /// Get the timer average/deviation
   Value getTimerStats(Value);
 
   /// Prints a float value (used for mean/dev)

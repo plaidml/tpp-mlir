@@ -4,15 +4,9 @@
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
 // RUN: -convert-xsmm-to-func | \
 // RUN: tpp-run -n 10 \
-// RUN:  -e entry -entry-point-result=void  \
+// RUN:  -e entry -entry-point-result=void -print \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
-//
-
-// RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 //
 // Total flops = O(2*n*k*m) = 2*64x64x64 = 524288
 // BENCH_TOTAL_FLOPS: 524288
@@ -30,8 +24,3 @@ func.func @entry(%A: tensor<64x64xf32>, %B: tensor<64x64xf32>,
 // CHECK-COUNT-64: ( 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65 )
 // Stats
 // CHECK: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
-
-// TPP: func.func @entry(
-// TPP-SAME:  %[[ARG0:.+]]: memref<64x64xf32>, %[[ARG1:.+]]: memref<64x64xf32>, %[[ARG2:.+]]: memref<64x64xf32>)
-// TPP: tpp.matmul ins(%[[ARG0]] : memref<64x64xf32>, %[[ARG1]] : memref<64x64xf32>) out(%[[ARG2]] : memref<64x64xf32>)
-// TPP: return

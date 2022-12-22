@@ -119,6 +119,15 @@ def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "ModuleOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
+def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
+  let summary = "Convert perf to func";
+  let constructor = "mlir::tpp::createConvertPerfToFuncPass()";
+  let description = [{
+    Convert perf operations to function calls.
+  }];
+  let dependentDialects = ["func::FuncDialect"];
+}
+
 def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
