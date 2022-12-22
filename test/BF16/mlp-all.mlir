@@ -123,8 +123,6 @@ func.func @entry(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
 // TPP: memref.dealloc %[[ALLOC2]] : memref<512x2048x2xbf16>
 // TPP: memref.dealloc %[[ALLOC3]] : memref<1024x1000x2xbf16>
 // TPP: memref.dealloc %[[ALLOC4]] : memref<128x1000xbf16>
-// TPP: return
-// TPP:}
   %interim = tensor.empty(): tensor<128x1000xbf16>
   %buf = linalg.fill ins(%constant:bf16) outs(%interim: tensor<128x1000xbf16>) -> tensor<128x1000xbf16>
   check.expect_almost_eq(%15, %buf, %threshold): tensor<128x1000xbf16>, tensor<128x1000xbf16>, bf16
