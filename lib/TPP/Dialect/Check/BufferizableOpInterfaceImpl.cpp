@@ -9,9 +9,9 @@
 #include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Check/CheckOps.h"
+#include "iostream"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Operation.h"
-
 using namespace mlir;
 using namespace mlir::bufferization;
 using namespace mlir::check;
@@ -115,6 +115,51 @@ struct ExpectAlmostEqLayoutInterface
   }
 };
 
+struct ExpectSaneLayoutInterface
+    : public BufferizableOpInterface::ExternalModel<ExpectSaneLayoutInterface,
+                                                    check::ExpectSaneOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) const {
+    return true;
+  }
+
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return {};
+  }
+
+  BufferRelation bufferRelation(Operation *op, OpResult opResult,
+                                const AnalysisState &state) const {
+    return BufferRelation::Equivalent;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    check::ExpectSaneOp saneOp = cast<check::ExpectSaneOp>(op);
+    FailureOr<Value> maybeBuffer =
+        getBuffer(rewriter, saneOp.getOperand(), options);
+    if (failed(maybeBuffer)) {
+      return failure();
+    }
+    Value buffer = *maybeBuffer;
+
+    auto newExpectOp =
+        rewriter.create<check::ExpectSaneOp>(op->getLoc(), buffer);
+    op->replaceAllUsesWith(newExpectOp);
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
 } // namespace
 } // namespace check
 } // namespace mlir
@@ -126,6 +171,7 @@ void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     ExpectTrueOp::attachInterface<check::ExpectTrueLayoutInterface>(*ctx);
     ExpectAlmostEqOp::attachInterface<check::ExpectAlmostEqLayoutInterface>(
         *ctx);
+    ExpectSaneOp::attachInterface<check::ExpectSaneLayoutInterface>(*ctx);
   });
 }
 } // namespace check
