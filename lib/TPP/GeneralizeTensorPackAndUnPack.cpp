@@ -171,13 +171,18 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return perm;
   }
 
-  Optional<SmallVector<ReassociationIndices>> getReassociation(ArrayRef<int64_t> innerDimsPos) const {
+  Optional<SmallVector<ReassociationIndices>> getReassociation(int64_t rank, ArrayRef<int64_t> innerDimsPos) const {
+    llvm::DenseSet<int64_t> innerDimsSet(innerDimsPos.begin(), innerDimsPos.end());
     SmallVector<ReassociationIndices> reassociations;
     int64_t prevReassociation = 0;
-    for (int64_t innerDim : innerDimsPos) {
-      ReassociationIndices reassociation = {prevReassociation * 2, prevReassociation * 2 + 1};
+    for (int64_t pos = 0; pos < rank; pos++) {
+      ReassociationIndices reassociation;
+      reassociation.push_back(pos + prevReassociation);
+      if (innerDimsSet.count(pos)) {
+        reassociation.push_back(pos + prevReassociation + 1);
+        prevReassociation++;
+      }
       reassociations.push_back(reassociation);
-      prevReassociation++;
     }
     return reassociations;
   }
@@ -234,7 +239,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     Value transposed =
         buildTranspose(rewriter, loc, transposeOuterInner, canonicalPerm);
 
-    auto reassoc = getReassociation(unPackOp.getInnerDimsPos());
+    auto reassoc = getReassociation(unPackOp.getDestType().getRank(), unPackOp.getInnerDimsPos());
     if (!reassoc)
       return failure();
 
@@ -243,6 +248,10 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
         unPackOp.getDestType().getElementType());
     auto collapsed = rewriter.create<tensor::CollapseShapeOp>(
         loc, transposed, *reassoc);
+
+    llvm::errs() << "--------------------\n";
+    llvm::errs() << collapsed << "\n";
+    llvm::errs() << "--------------------\n";
 
     SmallVector<OpFoldResult> extractSizes =
         getShapeDimSizes(rewriter, loc, unPackOp.getDest());
