@@ -23,6 +23,24 @@ class FuncDialect;
 } // namespace mlir
 
 namespace mlir {
+namespace bufferization {
+class BufferizationDialect;
+} // namespace bufferization
+} // namespace mlir
+
+namespace mlir {
+namespace math {
+class MathDialect;
+} // namespace math
+} // namespace mlir
+
+namespace mlir {
+namespace arith {
+class ArithDialect;
+} // namespace arith
+} // namespace mlir
+
+namespace mlir {
 namespace vector {
 class VectorDialect;
 } // namespace vector
@@ -41,9 +59,21 @@ class SCFDialect;
 } // namespace mlir
 
 namespace mlir {
+namespace tensor {
+class TensorDialect;
+} // namespace tensor
+} // namespace mlir
+
+namespace mlir {
 namespace memref {
 class MemRefDialect;
 } // namespace memref
+} // namespace mlir
+
+namespace mlir {
+namespace tpp {
+class TppDialect;
+} // namespace tpp
 } // namespace mlir
 
 namespace mlir {
@@ -90,7 +120,7 @@ createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposeConvToMatmulOrBrgemmPass();
 
-ModulePass *createDefaultTppPass();
+std::unique_ptr<OperationPass<ModuleOp>> createDefaultTppPass();
 } // namespace tpp
 } // namespace mlir
 

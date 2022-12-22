@@ -244,7 +244,12 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     A collection of passes that lower everything TPP-related
     to standard low-level dialects.
   }];
-  let dependentDialects = ["scf::SCFDialect"];
+  let dependentDialects = ["tpp::TppDialect", "xsmm::XsmmDialect",
+                           "vnni::VNNIDialect", "linalg::LinalgDialect",
+                           "math::MathDialect", "arith::ArithDialect", 
+                           "scf::SCFDialect", "func::FuncDialect",
+                           "bufferization::BufferizationDialect",
+                           "tensor::TensorDialect", "memref::MemRefDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
