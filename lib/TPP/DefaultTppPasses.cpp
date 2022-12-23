@@ -6,10 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppDialect.h"
-#include "TPP/Dialect/VNNI/VNNIDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/Passes.h"
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -24,11 +22,25 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+#include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Check/CheckDialect.h"
+#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
+#include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/TppDialect.h"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/VNNI/VNNIDialect.h"
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -39,9 +51,29 @@ using namespace mlir::tpp;
 namespace {
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // Add all custom TPP dialects
+    registry.insert<tpp::TppDialect>();
+    registry.insert<xsmm::XsmmDialect>();
+    registry.insert<linalgx::LinalgXDialect>();
+    registry.insert<check::CheckDialect>();
+    registry.insert<vnni::VNNIDialect>();
+    registry.insert<perf::PerfDialect>();
+    bufferization::registerAllocationOpInterfaceExternalModels(registry);
+    linalgx::registerTransformDialectExtension(registry);
+    linalgx::registerBufferizableOpInterfaceExternalModels(registry);
+    check::registerBufferizableOpInterfaceExternalModels(registry);
+    vnni::registerBufferizableOpInterfaceExternalModels(registry);
+    perf::registerBufferizableOpInterfaceExternalModels(registry);
+
+    // Add all core MLIR dialects as the default TPP passes may contain any
+    // combination of the existing passes.
+    registerAllDialects(registry);
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
-    PassManager pm(module.getContext());
+    PassManager pm(module.getContext(), mlir::OpPassManager::Nesting::Implicit);
 
     pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
 
@@ -59,7 +91,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
     pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
 
-    if (failed(pm.run(module)))
+    if (failed(runPipeline(pm, module)))
       return signalPassFailure();
   }
 };
