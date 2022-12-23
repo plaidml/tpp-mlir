@@ -16,7 +16,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 using namespace mlir;
 using namespace mlir::check;
 using namespace mlir::cf;
@@ -28,16 +27,16 @@ using namespace mlir::math;
 
 namespace {
 
-// Convert 
+// Convert
 // check.expect_almost_equals(%t1:tensor<2x2xf32>, %t2:tensor<2x2xf32>,
-// %threshold:f32) 
-// to the pattern: 
+// %threshold:f32)
+// to the pattern:
 // scf.some_loop(%i, %j)
-// %0 = load from %t1 
-// %1 = load from %t2 
-// %diff = math.subf %0, %1 
-// %abs = arith.absf %diff 
-// %compare = arith.cmpf le, %abs, %threshold 
+// %0 = load from %t1
+// %1 = load from %t2
+// %diff = math.subf %0, %1
+// %abs = arith.absf %diff
+// %compare = arith.cmpf le, %abs, %threshold
 // cf.assert %compare, "Result mismatch"
 struct ConvertAlmostEqualsOp
     : public OpRewritePattern<check::ExpectAlmostEqOp> {
@@ -107,8 +106,71 @@ struct ConvertExpectTrueOp : public OpRewritePattern<ExpectTrueOp> {
   }
 };
 
+// Convert
+// check.expect_sane(%t1:tensor<2x2xf32>)
+// to the pattern:
+// scf.some_loop(%i, %j)
+// %0 = load from %t1
+// %1 = arith.absf %0:f32
+// %2 = arith.cmpf ord, %1, %nan : f32
+// %3 = arith.cmpf one, %1, %inf : f32
+// %compare = arith.andi %2, %3 : i1
+// cf.assert %compare, "Buffer can't contain NaNs or Infinite values"
+struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
+  using OpRewritePattern<ExpectSaneOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ExpectSaneOp expectSaneOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = expectSaneOp.getLoc();
+    auto operand = expectSaneOp.getOperand();
+    auto operandType = operand.getType();
+    auto elementType = operandType.getElementType();
+    SmallVector<Value> ubs;
+    if (!operandType.isa<MemRefType>() || !elementType.isa<mlir::FloatType>()) {
+      return failure();
+    }
+    size_t rank = operandType.cast<MemRefType>().getRank();
+    for (size_t idx = 0; idx < rank; idx++) {
+      auto dim = linalg::createOrFoldDimOp(rewriter, loc, operand, idx);
+      ubs.push_back(dim);
+    }
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> lbs(rank, zero);
+    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    SmallVector<Value> steps(rank, one);
+    (void)scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps,
+        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+          Value scalarOperand =
+              b.create<memref::LoadOp>(loc, operand, localIvs);
+          Value scalarOperandAbsf = b.create<math::AbsFOp>(loc, scalarOperand);
+          Value zeroVal = b.create<arith::ConstantOp>(
+              loc, elementType, rewriter.getZeroAttr(elementType));
+
+          Value inf = rewriter.create<arith::ConstantOp>(
+              loc, elementType,
+              b.getFloatAttr(
+                  elementType,
+                  APFloat::getInf(
+                      elementType.cast<FloatType>().getFloatSemantics())));
+          Value notNan = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ORD,
+                                                 scalarOperandAbsf, zeroVal);
+          Value notInf = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ONE,
+                                                 scalarOperandAbsf, inf);
+
+          Value compare = b.create<arith::AndIOp>(loc, notNan, notInf);
+          b.create<cf::AssertOp>(
+              loc, compare,
+              b.getStringAttr("Buffer can't contain NaNs or Infinite values"));
+        });
+
+    rewriter.eraseOp(expectSaneOp);
+    return success();
+  }
+};
+
 void populateCheckToLoopsPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertAlmostEqualsOp, ConvertExpectTrueOp>(
+  patterns.add<ConvertAlmostEqualsOp, ConvertExpectTrueOp, ConvertExpectSaneOp>(
       patterns.getContext());
 }
 
