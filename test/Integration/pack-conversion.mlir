@@ -19,7 +19,6 @@ func.func private @generate_1D_source(%init_source : tensor<8xf32>) -> tensor<8x
   return %source : tensor<8xf32>
 }
 
-// CHECK: lore
 func.func @entry() {
   %cst = arith.constant 8 : index
   %init_source = tensor.empty() : tensor<8xf32>
