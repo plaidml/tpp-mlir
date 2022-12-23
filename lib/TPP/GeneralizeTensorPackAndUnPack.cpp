@@ -27,6 +27,7 @@ namespace {
 struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
 
+  // Check if the op is already tiles with outer 1s.
   bool isAlreadyTiled(tensor::PackOp packOp) const {
     int64_t srcRank = packOp.getSourceRank();
     return !llvm::any_of(packOp.getDestType().getShape().take_front(srcRank),
@@ -50,6 +51,8 @@ struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
   }
 };
 
+#if 0
+// Tiling unpack seems not to work, or the tiling strategy is wrong.
 struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -80,6 +83,7 @@ struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
     return success();
   }
 };
+#endif
 
 struct SwapWithLinalgxPack : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -171,8 +175,13 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return perm;
   }
 
-  Optional<SmallVector<ReassociationIndices>> getReassociation(int64_t rank, ArrayRef<int64_t> innerDimsPos) const {
-    llvm::DenseSet<int64_t> innerDimsSet(innerDimsPos.begin(), innerDimsPos.end());
+  // Cannot use upstream utils as we can have tensor like
+  // tensor<8x2x8x2xf32> unpacked to tensor<13x15xf32>
+  // The method assumes we already are in the canonical form AaBbCc.
+  Optional<SmallVector<ReassociationIndices>>
+  getReassociation(int64_t rank, ArrayRef<int64_t> innerDimsPos) const {
+    llvm::DenseSet<int64_t> innerDimsSet(innerDimsPos.begin(),
+                                         innerDimsPos.end());
     SmallVector<ReassociationIndices> reassociations;
     int64_t prevReassociation = 0;
     for (int64_t pos = 0; pos < rank; pos++) {
@@ -217,21 +226,13 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
   // collapse shape -> (Aa)(Bb)(Cc)
   // extract slice -> as the unpacked tensor can be bigger than the destination
   // tensor due to high-padding copy operation
+  // TODO: collapse the tranpose by composing the permutations.
   LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = unPackOp.getLoc();
-    
+
     SmallVector<int64_t> outerInnerPerm = getOuterDimsPerm(unPackOp);
     SmallVector<int64_t> canonicalPerm = getCanonicalPerm(unPackOp);
-
-    // llvm::errs() << "--------------------\n";
-    // for (int64_t i : outerInnerPerm)
-    //  llvm::errs() << i << " ";
-    // llvm::errs() << "\n";
-    // for (int64_t i : canonicalPerm)
-    //   llvm::errs() << i << " ";
-    // llvm::errs() << "\n";
-    // llvm::errs() << "--------------------\n";
 
     assert(!canonicalPerm.empty());
     Value transposeOuterInner =
@@ -239,19 +240,16 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     Value transposed =
         buildTranspose(rewriter, loc, transposeOuterInner, canonicalPerm);
 
-    auto reassoc = getReassociation(unPackOp.getDestType().getRank(), unPackOp.getInnerDimsPos());
+    auto reassoc = getReassociation(unPackOp.getDestType().getRank(),
+                                    unPackOp.getInnerDimsPos());
     if (!reassoc)
       return failure();
 
     Value empty = rewriter.create<tensor::EmptyOp>(
         loc, unPackOp.getDestType().getShape(),
         unPackOp.getDestType().getElementType());
-    auto collapsed = rewriter.create<tensor::CollapseShapeOp>(
-        loc, transposed, *reassoc);
-
-    llvm::errs() << "--------------------\n";
-    llvm::errs() << collapsed << "\n";
-    llvm::errs() << "--------------------\n";
+    auto collapsed =
+        rewriter.create<tensor::CollapseShapeOp>(loc, transposed, *reassoc);
 
     SmallVector<OpFoldResult> extractSizes =
         getShapeDimSizes(rewriter, loc, unPackOp.getDest());
