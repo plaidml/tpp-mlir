@@ -70,7 +70,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     perf::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Add all core MLIR dialects as the default TPP passes may contain any
-    // combination of the existing passes.
+    // combination of other passes.
     registerAllDialects(registry);
   }
 
