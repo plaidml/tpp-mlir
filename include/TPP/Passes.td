@@ -238,7 +238,7 @@ def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm",
 }
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
-  let summary = "Convert perf to loops";
+  let summary = "Collection of default TPP passes";
   let constructor = "mlir::tpp::createDefaultTppPass()";
   let description = [{
     A collection of passes that lower everything TPP-related
