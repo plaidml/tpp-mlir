@@ -244,6 +244,11 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     A collection of passes that lower everything TPP-related
     to standard low-level dialects.
   }];
+  let options= [
+    Option<"tppToLoops", "tpp-to-loops",
+           "bool", /*default=*/"0",
+           "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
+  ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
