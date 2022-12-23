@@ -20,7 +20,10 @@ func.func @entry() {
      [ 1.4, 2.4, 3.4, 4.35 ]
     ]> : tensor<4x4xf32>
 
-  %threshold = arith.constant 0.1: f32
-  check.expect_almost_eq(%b, %c, %threshold):tensor<4x4xf32>, tensor<4x4xf32>, f32
-  return
+ %threshold = arith.constant 0.1: f32
+ check.expect_almost_eq(%b, %c, %threshold):tensor<4x4xf32>, tensor<4x4xf32>, f32
+
+ check.expect_sane(%b):tensor<4x4xf32>
+
+ return
 }

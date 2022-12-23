@@ -111,9 +111,10 @@ struct ConvertExpectTrueOp : public OpRewritePattern<ExpectTrueOp> {
 // to the pattern:
 // scf.some_loop(%i, %j)
 // %0 = load from %t1
-// %1 = arith.cmpf ord, %0, %nan : f32
-// %2 = arith.cmpf one, %0, %inf : f32
-// %compare = arith.andi %1, %2 : i1
+// %1 = arith.absf %0:f32
+// %2 = arith.cmpf ord, %1, %nan : f32
+// %3 = arith.cmpf one, %1, %inf : f32
+// %compare = arith.andi %2, %3 : i1
 // cf.assert %compare, "Buffer can't contain NaNs or Infinite values"
 struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
   using OpRewritePattern<ExpectSaneOp>::OpRewritePattern;
@@ -121,17 +122,16 @@ struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
   LogicalResult matchAndRewrite(ExpectSaneOp expectSaneOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = expectSaneOp.getLoc();
-    auto elementType = expectSaneOp.getOperand().getType().getElementType();
+    auto operand = expectSaneOp.getOperand();
+    auto operandType = operand.getType();
+    auto elementType = operandType.getElementType();
     SmallVector<Value> ubs;
-    if (!expectSaneOp.getOperand().getType().isa<MemRefType>() ||
-        !elementType.isa<mlir::FloatType>()) {
+    if (!operandType.isa<MemRefType>() || !elementType.isa<mlir::FloatType>()) {
       return failure();
     }
-    size_t rank =
-        expectSaneOp.getOperand().getType().cast<MemRefType>().getRank();
+    size_t rank = operandType.cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
-      auto dim = linalg::createOrFoldDimOp(rewriter, loc,
-                                           expectSaneOp.getOperand(), idx);
+      auto dim = linalg::createOrFoldDimOp(rewriter, loc, operand, idx);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -141,8 +141,9 @@ struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value scalarOperand = b.create<memref::LoadOp>(
-              loc, expectSaneOp.getOperand(), localIvs);
+          Value scalarOperand =
+              b.create<memref::LoadOp>(loc, operand, localIvs);
+          Value scalarOperandAbsf = b.create<math::AbsFOp>(loc, scalarOperand);
           Value zeroVal = b.create<arith::ConstantOp>(
               loc, elementType, rewriter.getZeroAttr(elementType));
 
@@ -153,9 +154,9 @@ struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
                   APFloat::getInf(
                       elementType.cast<FloatType>().getFloatSemantics())));
           Value notNan = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ORD,
-                                                 scalarOperand, zeroVal);
+                                                 scalarOperandAbsf, zeroVal);
           Value notInf = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ONE,
-                                                 scalarOperand, inf);
+                                                 scalarOperandAbsf, inf);
 
           Value compare = b.create<arith::AndIOp>(loc, notNan, notInf);
           b.create<cf::AssertOp>(

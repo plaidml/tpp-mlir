@@ -8,6 +8,7 @@
 // RUN: %{command} 
 
 // XFAIL:*
+
 func.func @entry() {
   %a= arith.constant 0:i1
   check.expect_true(%a):i1
@@ -38,18 +39,10 @@ func.func @entry2() {
 }
 
 // -----
-// REDEFINE: %{option} = entry3
-// RUN: %{command}
-
-func.func @entry3(%arg0:tensor<4x4xf32>){
-  check.expect_sane(%arg0): tensor<4x4xf32>
-  return
-}
-
-// -----
 // REDEFINE: %{option} = entry4
 // RUN: %{command}
 
+//Inf
 func.func @entry4(){
   %inf = arith.constant 0x7F800000 : f32
   %alloc = tensor.empty() : tensor<4x4xf32>
@@ -58,3 +51,83 @@ func.func @entry4(){
   return
 }
 
+// -----
+// REDEFINE: %{option} = entry5
+// RUN: %{command}
+
+//Signaling NaN
+func.func @entry5(){
+  %snan = arith.constant 0x7FA00000 : f32
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%snan:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
+
+// -----
+// REDEFINE: %{option} = entry6
+// RUN: %{command}
+
+//Quiet NaN
+func.func @entry6(){
+  %qnan = arith.constant 0x7FC00000 : f32
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%qnan:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
+
+// -----
+// REDEFINE: %{option} = entry7
+// RUN: %{command}
+
+//Log 0
+func.func @entry7(){
+  %zero = arith.constant 0.0: f32
+  %log0 = math.log %zero : f32
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%log0:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
+
+// -----
+// REDEFINE: %{option} = entry8
+// RUN: %{command}
+
+//-Inf
+func.func @entry8(){
+  %minus_inf = arith.constant 0xFF800000 : f32
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%minus_inf:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
+
+// -----
+// REDEFINE: %{option} = entry9
+// RUN: %{command}
+
+//NaN with mantissa
+func.func @entry9(){
+  %minus_inf = arith.constant 0x7FC00001 : f32
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%minus_inf:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
+
+// -----
+// REDEFINE: %{option} = entry10
+// RUN: %{command}
+
+//Arithmetic inf
+func.func @entry10(){
+  %one = arith.constant 1.0 : f32
+  %zero = arith.constant 0.0 : f32
+  %div = arith.divf %one, %zero: f32 
+  %alloc = tensor.empty() : tensor<4x4xf32>
+  %0 = linalg.fill ins(%div:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
+  check.expect_sane(%0):tensor<4x4xf32>
+  return
+}
