@@ -29,8 +29,8 @@ int64_t _mlir_ciface_perf_start_timer() {
 // Compute time delta between the starting time and now.
 double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
   auto stop = std::chrono::high_resolution_clock::now();
-  std::chrono::system_clock::time_point start{
-      std::chrono::system_clock::duration{startTimestamp}};
+  std::chrono::high_resolution_clock::time_point start{
+      std::chrono::high_resolution_clock::duration{startTimestamp}};
   return std::chrono::duration_cast<std::chrono::duration<double>>(stop - start)
       .count();
 }
