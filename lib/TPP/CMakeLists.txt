@@ -10,6 +10,7 @@ add_mlir_library(MLIRTPP
     MapConvToMatmul.cpp
     TileConsumerAndFuseProducers.cpp
     DecomposeConvsToMatmulOrBrgemm.cpp
+    DefaultTppPasses.cpp
 
   # Utils
     TransformUtils.cpp

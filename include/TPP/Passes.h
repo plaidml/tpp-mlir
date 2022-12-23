@@ -13,53 +13,54 @@
 
 namespace mlir {
 class ModuleOp;
-} // namespace mlir
 
-namespace mlir {
 namespace func {
 class FuncOp;
 class FuncDialect;
 } // namespace func
-} // namespace mlir
 
-namespace mlir {
+namespace bufferization {
+class BufferizationDialect;
+} // namespace bufferization
+
+namespace math {
+class MathDialect;
+} // namespace math
+
+namespace arith {
+class ArithDialect;
+} // namespace arith
+
 namespace vector {
 class VectorDialect;
 } // namespace vector
-} // namespace mlir
 
-namespace mlir {
 namespace linalg {
 class LinalgDialect;
 } // namespace linalg
-} // namespace mlir
 
-namespace mlir {
 namespace scf {
 class SCFDialect;
 } // namespace scf
-} // namespace mlir
 
-namespace mlir {
+namespace tensor {
+class TensorDialect;
+} // namespace tensor
+
 namespace memref {
 class MemRefDialect;
 } // namespace memref
-} // namespace mlir
 
-namespace mlir {
 namespace xsmm {
 class XsmmDialect;
 } // namespace xsmm
-} // namespace mlir
 
-namespace mlir {
 namespace vnni {
 class VNNIDialect;
 } // namespace vnni
-} // namespace mlir
 
-namespace mlir {
 namespace tpp {
+class TppDialect;
 
 // RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
@@ -89,6 +90,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposeConvToMatmulOrBrgemmPass();
+
+std::unique_ptr<OperationPass<ModuleOp>> createDefaultTppPass();
 } // namespace tpp
 } // namespace mlir
 

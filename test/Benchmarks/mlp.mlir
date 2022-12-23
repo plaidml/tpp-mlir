@@ -1,9 +1,4 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
-// RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
-// RUN: -convert-xsmm-to-func | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void -print \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
