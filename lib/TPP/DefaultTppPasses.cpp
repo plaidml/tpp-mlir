@@ -51,6 +51,9 @@ using namespace mlir::tpp;
 namespace {
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
+  DefaultTppPasses() = default;
+  DefaultTppPasses(bool tppToLoops) { this->tppToLoops = tppToLoops; };
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects
     registry.insert<tpp::TppDialect>();
@@ -75,8 +78,16 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     ModuleOp module = getOperation();
     PassManager pm(module.getContext(), mlir::OpPassManager::Nesting::Implicit);
 
-    pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+    // Run transforms first and clean them up afterwards
+    pm.addPass(createTransformDialectInterpreterPass());
+    pm.addPass(createTransformDropSchedulePass());
 
+    // Add TPP mapping
+    pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+    // Materialize empty tensors
+    pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
+
+    // Run bufferization as the rest of the passes prefer working on memref
     bufferization::OneShotBufferizationOptions buffOpts;
     buffOpts.allowReturnAllocs = true;
     buffOpts.bufferizeFunctionBoundaries = true;
@@ -86,10 +97,24 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
     pm.addNestedPass<func::FuncOp>(
         bufferization::createFinalizingBufferizePass());
+    // Clean up after bufferization
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
+    // Convert all higher level dialects to TPP
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
-    pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+    pm.addPass(createConvertVNNIToTppPass());
+
+    // Lower all TPP ops
+    if (tppToLoops)
+      pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+    else
+      pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+    // Lower all XSMM ops
+    pm.addPass(createConvertXsmmToFuncPass());
+    // Lower all Check ops
+    pm.addPass(createConvertCheckToLoopsPass());
+    // Lower all LinalgX ops
+    pm.addPass(createLinalgXToLoopsPass());
 
     if (failed(runPipeline(pm, module)))
       return signalPassFailure();
