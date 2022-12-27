@@ -19,7 +19,6 @@ func.func private @generate_1D_source(%init_source : tensor<2xf32>) -> tensor<2x
   return %source : tensor<2xf32>
 }
 
-// CHECK: lore
 func.func @entry() {
   %cst = arith.constant 2 : index
   %init_source = tensor.empty() : tensor<2xf32>
