@@ -13,7 +13,7 @@ If you have a checkout with the previous name, please follow [these instructions
 
 ## Build Status
 
-[![TPP build status](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg)](https://buildkite.com/intel/tpp-compiler)
+[![TPP-MLIR build status](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg?branch=main)](https://buildkite.com/intel/tpp-mlir)
 
 ## How to build LLVM
 
