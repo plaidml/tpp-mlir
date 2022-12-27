@@ -29,14 +29,49 @@ func.func @entry() {
                                              dimensions = [0, 1, 2, 3]
   %c0 = arith.constant 0 : index
   %d1 = arith.constant -1.0 : f32
-  %v1 = vector.transfer_read %input_tensor_bcast[%c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x4x6x6x2xf32>, vector<1x4x6x6x2xf32>
-  vector.print %v1 : vector<1x4x6x6x2xf32>
-
-
   %unpacked_tensor = bufferization.alloc_tensor() : tensor<1x6x6x8xf32>
   %unpack = tensor.unpack %input_tensor_bcast outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %unpacked_tensor : tensor<1x4x6x6x2xf32> -> tensor<1x6x6x8xf32>
   
   %v0 = vector.transfer_read %unpack[%c0, %c0, %c0, %c0], %d1 : tensor<1x6x6x8xf32>, vector<1x6x6x8xf32>
   vector.print %v0 : vector<1x6x6x8xf32>
+  
+  // CHECK: ( ( ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ) ), 
+  // CHECK-SAME:  ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ) ), 
+  // CHECK-SAME:  ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ) ), 
+  // CHECK-SAME:  ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ) ), 
+  // CHECK-SAME:  ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ) ), 
+  // CHECK-SAME:  ( ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:  ( 0, 1, 0, 1, 0, 1, 0, 1 ), 
+  // CHECK-SAME:( 0, 1, 0, 1, 0, 1, 0, 1 ) ) ) ) 
+  //
+
   return
 }
