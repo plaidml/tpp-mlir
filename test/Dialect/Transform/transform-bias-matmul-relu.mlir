@@ -1,5 +1,4 @@
 // RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize | FileCheck %s
-// XFAIL: *
 
 !A_tensor_t = tensor<256x512xf32>
 !B_tensor_t = tensor<512x1024xf32>

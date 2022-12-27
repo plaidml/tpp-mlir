@@ -1,5 +1,4 @@
 // RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -loop-invariant-code-motion -canonicalize -cse -canonicalize -split-input-file | FileCheck %s
-// XFAIL: *
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
