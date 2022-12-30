@@ -279,6 +279,12 @@ static bool hasOneInputOneOutput(linalg::GenericOp linalgOp) {
           (linalgOp.getNumDpsInits() == 1));
 }
 
+// Returns true if the operation has 1 input and 0 output.
+static bool hasOneInputNoOutput(linalg::GenericOp linalgOp) {
+   return ((linalgOp.getNumDpsInputs() == 0) &&
+             (linalgOp.getNumDpsInits() == 1));
+}
+             
 // Returns true if the linalg.generic maps to a tpp.gemm.
 bool isTppMatmul(linalg::GenericOp linalgOp) {
   // structural and access pattern.
@@ -318,7 +324,7 @@ static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
 bool isTppAdd(linalg::GenericOp linalgOp) {
   if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
     return false;
-  if (linalgOp.getNumDpsInits() != 1)
+  if (linalgOp.getNumDpsInits() != 1 || linalgOp.getNumDpsInputs() != 1)
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
@@ -331,7 +337,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
 bool canMapToTppRelu(linalg::GenericOp linalgOp) {
   if (!linalg::isElementwise(linalgOp))
     return false;
-  if (!hasStaticShape(linalgOp) || !hasMaxfZeroOp(linalgOp))
+  if (!hasStaticShape(linalgOp) || !hasMaxfZeroOp(linalgOp) || !hasOneInputNoOutput(linalgOp))
     return false;
   return hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
 }
@@ -356,6 +362,8 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
   if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
     return false;
   if (!isUnaryOp(linalgOp))
+    return false;
+  if(linalgOp.getNumDpsInputs() != 0 || linalgOp.getNumDpsInits() != 1)
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
