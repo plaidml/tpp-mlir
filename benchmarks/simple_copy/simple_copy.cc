@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "../utils.h"
-#include "Utils/Perf.h"
+#include "../Perf.h"
 
 void simple_copy_ref(const float *input, float *output, int n, int m) {
   for (int64_t y = 0; y < n; y++) {

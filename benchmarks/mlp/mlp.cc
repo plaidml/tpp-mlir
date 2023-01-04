@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "../utils.h"
-#include "Utils/Perf.h"
+#include "../Perf.h"
 
 /* Reference implementation of a mlp */
 // A = 128 x 256
