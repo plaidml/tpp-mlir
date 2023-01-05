@@ -1,10 +1,10 @@
 // RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
 
-// CHECK: func.func @entry(
+// CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
-func.func @entry(%A: memref<4x8xf32>,
+func.func @matmul(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
   // CHECK: call @xsmm_matmul_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
