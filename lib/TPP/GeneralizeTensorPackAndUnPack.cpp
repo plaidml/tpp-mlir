@@ -51,40 +51,6 @@ struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
   }
 };
 
-#if 0
-// Tiling unpack seems not to work, or the tiling strategy is wrong.
-struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  bool isAlreadyTiled(tensor::UnPackOp unPackOp) const {
-    int64_t destRank = unPackOp.getDestRank();
-    ArrayRef<int64_t> srcShape = unPackOp.getSourceType().getShape();
-    return !llvm::any_of(srcShape.take_front(destRank),
-                         [](int64_t val) { return val != 1; });
-  }
-
-  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
-                                PatternRewriter &rewriter) const override {
-    auto tilingInterfaceOp = dyn_cast<TilingInterface>(unPackOp.getOperation());
-    if ((!tilingInterfaceOp) || (isAlreadyTiled(unPackOp)))
-      return failure();
-    ShapedType sourceType = unPackOp.getSourceType();
-    int64_t destRank = unPackOp.getDestType().getRank();
-    // SmallVector<int64_t> tiles =
-    //     llvm::to_vector(sourceType.getShape().take_back(destRank));
-    SmallVector<int64_t> tiles(destRank, 1);
-    scf::SCFTilingOptions tilingOptions;
-    tilingOptions.setTileSizes(tiles);
-    FailureOr<scf::SCFTilingResult> tilingResult =
-        tileUsingSCFForOp(rewriter, tilingInterfaceOp, tilingOptions);
-    if (failed(tilingResult))
-      return failure();
-    rewriter.replaceOp(tilingInterfaceOp, tilingResult->replacements);
-    return success();
-  }
-};
-#endif
-
 struct SwapWithLinalgxPack : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::PackOp packOp,
