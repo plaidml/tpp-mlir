@@ -400,7 +400,7 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
     // no conversion if the relu is a scalar operation.
-    Type outputType = reluOp.getOperand().getType();
+    Type outputType = reluOp.getInput().getType();
     if (!outputType.isa<ShapedType>())
       return rewriter.notifyMatchFailure(reluOp,
                                          "Expected a non-scalar operation");
@@ -450,7 +450,7 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = addOp.getLoc();
     // no conversion if the add is a scalar operation.
-    Type outputType = addOp.getOutput().getType();
+    Type outputType = addOp.getOut().getType();
     if (!outputType.isa<ShapedType>())
       return failure();
 

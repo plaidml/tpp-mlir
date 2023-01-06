@@ -78,7 +78,7 @@ func.func @matmul_static(
 // CHECK: }
 // CHECK: scf.parallel (%[[L:.+]], %[[E:.+]]) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]]) {
 // CHECK:   %[[SUBV3:.+]] = memref.subview %[[ALLOC2]][%[[L]], %[[E]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, #[[MAP0]]>
-// CHECK:   tpp.relu out(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>)
+// CHECK:   tpp.relu ins(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>) out(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>)
 // CHECK:   scf.yield
 // CHECK: }
 // CHECK: linalgx.unpack %[[ALLOC2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : (memref<8x32x32x32xf32> memref<256x1024xf32, strided<[?, ?], offset: ?>>)

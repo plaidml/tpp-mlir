@@ -187,22 +187,22 @@ _mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
   // printMemRefMetaData(std::cout, DynamicMemRefType<char>(*input));
   // std::cout << "tensor output: \n";
   // printMemRefMetaData(std::cout, DynamicMemRefType<char>(*output));
-  DynamicMemRefType<char> tensorA = DynamicMemRefType<char>(*input);
-  DynamicMemRefType<char> tensorB = DynamicMemRefType<char>(*output);
+  DynamicMemRefType<char> memrefA = DynamicMemRefType<char>(*input);
+  DynamicMemRefType<char> memrefB = DynamicMemRefType<char>(*output);
 
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
   libxsmm_meltw_unary_param param;
   if (dType == LIBXSMM_DATATYPE_F32) {
-    float *addr_a = (float *)tensorA.data + tensorA.offset;
-    float *addr_b = (float *)tensorB.data + tensorB.offset;
+    float *addr_a = (float *)memrefA.data + memrefA.offset;
+    float *addr_b = (float *)memrefB.data + memrefB.offset;
 
     param.in.primary = (void *)addr_a;
     param.out.primary = (void *)addr_b;
   } else if (dType == LIBXSMM_DATATYPE_BF16) {
 
-    bf16 *addr_a = (bf16 *)tensorA.data + tensorA.offset;
-    bf16 *addr_b = (bf16 *)tensorB.data + tensorB.offset;
+    bf16 *addr_a = (bf16 *)memrefA.data + memrefA.offset;
+    bf16 *addr_b = (bf16 *)memrefB.data + memrefB.offset;
 
     param.in.primary = (void *)addr_a;
     param.out.primary = (void *)addr_b;
@@ -220,27 +220,30 @@ _mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype dType,
 extern "C" void _mlir_ciface_xsmm_binary_invoke(const libxsmm_datatype dType,
                                                 int64_t addr,
                                                 UnrankedMemRefType<char> *lhs,
-                                                UnrankedMemRefType<char> *rhs) {
-
-  DynamicMemRefType<char> tensorLhs = DynamicMemRefType<char>(*lhs);
-  DynamicMemRefType<char> tensorRhs = DynamicMemRefType<char>(*rhs);
+                                                UnrankedMemRefType<char> *rhs,
+                                                UnrankedMemRefType<char> *out) {
+  DynamicMemRefType<char> memrefLhs = DynamicMemRefType<char>(*lhs);
+  DynamicMemRefType<char> memrefRhs = DynamicMemRefType<char>(*rhs);
+  DynamicMemRefType<char> memrefOut = DynamicMemRefType<char>(*out);
   libxsmm_meltwfunction_binary kernel =
       reinterpret_cast<libxsmm_meltwfunction_binary>(addr);
   libxsmm_meltw_binary_param param;
 
   if (dType == LIBXSMM_DATATYPE_F32) {
-    float *addr_tensor_lhs = (float *)tensorLhs.data + tensorLhs.offset;
-    float *addr_tensor_rhs = (float *)tensorRhs.data + tensorRhs.offset;
-    param.in0.primary = (void *)addr_tensor_lhs;
-    param.in1.primary = (void *)addr_tensor_rhs;
-    param.out.primary = (void *)addr_tensor_rhs;
+    float *addr_memref_lhs = (float *)memrefLhs.data + memrefLhs.offset;
+    float *addr_memref_rhs = (float *)memrefRhs.data + memrefRhs.offset;
+    float *addr_memref_out = (float *)memrefOut.data + memrefOut.offset;
+    param.in0.primary = (void *)addr_memref_lhs;
+    param.in1.primary = (void *)addr_memref_rhs;
+    param.out.primary = (void *)addr_memref_out;
 
   } else if (dType == LIBXSMM_DATATYPE_BF16) {
-    bf16 *addr_tensor_lhs = (bf16 *)tensorLhs.data + tensorLhs.offset;
-    bf16 *addr_tensor_rhs = (bf16 *)tensorRhs.data + tensorRhs.offset;
-    param.in0.primary = (void *)addr_tensor_lhs;
-    param.in1.primary = (void *)addr_tensor_rhs;
-    param.out.primary = (void *)addr_tensor_rhs;
+    bf16 *addr_memref_lhs = (bf16 *)memrefLhs.data + memrefLhs.offset;
+    bf16 *addr_memref_rhs = (bf16 *)memrefRhs.data + memrefRhs.offset;
+    bf16 *addr_memref_out = (bf16 *)memrefOut.data + memrefOut.offset;
+    param.in0.primary = (void *)addr_memref_lhs;
+    param.in1.primary = (void *)addr_memref_rhs;
+    param.out.primary = (void *)addr_memref_out;
   }
   kernel(&param);
 }
