@@ -1,5 +1,88 @@
 // RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
 
+// CHECK: func.func @add(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>
+func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+  // CHECK: call @xsmm_binary_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
+  tpp.add ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK: func.func @identity(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<1x1xf32>
+func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG1]]
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast1]]
+  tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK: func.func @relu(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+func.func @relu(%arg0: memref<3x3xf32>) {
+// CHECK: call @xsmm_unary_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
+  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]]
+  tpp.relu out(%arg0: memref<3x3xf32>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK: func.func @brgemm(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>
+func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
+  // CHECK:   call @xsmm_brgemm_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast %[[ARG0]]
+  // CHECK:   %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK:   %[[cast2:.*]] = memref.cast %[[ARG2]]
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @brgemm_bf16
+// CHECK-SAME:  %[[ARG0:.+]]: memref<64x4x4xbf16>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<64x2x4x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xbf16>
+func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
+                              %arg2: memref<4x4xbf16>) {
+  // CHECK:   call @xsmm_brgemm_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast %[[ARG0]]
+  // CHECK:   %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK:   %[[cast2:.*]] = memref.cast %[[ARG2]]
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  tpp.vnni_brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>) out(%arg2: memref<4x4xbf16>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
 // CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
@@ -12,6 +95,25 @@ func.func @matmul(%A: memref<4x8xf32>,
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) out(%C : memref<4x4xf32>)
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @matmul_bf16
+// CHECK-SAME:  %[[ARG0:.+]]: memref<6x10xbf16>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<5x6x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<6x6xbf16>
+func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
+                            %arg2: memref<6x6xbf16>) {
+  // CHECK:   call @xsmm_matmul_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast %[[ARG0]]
+  // CHECK:   %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK:   %[[cast2:.*]] = memref.cast %[[ARG2]]
+  // CHECK:   call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  tpp.vnni_matmul ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
 
   // CHECK: return
   return
