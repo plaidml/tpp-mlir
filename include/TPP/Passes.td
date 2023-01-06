@@ -244,7 +244,7 @@ def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
     it to other linalg operations.
   }];
   let options = [
-    Option<"convertToLinalg", "convert-to-linalg", "bool", "false",
+    Option<"convertToLinalg", "convert-to-linalg", "bool", "true",
            "Convert pack and unpack directly to linalg">
   ];
   let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";

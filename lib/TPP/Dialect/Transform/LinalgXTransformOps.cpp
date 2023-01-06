@@ -9,7 +9,6 @@
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
-#include "iostream"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+
 using namespace mlir;
 using namespace mlir::transform;
 
@@ -426,6 +426,7 @@ public:
         >();
   }
 };
+
 } // namespace
 
 #define GET_OP_CLASSES

@@ -15,6 +15,7 @@
 #include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
+
 namespace linalg {
 class GenericOp;
 class LinalgOp;
