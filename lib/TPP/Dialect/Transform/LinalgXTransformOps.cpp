@@ -173,8 +173,6 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateSinkPackPatterns(patterns);
   mlir::tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
-  // TODO: re-enable me.
-  // mlir::tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return emitDefaultDefiniteFailure(target);
