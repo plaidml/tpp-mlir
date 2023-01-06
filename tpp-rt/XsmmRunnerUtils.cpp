@@ -259,47 +259,6 @@ _mlir_ciface_xsmm_unary_scalar_invoke(const libxsmm_datatype dType,
   kernel(&param);
 }
 
-LIBXSMM_INLINE void matrix_copy_NC_to_NCNC(float *src, float *dst, int T, int N,
-                                           int C, int bn, int bc) {
-  int t, n1, n2, c1, c2;
-  int nBlocks = N / bn;
-  int cBlocks = C / bc;
-  LIBXSMM_VLA_DECL(3, float, real_src, src, N, C);
-  LIBXSMM_VLA_DECL(5, float, real_dst, dst, nBlocks, cBlocks, bn, bc);
-
-  for (t = 0; t < T; t++) {
-    for (n1 = 0; n1 < nBlocks; n1++) {
-      for (c1 = 0; c1 < cBlocks; c1++) {
-        for (n2 = 0; n2 < bn; n2++) {
-          for (c2 = 0; c2 < bc; c2++) {
-            LIBXSMM_VLA_ACCESS(5, real_dst, t, n1, c1, n2, c2, nBlocks, cBlocks,
-                               bn, bc) =
-                LIBXSMM_VLA_ACCESS(3, real_src, t, n1 * bn + n2, c1 * bc + c2,
-                                   N, C);
-          }
-        }
-      }
-    }
-  }
-}
-
-extern "C" void _mlir_ciface_matrix_copy_NC_to_NCNC(
-    UnrankedMemRefType<float> *input, UnrankedMemRefType<float> *output,
-    int64_t N, int64_t C, int64_t n, int64_t c) {
-  // std::cout << "\n";
-  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*input));
-  // std::cout << "\n";
-  // printMemRefMetaData(std::cout, DynamicMemRefType<float>(*output));
-  // std::cout << "\n";
-  DynamicMemRefType<float> tensorInput = DynamicMemRefType<float>(*input);
-  DynamicMemRefType<float> tensorOutput = DynamicMemRefType<float>(*output);
-
-  float *addr_input = tensorInput.data + tensorInput.offset;
-  float *addr_output = tensorOutput.data + tensorOutput.offset;
-
-  matrix_copy_NC_to_NCNC(addr_input, addr_output, 1, C, N, c, n);
-}
-
 extern "C" void _mlir_ciface_xsmm_brgemm_invoke(const libxsmm_datatype dType,
                                                 int64_t addr,
                                                 UnrankedMemRefType<char> *A,
