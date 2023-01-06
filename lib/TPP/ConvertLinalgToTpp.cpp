@@ -267,9 +267,7 @@ LogicalResult checkOperandForTpp(Value operand) {
   return success();
 }
 
-// Convert a linalg.generic to a tpp operation. Require the generic to be
-// annotated with the tpp operation to replace. Annotation uses linalg
-// library call mechanism.
+// Convert a linalg.generic to a tpp operation.
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
@@ -283,13 +281,20 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
     if (tpp::utils::isTppRelu(linalgOp)) {
-      assert(linalgOp.getNumDpsInits() == 1);
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0]);
+      // relu(A)
+      // B = relu(A)
+      Value output =
+          (linalgOp.getNumOperands() == 2) ? operands[1] : operands[0];
+      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0], output);
       return success();
     }
     if (tpp::utils::isTppAdd(linalgOp)) {
+      // A = A + B
+      // C = A + B
+      Value output =
+          (linalgOp.getNumOperands() == 3) ? operands[2] : operands[1];
       rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
-                                              operands[1]);
+                                              operands[1], output);
       return success();
     }
     if (tpp::utils::isTppMatmul(linalgOp)) {

@@ -4,7 +4,7 @@ func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
                            %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
-  tpp.add ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x2xf32>)
+  tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) out(%arg1: memref<2x2xf32>)
   return %arg1: memref<2x2xf32>
 }
 
@@ -12,7 +12,7 @@ func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
 
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
   // expected-error @below {{'tpp.add' op expects both operands to be shaped type}}
-  tpp.add ins(%arg0: f32) out(%arg1: f32)
+  tpp.add ins(%arg0: f32, %arg0: f32) out(%arg1: f32)
   return
 }
 

@@ -20,15 +20,16 @@
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
 
+// TPP: func.func @relutpp(
+// TPP-SAME: %[[A:.+]]: memref<9x6xf32>)
 func.func @relutpp(%A: tensor<9x6xf32>) -> tensor<9x6xf32> attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0.0 : f32
-  // TPP: tpp.relu out({{.*}} : {{.*}})
-  %O = linalg.generic { indexing_maps = [#map0],
-                          iterator_types = ["parallel", "parallel"] }
-       outs(%A: tensor<9x6xf32>) {
-        ^bb0(%a: f32):
-          %0 = arith.maxf %a, %c0 : f32
-          linalg.yield %0: f32
+  // TPP: tpp.relu ins(%[[A]] : memref<9x6xf32>) out(%[[A]] : memref<9x6xf32>)
+  %O = linalg.generic { indexing_maps = [#map0], iterator_types = ["parallel", "parallel"] }
+    outs(%A: tensor<9x6xf32>) {
+      ^bb0(%a: f32):
+        %0 = arith.maxf %a, %c0 : f32
+        linalg.yield %0: f32
   } -> tensor<9x6xf32>
   return %O: tensor<9x6xf32>
 }
