@@ -121,10 +121,8 @@ func.func @mlp_single_layer_no_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !
       linalg.yield %arg9 : f32
   } -> !C_tensor_t
 
-  // CHECK: scf.for {{.*}} {
-  // CHECK: scf.for {{.*}} {
+  // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.brgemm
-  // CHECK: }
   // CHECK: }
   // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.relu
@@ -197,7 +195,7 @@ func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C :
 
   // The outermost loop is the fused loop between the matmul and relu.
   // CHECK: scf.for {{.*}} {
-  // CHECK: scf.for {{.*}} {
+  // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.brgemm
   // CHECK: }
   // CHECK: scf.parallel {{.*}} {

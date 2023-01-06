@@ -61,14 +61,12 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
   // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-  // CHECK: scf.for %[[P1:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
-  // CHECK-NEXT: scf.for %[[P2:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
+  // CHECK: scf.parallel (%[[P1:.+]], %[[P2:.+]]) = (%[[C0]], %[[C0]]) to (%[[C4]], %[[C8]]) step (%[[C1]], %[[C1]]) {
   // CHECK-NEXT: %[[SLICE1:.+]] = memref.subview %[[ARG0]][%[[P1]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
   // CHECK-NEXT: %[[SLICE2:.+]] = memref.subview %[[ARG1]][%[[P2]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
   // CHECK-NEXT: %[[SLICE3:.+]] = memref.subview %[[ARG2]][%[[P1]], %[[P2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
   // CHECK-NEXT: linalg.batch_reduce_matmul ins(%[[SLICE1]], %[[SLICE2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[SLICE3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-  // CHECK-NEXT: }
-  // CHECK-NEXT: }
+  // CHECK: }
   // CHECK-NEXT: return %[[ARG2]] : memref<4x8x32x32xf32>
   linalg.generic {indexing_maps = [#map3, #map4, #map5], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : memref<4x16x32x32xf32>, memref<8x16x32x32xf32>) outs(%arg2 : memref<4x8x32x32xf32>) {
     ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):

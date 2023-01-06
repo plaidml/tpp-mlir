@@ -190,10 +190,15 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
 
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };
-  linalg::GenerateLoopNest<scf::ForOp>::doit(
-      rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
-      linalgOp.getIteratorTypesArray(), brgemmBuilder);
-
+  if (linalgOp.hasBufferSemantics()) {
+    linalg::GenerateLoopNest<scf::ParallelOp>::doit(
+        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+        linalgOp.getIteratorTypesArray(), brgemmBuilder);
+  } else {
+    linalg::GenerateLoopNest<scf::ForOp>::doit(
+        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+        linalgOp.getIteratorTypesArray(), brgemmBuilder);
+  }
   // see: `Tiling.cpp` in Linalg/Transforms
   // gather the newly created loops and return them with the new op.
   SmallVector<Operation *, 8> loops;
