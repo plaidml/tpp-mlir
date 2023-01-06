@@ -20,6 +20,37 @@ func.func @matmul(%A: memref<4x8xf32>,
 
 // -----
 
+// CHECK-LABEL: func.func @blocked_matmul(
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
+// CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
+// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: call @xsmm_brgemm_dispatch
+  // CHECK: scf.parallel
+  // CHECK:   %[[cast:.*]] = memref.cast
+  // CHECK:   %[[cast1:.*]] = memref.cast
+  // CHECK:   %[[cast2:.*]] = memref.cast
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  %c16_i64 = arith.constant 16 : i64
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  scf.parallel (%arg3, %arg4) = (%c0, %c0) to (%c4, %c8) step (%c1, %c1) {
+    %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+    %0 = xsmm.ternary.dispatch brgemm [32, 32, 32, 32, 32, 32](dataType f32)
+    xsmm.ternary brgemm(dataType f32, %0, %subview, %subview_0, %subview_1, %c16_i64) : (i64, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
+    scf.yield
+  }
+
+  // CHECK: return
+  return
+}
+
+// -----
+
 // Conv2D weights
 memref.global "private" constant @__constant_2048x512xf32 : memref<2048x512xf32> = dense<0.00332225906> {alignment = 128 : i64}
 

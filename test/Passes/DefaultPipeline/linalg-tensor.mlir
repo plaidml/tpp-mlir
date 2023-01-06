@@ -19,6 +19,34 @@ func.func @matmul(%A: tensor<4x8xf32>,
 
 // -----
 
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+
+// CHECK-LABEL: func.func @blocked_matmul(
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
+// CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
+// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: scf.parallel
+  // CHECK:   call @xsmm_brgemm_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast
+  // CHECK:   %[[cast1:.*]] = memref.cast
+  // CHECK:   %[[cast2:.*]] = memref.cast
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+    } -> tensor<4x8x32x32xf32>
+
+  // CHECK: return
+  return %1 :  tensor<4x8x32x32xf32>
+}
+
+// -----
+
 // 1x1 Conv2D shapes
 !conv1x1_input_tensor_t  = tensor<1x7x7x2048xf32> // N,H,W,Ic
 !conv1x1_filter_tensor_t = tensor<1x1x2048x512xf32> // H,W,Ic,Oc

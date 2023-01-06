@@ -39,6 +39,63 @@ func.func @brgemm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 
 // -----
 
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+
+// CHECK-LABEL: func.func @blocked_matmul(
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
+// CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
+// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: scf.parallel
+  // CHECK:   call @xsmm_brgemm_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast
+  // CHECK:   %[[cast1:.*]] = memref.cast
+  // CHECK:   %[[cast2:.*]] = memref.cast
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : memref<4x16x32x32xf32>, memref<8x16x32x32xf32>) outs(%arg2 : memref<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  }
+
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @blocked_matmul_mapped(
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
+// CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
+// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+func.func @blocked_matmul_mapped(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: scf.parallel
+  // CHECK:   call @xsmm_brgemm_dispatch
+  // CHECK:   %[[cast:.*]] = memref.cast
+  // CHECK:   %[[cast1:.*]] = memref.cast
+  // CHECK:   %[[cast2:.*]] = memref.cast
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  scf.parallel (%arg3, %arg4) = (%c0, %c0) to (%c4, %c8) step (%c1, %c1) {
+    %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+    linalg.batch_reduce_matmul ins(%subview, %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+    scf.yield
+  }
+
+  // CHECK: return
+  return
+}
+
+// -----
+
 #map5 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 // CHECK-LABEL: @relu_3d(
