@@ -147,7 +147,7 @@ def PackOp : LinalgX_Op<"pack", [
     OpBuilder<(ins "Value":$input, "Value":$output,
       "ArrayRef<int64_t>":$innerDimPos, 
       "ArrayRef<OpFoldResult>":$innerTiles,
-      CArg<"Optional<Value>", "llvm::None">:$paddingValue,
+      CArg<"Optional<Value>", "std::nullopt">:$paddingValue,
       CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
 

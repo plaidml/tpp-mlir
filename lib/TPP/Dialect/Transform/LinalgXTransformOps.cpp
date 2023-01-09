@@ -41,7 +41,7 @@ LogicalResult transform::PackOp::verify() {
 
 DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
-                              SmallVector<Operation *> &results,
+                              ApplyToEachResultList &results,
                               transform::TransformState &state) {
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
@@ -92,7 +92,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
 
 DiagnosedSilenceableFailure
 transform::CollapseOp::applyToOne(linalg::LinalgOp target,
-                                  SmallVector<Operation *> &results,
+                                  ApplyToEachResultList &results,
                                   transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
@@ -123,7 +123,7 @@ transform::CollapseOp::getReassociationIndices() {
 
 DiagnosedSilenceableFailure
 transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
-                                     SmallVector<Operation *> &results,
+                                     ApplyToEachResultList &results,
                                      transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
@@ -140,7 +140,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
 
 DiagnosedSilenceableFailure
 transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
-                                         SmallVector<Operation *> &results,
+                                         ApplyToEachResultList &results,
                                          transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
@@ -160,10 +160,8 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
 // PackingPropagationOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::PackingPropagationOp::applyToOne(Operation *target,
-                                            SmallVector<Operation *> &results,
-                                            TransformState &state) {
+DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -220,10 +218,8 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
 // FoldUnitExtentDimsOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
-                                            SmallVector<Operation *> &results,
-                                            TransformState &state) {
+DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -243,10 +239,8 @@ transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
 // CanonicalizeOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::CanonicalizeOp::applyToOne(Operation *target,
-                                      SmallVector<Operation *> &results,
-                                      TransformState &state) {
+DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
