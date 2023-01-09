@@ -449,14 +449,15 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = addOp.getLoc();
-    // no conversion if the add is a scalar operation.
     Type outputType = addOp.getOut().getType();
-    if (!outputType.isa<ShapedType>())
-      return failure();
-
+    assert(outputType.isa<MemRefType>() && "expect a memref type");
     MemRefType outputMemRef = outputType.cast<MemRefType>();
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
+    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
+           "expect memref with rank 1 or 2");
+    
+    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
+    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1] : outputMemRef.getShape()[0];
+    
     auto ldiLhsDim = getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
     if (failed(ldiLhsDim))
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on lhs");
