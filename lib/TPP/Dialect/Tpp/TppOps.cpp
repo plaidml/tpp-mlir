@@ -135,7 +135,21 @@ void BrgemmOp::build(OpBuilder &builder, OperationState &state,
 LogicalResult AddOp::verify() {
   Type lhsType = getLhs().getType();
   Type rhsType = getRhs().getType();
-  if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()))
+  Type outputType = getOut().getType();
+  if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
+      (!outputType.isa<ShapedType>()))
+    return emitOpError("expects all operands to be shaped type");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ReluOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReluOp::verify() {
+  Type inputType = getInput().getType();
+  Type outputType = getOutput().getType();
+  if ((!inputType.isa<ShapedType>()) || (!outputType.isa<ShapedType>()))
     return emitOpError("expects both operands to be shaped type");
   return success();
 }
