@@ -91,24 +91,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return transposeOp.getResults()[0];
   }
 
-  // Get canonical permutation to get from ABCabc to AaBbCc.
-  SmallVector<int64_t> getCanonicalPerm(tensor::UnPackOp unPackOp) const {
-    SmallVector<int64_t> canonicalPerm;
-    int64_t tileLoop = unPackOp.getDestType().getRank();
-    llvm::DenseSet<int64_t> tiledDims(unPackOp.getInnerDimsPos().begin(),
-                                      unPackOp.getInnerDimsPos().end());
-    int64_t posInTileLoop = 0;
-    while (posInTileLoop < tileLoop) {
-      canonicalPerm.push_back(posInTileLoop);
-      if (tiledDims.count(posInTileLoop))
-        canonicalPerm.push_back(posInTileLoop + tiledDims.size());
-      posInTileLoop++;
-    }
-    assert(canonicalPerm.size() ==
-           static_cast<size_t>(unPackOp.getSourceType().getRank()));
-    return canonicalPerm;
-  }
-
+  // TODO: Move into `StaticValueUtils.h`
   OpFoldResult getShapeDimSize(OpBuilder &b, Location loc, Value rankedTensor,
                                int64_t dimIdx) const {
     RankedTensorType tensorType =
@@ -120,6 +103,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return b.createOrFold<tensor::DimOp>(loc, rankedTensor, idxValue);
   }
 
+  // TODO: Move into StaticValueUtils.h
   SmallVector<OpFoldResult> getShapeDimSizes(OpBuilder &b, Location loc,
                                              Value rankedTensor) const {
     SmallVector<OpFoldResult> dimSizes;
@@ -163,9 +147,8 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return reassociations;
   }
 
-  // Get the inverse permutation of outer and permutation for inner dims pos.
+  // Get the inverse permutation of outer and permutation for inner dims pos if any.
   SmallVector<int64_t> getOuterDimsPerm(tensor::UnPackOp unPackOp) const {
-
     auto perm = llvm::to_vector(
         llvm::seq<int64_t>(0, unPackOp.getDestType().getRank()));
 
@@ -183,6 +166,24 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     return perm;
   }
 
+  // Get canonical permutation to get from ABCabc to AaBbCc.
+  SmallVector<int64_t> getCanonicalPerm(tensor::UnPackOp unPackOp) const {
+    SmallVector<int64_t> canonicalPerm;
+    int64_t tileLoop = unPackOp.getDestType().getRank();
+    llvm::DenseSet<int64_t> tiledDims(unPackOp.getInnerDimsPos().begin(),
+                                      unPackOp.getInnerDimsPos().end());
+    int64_t posInTileLoop = 0;
+    while (posInTileLoop < tileLoop) {
+      canonicalPerm.push_back(posInTileLoop);
+      if (tiledDims.count(posInTileLoop))
+        canonicalPerm.push_back(posInTileLoop + tiledDims.size());
+      posInTileLoop++;
+    }
+    assert(canonicalPerm.size() ==
+           static_cast<size_t>(unPackOp.getSourceType().getRank()));
+    return canonicalPerm;
+  }
+
   // Rewrite an unpack op as a sequence of linalg op.
   // Currently,
   // 1. tranpose -> undo outer dims perm and inner dims perm
@@ -194,16 +195,14 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
   LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = unPackOp.getLoc();
-
-    // TODO: Compose permutation.
     SmallVector<int64_t> outerInnerPerm = getOuterDimsPerm(unPackOp);
     SmallVector<int64_t> canonicalPerm = getCanonicalPerm(unPackOp);
+    applyPermutationToVector(outerInnerPerm, canonicalPerm);
+    canonicalPerm = outerInnerPerm;
 
     assert(!canonicalPerm.empty() && "Unexpected empty permutation");
-    Value transposeOuterInner =
-        buildTranspose(rewriter, loc, unPackOp.getSource(), outerInnerPerm);
     Value transposed =
-        buildTranspose(rewriter, loc, transposeOuterInner, canonicalPerm);
+        buildTranspose(rewriter, loc, unPackOp.getSource(), canonicalPerm);
 
     auto reassoc = getReassociation(unPackOp.getDestType().getRank(),
                                     unPackOp.getInnerDimsPos());
@@ -224,9 +223,9 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
         loc, collapsed.getResult(), offsets, extractSizes, strides);
 
     // TODO: check if we need to copy.
-    auto copy = rewriter.create<linalg::CopyOp>(loc, extracted.getResult(),
-                                                unPackOp.getDest());
-    rewriter.replaceOp(unPackOp, copy.getResults()[0]);
+    //auto copy = rewriter.create<linalg::CopyOp>(loc, extracted.getResult(),
+    //                                            unPackOp.getDest());
+    rewriter.replaceOp(unPackOp, /*copy.getResults()[0]*/ extracted.getResult());
     return success();
   }
 };
