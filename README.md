@@ -78,10 +78,3 @@ cmake --build . --target mlir-doc
 ## License
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
-
-
-## Note:
-
-- Nice link for conv: https://d2l.ai/chapter_convolutional-neural-networks/padding-and-strides.html
-
-- in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
