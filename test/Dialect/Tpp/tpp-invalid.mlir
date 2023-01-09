@@ -11,8 +11,24 @@ func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
 // -----
 
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{'tpp.add' op expects both operands to be shaped type}}
+  // expected-error @below {{'tpp.add' op expects all operands to be shaped type}}
   tpp.add ins(%arg0: f32, %arg0: f32) out(%arg1: f32)
+  return
+}
+
+// -----
+
+func.func @tpp_relu_invalid(%arg0: f32, %arg1: f32) {
+  // expected-error @below {{'tpp.relu' op expects both operands to be shaped type}}
+  tpp.relu ins(%arg0: f32) out(%arg1: f32)
+  return
+}
+
+// -----
+
+func.func @tpp_relu_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
+  // expected-error @below {{'tpp.relu' op operand #0 must be 1D/2D memref of floating-point values or floating-point, but got 'memref<f32>'}}
+  tpp.relu ins(%arg0: memref<f32>) out(%arg1: memref<f32>)
   return
 }
 

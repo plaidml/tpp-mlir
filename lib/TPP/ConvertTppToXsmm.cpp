@@ -399,17 +399,22 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = reluOp.getLoc();
-    // no conversion if the relu is a scalar operation.
     Type outputType = reluOp.getInput().getType();
-    if (!outputType.isa<ShapedType>())
-      return rewriter.notifyMatchFailure(reluOp,
-                                         "Expected a non-scalar operation");
+    assert(outputType.isa<MemRefType>() && "expect a memref type");
 
     MemRefType outputMemRef = outputType.cast<MemRefType>();
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-    int64_t ldo = n;
-    int64_t ldi = n;
+    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
+           "expect memref with rank 1 or 2");
+
+    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
+    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
+                                              : outputMemRef.getShape()[0];
+
+    auto leadDim = getLeadingDim(outputMemRef);
+    if (failed(leadDim))
+      return rewriter.notifyMatchFailure(reluOp, "Cannot compute ldo/ldi");
+    int64_t ldo = *leadDim;
+    int64_t ldi = *leadDim;
 
     xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
     xsmm::UnaryKindAttr attr =

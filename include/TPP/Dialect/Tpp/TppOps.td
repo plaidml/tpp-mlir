@@ -125,7 +125,9 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu", [SameTypeOperands]> {
     tpp.relu ins(%0: memref<2x2xf32>) out(%0: memref<2x2xf32>)
 
     ```
-  }]; 
+  }];
+
+  let hasVerifier = 1; 
 }
 
 //===----------------------------------------------------------------------===//

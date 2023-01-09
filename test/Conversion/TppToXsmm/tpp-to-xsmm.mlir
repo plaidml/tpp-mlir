@@ -182,3 +182,14 @@ func.func @add_to_xsmm(%arg0: memref<32xf32>, %arg1: memref<32xf32>, %arg2: memr
   tpp.add ins(%arg0: memref<32xf32>, %arg1: memref<32xf32>) out(%arg2: memref<32xf32>)
   return 
 }
+
+// -----
+
+// CHECK-LABEL: func.func @relu_to_xsmm(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<32xf32>)
+func.func @relu_to_xsmm(%arg0: memref<32xf32>) {
+  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch relu [1, 32, 1, 1](broadcast none dataType f32)
+  // CHECK-NEXT: xsmm.unary relu(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG0]])
+  tpp.relu ins(%arg0: memref<32xf32>) out(%arg0: memref<32xf32>)
+  return
+}
