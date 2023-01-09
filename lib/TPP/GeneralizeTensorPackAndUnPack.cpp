@@ -223,6 +223,7 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     auto extracted = rewriter.create<tensor::ExtractSliceOp>(
         loc, collapsed.getResult(), offsets, extractSizes, strides);
 
+    // TODO: check if we need to copy.
     auto copy = rewriter.create<linalg::CopyOp>(loc, extracted.getResult(),
                                                 unPackOp.getDest());
     rewriter.replaceOp(unPackOp, copy.getResults()[0]);
