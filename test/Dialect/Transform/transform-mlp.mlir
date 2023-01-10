@@ -121,10 +121,8 @@ func.func @mlp_single_layer_no_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !
       linalg.yield %arg9 : f32
   } -> !C_tensor_t
 
-  // CHECK: scf.for {{.*}} {
-  // CHECK: scf.for {{.*}} {
+  // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.brgemm
-  // CHECK: }
   // CHECK: }
   // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.relu
@@ -197,7 +195,7 @@ func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C :
 
   // The outermost loop is the fused loop between the matmul and relu.
   // CHECK: scf.for {{.*}} {
-  // CHECK: scf.for {{.*}} {
+  // CHECK: scf.parallel {{.*}} {
   // CHECK: tpp.brgemm
   // CHECK: }
   // CHECK: scf.parallel {{.*}} {
@@ -290,7 +288,7 @@ func.func @mlp_single_layer_fused_and_packed(%arg0: tensor<128x256xf32>, %arg1: 
 // CHECK: %[[SUB2:.+]] = memref.subview %[[BUFF2]][%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
 // CHECK: tpp.brgemm ins(%[[SUB0]] : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUB1]] : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>) out(%[[SUB2]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
 // CHECK: %[[SUB4:.+]] = memref.subview %alloc_1[%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<32x32xf32, #[[MAP]]>
-// CHECK: tpp.relu out(%[[SUB4]] : memref<32x32xf32, #[[MAP]]>)
+// CHECK: tpp.relu ins(%[[SUB4]] : memref<32x32xf32, #[[MAP]]>) out(%[[SUB4]] : memref<32x32xf32, #[[MAP]]>)
 // CHECK: }
 // CHECK: }
 // CHECK: linalgx.unpack %[[BUFF2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG3]] : (memref<4x16x32x32xf32> memref<128x512xf32, strided<[?, ?], offset: ?>>)

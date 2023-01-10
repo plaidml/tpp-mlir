@@ -14,7 +14,6 @@
 #include <ctime>
 
 #include "PerfRunnerUtils.h"
-#include "Utils/Perf.h"
 
 //===----------------------------------------------------------------------===//
 // Perf dialect utils

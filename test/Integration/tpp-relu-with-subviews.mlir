@@ -41,12 +41,13 @@ func.func @entry() {
         linalg.yield %in : f32
   }
 
+  // Check if subview extraction gives us the same result when comparing with the second relu op. 
   scf.for %arg3 = %c0 to %c12 step %c1 {
     scf.for %arg4 = %c0 to %c2 step %c1 {
       scf.for %arg5 = %c0 to %c56 step %c1 {
         %subview = memref.subview %alloc_0[%arg3, %arg4, %arg5, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : memref<12x2x56x56x32xf32> to memref<1x1x1x56x32xf32, strided<[200704, 100352, 1792, 32, 1], offset: ?>>
-        // TPP: tpp.relu out({{.*}} : {{.*}})
-        linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs(%subview : memref<1x1x1x56x32xf32, strided<[200704, 100352, 1792, 32, 1], offset: ?>>) {
+        // TPP: tpp.relu ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
+        linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%subview : memref<1x1x1x56x32xf32, strided<[200704, 100352, 1792, 32, 1], offset: ?>>) {
           ^bb0(%out: f32):
             %0 = arith.maxf %out, %cf : f32
             linalg.yield %0 : f32
@@ -61,7 +62,7 @@ func.func @entry() {
         linalg.yield %in : f32
   }
 
-  // TPP-NOT: tpp.relu outs({{.*}} : {{.*}})
+  // TPP: tpp.relu ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
   linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%alloc_1 : memref<12x2x56x56x32xf32>) {
       ^bb0(%out: f32):
         %0 = arith.maxf %out, %cf : f32

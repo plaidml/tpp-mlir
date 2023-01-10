@@ -51,7 +51,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     if (isScalarOp(addOp)) {
       Value scalarAdd =
           rewriter.create<arith::AddFOp>(loc, addOp.getLhs(), addOp.getRhs());
-      addOp.getOutput().replaceAllUsesWith(scalarAdd);
+      addOp.getOut().replaceAllUsesWith(scalarAdd);
       rewriter.eraseOp(addOp);
       return success();
     }
@@ -76,7 +76,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
               b.create<memref::LoadOp>(loc, addOp.getRhs(), localIvs);
           Value addLhsAndRhs =
               b.create<arith::AddFOp>(loc, scalarLhs, scalarRhs);
-          b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(),
+          b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOut(),
                                     localIvs);
         });
     rewriter.eraseOp(addOp);
@@ -196,7 +196,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, reluOp.getOutput(), localIvs);
+              b.create<memref::LoadOp>(loc, reluOp.getInput(), localIvs);
           Value scalarRelu =
               b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
           b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(),

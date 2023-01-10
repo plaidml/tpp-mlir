@@ -4,18 +4,41 @@ func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
                            %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
 
   // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
-  tpp.add ins(%arg0: memref<1x2xf32>) out(%arg1: memref<2x2xf32>)
+  tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) out(%arg1: memref<2x2xf32>)
   return %arg1: memref<2x2xf32>
 }
 
 // -----
 
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{'tpp.add' op expects both operands to be shaped type}}
-  tpp.add ins(%arg0: f32) out(%arg1: f32)
+  // expected-error @below {{'tpp.add' op expects all operands to be shaped type}}
+  tpp.add ins(%arg0: f32, %arg0: f32) out(%arg1: f32)
   return
 }
 
+// -----
+
+func.func @tpp_relu_invalid(%arg0: f32, %arg1: f32) {
+  // expected-error @below {{'tpp.relu' op expects both operands to be shaped type}}
+  tpp.relu ins(%arg0: f32) out(%arg1: f32)
+  return
+}
+
+// -----
+
+func.func @tpp_relu_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
+  // expected-error @below {{'tpp.relu' op operand #0 must be 1D/2D memref of floating-point values or floating-point, but got 'memref<f32>'}}
+  tpp.relu ins(%arg0: memref<f32>) out(%arg1: memref<f32>)
+  return
+}
+
+// -----
+
+func.func @tpp_add_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
+  // expected-error @below {{'tpp.add' op operand #0 must be 1D/2D memref of floating-point values or floating-point, but got 'memref<f32>'}}
+  tpp.add ins(%arg0: memref<f32>, %arg1: memref<f32>) out(%arg1: memref<f32>)
+  return
+}
 
 // -----
 

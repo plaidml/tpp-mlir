@@ -314,15 +314,55 @@ static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
   });
 }
 
-// Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp) {
+// Only parallel loops at buffer semantics with static shapes.
+bool hasMappingToTppConditions(linalg::GenericOp linalgOp) {
   if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
-    return false;
-  if (linalgOp.getNumDpsInits() != 1)
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
-  if (!hasStaticShape(linalgOp))
+  return hasStaticShape(linalgOp);
+}
+
+static bool hasOneUser(Value val) {
+  return std::distance(val.getUsers().begin(), val.getUsers().end()) == 1;
+}
+
+static bool hasZeroUser(Value val) {
+  return std::distance(val.getUsers().begin(), val.getUsers().end()) == 0;
+}
+
+// Return true if the operation is binary.
+static bool isBinaryOp(linalg::GenericOp linalgOp) {
+  if ((linalgOp.getNumDpsInputs() == 1) && (linalgOp.getNumDpsInits() == 1)) {
+    Value outArg = linalgOp.getRegionOutputArgs()[0];
+    Value inputArg = linalgOp.getRegionInputArgs()[0];
+    return (hasOneUser(outArg) && hasOneUser(inputArg));
+  }
+  if ((linalgOp.getNumDpsInputs() == 2) && (linalgOp.getNumDpsInits() == 1)) {
+    Value outArg = linalgOp.getRegionOutputArgs()[0];
+    return hasZeroUser(outArg);
+  }
+  return false;
+}
+
+// Return true if the operands are all the same.
+static bool allOperandsHaveSameType(linalg::GenericOp linalgOp) {
+  Type operandType = linalgOp->getOperand(0).getType();
+  for (Value operand : linalgOp->getOperands()) {
+    Type currentType = operand.getType();
+    if (currentType != operandType)
+      return false;
+  }
+  return true;
+}
+
+// Return true if the linalg.generic can be mapped to a tpp.add.
+bool isTppAdd(linalg::GenericOp linalgOp) {
+  if (!hasMappingToTppConditions(linalgOp))
+    return false;
+  if (!isBinaryOp(linalgOp))
+    return false;
+  if (!allOperandsHaveSameType(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
@@ -337,31 +377,28 @@ bool canMapToTppRelu(linalg::GenericOp linalgOp) {
 }
 
 // Return true if the operation is unary.
-bool isUnaryOp(linalg::GenericOp linalgOp) {
-  if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1))
-    return true;
+static bool isUnaryOp(linalg::GenericOp linalgOp) {
+  if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1)) {
+    Value outArg = linalgOp.getRegionOutputArgs()[0];
+    return hasOneUser(outArg);
+  }
   // If we have 1 input 1 output, the output must have no users.
   if ((linalgOp.getNumDpsInputs() == 1) && (linalgOp.getNumDpsInits() == 1)) {
     Value outArg = linalgOp.getRegionOutputArgs()[0];
-    SmallVector<Operation *> users(outArg.getUsers().begin(),
-                                   outArg.getUsers().end());
-    if (users.size() == 0)
-      return true;
+    Value inputArg = linalgOp.getRegionInputArgs()[0];
+    return (hasZeroUser(outArg) && hasOneUser(inputArg));
   }
   return false;
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp) {
-  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+  if (!hasMappingToTppConditions(linalgOp))
     return false;
   if (!isUnaryOp(linalgOp))
     return false;
-  if (linalgOp.hasTensorSemantics())
-    return false;
-  if (!hasStaticShape(linalgOp))
-    return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
+         hasMaxfZeroOp(linalgOp) &&
          hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
 }
 
@@ -373,13 +410,9 @@ bool canMapToTppIdentity(linalg::GenericOp linalgOp) {
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.
 bool isTppIdentity(linalg::GenericOp linalgOp) {
-  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops())
+  if (!hasMappingToTppConditions(linalgOp))
     return false;
-  if ((linalgOp.getNumDpsInputs() != 1) || (linalgOp.getNumDpsInits() != 1))
-    return false;
-  if (linalgOp.hasTensorSemantics())
-    return false;
-  if (!hasStaticShape(linalgOp))
+  if (!isUnaryOp(linalgOp))
     return false;
   return hasCopySemantics(linalgOp);
 }

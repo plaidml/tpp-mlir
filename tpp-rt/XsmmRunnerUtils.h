@@ -47,10 +47,9 @@ _mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype, int64_t,
                                UnrankedMemRefType<char> *,
                                UnrankedMemRefType<char> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_binary_invoke(const libxsmm_datatype, int64_t,
-                                UnrankedMemRefType<char> *,
-                                UnrankedMemRefType<char> *);
+extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_binary_invoke(
+    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
+    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype, int64_t,
@@ -59,11 +58,6 @@ _mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype, int64_t,
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 _mlir_ciface_xsmm_unary_scalar_invoke(const libxsmm_datatype, int64_t, float,
                                       UnrankedMemRefType<char> *);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_matrix_copy_NC_to_NCNC(UnrankedMemRefType<float> *,
-                                    UnrankedMemRefType<float> *, int64_t,
-                                    int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
     const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,

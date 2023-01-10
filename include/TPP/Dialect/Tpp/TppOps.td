@@ -29,66 +29,93 @@ def TppBRGEMMVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [4]>;
 
 // Tpp operands is a scalar float or a static memref with rank 1 or 2.
 def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
+
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
+
+
+// Class for tpp binary operations.
+class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
+  Tpp_Op<mnemonic, !listconcat(traits, [SameTypeOperands])> {
+
+  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
+
+  let assemblyFormat = [{
+        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
+        `out` `(` $out `:` type($out) `)` attr-dict
+  }];
+}
+
+// Class for tpp.unary operations.
+class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
+  Tpp_Op<mnemonic, !listconcat(traits, [])> {
+  
+  let arguments = (ins TppOperand:$input, TppOperand:$output);
+  
+  let assemblyFormat = [{
+    `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` 
+    attr-dict
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_Op<"add", [SameTypeOperands]> {
-    let summary = "Element-wise addition.";
-    let description = [{
-        The `tpp.add` operation performs element-wise addition
-        on two-dimensional memref.
+def Tpp_AddOp : Tpp_BinaryOp<"add"> {
+  let summary = "Element-wise addition.";
+  let description = [{
+    The `tpp.add` operation performs element-wise addition on two-dimensional
+    memrefs, writing the result on the output memref. No checks or assumption are
+    made on the input/output arguments so the same memref can be passed both as
+    input and output. 
 
-        Example:
+    Example:
 
-        ```mlir
+    ```mlir
 
-        tpp.add ins(%1 : memref<2x2xf32>) out(%2: memref<2x2xf32>)
+    // A = A + A
+    tpp.add ins(%1 : memref<2x2xf32>, %1: memref<2x2xf32>)
+            out(%1 : memref<2x2xf32>)
 
-        ```
-    }];
+    // B = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>) 
+            out(%2: memref<2x2xf32>)
 
-    let arguments = (ins TppOperand:$lhs, TppOperand:$rhs);
+    // C = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>)
+            out(%3 : memref<2x2xf32>)
 
-    let assemblyFormat = [{
-        `ins` `(` $lhs `:` type($lhs) `)`
-        `out` `(` $rhs `:` type($rhs) `)` attr-dict
-    }];
+    ```
+  }];
 
-    let extraClassDeclaration = [{
-      Value getOutput() { return getRhs(); };
-    }];
-
-    let hasVerifier = 1;
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // IdentityOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_IdentityOp : Tpp_Op<"identity"> {
+def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
-    The `tpp.identity` copies input memref to output memref.
+    The `tpp.identity` copies input memref to output memref. It supports
+    broadcast comparing the memref shape element-wise. Starting with the trailing
+    dimensions and working from right to left. Two dimensions are broadcast
+    compatible if:
+    - They are equal
+    - One if them is 1 For more details, see: 
+    https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
 
     Example:
 
     ```mlir
 
     tpp.identity ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
+    
     tpp.identity ins(%1: f32) out(%2: memref<2x2xf32>)
 
     ```
-  }];
-
-  let arguments = (ins TppOperand:$input, TppOperand:$output);
-
-  let assemblyFormat = [{
-      `ins` `(` $input `:` type($input) `)`
-      `out` `(` $output `:` type($output) `)` attr-dict
   }];
 
   let hasVerifier = 1;
@@ -98,25 +125,26 @@ def Tpp_IdentityOp : Tpp_Op<"identity"> {
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_ReluOp : Tpp_Op<"relu"> {
+def Tpp_ReluOp : Tpp_UnaryOp<"relu", [SameTypeOperands]> {
   let summary = "Applies a Rectified Linear Unit function in place.";
   let description = [{
-    The `tpp.relu` applies a Rectified Linear Unit function in place.
+    The `tpp.relu` applies a Rectified Linear Unit function in place 
+    or out-of-place.
 
     Example:
 
     ```mlir
 
-    tpp.relu out(%1: memref<2x2xf32>)
+    // out-of-place.
+    tpp.relu ins(%0: memref<2x2xf32>) out(%1: memref<2x2xf32>)
+
+    // in-place.
+    tpp.relu ins(%0: memref<2x2xf32>) out(%0: memref<2x2xf32>)
 
     ```
   }];
 
-  let arguments = (outs TppOperand:$output);
-
-  let assemblyFormat = [{
-      `out` `(` $output `:` type($output) `)`  attr-dict
-  }];
+  let hasVerifier = 1; 
 }
 
 //===----------------------------------------------------------------------===//

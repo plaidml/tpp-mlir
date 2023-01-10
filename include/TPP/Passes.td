@@ -28,7 +28,8 @@ def LinalgMapToTpp : Pass<"map-linalg-to-tpp", "func::FuncOp"> {
 def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Convert linalg to tpp.";
   let description = [{
-    Convert marked linalg.generic (or named) operations to tpp operations.
+    Convert linalg.generic (or named) operations to tpp operations. Linalg generic
+    operations are converted using simple pattern matching (i.e., see `isTppAdd`).
     Before mapping to tpp the conversion makes sure to resize all the tensors to 2d
     by tiling all but the two innermost dimensions. This pass runs at buffer level
     as we want to preserve parallel semantics when tiling. We do an additional
@@ -146,7 +147,6 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPackVNNIPass()";
 }
 
-
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   let summary = "Convert matmul to block layout and back";
   let description = [{
@@ -159,7 +159,6 @@ def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   ];
   let constructor = "mlir::tpp::createPackMatmulPass()";
 }
-
 
 def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
   let summary = "Convert Conv2DNchwFchw to block layout and back";

@@ -144,7 +144,7 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
   // Call the Kernel, making sure to set the result to either the return value
   // or the last argument, if the return is void.
   Value result;
-  auto funcType = main.getFunctionType();
+  auto funcType = kernel.getFunctionType();
   if (funcType.getNumResults() == 0) {
     builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
     result = kernelArgs.back();

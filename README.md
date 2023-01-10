@@ -56,10 +56,13 @@ mkdir tpp-mlir/build
 pushd tpp-mlir/build
 
 # Build & test
+# Please, make sure to use clang to build TPP-MLIR
 cmake -G Ninja .. \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DMLIR_DIR=$CUSTOM_LLVM_ROOT/lib/cmake/mlir \
-   -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit
+   -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit \
+   -DCMAKE_C_COMPILER=clang \
+   -DCMAKE_CXX_COMPILER=clang++ 
 cmake --build . --target check-all
 
 popd
@@ -75,10 +78,3 @@ cmake --build . --target mlir-doc
 ## License
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
-
-
-## Note:
-
-- Nice link for conv: https://d2l.ai/chapter_convolutional-neural-networks/padding-and-strides.html
-
-- in IREE: Codegen/Common/ConvertToDestinationPassingStylePass.cpp
