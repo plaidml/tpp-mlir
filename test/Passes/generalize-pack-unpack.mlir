@@ -61,10 +61,8 @@ func.func @unpack_conv(%arg0: tensor<1x4x6x6x2xf32>, %arg1: tensor<1x6x6x8xf32>)
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<1x4x6x6x2xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<1x6x6x8xf32>)
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x6x6x4x2xf32>
-// CHECK: %[[TRAN_OUTER_INNER:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<1x4x6x6x2xf32>) outs(%[[EMPTY]] : tensor<1x6x6x4x2xf32>) permutation = [0, 2, 3, 1, 4]
-// CHECK: %[[EMPTY1:.+]] = tensor.empty() : tensor<1x6x6x4x2xf32>
-// CHECK: %[[TRAN_CANONICAL_FORM:.+]] = linalg.transpose ins(%[[TRAN_OUTER_INNER]] : tensor<1x6x6x4x2xf32>) outs(%[[EMPTY1]] : tensor<1x6x6x4x2xf32>) permutation = [0, 1, 2, 3, 4]
-// CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRAN_CANONICAL_FORM]] {{\[}}[0], [1], [2], [3, 4]] : tensor<1x6x6x4x2xf32> into tensor<1x6x6x8xf32>
+// CHECK: %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<1x4x6x6x2xf32>) outs(%[[EMPTY]] : tensor<1x6x6x4x2xf32>) permutation = [0, 2, 3, 1, 4]
+// CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSE]] {{\[}}[0], [1], [2], [3, 4]] : tensor<1x6x6x4x2xf32> into tensor<1x6x6x8xf32>
 // CHECK: %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSED]] : tensor<1x6x6x8xf32>) outs(%[[ARG1]] : tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32>
 
 // -----
@@ -77,9 +75,7 @@ func.func @KCRSsr_to_KCRS(%arg0: tensor<1x1x4x8x8x32xf32>, %arg1: tensor<1x1x128
 // CHECK: func.func @KCRSsr_to_KCRS(
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<1x1x4x8x8x32xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<1x1x128x64xf32>)
-// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x1x4x8x32x8xf32>
-// CHECK: %[[TRAN_OUTER_INNER:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<1x1x4x8x8x32xf32>) outs(%[[EMPTY]] : tensor<1x1x4x8x32x8xf32>) permutation = [0, 1, 2, 3, 5, 4]
-// CHECK: %[[EMPTY1:.+]] = tensor.empty() : tensor<1x1x4x32x8x8xf32>
-// CHECK: %[[TRAN_CANONICAL_FORM:.+]] = linalg.transpose ins(%[[TRAN_OUTER_INNER]] : tensor<1x1x4x8x32x8xf32>) outs(%[[EMPTY1]] : tensor<1x1x4x32x8x8xf32>) permutation = [0, 1, 2, 4, 3, 5]
-// CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRAN_CANONICAL_FORM]] {{\[}}[0], [1], [2, 3], [4, 5]] : tensor<1x1x4x32x8x8xf32> into tensor<1x1x128x64xf32>
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x1x4x32x8x8xf32>
+// CHECK: %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<1x1x4x8x8x32xf32>) outs(%[[EMPTY]] : tensor<1x1x4x32x8x8xf32>) permutation = [0, 1, 2, 5, 3, 4]
+// CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSE]] {{\[}}[0], [1], [2, 3], [4, 5]] : tensor<1x1x4x32x8x8xf32> into tensor<1x1x128x64xf32>
 // CHECK: %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSED]] : tensor<1x1x128x64xf32>) outs(%[[ARG1]] : tensor<1x1x128x64xf32>) -> tensor<1x1x128x64xf32>

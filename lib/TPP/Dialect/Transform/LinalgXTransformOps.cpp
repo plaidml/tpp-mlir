@@ -170,7 +170,9 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateSinkPackPatterns(patterns);
+  mlir::tensor::populateSimplifyTensorPack(patterns);
   mlir::tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  mlir::tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return emitDefaultDefiniteFailure(target);

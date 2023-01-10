@@ -830,6 +830,7 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
@@ -871,6 +872,7 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -911,6 +913,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -970,6 +973,7 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<VNNIOnMatmul>(ctx, blockingFactors);
     patterns.add<VNNIOnBRGemm>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));

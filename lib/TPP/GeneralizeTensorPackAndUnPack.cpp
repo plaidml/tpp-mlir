@@ -186,8 +186,8 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
 
   // Rewrite an unpack op as a sequence of linalg op.
   // Currently,
-  // 1. tranpose -> undo outer dims perm and inner dims perm
-  // 2. transpose -> bring from canonical form ABCabc to AaBbCc
+  // 1. tranpose -> undo outer dims perm and inner dims perm and bring from
+  // ABCabc to AaBbCc
   // 3. collapse shape -> (Aa)(Bb)(Cc)
   // 4. extract slice -> as the unpacked tensor can be bigger than the
   // destination tensor due to high-padding copy operation.
@@ -222,10 +222,9 @@ struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
     auto extracted = rewriter.create<tensor::ExtractSliceOp>(
         loc, collapsed.getResult(), offsets, extractSizes, strides);
 
-    // TODO: check if we need to copy.
-    //auto copy = rewriter.create<linalg::CopyOp>(loc, extracted.getResult(),
-    //                                            unPackOp.getDest());
-    rewriter.replaceOp(unPackOp, /*copy.getResults()[0]*/ extracted.getResult());
+    auto copy = rewriter.create<linalg::CopyOp>(loc, extracted.getResult(),
+                                                unPackOp.getDest());
+    rewriter.replaceOp(unPackOp, copy.getResults()[0]);
     return success();
   }
 };
