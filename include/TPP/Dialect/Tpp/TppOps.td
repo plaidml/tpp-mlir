@@ -65,15 +65,26 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
 def Tpp_AddOp : Tpp_BinaryOp<"add"> {
   let summary = "Element-wise addition.";
   let description = [{
-    The `tpp.add` operation performs element-wise addition
-    on two-dimensional memref C = A + B.
+    The `tpp.add` operation performs element-wise addition on two-dimensional
+    memrefs, writing the result on the output memref. No checks or assumption are
+    made on the input/output arguments so the same memref can be passed both as
+    input and output. 
 
     Example:
 
     ```mlir
 
+    // A = A + A
+    tpp.add ins(%1 : memref<2x2xf32>, %1: memref<2x2xf32>)
+            out(%1 : memref<2x2xf32>)
+
+    // B = A + B
     tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>) 
             out(%2: memref<2x2xf32>)
+
+    // C = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>)
+            out(%3 : memref<2x2xf32>)
 
     ```
   }];
@@ -88,7 +99,13 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
-    The `tpp.identity` copies input memref to output memref.
+    The `tpp.identity` copies input memref to output memref. It supports
+    broadcast comparing the memref shape element-wise. Starting with the trailing
+    dimensions and working from right to left. Two dimensions are broadcast
+    compatible if:
+    - They are equal
+    - One if them is 1 For more details, see: 
+    https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
 
     Example:
 
