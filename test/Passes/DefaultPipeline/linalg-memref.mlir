@@ -165,7 +165,10 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
+
+// Expect not to map as the operation is not a relu see: arith.maxf %in %out.
+// CHECK-LABEL: @relu_mapping_fail
+func.func @relu_mapping_fail(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
   // CHECK-NOT: tpp.relu
   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1: memref<10x10xf32>) outs(%arg0: memref<10x10xf32>) {
     ^bb0(%in : f32, %out : f32):
@@ -202,15 +205,14 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-
-// CHECK-LABEL: @add_mapping_parallel
-func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>) {
+func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
+  // CHECK: memref.subview
+  // CHECK-NOT: scf.parallel
   // CHECK: call @xsmm_binary_dispatch
-  // CHECK: scf.parallel
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
-  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: memref<10x10x10xf32>) outs(%arg1: memref<10x10x10xf32>) {
+  // CHECK: %[[cast:.*]] = memref.cast
+  // CHECK: %[[cast1:.*]] = memref.cast
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: memref<1x10x10xf32>) outs(%arg1: memref<1x10x10xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.addf %in, %out : f32
       linalg.yield %0 : f32
@@ -223,14 +225,15 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
-  // CHECK: memref.subview
-  // CHECK-NOT: scf.parallel
+
+// CHECK-LABEL: @add_mapping_parallel
+func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>) {
   // CHECK: call @xsmm_binary_dispatch
-  // CHECK: %[[cast:.*]] = memref.cast
-  // CHECK: %[[cast1:.*]] = memref.cast
-  // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
-  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: memref<1x10x10xf32>) outs(%arg1: memref<1x10x10xf32>) {
+  // CHECK: scf.parallel
+  // CHECK:   %[[cast:.*]] = memref.cast
+  // CHECK:   %[[cast1:.*]] = memref.cast
+  // CHECK:   call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: memref<10x10x10xf32>) outs(%arg1: memref<10x10x10xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.addf %in, %out : f32
       linalg.yield %0 : f32
