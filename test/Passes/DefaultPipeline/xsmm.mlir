@@ -320,17 +320,15 @@ module @predict_function {
     // CHECK: call @xsmm_matmul_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: %[[cast3:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast3]]
+    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
     %1 = xsmm.ternary.dispatch matmul [128, 512, 256, 256, 512, 512](dataType f32)
     xsmm.ternary matmul(dataType f32, %1, %arg0, %arg1, %arg3) : (i64, memref<128x256xf32>, memref<256x512xf32>, memref<128x512xf32>) -> ()
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast4:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast4]]
+    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
     %2 = xsmm.unary.dispatch relu [128, 512, 512, 512](broadcast none dataType f32)
-    xsmm.unary relu(dataType f32, %2, %arg3) : (i64, memref<128x512xf32>) -> ()
+    xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
     // CHECK: return
     return

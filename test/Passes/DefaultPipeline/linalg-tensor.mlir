@@ -156,8 +156,7 @@ module @predict_function  {
     // CHECK: call @xsmm_matmul_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: %[[cast3:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast3]]
+    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
     %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
       %16 = arith.mulf %arg9, %arg10 : f32
@@ -167,8 +166,7 @@ module @predict_function  {
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast4:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast4]]
+    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
     %c0 = arith.constant 0.0 : f32
     %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):

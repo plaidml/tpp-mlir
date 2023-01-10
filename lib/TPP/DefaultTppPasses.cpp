@@ -130,9 +130,15 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     // This approach assumes that the function calls do not have any side
     // effects and can be safely moved outside of loop body.
     pm.addPass(createLoopInvariantCodeMotionPass());
+    pm.addPass(createParallelLoopFusionPass());
 
     // Lower all XSMM ops.
     pm.addPass(createConvertXsmmToFuncPass());
+
+    // General postprocessing.
+    pm.addPass(bufferization::createBufferHoistingPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
 
     if (failed(runPipeline(pm, module)))
       return signalPassFailure();

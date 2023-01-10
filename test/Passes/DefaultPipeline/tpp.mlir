@@ -304,14 +304,12 @@ module @predict_function  {
     // CHECK: call @xsmm_matmul_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: %[[cast3:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast3]]
+    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
     tpp.matmul ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>) out(%arg3 : memref<128x512xf32>)
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast4:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast4]]
+    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
     tpp.relu ins(%arg3 : memref<128x512xf32>) out(%arg3 : memref<128x512xf32>)
 
     // CHECK: return
