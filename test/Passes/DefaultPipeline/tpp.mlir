@@ -8,7 +8,7 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
-  tpp.add ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
 
   // CHECK: return
   return
@@ -28,7 +28,7 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
   %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
-  tpp.add ins(%subview : memref<10x10xf32>) out(%subview_0 : memref<10x10xf32>)
+  tpp.add ins(%subview : memref<10x10xf32>, %subview_0 : memref<10x10xf32>) out(%subview_0 : memref<10x10xf32>)
 
   // CHECK: return
   return
@@ -51,7 +51,7 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
   scf.parallel (%arg2) = (%c0) to (%c10) step (%c1) {
     %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
-    tpp.add ins(%subview : memref<10x10xf32, #map>) out(%subview_0 : memref<10x10xf32, #map>)
+    tpp.add ins(%subview : memref<10x10xf32, #map>, %subview_0 : memref<10x10xf32, #map>) out(%subview_0 : memref<10x10xf32, #map>)
     scf.yield
   }
 
@@ -109,7 +109,7 @@ func.func @relu(%arg0: memref<3x3xf32>) {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]]
-  tpp.relu out(%arg0: memref<3x3xf32>)
+  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
 
   // CHECK: return
   return
@@ -131,7 +131,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   %c1 = arith.constant 1 : index
   scf.parallel (%arg1) = (%c0) to (%c64) step (%c1) {
     %subview = memref.subview %arg0[%arg1, 0, 0] [1, 32, 32] [1, 1, 1] : memref<64x32x32xf32> to memref<32x32xf32, #map>
-    tpp.relu out(%subview : memref<32x32xf32, #map>)
+    tpp.relu ins(%subview : memref<32x32xf32, #map>) out(%subview : memref<32x32xf32, #map>)
     scf.yield
   }
 
@@ -312,7 +312,7 @@ module @predict_function  {
     // CHECK: call @xsmm_unary_dispatch
     // CHECK: %[[cast4:.*]] = memref.cast %[[ARG3]]
     // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast4]]
-    tpp.relu out(%arg3 : memref<128x512xf32>)
+    tpp.relu ins(%arg3 : memref<128x512xf32>) out(%arg3 : memref<128x512xf32>)
 
     // CHECK: return
     return
