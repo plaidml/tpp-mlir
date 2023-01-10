@@ -118,12 +118,21 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
       pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
     else
       pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
-    // Lower all XSMM ops.
-    pm.addPass(createConvertXsmmToFuncPass());
+
     // Lower all Check ops.
     pm.addPass(createConvertCheckToLoopsPass());
     // Lower all LinalgX ops.
     pm.addPass(createLinalgXToLoopsPass());
+
+    // Postprocess generated loops.
+    // Perform LICM before function calls are generated to ensure that ops which
+    // map directly to functions also get moved outside of loops, if possible.
+    // This approach assumes that the function calls do not have any side
+    // effects and can be safely moved outside of loop body.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+
+    // Lower all XSMM ops.
+    pm.addPass(createConvertXsmmToFuncPass());
 
     if (failed(runPipeline(pm, module)))
       return signalPassFailure();

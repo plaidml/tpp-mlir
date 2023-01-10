@@ -48,8 +48,8 @@ func.func @brgemm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_brgemm_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
@@ -72,8 +72,8 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul_mapped(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_brgemm_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
@@ -101,8 +101,8 @@ func.func @blocked_matmul_mapped(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x
 // CHECK-LABEL: @relu_3d(
 // CHECK-SAME: %[[arg:.*]]: memref<64x32x32xf32>) {
 func.func @relu_3d(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
+  // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_unary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
   %c0 = arith.constant 0.0 : f32
@@ -184,8 +184,8 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
 
 // CHECK-LABEL: @identity_mapping
 func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
+  // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_unary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast1]]
@@ -205,8 +205,8 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 
 // CHECK-LABEL: @add_mapping_parallel
 func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>) {
+  // CHECK: call @xsmm_binary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_binary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]

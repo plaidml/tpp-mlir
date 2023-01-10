@@ -28,8 +28,8 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_brgemm_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
@@ -94,8 +94,8 @@ func.func @conv2d_1x1_decomposed(
   %cst = arith.constant dense<0.00332225906> : tensor<2048x512xf32>
 
   // 1x1 Conv2D
+  // CHECK: call @xsmm_matmul_dispatch
   // CHECK: scf.for
-  // CHECK:   call @xsmm_matmul_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast

@@ -40,8 +40,8 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
 
 // CHECK-LABEL: @add_mapping_parallel
 func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>) {
+  // CHECK: call @xsmm_binary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_binary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
@@ -81,8 +81,8 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 
 // CHECK-LABEL: @identity_mapping
 func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
+  // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_unary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast1]]
@@ -122,8 +122,8 @@ func.func @relu(%arg0: memref<3x3xf32>) {
 // CHECK-LABEL: @relu_3d(
 // CHECK-SAME: %[[arg:.*]]: memref<64x32x32xf32>) {
 func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
+  // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_unary_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
   %c0 = arith.constant 0 : index
@@ -221,8 +221,8 @@ func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   call @xsmm_brgemm_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
@@ -258,8 +258,8 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   %0 = memref.get_global @__constant_2048x512xf32 : memref<2048x512xf32>
 
   // 1x1 Conv2D
+  // CHECK: call @xsmm_matmul_dispatch
   // CHECK: scf.for
-  // CHECK:   call @xsmm_matmul_dispatch
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
