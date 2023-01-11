@@ -1,10 +1,10 @@
 // RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -map-linalg-to-tpp -empty-tensor-to-alloc-tensor \
 // RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize \
-// RUN: -buffer-results-to-out-params -buffer-deallocation -canonicalize \
+// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
 // RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-tpp-to-xsmm -convert-xsmm-to-func \
-// RUN: -expand-strided-metadata -lower-affine
+// RUN: -expand-strided-metadata -lower-affine | \
+// RUN: FileCheck %s
 //
 
 // ----------------------
@@ -73,7 +73,11 @@
 #map2 = affine_map<(d0) -> (d0)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
 
-func.func private @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
+//
+// CHECK-LABEL: @mobilenet(
+// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1001xf32> {
+//
+func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant dense<1.000000e-03> : tensor<32xf32>
   %cst_1 = arith.constant dense<1.000000e-03> : tensor<16xf32>
