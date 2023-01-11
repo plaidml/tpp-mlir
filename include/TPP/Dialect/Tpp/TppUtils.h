@@ -47,7 +47,7 @@ bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
 // 3. A single region with a an add and a mul operation
 // 4. Loops are: [parallel, parallel, reduction]
 // 5. Access pattern is [i, j] -> [i, k] [k, j]
-bool isTppMatmul(linalg::GenericOp linalgOp);
+bool isTppMatmul(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg generic is a tpp.add.
 // 1. Buffer semantics.

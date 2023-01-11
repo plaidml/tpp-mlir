@@ -62,11 +62,7 @@ class VNNIDialect;
 namespace tpp {
 class TppDialect;
 
-// RETIRE
-std::unique_ptr<OperationPass<func::FuncOp>> createMapLinalgToTppPass();
-// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
-// RETIRE
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
@@ -80,7 +76,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgXToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToFuncPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
-
 std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();

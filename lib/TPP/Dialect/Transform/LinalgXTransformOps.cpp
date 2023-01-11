@@ -272,10 +272,10 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
 }
 
 //===----------------------------------------------------------------------===//
-// MapAndConvertLinalgToTpp
+// ConvertLinalgToTpp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure transform::MapAndConvertLinalgToTpp::applyToOne(
+DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
     Operation *target, SmallVector<Operation *> &results,
     TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
@@ -287,7 +287,6 @@ DiagnosedSilenceableFailure transform::MapAndConvertLinalgToTpp::applyToOne(
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateConvertLinalgToTppPatterns(patterns,
                                                 /*useParallelLoops=*/true);
-  mlir::tpp::populateMapLinalgToTppPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
