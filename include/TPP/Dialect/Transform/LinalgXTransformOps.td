@@ -286,20 +286,19 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
 }
 
 //===----------------------------------------------------------------------===//
-// MapAndConvertLinalgToTpp
+// ConvertLinalgToTpp
 //===----------------------------------------------------------------------===//
 
 // TODO: this does not compose as it invalidate all the handles.
-def MapAndConvertLinalgToTpp : Op<Transform_Dialect,
-                                  "structured.map_and_convert_linalg_to_tpp", [
+def ConvertLinalgToTpp : Op<Transform_Dialect,
+                            "structured.map_and_convert_linalg_to_tpp", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
     TransformEachOpTrait,
     TransformOpInterface]> {
 
   let description = [{
-    Wrapper around `populateConvertLinalgToTppPatterns` and
-    `populateMapLinalgToTppPatterns`.
+    Wrapper around `populateConvertLinalgToTppPatterns`.
 
     Note that this transformation is invalidating the handles to any payload IR
     operation contained in the target operation.

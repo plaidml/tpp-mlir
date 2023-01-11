@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -map-linalg-to-tpp \
+// RUN: tpp-opt %s \
 // RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \ 
-// RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
+// RUN: -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-linalg-to-tpp | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (0, d1)>

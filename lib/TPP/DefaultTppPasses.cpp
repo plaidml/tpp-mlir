@@ -8,27 +8,12 @@
 
 #include "TPP/Passes.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
-#include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/RegionUtils.h"
 
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
@@ -55,7 +40,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
   DefaultTppPasses(bool tppToLoops) { this->tppToLoops = tppToLoops; };
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    // Add all custom TPP dialects
+    // Add all custom TPP dialects.
     registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<linalgx::LinalgXDialect>();
@@ -78,16 +63,17 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     ModuleOp module = getOperation();
     PassManager pm(module.getContext(), mlir::OpPassManager::Nesting::Implicit);
 
-    // Run transforms first and clean them up afterwards
+    // Run transforms first and clean them up afterwards.
     pm.addPass(createTransformDialectInterpreterPass());
     pm.addPass(createTransformDropSchedulePass());
 
-    // Add TPP mapping
-    pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
+    // Preprocess convolutions.
+    pm.addNestedPass<func::FuncOp>(createDecomposeConvToMatmulOrBrgemmPass());
+
     // Materialize empty tensors
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 
-    // Run bufferization as the rest of the passes prefer working on memref
+    // Run bufferization as the rest of the passes prefer working on memref.
     bufferization::OneShotBufferizationOptions buffOpts;
     buffOpts.allowReturnAllocs = true;
     buffOpts.bufferizeFunctionBoundaries = true;
@@ -97,24 +83,47 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
     pm.addNestedPass<func::FuncOp>(
         bufferization::createFinalizingBufferizePass());
-    // Clean up after bufferization
+    // Clean up after bufferization.
+    pm.addPass(bufferization::createBufferDeallocationPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-    // Convert all higher level dialects to TPP
+    // Convert generics to BRGEMM.
+    // The mapping is done after bufferization as the buffer semantics
+    // allow direct use of scf.parallel loops. This prevents different
+    // lowering outputs between input linalg on tensors and memrefs.
+    pm.addNestedPass<func::FuncOp>(createMapToBatchReduceGEMMPass());
+
+    // Convert all higher level dialects to TPP.
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
     pm.addPass(createConvertVNNIToTppPass());
 
-    // Lower all TPP ops
+    // Lower all TPP ops.
     if (tppToLoops)
       pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
     else
       pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
-    // Lower all XSMM ops
-    pm.addPass(createConvertXsmmToFuncPass());
-    // Lower all Check ops
+
+    // Lower all Check ops.
     pm.addPass(createConvertCheckToLoopsPass());
-    // Lower all LinalgX ops
+    // Lower all LinalgX ops.
     pm.addPass(createLinalgXToLoopsPass());
+
+    // Postprocess generated loops.
+    // Perform LICM before function calls are generated to ensure that ops which
+    // map directly to functions also get moved outside of loops, if possible.
+    // This approach assumes that the function calls do not have any side
+    // effects and can be safely moved outside of loop body.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+    pm.addPass(createParallelLoopFusionPass());
+
+    // Lower all XSMM ops.
+    pm.addPass(createConvertXsmmToFuncPass());
+
+    // General postprocessing.
+    pm.addPass(bufferization::createBufferHoistingPass());
+    pm.addPass(bufferization::createBufferDeallocationPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
 
     if (failed(runPipeline(pm, module)))
       return signalPassFailure();
