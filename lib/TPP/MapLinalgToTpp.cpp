@@ -63,44 +63,8 @@ mapLinalgToTppImpl(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
   return rewriter.notifyMatchFailure(linalgOp, "unmatched linalg op");
 }
 
-namespace {
-
-struct MapGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<linalg::GenericOp> annotatedOp =
-        mapLinalgToTppImpl(rewriter, linalgOp);
-    if (failed(annotatedOp))
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "failed to map operation to tpp");
-    return success();
-  }
-};
-
-struct MapToTpp : public LinalgMapToTppBase<MapToTpp> {
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    tpp::populateMapLinalgToTppPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
-  }
-};
-
-} // end namespace
-
 FailureOr<linalg::GenericOp>
 mlir::linalgx::mapLinalgToTpp(RewriterBase &rewriter,
                               linalg::GenericOp linalgOp) {
   return mapLinalgToTppImpl(rewriter, linalgOp);
-}
-
-void mlir::tpp::populateMapLinalgToTppPatterns(RewritePatternSet &patterns) {
-  patterns.add<MapGenericOpToTpp>(patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createMapLinalgToTppPass() {
-  return std::make_unique<MapToTpp>();
 }

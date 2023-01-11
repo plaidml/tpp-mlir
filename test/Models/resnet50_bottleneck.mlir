@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -map-linalg-to-tpp -empty-tensor-to-alloc-tensor \
+// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -empty-tensor-to-alloc-tensor \
 // RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -map-linalg-to-tpp -convert-linalg-to-tpp="use-parallel-loops=false" \
+// RUN: -convert-linalg-to-tpp="use-parallel-loops=false" \
 // RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func \
 // RUN: -expand-strided-metadata | \
 // RUN: FileCheck %s

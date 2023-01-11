@@ -85,8 +85,6 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     // Preprocess convolutions.
     pm.addNestedPass<func::FuncOp>(createDecomposeConvToMatmulOrBrgemmPass());
 
-    // Add TPP mapping
-    pm.addNestedPass<func::FuncOp>(createMapLinalgToTppPass());
     // Materialize empty tensors
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 

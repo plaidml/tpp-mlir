@@ -280,7 +280,11 @@ static bool hasOneInputOneOutput(linalg::GenericOp linalgOp) {
 }
 
 // Returns true if the linalg.generic maps to a tpp.gemm.
-bool isTppMatmul(linalg::GenericOp linalgOp) {
+bool isTppMatmul(linalg::LinalgOp linalgOp) {
+  if (!isa_and_nonnull<linalg::GenericOp>(linalgOp))
+    return false;
+  if (isa_and_nonnull<linalg::MatmulOp>(linalgOp))
+    return true;
   // structural and access pattern.
   SmallVector<mlir::utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();

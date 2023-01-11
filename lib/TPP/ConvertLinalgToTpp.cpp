@@ -202,7 +202,7 @@ getTileSizesForOptimalMappingImpl(OpBuilder &builder,
 // Try to select optimal tile sizes.
 static SmallVector<Value>
 getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
-  if (tpp::utils::isMarkedWithTpp(linalgOp, "tpp.matmul"))
+  if (tpp::utils::isTppMatmul(linalgOp))
     return getTileSizesForOptimalMappingMatmulImpl(builder, linalgOp);
   return getTileSizesForOptimalMappingImpl(builder, linalgOp);
 }
@@ -214,12 +214,12 @@ LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
   if (!tpp::utils::hasTppMark(linalgOp))
     return failure();
-
+  
   OpBuilder builder(linalgOp);
   OpBuilder::InsertionGuard guard(builder);
   linalg::LinalgTilingOptions linalgTilingOptions;
   linalgTilingOptions.setLoopType(
-      linalg::LinalgTilingLoopType::/*Parallel*/ Loops);
+      linalg::LinalgTilingLoopType::ParallelLoops);
 
   if (tileSizes.size())
     linalgTilingOptions.setTileSizes(tileSizes);
