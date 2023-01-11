@@ -101,6 +101,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addNestedPass<func::FuncOp>(
         bufferization::createFinalizingBufferizePass());
     // Clean up after bufferization.
+    pm.addPass(bufferization::createBufferDeallocationPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
     // Convert generics to BRGEMM.
@@ -137,6 +138,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
 
     // General postprocessing.
     pm.addPass(bufferization::createBufferHoistingPass());
+    pm.addPass(bufferization::createBufferDeallocationPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addPass(createCSEPass());
 

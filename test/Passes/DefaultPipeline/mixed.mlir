@@ -44,3 +44,55 @@ module @predict_function  {
     return
   }
 }
+
+// -----
+
+// CHECK: func.func @buffer_dealloc(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
+func.func @buffer_dealloc(%A: memref<4x8xf32>,
+          %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
+  // CHECK: %[[alloc:.*]] = memref.alloc
+  %0 = memref.alloc() : memref<4x4xf32>
+
+  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
+  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%0 : memref<4x4xf32>)
+
+  // CHECK: memref.copy
+  memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
+
+  // CHECK: memref.dealloc %[[alloc]]
+  // CHECK: return
+  return
+}
+
+// -----
+
+// CHECK: func.func @buffer_no_dealloc(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
+func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
+          %B: memref<8x4xf32>, %C: memref<4x4xf32>) -> memref<4x4xf32> {
+  // CHECK: %[[alloc:.*]] = memref.alloc
+  %0 = memref.alloc() : memref<4x4xf32>
+
+  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
+  // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
+  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%0 : memref<4x4xf32>)
+
+  // CHECK: memref.copy
+  memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
+
+  // CHECK-NOT: memref.dealloc %[[alloc]]
+  // CHECK: return
+  return %0 : memref<4x4xf32>
+}
