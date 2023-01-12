@@ -1,15 +1,3 @@
-// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -empty-tensor-to-alloc-tensor \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize \
-// RUN: -buffer-results-to-out-params -buffer-deallocation -canonicalize \
-// RUN: -convert-linalg-to-tpp="use-parallel-loops=false" \
-// RUN: -convert-tpp-to-xsmm -convert-xsmm-to-func \
-// RUN: -expand-strided-metadata -lower-affine | \
-// RUN: tpp-run -n 10 -print \
-// RUN: -e resnet50_bottleneck_block -entry-point-result=void \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-
 // RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
 // RUN: tpp-run -n 10 -print \
 // RUN: -e resnet50_bottleneck_block -entry-point-result=void \
