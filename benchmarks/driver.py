@@ -11,8 +11,7 @@
      * directory: must have a JSON file with the configuration of the benchmark
 
     The directory file must have:
-     - Reference C++ file (to be linked with the common C++ driver)
-     - XSMM C++ file (to be linked with the common C++ driver)
+     - Reference C++ file (to be built by CMake and left in the bin directory)
      - At least one MLIR file (multiple if using options)
      - JSON file with the configuration on how to run it
 
@@ -23,40 +22,29 @@
          "64x64x64": {
              "ref": {
                  "type": "C++",
-                 "source": "matmul/matmul.cc",
-                 "iters" : "1000",
-                 "flags": "64x64x64"
+                 "benchmark": "matmul",
+                 "flags": [ "--input=64x64x64", "-v" ]
              },
              "xsmm": {
                  "type": "C++",
-                 "source": "matmul/matmul.cc",
-                 "iters" : "1000",
-                 "flags": "-x 64x64x64"
+                 "benchmark": "matmul",
+                 "flags": [ "--input=64x64x64", "-v", "-xsmm" ]
              },
              "mlir": {
                  "type": "MLIR",
-                 "source": "../../test/Benchmarks/matmul_64x64x64.mlir",
-                 "iters" : "1000",
-                 "flags": ""
+                 "benchmark": "matmul_64x64x64.mlir",
+                 "flags": [ "-v" ]
              },
          },
          "128x256x512":  {
              ...
          },
      ]
-
-    The compiler paths/includes/libraries will be detected automatically.
-    The source file will be compiled together with the common driver in the
-    root of the benchmark directory, so they should only contain the kernel
-    logic to be called by the driver.
-
-    The arguments to the MLIR harness will be detected automatically.
 """
 
 import os
 import sys
 import re
-import shlex
 import argparse
 import json
 
@@ -71,7 +59,7 @@ class Environment(object):
         self.logger = Logger("driver.env", loglevel)
         helper = TPPHelper(loglevel)
         self.base_dir = os.path.realpath(os.path.dirname(__file__))
-        self.root_dir = helper.findGitRoot(".")
+        self.root_dir = helper.findGitRoot(self.base_dir)
         programs = helper.findTPPProgs(self.root_dir)
         for _, path in programs.items():
             if os.path.exists(path):
@@ -79,8 +67,6 @@ class Environment(object):
                 parent = os.path.join(self.bin_dir, os.path.pardir)
                 self.build_dir = os.path.realpath(parent)
                 self.lib_dir = os.path.join(self.build_dir, "lib")
-                self.inc_path = os.path.join(self.root_dir, "include")
-                self.lib_inc_path = os.path.join(self.build_dir, "_deps", "xsmm-src", "include")
                 break
         assert(self.build_dir)
         self.bench_dir = os.path.join(self.root_dir, "benchmarks")
@@ -101,24 +87,15 @@ class BaseRun(object):
     def __init__(self, name, env, json, loglevel):
         self.name = name
         self.env = env
-        self.source = json["source"]
-        self.iters = json["iters"]
+        self.benchmark = json["benchmark"]
         self.flags = json["flags"]
         self.runner = Execute(loglevel)
         self.stdout = ""
         self.stderr = ""
 
-    def compile(self):
-        # This is optional
-        return True
-
     def run(self):
         # This is mandatory
         return False
-
-    def cleanup(self):
-        # This is optional
-        return True
 
 class CPPRun(BaseRun):
     """ C++ runs """
@@ -127,32 +104,12 @@ class CPPRun(BaseRun):
         self.logger = Logger("driver.cpprun", loglevel)
         BaseRun.__init__(self, name, env, json, loglevel)
         assert(json["type"] == "C++")
-        source_dir = os.path.dirname(self.source)
-        self.binary = os.path.join(source_dir, f"bench_{name}.bin")
-
-    def compile(self):
-        command = [
-                "clang++",
-                "-O3",
-                f"-I{self.env.inc_path}",
-                f"-I{self.env.lib_inc_path}",
-                f"-L{self.env.lib_dir}",
-                "-lm",
-                "-ltpp_c_runner_utils",
-                self.source,
-                "-o",
-                self.binary]
-        res = self.runner.run(command)
-        if res.stderr:
-            self.logger.error(f"Error compiling {self.name}")
-            self.logger.error(res.stderr)
-            return False
-        return True
+        self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
     def run(self):
-        command = [self.binary, "-n", self.iters]
+        command = [self.benchmark]
         if self.flags:
-            command.extend(shlex.split(self.flags))
+            command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
         res = self.runner.run(command)
@@ -163,23 +120,20 @@ class CPPRun(BaseRun):
             print(self.stderr, file=sys.stderr)
         return True
 
-    def cleanup(self):
-        if os.path.exists(self.binary):
-            os.remove(self.binary)
-        return True
-
 class MLIRRun(BaseRun):
     def __init__(self, name, env, json, loglevel):
         self.logger = Logger("driver.mlirrun", loglevel)
         BaseRun.__init__(self, name, env, json, loglevel)
         assert(json["type"] == "MLIR")
+        self.benchmark = os.path.join(env.test_dir, self.benchmark)
 
     def run(self):
-        command = [self.env.harness, "-n", self.iters, self.source]
+        command = [self.env.harness]
         if self.flags:
-            command.extend(shlex.split(self.flags))
+            command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
+        command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
@@ -212,8 +166,6 @@ class Benchmark(object):
     def runAll(self):
         for run in self.runs:
             self.logger.debug(f"Running bench {run.name}")
-            if not run.compile():
-                return False
             if not run.run():
                 return False
 
@@ -292,11 +244,6 @@ class BenchmarkDriver(object):
 
         return True
 
-    def cleanup(self):
-        for bench in self.benchs:
-            for run in bench.getRuns():
-                run.cleanup()
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TPP-MLIR Benchmark Harness')
 
@@ -336,7 +283,3 @@ if __name__ == '__main__':
     if (not driver.verifyStats()):
         logger.error("Error verifying stats")
         sys.exit(1)
-
-    # Cleanup
-    if not args.keep:
-        driver.cleanup()
