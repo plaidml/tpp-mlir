@@ -1,4 +1,6 @@
-// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
+// RUN: tpp-opt %s -default-tpp-passes \
+// RUN: -buffer-results-to-out-params -buffer-deallocation \
+// RUN: -expand-strided-metadata -lower-affine | \
 // RUN: tpp-run -n 10 -print \
 // RUN: -e resnet50_bottleneck_block -entry-point-result=void \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
