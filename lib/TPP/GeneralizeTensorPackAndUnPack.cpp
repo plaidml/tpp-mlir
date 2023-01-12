@@ -9,12 +9,10 @@
 #include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -26,11 +24,10 @@ using namespace mlir;
 
 namespace {
 
-#if 0
 struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  // Check if the op is already tiled with outer 1s.
+  // Check if the op is already tiles with outer 1s.
   bool isAlreadyTiled(tensor::PackOp packOp) const {
     int64_t srcRank = packOp.getSourceRank();
     return !llvm::any_of(packOp.getDestType().getShape().take_front(srcRank),
@@ -53,55 +50,6 @@ struct TilePackToUnitDims : OpRewritePattern<tensor::PackOp> {
     return success();
   }
 };
-
-struct TileUnPackToUnitDims : OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  // Check if the op is already tiled with outer 1s.
-  bool isAlreadyTiled(tensor::UnPackOp unPackOp) const {
-    int64_t srcRank = unPackOp.getSourceRank();
-    return !llvm::any_of(unPackOp.getDestType().getShape().take_front(srcRank),
-                         [](int64_t val) { return val != 1; });
-  }
-
-  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
-                                PatternRewriter &rewriter) const override {
-    llvm::errs() << unPackOp << "\n";
-    auto unpackTilingOptions =
-        scf::SCFTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder, Operation *op) {
-              OpBuilder::InsertionGuard guard(builder);
-              Location loc = op->getLoc();
-              auto unpackOp = cast<tensor::UnPackOp>(op);
-              int numLoops = unpackOp.getDestRank();
-              auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
-              SmallVector<Value> tileSizes;
-              for (int i = 0; i < numLoops; ++i) {
-                if (dimAndTileMapping.count(i)) {
-                  tileSizes.push_back(getValueOrCreateConstantIndexOp(
-                      builder, loc, dimAndTileMapping[i]));
-                } else {
-                  tileSizes.push_back(getValueOrCreateConstantIndexOp(
-                      builder, loc,
-                      linalg::createFoldedDimOp(builder, loc,
-                                                unpackOp.getDest(), i)));
-                }
-              }
-              return tileSizes;
-            });
-
-    auto tilingInterfaceOp = dyn_cast<TilingInterface>(unPackOp.getOperation());
-    if ((!tilingInterfaceOp) || (isAlreadyTiled(unPackOp)))
-      return failure();
-    FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-        rewriter, tilingInterfaceOp, unpackTilingOptions);
-    if (failed(tilingResult))
-      return failure();
-    rewriter.replaceOp(tilingInterfaceOp, tilingResult->replacements);
-    return success();
-  }
-};
-#endif
 
 struct SwapWithLinalgxPack : OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -127,7 +75,6 @@ struct SwapWithLinalgxUnPack : OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-#if 0
 struct GeneralizeUnPack : OpRewritePattern<tensor::UnPackOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -288,20 +235,9 @@ void populateGeneralizeTensorPackAndUnPack(RewritePatternSet &patterns,
     patterns.insert<SwapWithLinalgxPack, SwapWithLinalgxUnPack>(
         patterns.getContext());
   else
-    patterns.insert<TileUnPackToUnitDims, TilePackToUnitDims,
-                    mlir::linalg::GeneralizeOuterUnitDimsUnPackOpPattern,
+    patterns.insert<GeneralizeUnPack, TilePackToUnitDims,
                     mlir::linalg::GeneralizeOuterUnitDimsPackOpPattern>(
-       patterns.getContext());
-}
-#endif
-
-static Value getDimValue(OpBuilder &builder, Location loc, Value v,
-                         int64_t dim) {
-  ShapedType type = v.getType().cast<ShapedType>();
-  if (!type.isDynamicDim(dim)) {
-    return builder.create<arith::ConstantIndexOp>(loc, type.getDimSize(dim));
-  }
-  return builder.create<tensor::DimOp>(loc, v, dim);
+        patterns.getContext());
 }
 
 struct GeneralizeTensorPackAndUnPack
@@ -309,56 +245,9 @@ struct GeneralizeTensorPackAndUnPack
   GeneralizeTensorPackAndUnPack() = default;
 
   void runOnOperation() override {
-    func::FuncOp func = getOperation();
-
-    // TODO: this creates ? in the tensor and then the generalization
-    // pattern does not kick-in.
-    auto unpackTilingOptions =
-        scf::SCFTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder, Operation *op) {
-              Location loc = op->getLoc();
-              auto unpackOp = cast<tensor::UnPackOp>(op);
-              int numLoops = unpackOp.getDestRank();
-              auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
-              SmallVector<Value> tileSizes;
-              for (int i = 0; i < numLoops; ++i) {
-                if (dimAndTileMapping.count(i)) {
-                  tileSizes.push_back(getValueOrCreateConstantIndexOp(
-                      builder, loc, dimAndTileMapping[i]));
-                } else {
-                  tileSizes.push_back(
-                      getDimValue(builder, loc, unpackOp.getDest(), i));
-                }
-              }
-              return tileSizes;
-            });
-    transform::TrivialPatternRewriter rewriter(&getContext());
-    func->walk([&](tensor::UnPackOp unPackOp) {
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(unPackOp.getOperation()),
-          unpackTilingOptions);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(unPackOp, tilingResult->replacements);
-    });
-    func->walk([&](tensor::PackOp packOp) {
-      SmallVector<int64_t> tiles(packOp.getSourceType().getRank(), 1);
-      scf::SCFTilingOptions packTilingOptions;
-      packTilingOptions.setTileSizes(tiles);
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(packOp.getOperation()),
-          packTilingOptions);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(packOp, tilingResult->replacements);
-    });
-    RewritePatternSet patterns(&getContext());
-    patterns.add<linalg::GeneralizeOuterUnitDimsUnPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsPackOpPattern>(&getContext());
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    RewritePatternSet patterns(getOperation().getContext());
+    populateGeneralizeTensorPackAndUnPack(patterns, convertToLinalg);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
 };
