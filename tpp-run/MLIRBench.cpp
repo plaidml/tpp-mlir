@@ -308,6 +308,8 @@ LogicalResult MLIRBench::finalize() {
   // bufferization. In case of some future issues, this might need to be moved
   // to the default frontend/pre-pass pipeline.
   passManager.addPass(bufferization::createBufferResultsToOutParamsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      bufferization::createBufferDeallocationPass());
 
   // Partial Lowering
   passManager.addPass(tpp::createConvertPerfToLoopsPass());
