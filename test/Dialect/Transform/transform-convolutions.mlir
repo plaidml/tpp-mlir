@@ -297,7 +297,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 4, 5, 2, 3, 6]
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -334,7 +334,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
-    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -358,11 +358,11 @@ func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x2
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[EMPTY_ARG0:.+]] = tensor.empty() : tensor<1x2x113x113x32xf32>
-// CHECK: %[[PACK_ARG0:.+]] = linalgx.pack %[[ARG0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG0]] : (tensor<1x113x113x64xf32> tensor<1x2x113x113x32xf32>) -> tensor<1x2x113x113x32xf32>
+// CHECK: %[[PACK_ARG0:.+]] = tensor.pack %[[ARG0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG0]] : tensor<1x113x113x64xf32> -> tensor<1x2x113x113x32xf32>
 // CHECK: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<8x2x3x3x32x32xf32>
-// CHECK: %[[PACK_ARG1:.+]] = linalgx.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[EMPTY_ARG1]] : (tensor<3x3x64x256xf32> tensor<8x2x3x3x32x32xf32>) -> tensor<8x2x3x3x32x32xf32>
+// CHECK: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[EMPTY_ARG1]] : tensor<3x3x64x256xf32> -> tensor<8x2x3x3x32x32xf32>
 // CHECK: %[[EMPTY_ARG2:.+]] = tensor.empty() : tensor<1x8x56x56x32xf32>
-// CHECK: %[[PACK_ARG2:.+]] = linalgx.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG2]] : (tensor<1x56x56x256xf32> tensor<1x8x56x56x32xf32>) -> tensor<1x8x56x56x32xf32>
+// CHECK: %[[PACK_ARG2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG2]] : tensor<1x56x56x256xf32> -> tensor<1x8x56x56x32xf32>
 // CHECK: %[[LOOP:.+]] = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C8]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[PACK_ARG2]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C56]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[LOOP2:.+]] = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG8:.+]] = %[[ARG6]]) -> (tensor<1x8x56x56x32xf32>) {

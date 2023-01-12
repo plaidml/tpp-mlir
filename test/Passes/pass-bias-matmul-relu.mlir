@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs" -canonicalize  -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp="use-parallel-loops=true" -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs" -canonicalize  -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp="use-parallel-loops=true" -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
 
 !A_tensor_t = tensor<256x512xf32>
 !B_tensor_t = tensor<512x1024xf32>

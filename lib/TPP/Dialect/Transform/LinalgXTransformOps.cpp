@@ -270,8 +270,7 @@ DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
-    Operation *target, SmallVector<Operation *> &results,
-    TransformState &state) {
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
