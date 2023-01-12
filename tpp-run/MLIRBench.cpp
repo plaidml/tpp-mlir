@@ -300,6 +300,15 @@ LogicalResult MLIRBench::finalize() {
   passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
   passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
 
+  // Rewrite memref function results to out-params to avoid memory leaks
+  // This is done at the backend stage of the lowering pipeline to avoid
+  // automatically modifying function signatures which increases maintenance
+  // effort for standard model tests
+  // Note that technically this pass should be run immediately after one-shot
+  // bufferization. In case of some future issues, this might need to be moved
+  // to the default frontend/pre-pass pipeline.
+  passManager.addPass(bufferization::createBufferResultsToOutParamsPass());
+
   // Partial Lowering
   passManager.addPass(tpp::createConvertPerfToLoopsPass());
   passManager.addPass(tpp::createConvertPerfToFuncPass());
