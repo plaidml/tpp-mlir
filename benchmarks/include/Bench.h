@@ -9,18 +9,17 @@
 /// T is a numeric type (int, float, double), and represents the payload
 /// type of the input and output tensors, not necessarily the accumulation
 /// and working internal tensors.
-template <typename T>
-struct KernelInterface {
+template <typename T> struct KernelInterface {
   virtual ~KernelInterface() {}
   /// Runs the reference kernel with the list of arguments.
   /// Output needs to be passed in the args list and is up to the user to
   /// implement the correct logic.
-  virtual void runRef(std::vector<Tensor<T>>& args) = 0;
+  virtual void runRef(std::vector<Tensor<T>> &args) = 0;
 
   /// Runs the XSMM kernel with the list of arguments.
   /// Output needs to be passed in the args list and is up to the user to
   /// implement the correct logic.
-  virtual void runXSMM(std::vector<Tensor<T>>& args) = 0;
+  virtual void runXSMM(std::vector<Tensor<T>> &args) = 0;
 };
 
 /// Benchmark: runs a kernel multiple times, takes timings, return avg.
@@ -31,8 +30,7 @@ struct KernelInterface {
 /// Usage:
 ///  * Implement a kernel that implements the KernelInterface
 ///  * Define a variable as Benchmark<MyKernel>
-template <class Kernel, class T>
-class Benchmark {
+template <class Kernel, class T> class Benchmark {
   /// Performance tracker, caches timings and calculates avg/dev
   PerfResults perf;
   /// The kernel to execute, must implement KernelInterface
@@ -47,15 +45,14 @@ class Benchmark {
   bool xsmm;
 
 public:
-  Benchmark(size_t iter, double gflops=0.0, bool xsmm=false) : iter(iter), gflops(gflops), xsmm(xsmm) {}
+  Benchmark(size_t iter, double gflops = 0.0, bool xsmm = false)
+      : iter(iter), gflops(gflops), xsmm(xsmm) {}
 
   /// Sets argument (input/output) list.
-  void setArg(std::vector<Tensor<T>>&& arg) {
-    args = std::move(arg);
-  }
+  void setArg(std::vector<Tensor<T>> &&arg) { args = std::move(arg); }
 
   /// Inspects the tensors
-  const Tensor<T>& getArg(size_t index) {
+  const Tensor<T> &getArg(size_t index) {
     assert(index < args.size() && "Invalid index for arguments");
     return args[index];
   }
@@ -71,7 +68,7 @@ public:
   /// Runs the benchmark `iter` times and take timings
   void run() {
     // Easier to optimize / inline a branchless loop
-    for (size_t i=0; i<iter; i++) {
+    for (size_t i = 0; i < iter; i++) {
       perf.startTimer();
       if (xsmm)
         kernel.runXSMM(args);
@@ -85,7 +82,7 @@ public:
   double getMean() {
     auto mean = perf.getMean();
     if (gflops) {
-      return gflops/mean;
+      return gflops / mean;
     }
     return mean;
   }
@@ -95,7 +92,7 @@ public:
     auto stdev = perf.getStdev();
     if (gflops) {
       auto mean = perf.getMean();
-      return (gflops*stdev)/(mean*mean);
+      return (gflops * stdev) / (mean * mean);
     }
     return stdev;
   }
