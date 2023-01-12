@@ -143,7 +143,7 @@ struct TileConsumerAndFuseProducers
     RewritePatternSet patterns(&getContext());
     populateFusionPatterns(patterns, tileSizes);
     // fold unit-extent dims for linalg on tensors.
-    linalg::populateFoldUnitExtentDimsPatterns(patterns);
+    linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

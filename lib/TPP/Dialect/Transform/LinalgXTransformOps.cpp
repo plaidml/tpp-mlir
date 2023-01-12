@@ -79,7 +79,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       .Default([&](Operation *op) { packedOp = failure(); });
   if (succeeded(packedOp)) {
     results.push_back(*packedOp);
-    return DiagnosedSilenceableFailure(success());
+    return DiagnosedSilenceableFailure::success();
   }
   results.assign(1, nullptr);
   auto diag = this->emitOpError() << "Could not pack op: " << target << "\n";
@@ -104,7 +104,7 @@ transform::CollapseOp::applyToOne(linalg::LinalgOp target,
   if (failed(collapsedOp))
     return DiagnosedSilenceableFailure::definiteFailure();
   results.push_back(*collapsedOp);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 SmallVector<ReassociationIndices, 4>
@@ -132,7 +132,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops =
       mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -154,7 +154,7 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                 << "Could not map to matmul: " << target << "\n";
     diag.attachNote(target.getLoc()) << "when applied to this op";
   }
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,9 +177,9 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
   mlir::linalgx::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -215,7 +215,7 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
     }
   }
   results.set(getResult().cast<OpResult>(), res);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -233,12 +233,12 @@ transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
   }
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
-  mlir::linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  mlir::linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,9 +266,9 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -289,9 +289,9 @@ DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
                                                 /*useParallelLoops=*/true);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,7 +320,7 @@ transform::CollapseTo2dOp::apply(transform::TransformResults &results,
     collapsed.append(1, *collapsedOp);
   }
   results.set(getCollapsedLinalgOp().cast<OpResult>(), collapsed);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 SmallVector<ReassociationIndices, 4>
@@ -404,7 +404,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     tiled.append(1, tiledOp->op);
   }
   results.set(getTiledLinalgOp().cast<OpResult>(), tiled);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//

@@ -38,8 +38,7 @@ static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                               ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles);
   ShapedType result = linalgx::PackOp::getPackedType(
       input.getType(), staticTiles, innerDimsPos, outerDimsPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();

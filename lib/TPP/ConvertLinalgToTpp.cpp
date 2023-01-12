@@ -483,7 +483,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
     RewritePatternSet patterns(ctx);
     tpp::populateConvertLinalgToTppPatterns(patterns, useParallelLoops);
     populateSubViewFoldingPatterns(patterns);
-    linalg::populateFoldUnitExtentDimsPatterns(patterns);
+    linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;

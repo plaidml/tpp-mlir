@@ -101,6 +101,10 @@ transform.sequence failures(propagate) {
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
 
+    %empties = transform.structured.match ops{["tensor.empty"]} in %arg1
+    %casted_empties = transform.cast %empties : !pdl.operation to !transform.op<"tensor.empty">
+    transform.bufferization.empty_tensor_to_alloc_tensor %casted_empties : (!transform.op<"tensor.empty">) 
+        -> !transform.op<"bufferization.alloc_tensor">
     transform.bufferization.one_shot_bufferize %arg1 {
         target_is_module = true,
         bufferize_function_boundaries = true }
@@ -171,6 +175,10 @@ transform.sequence failures(propagate) {
     transform.structured.canonicalize %6
 
     // bufferize
+    %empties = transform.structured.match ops{["tensor.empty"]} in %arg1
+    %casted_empties = transform.cast %empties : !pdl.operation to !transform.op<"tensor.empty">
+    transform.bufferization.empty_tensor_to_alloc_tensor %casted_empties : (!transform.op<"tensor.empty">) 
+        -> !transform.op<"bufferization.alloc_tensor">
     transform.bufferization.one_shot_bufferize %arg1 {
         target_is_module = true,
         bufferize_function_boundaries = true }
@@ -237,6 +245,10 @@ transform.sequence failures(propagate) {
     %7 = transform.structured.match ops{["func.func"]} in %arg1
     transform.structured.canonicalize %7
 
+    %empties = transform.structured.match ops{["tensor.empty"]} in %arg1
+    %casted_empties = transform.cast %empties : !pdl.operation to !transform.op<"tensor.empty">
+    transform.bufferization.empty_tensor_to_alloc_tensor %casted_empties : (!transform.op<"tensor.empty">) 
+        -> !transform.op<"bufferization.alloc_tensor">
     transform.bufferization.one_shot_bufferize %arg1 {
         target_is_module = true,
         bufferize_function_boundaries = true }
@@ -275,11 +287,11 @@ func.func @mlp_single_layer_fused_and_packed(%arg0: tensor<128x256xf32>, %arg1: 
 // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32, strided<[?], offset: ?>>) out(%[[ARG3]] : memref<128x512xf32, strided<[?, ?], offset: ?>>)
-// CHECK: %[[BUFF0:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x8x32x32xf32>
+// CHECK: %[[BUFF0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<4x8x32x32xf32>
 // CHECK: linalgx.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF0]] : (memref<128x256xf32, strided<[?, ?], offset: ?>> memref<4x8x32x32xf32>)
-// CHECK: %[[BUFF1:.+]] = memref.alloc() {alignment = 128 : i64} : memref<16x8x32x32xf32>
+// CHECK: %[[BUFF1:.+]] = memref.alloc() {alignment = 64 : i64} : memref<16x8x32x32xf32>
 // CHECK: linalgx.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF1]] : (memref<256x512xf32, strided<[?, ?], offset: ?>> memref<16x8x32x32xf32>)
-// CHECK: %[[BUFF2:.+]] = memref.alloc() {alignment = 128 : i64} : memref<4x16x32x32xf32>
+// CHECK: %[[BUFF2:.+]] = memref.alloc() {alignment = 64 : i64} : memref<4x16x32x32xf32>
 // CHECK: linalgx.pack %[[ARG3]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF2]] : (memref<128x512xf32, strided<[?, ?], offset: ?>> memref<4x16x32x32xf32>)
 // CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
 // CHECK: %[[SUB0:.+]] = memref.subview %[[BUFF0]][%[[I]], 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>

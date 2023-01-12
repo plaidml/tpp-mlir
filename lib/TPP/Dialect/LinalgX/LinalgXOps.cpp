@@ -136,8 +136,7 @@ void PackOp::build(OpBuilder &builder, OperationState &result, Value input,
   assert(!tiles.empty() && "expect tiles to be non empty");
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
-  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles);
   Type typeOutput = output.getType();
   if (typeOutput.isa<MemRefType>()) {
     if (outerDimPerm.empty())
@@ -174,8 +173,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &result, Value input,
                      ArrayRef<OpFoldResult> tiles) {
   SmallVector<Value> innerTiles;
   SmallVector<int64_t> staticInnerTiles;
-  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(tiles, innerTiles, staticInnerTiles);
   Type typeOutput = output.getType();
   if (typeOutput.isa<MemRefType>()) {
     if (outerDimsPerm.empty())
@@ -374,8 +372,7 @@ template <typename OpTy> static SmallVector<int64_t> getStaticTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles);
   return staticTiles;
 }
 

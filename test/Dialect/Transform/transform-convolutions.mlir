@@ -29,7 +29,7 @@ transform.sequence failures(propagate) {
     //
     // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
     //
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -59,7 +59,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -93,7 +93,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -154,7 +154,7 @@ transform.sequence failures(propagate) {
     //      c   [reduction]
     //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
     //
-    %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    %4 = transform.structured.interchange %3 iterator_interchange = [0, 1, 4, 2, 3, 5] 
     transform.structured.map_to_brgemm %4
 }
 
@@ -280,14 +280,14 @@ transform.sequence failures(propagate) {
 
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
-    %conv1 = transform.structured.interchange %convs#1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %conv1
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
     %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
-    %9 = transform.structured.interchange %8 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5] 
     transform.structured.map_to_brgemm %9
 }
 
