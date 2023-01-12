@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Init benchmark (TODO: support BF16)
-  double gflops = (double)((n*m) + (2*n*m*k) + (n*m)) / 1e9;
+  double gflops = static_cast<double>((n*m) + (2*n*m*k) + (n*m)) / 1e9;
   auto bench = Benchmark<MLPKernel<float>, float>(config.iter, gflops, config.xsmm);
   bench.setArg({ConstantTensor<float>({m, k}),
                 ConstantTensor<float>({k, n}),
