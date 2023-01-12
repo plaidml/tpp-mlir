@@ -63,6 +63,9 @@ public:
   Tensor<T> &operator=(const Tensor<T> &other) {
     dims = other.dims;
     size = other.size;
+    /// Release current data before copying a new buffer
+    if (data)
+      free(data);
     alloc();
     std::memcpy(data, other.data, dataSize);
     return *this;
