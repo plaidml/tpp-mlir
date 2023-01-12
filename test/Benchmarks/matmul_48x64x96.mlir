@@ -1,4 +1,5 @@
-// RUN: tpp-opt %s -default-tpp-passes | \
+// RUN: tpp-opt %s -default-tpp-passes \
+// RUN:  -buffer-results-to-out-params -buffer-deallocation | \
 // RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void -print \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
