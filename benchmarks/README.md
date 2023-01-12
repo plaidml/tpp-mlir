@@ -28,13 +28,6 @@ The blocking/tiling/fusing parameters are in optimal configuration and should be
 The C++ code represent what the compiler _should_ be doing if it can get the transforms right.
 The MLIR code should be within 95% of the performance from C++ runs.
 
-## How to Build
-
-The C++ benchmarks are build by CMake and the binaries will be available in the build directory.
-The sources are in `benchmarks/CPPHarness`, each directory under `src` is a separate benchmark.
-
-The MLIR benchmarks use the `MLIRHarness`, which in turn uses `tpp-run` to JIT-compile the MLIR files in `test/Benchmarks` using the default pass pipeline.
-
 ## How to Run
 
 There are two ways of running benchmarks: manual and automatic.
@@ -42,7 +35,8 @@ There are two ways of running benchmarks: manual and automatic.
 ### Automatic Runs
 
 There's a Python driver in this folder that, once called, will read the `benchmarks.json` file and run all the benchmarks in there.
-This is what the CI does.
+
+This is what the CMake target `benchmarks` does.
 
 This will run both C++ and MLIR versions and will print out the results in order.
 The output is semi-formatted, human readable and machine parseable, and you can use that to track timings over time.
@@ -55,16 +49,20 @@ Use `driver.py -h` for its options.
 
 This is for developers to test their transforms in the compiler.
 
-#### C benchmakrs
+#### C++ benchmakrs
 
 For C++ benchmarks, run their respective binaries with `-h` to see the options, or look at the `driver.py` script for more options.
 
-The binaries generated on the build directory accept certain arguments to it, for example:
-* `-x`: Runs the XSMM version (if available), not the reference one.
-* `-n N`: Changes the number of iterations to run.
-* `-m MxNxK`: Sets the required shape for the tensors for simpler benchmarks.
-* `-r`: Sets the input to be random. If omitted, inputs are constant `all_ones`.
-* `-s SEED`: Sets the random seed for the input generator.
+These benchmarks are compiled by CMake and are available in the `build` directory.
+
+The binaries accept the same arguments, for example:
+* `--xsmm`: Runs the XSMM version (if available), not the reference one.
+* `--iter=N`: Changes the number of iterations to run.
+* `--input=MxNxK`: Sets the required shape for the tensors for simpler benchmarks.
+* `--random`: Sets the input to be random. If omitted, inputs are constant `all_ones`.
+* `--seed=SEED`: Sets the random seed for the input generator.
+
+Use `--help` for more information.
 
 Larger benchmarks, for example multiple layers and models, can have multiple tensors (weights, inputs, bias).
 For simplicity, weights and biases should be constants in IR (can be random, but as a constant in code), while only inputs can be run-time variable.
@@ -73,7 +71,7 @@ In the future, we should support reading input from files and have a more comple
 #### MLIR benchmakrs
 
 The MLIR benchmarks are also run as tests on a normal test run and are available under `test/Benchmarks`.
-The harness (`benchmarks/MLIRHarness/controller.py`) automatically detects tool paths, libraries and even LLVM LIT variables.
+The harness (`benchmarks/harness/controller.py`) automatically detects tool paths, libraries and even LLVM LIT variables.
 It also reads the MLIR file and parsers the FileCheck RUN lines to know how to run both `tpp-opt` and `tpp-run`.
 
 You can use the `-vv` flag, just like the driver, to see what's going on inside, and repeat the steps by hand, if needed.
