@@ -11,13 +11,12 @@
      * filename: kernel to run on
      * -n N: Number of times to run (default 1000)
      * -e ENTRY: Entry point name (default "entry")
-     * -shared-libs=PATH: MLIR/TPP runtime paths
 
     Like LLVM's FileCheck, we try to get information from comments on the MLIR
     file (//).
 
     We can look at RUN lines, for details on how to process the file, like entry
-    point, shared-libs, tpp-opt args.
+    point, tpp-opt args.
 
     We also support new ones:
      * BENCH_TOTAL_FLOPS: Number of FP ops in the kernel
@@ -49,7 +48,6 @@ class BenchmarkController(object):
         self.baseDir = self.helper.findGitRoot(os.path.dirname(__file__))
         self.logger.debug(f"Base dir: {self.baseDir}")
         self.programs = self.helper.findTPPProgs(self.baseDir)
-        self.variables = self.helper.getLLVMVariables(self.programs, self.baseDir)
         self.output = ''
         self.mean = 0.0
         self.stdev = 0.0
@@ -68,8 +66,6 @@ class BenchmarkController(object):
             self.args.n = fileArgs['iters']
         if (not self.args.entry and 'entry' in fileArgs):
             self.args.entry = fileArgs['entry']
-        if (not self.args.shared_libs and 'shared-libs' in fileArgs):
-            self.args.shared_libs = fileArgs['shared-libs']
         if (not self.args.flops and 'flops' in fileArgs):
             self.args.flops = fileArgs['flops']
             self.unit = "gflops"
@@ -85,22 +81,6 @@ class BenchmarkController(object):
         if (not self.args.entry):
             logger.error("No entry point defined, bailing")
             return False
-
-        if (not self.args.shared_libs):
-            logger.warning("No shared library path, benchmark may not run correctly")
-        else:
-            # Make sure the line doesn't have %vars% which can't be resolved
-            m = re.search("%", self.args.shared_libs)
-            if m:
-                for key, val in self.variables.items():
-                    self.args.shared_libs = re.sub("%" + key, val, self.args.shared_libs)
-                self.logger.debug(f"Shared libraries updated: {self.args.shared_libs}")
-
-            # Check again, to make sure we replaced everything
-            m = re.search("%", self.args.shared_libs)
-            if m:
-                self.logger.error("Shared libs argument contain %variables, won't be able to resolve")
-                return False
 
         return True
 
@@ -132,7 +112,6 @@ class BenchmarkController(object):
         runCmd = [ self.programs['tpp-run'], '-n', str(self.args.n),
                                              '-e', self.args.entry,
                                              '--entry-point-result=void',
-                                             '--shared-libs=' + self.args.shared_libs,
                                              '--print=0',
                   ]
         runResult = executor.run(runCmd, irContents)
@@ -190,8 +169,6 @@ if __name__ == '__main__':
                         help='Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)')
     parser.add_argument('-entry', type=str,
                         help='Name of the entry point (checks RUN line)')
-    parser.add_argument('-shared-libs', type=str,
-                        help='Path of the runtime libraries (checks RUN line)')
     parser.add_argument('-opt-args', type=str,
                         help='tpp-opt arguments (checks RUN line)')
     parser.add_argument('-v', '--verbose', action='count', default=0,

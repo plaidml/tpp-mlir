@@ -1,7 +1,6 @@
 // RUN: tpp-opt %s -convert-check-to-loops -linalg-ext-to-loops -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -arith-expand -convert-math-to-llvm  -convert-vector-to-scf -convert-scf-to-cf -lower-affine  -reconcile-unrealized-casts |\
 // RUN: tpp-run \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
+// RUN:  -e entry -entry-point-result=void
 //
 
   memref.global "private" constant @arg1 : memref<256x512xbf16> = dense<1.00e+00> 

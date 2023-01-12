@@ -1,7 +1,6 @@
 // RUN: tpp-opt %s --pack-vnni="block-factors=2"  --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize  --linalg-ext-to-loops --convert-linalg-to-tpp --convert-check-to-loops --convert-vnni-to-tpp --convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf  --convert-math-to-llvm --lower-affine --reconcile-unrealized-casts |\
 // RUN: tpp-run \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
+// RUN:  -e entry -entry-point-result=void
 //
 // RUN: tpp-opt %s --pack-vnni="block-factors=2"  --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize  --linalg-ext-to-loops --convert-linalg-to-tpp --convert-vnni-to-tpp | FileCheck %s -check-prefix=TPP
 // 
