@@ -30,7 +30,7 @@ The MLIR code should be within 95% of the performance from C++ runs.
 
 ## How to Build
 
-The C++ benchmakrs are build by CMake and the binaries will be available in the build directory.
+The C++ benchmarks are build by CMake and the binaries will be available in the build directory.
 The sources are in `benchmarks/CPPHarness`, each directory under `src` is a separate benchmark.
 
 The MLIR benchmarks use the `MLIRHarness`, which in turn uses `tpp-run` to JIT-compile the MLIR files in `test/Benchmarks` using the default pass pipeline.
@@ -47,7 +47,7 @@ This is what the CI does.
 This will run both C++ and MLIR versions and will print out the results in order.
 The output is semi-formatted, human readable and machine parseable, and you can use that to track timings over time.
 
-You can run it from the `build` directory via `ninja benchmarks`, or you can use the Python script directly for more controll.
+You can run it from the `build` directory via `ninja benchmarks`, or you can use the Python script directly for more control.
 
 Use `driver.py -h` for its options.
 
@@ -63,7 +63,7 @@ The binaries generated on the build directory accept certain arguments to it, fo
 * `-x`: Runs the XSMM version (if available), not the reference one.
 * `-n N`: Changes the number of iterations to run.
 * `-m MxNxK`: Sets the required shape for the tensors for simpler benchmarks.
-* `-r`: Sets the input to be random. If ommited, inputs are constant `all_ones`.
+* `-r`: Sets the input to be random. If omitted, inputs are constant `all_ones`.
 * `-s SEED`: Sets the random seed for the input generator.
 
 Larger benchmarks, for example multiple layers and models, can have multiple tensors (weights, inputs, bias).
