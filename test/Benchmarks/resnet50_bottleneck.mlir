@@ -9,7 +9,12 @@
 // RUN: -e resnet50_bottleneck_block -entry-point-result=void \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
-//
+
+// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
+// RUN: tpp-run -n 10 -print \
+// RUN: -e resnet50_bottleneck_block -entry-point-result=void \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
+// RUN: FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
