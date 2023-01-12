@@ -22,21 +22,7 @@ using namespace mlir::tpp;
 
 namespace {
 
-//
-// tpp.add ins(%a, %b) out(%c)
-//
-// Converts to:
-//
-// scf.some_loop(%i, %j)
-//   %0 = load from %a
-//   %1 = load from %b
-//   %2 = add %0, %1
-//   store %2 to %c
-//
-// or
-//
-// arith.addf(%a, %b)
-//
+// Convert tpp.add to SCF loops.
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
@@ -84,7 +70,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
-// Converts identity op.
+// Converts tpp.identity to SCF loops.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
 
@@ -157,7 +143,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 };
 
-// Convert relu to loops.
+// Convert tpp.relu to SCF loops.
 struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   using OpRewritePattern<ReluOp>::OpRewritePattern;
 
@@ -208,7 +194,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   }
 };
 
-// Convert matmul to loops.
+// Convert tpp.matmul to SCF loops.
 struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   using OpRewritePattern<MatmulOp>::OpRewritePattern;
 
@@ -254,6 +240,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   }
 };
 
+// Convert tpp.brgemm to SCF loops.
 struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   using OpRewritePattern<BrgemmOp>::OpRewritePattern;
 

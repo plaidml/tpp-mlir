@@ -158,9 +158,8 @@ struct GeneralizeConv2DNhwcHwcf : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    // do not handle convolutions with dilation and strides.
-    if (hasStride<linalg::Conv2DNhwcHwcfOp>(convOp) ||
-        hasDilation<linalg::Conv2DNhwcHwcfOp>(convOp))
+    // Do not handle convolutions with dilation.
+    if (hasDilation<linalg::Conv2DNhwcHwcfOp>(convOp))
       return failure();
 
     // [N][H][W][C]
@@ -564,6 +563,7 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
 };
 
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
+// TODO: Add pattern matching for the packed version too.
 void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
   patterns.insert<GeneralizeConv2DNhwcHwcf, MapConv2DNhwcHwcfToMatmul,
                   InterchangeIteratorsConv2DNhwcHwcf>(patterns.getContext());

@@ -11,7 +11,7 @@ set(TPP_OPT_TEST_DEPENDS
         tpp-run
         )
 
-add_lit_testsuite(check-all "Running the tpp-opt regression tests"
+add_lit_testsuite(check-all "Running the regression tests"
         ${CMAKE_CURRENT_BINARY_DIR}
         DEPENDS ${TPP_OPT_TEST_DEPENDS}
         )

@@ -1,11 +1,13 @@
 // RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -empty-tensor-to-alloc-tensor \
 // RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
-// RUN: -convert-linalg-to-tpp="use-parallel-loops=false" \
-// RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func \
-// RUN: -expand-strided-metadata | \
+// RUN: -convert-linalg-to-tpp -convert-tpp-to-xsmm \
+// RUN: -loop-invariant-code-motion -scf-parallel-loop-fusion \
+// RUN: -convert-xsmm-to-func -expand-strided-metadata | \
 // RUN: FileCheck %s
-//
+
+// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
+// RUN: FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -61,11 +63,12 @@ func.func @first_conv2d_1x1_biasadd_relu(
                 outs(%1 : !first_conv1x1_output_tensor_t) -> !first_conv1x1_output_tensor_t
     
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK: %[[cast:.*]] = memref.cast
-    // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: %[[cast2:.*]] = memref.cast 
-    // CHECK: func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.for
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     // BiasAdd
@@ -93,10 +96,11 @@ func.func @first_conv2d_1x1_biasadd_relu(
     } -> !first_conv1x1_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK: %[[cast:.*]] = memref.cast
-    // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     // ReLU
@@ -149,11 +153,12 @@ func.func @conv2d_3x3_biasadd_relu(
                 outs(%1 : !conv3x3_output_tensor_t) -> !conv3x3_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK: %[[cast:.*]] = memref.cast
-    // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: %[[cast2:.*]] = memref.cast 
-    // CHECK: func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.for
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     
     // BiasAdd
@@ -181,10 +186,11 @@ func.func @conv2d_3x3_biasadd_relu(
     } -> !conv3x3_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK: %[[cast:.*]] = memref.cast
-    // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     // ReLU
@@ -238,10 +244,10 @@ func.func @second_conv2d_1x1_biasadd_relu(
                 outs(%1 : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: %[[cast:.*]] = memref.cast
     // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: %[[cast2:.*]] = memref.cast 
+    // CHECK: %[[cast2:.*]] = memref.cast
     // CHECK: func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     
@@ -270,10 +276,11 @@ func.func @second_conv2d_1x1_biasadd_relu(
     } -> !second_conv1x1_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = func.call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK: %[[cast:.*]] = memref.cast
-    // CHECK: %[[cast1:.*]] = memref.cast
-    // CHECK: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     // ReLU

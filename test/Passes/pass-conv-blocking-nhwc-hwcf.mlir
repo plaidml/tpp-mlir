@@ -1,6 +1,6 @@
-// RUN: tpp-opt -pack-conv2DNhwcHwcf="block-factors=32,32" -split-input-file %s | FileCheck %s
+// RUN: tpp-opt %s -pack-conv2DNhwcHwcf="block-factors=32,32" -split-input-file | FileCheck %s
 
-func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
+func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
   %1 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>,
                                  strides = dense<1> : tensor<2xi64>}
     ins(%arg0, %arg1 : tensor<1x113x113x64xf32>, tensor<3x3x64x256xf32>)
@@ -12,7 +12,7 @@ func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, 
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
 
-// CHECK: func.func @main(
+// CHECK: func.func @conv_2d_nhwc_hwcf(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<1x113x113x64xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: tensor<3x3x64x256xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: tensor<1x56x56x256xf32>

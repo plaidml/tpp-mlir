@@ -76,6 +76,13 @@ if (NOT TPP_INSIDE_IREE)
   add_subdirectory(tpp-opt)
   add_subdirectory(tpp-run)
   add_subdirectory(test)
+  add_subdirectory(benchmarks)
+
+  set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
+  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v
+                    DEPENDS bench_simple_copy bench_mlp bench_matmul tpp-opt tpp-run
+                    WORKING_DIRECTORY ${BENCHMARK_DIR}
+                    COMMENT Run C++ and MLIR Benchmarks)
 endif()
 
 message(STATUS "TPP Project CMakeLists.txt END")

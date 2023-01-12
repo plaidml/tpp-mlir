@@ -5,24 +5,28 @@ This allows us to measure how much off are we when compared with ninja-written c
 
 ## Run Types
 
-There are three types of runs: reference, tpp-mlir and libxsmm.
+There are two types of runs: reference and XSMM, for each type of benchmark: MLIR compiler and ninja code.
 
 ### Reference Runs
 
-These runs pure C without using TPP/XSMM, just executing the code as is, with compiler at -O3.
+These runs pure C++/MLIR without using TPP/XSMM, just executing the code as is, with compiler at -O3.
 This is the most naive and inefficient way of running the kernels and lets us know what is the baseline.
 
-### TPP-MLIR Runs
+The reference run is intended to produce output that will be compared with the optimized outputs.
+Both reference runs (C++ and MLIR) should also produce similar outputs.
+Since the MLIR run needs to be representative of existing Python models, the C++ side has to adapt to have the same ops.
 
-These take in the MLIR implementation and run TPP optimizations on them before running the kernels.
-The timings of these runs must be between the vanilla runs and the ninja runs, closer to the latter.
-We aim to be within 90% of the performance from ninja runs.
+Those runs can be very slow and shouldn't be used for benchmakrs for anything bigger than a single MLP layer.
+But they should be used for golden outputs for any models we try to benchmark.
+Larger models may need to cache the inputs/outputs to avoid a very slow reference run on every benchmark loop.
 
-### Ninja Runs
+### XSMM Runs
 
-These do same computations as the MLIR kernels, but calling libxsmm directly.
+These are the ninja optimized code, either by hand in C++ calling libxsmm directly, or by the Tensor Compiler, generating the calls automatically.
 The blocking/tiling/fusing parameters are in optimal configuration and should be the fastest runs.
-They also represent what the compiler _should_ be doing if it can get the transforms right.
+
+The C++ code represent what the compiler _should_ be doing if it can get the transforms right.
+The MLIR code should be within 95% of the performance from C++ runs.
 
 ## How to Run
 
@@ -31,10 +35,13 @@ There are two ways of running benchmarks: manual and automatic.
 ### Automatic Runs
 
 There's a Python driver in this folder that, once called, will read the `benchmarks.json` file and run all the benchmarks in there.
-This is what the CI does.
+
+This is what the CMake target `benchmarks` does.
 
 This will run both C++ and MLIR versions and will print out the results in order.
 The output is semi-formatted, human readable and machine parseable, and you can use that to track timings over time.
+
+You can run it from the `build` directory via `ninja benchmarks`, or you can use the Python script directly for more control.
 
 Use `driver.py -h` for its options.
 
@@ -42,25 +49,24 @@ Use `driver.py -h` for its options.
 
 This is for developers to test their transforms in the compiler.
 
-The driver above does two things:
-1. Compiles the C++ file and run it with known options, which print results.
-2. Call the benchmark harness on the MLIR file, which runs it and print results.
+#### C++ benchmakrs
 
-You can call the driver with the `-v` (or `-vv`) option to see logs, and use those to repeat the runs by hand.
-Since the driver (and the harness) detect include/library/tools paths, it's wise to use it before trying it by hand.
+For C++ benchmarks, run their respective binaries with `-h` to see the options, or look at the `driver.py` script for more options.
 
-#### C benchmakrs
+These benchmarks are compiled by CMake and are available in the `build` directory.
 
-The C benchmakrs are split into two stages: compile and run.
+The binaries accept the same arguments, for example:
+* `--xsmm`: Runs the XSMM version (if available), not the reference one.
+* `--iter=N`: Changes the number of iterations to run.
+* `--input=MxNxK`: Sets the required shape for the tensors for simpler benchmarks.
+* `--random`: Sets the input to be random. If omitted, inputs are constant `all_ones`.
+* `--seed=SEED`: Sets the random seed for the input generator.
 
-The compilation is assuming `clang` is in the path and picking the other flags from the repository.
-You can get those options from a `./driver.py -vv` run.
+Use `--help` for more information.
 
-Once compiled, the binary is generated on the same directory as the source and you can pass certain arguments to it, for example:
-* `-x`: Runs the XSMM version (if available), not the reference one.
-* `-n`: Changes the number of iterations to run
-
-Some benchmarks, for example the matmul, have also an argument to define the size of the GEMM in the format `NxMxK`.
+Larger benchmarks, for example multiple layers and models, can have multiple tensors (weights, inputs, bias).
+For simplicity, weights and biases should be constants in IR (can be random, but as a constant in code), while only inputs can be run-time variable.
+In the future, we should support reading input from files and have a more complext configuration (ex. a JSON file, multiple binary files, etc).
 
 #### MLIR benchmakrs
 
@@ -70,13 +76,15 @@ It also reads the MLIR file and parsers the FileCheck RUN lines to know how to r
 
 You can use the `-vv` flag, just like the driver, to see what's going on inside, and repeat the steps by hand, if needed.
 
-Unlike the C benchmarks, it's hard to change the MLIR tensor shapes with a flag, that's why we have multiple MLIR files for a single C benchmark.
+The flags are the same as the C++ benchmarks.
+
+However, unlike the C benchmarks, it's hard to change the MLIR tensor shapes with a flag, that's why we have multiple MLIR files for a single C++ benchmark.
 
 ## How to Add New Runs
 
 To add a new benchmark, you need to add the following items:
- * A new directory in `benchmarks`.
- * A C implementation with a reference (optional) and a libxsmm in that directory.
+ * A new directory in `benchmarks/CPPHarness`.
+ * A C++ implementation with a reference (optional) and a libxsmm in that directory.
  * An MLIR file in `test/Benchmarks` with the same kernel, in IR form.
  * Update `benchmarks.json` to add those files.
 

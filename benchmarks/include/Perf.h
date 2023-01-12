@@ -43,7 +43,7 @@ class PerfResults {
   }
 
   /// Zero a time_point
-  void zero(std::chrono::high_resolution_clock::time_point& point) {
+  void zero(std::chrono::high_resolution_clock::time_point &point) {
     point = std::chrono::high_resolution_clock::time_point();
   }
 
