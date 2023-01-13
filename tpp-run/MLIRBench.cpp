@@ -85,7 +85,7 @@ LogicalResult MLIRBench::checkKernelSignature() {
   // If the function has no args or return values, just run it as is
   auto funcType = kernel.getFunctionType();
   if (funcType.getNumInputs() == 0 && funcType.getNumResults() == 0)
-    return module.emitError("Entry point already created, use mlir-cpu-runner");
+    return failure();
 
   return success();
 }
