@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes -buffer-deallocation  | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -buffer-results-to-out-params -buffer-deallocation  | FileCheck %s
 //
 
 // ----------------------
