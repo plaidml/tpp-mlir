@@ -14,7 +14,6 @@
 #define MLIR_DIALECT_VNNI_IR_VNNIINTERFACES_H_
 
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
