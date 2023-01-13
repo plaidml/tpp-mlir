@@ -33,4 +33,14 @@ llvm_update_compile_flags(tpp-run)
 
 target_link_libraries(tpp-run PRIVATE ${LIBS})
 
+message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
+message(STATUS "MLIR libraries at: ${LLVM_LIBRARY_DIR}")
+# Add TPP/MLIR library path so we don't need --shared-libs on every call
+target_link_options(tpp-run PRIVATE
+  -ltpp_c_runner_utils
+  -L${CMAKE_BINARY_DIR}/lib
+  -lmlir_c_runner_utils
+  -L${LLVM_LIBRARY_DIR}
+)
+
 install(TARGETS tpp-run)

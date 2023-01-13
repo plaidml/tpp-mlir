@@ -2,8 +2,7 @@
 // RUN: -buffer-results-to-out-params -buffer-deallocation \
 // RUN: -expand-strided-metadata -lower-affine | \
 // RUN: tpp-run -n 10 -print \
-// RUN: -e resnet50_bottleneck_block -entry-point-result=void \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
+// RUN: -e resnet50_bottleneck_block -entry-point-result=void | \
 // RUN: FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>

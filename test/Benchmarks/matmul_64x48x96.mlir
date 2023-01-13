@@ -1,8 +1,7 @@
 // RUN: tpp-opt %s -default-tpp-passes \
 // RUN:  -buffer-results-to-out-params -buffer-deallocation | \
 // RUN: tpp-run -n 10 \
-// RUN:  -e entry -entry-point-result=void -print \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
+// RUN:  -e entry -entry-point-result=void -print | \
 // RUN: FileCheck %s
 //
 // Total flops = O(2*n*k*m) = 2*64x96x48 = 589824
