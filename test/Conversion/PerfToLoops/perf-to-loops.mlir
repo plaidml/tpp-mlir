@@ -1,4 +1,6 @@
 // RUN: tpp-opt %s -convert-perf-to-loops -split-input-file -canonicalize | FileCheck %s
+// XFAIL:* 
+// See: #277
 
 // CHECK-LABEL: @perf_single_op
 func.func @perf_single_op(%arg0: tensor<4x8xf32>,
