@@ -18,7 +18,6 @@ add_mlir_library(MLIRTPP
 
   # Conversions
     ConvertLinalgToTpp.cpp
-    ConvertLinalgXToLoops.cpp
     ConvertTppToLoops.cpp
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
@@ -35,7 +34,6 @@ add_mlir_library(MLIRTPP
     TPPLinalgXTransformOps
 
     LINK_LIBS PUBLIC
-    TPPLinalgXDialect
     TPPTppDialect
     TPPXsmmDialect
     TPPVNNIDialect
