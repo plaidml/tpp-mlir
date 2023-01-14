@@ -17,8 +17,6 @@
 
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
-#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"

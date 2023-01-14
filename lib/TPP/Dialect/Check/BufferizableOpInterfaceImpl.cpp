@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Check/CheckOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Operation.h"
+
 using namespace mlir;
 using namespace mlir::bufferization;
 using namespace mlir::check;
