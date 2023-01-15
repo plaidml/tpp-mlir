@@ -74,7 +74,8 @@ static Value rankReducingSubviewDroppingUnitDims(OpBuilder &builder,
       loc, resultType, input, subViewOffsets, subViewSizes, subViewStrides);
 }
 
-bool isAlreadyReshaped(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
+static bool isAlreadyReshaped(RewriterBase &rewriter,
+                              linalg::GenericOp linalgOp) {
   assert(linalgOp.getNumLoops() > 2 && "expect two or more loops");
   SmallVector<Range> domain = cast<TilingInterface>(linalgOp.getOperation())
                                   .getIterationDomain(rewriter);
@@ -89,8 +90,9 @@ bool isAlreadyReshaped(RewriterBase &rewriter, linalg::GenericOp linalgOp) {
 
 // Make the generic operation mappable to tpp by preserving
 // the last and first dimension only.
-LogicalResult reshape2D(RewriterBase &rewriter, linalg::GenericOp linalgOp,
-                        bool useParallelLoops) {
+static LogicalResult reshape2D(RewriterBase &rewriter,
+                               linalg::GenericOp linalgOp,
+                               bool useParallelLoops) {
   if (!linalgOp.hasBufferSemantics())
     return failure();
 
@@ -208,8 +210,8 @@ getTileSizesForOptimalMapping(OpBuilder &builder, linalg::LinalgOp linalgOp) {
 }
 
 // Tile the generic operation such that we can select the best micro-kernel.
-LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
-                           ArrayRef<int64_t> tileSizes) {
+static LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
+                                  ArrayRef<int64_t> tileSizes) {
   if (!linalgOp.hasBufferSemantics())
     return linalgOp->emitError("Expect linalgOp with buffer semantics");
   if (!tpp::utils::hasTppMark(linalgOp))
@@ -241,7 +243,8 @@ LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
 // while shaped type with rank > 2 are rank reduced by dropping unit
 // dimensions.  Note that the rank-reduce may fail thus the caller needs to
 // check if the returned operand is valid using 'checkOperandForTpp'.
-Value getOperandForTpp(Value operand, PatternRewriter &rewriter, Location loc) {
+static Value getOperandForTpp(Value operand, PatternRewriter &rewriter,
+                              Location loc) {
   Type operandType = operand.getType();
   if (!operandType.isa<ShapedType>())
     return operand;
@@ -253,7 +256,7 @@ Value getOperandForTpp(Value operand, PatternRewriter &rewriter, Location loc) {
 
 // Given an operand 'operand' check if it is a scalar
 // or a static shape type with rank <= 2.
-LogicalResult checkOperandForTpp(Value operand) {
+static LogicalResult checkOperandForTpp(Value operand) {
   Type operandType = operand.getType();
   if (!operandType.isa<ShapedType>())
     return success();
@@ -281,16 +284,18 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
     if (tpp::utils::isTppRelu(linalgOp)) {
-      // relu(A)
-      // B = relu(A)
+      // Allow either:
+      // 1. relu(A)
+      // 2. B = relu(A)
       Value output =
           (linalgOp.getNumOperands() == 2) ? operands[1] : operands[0];
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0], output);
       return success();
     }
     if (tpp::utils::isTppAdd(linalgOp)) {
-      // A = A + B
-      // C = A + B
+      // Allow either:
+      // 1. A = A + B
+      // 2. C = A + B
       Value output =
           (linalgOp.getNumOperands() == 3) ? operands[2] : operands[1];
       rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
@@ -327,7 +332,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-// Convert a linalg.batch_reduce_matmul to a tpp.brgemm
+// Convert a linalg.batch_reduce_matmul to a tpp.brgemm.
 struct ConvertBrgemmToTpp
     : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
   using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
