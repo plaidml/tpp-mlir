@@ -73,7 +73,7 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     assert((benchOp.getArgs().size() == loop.getRegionIterArgs().size()) &&
            "expect equal number of loop-carried variables");
     for (auto [benchArg, loopArg] :
-         llvm::zip(benchOp.getArgs(), loop.getRegionIterArgs()))
+         llvm::zip_equal(benchOp.getArgs(), loop.getRegionIterArgs()))
       replaceAllUsesInRegionWith(benchArg, loopArg, loop.getRegion());
 
     // Pass perf.yield values through the scf.yield.
@@ -85,7 +85,7 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     assert((benchOp.getBodyResults().size() == loop.getResults().size()) &&
            "expect equal number of loop-carried variables");
     for (auto [benchRes, loopRes] :
-         llvm::zip(benchOp.getBodyResults(), loop.getResults()))
+         llvm::zip_equal(benchOp.getBodyResults(), loop.getResults()))
       benchRes.replaceAllUsesWith(loopRes);
 
     rewriter.eraseOp(benchOp);
