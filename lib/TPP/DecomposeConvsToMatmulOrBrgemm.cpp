@@ -335,7 +335,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
 struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult CollapseFilterPreconditions(linalg::GenericOp linalgOp) const {
+  LogicalResult collapseFilterPreconditions(linalg::GenericOp linalgOp) const {
     if (!tpp::utils::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
       return failure();
     OpOperand *filter = linalgOp.getDpsInputOperands()[1];
@@ -415,7 +415,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (failed(CollapseFilterPreconditions(linalgOp)))
+    if (failed(collapseFilterPreconditions(linalgOp)))
       return failure();
 
     // [original] = N K P Q k C R S c (R and S are 1)
@@ -427,10 +427,10 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     //  - output (N K P0 k C c) -> (N K P0 k)
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-    AffineExpr N, K, P0, k, C, c;
-    bindDims(linalgOp.getContext(), N, K, P0, k, C, c);
-    SmallVector<AffineMap> newIndexingMaps =
-        infer({{N, C, P0, c}, {K, C, c, k}, {N, K, P0, k}});
+    AffineExpr tileN, tileK, P0, k, tileC, c;
+    bindDims(linalgOp.getContext(), tileN, tileK, P0, k, tileC, c);
+    SmallVector<AffineMap> newIndexingMaps = infer(
+        {{tileN, tileC, P0, c}, {tileK, tileC, c, k}, {tileN, tileK, P0, k}});
 
     // We dropped R and S (two reductions) and collapse
     // parallel loops P and Q (aka H and W on the image).
