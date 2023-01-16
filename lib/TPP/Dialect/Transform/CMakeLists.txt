@@ -6,6 +6,9 @@ add_mlir_dialect_library(TPPLinalgXTransformOps
 
   DEPENDS
     TPPLinalgXTransformOpsIncGen
+
+  LINK_LIBS PUBLIC
+    TPPLinalgXDialect
 )
 
 target_include_directories(TPPLinalgXTransformOps

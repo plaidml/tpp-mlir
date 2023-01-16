@@ -91,6 +91,12 @@ def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleO
   }];
 }
 
+def LinalgExtToLoops :
+    Pass<"linalg-ext-to-loops", "func::FuncOp"> {
+  let summary = "Convert LinalgX ops to loops and Linalg ops.";
+  let constructor = "mlir::tpp::createLinalgXToLoopsPass()";
+}
+
 def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "ModuleOp"> {
   let summary = "Convert perf to loops";
   let constructor = "mlir::tpp::createConvertPerfToLoopsPass()";

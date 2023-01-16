@@ -43,11 +43,13 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     // Add all custom TPP dialects.
     registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
+    registry.insert<linalgx::LinalgXDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<vnni::VNNIDialect>();
     registry.insert<perf::PerfDialect>();
     bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
+    linalgx::registerBufferizableOpInterfaceExternalModels(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -103,6 +105,8 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
 
     // Lower all Check ops.
     pm.addPass(createConvertCheckToLoopsPass());
+    // Lower all LinalgX ops.
+    pm.addPass(createLinalgXToLoopsPass());
 
     // Postprocess generated loops.
     // Perform LICM before function calls are generated to ensure that ops which
