@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -58,6 +59,7 @@ struct GeneralizeTensorPackAndUnPack
     RewritePatternSet patterns(&getContext());
     patterns.add<linalg::GeneralizeOuterUnitDimsUnPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsPackOpPattern>(&getContext());
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
