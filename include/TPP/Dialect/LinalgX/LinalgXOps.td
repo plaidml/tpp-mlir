@@ -68,8 +68,8 @@ def PackOp : LinalgX_Op<"pack", [
 
   }];
 
-  let arguments = (ins AnyShaped:$input,
-    AnyShaped:$output,
+  let arguments = (ins AnyMemRef:$input,
+    AnyMemRef:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
@@ -169,8 +169,8 @@ def UnPackOp : LinalgX_Op<"unpack", [
 ]>{
   let summary = "unpack operation";
 
-  let arguments = (ins AnyShaped:$input,
-    AnyShaped:$output,
+  let arguments = (ins AnyMemRef:$input,
+    AnyMemRef:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
