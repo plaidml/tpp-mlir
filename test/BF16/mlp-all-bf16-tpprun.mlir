@@ -1,8 +1,7 @@
-// RUN: tpp-opt %s -convert-check-to-loops  -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -arith-expand -convert-math-to-llvm  -convert-vector-to-scf -convert-scf-to-cf -lower-affine  -reconcile-unrealized-casts |\
+// RUN: tpp-opt %s -convert-check-to-loops  -convert-linalg-to-loops -linalg-ext-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -arith-expand -convert-math-to-llvm  -convert-vector-to-scf -convert-scf-to-cf -lower-affine  -reconcile-unrealized-casts |\
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void
 //
-// XFAIL:*
 
   memref.global "private" constant @arg1 : memref<256x512xbf16> = dense<1.00e+00> 
   memref.global "private" constant @arg3 : memref<512x1024xbf16> = dense<1.00e+00>
