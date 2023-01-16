@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
@@ -8,7 +8,7 @@
 // RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm | FileCheck %s -check-prefix=IR 
 //
 
-// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -decompose-conv-to-matmul-or-brgemm -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
@@ -64,23 +64,23 @@ func.func @conv_non_unit_with_stride(%img: tensor<1x5x5x3xf32>, %filter: tensor<
 }
 
 func.func @entry() {
-  %init_img = tensor.empty() : tensor<3xf32>
+  %init_img = bufferization.alloc_tensor() : tensor<3xf32>
   %img_seed = call @generate_1D_source1(%init_img) : (tensor<3xf32>) -> (tensor<3xf32>)
-  %img_shape_broad = tensor.empty() : tensor<1x4x4x3xf32>
+  %img_shape_broad = bufferization.alloc_tensor() : tensor<1x4x4x3xf32>
   %img = linalg.broadcast ins(%img_seed: tensor<3xf32>)
                           outs(%img_shape_broad: tensor<1x4x4x3xf32>)
                           dimensions = [0, 1, 2]
 
-  %init_filter = tensor.empty() : tensor<8xf32>
+  %init_filter = bufferization.alloc_tensor() : tensor<8xf32>
   %filter_seed = call @generate_1D_source(%init_filter) : (tensor<8xf32>) -> (tensor<8xf32>)
-  %filter_shape_broad = tensor.empty() : tensor<1x1x3x8xf32>
+  %filter_shape_broad = bufferization.alloc_tensor() : tensor<1x1x3x8xf32>
   %filter = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
                            outs(%filter_shape_broad: tensor<1x1x3x8xf32>)
                            dimensions = [0, 1, 2]
 
-  %init_out = tensor.empty() : tensor<8xf32>
+  %init_out = bufferization.alloc_tensor() : tensor<8xf32>
   %output_seed = call @generate_1D_source(%init_out) : (tensor<8xf32>) -> (tensor<8xf32>)
-  %output_shape_broad = tensor.empty() : tensor<1x4x4x8xf32>
+  %output_shape_broad = bufferization.alloc_tensor() : tensor<1x4x4x8xf32>
   %out = linalg.broadcast ins(%output_seed: tensor<8xf32>)
                           outs(%output_shape_broad: tensor<1x4x4x8xf32>)
                           dimensions = [0, 1, 2]
@@ -128,17 +128,17 @@ func.func @entry() {
   //
   vector.print %v0 : vector<1x4x4x8xf32>
 
-  %img_shape_broad1 = tensor.empty() : tensor<1x5x5x3xf32>
+  %img_shape_broad1 = bufferization.alloc_tensor() : tensor<1x5x5x3xf32>
   %img1 = linalg.broadcast ins(%img_seed: tensor<3xf32>)
                            outs(%img_shape_broad1: tensor<1x5x5x3xf32>)
                            dimensions = [0, 1, 2]
   
-  %filter_shape_broad1 = tensor.empty() : tensor<3x3x3x8xf32>
+  %filter_shape_broad1 = bufferization.alloc_tensor() : tensor<3x3x3x8xf32>
   %filter1 = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
                               outs(%filter_shape_broad1: tensor<3x3x3x8xf32>)
                               dimensions = [0, 1, 2]
   
-  %output_shape_broad1 = tensor.empty() : tensor<1x3x3x8xf32>
+  %output_shape_broad1 = bufferization.alloc_tensor() : tensor<1x3x3x8xf32>
   %out1 = linalg.broadcast ins(%output_seed: tensor<8xf32>)
                            outs(%output_shape_broad1: tensor<1x3x3x8xf32>)
                            dimensions = [0, 1, 2]
@@ -173,17 +173,17 @@ func.func @entry() {
 
   vector.print %v1 : vector<1x3x3x8xf32>
 
-  %img_shape_broad2 = tensor.empty() : tensor<1x5x5x3xf32>
+  %img_shape_broad2 = bufferization.alloc_tensor() : tensor<1x5x5x3xf32>
   %img2 = linalg.broadcast ins(%img_seed: tensor<3xf32>)
                            outs(%img_shape_broad2: tensor<1x5x5x3xf32>)
                            dimensions = [0, 1, 2]
 
-  %filter_shape_broad2 = tensor.empty() : tensor<3x3x3x8xf32>
+  %filter_shape_broad2 = bufferization.alloc_tensor() : tensor<3x3x3x8xf32>
   %filter2 = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
                               outs(%filter_shape_broad2: tensor<3x3x3x8xf32>)
                               dimensions = [0, 1, 2]
   
-  %output_shape_broad2 = tensor.empty() : tensor<1x2x2x8xf32>
+  %output_shape_broad2 = bufferization.alloc_tensor() : tensor<1x2x2x8xf32>
   %out2 = linalg.broadcast ins(%output_seed: tensor<8xf32>)
                            outs(%output_shape_broad2: tensor<1x2x2x8xf32>)
                            dimensions = [0, 1, 2]
