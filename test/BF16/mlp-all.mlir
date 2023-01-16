@@ -38,11 +38,6 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   %c1 = arith.constant 1.0 : bf16
   // TPP: tpp.identity ins(%[[ARG2]] : memref<512xbf16>) out(%[[OUTPUT3]] : memref<128x512xbf16>)
   // TPP: %[[ALLOC0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<128x512x2xbf16>
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP:   memref.load
-  // TPP:   memref.store
   // TPP: tpp.vnni_matmul ins(%[[ARG0]] : memref<128x256xbf16>, %[[ALLOC0]] : memref<128x512x2xbf16>) out(%[[OUTPUT3]] : memref<128x512xbf16>)
   // TPP: tpp.relu ins(%[[OUTPUT3]] : memref<128x512xbf16>) out(%[[OUTPUT3]] : memref<128x512xbf16>)
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xbf16>) outs(%ouput3 : tensor<128x512xbf16>) {
@@ -57,11 +52,6 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   } -> tensor<128x512xbf16>
   // TPP: tpp.identity ins(%[[ARG4]] : memref<1024xbf16>) out(%[[OUTPUT2]] : memref<128x1024xbf16>)
   // TPP: %[[ALLOC1:.+]] = memref.alloc() {alignment = 64 : i64} : memref<256x1024x2xbf16>
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP:   memref.load
-  // TPP:   memref.store
   // TPP: tpp.vnni_matmul ins(%[[OUTPUT3]] : memref<128x512xbf16>, %[[ALLOC1]] : memref<256x1024x2xbf16>) out(%[[OUTPUT2]] : memref<128x1024xbf16>)
   // TPP: tpp.relu ins(%[[OUTPUT2]] : memref<128x1024xbf16>) out(%[[OUTPUT2]] : memref<128x1024xbf16>)
   %5 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg4 : tensor<1024xbf16>) outs(%output2 : tensor<128x1024xbf16>) {
@@ -77,11 +67,6 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
 
   // TPP: tpp.identity ins(%[[ARG6]] : memref<2048xbf16>) out(%[[OUTPUT1]] : memref<128x2048xbf16>)
   // TPP: %[[ALLOC2:.+]] = memref.alloc() {alignment = 64 : i64} : memref<512x2048x2xbf16>
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP:   memref.load
-  // TPP:   memref.store
   // TPP: tpp.vnni_matmul ins(%[[OUTPUT2]] : memref<128x1024xbf16>, %[[ALLOC2]] : memref<512x2048x2xbf16>) out(%[[OUTPUT1]] : memref<128x2048xbf16>)
   // TPP: tpp.relu ins(%[[OUTPUT1]] : memref<128x2048xbf16>) out(%[[OUTPUT1]] : memref<128x2048xbf16>)
   %9 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg6 : tensor<2048xbf16>) outs(%output1 : tensor<128x2048xbf16>) {
@@ -97,11 +82,6 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
 
   // TPP: tpp.identity ins(%[[ARG8]] : memref<1000xbf16>) out(%[[OUTPUT]] : memref<128x1000xbf16>)
   // TPP: %[[ALLOC3:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1024x1000x2xbf16>
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP: scf.for
-  // TPP:   memref.load
-  // TPP:   memref.store
   // TPP: tpp.vnni_matmul ins(%[[OUTPUT1]] : memref<128x2048xbf16>, %[[ALLOC3]] : memref<1024x1000x2xbf16>) out(%[[OUTPUT]] : memref<128x1000xbf16>)
   // TPP: tpp.relu ins(%[[OUTPUT]] : memref<128x1000xbf16>) out(%[[OUTPUT]] : memref<128x1000xbf16>)
   %13 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg8 : tensor<1000xbf16>) outs(%output : tensor<128x1000xbf16>) {
