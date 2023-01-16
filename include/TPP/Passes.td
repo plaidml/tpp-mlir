@@ -236,4 +236,14 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   ];
 }
 
+def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
+                                         "func::FuncOp"> {
+  let summary = "GeneralizeTensorPackAndUnPack.";
+  let description = [{
+    Generalize a pack or unpack operation by first tiling, and then generalize
+    it to other linalg operations.
+  }];
+  let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

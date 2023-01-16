@@ -7,10 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Transforms.h"
-#include "iostream"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -24,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+
 using namespace mlir;
 using namespace mlir::transform;
 
@@ -42,7 +41,7 @@ LogicalResult transform::PackOp::verify() {
 
 DiagnosedSilenceableFailure
 transform::PackOp::applyToOne(linalg::LinalgOp target,
-                              SmallVector<Operation *> &results,
+                              ApplyToEachResultList &results,
                               transform::TransformState &state) {
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
@@ -79,7 +78,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
       .Default([&](Operation *op) { packedOp = failure(); });
   if (succeeded(packedOp)) {
     results.push_back(*packedOp);
-    return DiagnosedSilenceableFailure(success());
+    return DiagnosedSilenceableFailure::success();
   }
   results.assign(1, nullptr);
   auto diag = this->emitOpError() << "Could not pack op: " << target << "\n";
@@ -93,7 +92,7 @@ transform::PackOp::applyToOne(linalg::LinalgOp target,
 
 DiagnosedSilenceableFailure
 transform::CollapseOp::applyToOne(linalg::LinalgOp target,
-                                  SmallVector<Operation *> &results,
+                                  ApplyToEachResultList &results,
                                   transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
@@ -104,7 +103,7 @@ transform::CollapseOp::applyToOne(linalg::LinalgOp target,
   if (failed(collapsedOp))
     return DiagnosedSilenceableFailure::definiteFailure();
   results.push_back(*collapsedOp);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 SmallVector<ReassociationIndices, 4>
@@ -124,7 +123,7 @@ transform::CollapseOp::getReassociationIndices() {
 
 DiagnosedSilenceableFailure
 transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
-                                     SmallVector<Operation *> &results,
+                                     ApplyToEachResultList &results,
                                      transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
@@ -132,7 +131,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops =
       mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -141,7 +140,7 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
 
 DiagnosedSilenceableFailure
 transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
-                                         SmallVector<Operation *> &results,
+                                         ApplyToEachResultList &results,
                                          transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
@@ -154,17 +153,15 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                 << "Could not map to matmul: " << target << "\n";
     diag.attachNote(target.getLoc()) << "when applied to this op";
   }
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
 // PackingPropagationOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::PackingPropagationOp::applyToOne(Operation *target,
-                                            SmallVector<Operation *> &results,
-                                            TransformState &state) {
+DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -173,13 +170,14 @@ transform::PackingPropagationOp::applyToOne(Operation *target,
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateSinkPackPatterns(patterns);
-  mlir::linalgx::PackOp::getCanonicalizationPatterns(patterns, ctx);
-  mlir::linalgx::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+  mlir::tensor::populateSimplifyTensorPack(patterns);
+  mlir::tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  mlir::tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -215,17 +213,15 @@ transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
     }
   }
   results.set(getResult().cast<OpResult>(), res);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
 // FoldUnitExtentDimsOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
-                                            SmallVector<Operation *> &results,
-                                            TransformState &state) {
+DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -233,22 +229,20 @@ transform::FoldUnitExtentDimsOp::applyToOne(Operation *target,
   }
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
-  mlir::linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  mlir::linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
 // CanonicalizeOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::CanonicalizeOp::applyToOne(Operation *target,
-                                      SmallVector<Operation *> &results,
-                                      TransformState &state) {
+DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -266,9 +260,9 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -276,8 +270,7 @@ transform::CanonicalizeOp::applyToOne(Operation *target,
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
-    Operation *target, SmallVector<Operation *> &results,
-    TransformState &state) {
+    Operation *target, ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -289,9 +282,9 @@ DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
                                                 /*useParallelLoops=*/true);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,7 +313,7 @@ transform::CollapseTo2dOp::apply(transform::TransformResults &results,
     collapsed.append(1, *collapsedOp);
   }
   results.set(getCollapsedLinalgOp().cast<OpResult>(), collapsed);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 SmallVector<ReassociationIndices, 4>
@@ -404,7 +397,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     tiled.append(1, tiledOp->op);
   }
   results.set(getTiledLinalgOp().cast<OpResult>(), tiled);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -426,6 +419,7 @@ public:
         >();
   }
 };
+
 } // namespace
 
 #define GET_OP_CLASSES

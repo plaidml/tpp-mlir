@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -convert-check-to-loops -linalg-ext-to-loops -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -arith-expand -convert-math-to-llvm  -convert-vector-to-scf -convert-scf-to-cf -lower-affine  -reconcile-unrealized-casts |\
+// RUN: tpp-opt %s -convert-check-to-loops  -linalg-ext-to-loops -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -arith-expand -convert-math-to-llvm  -convert-vector-to-scf -convert-scf-to-cf -lower-affine  -reconcile-unrealized-casts |\
 // RUN: tpp-run \
 // RUN:  -e entry -entry-point-result=void
 //

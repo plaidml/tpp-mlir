@@ -86,7 +86,7 @@ static Type inferNewOperandType(Type oldType,
     ArrayRef<int64_t> oldTypeShape =
         oldType.cast<RankedTensorType>().getShape();
     for (const ReassociationIndices &reassoc : reassociation) {
-      ArrayRef<int64_t> currentReassoc = llvm::makeArrayRef(reassoc);
+      ArrayRef<int64_t> currentReassoc = ArrayRef(reassoc);
       bool hasDynamicDim = false;
       int64_t currentReassocShape = 1;
       for (int64_t currentReassocIdx : currentReassoc) {

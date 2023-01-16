@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#include "TPP/Dialect/LinalgX/LinalgXOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
@@ -38,18 +37,16 @@ static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                               ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles,
-                             ShapedType::kDynamic);
-  ShapedType result = linalgx::PackOp::getPackedType(
+  dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles);
+  ShapedType result = tensor::PackOp::inferPackedType(
       input.getType(), staticTiles, innerDimsPos, outerDimsPerm);
   ShapedType inputType = input.getType().cast<ShapedType>();
   ArrayRef<int64_t> shape = result.getShape();
   Value output =
       builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
-  return builder
-      .create<linalgx::PackOp>(loc, input, output, innerDimsPos, tiles,
-                               /*paddingValue=*/std::nullopt, outerDimsPerm)
-      .getResults()[0];
+  return builder.create<tensor::PackOp>(loc, input, output, innerDimsPos, tiles,
+                                        /*paddingValue=*/std::nullopt,
+                                        outerDimsPerm);
 }
 
 // Helper function to create the unpack operation.
@@ -57,10 +54,8 @@ static Value toUnPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                                 Value output, ArrayRef<OpFoldResult> tiles,
                                 ArrayRef<int64_t> innerDimPos,
                                 ArrayRef<int64_t> outerDimsPerm) {
-  return builder
-      .create<linalgx::UnPackOp>(loc, input, output, innerDimPos, outerDimsPerm,
-                                 tiles)
-      .getResults()[0];
+  return builder.create<tensor::UnPackOp>(loc, input, output, innerDimPos,
+                                          tiles, outerDimsPerm);
 }
 
 static Value handleLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
@@ -468,7 +463,7 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
     Value inputPad = padOp.getSource();
-    linalgx::UnPackOp unpackOp = inputPad.getDefiningOp<linalgx::UnPackOp>();
+    tensor::UnPackOp unpackOp = inputPad.getDefiningOp<tensor::UnPackOp>();
     if (!unpackOp)
       return failure();
 
@@ -493,7 +488,7 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
     highPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
 
     auto newPadOp = rewriter.create<tensor::PadOp>(
-        padOp.getLoc(), /*result type=*/nullptr, unpackOp.getInput(), lowPad,
+        padOp.getLoc(), /*result type=*/nullptr, unpackOp.getSource(), lowPad,
         highPad, padOp.getNofold());
     SmallVector<Type> padArgsType(lowPad.size(), rewriter.getIndexType());
     SmallVector<Location> locs(lowPad.size(), padOp.getLoc());
@@ -538,8 +533,8 @@ struct PropagateThroughElementWiseOp
   bool hasOnlyOnePackedOperand(linalg::GenericOp linalgOp) const {
     unsigned count = 0;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
-      linalgx::UnPackOp unpackOp =
-          operand.get().getDefiningOp<linalgx::UnPackOp>();
+      tensor::UnPackOp unpackOp =
+          operand.get().getDefiningOp<tensor::UnPackOp>();
       if (unpackOp)
         count++;
     }
@@ -551,8 +546,8 @@ struct PropagateThroughElementWiseOp
                        ArrayRef<int64_t> tileLoopPerm,
                        SmallVector<SmallVector<int64_t>> &outerPerms,
                        PatternRewriter &rewriter) const {
-    linalgx::UnPackOp unpackOp =
-        operand->get().getDefiningOp<linalgx::UnPackOp>();
+    tensor::UnPackOp unpackOp =
+        operand->get().getDefiningOp<tensor::UnPackOp>();
     SmallVector<OpFoldResult> tiles;
     SmallVector<int64_t> innerDimsPos;
     SmallVector<int64_t> outerDimsPerm;
@@ -622,8 +617,8 @@ struct PropagateThroughElementWiseOp
     SmallVector<int64_t> tileLoopPerms;
     SmallVector<int64_t> interchangeVector;
     for (OpOperand &operand : linalgOp->getOpOperands()) {
-      linalgx::UnPackOp unpackOp =
-          operand.get().getDefiningOp<linalgx::UnPackOp>();
+      tensor::UnPackOp unpackOp =
+          operand.get().getDefiningOp<tensor::UnPackOp>();
       if (!unpackOp)
         continue;
 
@@ -696,10 +691,10 @@ struct PropagateThroughElementWiseOp
                          outerPermsForMaps, rewriter);
       packedOutputOperands.push_back(packedOperand);
       packedOutputTypes.push_back(packedOperand.getType());
-      linalgx::UnPackOp unpackOp =
-          operand->get().getDefiningOp<linalgx::UnPackOp>();
+      tensor::UnPackOp unpackOp =
+          operand->get().getDefiningOp<tensor::UnPackOp>();
       if (unpackOp)
-        unpackOutputs.push_back(unpackOp.getOutput());
+        unpackOutputs.push_back(unpackOp.getDest());
     }
 
     AffineMap permutationMap;
@@ -758,7 +753,7 @@ struct PropagateThroughElementWiseOp
     SmallVector<Value> outReplacements;
     size_t idx = 0;
     for (OpOperand *operand : replacementOp.getDpsInitOperands()) {
-      linalgx::PackOp packOp = operand->get().getDefiningOp<linalgx::PackOp>();
+      tensor::PackOp packOp = operand->get().getDefiningOp<tensor::PackOp>();
       Value result = replacementOp.getTiedOpResult(operand);
       if (unpackOutputs.empty())
         outReplacements.push_back(toUnPackLayoutImpl(
@@ -835,6 +830,7 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
@@ -876,6 +872,7 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -916,6 +913,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -975,6 +973,7 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<VNNIOnMatmul>(ctx, blockingFactors);
     patterns.add<VNNIOnBRGemm>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));

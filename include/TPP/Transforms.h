@@ -1,6 +1,3 @@
-#ifndef TPP_TRANSFORMS_H
-#define TPP_TRANSFORMS_H
-
 //===- Transforms.h ----------------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef TPP_TRANSFORMS_H
+#define TPP_TRANSFORMS_H
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
@@ -29,7 +29,7 @@ class BatchReduceMatmulOp;
 namespace vnni {
 class MatmulOp;
 class BRGemmOp;
-}
+} // namespace vnni
 
 namespace linalgx {
 

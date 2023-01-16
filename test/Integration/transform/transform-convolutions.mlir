@@ -6,7 +6,7 @@
 //
 
 
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -linalg-ext-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
@@ -85,14 +85,14 @@ transform.sequence failures(propagate) {
 
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
-    %conv1 = transform.structured.interchange %convs#1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %conv1
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
     %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
-    %9 = transform.structured.interchange %8 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5] 
     transform.structured.map_to_brgemm %9
 }
 

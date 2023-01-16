@@ -71,8 +71,7 @@ getExpectedResultMemRefShape(ArrayRef<OpFoldResult> sizes,
   SmallVector<int64_t> targetShape;
   SmallVector<int64_t> sourceShapeStatic;
   SmallVector<Value> sourceShapeDynamic;
-  dispatchIndexOpFoldResults(sizes, sourceShapeDynamic, sourceShapeStatic,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(sizes, sourceShapeDynamic, sourceShapeStatic);
 
   // TODO: Would be nice to have `inferRankReducedResultType` for subview to
   // have the same API has the one for tensor. This would allow us to pass only

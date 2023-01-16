@@ -29,7 +29,7 @@ transform.sequence failures(propagate) {
     //
     // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
     //
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -59,7 +59,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -93,7 +93,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -154,7 +154,7 @@ transform.sequence failures(propagate) {
     //      c   [reduction]
     //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
     //
-    %4 = transform.structured.interchange %3 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    %4 = transform.structured.interchange %3 iterator_interchange = [0, 1, 4, 2, 3, 5] 
     transform.structured.map_to_brgemm %4
 }
 
@@ -174,11 +174,11 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 // CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUF:.+]] = tensor.empty() : tensor<14x16x28x28x32xf32>
-// CHECK: %[[PACK:.+]] = linalgx.pack %[[ARG0]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF]] : (tensor<14x512x28x28xf32> tensor<14x16x28x28x32xf32>) -> tensor<14x16x28x28x32xf32>
+// CHECK: %[[PACK:.+]] = tensor.pack %[[ARG0]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF]] : tensor<14x512x28x28xf32> -> tensor<14x16x28x28x32xf32>
 // CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<32x16x1x1x32x32xf32>
-// CHECK: %[[PACK0:.+]] = linalgx.pack %[[ARG1]] inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %[[BUF0]] : (tensor<1024x512x1x1xf32> tensor<32x16x1x1x32x32xf32>) -> tensor<32x16x1x1x32x32xf32>
+// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %[[BUF0]] : tensor<1024x512x1x1xf32> -> tensor<32x16x1x1x32x32xf32>
 // CHECK: %[[BUF1:.+]] = tensor.empty() : tensor<14x32x28x28x32xf32>
-// CHECK: %[[PACK1:.+]] = linalgx.pack %[[ARG2]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF1]] : (tensor<14x1024x28x28xf32> tensor<14x32x28x28x32xf32>) -> tensor<14x32x28x28x32xf32>
+// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [1] inner_tiles = [32] into %[[BUF1]] : tensor<14x1024x28x28xf32> -> tensor<14x32x28x28x32xf32>
 // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[PACK0]] {{\[}}[0], [1, 2, 3], [4], [5]] : tensor<32x16x1x1x32x32xf32> into tensor<32x16x32x32xf32>
 // CHECK: %[[COLLAPSE0:.+]] = tensor.collapse_shape %[[PACK]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x16x28x28x32xf32> into tensor<14x16x784x32xf32>
 // CHECK: %[[COLLAPSE1:.+]] = tensor.collapse_shape %[[PACK1]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x28x28x32xf32> into tensor<14x32x784x32xf32>
@@ -193,7 +193,7 @@ func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
 // CHECK: }
 // CHECK: scf.yield %[[LOOP1]] : tensor<14x32x784x32xf32>
 // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[LOOP0]] {{\[}}[0], [1], [2, 3], [4]] : tensor<14x32x784x32xf32> into tensor<14x32x28x28x32xf32>
-// CHECK: %[[UNPACK:.+]] = linalgx.unpack %[[EXPAND]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : (tensor<14x32x28x28x32xf32> tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+// CHECK: %[[UNPACK:.+]] = tensor.unpack %[[EXPAND]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : tensor<14x32x28x28x32xf32> -> tensor<14x1024x28x28xf32>
 // CHECK: return %[[UNPACK]] : tensor<14x1024x28x28xf32>
 
 
@@ -280,14 +280,14 @@ transform.sequence failures(propagate) {
 
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
-    %conv1 = transform.structured.interchange %convs#1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %conv1
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
     %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
-    %9 = transform.structured.interchange %8 { iterator_interchange = [0, 1, 4, 2, 3, 5] }
+    %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5] 
     transform.structured.map_to_brgemm %9
 }
 
@@ -297,7 +297,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 4, 5, 2, 3, 6] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 4, 5, 2, 3, 6]
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -334,7 +334,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
     %1 = transform.structured.pack %0 { blocking_factors = [32, 32] }
-    %2 = transform.structured.interchange %1 { iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] }
+    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
     transform.structured.map_conv_to_matmul %2
 }
 
@@ -358,11 +358,11 @@ func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x2
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[EMPTY_ARG0:.+]] = tensor.empty() : tensor<1x2x113x113x32xf32>
-// CHECK: %[[PACK_ARG0:.+]] = linalgx.pack %[[ARG0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG0]] : (tensor<1x113x113x64xf32> tensor<1x2x113x113x32xf32>) -> tensor<1x2x113x113x32xf32>
+// CHECK: %[[PACK_ARG0:.+]] = tensor.pack %[[ARG0]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG0]] : tensor<1x113x113x64xf32> -> tensor<1x2x113x113x32xf32>
 // CHECK: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<8x2x3x3x32x32xf32>
-// CHECK: %[[PACK_ARG1:.+]] = linalgx.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[EMPTY_ARG1]] : (tensor<3x3x64x256xf32> tensor<8x2x3x3x32x32xf32>) -> tensor<8x2x3x3x32x32xf32>
+// CHECK: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[EMPTY_ARG1]] : tensor<3x3x64x256xf32> -> tensor<8x2x3x3x32x32xf32>
 // CHECK: %[[EMPTY_ARG2:.+]] = tensor.empty() : tensor<1x8x56x56x32xf32>
-// CHECK: %[[PACK_ARG2:.+]] = linalgx.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG2]] : (tensor<1x56x56x256xf32> tensor<1x8x56x56x32xf32>) -> tensor<1x8x56x56x32xf32>
+// CHECK: %[[PACK_ARG2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[EMPTY_ARG2]] : tensor<1x56x56x256xf32> -> tensor<1x8x56x56x32xf32>
 // CHECK: %[[LOOP:.+]] = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C8]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[PACK_ARG2]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C56]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[LOOP2:.+]] = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG8:.+]] = %[[ARG6]]) -> (tensor<1x8x56x56x32xf32>) {

@@ -70,6 +70,9 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     // Preprocess convolutions.
     pm.addNestedPass<func::FuncOp>(createDecomposeConvToMatmulOrBrgemmPass());
 
+    // Generalize tensor.pack and tensor.unpack.
+    pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
+
     // Materialize empty tensors
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 

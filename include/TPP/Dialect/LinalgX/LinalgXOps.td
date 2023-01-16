@@ -68,8 +68,8 @@ def PackOp : LinalgX_Op<"pack", [
 
   }];
 
-  let arguments = (ins AnyShaped:$input,
-    AnyShaped:$output,
+  let arguments = (ins AnyMemRef:$input,
+    AnyMemRef:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
@@ -147,7 +147,7 @@ def PackOp : LinalgX_Op<"pack", [
     OpBuilder<(ins "Value":$input, "Value":$output,
       "ArrayRef<int64_t>":$innerDimPos, 
       "ArrayRef<OpFoldResult>":$innerTiles,
-      CArg<"Optional<Value>", "llvm::None">:$paddingValue,
+      CArg<"Optional<Value>", "std::nullopt">:$paddingValue,
       CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
 
@@ -169,8 +169,8 @@ def UnPackOp : LinalgX_Op<"unpack", [
 ]>{
   let summary = "unpack operation";
 
-  let arguments = (ins AnyShaped:$input,
-    AnyShaped:$output,
+  let arguments = (ins AnyMemRef:$input,
+    AnyMemRef:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,

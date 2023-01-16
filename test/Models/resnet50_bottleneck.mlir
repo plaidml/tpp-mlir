@@ -331,7 +331,7 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t) -> 
     } : !first_conv1x1_output_tensor_t to !conv3x3_input_tensor_t
 
     //
-    // CHECK: %[[alloc:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x9x9x512xf32>
+    // CHECK: %[[alloc:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x9x9x512xf32>
     // CHECK: %[[reinterpret_cast:.*]] = memref.reinterpret_cast %alloc to offset: [5120], sizes: [1, 7, 7, 512], strides: [41472, 4608, 512, 1]
     //
 
