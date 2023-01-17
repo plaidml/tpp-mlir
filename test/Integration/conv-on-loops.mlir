@@ -6,7 +6,7 @@
 //
 
 // Validate default pipeline
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
