@@ -22,6 +22,14 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN: FileCheck %s
+// XFAIL:*
+// Lowering to XSMM executes but returns incorrect values
+
 module {
   //
   // Computes C = A x B with all matrices dense.

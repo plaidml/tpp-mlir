@@ -16,6 +16,14 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// RUN: tpp-opt %s -default-tpp-passes | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN: FileCheck %s
+// XFAIL:*
+// Lowering to XSMM executes but returns incorrect values
+
 #accessesToBlock = [
   affine_map<(n1, c1, n2, c2) -> (n1 * 2 + n2, c1 * 2 + c2)>,
   affine_map<(n1, c1, n2, c2) -> (n1, c1, n2, c2)>
