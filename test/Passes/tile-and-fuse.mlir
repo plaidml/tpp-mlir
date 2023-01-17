@@ -1,5 +1,6 @@
 // RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers -cse | FileCheck %s
 
+// CHECK-NOT: scf.for
 func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {

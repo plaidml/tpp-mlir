@@ -52,7 +52,7 @@ static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
 static FailureOr<scf::SCFTilingResult>
 tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
              ArrayRef<int64_t> tileSizes) {
-  // If tileSizes is provided use them otherwise defaul to 1, 1, meaning fuse
+  // If tileSizes is provided use them otherwise default to 1, 1, meaning fuse
   // entire the two outermost loops.
   SmallVector<int64_t> actualTileSizes = tileSizes.empty()
                                              ? SmallVector<int64_t>{1, 1}
