@@ -102,7 +102,7 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
       return false;
-    llvm::errs() << "CONSTANT RANGE: " << *sizeRangeAtIdx << "\n";
+    //llvm::errs() << "CONSTANT RANGE: " << *sizeRangeAtIdx << "\n";
     // Fail if the tile size equals the range or it is not a full tile.
     if (tileSizes[tileIdx] == *sizeRangeAtIdx ||
         *sizeRangeAtIdx % tileSizes[tileIdx] != 0)
@@ -113,11 +113,16 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
 }
 
 // TODO: tileSizes should be an OpFoldResult
-static llvm::SmallDenseSet<Operation *>
-collectTiledAndFusedOps(TilingInterface consumer, ArrayRef<int64_t> tileSizes) {
+static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
+    TilingInterface consumer, ArrayRef<int64_t> tileSizes,
+    const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
+  if (alreadyFusedOps.count(consumer.getOperation()))
+    return {}; 
+
   llvm::SmallDenseSet<Operation *> fusableProducers;
   SmallVector<Operation *> worklist;
   worklist.push_back(consumer);
+  llvm::errs() << "WORKLIST INSERT CONSUMER: " << consumer.getOperation() << "\n";
   fusableProducers.insert(consumer);
 
   while (!worklist.empty()) {
@@ -126,8 +131,10 @@ collectTiledAndFusedOps(TilingInterface consumer, ArrayRef<int64_t> tileSizes) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer || !isa<linalg::LinalgOp>(producer) ||
           fusableProducers.count(producer) ||
-          !canBeTiledWithCurrentSpec(producer, tileSizes))
+          !canBeTiledWithCurrentSpec(producer, tileSizes) ||
+          alreadyFusedOps.count(producer))
         continue;
+      llvm::errs() << "WORKLIST INSERT PRODUCER: " << producer << "\n";
       worklist.push_back(producer);
       fusableProducers.insert(producer);
     }
@@ -138,10 +145,11 @@ collectTiledAndFusedOps(TilingInterface consumer, ArrayRef<int64_t> tileSizes) {
 // Tile and fuse a matmul along the parallel dimensions.
 static FailureOr<scf::SCFTileAndFuseResult>
 fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
-                         ArrayRef<int64_t> tileSizes) {
+                         ArrayRef<int64_t> tileSizes,
+                         llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   // Step 0. collect the operations that can be tiled and fused.
   llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
-      collectTiledAndFusedOps(consumer, tileSizes);
+      collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
   llvm::errs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size() << "\n";
 
   // Step 1. tile the consumer.
@@ -182,15 +190,21 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
       continue;
 
     // Consider only candidates selected in step 0.
-    OpResult untiledProducer = fusedProducer->origProducer;
-    Operation *op = untiledProducer.getDefiningOp();
-    if (tiledAndFusedOpCandidates.count(op) == 0)
+    Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
+    llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
+    if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
+      llvm::errs() << "continue\n";
       continue;
+    }
 
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
       addCandidateSlices(tiledAndFusedOp, candidates);
+      alreadyFusedOps.insert(untiledProducer);
+      alreadyFusedOps.insert(consumer.getOperation());
+      llvm::errs() << "FUSED INSERT: " << untiledProducer << "\n";
+      llvm::errs() << "FUSED INSERT: " << consumer.getOperation() << "\n";
     }
   }
 
@@ -210,15 +224,17 @@ struct TileConsumerAndFuseProducers
   void runOnOperation() override {
     func::FuncOp func = getOperation();
     transform::TrivialPatternRewriter rewriter(&getContext());
+    llvm::SmallDenseSet<Operation *> fusedOps;
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
+        llvm::errs() << "------------------\n";
         SmallVector<int64_t> actualTileSizes = llvm::to_vector(this->tileSizes);
         if (actualTileSizes.empty())
           actualTileSizes = {1, 1};
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
             fuseMatmulLikeAndEltwise(
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
-                actualTileSizes);
+                actualTileSizes, fusedOps);
         if (failed(fuseAndTileResult))
           return signalPassFailure();
         rewriter.replaceOp(
