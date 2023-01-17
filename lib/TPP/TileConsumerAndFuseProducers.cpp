@@ -27,7 +27,8 @@ using namespace mlir;
 
 namespace {
 
-// TODO: improve checks here.
+// TODO: Check indexing maps and iterator types. They should
+// match the one of a packed matmul.
 static bool isBlockedMatmul(linalg::GenericOp genericOp) {
   return tpp::utils::hasMatmulBody(genericOp);
 }
@@ -57,6 +58,7 @@ tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
   SmallVector<int64_t> actualTileSizes = tileSizes.empty()
                                              ? SmallVector<int64_t>{1, 1}
                                              : llvm::to_vector(tileSizes);
+  assert(actualTileSizes.size() == 2 && "expect two tile factors only");
   auto options = scf::SCFTilingOptions().setTileSizes(actualTileSizes);
   FailureOr<scf::SCFTilingResult> tilingResult =
       scf::tileUsingSCFForOp(rewriter, consumer, options);
@@ -78,8 +80,8 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
   for (auto *tiledOp : tilingResult->tiledOps)
     tileAndFuseResult.tiledAndFusedOps.insert(tiledOp);
   tileAndFuseResult.loops = std::move(tilingResult->loops);
-  for (const auto &result : llvm::enumerate(
-           llvm::zip(consumer->getResults(), tilingResult->replacements))) {
+  for (const auto &result : llvm::enumerate(llvm::zip_equal(
+           consumer->getResults(), tilingResult->replacements))) {
     tileAndFuseResult.replacements[std::get<0>(result.value())] =
         std::get<1>(result.value());
   }
