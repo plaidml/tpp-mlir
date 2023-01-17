@@ -14,6 +14,13 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-opt %s -default-tpp-passes | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN: FileCheck %s
+
 func.func @brgemmtpp(%A: tensor<1x4x8xf32>,
                      %B: tensor<1x8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<1x4x8xf32>, tensor<1x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>

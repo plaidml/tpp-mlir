@@ -22,6 +22,13 @@
 // Make sure we map to tpp
 // RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
+// Validate default pipeline
+// RUN: tpp-opt %s -default-tpp-passes | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN: FileCheck %s
+
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

@@ -5,6 +5,13 @@
 // RUN: FileCheck %s 
 //
 
+// Validate default pipeline
+// RUN: tpp-opt %s -default-tpp-passes | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void  \
+// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN: FileCheck %s
+
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
   %init_source = tensor.empty(%width) : tensor<?xf32>
   %source = linalg.generic {

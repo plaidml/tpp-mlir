@@ -6,12 +6,12 @@
 //
 
 // Validate default pipeline
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -expand-strided-metadata -lower-affine | \
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
