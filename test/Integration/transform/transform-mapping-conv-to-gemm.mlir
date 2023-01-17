@@ -15,6 +15,9 @@
 // Make sure we map to linalg.matmul
 // RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule | FileCheck -check-prefix=LINALG %s
 
+// Validate default pipeline
+// Skip default pipeline testing as TPP does not support integer values
+
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
