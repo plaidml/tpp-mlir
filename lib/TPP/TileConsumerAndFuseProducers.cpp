@@ -102,7 +102,6 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
       return false;
-    //llvm::errs() << "CONSTANT RANGE: " << *sizeRangeAtIdx << "\n";
     // Fail if the tile size equals the range or it is not a full tile.
     if (tileSizes[tileIdx] == *sizeRangeAtIdx ||
         *sizeRangeAtIdx % tileSizes[tileIdx] != 0)
@@ -112,17 +111,27 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   return true;
 }
 
-// TODO: tileSizes should be an OpFoldResult
+bool hasAllUsersInWorklist(Operation *op,
+                           const llvm::SmallDenseSet<Operation *> &worklist) {
+  assert(op->getNumResults() == 1);
+  Value result = op->getResult(0);
+  for (Operation *user : result.getUsers())
+    if (worklist.count(user) == 0)
+      return false;
+  return true;
+}
+
 static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
     TilingInterface consumer, ArrayRef<int64_t> tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   if (alreadyFusedOps.count(consumer.getOperation()))
-    return {}; 
+    return {};
 
   llvm::SmallDenseSet<Operation *> fusableProducers;
   SmallVector<Operation *> worklist;
   worklist.push_back(consumer);
-  llvm::errs() << "WORKLIST INSERT CONSUMER: " << consumer.getOperation() << "\n";
+  llvm::errs() << "WORKLIST INSERT CONSUMER: " << consumer.getOperation()
+               << "\n";
   fusableProducers.insert(consumer);
 
   while (!worklist.empty()) {
@@ -132,7 +141,8 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
       if (!producer || !isa<linalg::LinalgOp>(producer) ||
           fusableProducers.count(producer) ||
           !canBeTiledWithCurrentSpec(producer, tileSizes) ||
-          alreadyFusedOps.count(producer))
+          alreadyFusedOps.count(producer) ||
+          !hasAllUsersInWorklist(producer, fusableProducers))
         continue;
       llvm::errs() << "WORKLIST INSERT PRODUCER: " << producer << "\n";
       worklist.push_back(producer);
@@ -140,6 +150,23 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
     }
   }
   return fusableProducers;
+}
+
+static Operation *
+getUntiledProducerFromSliceSource(OpOperand *source,
+                                  ArrayRef<scf::ForOp> loops) {
+  std::optional<OpOperand *> destinationIterArg;
+  auto loopIt = loops.rbegin();
+  while (auto iterArg = source->get().dyn_cast<BlockArgument>()) {
+    scf::ForOp loop = *loopIt;
+    if (iterArg.getOwner()->getParentOp() != loop)
+      break;
+    source = &loop.getOpOperandForRegionIterArg(iterArg);
+    loopIt++;
+  }
+  if (loopIt == loops.rend())
+    destinationIterArg = source;
+  return source->get().getDefiningOp();
 }
 
 // Tile and fuse a matmul along the parallel dimensions.
@@ -183,6 +210,11 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
     tensor::ExtractSliceOp candidateSliceOp = candidates.front();
     candidates.pop_front();
 
+    Operation *tmp = getUntiledProducerFromSliceSource(
+        &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
+    if (tiledAndFusedOpCandidates.count(tmp) == 0)
+      continue;
+
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
                                    tileAndFuseResult.loops);
@@ -191,17 +223,18 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
     // Consider only candidates selected in step 0.
     Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
-    llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
-    if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
-      llvm::errs() << "continue\n";
-      continue;
-    }
+    //llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
+    //llvm::errs() << *untiledProducer << "\n";
+    alreadyFusedOps.insert(untiledProducer);
+    //if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
+    //  continue;
+    //}
 
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
       addCandidateSlices(tiledAndFusedOp, candidates);
-      alreadyFusedOps.insert(untiledProducer);
+      // alreadyFusedOps.insert(untiledProducer);
       alreadyFusedOps.insert(consumer.getOperation());
       llvm::errs() << "FUSED INSERT: " << untiledProducer << "\n";
       llvm::errs() << "FUSED INSERT: " << consumer.getOperation() << "\n";
