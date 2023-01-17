@@ -178,6 +178,8 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
   llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
       collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
   llvm::errs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size() << "\n";
+  if (tiledAndFusedOpCandidates.size() == 1)
+    return failure();
 
   // Step 1. tile the consumer.
   scf::SCFTileAndFuseResult tileAndFuseResult;
@@ -223,12 +225,12 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
     // Consider only candidates selected in step 0.
     Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
-    //llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
-    //llvm::errs() << *untiledProducer << "\n";
+    // llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
+    // llvm::errs() << *untiledProducer << "\n";
     alreadyFusedOps.insert(untiledProducer);
-    //if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
-    //  continue;
-    //}
+    // if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
+    //   continue;
+    // }
 
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
@@ -260,7 +262,6 @@ struct TileConsumerAndFuseProducers
     llvm::SmallDenseSet<Operation *> fusedOps;
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
-        llvm::errs() << "------------------\n";
         SmallVector<int64_t> actualTileSizes = llvm::to_vector(this->tileSizes);
         if (actualTileSizes.empty())
           actualTileSizes = {1, 1};
@@ -268,11 +269,11 @@ struct TileConsumerAndFuseProducers
             fuseMatmulLikeAndEltwise(
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
                 actualTileSizes, fusedOps);
-        if (failed(fuseAndTileResult))
-          return signalPassFailure();
+        if (succeeded(fuseAndTileResult)) {
         rewriter.replaceOp(
             linalgOp,
             (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
+        }
       }
     });
     RewritePatternSet patterns(&getContext());
