@@ -19,11 +19,14 @@
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
+
+#define DEBUG_TYPE "tile-consumer-and-fuse-producers"
 
 namespace {
 
@@ -50,6 +53,7 @@ static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
   return false;
 }
 
+// Tile the consumer and return the tiled result.
 static FailureOr<scf::SCFTilingResult>
 tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
              ArrayRef<int64_t> tileSizes) {
@@ -111,9 +115,13 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   return true;
 }
 
+// Return true if the op has all users in the worklist. This is an important
+// condition as we want to fuse together 'isolated islands' of op. Basically
+// each op in the worklist must have users in the worklist. If this is not the
+// case we can introduce recomputation.
 bool hasAllUsersInWorklist(Operation *op,
                            const llvm::SmallDenseSet<Operation *> &worklist) {
-  assert(op->getNumResults() == 1);
+  assert(op->getNumResults() == 1 && "expect single result op");
   Value result = op->getResult(0);
   for (Operation *user : result.getUsers())
     if (worklist.count(user) == 0)
@@ -121,6 +129,8 @@ bool hasAllUsersInWorklist(Operation *op,
   return true;
 }
 
+// Return a list of op that can be fused together based on what has already been
+// fused and the current tile specification.
 static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
     TilingInterface consumer, ArrayRef<int64_t> tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
@@ -130,8 +140,8 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
   llvm::SmallDenseSet<Operation *> fusableProducers;
   SmallVector<Operation *> worklist;
   worklist.push_back(consumer);
-  llvm::errs() << "WORKLIST INSERT CONSUMER: " << consumer.getOperation()
-               << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "WORKLIST INSERT CONSUMER: "
+                          << consumer.getOperation() << "\n");
   fusableProducers.insert(consumer);
 
   while (!worklist.empty()) {
@@ -141,10 +151,11 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
       if (!producer || !isa<linalg::LinalgOp>(producer) ||
           fusableProducers.count(producer) ||
           !canBeTiledWithCurrentSpec(producer, tileSizes) ||
-          alreadyFusedOps.count(producer) ||
+          alreadyFusedOps.count(producer) || producer->getNumResults() != 1 ||
           !hasAllUsersInWorklist(producer, fusableProducers))
         continue;
-      llvm::errs() << "WORKLIST INSERT PRODUCER: " << producer << "\n";
+      LLVM_DEBUG(llvm::dbgs()
+                 << "WORKLIST INSERT PRODUCER: " << producer << "\n");
       worklist.push_back(producer);
       fusableProducers.insert(producer);
     }
@@ -152,6 +163,7 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
   return fusableProducers;
 }
 
+// Walk source and loops and return the defining op of 'source' if it exists.
 static Operation *
 getUntiledProducerFromSliceSource(OpOperand *source,
                                   ArrayRef<scf::ForOp> loops) {
@@ -177,7 +189,8 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
   // Step 0. collect the operations that can be tiled and fused.
   llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
       collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
-  llvm::errs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size() << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size()
+                          << "\n");
   if (tiledAndFusedOpCandidates.size() == 1)
     return failure();
 
@@ -212,9 +225,12 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
     tensor::ExtractSliceOp candidateSliceOp = candidates.front();
     candidates.pop_front();
 
-    Operation *tmp = getUntiledProducerFromSliceSource(
+    // Find the candidate operation potentially walking bbArgs in scf.for.
+    // If we find a candidate we check if it is in our worklist and fuse it
+    // only if so.
+    Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
-    if (tiledAndFusedOpCandidates.count(tmp) == 0)
+    if (!candidateOp || tiledAndFusedOpCandidates.count(candidateOp) == 0)
       continue;
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
@@ -223,26 +239,18 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
     if (!fusedProducer)
       continue;
 
-    // Consider only candidates selected in step 0.
-    Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
-    // llvm::errs() << "UNTILED PRODUCER: " << untiledProducer << "\n";
-    // llvm::errs() << *untiledProducer << "\n";
-    alreadyFusedOps.insert(untiledProducer);
-    // if (tiledAndFusedOpCandidates.count(untiledProducer) == 0) {
-    //   continue;
-    // }
-
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
       addCandidateSlices(tiledAndFusedOp, candidates);
-      // alreadyFusedOps.insert(untiledProducer);
       alreadyFusedOps.insert(consumer.getOperation());
-      llvm::errs() << "FUSED INSERT: " << untiledProducer << "\n";
-      llvm::errs() << "FUSED INSERT: " << consumer.getOperation() << "\n";
+      Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
+      alreadyFusedOps.insert(untiledProducer);
+      LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "FUSED INSERT: " << consumer.getOperation() << "\n");
     }
   }
-
   return tileAndFuseResult;
 }
 
@@ -263,6 +271,7 @@ struct TileConsumerAndFuseProducers
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
         SmallVector<int64_t> actualTileSizes = llvm::to_vector(this->tileSizes);
+        // Default tiling scheme, always legal to tile by 1.
         if (actualTileSizes.empty())
           actualTileSizes = {1, 1};
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
@@ -270,9 +279,9 @@ struct TileConsumerAndFuseProducers
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
                 actualTileSizes, fusedOps);
         if (succeeded(fuseAndTileResult)) {
-        rewriter.replaceOp(
-            linalgOp,
-            (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
+          rewriter.replaceOp(
+              linalgOp,
+              (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
         }
       }
     });
