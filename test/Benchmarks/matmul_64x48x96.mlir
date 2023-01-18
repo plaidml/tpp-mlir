@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes \
-// RUN:  -buffer-results-to-out-params -buffer-deallocation | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void -print | \
 // RUN: FileCheck %s
