@@ -46,8 +46,8 @@ llvm::cl::opt<unsigned>
                   llvm::cl::value_desc("int"), llvm::cl::init(1));
 
 // Print result
-llvm::cl::opt<bool> printResultMemRef("print",
-                                      llvm::cl::desc("Print result memref"),
+llvm::cl::opt<bool> printKernelResult("print",
+                                      llvm::cl::desc("Print kernel result"),
                                       llvm::cl::value_desc("true/false"),
                                       llvm::cl::init(false));
 
@@ -84,12 +84,12 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot create main wrapper");
 
   // Call kernel once, to bootstrap (JIT compile, warm up caches)
-  auto ret = bench.callKernel(globalList);
-  if (!ret)
+  auto call = bench.callKernel(globalList);
+  if (!call)
     return bench.emitError("Cannot generate a call to the kernel");
 
   // Print the result of the warming up, should be the same as any other
-  if (printResultMemRef && failed(bench.printMemRef(ret)))
+  if (printKernelResult && failed(bench.printResult(call)))
     return bench.emitError("Cannot print result memref");
 
   // This is the main loop, if N > 1
