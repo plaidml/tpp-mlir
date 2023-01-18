@@ -27,13 +27,13 @@ using namespace mlir;
 using namespace mlir::transform;
 
 //===----------------------------------------------------------------------===//
-// PackOp
+// PackOpExt
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::PackOp::applyToOne(linalg::LinalgOp target,
-                              ApplyToEachResultList &results,
-                              transform::TransformState &state) {
+transform::PackOpExt::applyToOne(linalg::LinalgOp target,
+                                 ApplyToEachResultList &results,
+                                 transform::TransformState &state) {
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   SmallVector<OpFoldResult> blockingFactors =

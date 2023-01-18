@@ -55,7 +55,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
     // Block matmul i, j and k
-    %1 = transform.structured.pack %0 blocking_factors = [32, 32, 32] 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     // Get the parent op (func.func)
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate packing
@@ -98,7 +98,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     // Pack matmul
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
-    %1 = transform.structured.pack %0  blocking_factors = [32, 32, 32]
+    %1 = transform.structured.pack_ext %0  blocking_factors = [32, 32, 32]
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
 

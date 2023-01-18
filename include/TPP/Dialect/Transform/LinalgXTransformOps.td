@@ -18,10 +18,10 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// PackOp
+// PackOpExt
 //===----------------------------------------------------------------------===//
 
-def PackOp : Op<Transform_Dialect, "structured.pack", [
+def PackOpExt : Op<Transform_Dialect, "structured.pack_ext", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
     TransformOpInterface,
