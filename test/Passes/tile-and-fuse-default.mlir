@@ -159,7 +159,6 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
         %6 = arith.maxf %out, %c0 : f32
         linalg.yield %6 : f32
   } -> tensor<32x32xf32>
-  // TODO: check with %2 in ins of %7.
   %7 = linalg.generic {indexing_maps = [#map, #map],
                        iterator_types = ["parallel", "parallel"]}
     ins(%arg6: tensor<32x32xf32>) outs(%5: tensor<32x32xf32>) {

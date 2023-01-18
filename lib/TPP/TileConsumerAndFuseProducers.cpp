@@ -94,8 +94,8 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
       cast<TilingInterface>(op).getIterationDomain(builder);
   SmallVector<utils::IteratorType> loopIteratorTypes =
       cast<TilingInterface>(op).getLoopIteratorTypes();
-  assert(iterationDomain.size() >= tileSizes.size() &&
-         "expect iteration domain to be >= than tile sizes");
+  if (tileSizes.size() > iterationDomain.size())
+    return false;
   for (size_t tileIdx = 0, idxEnd = tileSizes.size(); tileIdx < idxEnd;
        tileIdx++) {
     // Allow tiling only on parallel loop iterators.
@@ -105,6 +105,9 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
         getSizeRangeAtIdx(iterationDomain, tileIdx);
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
+      return false;
+    // Corner case tile equals 0.
+    if (tileSizes[tileIdx] == 0)
       return false;
     // Fail if the tile size equals the range or it is not a full tile.
     if (tileSizes[tileIdx] == *sizeRangeAtIdx ||
@@ -186,7 +189,11 @@ static FailureOr<scf::SCFTileAndFuseResult>
 fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
                          ArrayRef<int64_t> tileSizes,
                          llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
-  // Step 0. collect the operations that can be tiled and fused.
+  // Step -1. Check if the tile configuration fits the consumer.
+  if (!canBeTiledWithCurrentSpec(consumer, tileSizes))
+    return failure();
+
+  // Step 0. Collect the operations that can be tiled and fused.
   llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
       collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size()
@@ -194,7 +201,7 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
   if (tiledAndFusedOpCandidates.size() == 1)
     return failure();
 
-  // Step 1. tile the consumer.
+  // Step 1. Tile the consumer.
   scf::SCFTileAndFuseResult tileAndFuseResult;
   FailureOr<scf::SCFTilingResult> tilingResult =
       tileConsumer(rewriter, consumer, tileSizes);
@@ -210,7 +217,7 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
         std::get<1>(result.value());
   }
 
-  // Step 2. tile producers and fuse into the tiled consumer.
+  // Step 2. Tile producers and fuse into the tiled consumer.
   auto addCandidateSlices = [](Operation *fusedOp,
                                std::deque<tensor::ExtractSliceOp> &candidates) {
     for (Value operand : fusedOp->getOperands())
