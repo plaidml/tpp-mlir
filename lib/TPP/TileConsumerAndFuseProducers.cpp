@@ -239,6 +239,9 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
     if (!candidateOp || tiledAndFusedOpCandidates.count(candidateOp) == 0)
       continue;
+    // If the op is already fused to not fuse again.
+    if (alreadyFusedOps.count(candidateOp))
+      continue;
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
@@ -250,14 +253,17 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
       addCandidateSlices(tiledAndFusedOp, candidates);
-      alreadyFusedOps.insert(consumer.getOperation());
+      if (alreadyFusedOps.count(consumer.getOperation()) == 0) {
+        alreadyFusedOps.insert(consumer.getOperation());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "FUSED INSERT: " << consumer.getOperation() << "\n");
+      }
       Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
       alreadyFusedOps.insert(untiledProducer);
       LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
-      LLVM_DEBUG(llvm::dbgs()
-                 << "FUSED INSERT: " << consumer.getOperation() << "\n");
     }
   }
+  // TODO: assert if the current fused are not equal to worklist.
   return tileAndFuseResult;
 }
 
