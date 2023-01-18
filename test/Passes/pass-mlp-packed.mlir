@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -tile-consumer-and-fuse-producers -canonicalize -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1" -canonicalize -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp="use-parallel-loops=false" -map-to-brgemm -convert-linalg-to-tpp | FileCheck %s
 
 // This test isn't working fully due to issues #95 and #96.  
 

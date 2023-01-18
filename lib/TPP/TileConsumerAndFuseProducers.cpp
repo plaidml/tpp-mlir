@@ -92,7 +92,7 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
       return false;
-    // Corner case tile equals 0.
+    // Skip tile equals 0.
     if (tileSizes[tileIdx] == 0)
       return false;
     // Fail if the tile size equals the range or it is not a full tile.
@@ -274,9 +274,9 @@ struct TileConsumerAndFuseProducers
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
         SmallVector<int64_t> actualTileSizes = llvm::to_vector(this->tileSizes);
-        // Default tiling scheme, always legal to tile by 1.
+        // Default tiling scheme tile by 32.
         if (actualTileSizes.empty())
-          actualTileSizes = {1, 1};
+          actualTileSizes = {32, 32};
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
             fuseMatmulLikeAndEltwise(
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
