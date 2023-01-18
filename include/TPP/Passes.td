@@ -238,7 +238,7 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
 
 def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
                                          "func::FuncOp"> {
-  let summary = "GeneralizeTensorPackAndUnPack.";
+  let summary = "Generalize tensor.pack and tensor.unpack.";
   let description = [{
     Generalize a pack or unpack operation by first tiling, and then generalize
     it to other linalg operations.
