@@ -12,6 +12,7 @@ add_mlir_library(MLIRTPP
     DecomposeConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp
     GeneralizeTensorPackAndUnPack.cpp
+    RaiseToParallelLoop.cpp
 
   # Utils
     TransformUtils.cpp

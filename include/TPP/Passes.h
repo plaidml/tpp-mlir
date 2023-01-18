@@ -88,6 +88,7 @@ createDecomposeConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>> createDefaultTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGeneralizeTensorPackAndUnPackPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createRaiseToParallelLoopPass();
 
 } // namespace tpp
 } // namespace mlir
