@@ -246,4 +246,13 @@ def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
   let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";
 }
 
+def RaiseToParallelLoop : Pass<"raise-to-parallel-loop",
+                               "func::FuncOp"> {
+  let summary = "Rewrite scf.for to scf.parallel.";
+  let description = [{
+
+  }]; 
+  let constructor = "mlir::tpp::createRaiseToParallelLoopPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
