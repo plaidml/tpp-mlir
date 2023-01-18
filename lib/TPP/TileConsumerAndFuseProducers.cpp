@@ -92,9 +92,9 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
       return false;
-    // Skip tile equals 0.
+    // Skip tile equals 0. A '0' tile means skip this dimension.
     if (tileSizes[tileIdx] == 0)
-      return false;
+      continue;
     // Fail if the tile size equals the range or it is not a full tile.
     if (tileSizes[tileIdx] == *sizeRangeAtIdx ||
         *sizeRangeAtIdx % tileSizes[tileIdx] != 0)
@@ -212,6 +212,10 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
     tileAndFuseResult.replacements[std::get<0>(result.value())] =
         std::get<1>(result.value());
   }
+
+  // If there are no loops generated (i.e., tile sizes all zeros), exit.
+  if (tileAndFuseResult.loops.empty())
+    return tileAndFuseResult;
 
   // Step 2. Tile producers and fuse into the tiled consumer.
   auto addCandidateSlices = [](Operation *fusedOp,

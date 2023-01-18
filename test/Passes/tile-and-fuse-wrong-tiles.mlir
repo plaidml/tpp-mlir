@@ -1,6 +1,7 @@
 // RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5" -cse | FileCheck %s
 // RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=0,0" -cse | FileCheck %s
 // RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5,5" -cse | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,0" -cse | FileCheck -check-prefix=TILE %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
@@ -19,7 +20,19 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
   return %1 : tensor<32x32xf32>
 }
 
+// CHECK: func.func @matmul_eletwise
 // CHECK-NOT: scf.for
+
+// TILE: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// TILE: func.func @matmul_eletwise(
+// TILE-DAG:  %[[C32:.+]] = arith.constant 32 : index
+// TILE-DAG:  %[[C1:.+]] = arith.constant 1 : index
+// TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
+// TILE: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// TILE: linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<1x64xf32>, tensor<64x32xf32>)
+// TILE-SAME:          outs(%{{.+}} : tensor<1x32xf32>)
+// TILE: %{{.+}} = linalg.generic 
+// TILE-SAME: {indexing_maps = [#[[MAP]]], iterator_types = ["parallel"]} outs(%{{.+}} : tensor<32xf32>)
 
 // -----
 
@@ -59,7 +72,17 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   return %7 : tensor<32x32xf32>
 }
 
+// CHECK: func.func @matmul_sequence_fusion
 // CHECK-NOT: scf.for
+
+// TILE: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// TILE: func.func @matmul_sequence_fusion
+// TILE-DAG:  %[[C32:.+]] = arith.constant 32 : index
+// TILE-DAG:  %[[C1:.+]] = arith.constant 1 : index
+// TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
+// TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// TILE-COUNT-3: linalg.matmul
+// TILE-COUNT-3: linalg.generic
 
 // -----
 
@@ -99,4 +122,14 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   return %7 : tensor<32x32xf32>
 }
 
+// CHECK: func.func @matmul_sequence_fusion
 // CHECK-NOT: scf.for
+
+// TILE: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// TILE: func.func @matmul_sequence_fusion
+// TILE-DAG:  %[[C32:.+]] = arith.constant 32 : index
+// TILE-DAG:  %[[C1:.+]] = arith.constant 1 : index
+// TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
+// TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// TILE-COUNT-3: linalg.matmul
+// TILE-COUNT-3: linalg.generic
