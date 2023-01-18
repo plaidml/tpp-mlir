@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 using namespace mlir;
 using namespace mlir::check;
 using namespace mlir::cf;
@@ -186,7 +187,7 @@ struct ConvertCheckToLoops
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertCheckToLoopsPass() {
   return std::make_unique<ConvertCheckToLoops>();
 }
