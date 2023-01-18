@@ -238,3 +238,37 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK-NEXT: }
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>,
+    %arg2: tensor<32x32xf32>, %arg3: tensor<32x32xf32>, %arg4: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
+    outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32> // [M, N0] * [N0, N1]
+  %1 = linalg.matmul ins(%0, %arg3 : tensor<32x32xf32>, tensor<32x32xf32>)
+    outs(%arg4 : tensor<32x32xf32>) -> tensor<32x32xf32> // [M, N1] * [N1, N2]
+  %2 = linalg.generic {indexing_maps = [#map, #map],
+                       iterator_types = ["parallel", "parallel"]}
+    ins(%0: tensor<32x32xf32>) outs(%1: tensor<32x32xf32>) {
+      ^bb0(%in_0: f32, %out_0: f32):
+        %3 = arith.addf %in_0, %out_0 : f32
+        linalg.yield %3: f32
+  } -> tensor<32x32xf32>
+  return %2 : tensor<32x32xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<() -> ()>
+// CHECK: func.func @matmul_sequence_fusion(
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK-COUNT-2: linalg.matmul
+// CHECK-COUNT-1: linalg.generic
+// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
+// CHECK-NEXT: }
+// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
+// CHECK-NEXT: }
