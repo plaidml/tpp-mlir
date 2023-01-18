@@ -53,30 +53,16 @@ static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
   return false;
 }
 
-// Tile the consumer and return the tiled result.
-static FailureOr<scf::SCFTilingResult>
-tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
-             ArrayRef<int64_t> tileSizes) {
-  assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
-  FailureOr<scf::SCFTilingResult> tilingResult =
-      scf::tileUsingSCFForOp(rewriter, consumer, options);
-  return tilingResult;
-}
-
-// Return the range for the iteration domain at position `idx` return nullopt if
-// the range cannot be statically computed.
-static std::optional<int64_t> getSizeRangeAtIdx(ArrayRef<Range> iterationDomain,
-                                                size_t idx) {
-  std::optional<int64_t> stride =
-      getConstantIntValue(iterationDomain[idx].stride);
+// Return the range as int64_t for `range` if we can statically compute it,
+// otherwise return std::nullopt.
+static std::optional<int64_t> getSizeRangeAtIdx(const Range &range) {
+  std::optional<int64_t> stride = getConstantIntValue(range.stride);
   if (!stride || *stride != 1)
     return std::nullopt;
-  std::optional<int64_t> offset =
-      getConstantIntValue(iterationDomain[idx].offset);
+  std::optional<int64_t> offset = getConstantIntValue(range.offset);
   if (!offset)
     return std::nullopt;
-  std::optional<int64_t> size = getConstantIntValue(iterationDomain[idx].size);
+  std::optional<int64_t> size = getConstantIntValue(range.size);
   if (!size)
     return std::nullopt;
   return (*size - *offset);
@@ -102,7 +88,7 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     if (!linalg::isParallelIterator(loopIteratorTypes[tileIdx]))
       return false;
     std::optional<int64_t> sizeRangeAtIdx =
-        getSizeRangeAtIdx(iterationDomain, tileIdx);
+        getSizeRangeAtIdx(iterationDomain[tileIdx]);
     // Non constant range. Bail out and do not add the op as candidate.
     if (!sizeRangeAtIdx)
       return false;
@@ -116,6 +102,19 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   }
   // Candidate op is good to go.
   return true;
+}
+
+// Tile the consumer and return the tiled result.
+static FailureOr<scf::SCFTilingResult>
+tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
+             ArrayRef<int64_t> tileSizes) {
+  assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
+  assert(canBeTiledWithCurrentSpec(consumer, tileSizes) &&
+         "expect valid tile sizes");
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
+  FailureOr<scf::SCFTilingResult> tilingResult =
+      scf::tileUsingSCFForOp(rewriter, consumer, options);
+  return tilingResult;
 }
 
 // Return true if the op has all users in the worklist. This is an important
@@ -170,7 +169,6 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
 static Operation *
 getUntiledProducerFromSliceSource(OpOperand *source,
                                   ArrayRef<scf::ForOp> loops) {
-  std::optional<OpOperand *> destinationIterArg;
   auto loopIt = loops.rbegin();
   while (auto iterArg = source->get().dyn_cast<BlockArgument>()) {
     scf::ForOp loop = *loopIt;
@@ -179,8 +177,6 @@ getUntiledProducerFromSliceSource(OpOperand *source,
     source = &loop.getOpOperandForRegionIterArg(iterArg);
     loopIt++;
   }
-  if (loopIt == loops.rend())
-    destinationIterArg = source;
   return source->get().getDefiningOp();
 }
 
