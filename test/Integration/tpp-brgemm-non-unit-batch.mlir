@@ -18,8 +18,7 @@
 // Validate default pipeline
 // RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \
+// RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
 func.func @brgemmtpp(%A: tensor<2x4x8xf32>,

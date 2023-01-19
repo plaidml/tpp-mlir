@@ -18,14 +18,12 @@
 // Validate default pipeline
 // RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
+// RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=LINALG
 
 // RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
+// RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=TRANSFORM
 
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {

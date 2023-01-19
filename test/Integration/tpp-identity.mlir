@@ -10,8 +10,7 @@
 // Validate default pipeline
 // RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext
+// RUN:  -e entry -entry-point-result=void
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
