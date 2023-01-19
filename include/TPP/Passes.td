@@ -66,7 +66,7 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
-def ConvertCheckToLoops : Pass<"convert-check-to-loops", "ModuleOp"> {
+def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let summary = "Convert check to loops";
   let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";
   let description = [{
@@ -238,12 +238,21 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
 
 def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
                                          "func::FuncOp"> {
-  let summary = "GeneralizeTensorPackAndUnPack.";
+  let summary = "Generalize tensor.pack and tensor.unpack.";
   let description = [{
     Generalize a pack or unpack operation by first tiling, and then generalize
     it to other linalg operations.
   }];
   let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";
+}
+
+def RaiseToParallelLoop : Pass<"raise-to-parallel-loop",
+                               "func::FuncOp"> {
+  let summary = "Rewrite scf.for to scf.parallel.";
+  let description = [{
+
+  }]; 
+  let constructor = "mlir::tpp::createRaiseToParallelLoopPass()";
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
