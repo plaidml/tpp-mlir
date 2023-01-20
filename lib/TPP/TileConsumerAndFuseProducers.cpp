@@ -135,13 +135,6 @@ getTileBitVectorConfig(ArrayRef<int64_t> tileSizes, size_t rootConsumerParallelL
   return tileConfig;
 }
 
-static void _and(llvm::SmallBitVector &parallelLoops,
-                 const llvm::SmallBitVector &tileConfig) {
-  assert(tileConfig.size() <= parallelLoops.size() && "invalid tile config");
-  for (size_t idx : llvm::seq<size_t>(0, tileConfig.size()))
-    parallelLoops[idx] = parallelLoops[idx] && tileConfig[idx];
-}
-
 // Returns true if `map` is an identity map with zeros, i.e. if you
 // drop the result exprs that are constant zeros, the `map` will become an
 // identity.
@@ -223,9 +216,9 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
                             rootConsumerParallelLoops, llvm::dbgs());
              printBitVector("TILE CONFIG", tileConfig, llvm::dbgs()));
 
-  _and(producerParallelLoops, tileConfig);
-  _and(consumerParallelLoops, tileConfig);
-  _and(rootConsumerParallelLoops, tileConfig);
+  producerParallelLoops &= tileConfig;
+  consumerParallelLoops &= tileConfig;
+  rootConsumerParallelLoops &= tileConfig;
 
   if (!matchIteratorTypes(rootConsumerParallelLoops, producerParallelLoops) ||
       !matchIteratorTypes(rootConsumerParallelLoops, consumerParallelLoops))
