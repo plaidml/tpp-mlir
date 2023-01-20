@@ -126,7 +126,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-3: linalg.matmul
+// CHECK-COUNT-1: linalg.matmul
 // CHECK-COUNT-1: linalg.generic {indexing_maps = [#[[MAP]]], iterator_types = []} outs({{.+}} : tensor<f32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -179,7 +179,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-3: linalg.matmul
+// CHECK-COUNT-1: linalg.matmul
 // CHECK-COUNT-1: linalg.generic {indexing_maps = [#[[MAP]]], iterator_types = []} outs({{.+}} : tensor<f32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -232,7 +232,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-3: linalg.matmul
+// CHECK-COUNT-1: linalg.matmul
 // CHECK-COUNT-3: linalg.generic
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -266,7 +266,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32x
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-2: linalg.matmul
+// CHECK-COUNT-1: linalg.matmul
 // CHECK-COUNT-1: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = []} ins({{.+}}: tensor<f32>) outs({{.+}} : tensor<f32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
