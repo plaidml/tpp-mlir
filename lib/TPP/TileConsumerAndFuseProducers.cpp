@@ -128,7 +128,7 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 static llvm::SmallBitVector
 getTileBitVectorConfig(ArrayRef<int64_t> tileSizes) {
   llvm::SmallBitVector tileConfig(tileSizes.size(), false);
-  for (size_t idx = 0; idx < tileSizes.size(); idx++)
+  for (size_t idx : llvm::seq<size_t>(0, tileSizes.size()))
     if (tileSizes[idx] != 0)
       tileConfig.set(idx);
   return tileConfig;
@@ -137,13 +137,14 @@ getTileBitVectorConfig(ArrayRef<int64_t> tileSizes) {
 static void _and(llvm::SmallBitVector &parallelLoops,
                  const llvm::SmallBitVector &tileConfig) {
   assert(tileConfig.size() <= parallelLoops.size() && "invalid tile config");
-  for (size_t idx = 0; idx < tileConfig.size(); idx++)
+  for (size_t idx : llvm::seq<size_t>(0, tileConfig.size()))
     parallelLoops[idx] = parallelLoops[idx] && tileConfig[idx];
 }
 
 // Returns true if `map` is an identity map with zeros, i.e. if you
 // drop the result exprs that are constant zeros, the `map` will become an
 // identity.
+// Taken from IREE
 static bool isIdentityMapWithZeros(AffineMap map) {
   if (map.getNumSymbols() != 0)
     return false;
@@ -166,11 +167,12 @@ static bool isIdentityMapWithZeros(AffineMap map) {
   return dimsSeen == map.getNumDims();
 }
 
+// Helper fuction to print a bit vector.
 static void printBitVector(std::string banner,
                            const llvm::SmallBitVector &bitVector,
                            llvm::raw_ostream &os) {
   os << banner << "  ";
-  for (size_t idx = 0; idx < bitVector.size(); idx++) {
+  for (size_t idx : llvm::seq<size_t>(0, bitVector.size())) {
     os << bitVector.test(idx);
     if (idx != bitVector.size() - 1)
       os << ", ";
@@ -178,6 +180,24 @@ static void printBitVector(std::string banner,
   os << "\n";
 }
 
+// Return true if the candidate is as parallel as the root.
+static bool
+matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
+                   const llvm::SmallBitVector &candidateOuterParallelLoop) {
+  if (candidateOuterParallelLoop.size() < rootOuterParallelLoop.size())
+    return false;
+  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size());
+  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size())) {
+    if (!rootOuterParallelLoop.test(idx))
+      break;
+    if (!candidateOuterParallelLoop.test(idx))
+      return false;
+  }
+  return true;
+}
+
+// Return true if the producer and the current consumer have compatible parallel
+// dimension with the root consumer.
 static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
                                             Operation *producer,
                                             Operation *rootConsumer,
@@ -196,6 +216,10 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
   llvm::SmallBitVector rootConsumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(rootConsumer));
   llvm::SmallBitVector tileConfig = getTileBitVectorConfig(tileSizes);
+
+  if (!matchIteratorTypes(rootConsumerParallelLoops, producerParallelLoops) ||
+      !matchIteratorTypes(rootConsumerParallelLoops, consumerParallelLoops))
+    return false;
 
   LLVM_DEBUG(printBitVector("PRODUCER LOOP CONFIG", producerParallelLoops,
                             llvm::dbgs());
@@ -270,11 +294,6 @@ bool hasAllUsersInWorklist(Operation *op,
   return true;
 }
 
-bool validateTileSizes(TilingInterface rootConsumer,
-                       ArrayRef<int64_t> tileSizes) {
-  return true;
-}
-
 // Return a list of op that can be fused together based on what has already been
 // fused and the current tile specification.
 static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
@@ -282,7 +301,7 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
     return {};
-  if (!validateTileSizes(rootConsumer, tileSizes))
+  if (!canBeTiledWithCurrentSpec(rootConsumer, tileSizes))
     return {};
 
   llvm::SmallDenseSet<Operation *> worklist;
