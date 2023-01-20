@@ -9,7 +9,7 @@ add_mlir_library(MLIRTPP
     IteratorCollapsing.cpp
     MapConvToMatmul.cpp
     TileConsumerAndFuseProducers.cpp
-    DecomposeConvsToMatmulOrBrgemm.cpp
+    RewriteConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp
     GeneralizeTensorPackAndUnPack.cpp
     RaiseToParallelLoop.cpp
