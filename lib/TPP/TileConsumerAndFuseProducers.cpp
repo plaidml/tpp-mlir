@@ -14,6 +14,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -25,108 +27,92 @@ using namespace mlir;
 
 namespace {
 
-// Check if loopRange is statically known.
-static bool isStaticRange(Range loopRange) {
-  Optional<int64_t> offsetAsInt = getConstantIntValue(loopRange.offset);
-  if (!offsetAsInt)
-    return false;
-  Optional<int64_t> sizeAsInt = getConstantIntValue(loopRange.size);
-  if (!sizeAsInt)
-    return false;
-  Optional<int64_t> strideAsInt = getConstantIntValue(loopRange.stride);
-  return static_cast<bool>(strideAsInt);
+// TODO: improve checks here.
+static bool isBlockedMatmul(linalg::GenericOp genericOp) {
+  return tpp::utils::hasMatmulBody(genericOp);
 }
 
-static int64_t getSizeRange(Range loopRange) {
-  assert(isStaticRange(loopRange));
-  return *getConstantIntValue(loopRange.size) -
-         *getConstantIntValue(loopRange.offset);
+static bool isMatmulLike(Operation *op) {
+  if (isa_and_nonnull<linalg::MatmulOp>(op))
+    return true;
+  if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
+    return isBlockedMatmul(maybeMatmul);
+  return false;
 }
 
-static LogicalResult tileDivideIterationDomain(linalg::GenericOp linalgOp,
-                                               ArrayRef<int64_t> tiles,
-                                               OpBuilder &builder) {
-  if (linalgOp.getNumLoops() != tiles.size())
-    return failure();
-  SmallVector<Range> iterationDomain =
-      cast<TilingInterface>(linalgOp.getOperation())
-          .getIterationDomain(builder);
-  for (const auto &it : llvm::enumerate(iterationDomain)) {
-    // fine, we are not tiling along this dimension.
-    if (tiles[it.index()] == 0)
+static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
+  for (Value operand : linalgOp->getOperands()) {
+    Operation *op = operand.getDefiningOp<linalg::LinalgOp>();
+    if (op && isMatmulLike(op))
+      return true;
+  }
+  return false;
+}
+
+static FailureOr<scf::SCFTilingResult>
+tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
+             ArrayRef<int64_t> tileSizes) {
+  // If tileSizes is provided use them otherwise defaul to 1, 1, meaning fuse
+  // entire the two outermost loops.
+  SmallVector<int64_t> actualTileSizes = tileSizes.empty()
+                                             ? SmallVector<int64_t>{1, 1}
+                                             : llvm::to_vector(tileSizes);
+  auto options = scf::SCFTilingOptions().setTileSizes(actualTileSizes);
+  FailureOr<scf::SCFTilingResult> tilingResult =
+      scf::tileUsingSCFForOp(rewriter, consumer, options);
+  return tilingResult;
+}
+
+// Tile and fuse a matmul along the parallel dimensions.
+static FailureOr<scf::SCFTileAndFuseResult>
+fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
+                         ArrayRef<int64_t> tileSizes) {
+
+  // Step 1. tile the consumer.
+  scf::SCFTileAndFuseResult tileAndFuseResult;
+  FailureOr<scf::SCFTilingResult> tilingResult =
+      tileConsumer(rewriter, consumer, tileSizes);
+  if (failed(tilingResult))
+    return rewriter.notifyMatchFailure(consumer,
+                                       "failed to tile base operation");
+  for (auto *tiledOp : tilingResult->tiledOps)
+    tileAndFuseResult.tiledAndFusedOps.insert(tiledOp);
+  tileAndFuseResult.loops = std::move(tilingResult->loops);
+  for (const auto &result : llvm::enumerate(
+           llvm::zip(consumer->getResults(), tilingResult->replacements))) {
+    tileAndFuseResult.replacements[std::get<0>(result.value())] =
+        std::get<1>(result.value());
+  }
+
+  // Step 2. tile producers and fuse into the tiled consumer.
+  auto addCandidateSlices = [](Operation *fusedOp,
+                               std::deque<tensor::ExtractSliceOp> &candidates) {
+    for (Value operand : fusedOp->getOperands())
+      if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
+        candidates.push_back(sliceOp);
+  };
+
+  std::deque<tensor::ExtractSliceOp> candidates;
+  addCandidateSlices(tilingResult->tiledOps.back(), candidates);
+  OpBuilder::InsertionGuard g(rewriter);
+  while (!candidates.empty()) {
+    tensor::ExtractSliceOp candidateSliceOp = candidates.front();
+    candidates.pop_front();
+
+    std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
+        tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
+                                   tileAndFuseResult.loops);
+    if (!fusedProducer)
       continue;
-    // require static loop range
-    if (!isStaticRange(it.value()))
-      return failure();
-    int64_t sizeRange = getSizeRange(it.value());
-    // fail if the tail size equals the range
-    // or is not a full tile.
-    if (tiles[it.index()] == sizeRange)
-      return failure();
-    if (sizeRange % tiles[it.index()] != 0)
-      return failure();
-  }
-  return success();
-}
 
-struct FuseGenericOp : public OpRewritePattern<linalg::GenericOp> {
-  FuseGenericOp(MLIRContext *context, ArrayRef<int64_t> tileSizes,
-                PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::GenericOp>(context, benefit),
-        tileSizes(tileSizes) {}
-
-  bool isInplace(linalg::LinalgOp linalgOp) const {
-    return linalgOp.getNumDpsInputs() == 0;
-  }
-
-  // Locate an element-wise operation and fuse if the producer
-  // is a matmul.
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-
-    // hook only element-wise operation with tensor semantics.
-    if (!linalgOp.hasTensorSemantics() || !linalg::isElementwise(linalgOp))
-      return failure();
-
-    // further restrict to single result operations.
-    OpOperandVector operands = isInplace(linalgOp)
-                                   ? linalgOp.getDpsInitOperands()
-                                   : linalgOp.getDpsInputOperands();
-    if (operands.size() != 1)
-      return failure();
-    linalg::LinalgOp producer =
-        dyn_cast_or_null<linalg::LinalgOp>(operands[0]->get().getDefiningOp());
-    if (!producer)
-      return failure();
-
-    if (producer.getNumParallelLoops() != tileSizes.size()) {
-      return rewriter.notifyMatchFailure(
-          producer,
-          "expect tile sizes to be equal to number of parallel loops");
+    if (Operation *tiledAndFusedOp =
+            fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
+      tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
+      addCandidateSlices(tiledAndFusedOp, candidates);
     }
-
-    if (failed(tileDivideIterationDomain(linalgOp, tileSizes, rewriter)))
-      return rewriter.notifyMatchFailure(producer, "wrong tile sizes");
-
-    // tile and fuse.
-    scf::SCFTileAndFuseOptions options;
-    options.tilingOptions.setTileSizes(tileSizes);
-    TilingInterface tilingInterfaceOp =
-        cast<TilingInterface>(linalgOp.getOperation());
-    FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
-            rewriter, tilingInterfaceOp, options);
-    if (failed(tileAndFuseResult))
-      return failure();
-    rewriter.replaceOp(linalgOp, tileAndFuseResult->loops[0].getResults());
-    return success();
   }
-  ArrayRef<int64_t> tileSizes;
-};
 
-void populateFusionPatterns(RewritePatternSet &patterns,
-                            ArrayRef<int64_t> tileSizes) {
-  patterns.add<FuseGenericOp>(patterns.getContext(), tileSizes);
+  return tileAndFuseResult;
 }
 
 struct TileConsumerAndFuseProducers
@@ -140,10 +126,25 @@ struct TileConsumerAndFuseProducers
     linalg::registerTilingInterfaceExternalModels(registry);
   }
   void runOnOperation() override {
+    func::FuncOp func = getOperation();
+    transform::TrivialPatternRewriter rewriter(&getContext());
+    func->walk([&](linalg::LinalgOp linalgOp) {
+      if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
+        FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
+            fuseMatmulLikeAndEltwise(
+                rewriter, cast<TilingInterface>(linalgOp.getOperation()),
+                this->tileSizes);
+        if (failed(fuseAndTileResult))
+          return signalPassFailure();
+        rewriter.replaceOp(
+            linalgOp,
+            (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
+      }
+    });
     RewritePatternSet patterns(&getContext());
-    populateFusionPatterns(patterns, tileSizes);
     // fold unit-extent dims for linalg on tensors.
     linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

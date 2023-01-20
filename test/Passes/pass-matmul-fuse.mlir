@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1,0,0" -rewrite-conv-to-matmul-or-brgemm -map-to-brgemm | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1,0,0" -map-to-brgemm | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
