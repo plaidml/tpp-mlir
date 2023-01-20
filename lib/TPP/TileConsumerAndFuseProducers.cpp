@@ -126,8 +126,9 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 
 // Return the tile sizes as bit vector.
 static llvm::SmallBitVector
-getTileBitVectorConfig(ArrayRef<int64_t> tileSizes) {
-  llvm::SmallBitVector tileConfig(tileSizes.size(), false);
+getTileBitVectorConfig(ArrayRef<int64_t> tileSizes, size_t rootConsumerParallelLoops) {
+  assert(tileSizes.size() <= rootConsumerParallelLoops);
+  llvm::SmallBitVector tileConfig(rootConsumerParallelLoops, false);
   for (size_t idx : llvm::seq<size_t>(0, tileSizes.size()))
     if (tileSizes[idx] != 0)
       tileConfig.set(idx);
@@ -186,13 +187,10 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
                    const llvm::SmallBitVector &candidateOuterParallelLoop) {
   if (candidateOuterParallelLoop.size() < rootOuterParallelLoop.size())
     return false;
-  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size());
-  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size())) {
-    if (!rootOuterParallelLoop.test(idx))
-      break;
-    if (!candidateOuterParallelLoop.test(idx))
+  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size()); 
+  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size())) 
+    if (rootOuterParallelLoop.test(idx) && !candidateOuterParallelLoop.test(idx))
       return false;
-  }
   return true;
 }
 
@@ -215,11 +213,7 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
       getOuterParallelLoops(cast<TilingInterface>(consumer));
   llvm::SmallBitVector rootConsumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(rootConsumer));
-  llvm::SmallBitVector tileConfig = getTileBitVectorConfig(tileSizes);
-
-  if (!matchIteratorTypes(rootConsumerParallelLoops, producerParallelLoops) ||
-      !matchIteratorTypes(rootConsumerParallelLoops, consumerParallelLoops))
-    return false;
+  llvm::SmallBitVector tileConfig = getTileBitVectorConfig(tileSizes, rootConsumerParallelLoops.size());
 
   LLVM_DEBUG(printBitVector("PRODUCER LOOP CONFIG", producerParallelLoops,
                             llvm::dbgs());
@@ -232,6 +226,10 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
   _and(producerParallelLoops, tileConfig);
   _and(consumerParallelLoops, tileConfig);
   _and(rootConsumerParallelLoops, tileConfig);
+
+  if (!matchIteratorTypes(rootConsumerParallelLoops, producerParallelLoops) ||
+      !matchIteratorTypes(rootConsumerParallelLoops, consumerParallelLoops))
+    return false;
 
   LLVM_DEBUG(printBitVector("PRODUCER LOOP TILE CONFIG", producerParallelLoops,
                             llvm::dbgs());
