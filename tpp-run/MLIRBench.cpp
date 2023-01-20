@@ -312,6 +312,9 @@ LogicalResult MLIRBench::finalize() {
   PassManager passManager(module->getContext());
   applyPassManagerCLOptions(passManager);
 
+  // Apply the default preprocessing pass
+  passManager.addPass(tpp::createDefaultTppPass());
+
   // Bufferization, if needed
   passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
   passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
