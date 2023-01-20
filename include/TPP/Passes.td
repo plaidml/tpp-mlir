@@ -207,9 +207,9 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   ];
 }
 
-def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm", 
+def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 
                                          "func::FuncOp"> {
-  let summary = "Decompose Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
+  let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
   let description = [{
     Rewrite a convolution to a matmul or brgemm operation.
   }];
@@ -219,7 +219,7 @@ def DecomposeConvToMatmulOrBrgemm : Pass<"decompose-conv-to-matmul-or-brgemm",
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass()";
+  let constructor = "mlir::tpp::createRewriteConvToMatmulOrBrgemmPass()";
 }
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
