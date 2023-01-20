@@ -337,6 +337,7 @@ getUntiledProducerFromSliceSource(OpOperand *source,
   return source->get().getDefiningOp();
 }
 
+// TODO: tileSizes should be OpFoldResult.
 // Tile and fuse a matmul along the parallel dimensions.
 static FailureOr<scf::SCFTileAndFuseResult>
 fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
