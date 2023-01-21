@@ -15,32 +15,19 @@
 // RUN: FileCheck %s -check-prefix=TRANSFORM
 //
 
-func.func private @generate_1D_source(%init_source : tensor<8xf32>) -> tensor<8xf32> {
+func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
+  %init_source = bufferization.alloc_tensor(%width) : tensor<?xf32>
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
-      outs(%init_source : tensor<8xf32>) {
+      outs(%init_source : tensor<?xf32>) {
     ^bb0(%b0 : f32):
       %inner = linalg.index 0 : index
       %inner_val_i32 = arith.index_cast %inner : index to i32
       %inner_val = arith.sitofp %inner_val_i32 : i32 to f32
       linalg.yield %inner_val :  f32
-  } -> tensor<8xf32>
-  return %source : tensor<8xf32>
-}
-
-func.func private @generate_1D_source1(%init_source : tensor<3xf32>) -> tensor<3xf32> {
-  %source = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      outs(%init_source : tensor<3xf32>) {
-    ^bb0(%b0 : f32):
-      %inner = linalg.index 0 : index
-      %inner_val_i32 = arith.index_cast %inner : index to i32
-      %inner_val = arith.sitofp %inner_val_i32 : i32 to f32
-      linalg.yield %inner_val :  f32
-  } -> tensor<3xf32>
-  return %source : tensor<3xf32>
+  } -> tensor<?xf32>
+  return %source : tensor<?xf32>
 }
 
 // Unit fiter, non strided conv.
@@ -64,24 +51,26 @@ func.func @conv_non_unit_with_stride(%img: tensor<1x5x5x3xf32>, %filter: tensor<
 }
 
 func.func @entry() {
-  %init_img = bufferization.alloc_tensor() : tensor<3xf32>
-  %img_seed = call @generate_1D_source1(%init_img) : (tensor<3xf32>) -> (tensor<3xf32>)
+  %c3 = arith.constant 3 : index
+  %img_seed = call @generate_1D_source(%c3) : (index) -> (tensor<?xf32>)
+  %img_seed_cast = tensor.cast %img_seed : tensor<?xf32> to tensor<3xf32>
   %img_shape_broad = bufferization.alloc_tensor() : tensor<1x4x4x3xf32>
-  %img = linalg.broadcast ins(%img_seed: tensor<3xf32>)
+  %img = linalg.broadcast ins(%img_seed_cast: tensor<3xf32>)
                           outs(%img_shape_broad: tensor<1x4x4x3xf32>)
                           dimensions = [0, 1, 2]
 
-  %init_filter = bufferization.alloc_tensor() : tensor<8xf32>
-  %filter_seed = call @generate_1D_source(%init_filter) : (tensor<8xf32>) -> (tensor<8xf32>)
+  %c8 = arith.constant 8 : index
+  %filter_seed = call @generate_1D_source(%c8) : (index) -> (tensor<?xf32>)
+  %filter_seed_cast = tensor.cast %filter_seed : tensor<?xf32> to tensor<8xf32>
   %filter_shape_broad = bufferization.alloc_tensor() : tensor<1x1x3x8xf32>
-  %filter = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
+  %filter = linalg.broadcast ins(%filter_seed_cast: tensor<8xf32>)
                            outs(%filter_shape_broad: tensor<1x1x3x8xf32>)
                            dimensions = [0, 1, 2]
 
-  %init_out = bufferization.alloc_tensor() : tensor<8xf32>
-  %output_seed = call @generate_1D_source(%init_out) : (tensor<8xf32>) -> (tensor<8xf32>)
+  %output_seed = call @generate_1D_source(%c8) : (index) -> (tensor<?xf32>)
+  %output_seed_cast = tensor.cast %output_seed : tensor<?xf32> to tensor<8xf32>
   %output_shape_broad = bufferization.alloc_tensor() : tensor<1x4x4x8xf32>
-  %out = linalg.broadcast ins(%output_seed: tensor<8xf32>)
+  %out = linalg.broadcast ins(%output_seed_cast: tensor<8xf32>)
                           outs(%output_shape_broad: tensor<1x4x4x8xf32>)
                           dimensions = [0, 1, 2]
   %result_conv = call @conv_unit_no_stride(%img, %filter, %out) : (tensor<1x4x4x3xf32>, tensor<1x1x3x8xf32>, tensor<1x4x4x8xf32>) -> tensor<1x4x4x8xf32>
@@ -129,17 +118,17 @@ func.func @entry() {
   vector.print %v0 : vector<1x4x4x8xf32>
 
   %img_shape_broad1 = bufferization.alloc_tensor() : tensor<1x5x5x3xf32>
-  %img1 = linalg.broadcast ins(%img_seed: tensor<3xf32>)
+  %img1 = linalg.broadcast ins(%img_seed_cast: tensor<3xf32>)
                            outs(%img_shape_broad1: tensor<1x5x5x3xf32>)
                            dimensions = [0, 1, 2]
   
   %filter_shape_broad1 = bufferization.alloc_tensor() : tensor<3x3x3x8xf32>
-  %filter1 = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
+  %filter1 = linalg.broadcast ins(%filter_seed_cast: tensor<8xf32>)
                               outs(%filter_shape_broad1: tensor<3x3x3x8xf32>)
                               dimensions = [0, 1, 2]
   
   %output_shape_broad1 = bufferization.alloc_tensor() : tensor<1x3x3x8xf32>
-  %out1 = linalg.broadcast ins(%output_seed: tensor<8xf32>)
+  %out1 = linalg.broadcast ins(%output_seed_cast: tensor<8xf32>)
                            outs(%output_shape_broad1: tensor<1x3x3x8xf32>)
                            dimensions = [0, 1, 2]
   
@@ -174,17 +163,17 @@ func.func @entry() {
   vector.print %v1 : vector<1x3x3x8xf32>
 
   %img_shape_broad2 = bufferization.alloc_tensor() : tensor<1x5x5x3xf32>
-  %img2 = linalg.broadcast ins(%img_seed: tensor<3xf32>)
+  %img2 = linalg.broadcast ins(%img_seed_cast: tensor<3xf32>)
                            outs(%img_shape_broad2: tensor<1x5x5x3xf32>)
                            dimensions = [0, 1, 2]
 
   %filter_shape_broad2 = bufferization.alloc_tensor() : tensor<3x3x3x8xf32>
-  %filter2 = linalg.broadcast ins(%filter_seed: tensor<8xf32>)
+  %filter2 = linalg.broadcast ins(%filter_seed_cast: tensor<8xf32>)
                               outs(%filter_shape_broad2: tensor<3x3x3x8xf32>)
                               dimensions = [0, 1, 2]
   
   %output_shape_broad2 = bufferization.alloc_tensor() : tensor<1x2x2x8xf32>
-  %out2 = linalg.broadcast ins(%output_seed: tensor<8xf32>)
+  %out2 = linalg.broadcast ins(%output_seed_cast: tensor<8xf32>)
                            outs(%output_shape_broad2: tensor<1x2x2x8xf32>)
                            dimensions = [0, 1, 2]
 

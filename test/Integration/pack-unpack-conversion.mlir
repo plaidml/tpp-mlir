@@ -5,53 +5,27 @@
 // RUN: FileCheck %s 
 //
 
-func.func private @generate_1D_source_2(%init_source : tensor<2xf32>) -> tensor<2xf32> {
+func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
+  %init_source = tensor.empty(%width) : tensor<?xf32>
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
-      outs(%init_source : tensor<2xf32>) {
+      outs(%init_source : tensor<?xf32>) {
     ^bb0(%b0 : f32):
       %inner = linalg.index 0 : index
       %inner_val_i32 = arith.index_cast %inner : index to i32
       %inner_val = arith.sitofp %inner_val_i32 : i32 to f32
       linalg.yield %inner_val :  f32
-  } -> tensor<2xf32>
-  return %source : tensor<2xf32>
-}
-
-func.func private @generate_1D_source_32(%init_source : tensor<32xf32>) -> tensor<32xf32> {
-  %source = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      outs(%init_source : tensor<32xf32>) {
-    ^bb0(%b0 : f32):
-      %inner = linalg.index 0 : index
-      %inner_val_i32 = arith.index_cast %inner : index to i32
-      %inner_val = arith.sitofp %inner_val_i32 : i32 to f32
-      linalg.yield %inner_val :  f32
-  } -> tensor<32xf32>
-  return %source : tensor<32xf32>
-}
-
-func.func private @generate_1D_source_8(%init_source : tensor<8xf32>) -> tensor<8xf32> {
-  %source = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      outs(%init_source : tensor<8xf32>) {
-    ^bb0(%b0 : f32):
-      %inner = linalg.index 0 : index
-      %inner_val_i32 = arith.index_cast %inner : index to i32
-      %inner_val = arith.sitofp %inner_val_i32 : i32 to f32
-      linalg.yield %inner_val :  f32
-  } -> tensor<8xf32>
-  return %source : tensor<8xf32>
+  } -> tensor<?xf32>
+  return %source : tensor<?xf32>
 }
 
 func.func @entry() {
-  %init_source = tensor.empty() : tensor<2xf32>
-  %input_tensor = call @generate_1D_source_2(%init_source) : (tensor<2xf32>) -> (tensor<2xf32>)
+  %c2 = arith.constant 2 : index
+  %input_tensor = call @generate_1D_source(%c2) : (index) -> (tensor<?xf32>)
+  %input_tensor_cast = tensor.cast %input_tensor : tensor<?xf32> to tensor<2xf32>
   %bcast = tensor.empty() : tensor<2x8x8x2xf32>
-  %input_tensor_bcast = linalg.broadcast ins(%input_tensor: tensor<2xf32>)
+  %input_tensor_bcast = linalg.broadcast ins(%input_tensor_cast: tensor<2xf32>)
                                              outs(%bcast: tensor<2x8x8x2xf32>)
                                              dimensions = [0, 1, 2]
   %c0 = arith.constant 0 : index
@@ -101,10 +75,11 @@ func.func @entry() {
   //
 
 
-  %init_source1 = tensor.empty() : tensor<32xf32>
-  %input_tensor1 = call @generate_1D_source_32(%init_source1) : (tensor<32xf32>) -> (tensor<32xf32>)
+  %c32 = arith.constant 32 : index 
+  %input_tensor1 = call @generate_1D_source(%c32) : (index) -> (tensor<?xf32>)
+  %input_tensor1_cast = tensor.cast %input_tensor1 : tensor<?xf32> to tensor<32xf32>
   %bcast1 = tensor.empty() : tensor<1x1x1x1x8x32xf32> 
-  %input_tensor_bcast1 = linalg.broadcast ins(%input_tensor1: tensor<32xf32>)
+  %input_tensor_bcast1 = linalg.broadcast ins(%input_tensor1_cast: tensor<32xf32>)
                                           outs(%bcast1: tensor<1x1x1x1x8x32xf32>)
                                           dimensions = [0, 1, 2, 3, 4]
   %v2 = vector.transfer_read %input_tensor_bcast1[%c0, %c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x1x1x1x8x32xf32>, vector<1x1x1x1x8x32xf32>
@@ -163,9 +138,10 @@ func.func @entry() {
   //
 
 
-  %input_tensor2 = call @generate_1D_source_2(%init_source) : (tensor<2xf32>) -> (tensor<2xf32>)
+  %input_tensor2 = call @generate_1D_source(%c2) : (index) -> (tensor<?xf32>)
+  %input_tensor2_cast = tensor.cast %input_tensor2 : tensor<?xf32> to tensor<2xf32>
   %bcast2 = tensor.empty() : tensor<1x4x6x6x2xf32>
-  %input_tensor_bcast2 = linalg.broadcast ins(%input_tensor2: tensor<2xf32>)
+  %input_tensor_bcast2 = linalg.broadcast ins(%input_tensor2_cast: tensor<2xf32>)
                                           outs(%bcast2: tensor<1x4x6x6x2xf32>)
                                           dimensions = [0, 1, 2, 3]
   %unpacked_tensor2 = bufferization.alloc_tensor() : tensor<1x6x6x8xf32>
@@ -212,10 +188,11 @@ func.func @entry() {
   // CHECK-SAME:( 0, 1, 0, 1, 0, 1, 0, 1 ) ) ) ) 
   //
 
-  %init_source3 = bufferization.alloc_tensor() : tensor<8xf32>
-  %input_tensor3 = call @generate_1D_source_8(%init_source3) : (tensor<8xf32>) -> (tensor<8xf32>)
+  %c8 = arith.constant 8 : index
+  %input_tensor3 = call @generate_1D_source(%c8) : (index) -> (tensor<?xf32>)
+  %input_tensor3_cast = tensor.cast %input_tensor3 : tensor<?xf32> to tensor<8xf32>
   %bcast3 = tensor.empty() : tensor<1x6x6x8xf32>
-  %input_tensor_bcast3 = linalg.broadcast ins(%input_tensor3: tensor<8xf32>)
+  %input_tensor_bcast3 = linalg.broadcast ins(%input_tensor3_cast: tensor<8xf32>)
                                           outs(%bcast3: tensor<1x6x6x8xf32>)
                                           dimensions = [0, 1, 2]
   %packed_tensor = bufferization.alloc_tensor() : tensor<1x4x6x6x2xf32>
@@ -252,7 +229,7 @@ func.func @entry() {
   vector.print %v5 : vector<1x4x6x6x2xf32>
 
   %bcast4 = tensor.empty() : tensor<1x1x32x8xf32>
-  %input_tensor_bcast4 = linalg.broadcast ins(%input_tensor3: tensor<8xf32>)
+  %input_tensor_bcast4 = linalg.broadcast ins(%input_tensor3_cast: tensor<8xf32>)
                                           outs(%bcast4: tensor<1x1x32x8xf32>)
                                           dimensions = [0, 1, 2]
   %packed_tensor1 = bufferization.alloc_tensor() : tensor<1x1x1x1x8x32xf32>
