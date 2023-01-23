@@ -35,14 +35,15 @@ namespace linalgx {
 
 // Attempt to map the current linalgOp to a BRGEMM.
 // On success the returned values are the materialzed loops with BRGEMM inside.
-FailureOr<SmallVector<Value>> mapToBRGEMMOp(RewriterBase &rewriter,
-                                            linalg::LinalgOp linalgOp);
+FailureOr<SmallVector<Value>> rewriteToBRGEMMOp(RewriterBase &rewriter,
+                                                linalg::LinalgOp linalgOp);
 
-// Map a convolution to a matmul operation. We support the following formats:
+// Rewrite a convolution to a matmul operation. We support the following
+// formats:
 // 1. [N][P][Q][K] += [N][H][W][C] * [R][S][C][K]
 // 2. [N][K’][P][Q][k] += [N][C’][H][W][c] * [K’][C’][R][S][c][k] (blocked)
-FailureOr<linalg::MatmulOp> mapConvToMatmul(RewriterBase &rewriter,
-                                            linalg::LinalgOp linalgOp);
+FailureOr<linalg::MatmulOp> rewriteConvToMatmul(RewriterBase &rewriter,
+                                                linalg::LinalgOp linalgOp);
 
 // Attempt to block a Conv2DNchwFchwOp.
 FailureOr<linalg::GenericOp>

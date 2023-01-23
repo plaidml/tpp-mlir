@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s --pack-matmul="block-factors=32,32,32"  --pack-vnni -map-to-brgemm  -canonicalize | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32"  -pack-vnni -rewrite-to-brgemm  -canonicalize | FileCheck %s
 
 !A_tensor_t = tensor<256x512xbf16>
 !B_tensor_t = tensor<512x1024xbf16>

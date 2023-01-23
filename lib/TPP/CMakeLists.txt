@@ -6,10 +6,10 @@ add_mlir_library(MLIRTPP
   # Passes 
     MapLinalgToTpp.cpp
     ToBlockLayoutAndBack.cpp
-    MapToBatchReduceGEMM.cpp
+    RewriteToBatchReduceGEMM.cpp
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
-    MapConvToMatmul.cpp
+    RewriteConvToMatmulImpl.cpp
     TileConsumerAndFuseProducers.cpp
     RewriteConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp

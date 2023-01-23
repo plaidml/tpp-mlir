@@ -176,8 +176,7 @@ static FailureOr<Value> getSlicedConvOperand(OpBuilder &builder,
 static FailureOr<SmallVector<Value>>
 getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
                       linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
-  assert(linalgOp->getNumOperands() == 3 &&
-         "expect 3 input/output operands");
+  assert(linalgOp->getNumOperands() == 3 && "expect 3 input/output operands");
   assert(linalgOp.getDpsInputOperands().size() == 2 &&
          "expect 2 input operands");
 
@@ -224,8 +223,8 @@ static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
 }
 
 FailureOr<linalg::MatmulOp>
-mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp) {
+mlir::linalgx::rewriteConvToMatmul(RewriterBase &rewriter,
+                                   linalg::LinalgOp linalgOp) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "require a linalg.generic");
 
