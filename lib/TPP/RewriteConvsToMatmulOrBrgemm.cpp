@@ -101,7 +101,7 @@ struct RewriteConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     FailureOr<linalg::MatmulOp> matmul =
-        mlir::linalgx::mapConvToMatmul(rewriter, genericOp);
+        mlir::linalgx::rewriteConvToMatmul(rewriter, genericOp);
     if (failed(matmul))
       return rewriter.notifyMatchFailure(genericOp,
                                          "failed to map convolution to matmul");
@@ -321,7 +321,7 @@ struct RewriteConv2DNchwFchwToMatmul : OpRewritePattern<linalg::GenericOp> {
     if (failed(rewriteConv2DNchwFchwPreconditions(linalgOp)))
       return failure();
     FailureOr<linalg::MatmulOp> matmul =
-        mlir::linalgx::mapConvToMatmul(rewriter, linalgOp);
+        mlir::linalgx::rewriteConvToMatmul(rewriter, linalgOp);
     if (failed(matmul))
       return failure();
     return success();
@@ -553,7 +553,7 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
             linalgOp, "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
       return failure();
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::linalgx::mapToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::rewriteToBRGEMMOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();

@@ -172,11 +172,10 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
 }
 
-def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
-  let summary = "Map a linalg.generic to BRGEMM";
-  let constructor = "mlir::tpp::createMapToBatchReduceGEMMPass()";
+def RewriteToBatchReduceGEMM : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
+  let summary = "Rewrite a linalg.generic to BRGEMM";
   let description = [{
-    Map a linalg.generic to a linalg.batch_reduce_matmul.
+    Rewrite a linalg.generic to a linalg.batch_reduce_matmul.
     Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
     [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
     outermost parallel dimensions (as scf.for) and rewrite the body to a
@@ -185,6 +184,7 @@ def MapToBatchReduceGEMM : Pass<"map-to-brgemm", "func::FuncOp"> {
     The pass works on any linalg.generic and attempts to map the innermost
     loops to BRGEMM.  It works both a memref and tensor level.
   }];
+  let constructor = "mlir::tpp::createRewriteToBatchReduceGEMMPass()";
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
@@ -209,7 +209,7 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
   }];
   let options = [
     Option<"enableBrgemm", "enable-brgemm", "bool", "false",
-           "Map convolution to BRGEMM if possible">
+           "Rewrite convolution to BRGEMM if possible">
   ];
   let constructor = "mlir::tpp::createRewriteConvToMatmulOrBrgemmPass()";
 }

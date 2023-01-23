@@ -113,8 +113,8 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
     return DiagnosedSilenceableFailure::success();
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<SmallVector<Value>> brgemmLoops =
-      mlir::linalgx::mapToBRGEMMOp(rewriter, cast<linalg::GenericOp>(target));
+  FailureOr<SmallVector<Value>> brgemmLoops = mlir::linalgx::rewriteToBRGEMMOp(
+      rewriter, cast<linalg::GenericOp>(target));
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -130,8 +130,8 @@ transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
     return DiagnosedSilenceableFailure::definiteFailure();
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<linalg::MatmulOp> matmul =
-      mlir::linalgx::mapConvToMatmul(rewriter, cast<linalg::GenericOp>(target));
+  FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::rewriteConvToMatmul(
+      rewriter, cast<linalg::GenericOp>(target));
   if (failed(matmul)) {
     auto diag = this->emitOpError()
                 << "Could not map to matmul: " << target << "\n";

@@ -79,7 +79,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createRewriteToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>

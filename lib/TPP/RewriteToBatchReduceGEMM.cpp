@@ -222,15 +222,15 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
           *blockingFactor);
 }
 
-// Map a generic operation to BRGEMM. The following conditions apply:
+// Rewrite a generic operation to BRGEMM. The following conditions apply:
 // 1. The generic has a single region. The region performs a scalar GEMM
 // operation.
 // 2. The innermost dimensions for the generic must be [r, p, p, r]. r =
 // reduction p = parallel. Outermost dimensions must be parallel.
 // 3. Access pattern must be [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
 FailureOr<SmallVector<Value>>
-mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
-                             linalg::LinalgOp linalgOp) {
+mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
+                                 linalg::LinalgOp linalgOp) {
 
   if (!isa<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "expects a linalg.generic");
@@ -357,15 +357,15 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::linalgx::mapToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::rewriteToBRGEMMOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();
   }
 };
 
-struct MapToBatchReduceGEMM
-    : public MapToBatchReduceGEMMBase<MapToBatchReduceGEMM> {
+struct RewriteToBatchReduceGEMM
+    : public RewriteToBatchReduceGEMMBase<RewriteToBatchReduceGEMM> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     patterns.add<DoItOnGeneric>(patterns.getContext());
@@ -378,6 +378,6 @@ struct MapToBatchReduceGEMM
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createMapToBatchReduceGEMMPass() {
-  return std::make_unique<MapToBatchReduceGEMM>();
+mlir::tpp::createRewriteToBatchReduceGEMMPass() {
+  return std::make_unique<RewriteToBatchReduceGEMM>();
 }
