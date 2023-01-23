@@ -14,9 +14,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-using namespace mlir;
-
 namespace mlir {
+
+namespace linalgx {
 
 namespace utils {
 
@@ -185,5 +185,7 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
 }
 
 } // namespace utils
+
+} // namespace linalgx
 
 } // namespace mlir
