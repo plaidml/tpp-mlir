@@ -110,14 +110,14 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 
   SmallVector<Value> slicedOperands;
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+    FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 3);
     if (failed(slicedOperand))
       return failure();
     slicedOperands.push_back(*slicedOperand);
   }
   for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+    FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedOperand))
       return failure();
@@ -150,15 +150,15 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
-  // materialize outer loops
+  // Materialize outer loops.
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
   FailureOr<SmallVector<Range>> maybeLoopRanges =
-      mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
+      linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
   if (failed(maybeLoopRanges))
     return failure();
   SmallVector<Range> loopRanges = *maybeLoopRanges;
 
-  // replace linalgOp with BRGEMM.
+  // Replace linalgOp with BRGEMM.
   SmallVector<Value> ivs, tensorResults;
   auto brgemmBuilder = [&](OpBuilder &builder, Location loc,
                            ValueRange localIvs,

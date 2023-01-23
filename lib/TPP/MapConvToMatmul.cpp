@@ -151,8 +151,9 @@ static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
     strides[strides.size() - 2] = builder.getIndexAttr(
         multiplicativeFactor.cast<AffineConstantExpr>().getValue());
   }
-  return utils::getSliceOperand(builder, linalgOp, operandToUse, offsets, sizes,
-                                strides, desiredResultRank);
+  return linalgx::utils::getSliceOperand(builder, linalgOp, operandToUse,
+                                         offsets, sizes, strides,
+                                         desiredResultRank);
 }
 
 // Extract the sliced version of `operand` such that we can use it in a
@@ -164,7 +165,7 @@ static FailureOr<Value> getSlicedConvOperand(OpBuilder &builder,
                                              ValueRange valuesToUse) {
   Location loc = linalgOp.getLoc();
   FailureOr<SmallVector<Value>> involvedDimForOperand =
-      utils::getInvolvedLocalDimsForOperand(
+      linalgx::utils::getInvolvedLocalDimsForOperand(
           builder, loc, operand, linalgOp.getMatchingIndexingMap(operand), ivs);
   if (failed(involvedDimForOperand))
     return failure();
@@ -239,7 +240,7 @@ mlir::linalgx::mapConvToMatmul(RewriterBase &rewriter,
   // peel-out all loops but the three innermost.
   unsigned upTo = linalgOp.getNumLoops() - /*GEMM loops=*/3;
   FailureOr<SmallVector<Range>> maybeLoopRanges =
-      mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
+      linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
   if (failed(maybeLoopRanges))
     return failure();
   SmallVector<Range> loopRanges = *maybeLoopRanges;
