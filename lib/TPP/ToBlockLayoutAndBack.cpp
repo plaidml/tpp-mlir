@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
+#include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -353,7 +355,8 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
                                     linalg::Conv2DNhwcHwcfOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
-  if (!validateFullTilesOnDims(convOp, tiles, {/*Kidx=*/3, /*Cidx=*/6}))
+  if (!linalgx::utils::validateFullTilesOnDims(convOp, tiles,
+                                               {/*Kidx=*/3, /*Cidx=*/6}))
     return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
@@ -367,29 +370,15 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
                                     linalg::Conv2DNchwFchwOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
-  if (!validateFullTilesOnDims(convOp, tiles, {/*Kidx=*/1, /*Cidx=*/4}))
+  if (!linalgx::utils::validateFullTilesOnDims(convOp, tiles,
+                                               {/*Kidx=*/1, /*Cidx=*/4}))
     return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
 
-//===----------------------------------------------------------------------===//
-// MatmulOp
-//===----------------------------------------------------------------------===//
-//  i      j        i     k      k      j
-// [128 x 256] += [128 x 256] * [256 x 256]
-//
-// tile factor on i = 32
-// tile factor on j = 16
-// tile factor on k = 8
-//
-// [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
-// [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
-// KB is the batch reduce dimension.
-FailureOr<linalg::GenericOp>
-mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                            ArrayRef<OpFoldResult> tiles) {
-  if (tiles.size() != 3)
-    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+static FailureOr<linalg::GenericOp>
+packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                 ArrayRef<OpFoldResult> tiles) {
 
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
@@ -460,6 +449,28 @@ bool isMatmulOp(linalg::GenericOp matmulOp) {
   return tpp::utils::hasMatmulBody(matmulOp);
 }
 
+//===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
+//  i      j        i     k      k      j
+// [128 x 256] += [128 x 256] * [256 x 256]
+//
+// tile factor on i = 32
+// tile factor on j = 16
+// tile factor on k = 8
+//
+// [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
+// [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
+// KB is the batch reduce dimension.
+FailureOr<linalg::GenericOp>
+mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                            ArrayRef<OpFoldResult> tiles) {
+  if (tiles.size() != 3)
+    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+
+  return packMatmulOpImpl(rewriter, matmulOp, tiles);
+}
+
 FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                 linalg::GenericOp matmulOp) {
@@ -505,11 +516,13 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
       ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<utils::IteratorType>{
-          utils::IteratorType::parallel, utils::IteratorType::parallel,
-          utils::IteratorType::reduction, utils::IteratorType::parallel,
-          utils::IteratorType::parallel, utils::IteratorType::reduction,
-          utils::IteratorType::reduction},
+      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());

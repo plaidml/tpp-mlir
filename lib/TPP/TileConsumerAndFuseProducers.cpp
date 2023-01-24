@@ -67,53 +67,27 @@ static bool hasConvolutionLikeProducer(linalg::LinalgOp linalgOp) {
   return false;
 }
 
-// Return the range as int64_t for `range` if we can statically compute it,
-// otherwise return std::nullopt.
-static std::optional<int64_t> getSizeRangeAtIdx(const Range &range) {
-  std::optional<int64_t> stride = getConstantIntValue(range.stride);
-  if (!stride || *stride != 1)
-    return std::nullopt;
-  std::optional<int64_t> offset = getConstantIntValue(range.offset);
-  if (!offset)
-    return std::nullopt;
-  std::optional<int64_t> size = getConstantIntValue(range.size);
-  if (!size)
-    return std::nullopt;
-  return (*size - *offset);
-}
-
 // Return true if `op` can be tiled using `tileSizes`. Require to statically
 // know the range and the tile factor. The tile must be full.
 static bool canBeTiledWithCurrentSpec(Operation *op,
-                                      ArrayRef<int64_t> tileSizes) {
-  assert(isa<TilingInterface>(op) &&
+                                      ArrayRef<OpFoldResult> tileSizes) {
+  assert(isa<linalg::LinalgOp>(op) &&
          "expect an op implementing the tiling interface");
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
-  OpBuilder builder(op);
-  SmallVector<Range> iterationDomain =
-      cast<TilingInterface>(op).getIterationDomain(builder);
   SmallVector<utils::IteratorType> loopIteratorTypes =
       cast<TilingInterface>(op).getLoopIteratorTypes();
-  if (tileSizes.size() > iterationDomain.size())
+  if (tileSizes.size() > loopIteratorTypes.size())
     return false;
 
-  for (size_t tileIdx = 0, idxEnd = tileSizes.size(); tileIdx < idxEnd;
-       tileIdx++) {
-    // Allow tiling only on parallel loop iterators.
+  if (!linalgx::utils::validateFullTilesOnDims(cast<linalg::LinalgOp>(op),
+                                               tileSizes))
+    return false;
+
+  // Require tiling on parallel dimensions only.
+  for (auto tileIdx : llvm::seq<size_t>(0, tileSizes.size()))
     if (!linalg::isParallelIterator(loopIteratorTypes[tileIdx]))
       return false;
-    std::optional<int64_t> sizeRangeAtIdx =
-        getSizeRangeAtIdx(iterationDomain[tileIdx]);
-    // Non constant range. Bail out and do not add the op as candidate.
-    if (!sizeRangeAtIdx)
-      return false;
-    // Skip tile equals 0. A '0' tile means skip this dimension.
-    if (tileSizes[tileIdx] == 0)
-      continue;
-    // Fail if the tile is not a full tile.
-    if (*sizeRangeAtIdx % tileSizes[tileIdx] != 0)
-      return false;
-  }
+
   // Candidate op is good to go.
   return true;
 }
@@ -139,12 +113,12 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 
 // Return the tile sizes as bit vector.
 static llvm::SmallBitVector
-getTileBitVectorConfig(ArrayRef<int64_t> tileSizes,
+getTileBitVectorConfig(ArrayRef<OpFoldResult> tileSizes,
                        size_t rootConsumerParallelLoops) {
   assert(tileSizes.size() <= rootConsumerParallelLoops);
   llvm::SmallBitVector tileConfig(rootConsumerParallelLoops, false);
   for (size_t idx : llvm::seq<size_t>(0, tileSizes.size()))
-    if (tileSizes[idx] != 0)
+    if (!isConstantIntValue(tileSizes[idx], 0))
       tileConfig.set(idx);
   return tileConfig;
 }
@@ -207,7 +181,7 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
 static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
                                             Operation *producer,
                                             Operation *rootConsumer,
-                                            ArrayRef<int64_t> tileSizes) {
+                                            ArrayRef<OpFoldResult> tileSizes) {
   assert(operand.get().getDefiningOp() == producer);
   Operation *consumer = operand.getOwner();
   assert(isa<linalg::LinalgOp>(producer) && "producer must be a linalgOp");
@@ -277,11 +251,18 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
 // Tile the consumer and return the tiled result.
 static FailureOr<scf::SCFTilingResult>
 tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
-             ArrayRef<int64_t> tileSizes) {
+             ArrayRef<OpFoldResult> tileSizes) {
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
   assert(canBeTiledWithCurrentSpec(consumer, tileSizes) &&
          "expect valid tile sizes");
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
+  auto tileSizeComputationFunction = [tileSizes](OpBuilder &builder,
+                                                 Operation *op) {
+    OpBuilder::InsertionGuard guard(builder);
+    return getAsValues(builder, op->getLoc(), tileSizes);
+  };
+  auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
+      tileSizeComputationFunction);
+
   FailureOr<scf::SCFTilingResult> tilingResult =
       scf::tileUsingSCFForOp(rewriter, consumer, options);
   return tilingResult;
@@ -304,7 +285,7 @@ bool hasAllUsersInWorklist(Operation *op,
 // Return a list of op that can be fused together based on what has already been
 // fused and the current tile specification.
 static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
-    TilingInterface rootConsumer, ArrayRef<int64_t> tileSizes,
+    TilingInterface rootConsumer, ArrayRef<OpFoldResult> tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
     return {};
@@ -353,11 +334,10 @@ getUntiledProducerFromSliceSource(OpOperand *source,
   return source->get().getDefiningOp();
 }
 
-// TODO: tileSizes should be OpFoldResult.
 // Entry point for fusion.
 static FailureOr<scf::SCFTileAndFuseResult>
 fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
-                ArrayRef<int64_t> tileSizes,
+                ArrayRef<OpFoldResult> tileSizes,
                 llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   // Step 0. Early exit if tileSizes are empty.
   if (tileSizes.empty()) {
@@ -488,9 +468,10 @@ struct TileConsumerAndFuseProducers
           tileSizes = getDefaultTileSizes();
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
-            fuseWithEltwise(rewriter,
-                            cast<TilingInterface>(linalgOp.getOperation()),
-                            tileSizes, fusedOps);
+            fuseWithEltwise(
+                rewriter, cast<TilingInterface>(linalgOp.getOperation()),
+                getAsOpFoldResult(rewriter.getI64ArrayAttr(tileSizes)),
+                fusedOps);
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (succeeded(fuseAndTileResult)) {
           rewriter.replaceOp(
