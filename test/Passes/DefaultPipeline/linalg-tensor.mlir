@@ -138,43 +138,41 @@ func.func @conv2d_1x1_decomposed(
 // CHECK-SAME:  %[[ARG1:.+]]: memref<256x512xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<512xf32>,
 // CHECK-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
-module @predict_function  {
-  func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
-    %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
+func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
+  %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
 
-    // Identity
-    // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
-    // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
-    %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
+  // Identity
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
+  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
-    } -> tensor<128x512xf32>
+  } -> tensor<128x512xf32>
 
-    // Matmul
-    // CHECK: call @xsmm_matmul_dispatch
-    // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
-    // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
-    %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
+  // Matmul
+  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
+  // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
+  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
+  %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
       %16 = arith.mulf %arg9, %arg10 : f32
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
-    } -> tensor<128x512xf32>
+  } -> tensor<128x512xf32>
 
-    // Relu
-    // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
-    %c0 = arith.constant 0.0 : f32
-    %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
+  // Relu
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
+  %c0 = arith.constant 0.0 : f32
+  %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
       %16 = arith.maxf %arg9, %c0 : f32
       linalg.yield %16 : f32
-    } -> tensor<128x512xf32>
+  } -> tensor<128x512xf32>
 
-    // CHECK: return
-    return %3 : tensor<128x512xf32>
-  }
+  // CHECK: return
+  return %3 : tensor<128x512xf32>
 }
