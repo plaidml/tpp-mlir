@@ -1,5 +1,7 @@
 add_subdirectory(Dialect)
 
+get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+
 add_mlir_library(MLIRTPP
   # Passes 
     MapLinalgToTpp.cpp
@@ -44,6 +46,7 @@ add_mlir_library(MLIRTPP
 
     MLIRIR
     MLIRInferTypeOpInterface
+    ${mlir_dialect_libs}
 )
 
 target_include_directories(MLIRTPP
