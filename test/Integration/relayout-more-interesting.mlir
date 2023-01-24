@@ -5,6 +5,17 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -expand-strided-metadata -lower-affine | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 #accessesToBlock = [
   affine_map<(n1, c1, n2, c2) -> (n1 * 2 + n2, c1 * 2 + c2)>,
   affine_map<(n1, c1, n2, c2) -> (n1, c1, n2, c2)>

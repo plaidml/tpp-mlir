@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes -buffer-results-to-out-params -buffer-deallocation  | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes | FileCheck %s
 //
 
 // ----------------------
@@ -77,7 +77,7 @@
 
 //
 // CHECK-LABEL: @mobilenet(
-// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>, %[[arg:.*]]: memref<1x1001xf32>) {
+// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1001xf32> {
 //
 func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   //

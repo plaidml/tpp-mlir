@@ -298,8 +298,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
       int64_t ldi = 1;
       return {ldi, bCast};
     }
-    ArrayRef<int64_t> shapeInput =
-        identityOp.getInput().getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
     auto isOne = [](int64_t val) { return val == 1; };
     if (llvm::all_of(shapeInput, isOne)) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
@@ -307,8 +306,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
       return {ldi, bCast};
     }
 
-    ArrayRef<int64_t> shapeOutput =
-        identityOp.getOutput().getType().cast<ShapedType>().getShape();
+    Type outputType = identityOp.getOutput().getType();
+
+    ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
     assert(shapeOutput.size() >= shapeInput.size() &&
            "output rank must be >= input rank");
     SmallVector<int64_t, 4> bShapeInput;
@@ -318,19 +318,19 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
 
     if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
-      int64_t ldi = shapeInput[1];
+      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>(), 1);
       return {ldi, bCast};
     }
 
     if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_COL;
-      int64_t ldi = shapeInput[1];
+      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>());
       return {ldi, bCast};
     }
 
     if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
       xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
-      int64_t ldi = shapeInput[1];
+      int64_t ldi = *getLeadingDim(inputType.cast<MemRefType>());
       return {ldi, bCast};
     }
     assert(false && "failed to get ldi and bCast for identity");
@@ -459,10 +459,11 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
     MemRefType outputMemRef = outputType.cast<MemRefType>();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
            "expect memref with rank 1 or 2");
-    
+
     int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
-    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1] : outputMemRef.getShape()[0];
-    
+    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
+                                              : outputMemRef.getShape()[0];
+
     auto ldiLhsDim = getLeadingDim(addOp.getLhs().getType().cast<MemRefType>());
     if (failed(ldiLhsDim))
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on lhs");

@@ -22,6 +22,7 @@ namespace linalg {
 class LinalgOp;
 } // namespace linalg
 
+namespace linalgx {
 namespace utils {
 
 // Given an opOperand and a range of ivs return the one used by the operands.
@@ -55,7 +56,7 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     unsigned upTo);
 
 } // namespace utils
-
+} // namespace linalgx
 } // namespace mlir
 
 #endif

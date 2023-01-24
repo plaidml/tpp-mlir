@@ -95,9 +95,12 @@ public:
   /// Create main wrapper function, sets insertion point
   LogicalResult createMainWrapper();
 
-  /// Calls the kernel, returns the result, which is either
+  /// Creates and returns a call to the kernel.
+  Operation *callKernel(llvm::SmallVector<llvm::StringRef> &);
+
+  /// Returns the result of a kernel call, which is either
   /// the return value (if any) or the last argument (outs).
-  Value callKernel(llvm::SmallVector<llvm::StringRef> &);
+  Value getKernelResult(Operation *kernelCall);
 
   /// Create a benchmarking region around the kernel call
   /// Returns the memref containing measured time deltas
@@ -111,6 +114,9 @@ public:
 
   /// Prints the memref as a vector read + print
   LogicalResult printMemRef(Value);
+
+  /// Prints the result of a kernel call
+  LogicalResult printResult(Operation *kernelCall);
 
   /// Terminates the function, issuing a return, lower to LLVM
   LogicalResult finalize();

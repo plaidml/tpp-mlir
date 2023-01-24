@@ -67,7 +67,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
-std::unique_ptr<OperationPass<ModuleOp>> createConvertCheckToLoopsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertCheckToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertVNNIToTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToXsmmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -84,10 +84,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMapToBatchReduceGEMMPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createDecomposeConvToMatmulOrBrgemmPass();
+createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>> createDefaultTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGeneralizeTensorPackAndUnPackPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createRaiseToParallelLoopPass();
 
 } // namespace tpp
 } // namespace mlir

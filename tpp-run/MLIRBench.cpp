@@ -125,7 +125,7 @@ LogicalResult MLIRBench::createMainWrapper() {
   return success();
 }
 
-Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
+Operation *MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
   // Get those globals as arguments (function insertion point)
   // Cache locally, so we can avoid doing it again inside the loop
   if (kernelArgs.empty()) {
@@ -141,19 +141,28 @@ Value MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
     }
   }
 
-  // Call the Kernel, making sure to set the result to either the return value
-  // or the last argument, if the return is void.
-  Value result;
+  // Call the kernel
+  auto call = builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
+
+  // Cleanup kernel result if the returned value is a buffer
   auto funcType = kernel.getFunctionType();
-  if (funcType.getNumResults() == 0) {
-    builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
-    result = kernelArgs.back();
-  } else {
-    auto call = builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
-    result = call->getOpResult(0);
+  if (funcType.getNumResults() != 0) {
+    auto result = call->getOpResult(0);
+
+    if (dyn_cast_or_null<MemRefType>(result.getType()))
+      builder.create<memref::DeallocOp>(unkLoc, result);
   }
 
-  return result;
+  return call;
+}
+
+Value MLIRBench::getKernelResult(Operation *kernelCall) {
+  // Set the result to either the return value or the last argument, if the
+  // kernel return is void.
+  auto funcType = kernel.getFunctionType();
+
+  return funcType.getNumResults() == 0 ? kernelArgs.back()
+                                       : kernelCall->getOpResult(0);
 }
 
 Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
@@ -222,6 +231,8 @@ void MLIRBench::printVector(Value vector) {
 }
 
 LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
+  OpBuilder::InsertionGuard guard(builder);
+
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
@@ -273,11 +284,17 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
       unkLoc, vecType, memRef, ValueRange{beginIdx, zero}, minusOne);
   printVector(vector);
 
-  // Back to main
-  builder.setInsertionPointAfter(loop);
-
   // Finally lower to LLVM Dialect
   return success();
+}
+
+LogicalResult MLIRBench::printResult(Operation *kernelCall) {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // Build print logic directly after the kernel call.
+  builder.setInsertionPointAfter(kernelCall);
+
+  return printMemRef(getKernelResult(kernelCall));
 }
 
 LogicalResult MLIRBench::finalize() {

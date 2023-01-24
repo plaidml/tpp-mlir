@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 
@@ -109,14 +110,14 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 
   SmallVector<Value> slicedOperands;
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+    FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 3);
     if (failed(slicedOperand))
       return failure();
     slicedOperands.push_back(*slicedOperand);
   }
   for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-    FailureOr<Value> slicedOperand = utils::getSliceOperand(
+    FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
         builder, operand, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedOperand))
       return failure();
@@ -149,15 +150,15 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
-  // materialize outer loops
+  // Materialize outer loops.
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
   FailureOr<SmallVector<Range>> maybeLoopRanges =
-      mlir::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
+      linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
   if (failed(maybeLoopRanges))
     return failure();
   SmallVector<Range> loopRanges = *maybeLoopRanges;
 
-  // replace linalgOp with BRGEMM.
+  // Replace linalgOp with BRGEMM.
   SmallVector<Value> ivs, tensorResults;
   auto brgemmBuilder = [&](OpBuilder &builder, Location loc,
                            ValueRange localIvs,
@@ -254,6 +255,7 @@ struct MapToBatchReduceGEMM
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     patterns.add<DoItOnGeneric>(patterns.getContext());
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }

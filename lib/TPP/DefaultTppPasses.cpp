@@ -68,7 +68,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addPass(createTransformDropSchedulePass());
 
     // Preprocess convolutions.
-    pm.addNestedPass<func::FuncOp>(createDecomposeConvToMatmulOrBrgemmPass());
+    pm.addNestedPass<func::FuncOp>(createRewriteConvToMatmulOrBrgemmPass());
 
     // Generalize tensor.pack and tensor.unpack.
     pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
