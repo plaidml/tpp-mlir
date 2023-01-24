@@ -91,6 +91,8 @@ createGeneralizeTensorPackAndUnPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createRaiseToParallelLoopPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createInterchangeBlockConvToExposeMatmulPass();
 
 } // namespace tpp
 } // namespace mlir
