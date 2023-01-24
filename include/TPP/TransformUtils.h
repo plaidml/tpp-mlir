@@ -57,6 +57,9 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
 // Return true if the convolution is blocked.
 bool isBlockedConvolution(linalg::LinalgOp linalgOp);
 
+// Return true if the matmul is blocked.
+bool isBlockedMatmul(linalg::LinalgOp linalgOp);
+
 } // namespace utils
 } // namespace linalgx
 } // namespace mlir

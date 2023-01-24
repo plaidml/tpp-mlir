@@ -205,6 +205,12 @@ bool isBlockedConvolution(linalg::LinalgOp linalgOp) {
   return tpp::utils::hasMatmulBody(linalgOp);
 }
 
+// TODO: Check indexing maps and iterator types. They should
+// match the one of a packed matmul.
+bool isBlockedMatmul(linalg::LinalgOp linalgOp) {
+  return tpp::utils::hasMatmulBody(linalgOp);
+}
+
 } // namespace utils
 
 } // namespace linalgx
