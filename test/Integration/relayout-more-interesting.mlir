@@ -1,9 +1,20 @@
-// RUN: tpp-opt %s -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
+
+// Validate default pipeline
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -expand-strided-metadata -lower-affine | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
 
 #accessesToBlock = [
   affine_map<(n1, c1, n2, c2) -> (n1 * 2 + n2, c1 * 2 + c2)>,
@@ -31,7 +42,7 @@ func.func @entry() {
         [ 1.6, 2.6, 3.6, 4.6, 5.6, 6.6, 7.6, 8.6, 9.6, 10.6, 11.6, 12.6, 13.6, 14.6, 15.6, 16.6 ]
   ]> : tensor<6x16xf32>
 
-  %0 = tensor.empty() : tensor<3x8x2x2xf32>
+  %0 = bufferization.alloc_tensor() : tensor<3x8x2x2xf32>
   %1 = linalg.generic #traitToBlock
       ins(%d: tensor<6x16xf32>)
       outs(%0: tensor<3x8x2x2xf32>) {
@@ -68,7 +79,7 @@ func.func @entry() {
   //
   vector.print %v0 : vector<3x8x2x2xf32>
 
-  %2 = tensor.empty() : tensor<6x16xf32>
+  %2 = bufferization.alloc_tensor() : tensor<6x16xf32>
   %3 = linalg.copy ins(%d: tensor<6x16xf32>) outs(%2: tensor<6x16xf32>) -> tensor<6x16xf32>
   %4 = tensor.collapse_shape %3 [[0, 1]] : tensor<6x16xf32> into tensor<96xf32>
   %5 = tensor.expand_shape %4 [[0, 1, 2, 3]] : tensor<96xf32> into tensor<3x8x2x2xf32>

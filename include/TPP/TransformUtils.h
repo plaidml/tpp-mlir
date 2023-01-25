@@ -1,6 +1,3 @@
-#ifndef TPP_TRANSFORMUTILS_H
-#define TPP_TRANSFORMUTILS_H
-
 //===- TransformUtils.cpp ----------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef TPP_TRANSFORMUTILS_H
+#define TPP_TRANSFORMUTILS_H
 
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -22,6 +22,7 @@ namespace linalg {
 class LinalgOp;
 } // namespace linalg
 
+namespace linalgx {
 namespace utils {
 
 // Given an opOperand and a range of ivs return the one used by the operands.
@@ -55,7 +56,7 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     unsigned upTo);
 
 } // namespace utils
-
+} // namespace linalgx
 } // namespace mlir
 
 #endif

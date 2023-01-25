@@ -13,9 +13,9 @@ include "XsmmDialect.td"
 include "XsmmAttr.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [1, 2, 3, 4]>, AnyFloat, I64]>;
-def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [2]>]>;
-def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[AnyFloat], [4]>]>;
+def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, F32, BF16, I64]>;
+def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [2]>]>;
+def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
 
 //===----------------------------------------------------------------------===//
 // TernaryOp

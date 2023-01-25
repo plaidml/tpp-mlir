@@ -1,4 +1,4 @@
-//===- DecomposeConvToMatmul.cpp ---------------------------------*- C++-*-===//
+//===- RewriteConvToMatmul.cpp -----------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -72,7 +72,7 @@ static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
   return ((filterShape[i] == 1) && (filterShape[j] == 1));
 }
 
-struct MapConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
+struct RewriteConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   bool
@@ -289,7 +289,7 @@ struct InterchangeIteratorsConv2DNchwFchw
 // Given a blocked convolution where the dimensions have been interchanged
 // to expose a GEMM. Materialize outer loops and map the three innermost
 // ones to a linalg.matmul operation.
-struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
+struct RewriteConv2DNchwFchwToMatmul : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   bool hasInterchangedDims(linalg::GenericOp linalgOp) const {
@@ -311,7 +311,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
   // Make sure we are dealing with a generic 'Conv2DNchwFchwOp' blocked
   // with interchanged dimensions.
   LogicalResult
-  decomposeConv2DNchwFchwPreconditions(linalg::GenericOp linalgOp) const {
+  rewriteConv2DNchwFchwPreconditions(linalg::GenericOp linalgOp) const {
     if (!tpp::utils::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
       return failure();
     if (!hasInterchangedDims(linalgOp))
@@ -321,7 +321,7 @@ struct DecomposeConv2DNchwFchw : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (failed(decomposeConv2DNchwFchwPreconditions(linalgOp)))
+    if (failed(rewriteConv2DNchwFchwPreconditions(linalgOp)))
       return failure();
     FailureOr<linalg::MatmulOp> matmul =
         mlir::linalgx::mapConvToMatmul(rewriter, linalgOp);
@@ -565,15 +565,15 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
 
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
 // TODO: Add pattern matching for the packed version too.
-void populateConv2DNhwcHwcfOpDecomposePatterns(RewritePatternSet &patterns) {
-  patterns.insert<GeneralizeConv2DNhwcHwcf, MapConv2DNhwcHwcfToMatmul,
+void populateConv2DNhwcHwcfOpRewritePatterns(RewritePatternSet &patterns) {
+  patterns.insert<GeneralizeConv2DNhwcHwcf, RewriteConv2DNhwcHwcfToMatmul,
                   InterchangeIteratorsConv2DNhwcHwcf>(patterns.getContext());
 }
 
 // patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
-void populateconv2DNchwFchwOpDecomposePatterns(
-    RewritePatternSet &patterns, ArrayRef<int64_t> blockingFactors,
-    bool enableBrgemm) {
+void populateconv2DNchwFchwOpRewritePatterns(RewritePatternSet &patterns,
+                                             ArrayRef<int64_t> blockingFactors,
+                                             bool enableBrgemm) {
   // clang-format off
   // init: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
   // blocking: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
@@ -587,9 +587,8 @@ void populateconv2DNchwFchwOpDecomposePatterns(
   if (!enableBrgemm) {
     patterns.insert<BlockConv2DNchwFchw>(patterns.getContext(),
                                          blockingFactors);
-    patterns
-        .insert<DecomposeConv2DNchwFchw, InterchangeIteratorsConv2DNchwFchw>(
-            patterns.getContext());
+    patterns.insert<RewriteConv2DNchwFchwToMatmul,
+                    InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
   }
   // this is for BRGEMM
   else {
@@ -601,23 +600,23 @@ void populateconv2DNchwFchwOpDecomposePatterns(
   }
 }
 
-struct DecomposeConvToMatmulOrBrgemm
-    : public DecomposeConvToMatmulOrBrgemmBase<DecomposeConvToMatmulOrBrgemm> {
-  DecomposeConvToMatmulOrBrgemm() = default;
-  DecomposeConvToMatmulOrBrgemm(bool enableBrgemm,
-                                ArrayRef<int64_t> blockingFactors) {
+struct RewriteConvToMatmulOrBrgemm
+    : public RewriteConvToMatmulOrBrgemmBase<RewriteConvToMatmulOrBrgemm> {
+  RewriteConvToMatmulOrBrgemm() = default;
+  RewriteConvToMatmulOrBrgemm(bool enableBrgemm,
+                              ArrayRef<int64_t> blockingFactors) {
     this->enableBrgemm = enableBrgemm;
     this->blockingFactors = blockingFactors;
   }
-  DecomposeConvToMatmulOrBrgemm(ArrayRef<int64_t> blockingFactors) {
+  RewriteConvToMatmulOrBrgemm(ArrayRef<int64_t> blockingFactors) {
     this->enableBrgemm = false;
     this->blockingFactors = blockingFactors;
   }
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
-    populateConv2DNhwcHwcfOpDecomposePatterns(patterns);
-    populateconv2DNchwFchwOpDecomposePatterns(patterns, blockingFactors,
-                                              enableBrgemm);
+    populateConv2DNhwcHwcfOpRewritePatterns(patterns);
+    populateconv2DNchwFchwOpRewritePatterns(patterns, blockingFactors,
+                                            enableBrgemm);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -627,6 +626,6 @@ struct DecomposeConvToMatmulOrBrgemm
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createDecomposeConvToMatmulOrBrgemmPass() {
-  return std::make_unique<DecomposeConvToMatmulOrBrgemm>();
+mlir::tpp::createRewriteConvToMatmulOrBrgemmPass() {
+  return std::make_unique<RewriteConvToMatmulOrBrgemm>();
 }
