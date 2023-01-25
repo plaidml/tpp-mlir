@@ -17,6 +17,7 @@ namespace mlir {
 class OpBuilder;
 struct Range;
 class RewriterBase;
+class TilingInterface;
 
 namespace linalg {
 class LinalgOp;
@@ -64,7 +65,7 @@ bool isBlockedMatmul(linalg::LinalgOp linalgOp);
 // Specific dims can be passed using 'dims'. If dims is empty the validation
 // will start from the outermost dimension, moving to innermost ones up to the
 // number of tiles.
-bool validateFullTilesOnDims(linalg::LinalgOp linalgOp,
+bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
                              ArrayRef<size_t> dims = {});
 

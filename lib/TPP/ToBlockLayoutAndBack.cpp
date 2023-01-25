@@ -355,8 +355,9 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
                                     linalg::Conv2DNhwcHwcfOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
-  if (!linalgx::utils::validateFullTilesOnDims(convOp, tiles,
-                                               {/*Kidx=*/3, /*Cidx=*/6}))
+  if (!linalgx::utils::validateFullTilesOnDims(
+          cast<TilingInterface>(convOp.getOperation()), tiles,
+          {/*Kidx=*/3, /*Cidx=*/6}))
     return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
@@ -370,8 +371,9 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
                                     linalg::Conv2DNchwFchwOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
-  if (!linalgx::utils::validateFullTilesOnDims(convOp, tiles,
-                                               {/*Kidx=*/1, /*Cidx=*/4}))
+  if (!linalgx::utils::validateFullTilesOnDims(
+          cast<TilingInterface>(convOp.getOperation()), tiles,
+          {/*Kidx=*/1, /*Cidx=*/4}))
     return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }

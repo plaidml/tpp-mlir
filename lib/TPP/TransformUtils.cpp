@@ -228,13 +228,12 @@ static bool isFullTile(int64_t tileFactor, int64_t range) {
   return range % tileFactor == 0;
 }
 
-static bool validateFullTilesOnDim(linalg::LinalgOp linalgOp,
+static bool validateFullTilesOnDim(TilingInterface tileOp,
                                    const OpFoldResult &tile, size_t dim) {
-  OpBuilder builder(linalgOp);
+  OpBuilder builder(tileOp);
   OpBuilder::InsertionGuard guard(builder);
   SmallVector<Range> iterationDomain =
-      cast<TilingInterface>(linalgOp.getOperation())
-          .getIterationDomain(builder);
+      cast<TilingInterface>(tileOp.getOperation()).getIterationDomain(builder);
   if (dim >= iterationDomain.size())
     return false;
 
@@ -253,7 +252,7 @@ static bool validateFullTilesOnDim(linalg::LinalgOp linalgOp,
   return isFullTile(*tileFactor, *rangeOnDim);
 }
 
-bool validateFullTilesOnDims(linalg::LinalgOp linalgOp,
+bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
                              ArrayRef<size_t> dims) {
   if (!dims.empty() && dims.size() != tiles.size())
@@ -269,7 +268,7 @@ bool validateFullTilesOnDims(linalg::LinalgOp linalgOp,
 
   size_t idxInTiles = 0;
   for (size_t dim : dimsToCheck) {
-    if (!validateFullTilesOnDim(linalgOp, tiles[idxInTiles++], dim))
+    if (!validateFullTilesOnDim(tileOp, tiles[idxInTiles++], dim))
       return false;
   }
   return true;

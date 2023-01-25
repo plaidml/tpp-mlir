@@ -71,7 +71,7 @@ static bool hasConvolutionLikeProducer(linalg::LinalgOp linalgOp) {
 // know the range and the tile factor. The tile must be full.
 static bool canBeTiledWithCurrentSpec(Operation *op,
                                       ArrayRef<OpFoldResult> tileSizes) {
-  assert(isa<linalg::LinalgOp>(op) &&
+  assert(isa<TilingInterface>(op) &&
          "expect an op implementing the tiling interface");
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
   SmallVector<utils::IteratorType> loopIteratorTypes =
@@ -79,7 +79,7 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   if (tileSizes.size() > loopIteratorTypes.size())
     return false;
 
-  if (!linalgx::utils::validateFullTilesOnDims(cast<linalg::LinalgOp>(op),
+  if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
                                                tileSizes))
     return false;
 
