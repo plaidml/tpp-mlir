@@ -300,12 +300,32 @@ static bool isBinaryOp(linalg::GenericOp linalgOp) {
   return false;
 }
 
-// Return true if the operands are all the same.
-static bool allOperandsHaveSameType(linalg::GenericOp linalgOp) {
+// Returns true if all the operands of the current linalgOp are shape type and
+// have the same statically-known shape. For example: A: memref<56x32xf32,
+// strided<[32, 1], offset: ?>> B: memref<56x32xf32> allOperandsHaveSameShape(A,
+// B) return true. C: memref<1x32xf32> allOperandsHaveSameShape(A, C) return
+// false.
+static bool allOperandsHaveSameShape(linalg::GenericOp linalgOp) {
+  if (!hasStaticShape(linalgOp))
+    return false;
   Type operandType = linalgOp->getOperand(0).getType();
+  if (!operandType.isa<ShapedType>())
+    return false;
+  // Validate rank.
+  int64_t rankOperand = operandType.cast<ShapedType>().getRank();
   for (Value operand : linalgOp->getOperands()) {
     Type currentType = operand.getType();
-    if (currentType != operandType)
+    if (!currentType.isa<ShapedType>())
+      return false;
+    if (currentType.cast<ShapedType>().getRank() != rankOperand)
+      return false;
+  }
+  // Validate shape.
+  ArrayRef<int64_t> shapeOperand = operandType.cast<ShapedType>().getShape();
+  for (Value operand : linalgOp->getOperands()) {
+    ArrayRef<int64_t> shapeCurrentOperand =
+        operand.getType().cast<ShapedType>().getShape();
+    if (shapeCurrentOperand != shapeOperand)
       return false;
   }
   return true;
@@ -317,7 +337,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
-  if (!allOperandsHaveSameType(linalgOp))
+  if (!allOperandsHaveSameShape(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());

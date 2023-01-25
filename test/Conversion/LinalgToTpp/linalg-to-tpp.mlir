@@ -128,7 +128,7 @@ func.func @add_mapping(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 
 // Scalar operands we don't expect any mapping to tpp.
 #map = affine_map<() -> ()>
-func.func @add_mapping(%arg0: memref<f32>, %arg1: memref<f32>) {
+func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
   // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map], 
@@ -146,7 +146,7 @@ func.func @add_mapping(%arg0: memref<f32>, %arg1: memref<f32>) {
 // We don't support broadcast for tpp.add. All operands must have the same type.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
-func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
+func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
   // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map1],

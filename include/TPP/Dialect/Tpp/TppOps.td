@@ -36,7 +36,7 @@ def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
 // Class for tpp binary operations.
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [SameTypeOperands])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [])> {
 
   let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
 

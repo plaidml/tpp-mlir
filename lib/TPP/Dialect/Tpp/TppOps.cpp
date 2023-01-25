@@ -139,6 +139,11 @@ LogicalResult AddOp::verify() {
   if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
       (!outputType.isa<ShapedType>()))
     return emitOpError("expects all operands to be shaped type");
+  ArrayRef<int64_t> shapeLhs = lhsType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeRhs = rhsType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeOut = outputType.cast<ShapedType>().getShape();
+  if ((shapeLhs != shapeRhs) || (shapeRhs != shapeOut))
+    return emitOpError("requires all operands to have the same shape");
   return success();
 }
 
