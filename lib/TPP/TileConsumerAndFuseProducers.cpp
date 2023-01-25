@@ -282,9 +282,9 @@ bool hasAllUsersInWorklist(Operation *op,
   return true;
 }
 
-// Return a list of op that can be fused together based on what has already been
-// fused and the current tile specification.
-static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
+// Return a list of producers op that can be fused together based on what has
+// already been fused and the current tile specification.
+static llvm::SmallDenseSet<Operation *> collectFusableProducers(
     TilingInterface rootConsumer, ArrayRef<OpFoldResult> tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
@@ -361,7 +361,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
   // Step 3. Collect the operations that can be tiled and fused.
   llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
-      collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
+      collectFusableProducers(consumer, tileSizes, alreadyFusedOps);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size()
                           << "\n");
   if (tiledAndFusedOpCandidates.size() == 1)
