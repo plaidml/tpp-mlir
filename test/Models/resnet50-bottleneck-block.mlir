@@ -9,6 +9,8 @@
 // RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
 // RUN: FileCheck %s
 
+// NOTE: This model file does not contain BatchNorm layers, as for inference, those layers are folded.
+
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map2 = affine_map<(d0) -> (d0)>
