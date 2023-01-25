@@ -5,8 +5,7 @@
 //
 
 // Validate default pipeline
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>

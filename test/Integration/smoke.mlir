@@ -17,7 +17,7 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes | \
+// RUN: tpp-opt %s -linalg-generalize-named-ops | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s

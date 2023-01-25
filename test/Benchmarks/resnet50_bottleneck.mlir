@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -n 10 -print \
+// RUN: tpp-run %s -n 10 -print \
 // RUN: -e resnet50_bottleneck_block -entry-point-result=void | \
 // RUN: FileCheck %s
 

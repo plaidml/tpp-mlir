@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 //
 

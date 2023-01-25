@@ -16,13 +16,12 @@
 // RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule | FileCheck -check-prefix=LINALG %s
 
 // Validate default pipeline
-// RUN: tpp-opt %s -transform-drop-schedule -default-tpp-passes | \
+// RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=CHECK-NOOPT
 
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 

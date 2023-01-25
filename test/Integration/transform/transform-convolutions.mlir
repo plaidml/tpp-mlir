@@ -16,7 +16,7 @@
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
 // Validate default pipeline
-// RUN: tpp-opt %s -transform-drop-schedule -default-tpp-passes | \
+// RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=LINALG

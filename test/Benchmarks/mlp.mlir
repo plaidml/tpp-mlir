@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -n 10 \
+// RUN: tpp-run %s -n 10 \
 // RUN:  -e entry -entry-point-result=void -print | \
 // RUN: FileCheck %s
 //

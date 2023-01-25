@@ -14,12 +14,11 @@
 //
 
 // Validate default pipeline
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=LINALG
 
-// RUN: tpp-opt %s -pack-conv2DNhwcHwcf="block-factors=2,2" -default-tpp-passes | \
+// RUN: tpp-opt %s -pack-conv2DNhwcHwcf="block-factors=2,2" | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=TRANSFORM
