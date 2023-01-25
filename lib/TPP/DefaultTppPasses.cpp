@@ -36,8 +36,11 @@ using namespace mlir::tpp;
 namespace {
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
-  DefaultTppPasses() = default;
-  DefaultTppPasses(bool tppToLoops) { this->tppToLoops = tppToLoops; };
+  DefaultTppPasses() : DefaultTppPasses(false){};
+  DefaultTppPasses(bool tppToLoops)
+      : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit) {
+    this->tppToLoops = tppToLoops;
+  };
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
@@ -61,7 +64,22 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
 
   void runOnOperation() override {
     ModuleOp module = getOperation();
-    PassManager pm(module.getContext(), mlir::OpPassManager::Nesting::Implicit);
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  OpPassManager pm;
+
+  // Create the default processing pipeline.
+  void constructPipeline() {
+    pm.clear();
 
     // Run transforms first and clean them up afterwards.
     pm.addPass(createTransformDialectInterpreterPass());
@@ -127,9 +145,6 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     pm.addPass(bufferization::createBufferDeallocationPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
   }
 };
 
