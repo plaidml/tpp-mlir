@@ -10,6 +10,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -27,6 +28,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
@@ -43,6 +45,7 @@ MLIRBench::MLIRBench(mlir::Operation *op)
   ctx->getOrLoadDialect<vector::VectorDialect>();
   ctx->getOrLoadDialect<scf::SCFDialect>();
   ctx->getOrLoadDialect<math::MathDialect>();
+  ctx->getOrLoadDialect<bufferization::BufferizationDialect>();
   ctx->getOrLoadDialect<perf::PerfDialect>();
 }
 
@@ -100,13 +103,58 @@ LogicalResult MLIRBench::renameKernel() {
   return success();
 }
 
+LogicalResult MLIRBench::allocKernelArgs(llvm::SmallVector<Value> &list) {
+  // Create global dense memrefs (Module insertion point)
+  auto &mainBody = getMainBlock();
+  builder.setInsertionPointToStart(&mainBody);
+
+  for (auto &ty : kernel.getArgumentTypes()) {
+    auto shapedTy = cast<ShapedType>(ty);
+    auto argBuff =
+        TypeSwitch<Type, llvm::Optional<Value>>(ty)
+            .Case<MemRefType>([&](auto t) {
+              return builder.create<memref::AllocOp>(
+                  unkLoc, MemRefType::get(shapedTy.getShape(),
+                                          shapedTy.getElementType()));
+            })
+            .Case<TensorType>([&](auto t) {
+              return builder.create<bufferization::AllocTensorOp>(
+                  unkLoc,
+                  RankedTensorType::get(shapedTy.getShape(),
+                                        shapedTy.getElementType()),
+                  ValueRange{});
+            })
+            .Default([&](auto t) { return std::nullopt; });
+    // auto shapedTy = cast<ShapedType>(ty);
+    // auto memRefTy =
+    //     MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
+
+    if (!argBuff)
+      return failure();
+
+    list.push_back(*argBuff);
+  }
+
+  builder.setInsertionPointToEnd(&mainBody);
+
+  module.dump();
+
+  return success();
+}
+
 LogicalResult
 MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
   // Create global dense memrefs (Module insertion point)
   builder.setInsertionPointToStart(&getModuleBlock());
   auto funcType = kernel.getFunctionType();
   for (auto &ty : funcType.getInputs()) {
-    auto memRefTy = dyn_cast_or_null<MemRefType>(ty);
+    // auto memRefTy = dyn_cast_or_null<MemRefType>(ty);
+    auto shapedTy = cast<ShapedType>(ty);
+    auto memRefTy =
+        MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
+    llvm::dbgs() << "### shape: " << shapedTy.getElementType() << "\n";
+    llvm::dbgs() << "### memRefTy: " << memRefTy << "\n";
+
     list.push_back(createGlobal(memRefTy));
   }
 
@@ -233,11 +281,16 @@ void MLIRBench::printVector(Value vector) {
 LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
   OpBuilder::InsertionGuard guard(builder);
 
+  auto outputType = cast<ShapedType>(memRef.getType());
+  // auto outputType =
+  //     MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
+
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
-  auto outputType = dyn_cast_or_null<MemRefType>(memRef.getType());
-  assert(outputType && "Unsupported return type");
+  // auto outputType = dyn_cast_or_null<MemRefType>(memRef.getType());
+  // module.dump();
+  // assert(outputType && "Unsupported return type");
   VectorType vecType;
   auto lastDim = outputType.getRank() - 1;
   ArrayRef<int64_t> outerDims(1);
@@ -399,6 +452,8 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
 Block &MLIRBench::getModuleBlock() {
   return module->getRegions().front().front();
 }
+
+Block &MLIRBench::getMainBlock() { return main.getBody().front(); }
 
 LogicalResult MLIRBench::emitError(llvm::Twine desc) {
   return module.emitError(desc);

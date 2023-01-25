@@ -74,6 +74,9 @@ class MLIRBench {
   /// Gets module's main block
   Block &getModuleBlock();
 
+  /// Gets main wrappers's block
+  Block &getMainBlock();
+
 public:
   /// Creates context, builder
   MLIRBench(Operation *op);
@@ -87,6 +90,8 @@ public:
 
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
+
+  LogicalResult allocKernelArgs(llvm::SmallVector<Value> &);
 
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order

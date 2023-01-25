@@ -84,14 +84,18 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.renameKernel()))
     return bench.emitError("Cannot rename kernel function");
 
+  // Creates the main wrapper
+  if (failed(bench.createMainWrapper()))
+    return bench.emitError("Cannot create main wrapper");
+
+  SmallVector<Value> list;
+  if (failed(bench.allocKernelArgs(list)))
+    return bench.emitError("Done");
+
   // Creates the inputs for the kernel as dense globals
   SmallVector<llvm::StringRef> globalList;
   if (failed(bench.createGlobals(globalList)))
     return bench.emitError("Cannot create the global memrefs");
-
-  // Creates the main wrapper
-  if (failed(bench.createMainWrapper()))
-    return bench.emitError("Cannot create main wrapper");
 
   // Call kernel once, to bootstrap (JIT compile, warm up caches)
   auto call = bench.callKernel(globalList);
