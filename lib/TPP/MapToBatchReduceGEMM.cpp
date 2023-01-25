@@ -202,12 +202,22 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 
 // Returns true if linalg op is using its second operand in VNNI format
 static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
-  auto secondOperandType =
-      linalgOp->getOperands()[1].getType().cast<ShapedType>();
-  if (linalgOp.getNumLoops() == 7 &&
-      secondOperandType.getElementType().isBF16() &&
-      secondOperandType.getShape()[secondOperandType.getRank() - 1] ==
-          vnni::utils::getVNNIBlockingFactor(secondOperandType)) {
+  if (linalgOp.getNumLoops() == 7 && linalgOp->getOperands().size() >= 3 &&
+      linalgOp->getOperands()[1]
+          .getType()
+          .cast<ShapedType>()
+          .getElementType()
+          .isBF16() &&
+      linalgOp->getOperands()[1]
+              .getType()
+              .cast<ShapedType>()
+              .getShape()[linalgOp->getOperands()[1]
+                              .getType()
+                              .cast<ShapedType>()
+                              .getRank() -
+                          1] ==
+          vnni::utils::getVNNIBlockingFactor(
+              linalgOp->getOperands()[1].getType())) {
     if (!linalgOp.hasBufferSemantics()) {
       for (auto &operand : linalgOp.getDpsInputOperands()) {
         if (operand->getOperandNumber() == 1) {
@@ -250,6 +260,9 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   if (!isa<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "expects a linalg.generic");
 
+  if (failed(checkBody(linalgOp)))
+    return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
+
   bool isVNNILoop = isLinalgOpVNNI(linalgOp);
   if ((!isVNNILoop && failed(checkStructure(linalgOp))) ||
       (isVNNILoop && failed(checkVNNIStructure(linalgOp))))
@@ -260,9 +273,6 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
       (isVNNILoop && failed(checkVNNIAccessPatterns(linalgOp))))
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match BRGEMM access patterns");
-
-  if (failed(checkBody(linalgOp)))
-    return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
   // Materialize outer loops
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
