@@ -7,6 +7,8 @@
 //   ResNet50 v1 architecture
 //---------------------------
 
+// NOTE: This model file does not contain BatchNorm layers, as for inference, those layers are folded.
+
 // Layer 1 - Conv2D, 7x7 filter, BiasAdd, ReLU
 // Layer 2 - MaxPool 3x3, stride 2.
 // Layer 3 - Conv block 1 - Conv2D, 1x1 filter, stride 1, BiasAdd
