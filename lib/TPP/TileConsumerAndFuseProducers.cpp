@@ -41,30 +41,9 @@ static bool isMatmulLike(Operation *op) {
   return false;
 }
 
-// Return true if the current linalgOp has a 'matmul-like' op has producers.
-static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
-  for (Value operand : linalgOp->getOperands()) {
-    Operation *op = operand.getDefiningOp<linalg::LinalgOp>();
-    if (op && isMatmulLike(op))
-      return true;
-  }
-  return false;
-}
-
 static bool isConvolutionLike(Operation *op) {
   if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
     return linalgx::utils::isBlockedConvolution(op);
-  return false;
-}
-
-// Return true if the current linalgOp has a 'convolution-like' op has
-// producers.
-static bool hasConvolutionLikeProducer(linalg::LinalgOp linalgOp) {
-  for (Value operand : linalgOp->getOperands()) {
-    Operation *op = operand.getDefiningOp<linalg::LinalgOp>();
-    if (op && isConvolutionLike(op))
-      return true;
-  }
   return false;
 }
 
@@ -283,38 +262,57 @@ bool hasAllUsersInWorklist(Operation *op,
   return true;
 }
 
+void incDepthAndSwap(std::queue<Operation *> &frontier,
+                     std::queue<Operation *> &nextFrontier, int64_t &depth) {
+  if (frontier.empty() && !nextFrontier.empty()) {
+    std::swap(frontier, nextFrontier);
+    depth++;
+  }
+}
+
 // Return a list of producers op that can be fused together based on what has
 // already been fused and the current tile specification.
 static llvm::SmallDenseSet<Operation *> collectFusableProducers(
     TilingInterface rootConsumer, ArrayRef<OpFoldResult> tileSizes,
-    const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
+    const llvm::SmallDenseSet<Operation *> &alreadyFusedOps, int64_t maxDepth) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
     return {};
   if (!canBeTiledWithCurrentSpec(rootConsumer, tileSizes))
     return {};
 
   llvm::SmallDenseSet<Operation *> worklist;
-  SmallVector<Operation *> processingQueue;
-  processingQueue.push_back(rootConsumer);
+  std::queue<Operation *> processingQueue;
+  std::queue<Operation *> nextProcessingQueue;
+  processingQueue.push(rootConsumer);
   worklist.insert(rootConsumer);
   LLVM_DEBUG(llvm::dbgs() << "WORKLIST INSERT CONSUMER: "
                           << rootConsumer.getOperation() << "\n");
-
+  LLVM_DEBUG(
+      llvm::dbgs()
+          << "---------------------------------------------------------\n";
+      llvm::dbgs() << *rootConsumer.getOperation();
+      llvm::dbgs()
+      << "\n---------------------------------------------------------\n";);
+  int64_t depth = 0;
   while (!processingQueue.empty()) {
-    Operation *currentOp = processingQueue.pop_back_val();
+    if (depth >= maxDepth)
+      break;
+    Operation *currentOp = processingQueue.front();
+    processingQueue.pop();
     for (OpOperand &operand : currentOp->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
-      if (!producer || !isa<linalg::LinalgOp>(producer) ||
-          worklist.count(producer) || producer->getNumResults() != 1 ||
-          alreadyFusedOps.count(producer) ||
-          !hasCompatibleOuterParallelLoops(operand, producer, rootConsumer,
-                                           tileSizes) ||
-          !hasAllUsersInWorklist(producer, worklist))
-        continue;
-      LLVM_DEBUG(llvm::dbgs()
-                 << "WORKLIST INSERT PRODUCER: " << producer << "\n");
-      processingQueue.push_back(producer);
-      worklist.insert(producer);
+      if (producer && isa<linalg::LinalgOp>(producer) &&
+          !worklist.count(producer) && producer->getNumResults() == 1 &&
+          !alreadyFusedOps.count(producer) &&
+          hasCompatibleOuterParallelLoops(operand, producer, rootConsumer,
+                                          tileSizes) &&
+          hasAllUsersInWorklist(producer, worklist)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "WORKLIST INSERT PRODUCER: " << producer << "\n");
+        nextProcessingQueue.push(producer);
+        incDepthAndSwap(processingQueue, nextProcessingQueue, depth);
+        worklist.insert(producer);
+      }
     }
   }
   return worklist;
@@ -339,7 +337,8 @@ getUntiledProducerFromSliceSource(OpOperand *source,
 static FailureOr<scf::SCFTileAndFuseResult>
 fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
                 ArrayRef<OpFoldResult> tileSizes,
-                llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
+                llvm::SmallDenseSet<Operation *> &alreadyFusedOps,
+                int64_t maxDepth) {
   // Step 0. Early exit if tileSizes are empty.
   if (tileSizes.empty()) {
     LLVM_DEBUG(llvm::dbgs() << "EMPTY TILE SIZES\n");
@@ -362,9 +361,9 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
   // Step 3. Collect the operations that can be tiled and fused.
   llvm::SmallDenseSet<Operation *> worklist =
-      collectFusableProducers(consumer, tileSizes, alreadyFusedOps);
+      collectFusableProducers(consumer, tileSizes, alreadyFusedOps, maxDepth);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
-  if (worklist.size() == 1)
+  if (worklist.size() == 0)
     return failure();
 
   // Step 4. Tile the consumer.
@@ -407,13 +406,11 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
     // Find the candidate operation potentially walking bbArgs in scf.for.
     // If we find a candidate we check if it is in our worklist and fuse it
-    // only if so.
+    // only if so. We do not consider the candidate if it is already fused.
     Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
-    if (!candidateOp || worklist.count(candidateOp) == 0)
-      continue;
-    // If the op is already fused to not fuse again.
-    if (alreadyFusedOps.count(candidateOp))
+    if (!candidateOp || worklist.count(candidateOp) == 0 ||
+        alreadyFusedOps.count(candidateOp))
       continue;
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
@@ -436,15 +433,29 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
       LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
       alreadyFusedOps.insert(tiledAndFusedOp);
       LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledAndFusedOp << "\n");
-      if (auto metadata = untiledProducer->getAttr("metadata")) {
+      // This is for debug.
+      if (auto metadata = untiledProducer->getAttr("metadata"))
         tiledAndFusedOp->setAttr("metadata", metadata);
-      }
     }
   }
   return tileAndFuseResult;
 }
 
 static SmallVector<int64_t> getDefaultTileSizes() { return {32, 32}; }
+
+static FailureOr<Operation *>
+getImmediateElementWiseConsumer(linalg::LinalgOp linalgOp) {
+  assert(linalgOp->getNumResults() == 1);
+  Value res = linalgOp->getResult(0);
+  // If we allow use, we may end up doing recomputation. Unclear if it is
+  // profitablem thus disallow for now.
+  if (!res.hasOneUse())
+    return failure();
+  Operation *consumer = *(res.getUsers().begin());
+  if (!isa<linalg::LinalgOp>(consumer) || !linalg::isElementwise(consumer))
+    return failure();
+  return consumer;
+}
 
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
@@ -463,18 +474,40 @@ struct TileConsumerAndFuseProducers
     // Set to keep track of fused ops.
     llvm::SmallDenseSet<Operation *> fusedOps;
 
+    SmallVector<Operation *> linalgOperations;
     func->walk([&](linalg::LinalgOp linalgOp) {
-      if (linalg::isElementwise(linalgOp) &&
-          (hasMatmulLikeProducer(linalgOp) ||
-           hasConvolutionLikeProducer(linalgOp))) {
-        if (tileSizes.empty())
-          tileSizes = getDefaultTileSizes();
+      if (isConvolutionLike(linalgOp) || isMatmulLike(linalgOp))
+        linalgOperations.push_back(linalgOp.getOperation());
+    });
+
+    llvm::SmallDenseSet<Operation *> immediateConsumers;
+    if (this->immediateConsumer) {
+      for (linalg::LinalgOp linalgOp : linalgOperations) {
+        FailureOr<Operation *> immediateConsumer =
+            getImmediateElementWiseConsumer(linalgOp);
+        if (failed(immediateConsumer))
+          continue;
+        // If we alredy have the consumer in the set, it is already processed,
+        // move to the next.
+        if (immediateConsumers.count(*immediateConsumer))
+          continue;
+        immediateConsumers.insert(*immediateConsumer);
+      }
+    } else {
+      for (Operation *currentOp : linalgOperations)
+        immediateConsumers.insert(currentOp);
+    }
+
+    func->walk([&](linalg::LinalgOp linalgOp) {
+      if (immediateConsumers.count(linalgOp.getOperation())) {
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
+        if (this->tileSizes.empty())
+          this->tileSizes = getDefaultTileSizes();
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
             fuseWithEltwise(
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
-                getAsOpFoldResult(rewriter.getI64ArrayAttr(tileSizes)),
-                fusedOps);
+                getAsOpFoldResult(rewriter.getI64ArrayAttr(this->tileSizes)),
+                fusedOps, this->maxDepth);
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (succeeded(fuseAndTileResult)) {
           rewriter.replaceOp(

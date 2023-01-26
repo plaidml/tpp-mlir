@@ -38,6 +38,9 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
+// Note that %2 has two users. If we decide to fuse %2 and %3 we will end doing
+// some recomputation (%2). For now we bail out and do not fuse. Since we anchor
+// the pattern to matmul ops no fusion will happen for the element-wise.
 func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
@@ -75,12 +78,8 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK: func.func @matmul_sequence_fusion
 // CHECK-NOT: scf.for
 
-// TILE: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
 // TILE: func.func @matmul_sequence_fusion
-// TILE-DAG:  %[[C32:.+]] = arith.constant 32 : index
-// TILE-DAG:  %[[C1:.+]] = arith.constant 1 : index
-// TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
-// TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// TILE-NOT: scf.for
 // TILE-COUNT-3: linalg.matmul
 // TILE-COUNT-3: linalg.generic
 
@@ -132,4 +131,6 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
 // TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // TILE-COUNT-3: linalg.matmul
-// TILE-COUNT-3: linalg.generic
+// TILE: linalg.generic
+// TILE: scf.yield %{{.+}} : tensor<32x32xf32>
+// TILE-COUNT-2: linalg.generic

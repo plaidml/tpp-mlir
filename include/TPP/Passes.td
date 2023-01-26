@@ -197,7 +197,11 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   }];
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
+    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
+    Option<"maxDepth", "max-depth", "int64_t", "5", 
+           "Get producers till maxDepth">,
+    Option<"immediateConsumer", "start-from-immediate-conusmer", "bool",
+           "true", "Fuse from the immediate consumer of the current target">
   ];
 }
 
