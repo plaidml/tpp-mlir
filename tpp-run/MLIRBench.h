@@ -93,6 +93,8 @@ public:
 
   LogicalResult allocKernelArgs(llvm::SmallVector<Value> &);
 
+  Value initKernelArg(Value);
+
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order
   LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &);

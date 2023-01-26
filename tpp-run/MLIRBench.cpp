@@ -132,7 +132,7 @@ LogicalResult MLIRBench::allocKernelArgs(llvm::SmallVector<Value> &list) {
     if (!argBuff)
       return failure();
 
-    list.push_back(*argBuff);
+    list.push_back(initKernelArg(*argBuff));
   }
 
   builder.setInsertionPointToEnd(&mainBody);
@@ -140,6 +140,27 @@ LogicalResult MLIRBench::allocKernelArgs(llvm::SmallVector<Value> &list) {
   module.dump();
 
   return success();
+}
+
+Value MLIRBench::initKernelArg(Value arg) {
+  auto type = arg.getType().dyn_cast_or_null<ShapedType>();
+  assert(type && "Unsupported kernel argument type");
+
+  // TODO: Use some random initialiser
+  auto floatValue = APFloat(1.0F);
+  auto elementType = type.getElementType();
+  if (elementType.isBF16()) {
+    bool ignored;
+    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
+                       &ignored);
+  }
+
+  auto initVal = builder.create<arith::ConstantOp>(
+      unkLoc, elementType, builder.getFloatAttr(elementType, floatValue));
+
+  return builder
+      .create<linalg::FillOp>(unkLoc, ValueRange{initVal}, ValueRange{arg})
+      .result();
 }
 
 LogicalResult
