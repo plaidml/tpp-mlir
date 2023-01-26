@@ -88,17 +88,16 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.createMainWrapper()))
     return bench.emitError("Cannot create main wrapper");
 
-  SmallVector<Value> list;
-  if (failed(bench.allocKernelArgs(list)))
+  if (failed(bench.allocKernelArgs()))
     return bench.emitError("Done");
 
   // Creates the inputs for the kernel as dense globals
-  SmallVector<llvm::StringRef> globalList;
-  if (failed(bench.createGlobals(globalList)))
-    return bench.emitError("Cannot create the global memrefs");
+  // SmallVector<llvm::StringRef> globalList;
+  // if (failed(bench.createGlobals(globalList)))
+  //   return bench.emitError("Cannot create the global memrefs");
 
   // Call kernel once, to bootstrap (JIT compile, warm up caches)
-  auto call = bench.callKernel(globalList);
+  auto call = bench.callKernel();
   if (!call)
     return bench.emitError("Cannot generate a call to the kernel");
 
@@ -108,7 +107,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
 
   // This is the main loop, if N > 1
   if (benchNumLoops > 1) {
-    auto acc = bench.createTimerLoop(globalList, benchNumLoops);
+    auto acc = bench.createTimerLoop(benchNumLoops);
     if (!acc)
       return bench.emitError("Cannot create timer loop");
     auto stats = bench.getTimerStats(acc);

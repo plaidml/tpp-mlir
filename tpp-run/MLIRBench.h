@@ -71,6 +71,8 @@ class MLIRBench {
   /// Get a global memref by name
   MemRefType getGlobalType(llvm::StringRef);
 
+  Value createDenseTensor(TensorType);
+
   /// Gets module's main block
   Block &getModuleBlock();
 
@@ -91,7 +93,7 @@ public:
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
 
-  LogicalResult allocKernelArgs(llvm::SmallVector<Value> &);
+  LogicalResult allocKernelArgs();
 
   Value initKernelArg(Value);
 
@@ -103,7 +105,7 @@ public:
   LogicalResult createMainWrapper();
 
   /// Creates and returns a call to the kernel.
-  Operation *callKernel(llvm::SmallVector<llvm::StringRef> &);
+  Operation *callKernel();
 
   /// Returns the result of a kernel call, which is either
   /// the return value (if any) or the last argument (outs).
@@ -111,7 +113,7 @@ public:
 
   /// Create a benchmarking region around the kernel call
   /// Returns the memref containing measured time deltas
-  Value createTimerLoop(llvm::SmallVector<llvm::StringRef> &, unsigned);
+  Value createTimerLoop(unsigned);
 
   /// Get the timer average/deviation
   Value getTimerStats(Value);

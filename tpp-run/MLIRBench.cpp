@@ -103,28 +103,29 @@ LogicalResult MLIRBench::renameKernel() {
   return success();
 }
 
-LogicalResult MLIRBench::allocKernelArgs(llvm::SmallVector<Value> &list) {
+LogicalResult MLIRBench::allocKernelArgs() {
+  // Clear current args and rebuild them from scratch
+  kernelArgs.clear();
+
   // Create global dense memrefs (Module insertion point)
   auto &mainBody = getMainBlock();
   builder.setInsertionPointToStart(&mainBody);
 
   for (auto &ty : kernel.getArgumentTypes()) {
-    auto shapedTy = cast<ShapedType>(ty);
-    auto argBuff =
-        TypeSwitch<Type, llvm::Optional<Value>>(ty)
-            .Case<MemRefType>([&](auto t) {
-              return builder.create<memref::AllocOp>(
-                  unkLoc, MemRefType::get(shapedTy.getShape(),
-                                          shapedTy.getElementType()));
-            })
-            .Case<TensorType>([&](auto t) {
-              return builder.create<bufferization::AllocTensorOp>(
-                  unkLoc,
-                  RankedTensorType::get(shapedTy.getShape(),
-                                        shapedTy.getElementType()),
-                  ValueRange{});
-            })
-            .Default([&](auto t) { return std::nullopt; });
+    // auto shapedTy = cast<ShapedType>(ty);
+    auto argBuff = TypeSwitch<Type, llvm::Optional<Value>>(ty)
+                       .Case<MemRefType>([&](auto memRefTy) {
+                         auto name = createGlobal(memRefTy);
+
+                         // GetGlobal op properties
+                         auto nameAttr = builder.getStringAttr(name);
+                         return builder.create<memref::GetGlobalOp>(
+                             unkLoc, memRefTy, nameAttr);
+                       })
+                       .Case<TensorType>([&](auto tensorTy) {
+                         return createDenseTensor(tensorTy);
+                       })
+                       .Default([&](auto t) { return std::nullopt; });
     // auto shapedTy = cast<ShapedType>(ty);
     // auto memRefTy =
     //     MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
@@ -132,12 +133,12 @@ LogicalResult MLIRBench::allocKernelArgs(llvm::SmallVector<Value> &list) {
     if (!argBuff)
       return failure();
 
-    list.push_back(initKernelArg(*argBuff));
+    kernelArgs.push_back(*argBuff);
   }
 
   builder.setInsertionPointToEnd(&mainBody);
 
-  module.dump();
+  // module.dump();
 
   return success();
 }
@@ -173,8 +174,8 @@ MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
     auto shapedTy = cast<ShapedType>(ty);
     auto memRefTy =
         MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
-    llvm::dbgs() << "### shape: " << shapedTy.getElementType() << "\n";
-    llvm::dbgs() << "### memRefTy: " << memRefTy << "\n";
+    // llvm::dbgs() << "### shape: " << shapedTy.getElementType() << "\n";
+    // llvm::dbgs() << "### memRefTy: " << memRefTy << "\n";
 
     list.push_back(createGlobal(memRefTy));
   }
@@ -194,22 +195,7 @@ LogicalResult MLIRBench::createMainWrapper() {
   return success();
 }
 
-Operation *MLIRBench::callKernel(llvm::SmallVector<llvm::StringRef> &list) {
-  // Get those globals as arguments (function insertion point)
-  // Cache locally, so we can avoid doing it again inside the loop
-  if (kernelArgs.empty()) {
-    for (auto &name : list) {
-      // GetGlobal op properties
-      auto nameAttr = builder.getStringAttr(name);
-      auto type = getGlobalType(name);
-      auto getGlobal =
-          builder.create<memref::GetGlobalOp>(unkLoc, type, nameAttr);
-
-      // Add argument to list
-      kernelArgs.push_back(getGlobal);
-    }
-  }
-
+Operation *MLIRBench::callKernel() {
   // Call the kernel
   auto call = builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
 
@@ -234,8 +220,7 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
                                        : kernelCall->getOpResult(0);
 }
 
-Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
-                                 unsigned n) {
+Value MLIRBench::createTimerLoop(unsigned n) {
   // Allocates buffer for results
   auto i64Type = builder.getI64Type();
   auto count = builder.create<arith::ConstantOp>(
@@ -248,7 +233,7 @@ Value MLIRBench::createTimerLoop(llvm::SmallVector<llvm::StringRef> &list,
   builder.setInsertionPointToStart(loop.getBody());
 
   // Call the kernel, ignore output
-  callKernel(list);
+  callKernel();
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
@@ -468,6 +453,21 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
   auto memRefTy = dyn_cast_or_null<MemRefType>(op.getType());
   assert(memRefTy && "memref::Global type not a memref?");
   return memRefTy;
+}
+
+Value MLIRBench::createDenseTensor(TensorType type) {
+  // TODO: Use some random initialiser
+  auto floatValue = APFloat(1.0F);
+
+  auto elementType = type.getElementType();
+  if (elementType.isBF16()) {
+    bool ignored;
+    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
+                       &ignored);
+  }
+
+  auto floatInit = mlir::DenseElementsAttr::get(type, floatValue);
+  return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }
 
 Block &MLIRBench::getModuleBlock() {
