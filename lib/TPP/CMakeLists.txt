@@ -15,6 +15,7 @@ add_mlir_library(MLIRTPP
     DefaultTppPasses.cpp
     GeneralizeTensorPackAndUnPack.cpp
     RaiseToParallelLoop.cpp
+    ConstantFold.cpp
 
   # Utils
     TransformUtils.cpp
