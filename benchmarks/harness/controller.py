@@ -105,7 +105,7 @@ class BenchmarkController(object):
         else:
             # Bypass tpp-opt and just dump the file
             with open(self.args.benchmark_name) as file:
-                irContents = file.readall()
+                irContents = file.read()
 
         # Actually run the file in benchmark mode, no output
         self.logger.info("Running the kernel with the arguments provided")
