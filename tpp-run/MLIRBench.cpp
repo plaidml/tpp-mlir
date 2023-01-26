@@ -166,8 +166,6 @@ Value MLIRBench::initKernelArg(Value arg) {
 
 LogicalResult
 MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
-  // Create global dense memrefs (Module insertion point)
-  builder.setInsertionPointToStart(&getModuleBlock());
   auto funcType = kernel.getFunctionType();
   for (auto &ty : funcType.getInputs()) {
     // auto memRefTy = dyn_cast_or_null<MemRefType>(ty);
@@ -411,6 +409,10 @@ LogicalResult MLIRBench::finalize() {
 //----------------------- Helpers & private methods
 
 llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
+  // Create global dense memrefs (Module insertion point)
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&getModuleBlock());
+
   // Simple auto increment
   static unsigned order = 0;
 
