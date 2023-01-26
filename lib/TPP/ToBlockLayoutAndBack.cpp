@@ -332,6 +332,8 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
+  if (auto metadata = convOp->getAttr("metadata"))
+    replacementOp->setAttr("metadata", metadata);
 
   // convert back from pack layout.
   Value outPackedTensor = replacementOp.getResult(0);

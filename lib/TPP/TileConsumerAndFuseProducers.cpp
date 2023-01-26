@@ -22,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include <queue>
 
 using namespace mlir;
 
@@ -360,11 +361,10 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   }
 
   // Step 3. Collect the operations that can be tiled and fused.
-  llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
+  llvm::SmallDenseSet<Operation *> worklist =
       collectFusableProducers(consumer, tileSizes, alreadyFusedOps);
-  LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size()
-                          << "\n");
-  if (tiledAndFusedOpCandidates.size() == 1)
+  LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
+  if (worklist.size() == 1)
     return failure();
 
   // Step 4. Tile the consumer.
@@ -392,25 +392,25 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
   // Step 5. Tile producers and fuse into the tiled consumer.
   auto addCandidateSlices = [](Operation *fusedOp,
-                               std::deque<tensor::ExtractSliceOp> &candidates) {
+                               std::queue<tensor::ExtractSliceOp> &candidates) {
     for (Value operand : fusedOp->getOperands())
       if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push_back(sliceOp);
+        candidates.push(sliceOp);
   };
 
-  std::deque<tensor::ExtractSliceOp> candidates;
-  addCandidateSlices(tilingResult->tiledOps.back(), candidates);
+  std::queue<tensor::ExtractSliceOp> frontier;
+  addCandidateSlices(tilingResult->tiledOps.back(), frontier);
   OpBuilder::InsertionGuard g(rewriter);
-  while (!candidates.empty()) {
-    tensor::ExtractSliceOp candidateSliceOp = candidates.front();
-    candidates.pop_front();
+  while (!frontier.empty()) {
+    tensor::ExtractSliceOp candidateSliceOp = frontier.front();
+    frontier.pop();
 
     // Find the candidate operation potentially walking bbArgs in scf.for.
     // If we find a candidate we check if it is in our worklist and fuse it
     // only if so.
     Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
-    if (!candidateOp || tiledAndFusedOpCandidates.count(candidateOp) == 0)
+    if (!candidateOp || worklist.count(candidateOp) == 0)
       continue;
     // If the op is already fused to not fuse again.
     if (alreadyFusedOps.count(candidateOp))
@@ -425,7 +425,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
-      addCandidateSlices(tiledAndFusedOp, candidates);
+      addCandidateSlices(tiledAndFusedOp, frontier);
       if (alreadyFusedOps.count(consumer.getOperation()) == 0) {
         alreadyFusedOps.insert(consumer.getOperation());
         LLVM_DEBUG(llvm::dbgs()
@@ -436,6 +436,9 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
       LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
       alreadyFusedOps.insert(tiledAndFusedOp);
       LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledAndFusedOp << "\n");
+      if (auto metadata = untiledProducer->getAttr("metadata")) {
+        tiledAndFusedOp->setAttr("metadata", metadata);
+      }
     }
   }
   return tileAndFuseResult;
