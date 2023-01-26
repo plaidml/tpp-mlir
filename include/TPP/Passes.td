@@ -253,4 +253,12 @@ def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
 }
 
+def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
+  let summary = "Constant fold tensor.pack";
+  let description = [{
+    Reduce pack overhead by folding tensor.pack into constants.
+  }];
+  let constructor = "mlir::tpp::createConstantFoldPackPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
