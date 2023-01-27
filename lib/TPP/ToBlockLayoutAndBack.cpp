@@ -615,8 +615,6 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
@@ -657,8 +655,6 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -698,8 +694,6 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -750,6 +744,18 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
   }
 };
 
+struct PropagatePackUnPack
+    : public PropagatePackUnPackBase<PropagatePackUnPack> {
+  void runOnOperation() override {
+    MLIRContext *ctx = getOperation().getContext();
+    RewritePatternSet patterns(ctx);
+    mlir::tpp::populateSinkPackPatterns(patterns);
+    mlir::tensor::populateSimplifyTensorPack(patterns);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
 } // end namespace
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
@@ -773,4 +779,9 @@ mlir::tpp::createPackConv2DNhwcHwcfPass() {
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {
   return std::make_unique<PackVNNI>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createPropagatePackUnPackPass() {
+  return std::make_unique<PropagatePackUnPack>();
 }

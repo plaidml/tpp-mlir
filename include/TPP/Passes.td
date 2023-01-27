@@ -248,4 +248,9 @@ def RaiseToParallelLoop : Pass<"raise-to-parallel-loop",
   let constructor = "mlir::tpp::createRaiseToParallelLoopPass()";
 }
 
+def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
+  let summary = "Propagate tensor.pack and tensor.unpack";
+  let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
