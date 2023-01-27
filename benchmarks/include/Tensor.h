@@ -145,7 +145,7 @@ public:
 template <class T> struct EmptyTensor : public Tensor<T> {
   EmptyTensor(InitArg dims) : Tensor<T>(dims) { this->clear(); }
   std::ostream &operator<<(std::ostream &out) {
-    out << static_cast<Tensor<T>>(this);
+    return out << static_cast<Tensor<T>>(this);
   }
 };
 
@@ -157,7 +157,7 @@ template <class T> struct ConstantTensor : public Tensor<T> {
       this->data[i] = datum++;
   }
   std::ostream &operator<<(std::ostream &out) {
-    out << static_cast<Tensor<T>>(this);
+    return out << static_cast<Tensor<T>>(this);
   }
 };
 
