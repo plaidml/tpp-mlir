@@ -71,7 +71,8 @@ class MLIRBench {
   /// Get a global memref by name
   MemRefType getGlobalType(llvm::StringRef);
 
-  Value createDenseTensor(TensorType);
+  // Create a random constant dense tensor
+  Value createConstTensor(TensorType);
 
   /// Gets module's main block
   Block &getModuleBlock();
@@ -93,9 +94,9 @@ public:
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
 
-  LogicalResult allocKernelArgs();
-
-  Value initKernelArg(Value);
+  /// Create and initialize the kernel input arguments
+  /// The values are cached locally in a kernel argument list, in order
+  LogicalResult createKernelArgs();
 
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order
@@ -121,8 +122,8 @@ public:
   /// Prints a float value (used for mean/dev)
   void printVector(Value);
 
-  /// Prints the memref as a vector read + print
-  LogicalResult printMemRef(Value);
+  /// Prints the shaped type (tensor/memref) as a vector read + print
+  LogicalResult printShapedType(Value);
 
   /// Prints the result of a kernel call
   LogicalResult printResult(Operation *kernelCall);

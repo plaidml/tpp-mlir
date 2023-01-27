@@ -103,7 +103,7 @@ LogicalResult MLIRBench::renameKernel() {
   return success();
 }
 
-LogicalResult MLIRBench::allocKernelArgs() {
+LogicalResult MLIRBench::createKernelArgs() {
   // Clear current args and rebuild them from scratch
   kernelArgs.clear();
 
@@ -112,68 +112,41 @@ LogicalResult MLIRBench::allocKernelArgs() {
   builder.setInsertionPointToStart(&mainBody);
 
   for (auto &ty : kernel.getArgumentTypes()) {
-    // auto shapedTy = cast<ShapedType>(ty);
-    auto argBuff = TypeSwitch<Type, llvm::Optional<Value>>(ty)
-                       .Case<MemRefType>([&](auto memRefTy) {
-                         auto name = createGlobal(memRefTy);
+    auto arg = TypeSwitch<Type, llvm::Optional<Value>>(ty)
+                   .Case<MemRefType>([&](auto memRefTy) {
+                     // Create a memref global
+                     auto name = createGlobal(memRefTy);
+                     // Get the created global value and use it
+                     // as an input to the kernel
+                     auto nameAttr = builder.getStringAttr(name);
+                     return builder.create<memref::GetGlobalOp>(
+                         unkLoc, memRefTy, nameAttr);
+                   })
+                   .Case<TensorType>([&](auto tensorTy) {
+                     // Create a dense const tensor and use it directly
+                     // as an input to the kernel
+                     return createConstTensor(tensorTy);
+                   })
+                   .Default([&](auto t) { return std::nullopt; });
 
-                         // GetGlobal op properties
-                         auto nameAttr = builder.getStringAttr(name);
-                         return builder.create<memref::GetGlobalOp>(
-                             unkLoc, memRefTy, nameAttr);
-                       })
-                       .Case<TensorType>([&](auto tensorTy) {
-                         return createDenseTensor(tensorTy);
-                       })
-                       .Default([&](auto t) { return std::nullopt; });
-    // auto shapedTy = cast<ShapedType>(ty);
-    // auto memRefTy =
-    //     MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
-
-    if (!argBuff)
+    if (!arg)
       return failure();
 
-    kernelArgs.push_back(*argBuff);
+    kernelArgs.push_back(*arg);
   }
 
   builder.setInsertionPointToEnd(&mainBody);
 
-  // module.dump();
-
   return success();
-}
-
-Value MLIRBench::initKernelArg(Value arg) {
-  auto type = arg.getType().dyn_cast_or_null<ShapedType>();
-  assert(type && "Unsupported kernel argument type");
-
-  // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0F);
-  auto elementType = type.getElementType();
-  if (elementType.isBF16()) {
-    bool ignored;
-    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &ignored);
-  }
-
-  auto initVal = builder.create<arith::ConstantOp>(
-      unkLoc, elementType, builder.getFloatAttr(elementType, floatValue));
-
-  return builder
-      .create<linalg::FillOp>(unkLoc, ValueRange{initVal}, ValueRange{arg})
-      .result();
 }
 
 LogicalResult
 MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
   auto funcType = kernel.getFunctionType();
   for (auto &ty : funcType.getInputs()) {
-    // auto memRefTy = dyn_cast_or_null<MemRefType>(ty);
     auto shapedTy = cast<ShapedType>(ty);
     auto memRefTy =
         MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
-    // llvm::dbgs() << "### shape: " << shapedTy.getElementType() << "\n";
-    // llvm::dbgs() << "### memRefTy: " << memRefTy << "\n";
 
     list.push_back(createGlobal(memRefTy));
   }
@@ -282,19 +255,15 @@ void MLIRBench::printVector(Value vector) {
   builder.create<vector::PrintOp>(unkLoc, op);
 }
 
-LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
+LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   OpBuilder::InsertionGuard guard(builder);
 
-  auto outputType = cast<ShapedType>(memRef.getType());
-  // auto outputType =
-  //     MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
+  auto outputType = cast<ShapedType>(val.getType());
+  assert(outputType && "expected a shaped type");
 
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
-  // auto outputType = dyn_cast_or_null<MemRefType>(memRef.getType());
-  // module.dump();
-  // assert(outputType && "Unsupported return type");
   VectorType vecType;
   auto lastDim = outputType.getRank() - 1;
   ArrayRef<int64_t> outerDims(1);
@@ -324,7 +293,7 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
                                                       builder.getF32Type());
   }
 
-  // Loop through memref, transfer each dim to vector
+  // Loop through the shaped type, transfer each dim to vector
   auto indexType = builder.getIndexType();
   auto countAttr = builder.getIntegerAttr(indexType, outerDims[0]);
   auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
@@ -338,7 +307,7 @@ LogicalResult MLIRBench::printMemRef(mlir::Value memRef) {
   // Loop body
   auto beginIdx = loop.getInductionVar();
   auto vector = builder.create<vector::TransferReadOp>(
-      unkLoc, vecType, memRef, ValueRange{beginIdx, zero}, minusOne);
+      unkLoc, vecType, val, ValueRange{beginIdx, zero}, minusOne);
   printVector(vector);
 
   // Finally lower to LLVM Dialect
@@ -351,7 +320,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   // Build print logic directly after the kernel call.
   builder.setInsertionPointAfter(kernelCall);
 
-  return printMemRef(getKernelResult(kernelCall));
+  return printShapedType(getKernelResult(kernelCall));
 }
 
 LogicalResult MLIRBench::finalize() {
@@ -361,11 +330,7 @@ LogicalResult MLIRBench::finalize() {
     builder.create<func::ReturnOp>(unkLoc);
   }
 
-  // Minimal passes to make it work
-  // We don't want TPP passes here, as that's the job of tpp-opt
-  // The IR here should be free of TPP/XSMM or any TPP extensions
-  // Perf passes are an exception as they provide necessary generic
-  // lowering to materialize benchmarking code
+  // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
   applyPassManagerCLOptions(passManager);
 
@@ -457,7 +422,7 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
   return memRefTy;
 }
 
-Value MLIRBench::createDenseTensor(TensorType type) {
+Value MLIRBench::createConstTensor(TensorType type) {
   // TODO: Use some random initialiser
   auto floatValue = APFloat(1.0F);
 
@@ -467,8 +432,8 @@ Value MLIRBench::createDenseTensor(TensorType type) {
     floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
                        &ignored);
   }
-
   auto floatInit = mlir::DenseElementsAttr::get(type, floatValue);
+
   return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }
 
