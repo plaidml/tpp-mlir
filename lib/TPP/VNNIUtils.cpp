@@ -18,6 +18,7 @@ Optional<int64_t> getVNNIBlockingFactor(Type type) {
     return std::nullopt;
   return 2;
 }
+
 bool isBF16Type(Type type) {
   if (!isa<ShapedType>(type))
     return false;

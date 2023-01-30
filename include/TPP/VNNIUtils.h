@@ -8,6 +8,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
 
