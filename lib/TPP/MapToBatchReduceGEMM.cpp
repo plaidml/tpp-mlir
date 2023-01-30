@@ -93,25 +93,30 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
       if (map.getNumResults() < 3)
         return failure();
       if (operand.getOperandNumber() == 1) {
-        assert(map.getNumResults() == 5);
+        if (map.getNumResults() != 5)
+          return failure();
         maps.push_back(map.getMinorSubMap(4));
       } else {
         maps.push_back(map.getMinorSubMap(3));
       }
-    } else {
-      assert(isOutputOperand(linalgOp, operand));
+    }
+  }
+  for (OpOperand &operand : linalgOp->getOpOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
+    if (isOutputOperand(linalgOp, operand)) {
       if (map.getNumResults() < 2)
         return failure();
       maps.push_back(map.getMinorSubMap(2));
     }
   }
+
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
   AffineExpr r1, p4, p5, r2, r3;
   SmallVector<AffineMap> expectedMaps;
   bindDims(linalgOp.getContext(), r1, p4, p5, r2, r3);
-  // Expected access patterns of BRGEMM
+  // Expected access patterns of BRGEMM.
   expectedMaps = infer({{r1, p4, r2},
                         {r1,
                          r2.floorDiv(vnni::utils::getVNNIBlockingFactor(
@@ -218,30 +223,6 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
                           1] ==
           vnni::utils::getVNNIBlockingFactor(
               linalgOp->getOperands()[1].getType())) {
-    if (!linalgOp.hasBufferSemantics()) {
-      for (auto &operand : linalgOp.getDpsInputOperands()) {
-        if (operand->getOperandNumber() == 1) {
-          auto definingOp = operand->get().getDefiningOp<tensor::PackOp>();
-          if (definingOp == NULL) {
-            return false;
-          }
-          auto innerDims = definingOp.getInnerDimsPos();
-          auto innerTiles = definingOp.getStaticInnerTiles();
-          if (innerDims.size() != 1 ||
-              innerDims[0] != definingOp.getOperand(0)
-                                      .getType()
-                                      .cast<ShapedType>()
-                                      .getRank() -
-                                  2 ||
-              innerTiles.size() != 1 ||
-              innerTiles[0] != vnni::utils::getVNNIBlockingFactor(
-                                   operand->get().getType())) {
-            return false;
-          }
-          return true;
-        }
-      }
-    }
     return true;
   }
   return false;
