@@ -116,13 +116,14 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
   AffineExpr r1, p4, p5, r2, r3;
   SmallVector<AffineMap> expectedMaps;
   bindDims(linalgOp.getContext(), r1, p4, p5, r2, r3);
+  auto blockingFactor =
+      vnni::utils::getVNNIBlockingFactor(linalgOp->getOperands()[0].getType());
+  // Unsupported blocking factor for type.
+  if (!blockingFactor)
+    return failure();
   // Expected access patterns of BRGEMM.
-  expectedMaps = infer({{r1, p4, r2},
-                        {r1,
-                         r2.floorDiv(vnni::utils::getVNNIBlockingFactor(
-                             linalgOp->getOperands()[0].getType())),
-                         p5, r3},
-                        {p4, p5}});
+  expectedMaps = infer(
+      {{r1, p4, r2}, {r1, r2.floorDiv(*blockingFactor), p5, r3}, {p4, p5}});
   if (compressedDimMaps != expectedMaps)
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
@@ -205,24 +206,23 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
   return slicedOperands;
 }
 
-// Returns true if linalg op is using its second operand in VNNI format
+// Returns true if linalg op is using its second operand in VNNI format.
 static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumLoops() == 7 && linalgOp->getOperands().size() >= 3 &&
-      linalgOp->getOperands()[1]
-          .getType()
-          .cast<ShapedType>()
-          .getElementType()
-          .isBF16() &&
-      linalgOp->getOperands()[1]
-              .getType()
-              .cast<ShapedType>()
-              .getShape()[linalgOp->getOperands()[1]
-                              .getType()
-                              .cast<ShapedType>()
-                              .getRank() -
-                          1] ==
-          vnni::utils::getVNNIBlockingFactor(
-              linalgOp->getOperands()[1].getType())) {
+  // Linalg loop must have 7 dimensions.
+  if (linalgOp.getNumLoops() != 7)
+    return false;
+  if (linalgOp->getOperands().size() < 3)
+    return false;
+  auto firstOperand = linalgOp->getOperands()[1];
+  auto firstOperandType = firstOperand.getType();
+  auto blockingFactor = vnni::utils::getVNNIBlockingFactor(firstOperandType);
+  if (!blockingFactor)
+    // Unsupported blocking factor for type.
+    return false;
+  if (vnni::utils::isBF16Type(firstOperandType) &&
+      firstOperandType.cast<ShapedType>()
+              .getShape()[firstOperandType.cast<ShapedType>().getRank() - 1] ==
+          *blockingFactor) {
     return true;
   }
   return false;

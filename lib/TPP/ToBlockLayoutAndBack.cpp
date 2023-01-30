@@ -436,13 +436,14 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
   AffineMap mapA =
       AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
+  Optional<int64_t> blockingFactor =
+      vnni::utils::getVNNIBlockingFactor(matmulOp.getInputs()[1].getType());
+  if (!blockingFactor)
+    return rewriter.notifyMatchFailure(
+        matmulOp, "Unsupported type and its blocking factor");
   AffineMap mapB =
       AffineMap::get(/*dims=*/7, /*symbols=*/0,
-                     {p2, r1,
-                      r2.floorDiv(vnni::utils::getVNNIBlockingFactor(
-                          matmulOp.getInputs()[1].getType())),
-                      p4, r3},
-                     ctx);
+                     {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
   AffineMap mapC =
       AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
   Value matrixC = matmulOp.getOutputs()[0];
@@ -467,11 +468,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 FailureOr<vnni::BRGemmOp>
 mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                 linalg::BatchReduceMatmulOp brgemmOp) {
-  if (!brgemmOp.getInputs()[0]
-           .getType()
-           .cast<ShapedType>()
-           .getElementType()
-           .isBF16())
+  if (!vnni::utils::isBF16Type(brgemmOp.getInputs()[0].getType()))
     return rewriter.notifyMatchFailure(brgemmOp, "require bf16 type");
 
   if (brgemmOp.hasDynamicShape())
@@ -480,11 +477,7 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   if (brgemmOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(brgemmOp, "require tensor semantics");
 
-  assert(brgemmOp.getInputs()[0]
-             .getType()
-             .cast<ShapedType>()
-             .getElementType()
-             .isBF16());
+  assert(vnni::utils::isBF16Type(brgemmOp.getInputs()[0].getType()));
   // Set blocking factor to size 2
   OpFoldResult tileOnI = rewriter.getI64IntegerAttr(2);
   SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};

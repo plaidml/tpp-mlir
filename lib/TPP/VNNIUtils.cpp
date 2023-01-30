@@ -12,10 +12,14 @@
 namespace mlir {
 namespace vnni {
 namespace utils {
-int getVNNIBlockingFactor(Type type) {
-  assert(type.cast<ShapedType>().getElementType().isBF16() &&
-         "Only BF16 VNNI packing supported");
+
+Optional<int64_t> getVNNIBlockingFactor(Type type) {
+  if (!type.cast<ShapedType>().getElementType().isBF16())
+    return std::nullopt;
   return 2;
+}
+bool isBF16Type(Type type) {
+  return type.cast<ShapedType>().getElementType().isBF16();
 }
 } // namespace utils
 } // namespace vnni

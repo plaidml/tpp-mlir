@@ -15,7 +15,11 @@ namespace mlir {
 namespace vnni {
 namespace utils {
 // Returns the VNNI blocking factor: 2 for BF16/4 for BF8.
-int getVNNIBlockingFactor(Type type);
+Optional<int64_t> getVNNIBlockingFactor(Type type);
+
+// Checks if the type is BF16.
+bool isBF16Type(Type type);
+
 } // namespace utils
 } // namespace vnni
 } // namespace mlir
