@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #include "TPP/VNNIUtils.h"
 
 namespace mlir {
@@ -14,11 +13,14 @@ namespace vnni {
 namespace utils {
 
 Optional<int64_t> getVNNIBlockingFactor(Type type) {
-  if (!type.cast<ShapedType>().getElementType().isBF16())
+  if (!isa<ShapedType>(type) ||
+      !type.cast<ShapedType>().getElementType().isBF16())
     return std::nullopt;
   return 2;
 }
 bool isBF16Type(Type type) {
+  if (!isa<ShapedType>(type))
+    return false;
   return type.cast<ShapedType>().getElementType().isBF16();
 }
 } // namespace utils

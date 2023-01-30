@@ -87,27 +87,23 @@ static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
 
 static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> maps;
-  for (OpOperand &operand : linalgOp->getOpOperands()) {
-    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
-    if (isInputOperand(linalgOp, operand)) {
-      if (map.getNumResults() < 3)
+  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+    if (map.getNumResults() < 3)
+      return failure();
+    if (operand->getOperandNumber() == 1) {
+      if (map.getNumResults() != 5)
         return failure();
-      if (operand.getOperandNumber() == 1) {
-        if (map.getNumResults() != 5)
-          return failure();
-        maps.push_back(map.getMinorSubMap(4));
-      } else {
-        maps.push_back(map.getMinorSubMap(3));
-      }
+      maps.push_back(map.getMinorSubMap(4));
+    } else {
+      maps.push_back(map.getMinorSubMap(3));
     }
   }
-  for (OpOperand &operand : linalgOp->getOpOperands()) {
-    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
-    if (isOutputOperand(linalgOp, operand)) {
-      if (map.getNumResults() < 2)
-        return failure();
-      maps.push_back(map.getMinorSubMap(2));
-    }
+  for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+    if (map.getNumResults() < 2)
+      return failure();
+    maps.push_back(map.getMinorSubMap(2));
   }
 
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
@@ -211,7 +207,7 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
   // Linalg loop must have 7 dimensions.
   if (linalgOp.getNumLoops() != 7)
     return false;
-  if (linalgOp->getOperands().size() < 3)
+  if (linalgOp->getNumOperands() < 3)
     return false;
   auto firstOperand = linalgOp->getOperands()[1];
   auto firstOperandType = firstOperand.getType();
@@ -219,13 +215,11 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
   if (!blockingFactor)
     // Unsupported blocking factor for type.
     return false;
-  if (vnni::utils::isBF16Type(firstOperandType) &&
+  return (
+      vnni::utils::isBF16Type(firstOperandType) &&
       firstOperandType.cast<ShapedType>()
               .getShape()[firstOperandType.cast<ShapedType>().getRank() - 1] ==
-          *blockingFactor) {
-    return true;
-  }
-  return false;
+          *blockingFactor);
 }
 
 // Map a generic operation to BRGEMM. The following conditions apply:
@@ -258,9 +252,9 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   // Materialize outer loops
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
   // VNNI loop
-  if (isVNNILoop) {
+  if (isVNNILoop)
     upTo--;
-  }
+
   FailureOr<SmallVector<Range>> maybeLoopRanges =
       linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
   if (failed(maybeLoopRanges))

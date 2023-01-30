@@ -8,7 +8,6 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
-#include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -366,12 +365,10 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, packMatrixC.getType(), packedInputs, ValueRange{packMatrixC},
       ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction},
+      ArrayRef<utils::IteratorType>{
+          utils::IteratorType::parallel, utils::IteratorType::parallel,
+          utils::IteratorType::reduction, utils::IteratorType::parallel,
+          utils::IteratorType::parallel, utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
@@ -399,11 +396,8 @@ bool isMatmulOp(linalg::GenericOp matmulOp) {
 FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                 linalg::GenericOp matmulOp) {
-  if (matmulOp.getInputs().size() > 0 && !matmulOp.getInputs()[0]
-                                              .getType()
-                                              .cast<ShapedType>()
-                                              .getElementType()
-                                              .isBF16())
+  if (matmulOp.getInputs().size() > 0 &&
+      !vnni::utils::isBF16Type(matmulOp.getInputs()[0].getType()))
     return rewriter.notifyMatchFailure(matmulOp, "require bf16 type");
 
   if (matmulOp.hasDynamicShape())
@@ -418,14 +412,13 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   if (isVNNIPacked(matmulOp))
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
 
-  assert(matmulOp.getInputs()[0]
-             .getType()
-             .cast<ShapedType>()
-             .getElementType()
-             .isBF16());
-  // Set blocking factor to size 2
   Location loc = matmulOp.getLoc();
-  OpFoldResult tileOnI = rewriter.getI64IntegerAttr(2);
+  auto blockingFactor =
+      vnni::utils::getVNNIBlockingFactor(matmulOp.getInputs()[1].getType());
+  if (!blockingFactor)
+    return rewriter.notifyMatchFailure(matmulOp,
+                                       "unsupported blocking factor for type");
+  OpFoldResult tileOnI = rewriter.getI64IntegerAttr(*blockingFactor);
   SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
   // reshape input B.
   Value packedMatrixB =
@@ -436,11 +429,6 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
   AffineMap mapA =
       AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
-  Optional<int64_t> blockingFactor =
-      vnni::utils::getVNNIBlockingFactor(matmulOp.getInputs()[1].getType());
-  if (!blockingFactor)
-    return rewriter.notifyMatchFailure(
-        matmulOp, "Unsupported type and its blocking factor");
   AffineMap mapB =
       AffineMap::get(/*dims=*/7, /*symbols=*/0,
                      {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
@@ -450,13 +438,11 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
       ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::reduction},
+      ArrayRef<utils::IteratorType>{
+          utils::IteratorType::parallel, utils::IteratorType::parallel,
+          utils::IteratorType::reduction, utils::IteratorType::parallel,
+          utils::IteratorType::parallel, utils::IteratorType::reduction,
+          utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
