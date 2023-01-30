@@ -54,6 +54,8 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
 FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     linalg::LinalgOp linalgOp,
                                                     unsigned upTo);
+// Return true if the convolution is blocked.
+bool isBlockedConvolution(linalg::LinalgOp linalgOp);
 
 } // namespace utils
 } // namespace linalgx

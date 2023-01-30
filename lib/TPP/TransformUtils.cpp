@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -182,6 +183,26 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
     loopRanges.push_back(
         Range{rewriter.getIndexAttr(0), domain[idx], rewriter.getIndexAttr(1)});
   return loopRanges;
+}
+
+bool isBlockedConvolution(linalg::LinalgOp linalgOp) {
+  auto iteratorTypes = linalgOp.getIteratorTypesArray();
+  if (iteratorTypes.size() != 9)
+    return false;
+  bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
+               linalg::isParallelIterator(iteratorTypes[1]) &&
+               linalg::isParallelIterator(iteratorTypes[2]) &&
+               linalg::isParallelIterator(iteratorTypes[3]) &&
+               linalg::isParallelIterator(iteratorTypes[4]) &&
+               linalg::isReductionIterator(iteratorTypes[5]) &&
+               linalg::isReductionIterator(iteratorTypes[6]) &&
+               linalg::isReductionIterator(iteratorTypes[7]) &&
+               linalg::isReductionIterator(iteratorTypes[8]);
+  if (!match)
+    return false;
+  if (failed(mlir::linalg::detail::verifyConvolutionInterface(linalgOp)))
+    return false;
+  return tpp::utils::hasMatmulBody(linalgOp);
 }
 
 } // namespace utils

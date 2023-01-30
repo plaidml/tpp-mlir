@@ -240,15 +240,14 @@ private:
   SmallVector<int64_t> blockingFactors;
 };
 
-// Interchange iterator in a linalg.generic marked as
-// 'tpp.BlockedConv2DNchwFchwOp' to expose a GEMM operation.
+// Interchange a blocked convolutions to expose a linalg.matmul.
 struct InterchangeIteratorsConv2DNchwFchw
     : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::isMarkedWithTpp(genericOp, "tpp.BlockedConv2DNchwFchwOp"))
+    if (!linalgx::utils::isBlockedConvolution(genericOp))
       return failure();
 
     // clang-format off
@@ -312,8 +311,6 @@ struct RewriteConv2DNchwFchwToMatmul : OpRewritePattern<linalg::GenericOp> {
   // with interchanged dimensions.
   LogicalResult
   rewriteConv2DNchwFchwPreconditions(linalg::GenericOp linalgOp) const {
-    if (!tpp::utils::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
-      return failure();
     if (!hasInterchangedDims(linalgOp))
       return failure();
     return success();
@@ -564,36 +561,33 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
 };
 
 // patterns for mapping a Conv2DNhwcHwcfOp to a GEMM operation.
-// TODO: Add pattern matching for the packed version too.
-void populateConv2DNhwcHwcfOpRewritePatterns(RewritePatternSet &patterns) {
+void populateRewrite2DNhwcHwcfConvPatterns(RewritePatternSet &patterns) {
   patterns.insert<GeneralizeConv2DNhwcHwcf, RewriteConv2DNhwcHwcfToMatmul,
                   InterchangeIteratorsConv2DNhwcHwcf>(patterns.getContext());
 }
 
-// patterns for mapping a Conv2DNchwFchwOp to a GEMM operation.
-void populateconv2DNchwFchwOpRewritePatterns(RewritePatternSet &patterns,
-                                             ArrayRef<int64_t> blockingFactors,
-                                             bool enableBrgemm) {
+// patterns for mapping a blocked convolutions to a GEMM/BRGEMM operations.
+void populateRewriteBlockedConvPatterns(RewritePatternSet &patterns,
+                                        bool enableBrgemm) {
   // clang-format off
-  // init: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
-  // blocking: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+  //
+  // blocked conv: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
+  //
   // if (R = S = 1) -> [P + Q] == [H + W]
+  //
   // collapsing: [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
   // [*][* ][P + Q][k] = [*][* ][H + W][c] * [* ][* ][c][k] // GEMM with c as red.
   // [*][* ][P + Q][k] = [*][C'][H + W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
+  //
   // clang-format on
 
-  // This is for GEMM
+  // Rewrite to GEMM.
   if (!enableBrgemm) {
-    patterns.insert<BlockConv2DNchwFchw>(patterns.getContext(),
-                                         blockingFactors);
     patterns.insert<RewriteConv2DNchwFchwToMatmul,
                     InterchangeIteratorsConv2DNchwFchw>(patterns.getContext());
   }
-  // this is for BRGEMM
+  // Rewrite to BRGEMM.
   else {
-    patterns.insert<BlockConv2DNchwFchw>(patterns.getContext(),
-                                         blockingFactors);
     patterns.insert<CollapseFilterAndImage,
                     InterchangeAfterBlockingAndCollapsing, MapToBRGEMM>(
         patterns.getContext());
@@ -603,20 +597,13 @@ void populateconv2DNchwFchwOpRewritePatterns(RewritePatternSet &patterns,
 struct RewriteConvToMatmulOrBrgemm
     : public RewriteConvToMatmulOrBrgemmBase<RewriteConvToMatmulOrBrgemm> {
   RewriteConvToMatmulOrBrgemm() = default;
-  RewriteConvToMatmulOrBrgemm(bool enableBrgemm,
-                              ArrayRef<int64_t> blockingFactors) {
+  RewriteConvToMatmulOrBrgemm(bool enableBrgemm) {
     this->enableBrgemm = enableBrgemm;
-    this->blockingFactors = blockingFactors;
-  }
-  RewriteConvToMatmulOrBrgemm(ArrayRef<int64_t> blockingFactors) {
-    this->enableBrgemm = false;
-    this->blockingFactors = blockingFactors;
   }
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
-    populateConv2DNhwcHwcfOpRewritePatterns(patterns);
-    populateconv2DNchwFchwOpRewritePatterns(patterns, blockingFactors,
-                                            enableBrgemm);
+    populateRewrite2DNhwcHwcfConvPatterns(patterns);
+    populateRewriteBlockedConvPatterns(patterns, enableBrgemm);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
