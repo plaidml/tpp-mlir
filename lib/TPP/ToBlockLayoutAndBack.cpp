@@ -749,8 +749,8 @@ struct PropagatePackUnPack
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    mlir::tensor::populateSimplifyTensorPack(patterns);
+    tpp::populateSinkPackPatterns(patterns);
+    tensor::populateSimplifyTensorPack(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
   }
