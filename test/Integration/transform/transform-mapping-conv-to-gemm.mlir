@@ -9,7 +9,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck --check-prefixes=CHECK-NOOPT %s
+// RUN: FileCheck %s
 //
 
 // Make sure we map to linalg.matmul
@@ -19,7 +19,7 @@
 // RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=CHECK-NOOPT
+// RUN: FileCheck %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -115,18 +115,6 @@ func.func @entry() {
   // CHECK-SAME:( ( 1970, 2372, 2774, 3176, 3578, 3980, 4382, 4784 ),
   // CHECK-SAME:  ( 2150, 2588, 3026, 3464, 3902, 4340, 4778, 5216 ),
   // CHECK-SAME:  ( 2320, 2784, 3248, 3712, 4176, 4640, 5104, 5568 ) ) ) )
-  //
-
-  //
-  // CHECK-NOOPT: ( ( ( ( 530, 644, 758, 872, 986, 1100, 1214, 1328 ),
-  // CHECK-NOOPT-SAME:  ( 710, 860, 1010, 1160, 1310, 1460, 1610, 1760 ),
-  // CHECK-NOOPT-SAME:  ( 890, 1076, 1262, 1448, 1634, 1820, 2006, 2192 ) ),
-  // CHECK-NOOPT-SAME:( ( 1250, 1508, 1766, 2024, 2282, 2540, 2798, 3056 ),
-  // CHECK-NOOPT-SAME:  ( 1430, 1724, 2018, 2312, 2606, 2900, 3194, 3488 ),
-  // CHECK-NOOPT-SAME:  ( 1610, 1940, 2270, 2600, 2930, 3260, 3590, 3920 ) ),
-  // CHECK-NOOPT-SAME:( ( 1970, 2372, 2774, 3176, 3578, 3980, 4382, 4784 ),
-  // CHECK-NOOPT-SAME:  ( 2150, 2588, 3026, 3464, 3902, 4340, 4778, 5216 ),
-  // CHECK-NOOPT-SAME:  ( 2320, 2784, 3248, 3712, 4176, 4640, 5104, 5568 ) ) ) )
   //
 
   %v0 = vector.transfer_read %0[%c0, %c0, %c0, %c0], %d1

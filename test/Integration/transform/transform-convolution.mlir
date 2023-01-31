@@ -2,7 +2,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=LINALG
+// RUN: FileCheck %s
 //
 
 
@@ -10,7 +10,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=TRANSFORM
+// RUN: FileCheck %s
 //
 
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
@@ -19,11 +19,11 @@
 // RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=LINALG
+// RUN: FileCheck %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=TRANSFORM
+// RUN: FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -90,81 +90,42 @@ func.func @entry() {
   %v0 = vector.transfer_read %result[%c0, %c0, %c0, %c0], %d1 : tensor<1x6x6x8xf32>, vector<1x6x6x8xf32>
 
   //
-  // LINALG: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // LINALG-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // LINALG-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // LINALG-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
-  //
-
-  //
-  // TRANSFORM: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM -SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // TRANSFORM-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
-  // TRANSFORM-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
-  // TRANSFORM-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
+  // CHECK: ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME:  ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME:( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:  ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
   //
   vector.print %v0 : vector<1x6x6x8xf32>
   return

@@ -2,7 +2,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=LINALG
+// RUN: FileCheck %s
 //
 
 
@@ -10,7 +10,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=TRANSFORM
+// RUN: FileCheck %s
 //
 
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
@@ -19,11 +19,11 @@
 // RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=LINALG
+// RUN: FileCheck %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=TRANSFORM
+// RUN: FileCheck %s
 
 !A_tensor_t = tensor<4x8xf32>
 !B_tensor_t = tensor<8x16xf32>
@@ -101,17 +101,10 @@ func.func @entry() {
   %v0 = vector.transfer_read %result[%c0, %c0], %d1 : tensor<4x16xf32>, vector<4x16xf32>
 
   //
-  // LINALG:     ( ( 59.46, 97.26, 135.06, 172.86, 210.66, 248.46, 286.26, 324.06, 361.86, 399.66, 437.46, 475.26, 513.06, 550.86, 588.66, 626.46 ),
-  // LINALG-SAME:  ( 60.62, 99.22, 137.82, 176.42, 215.02, 253.62, 292.22, 330.82, 369.42, 408.02, 446.62, 485.22, 523.82, 562.42, 601.02, 639.62 ),
-  // LINALG-SAME:  ( 61.78, 101.18, 140.58, 179.98, 219.38, 258.78, 298.18, 337.58, 376.98, 416.38, 455.78, 495.18, 534.58, 573.98, 613.38, 652.78 ),
-  // LINALG-SAME:  ( 62.94, 103.14, 143.34, 183.54, 223.74, 263.94, 304.14, 344.34, 384.54, 424.74, 464.94, 505.14, 545.34, 585.54, 625.74, 665.94 ) )
-  //
-
-  //
-  // TRANSFORM:     ( ( 59.46, 97.26, 135.06, 172.86, 210.66, 248.46, 286.26, 324.06, 361.86, 399.66, 437.46, 475.26, 513.06, 550.86, 588.66, 626.46 ),
-  // TRANSFORM-SAME:  ( 60.62, 99.22, 137.82, 176.42, 215.02, 253.62, 292.22, 330.82, 369.42, 408.02, 446.62, 485.22, 523.82, 562.42, 601.02, 639.62 ),
-  // TRANSFORM-SAME:  ( 61.78, 101.18, 140.58, 179.98, 219.38, 258.78, 298.18, 337.58, 376.98, 416.38, 455.78, 495.18, 534.58, 573.98, 613.38, 652.78 ),
-  // TRANSFORM-SAME:  ( 62.94, 103.14, 143.34, 183.54, 223.74, 263.94, 304.14, 344.34, 384.54, 424.74, 464.94, 505.14, 545.34, 585.54, 625.74, 665.94 ) )
+  // CHECK:     ( ( 59.46, 97.26, 135.06, 172.86, 210.66, 248.46, 286.26, 324.06, 361.86, 399.66, 437.46, 475.26, 513.06, 550.86, 588.66, 626.46 ),
+  // CHECK-SAME:  ( 60.62, 99.22, 137.82, 176.42, 215.02, 253.62, 292.22, 330.82, 369.42, 408.02, 446.62, 485.22, 523.82, 562.42, 601.02, 639.62 ),
+  // CHECK-SAME:  ( 61.78, 101.18, 140.58, 179.98, 219.38, 258.78, 298.18, 337.58, 376.98, 416.38, 455.78, 495.18, 534.58, 573.98, 613.38, 652.78 ),
+  // CHECK-SAME:  ( 62.94, 103.14, 143.34, 183.54, 223.74, 263.94, 304.14, 344.34, 384.54, 424.74, 464.94, 505.14, 545.34, 585.54, 625.74, 665.94 ) )
   //
   vector.print %v0 : vector<4x16xf32>
   return
