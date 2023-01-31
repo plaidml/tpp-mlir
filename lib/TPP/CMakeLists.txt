@@ -18,6 +18,7 @@ add_mlir_library(MLIRTPP
 
   # Utils
     TransformUtils.cpp
+    VNNIUtils.cpp
 
   # Conversions
     ConvertLinalgToTpp.cpp

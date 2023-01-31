@@ -49,22 +49,15 @@ transform::PackOpExt::applyToOne(linalg::LinalgOp target,
         packedOp = mlir::linalgx::packConv2DNhwcHwcfOp(rewriter, convOp,
                                                        blockingFactors);
       })
+      .Case([&](linalg::GenericOp matmulOp) {
+        packedOp = mlir::linalgx::packVNNIMatmulOp(rewriter, matmulOp);
+      })
       .Case([&](linalg::MatmulOp matmulOp) {
-        auto useVnniFlag = getUseVnni();
-        if (useVnniFlag) {
-          packedOp = mlir::linalgx::packVNNIMatmulOp(rewriter, matmulOp,
-                                                     blockingFactors);
-        } else {
-          packedOp =
-              mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
-        }
+        packedOp =
+            mlir::linalgx::packMatmulOp(rewriter, matmulOp, blockingFactors);
       })
       .Case([&](linalg::BatchReduceMatmulOp brgemmOp) {
-        auto useVnniFlag = getUseVnni();
-        assert(useVnniFlag &&
-               "No form of packing other than VNNI supported for BRGEMM");
-        packedOp = mlir::linalgx::packVNNIBRGemmOp(rewriter, brgemmOp,
-                                                   blockingFactors);
+        packedOp = mlir::linalgx::packVNNIBRGemmOp(rewriter, brgemmOp);
       })
       .Default([&](Operation *op) { packedOp = failure(); });
   if (succeeded(packedOp)) {

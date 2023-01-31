@@ -7,9 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
+#include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -25,6 +27,30 @@ using namespace mlir;
 #include "TPP/Passes.h.inc"
 
 #define DEBUG_TYPE "mlir-map-to-brgemm"
+
+// Look for [p ... p] brgemm [r p p r r]
+static LogicalResult checkVNNIStructure(linalg::LinalgOp linalgOp) {
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  if (iteratorTypes.size() < 5)
+    return failure();
+  size_t size = iteratorTypes.size() - 1;
+  bool match = linalg::isReductionIterator(iteratorTypes[size]) &&
+               linalg::isReductionIterator(iteratorTypes[size - 1]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 2]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 3]) &&
+               linalg::isReductionIterator(iteratorTypes[size - 4]);
+  if (!match)
+    return failure();
+  size = size - /*VNNI BRGEMM loops*/ 4;
+  size_t idx = 0;
+  while (idx < size) {
+    if (!linalg::isParallelIterator(iteratorTypes[idx++]))
+      return failure();
+  }
+  LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
+  return success();
+}
 
 // Look for [p ... p] brgemm[r p p r]
 static LogicalResult checkStructure(linalg::LinalgOp linalgOp) {
@@ -59,6 +85,47 @@ static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
   return !isInputOperand(linalgOp, operand);
 }
 
+static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
+  SmallVector<AffineMap> maps;
+  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+    if (map.getNumResults() < 3)
+      return failure();
+    if (operand->getOperandNumber() == 1) {
+      if (map.getNumResults() != 5)
+        return failure();
+      maps.push_back(map.getMinorSubMap(4));
+    } else {
+      maps.push_back(map.getMinorSubMap(3));
+    }
+  }
+  for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+    if (map.getNumResults() < 2)
+      return failure();
+    maps.push_back(map.getMinorSubMap(2));
+  }
+
+  SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr r1, p4, p5, r2, r3;
+  SmallVector<AffineMap> expectedMaps;
+  bindDims(linalgOp.getContext(), r1, p4, p5, r2, r3);
+  auto blockingFactor =
+      vnni::utils::getVNNIBlockingFactor(linalgOp->getOperands()[0].getType());
+  // Unsupported blocking factor for type.
+  if (!blockingFactor)
+    return failure();
+  // Expected access patterns of BRGEMM.
+  expectedMaps = infer(
+      {{r1, p4, r2}, {r1, r2.floorDiv(*blockingFactor), p5, r3}, {p4, p5}});
+  if (compressedDimMaps != expectedMaps)
+    return failure();
+  LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
+  return success();
+}
+
 // Check the access pattern that must match the one expected for BRGEMM.
 // We extract the 3 innermost dimensions for the input and the 2 innermost
 // dimensions for the output. We then check that they equal:
@@ -81,11 +148,12 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-  AffineExpr r1, p3, p4, r2;
+  AffineExpr r1, p3, p4, r2, r3;
+  SmallVector<AffineMap> expectedMaps;
+
   bindDims(linalgOp.getContext(), r1, p3, p4, r2);
-  // Expected access patterns of BRGEMM
-  SmallVector<AffineMap> expectedMaps =
-      infer({{r1, p3, r2}, {r1, r2, p4}, {p3, p4}});
+  expectedMaps = infer({{r1, p3, r2}, {r1, r2, p4}, {p3, p4}});
+
   if (compressedDimMaps != expectedMaps)
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
@@ -102,18 +170,26 @@ static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
 
 static FailureOr<SmallVector<Value>>
 getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
-                  linalg::LinalgOp linalgOp, ValueRange valuesToUse) {
-  assert(linalgOp->getNumOperands() == 3 &&
-         "expect 3 input/output operands");
+                  linalg::LinalgOp linalgOp, ValueRange valuesToUse,
+                  bool isVNNILoop) {
+  assert(linalgOp->getNumOperands() == 3 && "expect 3 input/output operands");
   assert(linalgOp.getDpsInputOperands().size() == 2 &&
          "expect 2 input operands");
 
   SmallVector<Value> slicedOperands;
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
-        builder, operand, linalgOp, localIvs, valuesToUse, 3);
+    FailureOr<Value> slicedOperand;
+    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
+    if (isVNNILoop && map.getNumResults() == 5) {
+      slicedOperand = linalgx::utils::getSliceOperand(
+          builder, operand, linalgOp, localIvs, valuesToUse, 4);
+    } else {
+      slicedOperand = linalgx::utils::getSliceOperand(
+          builder, operand, linalgOp, localIvs, valuesToUse, 3);
+    }
     if (failed(slicedOperand))
       return failure();
+
     slicedOperands.push_back(*slicedOperand);
   }
   for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
@@ -124,6 +200,26 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
     slicedOperands.push_back(*slicedOperand);
   }
   return slicedOperands;
+}
+
+// Returns true if linalg op is using its second operand in VNNI format.
+static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
+  // Linalg loop must have 7 dimensions.
+  if (linalgOp.getNumLoops() != 7)
+    return false;
+  if (linalgOp->getNumOperands() < 3)
+    return false;
+  auto firstOperand = linalgOp->getOperands()[1];
+  auto firstOperandType = firstOperand.getType();
+  auto blockingFactor = vnni::utils::getVNNIBlockingFactor(firstOperandType);
+  if (!blockingFactor)
+    // Unsupported blocking factor for type.
+    return false;
+  return (
+      vnni::utils::isBF16Type(firstOperandType) &&
+      firstOperandType.cast<ShapedType>()
+              .getShape()[firstOperandType.cast<ShapedType>().getRank() - 1] ==
+          *blockingFactor);
 }
 
 // Map a generic operation to BRGEMM. The following conditions apply:
@@ -139,19 +235,26 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
   if (!isa<linalg::GenericOp>(linalgOp))
     return rewriter.notifyMatchFailure(linalgOp, "expects a linalg.generic");
 
-  if (failed(checkStructure(linalgOp)))
-    return rewriter.notifyMatchFailure(
-        linalgOp, "failed to match structurally with BRGEMM");
-
-  if (failed(checkAccessPatterns(linalgOp)))
-    return rewriter.notifyMatchFailure(
-        linalgOp, "failed to match BRGEMM access patterns");
-
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
-  // Materialize outer loops.
+  bool isVNNILoop = isLinalgOpVNNI(linalgOp);
+  if ((!isVNNILoop && failed(checkStructure(linalgOp))) ||
+      (isVNNILoop && failed(checkVNNIStructure(linalgOp))))
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match structurally with BRGEMM");
+
+  if ((!isVNNILoop && failed(checkAccessPatterns(linalgOp))) ||
+      (isVNNILoop && failed(checkVNNIAccessPatterns(linalgOp))))
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match BRGEMM access patterns");
+
+  // Materialize outer loops
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
+  // VNNI loop
+  if (isVNNILoop)
+    upTo--;
+
   FailureOr<SmallVector<Range>> maybeLoopRanges =
       linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
   if (failed(maybeLoopRanges))
@@ -167,27 +270,38 @@ mlir::linalgx::mapToBRGEMMOp(RewriterBase &rewriter,
                static_cast<size_t>(linalgOp->getNumOperands()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
-    FailureOr<SmallVector<Value>> maybeSlicedOperands =
-        getSlicedOperands(builder, loc, localIvs, linalgOp, operandValuesToUse);
+    FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
+        builder, loc, localIvs, linalgOp, operandValuesToUse, isVNNILoop);
     if (failed(maybeSlicedOperands)) {
       assert(0 && "failed to generate loops");
       return {};
     }
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
-
-    linalg::BatchReduceMatmulOp brgemm =
-        (linalgOp.hasTensorSemantics())
-            ? builder.create<linalg::BatchReduceMatmulOp>(
-                  loc, slicedOperands[2].getType(),
-                  ValueRange{slicedOperands[0], slicedOperands[1]},
-                  slicedOperands[2])
-            : builder.create<linalg::BatchReduceMatmulOp>(
-                  loc, ValueRange{slicedOperands[0], slicedOperands[1]},
-                  slicedOperands[2]);
-
-    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                     brgemm->getResults());
+    if (isVNNILoop) {
+      vnni::BRGemmOp brgemm =
+          (linalgOp.hasTensorSemantics())
+              ? builder.create<vnni::BRGemmOp>(
+                    loc, slicedOperands[2].getType(), slicedOperands[0],
+                    slicedOperands[1], slicedOperands[2])
+              : builder.create<vnni::BRGemmOp>(loc, slicedOperands[0],
+                                               slicedOperands[1],
+                                               slicedOperands[2]);
+      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                       brgemm->getResults());
+    } else {
+      linalg::BatchReduceMatmulOp brgemm =
+          (linalgOp.hasTensorSemantics())
+              ? builder.create<linalg::BatchReduceMatmulOp>(
+                    loc, slicedOperands[2].getType(),
+                    ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2])
+              : builder.create<linalg::BatchReduceMatmulOp>(
+                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
+                    slicedOperands[2]);
+      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                       brgemm->getResults());
+    }
 
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };

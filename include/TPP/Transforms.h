@@ -60,14 +60,12 @@ FailureOr<linalg::GenericOp> packMatmulOp(RewriterBase &rewriter,
                                           ArrayRef<OpFoldResult> tiles);
 
 // Attempt to block a MatmulOp to VNNI format.
-FailureOr<vnni::MatmulOp> packVNNIMatmulOp(RewriterBase &rewriter,
-                                           linalg::MatmulOp linalgOp,
-                                           ArrayRef<OpFoldResult> tiles);
+FailureOr<linalg::GenericOp> packVNNIMatmulOp(RewriterBase &rewriter,
+                                              linalg::GenericOp linalgOp);
 
 // Attempt to block a BRGemmOp to VNNI format.
-FailureOr<vnni::BRGemmOp> packVNNIBRGemmOp(RewriterBase &rewriter,
-                                           linalg::BatchReduceMatmulOp linalgOp,
-                                           ArrayRef<OpFoldResult> tiles);
+FailureOr<vnni::BRGemmOp>
+packVNNIBRGemmOp(RewriterBase &rewriter, linalg::BatchReduceMatmulOp linalgOp);
 
 // Collapse iterators in a linalg.generic based on 'reassociation'.
 FailureOr<linalg::GenericOp>
