@@ -5,6 +5,11 @@
 // RUN: FileCheck %s 
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
   %init_source = tensor.empty(%width) : tensor<?xf32>
   %source = linalg.generic {
@@ -248,6 +253,11 @@ func.func @entry() {
   //
  
   vector.print %v6 : vector<1x1x1x1x8x32xf32>
+
+  bufferization.dealloc_tensor %input_tensor : tensor<?xf32>
+  bufferization.dealloc_tensor %input_tensor1 : tensor<?xf32>
+  bufferization.dealloc_tensor %input_tensor2 : tensor<?xf32>
+  bufferization.dealloc_tensor %input_tensor3 : tensor<?xf32>
 
   return
 }

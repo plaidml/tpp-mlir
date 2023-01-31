@@ -4,6 +4,10 @@
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s \
+// RUN:  -e entry -entry-point-result=void
+
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

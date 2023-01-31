@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes -buffer-results-to-out-params -buffer-deallocation | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: FileCheck %s
 //
 
@@ -97,7 +97,7 @@
 
 //
 // CHECK-LABEL: @resnet50v1(
-// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>, %[[arg:.*]]: memref<1x1000xf32>) {
+// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1000xf32> {
 //
 func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %cst = arith.constant 0xFF800000 : f32

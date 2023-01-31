@@ -15,6 +15,11 @@
 // Make sure we map to tpp
 // RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 func.func @brgemmtpp(%A: tensor<2x4x8xf32>,
                      %B: tensor<2x8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
   // TPP: tpp.brgemm ins({{.*}} : {{.*}}, {{.*}} : {{.*}}) out({{.*}} : {{.*}})

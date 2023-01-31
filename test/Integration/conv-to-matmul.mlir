@@ -2,7 +2,7 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=LINALG
+// RUN: FileCheck %s
 //
 
 // RUN: tpp-opt %s -rewrite-conv-to-matmul-or-brgemm | FileCheck %s -check-prefix=IR 
@@ -12,8 +12,18 @@
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s -check-prefix=TRANSFORM
+// RUN: FileCheck %s
 //
+
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
 
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
   %init_source = bufferization.alloc_tensor(%width) : tensor<?xf32>
@@ -79,41 +89,22 @@ func.func @entry() {
   %d1 = arith.constant -1.0 : f32
   %v0 = vector.transfer_read %result_conv[%c0, %c0, %c0, %c0], %d1 : tensor<1x4x4x8xf32>, vector<1x4x4x8xf32>
   // 
-  // LINALG: ( ( ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // LINALG-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // LINALG-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // LINALG-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // LINALG-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ) ) )
-  //
-  
-  // 
-  // TRANSFORM: ( ( ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // TRANSFORM-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // TRANSFORM-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ), 
-  // TRANSFORM-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ), 
-  // TRANSFORM-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ) ) )
+  // CHECK: ( ( ( ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:  ( 0, 4, 8, 12, 16, 20, 24, 28 ) ),
+  // CHECK-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ),
+  // CHECK-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ),
+  // CHECK-SAME:  ( ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ),
+  // CHECK-SAME:    ( 0, 4, 8, 12, 16, 20, 24, 28 ) ) ) )
   //
   vector.print %v0 : vector<1x4x4x8xf32>
 
@@ -137,29 +128,16 @@ func.func @entry() {
   %v1 = vector.transfer_read %result_conv1[%c0, %c0, %c0, %c0], %d1 : tensor<1x3x3x8xf32>, vector<1x3x3x8xf32>
   
   //
-  // LINALG:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
+  // CHECK:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
   //
-
-  //
-  // TRANSFORM:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
-  //
-
   vector.print %v1 : vector<1x3x3x8xf32>
 
   %img_shape_broad2 = bufferization.alloc_tensor() : tensor<1x5x5x3xf32>
@@ -182,18 +160,16 @@ func.func @entry() {
   %v2 = vector.transfer_read %result_conv2[%c0, %c0, %c0, %c0], %d1 : tensor<1x2x2x8xf32>, vector<1x2x2x8xf32>
   
   //
-  // LINALG:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // LINALG-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // LINALG-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
-  //
-
-  //
-  // TRANSFORM:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ), 
-  // TRANSFORM-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ), 
-  // TRANSFORM-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
+  // CHECK:  ( ( ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ),
+  // CHECK-SAME: ( ( 0, 28, 56, 84, 112, 140, 168, 196 ),
+  // CHECK-SAME:   ( 0, 28, 56, 84, 112, 140, 168, 196 ) ) ) )
   //
   vector.print %v2 : vector<1x2x2x8xf32>
+
+  bufferization.dealloc_tensor %img_seed : tensor<?xf32>
+  bufferization.dealloc_tensor %filter_seed : tensor<?xf32>
+  bufferization.dealloc_tensor %output_seed : tensor<?xf32>
+
   return
 }

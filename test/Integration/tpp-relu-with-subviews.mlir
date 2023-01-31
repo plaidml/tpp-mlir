@@ -7,6 +7,10 @@
 // Make sure we map to tpp
 // RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void
+
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>

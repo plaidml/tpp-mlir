@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata -lower-affine | \
-// RUN: tpp-run -n 10 -print \
+// RUN: tpp-run %s -n 10 -print \
 // RUN: -e resnet50_bottleneck_block -entry-point-result=void | \
 // RUN: FileCheck %s
 
@@ -193,7 +192,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
     return %7 : !second_conv1x1_output_tensor_t
 }
 
-func.func @resnet50_bottleneck_block(%input_2d : !first_conv1x1_input_tensor_2d_t) -> tensor<2x4xf32> {
+func.func @resnet50_bottleneck_block(%input_2d : !first_conv1x1_input_tensor_2d_t, %out : tensor<2x4xf32>) -> tensor<2x4xf32> {
 
     // Expand 2D input tensor into 4D for 1x1 Conv: expand <49x2048xf32> into <1x7x7x2048xf32>
     %input = tensor.expand_shape %input_2d [[0, 1, 2], [3]] : !first_conv1x1_input_tensor_2d_t into !first_conv1x1_input_tensor_t
@@ -224,16 +223,15 @@ func.func @resnet50_bottleneck_block(%input_2d : !first_conv1x1_input_tensor_2d_
     // Extract a 2D slice for printing: avoids 2D-memref print limitation
     %3 = tensor.extract_slice %second_conv1x1_output[0, 0, 0, 0][1, 1, 2, 4][1, 1, 1, 1] : !second_conv1x1_output_tensor_t to tensor<2x4xf32>
 
-    // Copy the result into a separate output buffer
-    %outBuf = bufferization.alloc_tensor() : tensor<2x4xf32>
-    %out = linalg.copy ins(%3 : tensor<2x4xf32>) outs(%outBuf : tensor<2x4xf32>) -> tensor<2x4xf32>
+    // Copy the result into the output buffer
+    %outCopy = linalg.copy ins(%3 : tensor<2x4xf32>) outs(%out : tensor<2x4xf32>) -> tensor<2x4xf32>
 
     // Cleanup temporary buffers
     bufferization.dealloc_tensor %first_conv1x1_output : !first_conv1x1_output_tensor_t
     bufferization.dealloc_tensor %conv3x3_output : !conv3x3_output_tensor_t
     bufferization.dealloc_tensor %second_conv1x1_output : !second_conv1x1_output_tensor_t
 
-    return %out : tensor<2x4xf32>
+    return %outCopy : tensor<2x4xf32>
 }
 
 // Output

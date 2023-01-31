@@ -5,6 +5,11 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 module {
 
   func.func @fillSubview(%A: tensor<2x2x3x3xf32>,

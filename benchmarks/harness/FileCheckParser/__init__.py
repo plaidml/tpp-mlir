@@ -85,8 +85,6 @@ class FileCheckParser(object):
         if m:
             self.result['shared-libs'] = m.group(1)
             self.logger.debug(f"Shared libraries detected: {m.group(1)}")
-        else:
-            self.logger.info("Did not find the shared libs argument in RUN lines")
 
     def parse(self, filename):
         """Parses an IR file, returns a dictsionary with the data found"""

@@ -5,6 +5,11 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 #map1 = affine_map<(d0, d1) -> (d0 + d1)>
 module {
 

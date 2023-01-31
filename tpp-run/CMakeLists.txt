@@ -40,6 +40,7 @@ target_link_options(tpp-run PRIVATE
   -ltpp_c_runner_utils
   -L${CMAKE_BINARY_DIR}/lib
   -lmlir_c_runner_utils
+  -lmlir_runner_utils
   -L${LLVM_LIBRARY_DIR}
 )
 

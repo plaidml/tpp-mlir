@@ -71,8 +71,14 @@ class MLIRBench {
   /// Get a global memref by name
   MemRefType getGlobalType(llvm::StringRef);
 
+  // Create a random constant dense tensor
+  Value createConstTensor(TensorType);
+
   /// Gets module's main block
   Block &getModuleBlock();
+
+  /// Gets main wrappers's block
+  Block &getMainBlock();
 
 public:
   /// Creates context, builder
@@ -88,6 +94,10 @@ public:
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
 
+  /// Create and initialize the kernel input arguments
+  /// The values are cached locally in a kernel argument list, in order
+  LogicalResult createKernelArgs();
+
   /// Create all globals for the kernel method initializers
   /// Populates the list with the names, in order
   LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &);
@@ -96,7 +106,7 @@ public:
   LogicalResult createMainWrapper();
 
   /// Creates and returns a call to the kernel.
-  Operation *callKernel(llvm::SmallVector<llvm::StringRef> &);
+  Operation *callKernel();
 
   /// Returns the result of a kernel call, which is either
   /// the return value (if any) or the last argument (outs).
@@ -104,7 +114,7 @@ public:
 
   /// Create a benchmarking region around the kernel call
   /// Returns the memref containing measured time deltas
-  Value createTimerLoop(llvm::SmallVector<llvm::StringRef> &, unsigned);
+  Value createTimerLoop(unsigned);
 
   /// Get the timer average/deviation
   Value getTimerStats(Value);
@@ -112,8 +122,8 @@ public:
   /// Prints a float value (used for mean/dev)
   void printVector(Value);
 
-  /// Prints the memref as a vector read + print
-  LogicalResult printMemRef(Value);
+  /// Prints the shaped type (tensor/memref) as a vector read + print
+  LogicalResult printShapedType(Value);
 
   /// Prints the result of a kernel call
   LogicalResult printResult(Operation *kernelCall);

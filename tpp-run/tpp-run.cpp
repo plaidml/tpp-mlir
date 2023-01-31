@@ -35,8 +35,14 @@
 #include "mlir/Target/LLVMIR/Dialect/All.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
-#include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Check/CheckDialect.h"
+#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/TppDialect.h"
+#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/Dialect/VNNI/VNNIDialect.h"
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Passes.h"
 
 using namespace mlir;
 
@@ -74,17 +80,16 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.renameKernel()))
     return bench.emitError("Cannot rename kernel function");
 
-  // Creates the inputs for the kernel as dense globals
-  SmallVector<llvm::StringRef> globalList;
-  if (failed(bench.createGlobals(globalList)))
-    return bench.emitError("Cannot create the global memrefs");
-
   // Creates the main wrapper
   if (failed(bench.createMainWrapper()))
     return bench.emitError("Cannot create main wrapper");
 
+  // Creates the inputs for the kernel
+  if (failed(bench.createKernelArgs()))
+    return bench.emitError("Cannot create kernel inputs");
+
   // Call kernel once, to bootstrap (JIT compile, warm up caches)
-  auto call = bench.callKernel(globalList);
+  auto call = bench.callKernel();
   if (!call)
     return bench.emitError("Cannot generate a call to the kernel");
 
@@ -94,7 +99,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
 
   // This is the main loop, if N > 1
   if (benchNumLoops > 1) {
-    auto acc = bench.createTimerLoop(globalList, benchNumLoops);
+    auto acc = bench.createTimerLoop(benchNumLoops);
     if (!acc)
       return bench.emitError("Cannot create timer loop");
     auto stats = bench.getTimerStats(acc);
@@ -118,8 +123,13 @@ int main(int argc, char **argv) {
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated
   DialectRegistry registry;
+  registry.insert<mlir::tpp::TppDialect>();
+  registry.insert<mlir::xsmm::XsmmDialect>();
+  registry.insert<mlir::linalgx::LinalgXDialect>();
+  registry.insert<mlir::check::CheckDialect>();
+  registry.insert<mlir::vnni::VNNIDialect>();
   registry.insert<mlir::perf::PerfDialect>();
-  mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::linalgx::registerTransformDialectExtension(registry);
   registerAllDialects(registry);
   registerAllToLLVMIRTranslations(registry);
 
