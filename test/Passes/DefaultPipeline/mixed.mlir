@@ -96,3 +96,22 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
   // CHECK: return
   return %0 : memref<4x4xf32>
 }
+
+// -----
+
+// CHECK: func.func @raise_to_parallel(
+// CHECK-SAME:  %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index,
+// CHECK-SAME:  %[[SRC:.+]]: memref<32xf32>)
+func.func @raise_to_parallel(%lb: index, %ub: index, %step: index,
+          %src: memref<32xf32>) {
+  // CHECK-NOT: scf.for
+  // CHECK: scf.parallel
+  scf.for %i = %lb to %ub step %step {
+    %load = memref.load %src[%i] : memref<32xf32>
+    %add = arith.addf %load, %load : f32
+    memref.store %add, %src[%i] : memref<32xf32>
+  } {parallel}
+
+  // CHECK: return
+  return
+}

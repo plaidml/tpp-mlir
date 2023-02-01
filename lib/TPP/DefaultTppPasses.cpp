@@ -91,7 +91,7 @@ private:
     // Generalize tensor.pack and tensor.unpack.
     pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
 
-    // Preprocess tensors
+    // Preprocess tensors.
     pm.addPass(bufferization::createEmptyTensorEliminationPass());
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 
@@ -136,6 +136,7 @@ private:
     // This approach assumes that the function calls do not have any side
     // effects and can be safely moved outside of loop body.
     pm.addPass(createLoopInvariantCodeMotionPass());
+    pm.addPass(createRaiseToParallelLoopPass());
     pm.addPass(createParallelLoopFusionPass());
 
     // Lower all XSMM ops.
