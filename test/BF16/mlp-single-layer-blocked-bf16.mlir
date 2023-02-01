@@ -6,28 +6,17 @@
 //
 
 func.func @entry(){
-  %arg0 = memref.alloc(): memref<128x256xbf16>
-  %arg1 = memref.alloc(): memref<256x512xbf16>
-  %arg2 = memref.alloc(): memref<512xbf16>
-  %arg3 = memref.alloc(): memref<128x512xbf16>
   %f0 = arith.constant 1.0:bf16
-  linalg.fill ins(%f0:bf16) outs(%arg0:memref<128x256xbf16>)
-  linalg.fill ins(%f0:bf16) outs(%arg1:memref<256x512xbf16>)
-  linalg.fill ins(%f0:bf16) outs(%arg2:memref<512xbf16>)
-  linalg.fill ins(%f0:bf16) outs(%arg3:memref<128x512xbf16>)
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
   %c1 = arith.constant 1 : index
-  tpp.identity ins(%arg2 : memref<512xbf16>) out(%arg3 : memref<128x512xbf16>)
   %alloc = memref.alloc() {alignment = 128 : i64} : memref<32x64x4x4xbf16>
-  linalgx.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [4, 4] into %alloc : (memref<128x256xbf16> memref<32x64x4x4xbf16>)
-  %alloc_0 = memref.alloc() {alignment = 128 : i64} : memref<128x64x4x4xbf16>
-  linalgx.pack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [4, 4] into %alloc_0 : (memref<256x512xbf16> memref<128x64x4x4xbf16>)
+  linalg.fill ins(%f0:bf16) outs(%alloc:memref<32x64x4x4xbf16>)
   %wt_alloc = memref.alloc() {alignment = 128 : i64} : memref<128x64x2x4x2xbf16>
-  linalgx.pack %alloc_0 inner_dims_pos = [2] inner_tiles = [2] into %wt_alloc : (memref<128x64x4x4xbf16> memref<128x64x2x4x2xbf16>)
+  linalg.fill ins(%f0:bf16) outs(%wt_alloc:memref<128x64x2x4x2xbf16>)
   %alloc_1 = memref.alloc() {alignment = 128 : i64} : memref<32x128x4x4xbf16>
-  linalgx.pack %arg3 inner_dims_pos = [0, 1] inner_tiles = [4, 4] into %alloc_1 : (memref<128x512xbf16> memref<32x128x4x4xbf16>)
+  linalg.fill ins(%f0:bf16) outs(%alloc_1:memref<32x128x4x4xbf16>)
   scf.for %arg4 = %c0 to %c4 step %c1 {
     %subview = memref.subview %alloc[%arg4, 0, 0, 0] [1, 64, 4, 4] [1, 1, 1, 1] : memref<32x64x4x4xbf16> to memref<64x4x4xbf16, strided<[16, 4, 1], offset: ?>>
     %subview_2 = memref.subview %alloc_1[%arg4, 0, 0, 0] [1, 128, 4, 4] [1, 1, 1, 1] : memref<32x128x4x4xbf16> to memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>>
@@ -46,14 +35,8 @@ func.func @entry(){
       vector.print %f1 : vector<4x4xf32>
     }
   }
-  linalgx.unpack %alloc_1 inner_dims_pos = [0, 1] inner_tiles = [4, 4] into %arg3 : (memref<32x128x4x4xbf16> memref<128x512xbf16>)
   memref.dealloc %alloc : memref<32x64x4x4xbf16>
   memref.dealloc %wt_alloc : memref<128x64x2x4x2xbf16>
-  memref.dealloc %alloc_0 : memref<128x64x4x4xbf16>
   memref.dealloc %alloc_1 : memref<32x128x4x4xbf16>
-  memref.dealloc %arg0 : memref<128x256xbf16>
-  memref.dealloc %arg1 : memref<256x512xbf16>
-  memref.dealloc %arg2 : memref<512xbf16>
-  memref.dealloc %arg3 : memref<128x512xbf16>
   return
 }
