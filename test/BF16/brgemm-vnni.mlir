@@ -1,4 +1,4 @@
-// RUN: tpp-opt -pack-vnni="block-factors=2" %s | FileCheck %s
+// RUN: tpp-opt -pack-vnni %s | FileCheck %s
 
 func.func @matmul(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
 // CHECK: %[[pack:.+]] = tensor.empty() : tensor<32x2x4x2xbf16>
