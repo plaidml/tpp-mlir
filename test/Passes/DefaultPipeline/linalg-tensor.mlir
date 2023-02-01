@@ -13,7 +13,6 @@ func.func @matmul(%A: tensor<4x8xf32>,
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
 
-  // CHECK: return
   return %D : tensor<4x4xf32>
 }
 
@@ -41,7 +40,6 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
       linalg.yield %9 : f32
     } -> tensor<4x8x32x32xf32>
 
-  // CHECK: return
   return %1 :  tensor<4x8x32x32xf32>
 }
 
@@ -173,6 +171,5 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
       linalg.yield %16 : f32
   } -> tensor<128x512xf32>
 
-  // CHECK: return
   return %3 : tensor<128x512xf32>
 }

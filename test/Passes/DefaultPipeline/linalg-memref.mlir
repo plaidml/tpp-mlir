@@ -13,7 +13,6 @@ func.func @matmul(%A: memref<4x8xf32>,
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%C : memref<4x4xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -33,7 +32,6 @@ func.func @brgemm(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
   linalg.batch_reduce_matmul ins(%arg0, %arg1: memref<3x5x4xf32>, memref<3x4x5xf32>)
                              outs(%arg2: memref<5x5xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -61,7 +59,6 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
       linalg.yield %9 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -90,7 +87,6 @@ func.func @blocked_matmul_mapped(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x
     scf.yield
   }
 
-  // CHECK: return
   return
 }
 
@@ -115,7 +111,6 @@ func.func @relu_3d(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
         linalg.yield %13 : f32
   }
 
-  // CHECK: return
   return %arg3 : memref<64x32x32xf32>
 }
 
@@ -136,7 +131,6 @@ func.func @relu_mapping_inplace(%arg0: memref<10x10xf32>) {
       linalg.yield %0 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -158,7 +152,6 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
       linalg.yield %0 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -176,7 +169,6 @@ func.func @relu_mapping_fail(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>)
       linalg.yield %0 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -198,7 +190,6 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
       linalg.yield %in : f32
   }
 
-  // CHECK: return
   return %alloc : memref<12x56x56x64xf32>
 }
 
@@ -218,7 +209,6 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
       linalg.yield %0 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -239,7 +229,6 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
       linalg.yield %0 : f32
   }
 
-  // CHECK: return
   return
 }
 
@@ -324,7 +313,6 @@ module @predict_function  {
       linalg.yield %0 : f32
     }
 
-    // CHECK: return
     return
   }
 }

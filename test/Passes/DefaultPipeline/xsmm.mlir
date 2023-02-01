@@ -11,7 +11,6 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   %0 = xsmm.binary.dispatch add [3, 3, 3, 3, 3](broadcast none dataType f32)
   xsmm.binary add(dataType f32, %0, %arg0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -32,7 +31,6 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
     %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10](broadcast none dataType f32)
     xsmm.binary add(dataType f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32>, memref<10x10xf32>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -58,7 +56,6 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
     scf.yield
   }
 
-  // CHECK: return
   return
 }
 
@@ -75,7 +72,6 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   %0 = xsmm.unary.dispatch identity [3, 3, 1, 3](broadcast scalar dataType f32)
   xsmm.unary identity(dataType f32, %0, %arg1, %arg0) : (i64, memref<1x1xf32>, memref<3x3xf32>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -102,7 +98,6 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
     scf.yield
   }
 
-  // CHECK: return
   return %alloc : memref<12x56x56x64xf32>
 }
 
@@ -117,7 +112,6 @@ func.func @relu(%arg0: memref<3x3xf32>) {
   %0 = xsmm.unary.dispatch relu [3, 3, 3, 3](broadcast none dataType f32)
   xsmm.unary relu(dataType f32, %0, %arg0) : (i64, memref<3x3xf32>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -142,7 +136,6 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
     scf.yield
   }
 
-  // CHECK: return
   return %arg0 : memref<64x32x32xf32>
 }
 
@@ -162,7 +155,6 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   %0 = xsmm.ternary.dispatch brgemm [3, 3, 4, 4, 3, 3](dataType f32)
   xsmm.ternary brgemm(dataType f32, %0, %arg0, %arg1, %arg2, %c2_i64) : (i64, memref<2x3x4xf32>, memref<2x4x3xf32>, memref<3x3xf32>, i64) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -183,7 +175,6 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   %0 = xsmm.ternary.dispatch brgemm [4, 4, 4, 4, 4, 4](dataType bf16)
   xsmm.ternary brgemm(dataType bf16, %0, %arg0, %arg1, %arg2, %c64_i64) : (i64, memref<64x4x4xbf16>, memref<64x2x4x2xbf16>, memref<4x4xbf16>, i64) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -203,7 +194,6 @@ func.func @matmul(%A: memref<4x8xf32>,
   %0 = xsmm.ternary.dispatch matmul [4, 4, 8, 8, 4, 4](dataType f32)
   xsmm.ternary matmul(dataType f32, %0, %A, %B, %C) : (i64, memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -223,7 +213,6 @@ func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
   %0 = xsmm.ternary.dispatch matmul [6, 6, 10, 10, 6, 6](dataType bf16)
   xsmm.ternary matmul(dataType bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
 
-  // CHECK: return
   return
 }
 
@@ -254,7 +243,6 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     scf.yield
   }
 
-  // CHECK: return
   return
 }
 
@@ -330,7 +318,6 @@ module @predict_function {
     %2 = xsmm.unary.dispatch relu [128, 512, 512, 512](broadcast none dataType f32)
     xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
-    // CHECK: return
     return
   }
 }
