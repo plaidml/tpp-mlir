@@ -4,6 +4,10 @@
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s \
+// RUN:  -e entry -entry-point-result=void
+
 func.func @entry(){
   %c0 = arith.constant 1.0:bf16
   %arg0 = memref.alloc():memref<128x256xbf16>

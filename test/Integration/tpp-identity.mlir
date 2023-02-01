@@ -8,7 +8,7 @@
 // RUN: tpp-opt %s -canonicalize -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
 // Validate default pipeline
-// RUN: tpp-run %s -print \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>

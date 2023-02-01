@@ -5,6 +5,11 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 func.func @matmultpp(%A: memref<4x8xbf16>,
           %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>) attributes {llvm.emit_c_interface} {
   tpp.vnni_matmul ins(%A: memref<4x8xbf16>, %B: memref<4x4x2xbf16>)
