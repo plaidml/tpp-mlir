@@ -33,11 +33,6 @@ struct MatmulLayoutInterface
     return opOperand.getOperandNumber() == 2;
   }
 
-  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
-                            const AnalysisState &state) const {
-    return true;
-  }
-
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 2)
@@ -90,11 +85,6 @@ struct BRGemmLayoutInterface
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
     return opOperand.getOperandNumber() == 2;
-  }
-
-  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
-                            const AnalysisState &state) const {
-    return true;
   }
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
