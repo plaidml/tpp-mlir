@@ -91,7 +91,8 @@ private:
     // Generalize tensor.pack and tensor.unpack.
     pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
 
-    // Materialize empty tensors
+    // Preprocess tensors
+    pm.addPass(bufferization::createEmptyTensorEliminationPass());
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 
     // Run bufferization as the rest of the passes prefer working on memref.
