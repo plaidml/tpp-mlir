@@ -8,15 +8,13 @@ func.func @entry(){
   %c0 = arith.constant 1.0:bf16
   %arg0 = memref.alloc():memref<128x256xbf16>
   linalg.fill ins(%c0:bf16) outs(%arg0:memref<128x256xbf16>)
-  %arg1 = memref.alloc():memref<256x512xbf16>
-  linalg.fill ins(%c0:bf16) outs(%arg1:memref<256x512xbf16>)
   %arg2 = memref.alloc():memref<512xbf16>
   linalg.fill ins(%c0:bf16) outs(%arg2:memref<512xbf16>)
   %arg3 = memref.alloc():memref<128x512xbf16>
   linalg.fill ins(%c0:bf16) outs(%arg3:memref<128x512xbf16>)
   tpp.identity ins(%arg2 : memref<512xbf16>) out(%arg3 : memref<128x512xbf16>)
   %wt = memref.alloc():memref<128x512x2xbf16>
-  linalgx.pack %arg1 inner_dims_pos=[0] inner_tiles=[2] into %wt: (memref<256x512xbf16> memref<128x512x2xbf16>)
+  linalg.fill ins(%c0:bf16) outs(%wt:memref<128x512x2xbf16>)
   tpp.vnni_matmul ins(%arg0 : memref<128x256xbf16>, %wt : memref<128x512x2xbf16>) out(%arg3 : memref<128x512xbf16>)
   tpp.relu ins(%arg3 : memref<128x512xbf16>) out(%arg3 : memref<128x512xbf16>)
   %result = memref.alloc():memref<128x512xbf16>
