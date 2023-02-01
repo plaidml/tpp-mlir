@@ -5,6 +5,11 @@
 // RUN: FileCheck %s
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 func.func @entry(){
   %f0 = arith.constant 1.0:bf16
   %c4 = arith.constant 4 : index

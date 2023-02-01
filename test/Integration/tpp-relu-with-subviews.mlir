@@ -8,7 +8,7 @@
 // RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
 // Validate default pipeline
-// RUN: tpp-run %s -print \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
 #map = affine_map<(d0) -> (d0)>

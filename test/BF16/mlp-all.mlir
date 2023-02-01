@@ -9,6 +9,10 @@
 // 2*128x512 (131072) + 2*128x256x512 (33554432) + 2*128x1024 (262144) + 2*128x512x1024 (134217728) + 2*128x2048 (524288) + 2*128x1024x2048 (536870912) + 2*128x1000 (256000) + 2*128x2048x1000 (524288000) = 1230102376
 // BENCH_TOTAL_FLOPS: 1230102376
 
+// Validate default pipeline
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni | \
+// RUN: tpp-run \
+// RUN:  -e entry -entry-point-result=void
  
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>

@@ -4,6 +4,10 @@
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
 //
 
+// Validate default pipeline
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void
+
 func.func @entry() {
  %a = arith.constant 1:i1
  check.expect_true(%a):i1
