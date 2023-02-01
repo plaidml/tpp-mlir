@@ -10,7 +10,6 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
   tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -30,7 +29,6 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   tpp.add ins(%subview : memref<10x10xf32>, %subview_0 : memref<10x10xf32>) out(%subview_0 : memref<10x10xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -55,7 +53,6 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
     scf.yield
   }
 
-  // CHECK: return
   return
 }
 
@@ -71,7 +68,6 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast1]]
   tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -97,7 +93,6 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
     scf.yield
   }
 
-  // CHECK: return
   return %alloc : memref<12x56x56x64xf32>
 }
 
@@ -111,7 +106,6 @@ func.func @relu(%arg0: memref<3x3xf32>) {
   // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]]
   tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -135,7 +129,6 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
     scf.yield
   }
 
-  // CHECK: return
   return %arg0 : memref<64x32x32xf32>
 }
 
@@ -153,7 +146,6 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -172,7 +164,6 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   tpp.vnni_brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>) out(%arg2: memref<4x4xbf16>)
 
-  // CHECK: return
   return
 }
 
@@ -191,7 +182,6 @@ func.func @matmul(%A: memref<4x8xf32>,
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) out(%C : memref<4x4xf32>)
 
-  // CHECK: return
   return
 }
 
@@ -210,7 +200,6 @@ func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   tpp.vnni_matmul ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
 
-  // CHECK: return
   return
 }
 
@@ -239,7 +228,6 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     scf.yield
   }
 
-  // CHECK: return
   return
 }
 
@@ -312,7 +300,6 @@ module @predict_function  {
     // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
     tpp.relu ins(%arg3 : memref<128x512xf32>) out(%arg3 : memref<128x512xf32>)
 
-    // CHECK: return
     return
   }
 }

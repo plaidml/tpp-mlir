@@ -40,7 +40,6 @@ module @predict_function  {
     %2 = xsmm.unary.dispatch relu [128, 512, 512, 512](broadcast none dataType f32)
     xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
-    // CHECK: return
     return
   }
 }
@@ -67,7 +66,6 @@ func.func @buffer_dealloc(%A: memref<4x8xf32>,
   memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
 
   // CHECK: memref.dealloc %[[alloc]]
-  // CHECK: return
   return
 }
 
@@ -93,7 +91,6 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
   memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
 
   // CHECK-NOT: memref.dealloc %[[alloc]]
-  // CHECK: return
   return %0 : memref<4x4xf32>
 }
 
@@ -112,6 +109,5 @@ func.func @raise_to_parallel(%lb: index, %ub: index, %step: index,
     memref.store %add, %src[%i] : memref<32xf32>
   } {parallel}
 
-  // CHECK: return
   return
 }
