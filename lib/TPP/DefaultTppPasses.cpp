@@ -123,8 +123,6 @@ private:
 
     // Lower all Check ops.
     pm.addPass(createConvertCheckToLoopsPass());
-    // Lower all LinalgX ops.
-    pm.addPass(createLinalgXToLoopsPass());
 
     // Postprocess generated loops.
     // Perform LICM before function calls are generated to ensure that ops which

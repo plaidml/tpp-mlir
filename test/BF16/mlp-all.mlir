@@ -3,7 +3,7 @@
 // RUN:  -e entry -entry-point-result=void \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
 //
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-to-brgemm  -linalg-ext-to-loops -convert-linalg-to-tpp -convert-vnni-to-tpp | FileCheck %s -check-prefix=TPP
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -map-to-brgemm  -convert-linalg-to-tpp -convert-vnni-to-tpp | FileCheck %s -check-prefix=TPP
 // 
 // Total flops = sum(broadcast O(n*m) + matmul O(2*n*m*k) + ReLU (O(n*m))
 // 2*128x512 (131072) + 2*128x256x512 (33554432) + 2*128x1024 (262144) + 2*128x512x1024 (134217728) + 2*128x2048 (524288) + 2*128x1024x2048 (536870912) + 2*128x1000 (256000) + 2*128x2048x1000 (524288000) = 1230102376
