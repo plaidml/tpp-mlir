@@ -39,7 +39,6 @@ add_mlir_library(MLIRTPP
     TPPLinalgXTransformOps
 
     LINK_LIBS PUBLIC
-    TPPLinalgXDialect
     TPPTppDialect
     TPPXsmmDialect
     TPPVNNIDialect

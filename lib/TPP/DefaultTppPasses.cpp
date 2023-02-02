@@ -17,8 +17,6 @@
 
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
-#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
@@ -46,13 +44,11 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
     // Add all custom TPP dialects.
     registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
-    registry.insert<linalgx::LinalgXDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<vnni::VNNIDialect>();
     registry.insert<perf::PerfDialect>();
     bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
-    linalgx::registerBufferizableOpInterfaceExternalModels(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
