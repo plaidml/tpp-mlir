@@ -248,7 +248,8 @@ def RaiseToParallelLoop : Pass<"raise-to-parallel-loop",
                                "func::FuncOp"> {
   let summary = "Rewrite scf.for to scf.parallel.";
   let description = [{
-
+    Rewrite an scf.for loop to scf.parallel. The scf.for should be marked
+    as parallel.
   }]; 
   let constructor = "mlir::tpp::createRaiseToParallelLoopPass()";
 }
