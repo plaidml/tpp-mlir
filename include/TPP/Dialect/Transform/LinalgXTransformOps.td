@@ -34,13 +34,12 @@ def PackOpExt : Op<Transform_Dialect, "structured.pack_ext", [
   let assemblyFormat = [{
     $target
     (`blocking_factors` `=` $blocking_factors^)? 
-    (`use_vnni` `=` $use_vnni^)? attr-dict
+     attr-dict
   }];
 
   let arguments = (ins PDL_Operation:$target,
                    ConfinedAttr<DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">,
-                                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$blocking_factors,
-		               DefaultValuedAttr<I1Attr, "0">:$use_vnni);
+                                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$blocking_factors);
   let results = (outs PDL_Operation:$packed_linalg_op);
 
   let extraClassDeclaration = [{
