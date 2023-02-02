@@ -3,7 +3,7 @@
 // RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
 // RUN: -convert-linalg-to-loops \
 // RUN: -convert-vector-to-scf -convert-scf-to-cf \
-// RUN: -finalizing-bufferize -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm \
+// RUN: -finalizing-bufferize -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm \
 // RUN: -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \

@@ -51,8 +51,7 @@ func.func @matmul_static(
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x16x32x32xf32
 // CHECK: %[[ALLOC1:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32x16x32x32xf32>
 // CHECK: %[[ALLOC2:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xf32>
-// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
-// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
+// CHECK: scf.parallel (%[[I:.+]], %[[J:.+]]) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]])
 // CHECK:     %[[SUBV:.+]] = memref.subview %[[ALLOC]][%[[I]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:     %[[SUBV1:.+]] = memref.subview %[[ALLOC1]][%[[J]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<32x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK:     %[[SUBV2:.+]] = memref.subview %[[ALLOC2]][%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>

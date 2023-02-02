@@ -2,7 +2,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.reshape_2d in %0
 }
 
@@ -36,7 +36,7 @@ func.func @add(%arg0: memref<5x5x4xf32>, %arg1: memref<5x5x4xf32>) -> memref<5x5
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.reshape_2d in %0
 }
 
@@ -70,7 +70,7 @@ func.func @add(%arg0: tensor<5x5x4xf32>, %arg1: tensor<5x5x4xf32>) -> tensor<5x5
 // Expect to fail, as we have a single loop
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // expected-error @below {{Expect at least two loops:}}
     %1 = transform.structured.reshape_2d in %0
 }
@@ -93,7 +93,7 @@ func.func @add(%arg0: tensor<5xf32>, %arg1: tensor<5xf32>) -> tensor<5xf32> {
 // Expect to fail as we handle only generic
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // expected-error @below {{Cannot reshape non-generic:}}
     %1 = transform.structured.reshape_2d in %0
 }
@@ -112,7 +112,7 @@ func.func @block_linalg_matmul(
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.reshape_2d in %0
 }
 

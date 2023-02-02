@@ -2,7 +2,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.collapse_to_2d in %0
 }
 

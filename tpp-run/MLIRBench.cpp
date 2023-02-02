@@ -356,7 +356,7 @@ LogicalResult MLIRBench::finalize() {
   // Lower to LLVM
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
-  passManager.addPass(createMemRefToLLVMConversionPass());
+  passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
