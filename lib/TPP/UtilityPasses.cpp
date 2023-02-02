@@ -33,6 +33,153 @@ using namespace mlir::tpp;
 
 namespace {
 
+// Prototypes
+std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass();
+std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
+std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
+
+// A general cleanup pass that performs general IR normalization and
+// generic optimizations without any lowering or any logical changes.
+// Commonly applied after other major passes.
+struct CleanupPass : public PassWrapper<CleanupPass, OperationPass<ModuleOp>> {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  OpPassManager pm;
+
+  // Create the processing pipeline.
+  void constructPipeline() {
+    pm.clear();
+
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
+  }
+};
+
+std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass() {
+  return std::make_unique<CleanupPass>();
+}
+
+// Apply any present transforms and remove transform blocks afterwards.
+struct TransformPass
+    : public PassWrapper<TransformPass, OperationPass<ModuleOp>> {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  OpPassManager pm;
+
+  // Create the processing pipeline.
+  void constructPipeline() {
+    pm.clear();
+
+    // Run all transforms and clean them up afterwards.
+    pm.addPass(createTransformDialectInterpreterPass());
+    pm.addPass(createTransformDropSchedulePass());
+  }
+};
+
+std::unique_ptr<OperationPass<ModuleOp>> createTransformPass() {
+  return std::make_unique<TransformPass>();
+}
+
+// Apply global bufferization - convert all tensors to memrefs.
+// Uses TPP-specific bufferization options.
+struct BufferizationPass
+    : public PassWrapper<BufferizationPass, OperationPass<ModuleOp>> {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  OpPassManager pm;
+
+  // Create the processing pipeline.
+  void constructPipeline() {
+    pm.clear();
+
+    // Run bufferization as the rest of the passes prefer working on memref.
+    bufferization::OneShotBufferizationOptions buffOpts;
+    buffOpts.allowReturnAllocs = true;
+    buffOpts.bufferizeFunctionBoundaries = true;
+    buffOpts.functionBoundaryTypeConversion =
+        bufferization::LayoutMapOption::IdentityLayoutMap;
+
+    pm.addPass(bufferization::createOneShotBufferizePass(buffOpts));
+    pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
+    pm.addNestedPass<func::FuncOp>(
+        bufferization::createFinalizingBufferizePass());
+
+    // Clean up after bufferization.
+    pm.addPass(bufferization::createBufferDeallocationPass());
+  }
+};
+
+std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass() {
+  return std::make_unique<BufferizationPass>();
+}
+
+// Lower all local dialects (XSMM, check, perf) to standard dialects
+// and function calls.
+struct LocalDialectsLoweringPass
+    : public PassWrapper<LocalDialectsLoweringPass, OperationPass<ModuleOp>> {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  OpPassManager pm;
+
+  // Create the processing pipeline.
+  void constructPipeline() {
+    pm.clear();
+
+    pm.addPass(createConvertCheckToLoopsPass());
+    pm.addPass(createConvertXsmmToFuncPass());
+    pm.addPass(createConvertPerfToLoopsPass());
+    pm.addPass(createConvertPerfToFuncPass());
+  }
+};
+
+std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass() {
+  return std::make_unique<LocalDialectsLoweringPass>();
+}
+
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
   DefaultTppPasses() : DefaultTppPasses(false, false){};
   DefaultTppPasses(bool tppToLoops, bool linalgToLoops)
@@ -119,10 +266,10 @@ private:
     pm.addPass(createConvertCheckToLoopsPass());
 
     // Postprocess generated loops.
-    // Perform LICM before function calls are generated to ensure that ops which
-    // map directly to functions also get moved outside of loops, if possible.
-    // This approach assumes that the function calls do not have any side
-    // effects and can be safely moved outside of loop body.
+    // Perform LICM before function calls are generated to ensure that ops
+    // which map directly to functions also get moved outside of loops, if
+    // possible. This approach assumes that the function calls do not have any
+    // side effects and can be safely moved outside of loop body.
     pm.addPass(createLoopInvariantCodeMotionPass());
     pm.addPass(createRaiseToParallelLoopPass());
     pm.addPass(createParallelLoopFusionPass());
