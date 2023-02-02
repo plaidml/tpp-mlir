@@ -44,7 +44,11 @@ def VNNI_MatmulOp : VNNI_Op<"matmul"> {
 
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
   let results = (outs Variadic<VNNIOperand>:$dest);
-  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict";
+  
+  let assemblyFormat = [{
+    `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
+     `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
+  }];
 
   let builders = [
     OpBuilder<(ins "Value":$matrixA, "Value":$matrixB, "Value":$matrixC)>
@@ -68,7 +72,11 @@ def VNNI_BRGemmOp : VNNI_Op<"brgemm"> {
 
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
   let results = (outs Variadic<VNNIOperand>:$dest);
-  let assemblyFormat = "`ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict";
+  
+  let assemblyFormat = [{
+    `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
+    `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
+  }];
 
   let builders = [
     OpBuilder<(ins "Value":$matrixA, "Value":$matrixB, "Value":$matrixC)>
