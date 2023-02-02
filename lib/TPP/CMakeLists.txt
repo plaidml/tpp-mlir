@@ -12,7 +12,6 @@ add_mlir_library(MLIRTPP
     RewriteConvToMatmulImpl.cpp
     TileConsumerAndFuseProducers.cpp
     RewriteConvsToMatmulOrBrgemm.cpp
-    DefaultTppPasses.cpp
     GeneralizeTensorPackAndUnPack.cpp
     RaiseToParallelLoop.cpp
     ConstantFoldPack.cpp
@@ -21,6 +20,7 @@ add_mlir_library(MLIRTPP
   # Utils
     TensorInit.cpp
     TransformUtils.cpp
+    UtilityPasses.cpp
     VNNIUtils.cpp
 
   # Conversions
