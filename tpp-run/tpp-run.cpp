@@ -53,14 +53,23 @@ llvm::cl::opt<unsigned>
 // Print result
 llvm::cl::opt<bool> printKernelResult("print",
                                       llvm::cl::desc("Print kernel result"),
-                                      llvm::cl::value_desc("true/false"),
                                       llvm::cl::init(false));
+
+// Lower to loops (for validation purposes)
+llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
+                                      llvm::cl::desc("Lower TPP to loops"),
+                                      llvm::cl::init(false));
+
+// Random seed, if zero, don't emit randominputs
+llvm::cl::opt<int>
+    seed("seed", llvm::cl::desc("Random seed, defualt 0 (no random)"),
+                  llvm::cl::value_desc("int"), llvm::cl::init(0));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
-  MLIRBench bench(op);
+  MLIRBench bench(op, seed, tppToLoops);
 
   // Basic checks
   if (options.mainFuncType != "void")
@@ -88,7 +97,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot create kernel inputs");
 
   // Call kernel once, to bootstrap (JIT compile, warm up caches)
-  auto call = bench.callKernel();
+  auto *call = bench.callKernel();
   if (!call)
     return bench.emitError("Cannot generate a call to the kernel");
 

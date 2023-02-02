@@ -8,7 +8,6 @@
 
 #include "MLIRBench.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -36,8 +35,9 @@
 
 using namespace mlir;
 
-MLIRBench::MLIRBench(mlir::Operation *op)
-    : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
+MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops)
+    : builder(op->getContext()), unkLoc(builder.getUnknownLoc()), seed(seed),
+      tppToLoops(tppToLoops) {
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
   auto *ctx = module->getContext();
@@ -125,7 +125,7 @@ LogicalResult MLIRBench::createKernelArgs() {
                    .Case<TensorType>([&](auto tensorTy) {
                      // Create a dense const tensor and use it directly
                      // as an input to the kernel
-                     return createConstTensor(tensorTy);
+                     return createDenseTensor(tensorTy);
                    })
                    .Default([&](auto t) { return std::nullopt; });
 
@@ -193,9 +193,7 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
 
 Value MLIRBench::createTimerLoop(unsigned n) {
   // Allocates buffer for results
-  auto i64Type = builder.getI64Type();
-  auto count = builder.create<arith::ConstantOp>(
-      unkLoc, i64Type, builder.getIntegerAttr(i64Type, n));
+  auto count = getConstant(builder.getI64Type(), n);
   auto memrefType = MemRefType::get({n}, builder.getF64Type());
   auto acc = builder.create<memref::AllocOp>(unkLoc, memrefType);
 
@@ -220,9 +218,7 @@ Value MLIRBench::getTimerStats(Value acc) {
   auto dev = callDev.getStdev();
 
   // Create a vector<2xf64> so we can print
-  auto zeroFAttr = builder.getFloatAttr(builder.getF64Type(), 0.0);
-  auto zeroF = builder.create<arith::ConstantOp>(unkLoc, builder.getF64Type(),
-                                                 zeroFAttr);
+  auto zeroF = getConstant(builder.getF64Type(), 0.0);
   auto vectorType = VectorType::get({2}, builder.getF64Type());
   auto stats = builder.create<vector::SplatOp>(unkLoc, vectorType, zeroF);
 
@@ -294,13 +290,9 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   }
 
   // Loop through the shaped type, transfer each dim to vector
-  auto indexType = builder.getIndexType();
-  auto countAttr = builder.getIntegerAttr(indexType, outerDims[0]);
-  auto count = builder.create<arith::ConstantOp>(unkLoc, indexType, countAttr);
-  auto zeroAttr = builder.getIntegerAttr(indexType, 0);
-  auto zero = builder.create<arith::ConstantOp>(unkLoc, indexType, zeroAttr);
-  auto oneAttr = builder.getIntegerAttr(indexType, 1);
-  auto one = builder.create<arith::ConstantOp>(unkLoc, indexType, oneAttr);
+  auto count = getConstant(builder.getIndexType(), outerDims[0]);
+  auto zero = getConstant(builder.getIndexType(), 0);
+  auto one = getConstant(builder.getIndexType(), 1);
   auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
   builder.setInsertionPointToStart(loop.getBody());
 
@@ -335,7 +327,7 @@ LogicalResult MLIRBench::finalize() {
   applyPassManagerCLOptions(passManager);
 
   // Apply the default preprocessing pass
-  passManager.addPass(tpp::createDefaultTppPass());
+  passManager.addPass(tpp::createDefaultTppPass(tppToLoops));
 
   // Bufferization, if needed
   passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
@@ -373,6 +365,37 @@ LogicalResult MLIRBench::finalize() {
 
 //----------------------- Helpers & private methods
 
+template <class ValueT>
+arith::ConstantOp MLIRBench::getConstant(Type type, ValueT value) {
+  Attribute attr;
+  if constexpr (std::numeric_limits<ValueT>::is_integer) {
+    attr = builder.getIntegerAttr(type, value);
+  } else if constexpr (llvm::is_one_of<ValueT, float, double>()) {
+    attr = builder.getFloatAttr(type, value);
+  }
+  assert(attr && "Unsupported ConstantOp type");
+  return builder.create<arith::ConstantOp>(unkLoc, type, attr);
+}
+
+DenseElementsAttr MLIRBench::getDenseAttribute(ShapedType shape) {
+  // TODO: Use some random initialiser
+  auto floatValue = APFloat(1.0F);
+
+  if (shape.getElementType().isBF16()) {
+    bool ignored;
+    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
+                       &ignored);
+  } else {
+    assert(shape.getElementType().isF32() && "Element type not supported");
+  }
+
+  // For some reason, memref global op needs dense tensor type
+  // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
+  auto tensorType =
+      RankedTensorType::get(shape.getShape(), shape.getElementType());
+  return mlir::DenseElementsAttr::get(tensorType, floatValue);
+}
+
 llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   // Create global dense memrefs (Module insertion point)
   OpBuilder::InsertionGuard guard(builder);
@@ -381,34 +404,18 @@ llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
   // Simple auto increment
   static unsigned order = 0;
 
-  // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0F);
-
-  if (type.getElementType().isBF16()) {
-    bool ignored;
-    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &ignored);
-  }
   // Create global dense memrefs (Module insertion point)
   auto privAttr = builder.getStringAttr("private");
-
-  // We really only support memrefs as arguments for now
-  auto memrefTy = dyn_cast_or_null<MemRefType>(type);
-  assert(memrefTy && "Unsupported argument type");
 
   // Auto incremental naming system
   std::string name = "__wrapper_" + std::to_string(order++);
 
-  // For some reason, memref global op needs dense tensor type
-  // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-  auto tensorType =
-      RankedTensorType::get(memrefTy.getShape(), memrefTy.getElementType());
-  auto floatInit = mlir::DenseElementsAttr::get(tensorType, floatValue);
   auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
+  auto floatInit = getDenseAttribute(type);
 
   // Create the global object in the Module's region
   auto global = builder.create<memref::GlobalOp>(unkLoc, StringRef(name),
-                                                 privAttr, memrefTy, floatInit,
+                                                 privAttr, type, floatInit,
                                                  /*constant=*/false, alignment);
 
   return global.getName();
@@ -422,18 +429,27 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
   return memRefTy;
 }
 
-Value MLIRBench::createConstTensor(TensorType type) {
-  // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0F);
+Value MLIRBench::createDenseTensor(TensorType type) {
+  // If seed is not zero, generate a random fill tensor
+  if (seed) {
+    assert(type.getRank() == 2 && "Wrong shape to random fill");
 
-  auto elementType = type.getElementType();
-  if (elementType.isBF16()) {
-    bool ignored;
-    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &ignored);
+    // Inputs (min, max, seed)
+    Value zero = getConstant(builder.getF64Type(), 0.0);
+    Value one = getConstant(builder.getF64Type(), 1.0);
+    Value randSeed = getConstant(builder.getI32Type(), seed);
+
+    // Output tensor
+    Value out = builder.create<tensor::EmptyOp>(unkLoc, type, ValueRange{});
+
+    // Fill
+    auto fill = builder.create<linalg::FillRng2DOp>(unkLoc,
+        ValueRange{zero, one, randSeed}, ValueRange{out});
+    return fill.getResult(0);
   }
-  auto floatInit = mlir::DenseElementsAttr::get(type, floatValue);
 
+  // Otherwise, just get a const tensor
+  auto floatInit = getDenseAttribute(type);
   return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }
 
