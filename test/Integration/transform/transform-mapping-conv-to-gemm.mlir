@@ -1,11 +1,11 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
 //
 
-// RUN: tpp-opt %s -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -transform-drop-schedule -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
@@ -27,7 +27,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.generalize %0
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
     transform.structured.map_conv_to_matmul %2

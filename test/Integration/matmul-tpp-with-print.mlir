@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -convert-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | \

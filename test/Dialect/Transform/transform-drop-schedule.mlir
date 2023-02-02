@@ -16,6 +16,6 @@ func.func @relu(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32> {
 // CHECK-NOT: transform.sequence
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }

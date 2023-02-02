@@ -33,7 +33,7 @@ struct MatmulLayoutInterface
     return opOperand.getOperandNumber() == 2;
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 2)
       return {};
@@ -87,7 +87,7 @@ struct BRGemmLayoutInterface
     return opOperand.getOperandNumber() == 2;
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 2)
       return {};

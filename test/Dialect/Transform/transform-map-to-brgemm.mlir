@@ -6,7 +6,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 
@@ -48,7 +48,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 
@@ -85,7 +85,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 
@@ -111,7 +111,7 @@ func.func @blocked_matmul(%arg0: tensor<8x32x32xf32>, %arg1: tensor<8x32x32xf32>
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 
@@ -150,7 +150,7 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 
@@ -192,7 +192,7 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %0
 }
 

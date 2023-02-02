@@ -31,7 +31,7 @@ struct TransformDialectInterpreter
     for (auto op :
          module.getBody()->getOps<transform::TransformOpInterface>()) {
       if (failed(transform::applyTransforms(
-              module, op,
+              module, op, std::nullopt,
               transform::TransformOptions().enableExpensiveChecks(true))))
         return signalPassFailure();
     }

@@ -15,7 +15,7 @@ func.func @propagation(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg0
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %0
 }
 
@@ -44,7 +44,7 @@ func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64x
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %1
 }
@@ -75,7 +75,7 @@ func.func @main(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     // expected-error @below {{op requires isolated-from-above targets}}
     transform.structured.packing_propagation %0
 }
@@ -97,7 +97,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -139,7 +139,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -184,7 +184,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -225,7 +225,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -270,7 +270,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -317,7 +317,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
@@ -369,7 +369,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2

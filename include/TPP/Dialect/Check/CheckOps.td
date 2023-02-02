@@ -13,6 +13,7 @@ def CHECK_Dialect : Dialect {
   let summary = [{
     A dialect implementing test assertions.
   }];
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {

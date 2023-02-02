@@ -7,7 +7,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // expected-error @below {{Cannot map non-generic op to tpp}}
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
@@ -29,7 +29,7 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -51,7 +51,7 @@ func.func @identity(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -75,7 +75,7 @@ func.func @relu(%arg1: tensor<1x512xf32>) -> tensor<1x512xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -98,7 +98,7 @@ func.func @add(%arg1: tensor<256x256xf32>, %arg2: tensor<256x256xf32>) -> tensor
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -123,7 +123,7 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -147,7 +147,7 @@ func.func @gemm(%arg0: tensor<1x256xf32>, %arg1: tensor<256x512xf32>) -> tensor<
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -168,7 +168,7 @@ func.func @identity(%arg1: tensor<32x32x32x32xf32>) -> tensor<32x32x32x32xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.map_linalg_to_tpp in %0
 }
 
@@ -189,7 +189,7 @@ func.func @add(%arga: tensor<32xf32>, %argb: tensor<32xf32>) -> tensor<32xf32> {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -210,7 +210,7 @@ func.func @identity(%arg1: memref<1x512xf32>) {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -233,7 +233,7 @@ func.func @relu(%arg1: memref<1x512xf32>) {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -256,7 +256,7 @@ func.func @add(%arg1: memref<256x256xf32>, %arg2: memref<256x256xf32>) {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -280,7 +280,7 @@ func.func @gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2: mem
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -302,7 +302,7 @@ func.func @not_gemm(%arg0: memref<1x256xf32>, %arg1: memref<256x512xf32>, %arg2:
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 
@@ -330,7 +330,7 @@ func.func @identity(%arg1: memref<32x33x34x35xf32>) {
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // expected-error @below {{failed to apply}}
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
@@ -353,7 +353,7 @@ func.func @dyn_gemm(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memre
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_and_convert_linalg_to_tpp %0
 }
 

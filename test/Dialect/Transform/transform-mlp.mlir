@@ -53,7 +53,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: te
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // Block matmul i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     // Get the parent op (func.func)
@@ -61,7 +61,7 @@ transform.sequence failures(propagate) {
     // Propagate packing
     transform.structured.packing_propagation %2
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // Annotate and collect relu(s)
     %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
@@ -70,9 +70,9 @@ transform.sequence failures(propagate) {
     %5, %loop = transform.structured.fuse %relus#3 { tile_sizes = [1, 0, 0, 0] }
 
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
-    %6 = transform.structured.match ops{["func.func"]} in %arg1
+    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.fold_unit_extent_dims %6
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %8 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %7
 
     // Fuse matmul + relu and map the matmul to BRGEMM
@@ -97,24 +97,24 @@ transform.sequence failures(propagate) {
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     // Pack matmul
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0  blocking_factors = [32, 32, 32]
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
 
     // Detect relus and identity
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
     // Fuse relu with matmul
     %5, %loop:2 = transform.structured.fuse %4 { tile_sizes = [1, 1, 0, 0] }
 
     // clean-up IR after fusion
-    %6 = transform.structured.match ops{["func.func"]} in %arg1
+    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.canonicalize %6
 
     // map a packed matmul to a brgemm
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.map_to_brgemm %7
 }
 
