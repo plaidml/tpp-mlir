@@ -134,7 +134,7 @@ public:
   LogicalResult printResult(Operation *kernelCall);
 
   /// Terminates the function, issuing a return, lower to LLVM
-  LogicalResult finalize();
+  LogicalResult finalize(bool dump);
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);

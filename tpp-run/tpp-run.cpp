@@ -118,7 +118,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
 
   if (failed(bench.checkKernelSignature()))
-    return bench.finalize();
+    return bench.finalize(dumpMLIR);
 
   // Move the kernel to a local name, so we can create `main` with the same
   // name as the pre-defined entry point (since we can't change it)
@@ -154,14 +154,11 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   }
 
   // Finally lower to LLVM Dialect
-  return bench.finalize();
+  return bench.finalize(dumpMLIR);
 }
 
 std::unique_ptr<llvm::Module>
 lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
-  if (dumpMLIR)
-    module->dump();
-
   // Default lowering for mlir-cpu-runner
   auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
   assert(llvmModule);
