@@ -60,14 +60,6 @@ class MLIRBench {
   /// Create a random global based on the memref type
   llvm::StringRef createGlobal(MemRefType);
 
-  struct {
-    func::FuncOp alloc;
-    func::FuncOp start;
-    func::FuncOp stop;
-    func::FuncOp average;
-    func::FuncOp deviation;
-  } timer;
-
   /// Get a global memref by name
   MemRefType getGlobalType(llvm::StringRef);
 
