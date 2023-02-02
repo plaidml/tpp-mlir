@@ -37,11 +37,26 @@ namespace {
 std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
+std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
+
+template <typename DerivedT>
+class UtilityPassBase : public PassWrapper<DerivedT, OperationPass<ModuleOp>> {
+public:
+  virtual void runOnOperation() = 0;
+
+protected:
+  OpPassManager pm;
+
+  // Create the pass processing pipeline.
+  virtual void constructPipeline() = 0;
+};
 
 // A general cleanup pass that performs general IR normalization and
 // generic optimizations without any lowering or any logical changes.
 // Commonly applied after other major passes.
-struct CleanupPass : public PassWrapper<CleanupPass, OperationPass<ModuleOp>> {
+struct CleanupPass : public UtilityPassBase<CleanupPass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CleanupPass)
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -55,10 +70,7 @@ struct CleanupPass : public PassWrapper<CleanupPass, OperationPass<ModuleOp>> {
   }
 
 private:
-  OpPassManager pm;
-
-  // Create the processing pipeline.
-  void constructPipeline() {
+  void constructPipeline() override {
     pm.clear();
 
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -71,8 +83,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass() {
 }
 
 // Apply any present transforms and remove transform blocks afterwards.
-struct TransformPass
-    : public PassWrapper<TransformPass, OperationPass<ModuleOp>> {
+struct TransformPass : public UtilityPassBase<TransformPass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformPass)
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -86,10 +99,7 @@ struct TransformPass
   }
 
 private:
-  OpPassManager pm;
-
-  // Create the processing pipeline.
-  void constructPipeline() {
+  void constructPipeline() override {
     pm.clear();
 
     // Run all transforms and clean them up afterwards.
@@ -104,8 +114,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createTransformPass() {
 
 // Apply global bufferization - convert all tensors to memrefs.
 // Uses TPP-specific bufferization options.
-struct BufferizationPass
-    : public PassWrapper<BufferizationPass, OperationPass<ModuleOp>> {
+struct BufferizationPass : public UtilityPassBase<BufferizationPass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BufferizationPass)
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -119,10 +130,7 @@ struct BufferizationPass
   }
 
 private:
-  OpPassManager pm;
-
-  // Create the processing pipeline.
-  void constructPipeline() {
+  void constructPipeline() override {
     pm.clear();
 
     // Run bufferization as the rest of the passes prefer working on memref.
@@ -146,10 +154,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass() {
   return std::make_unique<BufferizationPass>();
 }
 
-// Lower all local dialects (XSMM, check, perf) to standard dialects
+// Lower all local dialects (XSMM, check etc.) to standard dialects
 // and function calls.
 struct LocalDialectsLoweringPass
-    : public PassWrapper<LocalDialectsLoweringPass, OperationPass<ModuleOp>> {
+    : public UtilityPassBase<LocalDialectsLoweringPass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LocalDialectsLoweringPass)
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -163,10 +173,7 @@ struct LocalDialectsLoweringPass
   }
 
 private:
-  OpPassManager pm;
-
-  // Create the processing pipeline.
-  void constructPipeline() {
+  void constructPipeline() override {
     pm.clear();
 
     pm.addPass(createConvertCheckToLoopsPass());
