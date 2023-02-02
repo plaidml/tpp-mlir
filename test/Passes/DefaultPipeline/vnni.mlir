@@ -83,20 +83,15 @@ func.func @brgemm_static_tensor(%arg0: tensor<4x256x512xbf16>, %arg1: tensor<4x5
 
 // CHECK: func.func @brgemm_static_memref(
 // CHECK: %[[ARG0:.+]]: memref<4x256x512xbf16>,
-// CHECK: %[[ARG1:.+]]: memref<4x512x1024xbf16>,
+// CHECK: %[[ARG1:.+]]: memref<4x256x1024x2xbf16>,
 // CHECK: %[[ARG2:.+]]: memref<256x1024xbf16>)
-func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x512x1024xbf16>, %arg2: memref<256x1024xbf16>) -> memref<256x1024xbf16> {
-  // CHECK: %[[alloc:.*]] = memref.alloc{{.*}}: memref<4x256x1024x2xbf16>
-  %1 = memref.alloc() {alignment = 128 : i64} : memref<4x256x1024x2xbf16>
-  linalgx.pack %arg1 inner_dims_pos = [1] inner_tiles = [2] into %1 : (memref<4x512x1024xbf16> memref<4x256x1024x2xbf16>)
-
+func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x256x1024x2xbf16>, %arg2: memref<256x1024xbf16>) -> memref<256x1024xbf16> {
   // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[alloc]]
+  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>)
-  memref.dealloc %1 : memref<4x256x1024x2xbf16>
+  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>)
 
   return %arg2 : memref<256x1024xbf16>
 }
@@ -107,20 +102,16 @@ func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x5
 
 // CHECK: func.func @brgemm_static_memref_result(
 // CHECK: %[[ARG0:.+]]: memref<4x256x512xbf16>,
-// CHECK: %[[ARG1:.+]]: memref<4x512x1024xbf16>,
+// CHECK: %[[ARG1:.+]]: memref<4x256x1024x2xbf16>,
 // CHECK: %[[ARG2:.+]]: memref<256x1024xbf16>)
-func.func @brgemm_static_memref_result(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x512x1024xbf16>, %arg2: memref<256x1024xbf16>) -> memref<256x1024xbf16> {
-  // CHECK: %[[alloc:.*]] = memref.alloc{{.*}}: memref<4x256x1024x2xbf16>
-  %1 = memref.alloc() {alignment = 128 : i64} : memref<4x256x1024x2xbf16>
-  linalgx.pack %arg1 inner_dims_pos = [1] inner_tiles = [2] into %1 : (memref<4x512x1024xbf16> memref<4x256x1024x2xbf16>)
-
+func.func @brgemm_static_memref_result(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x256x1024x2xbf16>, %arg2: memref<256x1024xbf16>) -> memref<256x1024xbf16> {
   // CHECK-NOT: call @xsmm_brgemm_dispatch
   // CHECK-NOT: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK-NOT: %[[cast1:.*]] = memref.cast %[[alloc]]
+  // CHECK-NOT: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK-NOT: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK-NOT: call @xsmm_brgemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   // CHECK: vnni.brgemm
-  %2 = vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>) -> memref<256x1024xbf16>
+  %2 = vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>) -> memref<256x1024xbf16>
 
   return %2 : memref<256x1024xbf16>
 }
