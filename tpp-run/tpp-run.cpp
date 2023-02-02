@@ -36,7 +36,6 @@
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
 #include "TPP/Dialect/Check/CheckDialect.h"
-#include "TPP/Dialect/LinalgX/LinalgXDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
@@ -125,7 +124,6 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();
   registry.insert<mlir::xsmm::XsmmDialect>();
-  registry.insert<mlir::linalgx::LinalgXDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::vnni::VNNIDialect>();
   registry.insert<mlir::perf::PerfDialect>();

@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/LinalgX/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Check/CheckOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
