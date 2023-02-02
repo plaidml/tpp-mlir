@@ -22,7 +22,6 @@ add_mlir_library(MLIRTPP
 
   # Conversions
     ConvertLinalgToTpp.cpp
-    ConvertLinalgXToLoops.cpp
     ConvertTppToLoops.cpp
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
