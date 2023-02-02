@@ -30,13 +30,16 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
 
   let arguments = (ins I1:$operand);
 
-  let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    `(` $operand `)` attr-dict `:` type($operand)
+  }];
 }
 
 def CHECK_ExpectAlmostEqOp :
-    Op<CHECK_Dialect, "expect_almost_eq",[TypesMatchWith<"Operand types match",
-                   "lhs", "rhs",
-                   "$_self.cast<ShapedType>()">]> {
+    Op<CHECK_Dialect, "expect_almost_eq",
+    [TypesMatchWith<"Operand types match",
+                    "lhs", "rhs",
+                    "$_self.cast<ShapedType>()">]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
     Verifies that the tensor operands with float elements are
@@ -49,13 +52,15 @@ def CHECK_ExpectAlmostEqOp :
     ```
   }];
 
-  let arguments = (ins
-    	AnyShaped:$lhs,
-        AnyShaped:$rhs,
-        AnyFloat:$threshold
+  let arguments = (ins AnyShaped:$lhs,
+                       AnyShaped:$rhs,
+                       AnyFloat:$threshold
   );
 
-  let assemblyFormat = "`(` $lhs `,` $rhs `,` $threshold `)` attr-dict `:` type($lhs) `,` type($rhs) `,` type($threshold)";
+  let assemblyFormat = [{
+    `(` $lhs `,` $rhs `,` $threshold `)` 
+    attr-dict `:` type($lhs) `,` type($rhs) `,` type($threshold)
+  }];
 }
 
 def CHECK_ExpectSaneOp :
@@ -75,7 +80,9 @@ def CHECK_ExpectSaneOp :
   let arguments = (ins AnyShaped:$operand
   );
 
-  let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    `(` $operand `)` attr-dict `:` type($operand)
+  }];
 }
 
 
