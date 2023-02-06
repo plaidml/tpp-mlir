@@ -211,7 +211,6 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-DAG: %[[C56:.+]] = arith.constant 56 : index
   %0 = tensor.empty() : tensor<1x56x56x64xf32>
   %1 = tensor.empty() : tensor<1x56x56x64xf32>
-  // CHECK: linalg.generic {{.*}}library_call = "tpp.identity"}
   %2 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg2 : tensor<64xf32>) outs(%1 : tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
@@ -221,9 +220,14 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-NEXT:   scf.for %{{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:    scf.for %{{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:      scf.for %{{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
+  // CHECK: linalg.generic
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  // CHECK-SAME:  library_call = "tpp.identity"
   // CHECK:     linalg.batch_reduce_matmul
   %3 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg0 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%2 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs({{.*}} : tensor<1x1x1x1x1xf32>)
+  // CHECK:     linalg.generic 
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], 
+  // CHECK-SAME:  library_call = "tpp.relu"} 
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -245,12 +249,18 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-NEXT:   scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:     scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:       scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
+  // CHECK: linalg.generic 
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"],
+  // CHECK-SAME:  library_call = "tpp.identity"
   // CHECK:               scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
   // CHECK-NEXT:            scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK-NEXT:              scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK:           linalg.matmul
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%6 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK: linalg.generic {{.*}}, iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
+  // CHECK:     linalg.generic  
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], 
+  // CHECK-SAME:  library_call = "tpp.relu" 
+  // CHECK-SAME:  outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
       %10 = arith.maxf %out, %c0 : f32
