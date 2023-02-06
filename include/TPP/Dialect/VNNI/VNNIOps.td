@@ -22,6 +22,7 @@ def VNNI_Dialect : Dialect {
     A dialect implementing Intel Vector Neural Network Instructions operations.
     https://www.intel.com/content/www/us/en/artificial-intelligence/deep-learning-boost.html
   }];
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 

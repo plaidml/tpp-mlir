@@ -2,7 +2,7 @@
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1, %loops:3 = transform.structured.tile %0 [4, 4, 4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 }
 
@@ -38,7 +38,7 @@ func.func @tile_linalg_matmul(
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
 }
 
@@ -91,7 +91,7 @@ func.func @matmul_and_relu(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     // Get the matmul
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     // Pack the matmul with blocking factors of 32 along i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     // Get parent operation (aka func.func)
@@ -100,7 +100,7 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
 
     // Simply map linalg.generic to tpp.relu
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
 
     // Cooking recipe for relu
