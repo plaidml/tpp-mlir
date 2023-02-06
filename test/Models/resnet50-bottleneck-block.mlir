@@ -41,6 +41,7 @@ func.func @first_conv2d_1x1_biasadd_relu(
         %input : !first_conv1x1_input_tensor_t) -> !first_conv1x1_output_tensor_t {
     //
     // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
     // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
     // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
     // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
@@ -65,7 +66,7 @@ func.func @first_conv2d_1x1_biasadd_relu(
                 outs(%1 : !first_conv1x1_output_tensor_t) -> !first_conv1x1_output_tensor_t
     
     //
-    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.for
     // CHECK:   %[[cast:.*]] = memref.cast
     // CHECK:   %[[cast1:.*]] = memref.cast
@@ -132,6 +133,7 @@ func.func @conv2d_3x3_biasadd_relu(
         %input : !conv3x3_input_tensor_t) -> !conv3x3_output_tensor_t {
     //
     // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
     // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
     // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
     // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
@@ -155,7 +157,7 @@ func.func @conv2d_3x3_biasadd_relu(
                 outs(%1 : !conv3x3_output_tensor_t) -> !conv3x3_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.for
     // CHECK:   %[[cast:.*]] = memref.cast
     // CHECK:   %[[cast1:.*]] = memref.cast
@@ -222,6 +224,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
         %input : !second_conv1x1_input_tensor_t) -> !second_conv1x1_output_tensor_t {
     //
     // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
     // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
     // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
     // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
@@ -246,7 +249,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
                 outs(%1 : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t
 
     //
-    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: %[[cast:.*]] = memref.cast
     // CHECK: %[[cast1:.*]] = memref.cast
     // CHECK: %[[cast2:.*]] = memref.cast
@@ -308,7 +311,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
 // CHECK-DAG: func.func private @xsmm_unary_invoke(i64, i64, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @xsmm_unary_dispatch(i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @xsmm_matmul_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @xsmm_matmul_dispatch(i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @xsmm_matmul_dispatch(i64, i1, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 //
 
 //

@@ -26,8 +26,8 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_matmul_invoke(
     UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype, int64_t, int64_t,
-                                  int64_t, int64_t, int64_t, int64_t);
+_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype, bool isVNNI, int64_t,
+                                  int64_t, int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype, int64_t, int64_t,
@@ -38,8 +38,8 @@ _mlir_ciface_xsmm_binary_dispatch(const libxsmm_datatype, int64_t, int64_t,
                                   int64_t, int64_t, int64_t, int64_t, int64_t);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t,
-                                  int64_t, int64_t, int64_t, int64_t);
+_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype, bool isVNNI, int64_t,
+                                  int64_t, int64_t, int64_t, int64_t, int64_t);
 
 //TODO: Remove this function as all unary ops are expected to work in place.
 extern "C" MLIR_RUNNERUTILS_EXPORT void

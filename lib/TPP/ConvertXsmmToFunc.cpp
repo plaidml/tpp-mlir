@@ -298,6 +298,12 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
         rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
     dispatchOperandTypes.push_back(integer64);
 
+    BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
+    IntegerType boolType = IntegerType::get(rewriter.getContext(), 1);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, boolType, isVNNIAttr));
+    dispatchOperandTypes.push_back(boolType);
+
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
     size_t arrayAttrSize = integers.size();
     for (size_t idx = 0; idx < arrayAttrSize; idx++) {

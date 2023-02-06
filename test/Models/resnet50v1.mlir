@@ -121,6 +121,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 
   //
   // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+  // CHECK-DAG: %[[false:.*]] = arith.constant false
   // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
   // CHECK-DAG: %[[c3_i64:.*]] = arith.constant 3 : i64
   // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
@@ -148,7 +149,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   // CHECK-DAG: %[[c112:.*]] = arith.constant 112 : index
   // CHECK-DAG: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
   // CHECK-DAG: %[[cst_0:.*]] = arith.constant 0xFF800000 : f32
-  //
   
   %layer-2.kernel = arith.constant dense<1.000000e+00> : tensor<7x7x3x64xf32>
   %layer-2.bias = arith.constant dense<5.000000e-01> : tensor<64xf32>
@@ -280,7 +280,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x112x112x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c112_i64]], %[[c64_i64]], %[[c3_i64]], %[[c6_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c64_i64]], %[[c3_i64]], %[[c6_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c112]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -326,7 +326,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -350,7 +350,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -387,7 +387,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -419,7 +419,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -459,7 +459,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -496,7 +496,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -528,7 +528,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -568,7 +568,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]],  %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]] 
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -605,7 +605,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -637,7 +637,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -677,7 +677,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c512_i64]], %[[c256_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c256_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -701,7 +701,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c256_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c256_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -737,7 +737,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -769,7 +769,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -809,7 +809,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -845,7 +845,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -877,7 +877,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -909,7 +909,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -945,7 +945,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -977,7 +977,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]],  %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1017,7 +1017,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1053,7 +1053,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1085,7 +1085,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1125,7 +1125,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1149,7 +1149,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1185,7 +1185,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1217,7 +1217,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1257,7 +1257,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1293,7 +1293,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1325,7 +1325,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1365,7 +1365,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1401,7 +1401,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1433,7 +1433,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1473,7 +1473,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1509,7 +1509,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1541,7 +1541,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1581,7 +1581,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1617,7 +1617,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1649,7 +1649,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1689,7 +1689,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1725,7 +1725,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1757,7 +1757,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1797,7 +1797,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1821,7 +1821,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1857,7 +1857,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1889,7 +1889,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1929,7 +1929,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1965,7 +1965,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -1997,7 +1997,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -2037,7 +2037,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -2073,7 +2073,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -2105,7 +2105,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
@@ -2148,7 +2148,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %1571 = linalg.fill ins(%cst_0 : f32) outs(%1570 : tensor<1x1000xf32>) -> tensor<1x1000xf32>
   %1572 = linalg.matmul ins(%1569, %layer-176.kernel : tensor<1x2048xf32>, tensor<2048x1000xf32>) outs(%1571 : tensor<1x1000xf32>) -> tensor<1x1000xf32>
   //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast

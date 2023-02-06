@@ -75,10 +75,9 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t
-_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype dtype, int64_t m,
-                                  int64_t n, int64_t k, int64_t lda,
-                                  int64_t ldb, int64_t ldc) {
+extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
+    const libxsmm_datatype dtype, const bool isVNNI, int64_t m, int64_t n,
+    int64_t k, int64_t lda, int64_t ldb, int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -93,8 +92,7 @@ _mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype dtype, int64_t m,
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags;
-  if (dtype == LIBXSMM_DATATYPE_BF16) {
-    // Set VNNI Flag to the first operand if datatype is bf16
+  if (isVNNI) {
     l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
   } else {
     l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
@@ -305,8 +303,8 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke(const libxsmm_datatype dType,
 }
 
 extern "C" int64_t
-_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
-                                  int64_t n, int64_t k, int64_t lda,
+_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
+                                  int64_t m, int64_t n, int64_t k, int64_t lda,
                                   int64_t ldb, int64_t ldc) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "lbd: " << ldb << "\n";
@@ -329,7 +327,7 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags;
-  if (dtype == LIBXSMM_DATATYPE_BF16) {
+  if (isVNNI) {
     // Set VNNI Flag to the first operand if datatype is bf16
     l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
   } else {
@@ -375,8 +373,8 @@ extern "C" int iree_xsmm_brgemm_dispatch_f32(void *context, void *params,
     int64_t ldc;
   } xsmm_brgemm_dispatch_f32_t;
   xsmm_brgemm_dispatch_f32_t *p = (xsmm_brgemm_dispatch_f32_t *)params;
-  p->res = _mlir_ciface_xsmm_brgemm_dispatch(LIBXSMM_DATATYPE_F32, p->m, p->n,
-                                             p->k, p->lda, p->ldb, p->ldc);
+  p->res = _mlir_ciface_xsmm_brgemm_dispatch(
+      LIBXSMM_DATATYPE_F32, false, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -392,8 +390,8 @@ extern "C" int iree_xsmm_matmul_dispatch_f32(void *context, void *params,
     int64_t ldc;
   } xsmm_matmul_dispatch_f32_t;
   xsmm_matmul_dispatch_f32_t *p = (xsmm_matmul_dispatch_f32_t *)params;
-  p->res = _mlir_ciface_xsmm_matmul_dispatch(LIBXSMM_DATATYPE_F32, p->m, p->n,
-                                             p->k, p->lda, p->ldb, p->ldc);
+  p->res = _mlir_ciface_xsmm_matmul_dispatch(
+      LIBXSMM_DATATYPE_F32, false, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
   return 0;
 }
 
