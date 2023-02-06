@@ -38,6 +38,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
+std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass();
 
 template <typename DerivedT>
 class UtilityPassBase : public PassWrapper<DerivedT, OperationPass<ModuleOp>> {
@@ -185,6 +186,45 @@ private:
 
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass() {
   return std::make_unique<LocalDialectsLoweringPass>();
+}
+
+// Apply various postprocessing passes such as LICM, parallel loop fusion,
+// buffer deallocation, general cleanup etc.
+struct PostprocessingPass : public UtilityPassBase<PostprocessingPass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PostprocessingPass)
+
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  void constructPipeline() override {
+    pm.clear();
+
+    // Postprocess generated loops.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+    pm.addPass(createRaiseToParallelLoopPass());
+    pm.addPass(createParallelLoopFusionPass());
+
+    // Postprocess buffers.
+    pm.addPass(bufferization::createBufferHoistingPass());
+    pm.addPass(bufferization::createBufferDeallocationPass());
+
+    // Run general cleanup to normalize IR.
+    pm.addPass(createCleanupPass());
+  }
+};
+
+std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass() {
+  return std::make_unique<PostprocessingPass>();
 }
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
