@@ -62,7 +62,7 @@ llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
 
 // Random seed, if zero, don't emit randominputs
 llvm::cl::opt<int>
-    seed("seed", llvm::cl::desc("Random seed, defualt 0 (no random)"),
+    seed("seed", llvm::cl::desc("Random seed, default 0 (no random)"),
                   llvm::cl::value_desc("int"), llvm::cl::init(0));
 
 // This function will be called by the pass manager after parsing,
