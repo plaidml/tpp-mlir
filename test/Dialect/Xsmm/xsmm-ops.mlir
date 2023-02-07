@@ -18,7 +18,7 @@ func.func @myfunc(%arg0: memref<2x2xf32>,
     : (memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.ternary.dispatch
-  xsmm.ternary.dispatch matmul [3, 2, 1] (dataType f32)
+  xsmm.ternary.dispatch matmul [3, 2, 1] (dataType f32, isVNNI false)
 
   // CHECK: xsmm.binary.dispatch
   xsmm.binary.dispatch add [3, 2, 1] (broadcast none dataType f32)
