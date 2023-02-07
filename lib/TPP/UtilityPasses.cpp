@@ -40,11 +40,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
 std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass();
 
-template <typename DerivedT>
-class UtilityPassBase : public PassWrapper<DerivedT, OperationPass<ModuleOp>> {
-public:
-  virtual void runOnOperation() = 0;
-
+template <typename DerivedT, typename OpT = ModuleOp>
+class UtilityPassBase : public PassWrapper<DerivedT, OperationPass<OpT>> {
 protected:
   OpPassManager pm;
 
