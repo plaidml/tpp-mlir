@@ -146,6 +146,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createDefaultTppPass() {
-  return std::make_unique<DefaultTppPasses>();
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createDefaultTppPass(bool loops) {
+  return std::make_unique<DefaultTppPasses>(loops);
 }

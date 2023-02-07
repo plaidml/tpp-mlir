@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -57,14 +58,26 @@ class MLIRBench {
   /// Global variables for all arguments (in order)
   llvm::SmallVector<llvm::StringRef> globals;
 
+  /// Seed for the random tensor filling
+  int seed;
+
+  /// Lower TPP to loops for validation purposes
+  bool tppToLoops;
+
   /// Create a random global based on the memref type
   llvm::StringRef createGlobal(MemRefType);
 
   /// Get a global memref by name
   MemRefType getGlobalType(llvm::StringRef);
 
-  // Create a random constant dense tensor
-  Value createConstTensor(TensorType);
+  // Create a local dense tensor
+  Value createDenseTensor(TensorType);
+
+  // Create a constant dense attribute
+  DenseElementsAttr getDenseAttribute(ShapedType);
+
+  // Return a ConstantOp of a certain type with a certain initializer
+  template <class ValueT> arith::ConstantOp getConstant(Type, ValueT);
 
   /// Gets module's main block
   Block &getModuleBlock();
@@ -74,7 +87,7 @@ class MLIRBench {
 
 public:
   /// Creates context, builder
-  MLIRBench(Operation *op);
+  MLIRBench(Operation *op, int seed, bool tppToLoops);
 
   /// Finds the kernel method, checks correct name and shape
   LogicalResult findKernel(llvm::StringRef);
