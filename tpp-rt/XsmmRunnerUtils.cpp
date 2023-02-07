@@ -93,6 +93,7 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags;
   if (isVNNI) {
+    assert(dtype == LIBXSMM_DATATYPE_BF16);
     l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
   } else {
     l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
@@ -328,7 +329,7 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags;
   if (isVNNI) {
-    // Set VNNI Flag to the first operand if datatype is bf16
+    assert(dtype == LIBXSMM_DATATYPE_BF16);
     l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
   } else {
     l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');

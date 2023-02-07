@@ -111,7 +111,9 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
   let summary = "dispatch ternary operation.";
   let description = [{
     The 'kind' carries information about the name of the LIBXSMM function to
-    dispatch; additional I64 operands are passed based on the operation to
+    dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
+    dataType is passed to set the datatype in libxsmm call.
+    Additional I64 operands are passed based on the operation to
     dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
     the pointer to call as I64.
   }];
