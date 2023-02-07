@@ -121,7 +121,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `dataType` $dataType `isVNNI` $isVNNI `)` attr-dict
+    $kind $inputs `(` `dataType` $dataType `,` `isVNNI` $isVNNI `)` attr-dict
   }];
 }
 
@@ -140,7 +140,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `dataType` $dataType  `)` attr-dict
+    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
   }];
 }
 
