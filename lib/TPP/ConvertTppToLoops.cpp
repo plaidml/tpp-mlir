@@ -203,8 +203,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC = matmulOp.getMatrixCType().getShape();
     ArrayRef<int64_t> shapeB = matmulOp.getMatrixBType().getShape();
-    ArrayRef<int64_t> shapeA =
-        matmulOp.getMatrixA().getType().cast<MemRefType>().getShape();
+    ArrayRef<int64_t> shapeA = matmulOp.getMatrixAType().getShape();
     if (shapeB.size() == 3)
       return rewriter.notifyMatchFailure(matmulOp, "Packed BF16 loops unsupported");
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
