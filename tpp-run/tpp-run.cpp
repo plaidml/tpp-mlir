@@ -9,9 +9,12 @@
 
 #include "MLIRBench.h"
 
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -22,6 +25,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/ExecutionEngine/JitRunner.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -33,6 +37,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Target/LLVMIR/Dialect/All.h"
+#include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
 #include "TPP/Dialect/Check/CheckDialect.h"
@@ -57,13 +62,45 @@ llvm::cl::opt<bool> printKernelResult("print",
 
 // Lower to loops (for validation purposes)
 llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
-                                      llvm::cl::desc("Lower TPP to loops"),
-                                      llvm::cl::init(false));
+                               llvm::cl::desc("Lower TPP to loops"),
+                               llvm::cl::init(false));
 
 // Random seed, if zero, don't emit randominputs
-llvm::cl::opt<int>
-    seed("seed", llvm::cl::desc("Random seed, default 0 (no random)"),
-                  llvm::cl::value_desc("int"), llvm::cl::init(0));
+llvm::cl::opt<int> seed("seed",
+                        llvm::cl::desc("Random seed, default 0 (no random)"),
+                        llvm::cl::value_desc("int"), llvm::cl::init(0));
+
+// Speed optimization level
+llvm::cl::opt<unsigned>
+    optLevel("O", llvm::cl::desc("Speed optimization level (O0, O1, O2, O3)"),
+             llvm::cl::value_desc("0-3"), llvm::cl::init(2));
+
+// Target Triple
+// Default x86_64, can be changed to aarch64 on other arches
+llvm::cl::opt<std::string> triple("triple", llvm::cl::desc("Target triple"),
+                                  llvm::cl::init("x86_64-linux-gnu"));
+
+// Target CPU name
+// Default skylake is old enough to be relevant for most cases
+llvm::cl::opt<std::string>
+    cpuName("cpu", llvm::cl::desc("CPU name (sapphirerapids, alderlake, etc)"),
+            llvm::cl::init("skylake"));
+
+// Target FPU name
+// Default avx2 is old enough to be relevant for most cases
+llvm::cl::opt<std::string>
+    fpuName("fpu", llvm::cl::desc("FPU name (avx, avx2, avx512bf16)"),
+            llvm::cl::init("avx2"));
+
+// Dump MLIR before lowering
+llvm::cl::opt<bool> dumpMLIR("dump-mlir",
+                               llvm::cl::desc("Dump MLIR before lowering"),
+                               llvm::cl::init(false));
+
+// Dump LLVM IR before lowering
+llvm::cl::opt<bool> dumpLLVM("dump-llvm",
+                               llvm::cl::desc("Dump LLVM IR before lowering"),
+                               llvm::cl::init(false));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
@@ -120,6 +157,71 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   return bench.finalize();
 }
 
+std::unique_ptr<llvm::Module>
+lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
+  if (dumpMLIR)
+    module->dump();
+
+  // Default lowering for mlir-cpu-runner
+  auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
+  assert(llvmModule);
+
+  // Target machine, null if not specified
+  std::unique_ptr<llvm::TargetMachine> targetMachine;
+
+  // Specify target machine
+  if (!triple.empty() && !cpuName.empty()) {
+    std::string error;
+    const llvm::Target *target =
+        llvm::TargetRegistry::lookupTarget(triple, error);
+    if (!target) {
+      llvm::errs() << "Error while looking up target triple: ";
+      llvm::errs() << error << "\n";
+      return nullptr;
+    }
+
+    llvm::CodeGenOpt::Level codeGenOpt =
+        (llvm::CodeGenOpt::Level)optLevel.getValue();
+
+    // These options should force fused MLA, but they don't. :/
+    // Adding unsafe math attribute to functions below do the trick.
+    llvm::TargetOptions targetOptions;
+    targetOptions.UnsafeFPMath = true;
+    targetOptions.AllowFPOpFusion = llvm::FPOpFusion::FPOpFusionMode::Fast;
+    targetMachine.reset(target->createTargetMachine(
+        triple, cpuName, "+" + fpuName, targetOptions,
+        /* reloc model */ std::nullopt,
+        /* code model */ std::nullopt, codeGenOpt));
+    if (!targetMachine) {
+      llvm::errs() << "Error while looking up target CPU: ";
+      llvm::errs() << cpuName << "\n";
+      return nullptr;
+    }
+  }
+
+  // Run the optimized pipeline
+  int sizeLevel = 0;
+  auto optPipeline =
+      makeOptimizingTransformer(optLevel, sizeLevel, targetMachine.get());
+  if (auto err = optPipeline(llvmModule.get())) {
+    llvmModule->dump();
+    llvm::errs() << "Error while passing through the LLVM pipeline: ";
+    llvm::errs() << err << "\n";
+    return nullptr;
+  }
+
+  // MLIR doesn't lower LLVM with fast-math flags, but we need that, so we
+  // add for each function, to get FMAs and other goodies.
+  for (auto &func : llvmModule->functions()) {
+    func.addFnAttr("unsafe-fp-math", "true");
+  }
+
+  if (dumpLLVM)
+    llvmModule->dump();
+
+  return llvmModule;
+}
+
 int main(int argc, char **argv) {
   // Initialize the LLVM machinery
   llvm::InitLLVM y(argc, argv);
@@ -143,6 +245,7 @@ int main(int argc, char **argv) {
   // This is how we integrate with the pipeline
   JitRunnerConfig config;
   config.mlirTransformer = prepareMLIRKernel;
+  config.llvmModuleBuilder = lowerToLLVMIR;
 
   // Call the main JIT function
   return JitRunnerMain(argc, argv, registry, config);
