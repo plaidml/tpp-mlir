@@ -16,7 +16,7 @@ The reference run is intended to produce output that will be compared with the o
 Both reference runs (C++ and MLIR) should also produce similar outputs.
 Since the MLIR run needs to be representative of existing Python models, the C++ side has to adapt to have the same ops.
 
-Those runs can be very slow and shouldn't be used for benchmakrs for anything bigger than a single MLP layer.
+Those runs can be very slow and shouldn't be used for benchmarks for anything bigger than a single MLP layer.
 But they should be used for golden outputs for any models we try to benchmark.
 Larger models may need to cache the inputs/outputs to avoid a very slow reference run on every benchmark loop.
 
@@ -49,7 +49,7 @@ Use `driver.py -h` for its options.
 
 This is for developers to test their transforms in the compiler.
 
-#### C++ benchmakrs
+#### C++ Benchmarks
 
 For C++ benchmarks, run their respective binaries with `-h` to see the options, or look at the `driver.py` script for more options.
 
@@ -68,7 +68,7 @@ Larger benchmarks, for example multiple layers and models, can have multiple ten
 For simplicity, weights and biases should be constants in IR (can be random, but as a constant in code), while only inputs can be run-time variable.
 In the future, we should support reading input from files and have a more complext configuration (ex. a JSON file, multiple binary files, etc).
 
-#### MLIR benchmakrs
+#### MLIR Benchmarks
 
 The MLIR benchmarks are also run as tests on a normal test run and are available under `test/Benchmarks`.
 The harness (`benchmarks/harness/controller.py`) automatically detects tool paths, libraries and even LLVM LIT variables.
