@@ -477,3 +477,28 @@ func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: me
     }
   return %arg2: memref<3x3xf32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @entry() -> memref<28x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() : memref<28x55xf32>
+  %alloc_0 = memref.alloc() : memref<55x32xf32>
+  %alloc_1 = memref.alloc() : memref<28x32xf32>
+  
+  // CHECK-NOT: tpp.matmul
+  linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%alloc, %alloc_0 : memref<28x55xf32>, memref<55x32xf32>) outs(%alloc_1 : memref<28x32xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %0 = arith.mulf %in, %in_2 : f32
+      %1 = arith.addf %out, %0 : f32
+      %2 = arith.maxf %1, %cst : f32
+      linalg.yield %2 : f32
+  }
+  
+  memref.dealloc %alloc : memref<28x55xf32>
+  memref.dealloc %alloc_0 : memref<55x32xf32>
+  return %alloc_1 : memref<28x32xf32>
+}

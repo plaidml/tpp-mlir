@@ -59,13 +59,10 @@ template <typename OpType> static OpType getSingleOpOfType(Block &block) {
   return res;
 }
 
-// taken from: LinalgInterfaces.cpp
+// Taken from: LinalgInterfaces.cpp
 // Detect whether res is any permutation of `u5(u1(c) + u2(u3(a) * u4(b)))`
 // on the field (AddOpType, MulOpType), where u1, u2, u3, u4 and u5 represent
 // unary operations that may change the type.
-// TODO: this low-tech stuff is too manual (see:
-// https://discourse.llvm.org/t/linalg-to-llvm-lowering/4867/7)
-// Use OpDSL to generate all this.
 template <typename AddOpType, typename MulOpType>
 static bool isAddMul(Block &block) {
   if (block.getNumArguments() != 3)
@@ -101,6 +98,8 @@ bool hasMatmulBody(linalg::LinalgOp linalgOp) {
     return false;
   Region &region = linalgOp->getRegion(0);
   if (!region.hasOneBlock())
+    return false;
+  if (std::distance(region.front().begin(), region.front().end()) != 3)
     return false;
   bool isFloat = isAddMul<arith::AddFOp, arith::MulFOp>(region.front());
   bool isInt = isAddMul<arith::AddIOp, arith::MulIOp>(region.front());
