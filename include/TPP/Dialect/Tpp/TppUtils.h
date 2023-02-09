@@ -9,6 +9,8 @@
 #ifndef TPP_DIALECT_TPP_TPPUTILS_H
 #define TPP_DIALECT_TPP_TPPUTILS_H
 
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Region.h"
 #include <string>
 
 namespace mlir {
@@ -16,6 +18,7 @@ namespace mlir {
 namespace linalg {
 class LinalgOp;
 class GenericOp;
+class YieldOp;
 } // end namespace linalg
 
 namespace tpp {
@@ -52,6 +55,29 @@ bool isTppIdentity(linalg::GenericOp linalgOp);
 
 // Returns true if the linalg.generic can convert to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp);
+
+// Returns true if the linalg region has a single yield op.
+bool hasOnlyYieldOp(Region &region);
+
+// Returns true if: 1) the region has a single block. 2) The block has two
+// operations only (linalg.YieldOp and OP). 3) The operation result types are
+// int or float.
+template <typename OP> static bool hasOnlyScalarElementwiseOp(Region &region) {
+  if (!region.hasOneBlock())
+    return false;
+  if (std::distance(region.front().begin(), region.front().end()) != 2)
+    return false;
+  for (Operation &op : region.front()) {
+    if (!isa<OP, linalg::YieldOp>(op) ||
+        llvm::any_of(op.getResultTypes(),
+                     [](Type type) { return !type.isIntOrFloat(); }))
+      return false;
+  }
+  return true;
+}
+
+// Returns true if the value is a constant float or integer.
+bool isValConstZero(Value val);
 
 } // namespace utils
 } // namespace tpp
