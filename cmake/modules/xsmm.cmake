@@ -13,8 +13,8 @@ else()
 
   FetchContent_Declare(
     xsmm
-    URL https://github.com/libxsmm/libxsmm/archive/ef30fb75b01e7d3535184e14ddcb01af3c151720.tar.gz
-    URL_HASH SHA256=491fa6d51e638af1c11b45fd9184369313c0ff10dcc2d76954f5dc934a290e38
+    URL https://github.com/libxsmm/libxsmm/archive/8bd0847d4e595fd4efe9854b16b8a7decb56a0dc.tar.gz
+    URL_HASH SHA256=93fb68417ef06a1ee0586186c7c4ef8bf41bc2d587e14cda11b53d5d9a92a6a8
   )
 
   FetchContent_GetProperties(xsmm)
