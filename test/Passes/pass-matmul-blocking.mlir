@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -split-input-file | FileCheck %s
 
 func.func @block_linalg_matmul(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>)
@@ -27,3 +27,23 @@ func.func @block_linalg_matmul(
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 // CHECK: return %[[OUT]] : tensor<128x128xf32>
 // CHECK: }
+
+// -----
+
+// We don't expect to block as the blocking factor do not create full tiles.
+func.func @block_linalg_matmul(
+  %arg0: tensor<5x6xf32>, %arg1: tensor<6x5xf32>, %arg2: tensor<5x5xf32>)
+    -> tensor<5x5xf32> {
+  %0 = linalg.matmul  ins(%arg0, %arg1: tensor<5x6xf32>, tensor<6x5xf32>)
+                     outs(%arg2: tensor<5x5xf32>)
+    -> tensor<5x5xf32>
+  return %0 : tensor<5x5xf32>
+}
+
+// CHECK: func.func @block_linalg_matmul(
+// CHECK-SAME:  %[[ARG0:[0-9a-z]+]]: tensor<5x6xf32>,
+// CHECK-SAME:  %[[ARG1:[0-9a-z]+]]: tensor<6x5xf32>,
+// CHECK-SAME:  %[[ARG2:[0-9a-z]+]]: tensor<5x5xf32>) -> tensor<5x5xf32> {
+// CHECK: %{{.+}} = linalg.matmul 
+// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]]
+// CHECK-SAME:  outs(%[[ARG2]]
