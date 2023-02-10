@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
+#include "TPP/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
@@ -21,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include <queue>
 
 using namespace mlir;
 
@@ -31,20 +33,15 @@ using namespace mlir;
 
 namespace {
 
-// TODO: Check indexing maps and iterator types. They should
-// match the one of a packed matmul.
-static bool isBlockedMatmul(linalg::GenericOp genericOp) {
-  return tpp::utils::hasMatmulBody(genericOp);
-}
-
 static bool isMatmulLike(Operation *op) {
   if (isa_and_nonnull<linalg::MatmulOp>(op))
     return true;
   if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
-    return isBlockedMatmul(maybeMatmul);
+    return linalgx::utils::isBlockedMatmul(maybeMatmul);
   return false;
 }
 
+// Return true if the current linalgOp has a 'matmul-like' op has producers.
 static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
   for (Value operand : linalgOp->getOperands()) {
     Operation *op = operand.getDefiningOp<linalg::LinalgOp>();
@@ -54,53 +51,44 @@ static bool hasMatmulLikeProducer(linalg::LinalgOp linalgOp) {
   return false;
 }
 
-// Return the range as int64_t for `range` if we can statically compute it,
-// otherwise return std::nullopt.
-static std::optional<int64_t> getSizeRangeAtIdx(const Range &range) {
-  std::optional<int64_t> stride = getConstantIntValue(range.stride);
-  if (!stride || *stride != 1)
-    return std::nullopt;
-  std::optional<int64_t> offset = getConstantIntValue(range.offset);
-  if (!offset)
-    return std::nullopt;
-  std::optional<int64_t> size = getConstantIntValue(range.size);
-  if (!size)
-    return std::nullopt;
-  return (*size - *offset);
+static bool isConvolutionLike(Operation *op) {
+  if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
+    return linalgx::utils::isBlockedConvolution(op);
+  return false;
+}
+
+// Return true if the current linalgOp has a 'convolution-like' op has
+// producers.
+static bool hasConvolutionLikeProducer(linalg::LinalgOp linalgOp) {
+  for (Value operand : linalgOp->getOperands()) {
+    Operation *op = operand.getDefiningOp<linalg::LinalgOp>();
+    if (op && isConvolutionLike(op))
+      return true;
+  }
+  return false;
 }
 
 // Return true if `op` can be tiled using `tileSizes`. Require to statically
 // know the range and the tile factor. The tile must be full.
 static bool canBeTiledWithCurrentSpec(Operation *op,
-                                      ArrayRef<int64_t> tileSizes) {
+                                      ArrayRef<OpFoldResult> tileSizes) {
   assert(isa<TilingInterface>(op) &&
          "expect an op implementing the tiling interface");
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
-  OpBuilder builder(op);
-  SmallVector<Range> iterationDomain =
-      cast<TilingInterface>(op).getIterationDomain(builder);
   SmallVector<utils::IteratorType> loopIteratorTypes =
       cast<TilingInterface>(op).getLoopIteratorTypes();
-  if (tileSizes.size() > iterationDomain.size())
+  if (tileSizes.size() > loopIteratorTypes.size())
     return false;
-  for (size_t tileIdx = 0, idxEnd = tileSizes.size(); tileIdx < idxEnd;
-       tileIdx++) {
-    // Allow tiling only on parallel loop iterators.
+
+  if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
+                                               tileSizes))
+    return false;
+
+  // Require tiling on parallel dimensions only.
+  for (auto tileIdx : llvm::seq<size_t>(0, tileSizes.size()))
     if (!linalg::isParallelIterator(loopIteratorTypes[tileIdx]))
       return false;
-    std::optional<int64_t> sizeRangeAtIdx =
-        getSizeRangeAtIdx(iterationDomain[tileIdx]);
-    // Non constant range. Bail out and do not add the op as candidate.
-    if (!sizeRangeAtIdx)
-      return false;
-    // Skip tile equals 0. A '0' tile means skip this dimension.
-    if (tileSizes[tileIdx] == 0)
-      continue;
-    // Fail if the tile size equals the range or it is not a full tile.
-    if (tileSizes[tileIdx] == *sizeRangeAtIdx ||
-        *sizeRangeAtIdx % tileSizes[tileIdx] != 0)
-      return false;
-  }
+
   // Candidate op is good to go.
   return true;
 }
@@ -126,11 +114,12 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 
 // Return the tile sizes as bit vector.
 static llvm::SmallBitVector
-getTileBitVectorConfig(ArrayRef<int64_t> tileSizes, size_t rootConsumerParallelLoops) {
+getTileBitVectorConfig(ArrayRef<OpFoldResult> tileSizes,
+                       size_t rootConsumerParallelLoops) {
   assert(tileSizes.size() <= rootConsumerParallelLoops);
   llvm::SmallBitVector tileConfig(rootConsumerParallelLoops, false);
   for (size_t idx : llvm::seq<size_t>(0, tileSizes.size()))
-    if (tileSizes[idx] != 0)
+    if (!isConstantIntValue(tileSizes[idx], 0))
       tileConfig.set(idx);
   return tileConfig;
 }
@@ -180,9 +169,10 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
                    const llvm::SmallBitVector &candidateOuterParallelLoop) {
   if (candidateOuterParallelLoop.size() < rootOuterParallelLoop.size())
     return false;
-  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size()); 
-  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size())) 
-    if (rootOuterParallelLoop.test(idx) && !candidateOuterParallelLoop.test(idx))
+  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size());
+  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size()))
+    if (rootOuterParallelLoop.test(idx) &&
+        !candidateOuterParallelLoop.test(idx))
       return false;
   return true;
 }
@@ -192,7 +182,7 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
 static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
                                             Operation *producer,
                                             Operation *rootConsumer,
-                                            ArrayRef<int64_t> tileSizes) {
+                                            ArrayRef<OpFoldResult> tileSizes) {
   assert(operand.get().getDefiningOp() == producer);
   Operation *consumer = operand.getOwner();
   assert(isa<linalg::LinalgOp>(producer) && "producer must be a linalgOp");
@@ -206,7 +196,8 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
       getOuterParallelLoops(cast<TilingInterface>(consumer));
   llvm::SmallBitVector rootConsumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(rootConsumer));
-  llvm::SmallBitVector tileConfig = getTileBitVectorConfig(tileSizes, rootConsumerParallelLoops.size());
+  llvm::SmallBitVector tileConfig =
+      getTileBitVectorConfig(tileSizes, rootConsumerParallelLoops.size());
 
   LLVM_DEBUG(printBitVector("PRODUCER LOOP CONFIG", producerParallelLoops,
                             llvm::dbgs());
@@ -261,11 +252,18 @@ static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
 // Tile the consumer and return the tiled result.
 static FailureOr<scf::SCFTilingResult>
 tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
-             ArrayRef<int64_t> tileSizes) {
+             ArrayRef<OpFoldResult> tileSizes) {
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
   assert(canBeTiledWithCurrentSpec(consumer, tileSizes) &&
          "expect valid tile sizes");
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
+  auto tileSizeComputationFunction = [tileSizes](OpBuilder &builder,
+                                                 Operation *op) {
+    OpBuilder::InsertionGuard guard(builder);
+    return getAsValues(builder, op->getLoc(), tileSizes);
+  };
+  auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
+      tileSizeComputationFunction);
+
   FailureOr<scf::SCFTilingResult> tilingResult =
       scf::tileUsingSCFForOp(rewriter, consumer, options);
   return tilingResult;
@@ -285,10 +283,10 @@ bool hasAllUsersInWorklist(Operation *op,
   return true;
 }
 
-// Return a list of op that can be fused together based on what has already been
-// fused and the current tile specification.
-static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
-    TilingInterface rootConsumer, ArrayRef<int64_t> tileSizes,
+// Return a list of producers op that can be fused together based on what has
+// already been fused and the current tile specification.
+static llvm::SmallDenseSet<Operation *> collectFusableProducers(
+    TilingInterface rootConsumer, ArrayRef<OpFoldResult> tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
     return {};
@@ -337,33 +335,50 @@ getUntiledProducerFromSliceSource(OpOperand *source,
   return source->get().getDefiningOp();
 }
 
-// TODO: tileSizes should be OpFoldResult.
-// Tile and fuse a matmul along the parallel dimensions.
+// Entry point for fusion.
 static FailureOr<scf::SCFTileAndFuseResult>
-fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
-                         ArrayRef<int64_t> tileSizes,
-                         llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
-  // Step -1. Check if the tile configuration fits the consumer.
-  if (!canBeTiledWithCurrentSpec(consumer, tileSizes))
+fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
+                ArrayRef<OpFoldResult> tileSizes,
+                llvm::SmallDenseSet<Operation *> &alreadyFusedOps) {
+  // Step 0. Early exit if tileSizes are empty.
+  if (tileSizes.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "EMPTY TILE SIZES\n");
+    return failure();
+  }
+
+  // Step 1. If the consumer is already tiled and fused, bail out.
+  if (alreadyFusedOps.count(consumer)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "CONSUMER: " << consumer << "\nALREADY TILED AND FUSED\n");
+    return failure();
+  }
+
+  // Step 2. Check if the tile configuration fits the consumer.
+  if (!canBeTiledWithCurrentSpec(consumer, tileSizes)) {
+    LLVM_DEBUG(llvm::dbgs() << "CONSUMER: " << consumer
+                            << "\nCANNOT BE TILED WITH CURRENT CONFIG\n");
+    return failure();
+  }
+
+  // Step 3. Collect the operations that can be tiled and fused.
+  llvm::SmallDenseSet<Operation *> worklist =
+      collectFusableProducers(consumer, tileSizes, alreadyFusedOps);
+  LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
+  if (worklist.size() == 1)
     return failure();
 
-  // Step 0. Collect the operations that can be tiled and fused.
-  llvm::SmallDenseSet<Operation *> tiledAndFusedOpCandidates =
-      collectTiledAndFusedOps(consumer, tileSizes, alreadyFusedOps);
-  LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << tiledAndFusedOpCandidates.size()
-                          << "\n");
-  if (tiledAndFusedOpCandidates.size() == 1)
-    return failure();
-
-  // Step 1. Tile the consumer.
+  // Step 4. Tile the consumer.
   scf::SCFTileAndFuseResult tileAndFuseResult;
   FailureOr<scf::SCFTilingResult> tilingResult =
       tileConsumer(rewriter, consumer, tileSizes);
   if (failed(tilingResult))
     return rewriter.notifyMatchFailure(consumer,
                                        "failed to tile base operation");
-  for (auto *tiledOp : tilingResult->tiledOps)
+  for (auto *tiledOp : tilingResult->tiledOps) {
     tileAndFuseResult.tiledAndFusedOps.insert(tiledOp);
+    alreadyFusedOps.insert(tiledOp);
+    LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledOp << "\n");
+  }
   tileAndFuseResult.loops = std::move(tilingResult->loops);
   for (const auto &result : llvm::enumerate(llvm::zip_equal(
            consumer->getResults(), tilingResult->replacements))) {
@@ -375,27 +390,27 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
   if (tileAndFuseResult.loops.empty())
     return tileAndFuseResult;
 
-  // Step 2. Tile producers and fuse into the tiled consumer.
+  // Step 5. Tile producers and fuse into the tiled consumer.
   auto addCandidateSlices = [](Operation *fusedOp,
-                               std::deque<tensor::ExtractSliceOp> &candidates) {
+                               std::queue<tensor::ExtractSliceOp> &candidates) {
     for (Value operand : fusedOp->getOperands())
       if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push_back(sliceOp);
+        candidates.push(sliceOp);
   };
 
-  std::deque<tensor::ExtractSliceOp> candidates;
-  addCandidateSlices(tilingResult->tiledOps.back(), candidates);
+  std::queue<tensor::ExtractSliceOp> frontier;
+  addCandidateSlices(tilingResult->tiledOps.back(), frontier);
   OpBuilder::InsertionGuard g(rewriter);
-  while (!candidates.empty()) {
-    tensor::ExtractSliceOp candidateSliceOp = candidates.front();
-    candidates.pop_front();
+  while (!frontier.empty()) {
+    tensor::ExtractSliceOp candidateSliceOp = frontier.front();
+    frontier.pop();
 
     // Find the candidate operation potentially walking bbArgs in scf.for.
     // If we find a candidate we check if it is in our worklist and fuse it
     // only if so.
     Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
-    if (!candidateOp || tiledAndFusedOpCandidates.count(candidateOp) == 0)
+    if (!candidateOp || worklist.count(candidateOp) == 0)
       continue;
     // If the op is already fused to not fuse again.
     if (alreadyFusedOps.count(candidateOp))
@@ -410,7 +425,7 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
     if (Operation *tiledAndFusedOp =
             fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
       tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
-      addCandidateSlices(tiledAndFusedOp, candidates);
+      addCandidateSlices(tiledAndFusedOp, frontier);
       if (alreadyFusedOps.count(consumer.getOperation()) == 0) {
         alreadyFusedOps.insert(consumer.getOperation());
         LLVM_DEBUG(llvm::dbgs()
@@ -419,11 +434,17 @@ fuseMatmulLikeAndEltwise(RewriterBase &rewriter, TilingInterface consumer,
       Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
       alreadyFusedOps.insert(untiledProducer);
       LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
+      alreadyFusedOps.insert(tiledAndFusedOp);
+      LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledAndFusedOp << "\n");
+      if (auto metadata = untiledProducer->getAttr("metadata")) {
+        tiledAndFusedOp->setAttr("metadata", metadata);
+      }
     }
   }
-  // TODO: assert if the current fused are not equal to worklist.
   return tileAndFuseResult;
 }
+
+static SmallVector<int64_t> getDefaultTileSizes() { return {32, 32}; }
 
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
@@ -438,17 +459,23 @@ struct TileConsumerAndFuseProducers
   void runOnOperation() override {
     func::FuncOp func = getOperation();
     transform::TrivialPatternRewriter rewriter(&getContext());
+
+    // Set to keep track of fused ops.
     llvm::SmallDenseSet<Operation *> fusedOps;
+
     func->walk([&](linalg::LinalgOp linalgOp) {
-      if (linalg::isElementwise(linalgOp) && hasMatmulLikeProducer(linalgOp)) {
-        SmallVector<int64_t> actualTileSizes = llvm::to_vector(this->tileSizes);
-        // Default tiling scheme tile by 32.
-        if (actualTileSizes.empty())
-          actualTileSizes = {32, 32};
+      if (linalg::isElementwise(linalgOp) &&
+          (hasMatmulLikeProducer(linalgOp) ||
+           hasConvolutionLikeProducer(linalgOp))) {
+        if (tileSizes.empty())
+          tileSizes = getDefaultTileSizes();
+        LLVM_DEBUG(llvm::dbgs() << "\n\n");
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
-            fuseMatmulLikeAndEltwise(
+            fuseWithEltwise(
                 rewriter, cast<TilingInterface>(linalgOp.getOperation()),
-                actualTileSizes, fusedOps);
+                getAsOpFoldResult(rewriter.getI64ArrayAttr(tileSizes)),
+                fusedOps);
+        LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (succeeded(fuseAndTileResult)) {
           rewriter.replaceOp(
               linalgOp,
@@ -456,6 +483,7 @@ struct TileConsumerAndFuseProducers
         }
       }
     });
+
     RewritePatternSet patterns(&getContext());
     // fold unit-extent dims for linalg on tensors.
     linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);

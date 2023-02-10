@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
+#include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -31,6 +33,65 @@ using namespace mlir;
 //===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
+
+static std::optional<int64_t> getConstantRange(const Range &range) {
+  std::optional<int64_t> stride = getConstantIntValue(range.stride);
+  if (!stride || *stride != 1)
+    return std::nullopt;
+  std::optional<int64_t> offset = getConstantIntValue(range.offset);
+  if (!offset)
+    return std::nullopt;
+  std::optional<int64_t> size = getConstantIntValue(range.size);
+  if (!size)
+    return std::nullopt;
+  return (*size - *offset);
+}
+
+static bool isFullTile(int64_t tileFactor, int64_t range) {
+  return range % tileFactor == 0;
+}
+
+// Statically validate the 'tile' along the dimension 'dim'. If the tile or the
+// dimension are not-statically known return true, as no assumption can be made.
+// If the the tile and the dimension are statically known require the tile to be
+// a full tile.
+static bool validateFullTilesOnDim(linalg::LinalgOp linalgOp,
+                                   const OpFoldResult &tile, size_t dim) {
+  OpBuilder builder(linalgOp);
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(linalgOp.getOperation())
+          .getIterationDomain(builder);
+  if (dim >= iterationDomain.size())
+    return false;
+
+  auto tileFactor = getConstantIntValue(tile);
+  auto rangeOnDim = getConstantRange(iterationDomain[dim]);
+
+  // If the tile factor or the range are non-constant, the tile size is
+  // considered to be valid.
+  if (!tileFactor || !rangeOnDim)
+    return true;
+
+  // Tiling with '0' along 'dim' is valid - no tiling.
+  if (*tileFactor == 0)
+    return true;
+
+  return isFullTile(*tileFactor, *rangeOnDim);
+}
+
+// TODO: Expose this as tile utils (it should be used by fusion too).
+static bool validateFullTilesOnDims(linalg::LinalgOp linalgOp,
+                                    ArrayRef<OpFoldResult> tiles,
+                                    ArrayRef<size_t> dims) {
+  if (dims.size() != tiles.size())
+    return false;
+  size_t idxInTiles = 0;
+  for (size_t dim : dims) {
+    if (!validateFullTilesOnDim(linalgOp, tiles[idxInTiles++], dim))
+      return false;
+  }
+  return true;
+}
 
 // Helper function to create the pack operation.
 static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
@@ -271,6 +332,8 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(convOp->getRegion(0), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
+  if (auto metadata = convOp->getAttr("metadata"))
+    replacementOp->setAttr("metadata", metadata);
 
   // convert back from pack layout.
   Value outPackedTensor = replacementOp.getResult(0);
@@ -294,6 +357,10 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
                                     linalg::Conv2DNhwcHwcfOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
+  if (!linalgx::utils::validateFullTilesOnDims(
+          cast<TilingInterface>(convOp.getOperation()), tiles,
+          {/*Kidx=*/3, /*Cidx=*/6}))
+    return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
 
@@ -306,27 +373,16 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
                                     linalg::Conv2DNchwFchwOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
+  if (!linalgx::utils::validateFullTilesOnDims(
+          cast<TilingInterface>(convOp.getOperation()), tiles,
+          {/*Kidx=*/1, /*Cidx=*/4}))
+    return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
 
-//===----------------------------------------------------------------------===//
-// MatmulOp
-//===----------------------------------------------------------------------===//
-//  i      j        i     k      k      j
-// [128 x 256] += [128 x 256] * [256 x 256]
-//
-// tile factor on i = 32
-// tile factor on j = 16
-// tile factor on k = 8
-//
-// [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
-// [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
-// KB is the batch reduce dimension.
-FailureOr<linalg::GenericOp>
-mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                            ArrayRef<OpFoldResult> tiles) {
-  if (tiles.size() != 3)
-    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+static FailureOr<linalg::GenericOp>
+packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                 ArrayRef<OpFoldResult> tiles) {
 
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
@@ -337,6 +393,9 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   OpFoldResult tileOnI = tiles[0];
   OpFoldResult tileOnJ = tiles[1];
   OpFoldResult tileOnK = tiles[2];
+  if (!validateFullTilesOnDims(matmulOp, {tileOnI, tileOnJ, tileOnK},
+                               {/*I=*/0, /*J=*/1, /*K=*/2}))
+    return rewriter.notifyMatchFailure(matmulOp, "expect full tiles only");
   SmallVector<OpFoldResult, 2> tilesOnA = {tileOnI, tileOnK};
   SmallVector<OpFoldResult, 2> tilesOnB = {tileOnK, tileOnJ};
   SmallVector<OpFoldResult, 2> tilesOnC = {tileOnI, tileOnJ};
@@ -394,6 +453,28 @@ bool isMatmulOp(linalg::GenericOp matmulOp) {
   return tpp::utils::hasMatmulBody(matmulOp);
 }
 
+//===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
+//  i      j        i     k      k      j
+// [128 x 256] += [128 x 256] * [256 x 256]
+//
+// tile factor on i = 32
+// tile factor on j = 16
+// tile factor on k = 8
+//
+// [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
+// [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
+// KB is the batch reduce dimension.
+FailureOr<linalg::GenericOp>
+mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                            ArrayRef<OpFoldResult> tiles) {
+  if (tiles.size() != 3)
+    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+
+  return packMatmulOpImpl(rewriter, matmulOp, tiles);
+}
+
 FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                 linalg::GenericOp matmulOp) {
@@ -439,11 +520,13 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
       loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
       ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<utils::IteratorType>{
-          utils::IteratorType::parallel, utils::IteratorType::parallel,
-          utils::IteratorType::reduction, utils::IteratorType::parallel,
-          utils::IteratorType::parallel, utils::IteratorType::reduction,
-          utils::IteratorType::reduction},
+      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
@@ -553,6 +636,62 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
         unpackOp.getMixedTiles(), innerDimsPos, unpackOp.getOuterDimsPerm());
 
     rewriter.replaceOp(padOp, replacement);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// BubbleUpThroughFillOp
+//===----------------------------------------------------------------------===//
+
+// Attempt to avoid packing a fill op. Instead create a 'packed' fill.
+// %0 = tensor.empty
+// %packed = tensor.empty
+// %1 = linalg.fill ins(%cst) outs(%0)
+// %2 = tensor.pack %1 into %packed
+// %3 = some_packed_op %2
+// %4 = tensor.unpack %3 into %1
+// --->
+// %0 = tensor.empty
+// %1 = linalg.fill ins(%cst) outs (%packed)
+// %2 = some_packed_op %1
+// %3 = tensor.unpack %2 into %0
+//
+struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    Value source = packOp.getSource();
+    auto fillOp = source.getDefiningOp<linalg::FillOp>();
+    if (!fillOp)
+      return failure();
+
+    Value fillRes = fillOp.getResult(0);
+    auto users = fillRes.getUsers();
+
+    // Only two users: a pack and an unpack.
+    if (std::distance(users.begin(), users.end()) != 2)
+      return failure();
+
+    bool foundPack, foundUnPack = false;
+    for (Operation *op : users) {
+      if (isa_and_nonnull<tensor::UnPackOp>(op))
+        foundUnPack = true;
+      if (isa_and_nonnull<tensor::PackOp>(op))
+        foundPack = true;
+    }
+
+    if (!foundUnPack || !foundPack)
+      return failure();
+
+    // Replace result with output.
+    fillRes.replaceAllUsesWith(fillOp.getOutputs()[0]);
+    auto empty = tensor::PackOp::createDestinationTensor(
+        rewriter, packOp.getLoc(), source, packOp.getMixedTiles(),
+        packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(packOp, fillOp.getInputs(),
+                                                empty);
     return success();
   }
 };
@@ -700,7 +839,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
   }
 };
 
-// Pack MatmulOp to VNNI
+// Pack MatmulOp to VNNI.
 struct VNNIOnMatmul : public OpRewritePattern<linalg::GenericOp> {
   VNNIOnMatmul(MLIRContext *context, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::GenericOp>(context, benefit) {}
@@ -714,7 +853,7 @@ struct VNNIOnMatmul : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-// Pack BRGemmOp to VNNI
+// Pack BRGemmOp to VNNI.
 struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
   VNNIOnBRGemm(MLIRContext *context, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::BatchReduceMatmulOp>(context, benefit) {}
@@ -760,7 +899,8 @@ struct PropagatePackUnPack
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(patterns);
-  patterns.add<PropagateThroughPadOp>(patterns.getContext());
+  patterns.add<PropagateThroughPadOp, BubbleUpThroughFillOp>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {

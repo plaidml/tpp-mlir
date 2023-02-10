@@ -1,4 +1,4 @@
-//===- TransformUtils.cpp ----------------------------------------*- C++-*-===//
+//===- TransformUtils.h ------------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,6 +17,7 @@ namespace mlir {
 class OpBuilder;
 struct Range;
 class RewriterBase;
+class TilingInterface;
 
 namespace linalg {
 class LinalgOp;
@@ -56,6 +57,17 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     unsigned upTo);
 // Return true if the convolution is blocked.
 bool isBlockedConvolution(linalg::LinalgOp linalgOp);
+
+// Return true if the matmul is blocked.
+bool isBlockedMatmul(linalg::LinalgOp linalgOp);
+
+// Validate a tile configuration for a linalgOp when we can statically do that.
+// Specific dims can be passed using 'dims'. If dims is empty the validation
+// will start from the outermost dimension, moving to innermost ones up to the
+// number of tiles.
+bool validateFullTilesOnDims(TilingInterface tileOp,
+                             ArrayRef<OpFoldResult> tiles,
+                             ArrayRef<size_t> dims = {});
 
 } // namespace utils
 } // namespace linalgx

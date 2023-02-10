@@ -205,6 +205,75 @@ bool isBlockedConvolution(linalg::LinalgOp linalgOp) {
   return tpp::utils::hasMatmulBody(linalgOp);
 }
 
+// TODO: Check indexing maps and iterator types. They should
+// match the one of a packed matmul.
+bool isBlockedMatmul(linalg::LinalgOp linalgOp) {
+  return tpp::utils::hasMatmulBody(linalgOp);
+}
+
+static std::optional<int64_t> getConstantRange(const Range &range) {
+  std::optional<int64_t> stride = getConstantIntValue(range.stride);
+  if (!stride || *stride != 1)
+    return std::nullopt;
+  std::optional<int64_t> offset = getConstantIntValue(range.offset);
+  if (!offset)
+    return std::nullopt;
+  std::optional<int64_t> size = getConstantIntValue(range.size);
+  if (!size)
+    return std::nullopt;
+  return (*size - *offset);
+}
+
+static bool isFullTile(int64_t tileFactor, int64_t range) {
+  return range % tileFactor == 0;
+}
+
+static bool validateFullTilesOnDim(TilingInterface tileOp,
+                                   const OpFoldResult &tile, size_t dim) {
+  OpBuilder builder(tileOp);
+  OpBuilder::InsertionGuard guard(builder);
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(tileOp.getOperation()).getIterationDomain(builder);
+  if (dim >= iterationDomain.size())
+    return false;
+
+  auto tileFactor = getConstantIntValue(tile);
+  auto rangeOnDim = getConstantRange(iterationDomain[dim]);
+
+  // If the tile factor or the range are non-constant, the tile size is
+  // considered to be valid.
+  if (!tileFactor || !rangeOnDim)
+    return true;
+
+  // Tiling with '0' along 'dim' is valid - no tiling.
+  if (*tileFactor == 0)
+    return true;
+
+  return isFullTile(*tileFactor, *rangeOnDim);
+}
+
+bool validateFullTilesOnDims(TilingInterface tileOp,
+                             ArrayRef<OpFoldResult> tiles,
+                             ArrayRef<size_t> dims) {
+  if (!dims.empty() && dims.size() != tiles.size())
+    return false;
+
+  // If dims is empty we start from the outermost dim '0'.
+  SmallVector<size_t> dimsToCheck;
+  if (dims.empty())
+    dimsToCheck = llvm::to_vector(llvm::seq<size_t>(0, tiles.size()));
+  else
+    dimsToCheck = llvm::to_vector(dims);
+  assert(dimsToCheck.size() == tiles.size());
+
+  size_t idxInTiles = 0;
+  for (size_t dim : dimsToCheck) {
+    if (!validateFullTilesOnDim(tileOp, tiles[idxInTiles++], dim))
+      return false;
+  }
+  return true;
+}
+
 } // namespace utils
 
 } // namespace linalgx

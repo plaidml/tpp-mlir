@@ -1,4 +1,4 @@
-// RUN: tpp-opt -pack-conv2DNchwFchw="block-factors=32,32" %s | FileCheck %s
+// RUN: tpp-opt -pack-conv2DNchwFchw="block-factors=32,32" -split-input-file %s | FileCheck %s
 
 func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
                 %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
@@ -24,3 +24,20 @@ func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [1] inner_tiles = [32] into %[[ARG2]] : tensor<14x32x28x28x32xf32> -> tensor<14x1024x28x28xf32>
 // CHECK: return %[[OUT]] : tensor<14x1024x28x28xf32>
 // CHECK: }
+
+// -----
+
+// We don't expect to block as the blocking factor do not create full tiles.
+func.func @conv_2d_nchw_fchw(%i: tensor<14x14x28x28xf32>, %f: tensor<16x14x1x1xf32>,
+                %o: tensor<14x16x28x28xf32>) -> tensor<14x16x28x28xf32> {
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x14x28x28xf32>, tensor<16x14x1x1xf32>) outs(%o: tensor<14x16x28x28xf32>) -> tensor<14x16x28x28xf32>
+  return %0: tensor<14x16x28x28xf32>
+}
+
+// CHECK: func.func @conv_2d_nchw_fchw(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<14x14x28x28xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<16x14x1x1xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<14x16x28x28xf32>) -> tensor<14x16x28x28xf32>
+// CHECK: %{{.+}} = linalg.conv_2d_nchw_fchw
+// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]]
+// CHECK-SAME:  outs(%[[ARG2]]
