@@ -75,6 +75,14 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
+def BiasToBRGemm : Pass<"move-bias-to-brgemm", "func::FuncOp"> {
+  let summary = "Move bias to inside BRGemm";
+  let constructor = "mlir::tpp::createBiasToBRGemmPass()";
+  let description = [{
+    Move bias to inside BRGemm.
+  }];
+}
+
 def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "ModuleOp"> {
   let summary = "Convert VNNI to TPP";
   let constructor = "mlir::tpp::createConvertVNNIToTppPass()";
