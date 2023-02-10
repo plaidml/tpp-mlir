@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -propagate-pack-and-unpack -canonicalize -split-input-file | FileCheck -check-prefix=CHECK %s
+// RUN: tpp-opt %s -propagate-pack-and-unpack -canonicalize -split-input-file | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
