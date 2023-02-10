@@ -78,3 +78,20 @@ func.func @main(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, 
 // CHECK-SAME:  outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] 
 // CHECK-SAME:  into %[[ARG2]] : tensor<1x8x56x56x32xf32> -> tensor<1x56x56x256xf32>
 // CHECK: return %[[RES]] : tensor<1x56x56x256xf32>
+
+// -----
+
+// We don't expect to block as the blocking factor do not create full tiles.
+func.func @conv_2d_nhwc_hwcf(%i: tensor<1x230x230x3xf32>, %f: tensor<7x7x3x64xf32>,
+                             %o: tensor<1x112x112x64xf32>) -> tensor<1x112x112x64xf32> {
+  %0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides =  dense<2> : tensor<2xi64>} ins(%i, %f : tensor<1x230x230x3xf32>, tensor<7x7x3x64xf32>) outs(%o : tensor<1x112x112x64xf32>) -> tensor<1x112x112x64xf32>
+  return %0 : tensor<1x112x112x64xf32>
+}
+
+// CHECK: func.func @conv_2d_nhwc_hwcf(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x230x230x3xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<7x7x3x64xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<1x112x112x64xf32>)
+// CHECK: %{{.+}} = linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]] : tensor<1x230x230x3xf32>, tensor<7x7x3x64xf32>)
+// CHECK-SAME:  outs(%[[ARG2]] : tensor<1x112x112x64xf32>)

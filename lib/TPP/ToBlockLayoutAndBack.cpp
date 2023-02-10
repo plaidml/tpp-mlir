@@ -32,6 +32,65 @@ using namespace mlir;
 // Utils
 //===----------------------------------------------------------------------===//
 
+static std::optional<int64_t> getConstantRange(const Range &range) {
+  std::optional<int64_t> stride = getConstantIntValue(range.stride);
+  if (!stride || *stride != 1)
+    return std::nullopt;
+  std::optional<int64_t> offset = getConstantIntValue(range.offset);
+  if (!offset)
+    return std::nullopt;
+  std::optional<int64_t> size = getConstantIntValue(range.size);
+  if (!size)
+    return std::nullopt;
+  return (*size - *offset);
+}
+
+static bool isFullTile(int64_t tileFactor, int64_t range) {
+  return range % tileFactor == 0;
+}
+
+// Statically validate the 'tile' along the dimension 'dim'. If the tile or the
+// dimension are not-statically known return true, as no assumption can be made.
+// If the the tile and the dimension are statically known require the tile to be
+// a full tile.
+static bool validateFullTilesOnDim(linalg::LinalgOp linalgOp,
+                                   const OpFoldResult &tile, size_t dim) {
+  OpBuilder builder(linalgOp);
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(linalgOp.getOperation())
+          .getIterationDomain(builder);
+  if (dim >= iterationDomain.size())
+    return false;
+
+  auto tileFactor = getConstantIntValue(tile);
+  auto rangeOnDim = getConstantRange(iterationDomain[dim]);
+
+  // If the tile factor or the range are non-constant, the tile size is
+  // considered to be valid.
+  if (!tileFactor || !rangeOnDim)
+    return true;
+
+  // Tiling with '0' along 'dim' is valid - no tiling.
+  if (*tileFactor == 0)
+    return true;
+
+  return isFullTile(*tileFactor, *rangeOnDim);
+}
+
+// TODO: Expose this as tile utils (it should be used by fusion too).
+static bool validateFullTilesOnDims(linalg::LinalgOp linalgOp,
+                                    ArrayRef<OpFoldResult> tiles,
+                                    ArrayRef<size_t> dims) {
+  if (dims.size() != tiles.size())
+    return false;
+  size_t idxInTiles = 0;
+  for (size_t dim : dims) {
+    if (!validateFullTilesOnDim(linalgOp, tiles[idxInTiles++], dim))
+      return false;
+  }
+  return true;
+}
+
 // Helper function to create the pack operation.
 static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                               ArrayRef<OpFoldResult> tiles,
@@ -294,6 +353,8 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNhwcHwcfOp(RewriterBase &rewriter,
                                     linalg::Conv2DNhwcHwcfOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
+  if (!validateFullTilesOnDims(convOp, tiles, {/*Kidx=*/3, /*Cidx=*/6}))
+    return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
 
@@ -306,6 +367,8 @@ FailureOr<linalg::GenericOp>
 mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
                                     linalg::Conv2DNchwFchwOp convOp,
                                     ArrayRef<OpFoldResult> tiles) {
+  if (!validateFullTilesOnDims(convOp, tiles, {/*Kidx=*/1, /*Cidx=*/4}))
+    return rewriter.notifyMatchFailure(convOp, "expect full tiles only");
   return packConvolutions(rewriter, convOp, tiles);
 }
 
@@ -337,6 +400,9 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   OpFoldResult tileOnI = tiles[0];
   OpFoldResult tileOnJ = tiles[1];
   OpFoldResult tileOnK = tiles[2];
+  if (!validateFullTilesOnDims(matmulOp, {tileOnI, tileOnJ, tileOnK},
+                               {/*I=*/0, /*J=*/1, /*K=*/2}))
+    return rewriter.notifyMatchFailure(matmulOp, "expect full tiles only");
   SmallVector<OpFoldResult, 2> tilesOnA = {tileOnI, tileOnK};
   SmallVector<OpFoldResult, 2> tilesOnB = {tileOnK, tileOnJ};
   SmallVector<OpFoldResult, 2> tilesOnC = {tileOnI, tileOnJ};
@@ -700,7 +766,7 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
   }
 };
 
-// Pack MatmulOp to VNNI
+// Pack MatmulOp to VNNI.
 struct VNNIOnMatmul : public OpRewritePattern<linalg::GenericOp> {
   VNNIOnMatmul(MLIRContext *context, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::GenericOp>(context, benefit) {}
@@ -714,7 +780,7 @@ struct VNNIOnMatmul : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-// Pack BRGemmOp to VNNI
+// Pack BRGemmOp to VNNI.
 struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
   VNNIOnBRGemm(MLIRContext *context, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::BatchReduceMatmulOp>(context, benefit) {}
