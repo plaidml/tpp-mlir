@@ -360,3 +360,55 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 // CONV: %[[OUT:.+]] = tensor.empty() : tensor<1x58x58x64xf32>
 // CONV: %[[UNPACK:.+]] = tensor.unpack %[[PADDED]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[OUT]] : tensor<1x2x58x58x32xf32> -> tensor<1x58x58x64xf32>
 // CONV: return %[[UNPACK]] : tensor<1x58x58x64xf32> 
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
+
+func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x64xf32>) -> tensor<1x56x56x64xf32> {
+  %0 = tensor.empty() : tensor<1x56x56x64xf32>
+  %1 = linalg.fill ins(%arg0 : f32) outs(%0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+  %2 = tensor.empty() : tensor<1x2x56x56x32xf32>
+  %pack = tensor.pack %arg1 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %2 : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
+  %3 = tensor.empty() : tensor<2x2x1x1x32x32xf32>
+  %pack_0 = tensor.pack %arg2 outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %3 : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
+  %4 = tensor.empty() : tensor<1x2x56x56x32xf32>
+  %pack_1 = tensor.pack %1 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %4 : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]} ins(%pack, %pack_0 : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) outs(%pack_1 : tensor<1x2x56x56x32xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %6 = arith.mulf %in, %in_2 : f32
+      %7 = arith.addf %out, %6 : f32
+      linalg.yield %7 : f32
+  } -> tensor<1x2x56x56x32xf32>
+  %unpack = tensor.unpack %5 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %1 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
+  return %unpack : tensor<1x56x56x64xf32>
+}
+
+// CONV-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
+// CONV-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d8, d4)>
+// CONV-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
+// CONV: func.func @fill
+// CONV-SAME: %[[ARG0:.+]]: f32,
+// CONV-SAME: %[[ARG1:.+]]: tensor<1x56x56x64xf32>,
+// CONV-SAME: %[[ARG2:.+]]: tensor<1x1x64x64xf32>
+// CONV: %[[RES:.+]] = tensor.empty() : tensor<1x56x56x64xf32>
+// CONV: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
+// CONV: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] 
+// CONV-SAME: outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] 
+// CONV-SAME: into %[[EMPTY_ARG1]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
+// CONV: %[[EMPTY_ARG2:.+]] = tensor.empty() : tensor<2x2x1x1x32x32xf32>
+// CONV: %[[PACK_ARG2:.+]] = tensor.pack %[[ARG2]] 
+// CONV-SAME: outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] 
+// CONV-SAME: into %[[EMPTY_ARG2]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
+// CONV: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
+// CONV: %[[PACKED_FILL:.+]] = linalg.fill ins(%[[ARG0]] : f32) 
+// CONV-SAME: outs(%[[EMPTY_FILL]] : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
+// CONV: %[[GEN:.+]] = linalg.generic
+// CONV-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]
+// CONV-SAME: ins(%[[PACK_ARG1]], %[[PACK_ARG2]]
+// CONV-SAME: outs(%[[PACKED_FILL]]
+// CONV: %[[UNPACK:.+]] = tensor.unpack %[[GEN]] 
+// CONV-SAME: outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] 
+// CONV-SAME: into %[[RES]] : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>

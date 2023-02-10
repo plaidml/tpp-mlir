@@ -641,6 +641,62 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// BubbleUpThroughFillOp
+//===----------------------------------------------------------------------===//
+
+// Attempt to avoid packing a fill op. Instead create a 'packed' fill.
+// %0 = tensor.empty
+// %packed = tensor.empty
+// %1 = linalg.fill ins(%cst) outs(%0)
+// %2 = tensor.pack %1 into %packed
+// %3 = some_packed_op %2
+// %4 = tensor.unpack %3 into %1
+// --->
+// %0 = tensor.empty
+// %1 = linalg.fill ins(%cst) outs (%packed)
+// %2 = some_packed_op %1
+// %3 = tensor.unpack %2 into %0
+//
+struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    Value source = packOp.getSource();
+    auto fillOp = source.getDefiningOp<linalg::FillOp>();
+    if (!fillOp)
+      return failure();
+
+    Value fillRes = fillOp.getResult(0);
+    auto users = fillRes.getUsers();
+
+    // Only two users: a pack and an unpack.
+    if (std::distance(users.begin(), users.end()) != 2)
+      return failure();
+
+    bool foundPack, foundUnPack = false;
+    for (Operation *op : users) {
+      if (isa_and_nonnull<tensor::UnPackOp>(op))
+        foundUnPack = true;
+      if (isa_and_nonnull<tensor::PackOp>(op))
+        foundPack = true;
+    }
+
+    if (!foundUnPack || !foundPack)
+      return failure();
+
+    // Replace result with output.
+    fillRes.replaceAllUsesWith(fillOp.getOutputs()[0]);
+    auto empty = tensor::PackOp::createDestinationTensor(
+        rewriter, packOp.getLoc(), source, packOp.getMixedTiles(),
+        packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(packOp, fillOp.getInputs(),
+                                                empty);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 
@@ -843,7 +899,8 @@ struct PropagatePackUnPack
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(patterns);
-  patterns.add<PropagateThroughPadOp>(patterns.getContext());
+  patterns.add<PropagateThroughPadOp, BubbleUpThroughFillOp>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
