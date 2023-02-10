@@ -117,6 +117,8 @@ static Value toUnPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                                 Value output, ArrayRef<OpFoldResult> tiles,
                                 ArrayRef<int64_t> innerDimPos,
                                 ArrayRef<int64_t> outerDimsPerm) {
+  if (auto fillOp = output.getDefiningOp<linalg::FillOp>())
+    output = fillOp.getOutputs()[0];
   return builder.create<tensor::UnPackOp>(loc, input, output, innerDimPos,
                                           tiles, outerDimsPerm);
 }
@@ -650,8 +652,9 @@ struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
 // %1 = linalg.fill ins(%cst) outs(%0)
 // %2 = tensor.pack %1 into %packed
 // %3 = some_packed_op %2
-// %4 = tensor.unpack %3 into %1
+//
 // --->
+//
 // %0 = tensor.empty
 // %1 = linalg.fill ins(%cst) outs (%packed)
 // %2 = some_packed_op %1
@@ -668,21 +671,7 @@ struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
       return failure();
 
     Value fillRes = fillOp.getResult(0);
-    auto users = fillRes.getUsers();
-
-    // Only two users: a pack and an unpack.
-    if (std::distance(users.begin(), users.end()) != 2)
-      return failure();
-
-    bool foundPack, foundUnPack = false;
-    for (Operation *op : users) {
-      if (isa_and_nonnull<tensor::UnPackOp>(op))
-        foundUnPack = true;
-      if (isa_and_nonnull<tensor::PackOp>(op))
-        foundPack = true;
-    }
-
-    if (!foundUnPack || !foundPack)
+    if (!fillRes.hasOneUse())
       return failure();
 
     // Replace result with output.

@@ -381,7 +381,7 @@ func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x
       %7 = arith.addf %out, %6 : f32
       linalg.yield %7 : f32
   } -> tensor<1x2x56x56x32xf32>
-  %unpack = tensor.unpack %5 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %1 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
+  %unpack = tensor.unpack %5 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %0 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
   return %unpack : tensor<1x56x56x64xf32>
 }
 
