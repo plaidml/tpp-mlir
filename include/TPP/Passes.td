@@ -261,4 +261,9 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
   let constructor = "mlir::tpp::createConstantFoldPackPass()";
 }
 
+def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
+  let summary = "Run linalg element-wise fusion";
+  let constructor = "mlir::tpp::createElementWiseFusionPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

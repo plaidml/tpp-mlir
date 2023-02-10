@@ -493,9 +493,43 @@ struct TileConsumerAndFuseProducers
   }
 };
 
+static bool areFusableOps(Operation *producerOp, Operation *consumerOp) {
+  if ((!isa<linalg::LinalgOp>(producerOp)) ||
+      (!isa<linalg::LinalgOp>(consumerOp)))
+    return false;
+  if (!linalg::isElementwise(producerOp) || !linalg::isElementwise(consumerOp))
+    return false;
+  return producerOp->hasOneUse();
+}
+
+struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+
+    linalg::ControlFusionFn fuseElementwiseOpsControlFn =
+        [&](OpOperand *fusedOperand) {
+          Operation *producer = fusedOperand->get().getDefiningOp();
+          if (!producer)
+            return false;
+          Operation *consumer = fusedOperand->getOwner();
+          return areFusableOps(producer, consumer);
+        };
+
+    linalg::populateElementwiseOpsFusionPatterns(patterns,
+                                                 fuseElementwiseOpsControlFn);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    return;
+  }
+};
+
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createTileConsumerAndFuseProducersPass() {
   return std::make_unique<TileConsumerAndFuseProducers>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createElementWiseFusionPass() {
+  return std::make_unique<ElementWiseFusion>();
 }
