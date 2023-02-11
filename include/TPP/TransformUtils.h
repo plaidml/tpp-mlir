@@ -14,6 +14,7 @@
 
 namespace mlir {
 
+class Operation;
 class OpBuilder;
 struct Range;
 class RewriterBase;
@@ -56,10 +57,10 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     linalg::LinalgOp linalgOp,
                                                     unsigned upTo);
 // Return true if the convolution is blocked.
-bool isBlockedConvolution(linalg::LinalgOp linalgOp);
+bool isBlockedConvolution(Operation *op);
 
 // Return true if the matmul is blocked.
-bool isBlockedMatmul(linalg::LinalgOp linalgOp);
+bool isBlockedMatmul(Operation *op);
 
 // Validate a tile configuration for a linalgOp when we can statically do that.
 // Specific dims can be passed using 'dims'. If dims is empty the validation

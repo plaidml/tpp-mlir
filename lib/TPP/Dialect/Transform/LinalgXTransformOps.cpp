@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/VNNIOps.h"
+#include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -161,42 +162,6 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return emitDefaultDefiniteFailure(target);
 
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
-// MapLinalgToTppOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform::MapLinalgToTppOp::apply(transform::TransformResults &results,
-                                   transform::TransformState &state) {
-  llvm::StringSet<> strs;
-  if (getFilter().has_value())
-    strs.insert(getFilter()->getAsValueRange<StringAttr>().begin(),
-                getFilter()->getAsValueRange<StringAttr>().end());
-
-  SmallVector<Operation *> res;
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
-  for (Operation *op : payloadOps) {
-    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
-    if (!currentTarget) {
-      auto diag = this->emitOpError()
-                  << "Cannot map non-generic op to tpp: " << *op << "\n";
-      diag.attachNote(op->getLoc()) << "when applied to this op";
-      return DiagnosedSilenceableFailure::definiteFailure();
-    }
-    TrivialPatternRewriter rewriter(currentTarget->getContext());
-    FailureOr<linalg::GenericOp> annotatedOp =
-        mlir::linalgx::mapLinalgToTpp(rewriter, currentTarget);
-    if (succeeded(annotatedOp)) {
-      if (getFilter().has_value() &&
-          !strs.contains((*annotatedOp).getLibraryCallName()))
-        continue;
-      res.push_back(*annotatedOp);
-    }
-  }
-  results.set(getResult().cast<OpResult>(), res);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -381,6 +346,40 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     tiled.append(1, tiledOp->op);
   }
   results.set(getTiledLinalgOp().cast<OpResult>(), tiled);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// GetBlockedConvolutions
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::GetBlockedConvolutions::apply(transform::TransformResults &results,
+                                         transform::TransformState &state) {
+  SmallVector<Operation *> res;
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    if (linalgx::utils::isBlockedConvolution(op))
+      res.push_back(op);
+  }
+  results.set(getResult().cast<OpResult>(), res);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// GetBlockedMatmuls
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform::GetBlockedMatmuls::apply(transform::TransformResults &results,
+                                    transform::TransformState &state) {
+  SmallVector<Operation *> res;
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    if (linalgx::utils::isBlockedMatmul(op))
+      res.push_back(op);
+  }
+  results.set(getResult().cast<OpResult>(), res);
   return DiagnosedSilenceableFailure::success();
 }
 

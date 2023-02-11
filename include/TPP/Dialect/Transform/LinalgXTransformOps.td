@@ -11,6 +11,7 @@
 
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
+include "mlir/Dialect/Transform/IR/TransformTypes.td"
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/EnumAttr.td"
@@ -182,39 +183,6 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
 }
 
 //===----------------------------------------------------------------------===//
-// MapLinalgToTppOp
-//===----------------------------------------------------------------------===//
-
-def MapLinalgToTppOp : Op<Transform_Dialect, "structured.map_linalg_to_tpp", [
-    FunctionalStyleTransformOpTrait,
-    MemoryEffectsOpInterface,
-    TransformEachOpTrait,
-    TransformOpInterface]> {
-
-  let description = [{
-    Pattern match a linalg.generic and map it to tpp operations. On success,
-    the resulting operation will still be a linalg.generic with the library_call
-    set with the name of the tpp operation detected.
-
-    `filter` allows to select a subset of the detected operations.
-  }];
-
-  let arguments = (ins PDL_Operation:$target,
-                       OptionalAttr<StrArrayAttr>:$filter);
-  let results = (outs PDL_Operation:$collapsed_linalg_op);
-
-  let assemblyFormat = [{
-     (`filter` `{` $filter^ `}`)? `in` $target attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-      ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state);
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // FoldUnitExtentDimsOp
 //===----------------------------------------------------------------------===//
 
@@ -281,9 +249,9 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
+      ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -315,9 +283,9 @@ def ConvertLinalgToTpp : Op<Transform_Dialect,
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
+      ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -383,6 +351,58 @@ def CollapseTo2dOp : Op<Transform_Dialect, "structured.collapse_to_2d", [
     // Get reassociation for 2d collapsing.
     SmallVector<ReassociationIndices, 4>
       getReassociationIndices(linalg::GenericOp linalgOp);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// GetBlockedConvolutions
+//===----------------------------------------------------------------------===//
+
+def GetBlockedConvolutions : Op<Transform_Dialect, 
+                                "structured.get_blocked_convolutions", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (
+    outs Transform_ConcreteOpType<"linalg.generic">:$blocked_convolutions);
+  
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// GetBlockedMatmuls
+//===----------------------------------------------------------------------===//
+
+def GetBlockedMatmuls : Op<Transform_Dialect, 
+                           "structured.get_blocked_matmuls", [
+    FunctionalStyleTransformOpTrait,
+    MemoryEffectsOpInterface,
+    TransformEachOpTrait,
+    TransformOpInterface]> {
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (
+    outs Transform_ConcreteOpType<"linalg.generic">:$blocked_matmuls);
+  
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformResults &transformResults,
+      ::mlir::transform::TransformState &state);
   }];
 }
 

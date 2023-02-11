@@ -80,19 +80,34 @@ func.func @walk(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<3x3x8x8xf32>, %arg2: t
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
     // Blocks all the convs
     %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate all the packs
     transform.structured.packing_propagation %2
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    // Mark all the relu(s) with tpp.relu
-    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
+    %4 = transform.structured.get_blocked_matmuls %3
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+    %blocked_matmuls:2 = split_handles %4 in [2]
+      : (!transform.op<"linalg.generic">) 
+      -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
+    %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %second_relu = transform.get_consumers_of_result %blocked_matmuls#1[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %casted_first_relu = transform.cast %first_relu 
+      : !transform.op<"linalg.generic"> to !pdl.operation
+    %casted_second_relu = transform.cast %second_relu 
+      : !transform.op<"linalg.generic"> to !pdl.operation
+    %relus = transform.merge_handles %casted_first_relu, %casted_second_relu : !pdl.operation
+
 
     // Fuse relu and conv on the three outermost loops
-    %5, %loop:3 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 0, 0] }
+    %5, %loop:3 = transform.structured.fuse %relus { tile_sizes = [1, 1, 1, 0, 0] }
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     %convs:2 = split_handles %6 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 

@@ -185,7 +185,10 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
   return loopRanges;
 }
 
-bool isBlockedConvolution(linalg::LinalgOp linalgOp) {
+bool isBlockedConvolution(Operation *op) {
+  if (!isa<linalg::LinalgOp>(op))
+    return false;
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   auto iteratorTypes = linalgOp.getIteratorTypesArray();
   if (iteratorTypes.size() != 9)
     return false;
@@ -207,7 +210,10 @@ bool isBlockedConvolution(linalg::LinalgOp linalgOp) {
 
 // TODO: Check indexing maps and iterator types. They should
 // match the one of a packed matmul.
-bool isBlockedMatmul(linalg::LinalgOp linalgOp) {
+bool isBlockedMatmul(Operation *op) {
+  if (!isa<linalg::LinalgOp>(op))
+    return false;
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   return tpp::utils::hasMatmulBody(linalgOp);
 }
 

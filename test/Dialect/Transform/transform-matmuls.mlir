@@ -91,7 +91,8 @@ func.func @matmul_and_relu(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
     // Get the matmul
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
     // Pack the matmul with blocking factors of 32 along i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
     // Get parent operation (aka func.func)
@@ -100,14 +101,20 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
 
     // Simply map linalg.generic to tpp.relu
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
+    %4 = transform.structured.get_blocked_matmuls %3 
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+    %relus = transform.get_consumers_of_result %4[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %casted_relus = transform.cast %relus : !transform.op<"linalg.generic"> to !pdl.operation
 
     // Cooking recipe for relu
     // Fuse the relu into the matmul. Fuse the 2 outermost loops
-    %5, %loop:2 = transform.structured.fuse %4 { tile_sizes = [1, 1, 0, 0] }
+    %5, %loop:2 = transform.structured.fuse %casted_relus { tile_sizes = [1, 1, 0, 0] }
     // Get the producer for the relu (aka the packed matmul)
-    %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
+    %6 = get_producer_of_operand %5[0] 
+      : (!pdl.operation) -> !pdl.operation
     // Map the matmul to brgemm
     transform.structured.rewrite_to_brgemm %6
 
@@ -124,23 +131,49 @@ transform.sequence failures(propagate) {
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
-// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF0]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG0]] 
+// CHECK-SAME:  inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[BUF0]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
 // CHECK: %[[BUF1:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
-// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF1]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] 
+// CHECK-SAME:  outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[BUF1]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
 // CHECK: %[[BUF2:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
-// CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF2]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
-// CHECK: %[[LOOP0:.+]] = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C4]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[PACK2]]) -> (tensor<4x4x32x32xf32>) {
-// CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C4]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<4x4x32x32xf32>) {
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x4x32x32xf32> to tensor<1x1x32x32xf32>
-// CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[PACK0]][%[[ARG3]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<4x4x32x32xf32> to tensor<4x32x32xf32>
-// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[PACK1]][%[[ARG5]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<4x4x32x32xf32> to tensor<4x32x32xf32>
-// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x4x32x32xf32> to tensor<32x32xf32>
-// CHECK: %[[MUL:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE0]], %[[SLICE1]] : tensor<4x32x32xf32>, tensor<4x32x32xf32>) outs(%[[SLICE2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: %[[INSERT:.+]] = tensor.insert_slice %[[MUL]] into %[[SLICE]][0, 0, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<1x1x32x32xf32>
-// CHECK: %[[RELU:.+]] = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"], library_call = "tpp.relu"} outs(%[[INSERT]] : tensor<1x1x32x32xf32>)
-// CHECK: %[[INSERT1:.+]] = tensor.insert_slice %[[RELU]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<1x1x32x32xf32> into tensor<4x4x32x32xf32>
+// CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] 
+// CHECK-SAME:  inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[BUF2]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[LOOP0:.+]] = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C4]] step %[[C1]] 
+// CHECK-SAME:  iter_args(%[[ARG4:.+]] = %[[PACK2]]) -> (tensor<4x4x32x32xf32>) {
+// CHECK: %[[LOOP1:.+]] = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C4]] step %[[C1]] 
+// CHECK-SAME:  iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<4x4x32x32xf32>) {
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice 
+// CHECK-SAME:  %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<4x4x32x32xf32> to tensor<1x1x32x32xf32>
+// CHECK: %[[SLICE0:.+]] = tensor.extract_slice 
+// CHECK-SAME:  %[[PACK0]][%[[ARG3]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<4x4x32x32xf32> to tensor<4x32x32xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice 
+// CHECK-SAME:  %[[PACK1]][%[[ARG5]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<4x4x32x32xf32> to tensor<4x32x32xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice 
+// CHECK-SAME:  %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<4x4x32x32xf32> to tensor<32x32xf32>
+// CHECK: %[[MUL:.+]] = linalg.batch_reduce_matmul 
+// CHECK-SAME:  ins(%[[SLICE0]], %[[SLICE1]] : tensor<4x32x32xf32>, tensor<4x32x32xf32>) 
+// CHECK-SAME:  outs(%[[SLICE2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[INSERT:.+]] = tensor.insert_slice %[[MUL]] 
+// CHECK-SAME:  into %[[SLICE]][0, 0, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<32x32xf32> into tensor<1x1x32x32xf32>
+// CHECK: %[[RELU:.+]] = linalg.generic 
+// CHECK-SAME:  {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+// CHECK-SAME:  outs(%[[INSERT]] : tensor<1x1x32x32xf32>)
+// CHECK: %[[INSERT1:.+]] = tensor.insert_slice 
+// CHECK-SAME:  %[[RELU]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<1x1x32x32xf32> into tensor<4x4x32x32xf32>
 // CHECK: scf.yield %[[INSERT1]] : tensor<4x4x32x32xf32>
 // CHECK: }
 // CHECK: scf.yield %[[LOOP1]] : tensor<4x4x32x32xf32>
-// CHECK: %[[UNPACK:.+]] = tensor.unpack %[[LOOP0]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
+// CHECK: %[[UNPACK:.+]] = tensor.unpack %[[LOOP0]] 
+// CHECK-SAME:  inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 // CHECK: return %[[UNPACK]] : tensor<128x128xf32>
