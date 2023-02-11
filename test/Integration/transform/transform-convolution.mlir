@@ -68,7 +68,7 @@ transform.sequence failures(propagate) {
     %4 = transform.structured.collapse %generic#2 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %5 = transform.structured.collapse %4 [[0], [1], [2, 3], [4], [5], [6]]
     %6 = transform.structured.interchange %5 iterator_interchange = [0, 1, 4, 2, 3, 5] 
-    transform.structured.map_to_brgemm %6
+    transform.structured.rewrite_to_brgemm %6
 }
 
 func.func @entry() {

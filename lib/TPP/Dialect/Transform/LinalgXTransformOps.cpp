@@ -102,13 +102,13 @@ transform::CollapseOp::getReassociationIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// MapToBrgemmOp
+// RewriteToBrgemmOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
-                                     ApplyToEachResultList &results,
-                                     transform::TransformState &state) {
+transform::RewriteToBrgemmOp::applyToOne(linalg::LinalgOp target,
+                                         ApplyToEachResultList &results,
+                                         transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
   TrivialPatternRewriter rewriter(target->getContext());
@@ -119,13 +119,13 @@ transform::MapToBrgemmOp::applyToOne(linalg::LinalgOp target,
 }
 
 //===----------------------------------------------------------------------===//
-// MapConvToMatmulOp
+// RewriteConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::MapConvToMatmulOp::applyToOne(linalg::LinalgOp target,
-                                         ApplyToEachResultList &results,
-                                         transform::TransformState &state) {
+transform::RewriteConvToMatmulOp::applyToOne(linalg::LinalgOp target,
+                                             ApplyToEachResultList &results,
+                                             transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
   TrivialPatternRewriter rewriter(target->getContext());
