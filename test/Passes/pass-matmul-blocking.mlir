@@ -40,10 +40,44 @@ func.func @block_linalg_matmul(
   return %0 : tensor<5x5xf32>
 }
 
-// CHECK: func.func @block_linalg_matmul(
+// CHECK-LABEL: func.func @block_linalg_matmul(
 // CHECK-SAME:  %[[ARG0:[0-9a-z]+]]: tensor<5x6xf32>,
 // CHECK-SAME:  %[[ARG1:[0-9a-z]+]]: tensor<6x5xf32>,
 // CHECK-SAME:  %[[ARG2:[0-9a-z]+]]: tensor<5x5xf32>) -> tensor<5x5xf32> {
 // CHECK: %{{.+}} = linalg.matmul 
 // CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]]
 // CHECK-SAME:  outs(%[[ARG2]]
+
+// -----
+
+func.func @block_linalg_matmul(
+  %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>)
+    -> tensor<128x128xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg2: tensor<128x128xf32>) -> tensor<128x128xf32>
+  %1 = linalg.matmul ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>) 
+                      outs(%0: tensor<128x128xf32>) -> tensor<128x128xf32>
+  return %1 : tensor<128x128xf32>
+}
+
+// CHECK-LABEL: func @block_linalg_matmul(
+// CHECK-SAME:    %[[ARG0:[0-9a-z]+]]: tensor<128x128xf32>
+// CHECK-SAME:    %[[ARG1:[0-9a-z]+]]: tensor<128x128xf32>
+// CHECK-SAME:    %[[ARG2:[0-9a-z]+]]: tensor<128x128xf32>) -> tensor<128x128xf32> {
+// CHECK: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) 
+// CHECK-SAME:  outs(%[[ARG2]] : tensor<128x128xf32>) -> tensor<128x128xf32>
+// CHECK: %[[EMPTY_ARG0:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
+// CHECK: %[[PACK_ARG0:.+]] = tensor.pack %[[ARG0]] 
+// CHECK-SAME:  inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[EMPTY_ARG0]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
+// CHECK: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] 
+// CHECK-SAME:  outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[EMPTY_ARG1]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
+// CHECK: %[[PACK_FILL:.+]] = tensor.pack %[[FILL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[EMPTY_FILL]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
+// CHECK: %[[RES:.+]] = linalg.generic
+// CHECK: %{{.+}} = tensor.unpack %[[RES]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
