@@ -78,7 +78,7 @@ transform.sequence failures(propagate) {
     // Fuse matmul + relu and map the matmul to BRGEMM
     %9, %loop1 = transform.structured.fuse %8 { tile_sizes = [1, 0, 0] }
     %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
-    transform.structured.map_to_brgemm %10
+    transform.structured.rewrite_to_brgemm %10
 }
 
 // We have 4 layers. 1 loop for each layer and 1 outermost loop for all the layers
@@ -115,7 +115,7 @@ transform.sequence failures(propagate) {
 
     // map a packed matmul to a brgemm
     %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.map_to_brgemm %7
+    transform.structured.rewrite_to_brgemm %7
 }
 
 func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {

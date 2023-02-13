@@ -109,7 +109,7 @@ transform.sequence failures(propagate) {
     // Get the producer for the relu (aka the packed matmul)
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     // Map the matmul to brgemm
-    transform.structured.map_to_brgemm %6
+    transform.structured.rewrite_to_brgemm %6
 
     // Clean-up IR after transformations
     transform.structured.canonicalize %arg1 {

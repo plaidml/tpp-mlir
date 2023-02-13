@@ -30,7 +30,7 @@ transform.sequence failures(propagate) {
     // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
     //
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-    transform.structured.map_conv_to_matmul %2
+    transform.structured.rewrite_conv_to_matmul %2
 }
 
 func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
@@ -60,7 +60,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.generalize %0
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-    transform.structured.map_conv_to_matmul %2
+    transform.structured.rewrite_conv_to_matmul %2
 }
 
 func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: memref<1x3x3x8xf32>) {
@@ -94,7 +94,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.generalize %0
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-    transform.structured.map_conv_to_matmul %2
+    transform.structured.rewrite_conv_to_matmul %2
 }
 
 func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: memref<?x?x?x?xf32>) {
@@ -155,7 +155,7 @@ transform.sequence failures(propagate) {
     //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
     //
     %4 = transform.structured.interchange %3 iterator_interchange = [0, 1, 4, 2, 3, 5] 
-    transform.structured.map_to_brgemm %4
+    transform.structured.rewrite_to_brgemm %4
 }
 
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
@@ -290,14 +290,14 @@ transform.sequence failures(propagate) {
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
     %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
-    transform.structured.map_conv_to_matmul %conv1
+    transform.structured.rewrite_conv_to_matmul %conv1
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
     %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
     %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5] 
-    transform.structured.map_to_brgemm %9
+    transform.structured.rewrite_to_brgemm %9
 }
 
 // -----
@@ -307,7 +307,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.generalize %0
     %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 4, 5, 2, 3, 6]
-    transform.structured.map_conv_to_matmul %2
+    transform.structured.rewrite_conv_to_matmul %2
 }
 
 func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
@@ -344,7 +344,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32]
     %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
-    transform.structured.map_conv_to_matmul %2
+    transform.structured.rewrite_conv_to_matmul %2
 }
 
 func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {

@@ -80,10 +80,10 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapse", [
 }
 
 //===----------------------------------------------------------------------===//
-// MapToBrgemmOp
+// RewriteToBrgemmOp
 //===----------------------------------------------------------------------===//
 
-def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
+def RewriteToBrgemmOp : Op<Transform_Dialect, "structured.rewrite_to_brgemm", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
     TransformOpInterface,
@@ -111,10 +111,11 @@ def MapToBrgemmOp : Op<Transform_Dialect, "structured.map_to_brgemm", [
 }
 
 //===----------------------------------------------------------------------===//
-// MapConvToMatmulOp
+// RewriteConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-def MapConvToMatmulOp : Op<Transform_Dialect, "structured.map_conv_to_matmul", [
+def RewriteConvToMatmulOp : Op<Transform_Dialect, 
+    "structured.rewrite_conv_to_matmul", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
     TransformOpInterface,

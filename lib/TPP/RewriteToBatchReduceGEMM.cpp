@@ -26,7 +26,7 @@ using namespace mlir;
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
-#define DEBUG_TYPE "mlir-map-to-brgemm"
+#define DEBUG_TYPE "mlir-rewrite-to-brgemm"
 
 // Look for [p ... p] brgemm [r p p r r]
 static LogicalResult checkVNNIStructure(linalg::LinalgOp linalgOp) {

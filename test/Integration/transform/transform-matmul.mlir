@@ -71,7 +71,7 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.map_to_brgemm %3
+    transform.structured.rewrite_to_brgemm %3
 }
 
 func.func @entry() {

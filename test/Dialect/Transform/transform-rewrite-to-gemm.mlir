@@ -18,5 +18,5 @@ func.func @conv(%arg0: tensor<1x4x4x3xi64>, %arg1: tensor<2x2x3x8xi64>, %arg2: t
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    transform.structured.map_conv_to_matmul %0
+    transform.structured.rewrite_conv_to_matmul %0
 }
