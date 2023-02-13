@@ -222,12 +222,10 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-NEXT:      scf.for %{{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
   // CHECK: linalg.generic
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-  // CHECK-SAME:  library_call = "tpp.identity"
   // CHECK:     linalg.batch_reduce_matmul
   %3 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg0 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%2 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   // CHECK:     linalg.generic 
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], 
-  // CHECK-SAME:  library_call = "tpp.relu"} 
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -245,21 +243,21 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
   // CHECK-NOT: {{.*}} = linalg.conv_2d_nhwc_hwcf
+  // CHECK: linalg.generic 
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK: scf.for {{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
   // CHECK-NEXT:   scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:     scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:       scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
   // CHECK: linalg.generic 
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"],
-  // CHECK-SAME:  library_call = "tpp.identity"
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
   // CHECK:               scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
   // CHECK-NEXT:            scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK-NEXT:              scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK:           linalg.matmul
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%6 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   // CHECK:     linalg.generic  
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"], 
-  // CHECK-SAME:  library_call = "tpp.relu" 
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
   // CHECK-SAME:  outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -271,19 +269,33 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
     // Blocks all the convs
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     // Propagate all the packs
     transform.structured.packing_propagation %2
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    // Mark all the relu(s) with tpp.relu
-    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
+    %4 = transform.structured.get_blocked_matmuls %3
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+    %blocked_matmuls:2 = split_handles %4 in [2] 
+      : (!transform.op<"linalg.generic">) 
+      -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
+    %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %second_relu = transform.get_consumers_of_result %blocked_matmuls#1[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %casted_first_relu = transform.cast %first_relu 
+      : !transform.op<"linalg.generic"> to !pdl.operation
+    %casted_second_relu = transform.cast %second_relu 
+      : !transform.op<"linalg.generic"> to !pdl.operation
+    %relus = transform.merge_handles %casted_first_relu, %casted_second_relu : !pdl.operation
 
     // Fuse relu and conv on the three outermost loops
-    %5, %loop:5 = transform.structured.fuse %4 { tile_sizes = [1, 1, 1, 1, 1] }
+    %5, %loop:5 = transform.structured.fuse %relus { tile_sizes = [1, 1, 1, 1, 1] }
     %6 = get_producer_of_operand %5[0] : (!pdl.operation) -> !pdl.operation
     %convs:2 = split_handles %6 in [2] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
 

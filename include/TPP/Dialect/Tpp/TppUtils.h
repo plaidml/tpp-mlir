@@ -53,15 +53,6 @@ bool isTppIdentity(linalg::GenericOp linalgOp);
 // Returns true if the linalg.generic can convert to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp);
 
-// Returns true if the linalg generic can be mapped to a tpp.identity.
-bool canMapToTppIdentity(linalg::GenericOp linalgOp);
-
-// Returns true if the linalg generic can be mapped to a tpp.relu.
-bool canMapToTppRelu(linalg::GenericOp linalgOp);
-
-// Returns true if the linalg generic can be mapped to a tpp.add.
-bool canMapToTppAdd(linalg::GenericOp linalgOp);
-
 } // namespace utils
 } // namespace tpp
 } // namespace mlir

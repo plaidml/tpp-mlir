@@ -272,12 +272,6 @@ template <typename OP> static bool hasOnlyScalarElementwiseOp(Region &region) {
   return true;
 }
 
-// Returns true if the operation as 1 input and 1 output.
-static bool hasOneInputOneOutput(linalg::GenericOp linalgOp) {
-  return ((linalgOp.getNumDpsInputs() == 1) &&
-          (linalgOp.getNumDpsInits() == 1));
-}
-
 // Returns true if the linalg.generic maps to a tpp.gemm.
 bool isTppMatmul(linalg::LinalgOp linalgOp) {
   if (!isa_and_nonnull<linalg::GenericOp>(linalgOp))
@@ -301,14 +295,6 @@ bool isTppMatmul(linalg::LinalgOp linalgOp) {
     return false;
   // operations and operands.
   return hasMatmulBody(linalgOp);
-}
-
-bool canMapToTppAdd(linalg::GenericOp linalgOp) {
-  if (!linalg::isElementwise(linalgOp))
-    return false;
-  if (!hasStaticShape(linalgOp) || !hasOneInputOneOutput(linalgOp))
-    return false;
-  return hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
 static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
@@ -371,14 +357,6 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
          hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
-bool canMapToTppRelu(linalg::GenericOp linalgOp) {
-  if (!linalg::isElementwise(linalgOp))
-    return false;
-  if (!hasStaticShape(linalgOp) || !hasMaxfZeroOp(linalgOp))
-    return false;
-  return hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
-}
-
 // Return true if the operation is unary.
 static bool isUnaryOp(linalg::GenericOp linalgOp) {
   if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1)) {
@@ -403,12 +381,6 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasMaxfZeroOp(linalgOp) &&
          hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
-}
-
-bool canMapToTppIdentity(linalg::GenericOp linalgOp) {
-  if (!linalg::isElementwise(linalgOp))
-    return false;
-  return (hasStaticShape(linalgOp) && hasCopySemantics(linalgOp));
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.

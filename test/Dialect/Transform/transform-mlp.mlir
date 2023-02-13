@@ -62,21 +62,43 @@ transform.sequence failures(propagate) {
     transform.structured.packing_propagation %2
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    // Annotate and collect relu(s)
-    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
+    %4 = transform.structured.get_blocked_matmuls %3
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
 
     // Get the last one, and fuse the outermost dimensions with all the producers
-    %relus:4 = split_handles %4 in [4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-    %5, %loop = transform.structured.fuse %relus#3 { tile_sizes = [1, 0, 0, 0] }
+    %blocked_matmuls:4 = split_handles %4 in [4] 
+      : (!transform.op<"linalg.generic">) 
+      -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+    %relu = transform.get_consumers_of_result %blocked_matmuls#3[0]
+      : (!pdl.operation) -> (!pdl.operation)
+    %5, %loop = transform.structured.fuse %relu { tile_sizes = [1, 0, 0, 0] }
 
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
-    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %6 = transform.structured.match ops{["func.func"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
     transform.structured.fold_unit_extent_dims %6
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %8 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %7
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!pdl.operation) -> !pdl.operation
+    %8 = transform.structured.get_blocked_matmuls %7
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+    %rematch_blocked_matmuls:4 = split_handles %8 in [4]
+      : (!transform.op<"linalg.generic">)
+      -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+    
+    %first_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#0[0]
+      : (!pdl.operation) -> (!pdl.operation)
+    %second_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#1[0]
+      : (!pdl.operation) -> (!pdl.operation)
+    %third_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#2[0]
+      : (!pdl.operation) -> (!pdl.operation)
+    %fourth_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#3[0]
+      : (!pdl.operation) -> (!pdl.operation)
+    %all_relus = transform.merge_handles %first_relu, %second_relu,
+      %third_relu, %fourth_relu : !pdl.operation
+
 
     // Fuse matmul + relu and map the matmul to BRGEMM
-    %9, %loop1 = transform.structured.fuse %8 { tile_sizes = [1, 0, 0] }
+    %9, %loop1 = transform.structured.fuse %all_relus { tile_sizes = [1, 0, 0] }
     %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
     transform.structured.rewrite_to_brgemm %10
 }
@@ -102,12 +124,15 @@ transform.sequence failures(propagate) {
     %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.packing_propagation %2
 
-    // Detect relus and identity
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %4 = transform.structured.map_linalg_to_tpp filter{["tpp.relu"]} in %3
+    %4 = transform.structured.get_blocked_matmuls %3
+      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+    %relu = transform.get_consumers_of_result %4[0]
+      : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
+    %casted_relu = transform.cast %relu : !transform.op<"linalg.generic"> to !pdl.operation
 
     // Fuse relu with matmul
-    %5, %loop:2 = transform.structured.fuse %4 { tile_sizes = [1, 1, 0, 0] }
+    %5, %loop:2 = transform.structured.fuse %casted_relu { tile_sizes = [1, 1, 0, 0] }
 
     // clean-up IR after fusion
     %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
@@ -120,7 +145,6 @@ transform.sequence failures(propagate) {
 
 func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {
   // Expanding bias beforehand may be easier to fuse and completely fold away than post-hoc addBias to matmul.
-  // CHECK: tpp.identity
   %expanded_bias = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]}
       ins(%Bias : !Bias_tensor_t) outs(%C : !C_tensor_t) {
         ^bb0(%arg9: f32, %arg10: f32):
