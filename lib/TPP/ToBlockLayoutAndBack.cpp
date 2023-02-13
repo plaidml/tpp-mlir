@@ -447,7 +447,10 @@ packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 bool isVNNIPacked(linalg::GenericOp matmulOp) {
   // TODO add VNNI packing checks here
   auto indexingMap = matmulOp.getIndexingMapsArray()[1];
-  return indexingMap.getNumDims() == 7;
+  auto inputRank =
+      matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank();
+  return (inputRank == 5 && indexingMap.getNumDims() == 7) ||
+         (inputRank == 4 && indexingMap.getNumDims() == 5);
 }
 
 bool isMatmulOp(linalg::GenericOp matmulOp) {
@@ -509,27 +512,50 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
       toPackLayout_VNNI(rewriter, loc, matmulOp.getInputs()[1], tilesOnB);
   MLIRContext *ctx = matmulOp.getContext();
   AffineExpr p1, p2, r1, p3, p4, r2, r3;
-  bindDims(ctx, p1, p2, r1, p3, p4, r2, r3);
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
-  AffineMap mapA =
-      AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
-  AffineMap mapB =
-      AffineMap::get(/*dims=*/7, /*symbols=*/0,
-                     {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
-  AffineMap mapC =
-      AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
+  int64_t dims;
+  AffineMap mapA, mapB, mapC;
   Value matrixC = matmulOp.getOutputs()[0];
-  linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-      loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
-      ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::reduction},
-      /*doc=*/"", /*libraryCall=*/"");
+  linalg::GenericOp replacementOp;
+  if (matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() == 4) {
+    dims = 7;
+    bindDims(ctx, p1, p2, r1, r3, p3, p4, r2);
+    mapA = AffineMap::get(dims, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
+    mapB = AffineMap::get(dims, /*symbols=*/0,
+                          {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
+    mapC = AffineMap::get(dims, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
+    replacementOp = rewriter.create<linalg::GenericOp>(
+        loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
+        ArrayRef<AffineMap>{mapA, mapB, mapC},
+        ArrayRef<mlir::utils::IteratorType>{
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::reduction,
+            mlir::utils::IteratorType::reduction,
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::reduction},
+        /*doc=*/"", /*libraryCall=*/"");
+
+  } else {
+    assert(matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() == 3);
+    dims = 5;
+    bindDims(ctx, r1, r2, p1, p2, r3);
+    mapA = AffineMap::get(dims, /*symbols=*/0, {r1, p1, r3}, ctx);
+    mapB = AffineMap::get(dims, /*symbols=*/0,
+                          {r1, r3.floorDiv(*blockingFactor), p2, r2}, ctx);
+    mapC = AffineMap::get(dims, /*symbols=*/0, {p1, p2}, ctx);
+    replacementOp = rewriter.create<linalg::GenericOp>(
+        loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
+        ArrayRef<AffineMap>{mapA, mapB, mapC},
+        ArrayRef<mlir::utils::IteratorType>{
+            mlir::utils::IteratorType::reduction,
+            mlir::utils::IteratorType::reduction,
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::parallel,
+            mlir::utils::IteratorType::reduction},
+        /*doc=*/"", /*libraryCall=*/"");
+  }
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 

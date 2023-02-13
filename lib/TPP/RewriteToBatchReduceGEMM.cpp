@@ -36,9 +36,9 @@ static LogicalResult checkVNNIStructure(linalg::LinalgOp linalgOp) {
     return failure();
   size_t size = iteratorTypes.size() - 1;
   bool match = linalg::isReductionIterator(iteratorTypes[size]) &&
-               linalg::isReductionIterator(iteratorTypes[size - 1]) &&
+               linalg::isParallelIterator(iteratorTypes[size - 1]) &&
                linalg::isParallelIterator(iteratorTypes[size - 2]) &&
-               linalg::isParallelIterator(iteratorTypes[size - 3]) &&
+               linalg::isReductionIterator(iteratorTypes[size - 3]) &&
                linalg::isReductionIterator(iteratorTypes[size - 4]);
   if (!match)
     return failure();
@@ -92,7 +92,8 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     if (map.getNumResults() < 3)
       return failure();
     if (operand->getOperandNumber() == 1) {
-      if (map.getNumResults() != 5)
+      if (operand->get().getType().cast<ShapedType>().getRank() == 5 &&
+          map.getNumResults() != 5)
         return failure();
       maps.push_back(map.getMinorSubMap(4));
     } else {
@@ -106,12 +107,15 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     maps.push_back(map.getMinorSubMap(2));
   }
 
+  llvm::errs() << "compressed dims maps\n";
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  for (auto dimMap : compressedDimMaps)
+    dimMap.dump();
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
   AffineExpr r1, p4, p5, r2, r3;
   SmallVector<AffineMap> expectedMaps;
-  bindDims(linalgOp.getContext(), r1, p4, p5, r2, r3);
+  bindDims(linalgOp.getContext(), r1, r2, p4, p5, r3);
   auto blockingFactor =
       vnni::utils::getVNNIBlockingFactor(linalgOp->getOperands()[0].getType());
   // Unsupported blocking factor for type.
@@ -119,7 +123,7 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     return failure();
   // Expected access patterns of BRGEMM.
   expectedMaps = infer(
-      {{r1, p4, r2}, {r1, r2.floorDiv(*blockingFactor), p5, r3}, {p4, p5}});
+      {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
   if (compressedDimMaps != expectedMaps)
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
@@ -204,13 +208,18 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 
 // Returns true if linalg op is using its second operand in VNNI format.
 static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
-  // Linalg loop must have 7 dimensions.
-  if (linalgOp.getNumLoops() != 7)
-    return false;
   if (linalgOp->getNumOperands() < 3)
     return false;
   auto firstOperand = linalgOp->getOperands()[1];
   auto firstOperandType = firstOperand.getType();
+
+  // Linalg loop must have 7 dimensions.
+  if ((firstOperandType.cast<ShapedType>().getRank() == 5 &&
+       linalgOp.getNumLoops() != 7) ||
+      (firstOperandType.cast<ShapedType>().getRank() == 4 &&
+       linalgOp.getNumLoops() != 5))
+    return false;
+
   auto blockingFactor = vnni::utils::getVNNIBlockingFactor(firstOperandType);
   if (!blockingFactor)
     // Unsupported blocking factor for type.
