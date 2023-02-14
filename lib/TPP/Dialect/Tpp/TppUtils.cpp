@@ -23,9 +23,6 @@ namespace mlir {
 namespace tpp {
 namespace utils {
 
-// Prototypes
-static bool isZeroTensor(Operation *defOp);
-
 // taken from LinalgInterfaces.cpp
 // Returns true if the use-def chain from `v` to `from` consists of 0 or more
 // unary single-operand operations.
@@ -138,104 +135,103 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp) {
   return hasOnlyOp<linalg::YieldOp>(linalgOp->getRegion(0));
 }
 
-// Returns the closest earlier user of a given operation op relative
-// to an another op user currentUser.
-// If there are no earlier users or the specified currentUser is invalid
-// e.g., it does not belong the def-use chain of op, return nullptr instead.
-static Operation *getPrevUser(Operation *op, Operation *currentUser) {
-  if (!op || !currentUser)
-    return nullptr;
-
-  // Iterate over the op users to find the given current user.
-  auto userIt = op->user_begin();
-  while (userIt != op->user_end()) {
-    if (*userIt == currentUser) {
-      // Given that the user_iterator visits the op users from the last to
-      // the first user, simply return the next user after the current user
-      // i.e. an earlier/previous operation.
-      const auto nextUser = ++userIt;
-      return nextUser != op->user_end() ? *nextUser : nullptr;
-    }
-
-    ++userIt;
-  }
-
-  return nullptr;
-}
-
+// Returns true if the value is a constant float or integer.
 bool isValConstZero(Value val) {
   return matchPattern(val, m_AnyZeroFloat()) || matchPattern(val, m_Zero());
 }
 
-bool isZeroTensor(Value val) { return isZeroTensor(val.getDefiningOp()); }
+// Prototypes
+static bool isZeroOp(Operation *, Operation *);
+
+// Returns true if the value represents a zero filled tensor.
+// Recurse into isZeroOp for defining ops if not imediately obvious
+// Looks past linalg generic's argument (which don't have defining ops)
+static bool isZeroValue(Value val, Operation *userOp) {
+  if (!val)
+    return false;
+  if (isValConstZero(val))
+    return true;
+
+  Operation *defOp = nullptr;
+
+  // Block arguments don't have a defining op, but they do have an op arg
+  if (auto arg = dyn_cast<BlockArgument>(val)) {
+    // We need to find the argument to the linalg on the same order as this one
+    auto *linalgOp = arg.getParentRegion()->getParentOp();
+    if (!isa<linalg::GenericOp>(linalgOp))
+        return false;
+    auto index = arg.getArgNumber();
+    auto linalgArg = linalgOp->getOperand(index);
+    defOp = linalgArg.getDefiningOp();
+  } else {
+    defOp = val.getDefiningOp();
+  }
+
+  return isZeroOp(defOp, userOp);
+}
+
+// This is a wrapper to isZeroValue as the entry point of the recursive pattern
+bool isZeroTensor(Value val) { return isZeroValue(val, nullptr); }
+
+// Returns true if the attribute represent "all zeros"
+bool isZeroAttr(Attribute attribute) {
+  return TypeSwitch<Attribute, bool>(attribute)
+      .Case<FloatAttr>([](auto attr) {
+          return attr.getValueAsDouble() == 0.0;
+      })
+      .Case<IntegerAttr>([](auto attr) {
+          return attr.getInt() == 0;
+      })
+      .Case<DenseElementsAttr>([](auto attr) {
+        if (!attr.getElementType().isIntOrFloat())
+          return false;
+        if (!attr.isSplat())
+          return false;
+        auto value = attr.template getSplatValue<Attribute>();
+        if (auto floatAttr = dyn_cast<FloatAttr>(value)) {
+          if (floatAttr.getValueAsDouble() == 0.0)
+            return true;
+        }
+        return false;
+      })
+      .Default([](auto attr) { return false; });
+}
 
 // Returns true if the operation represents a zero filled tensor
-static bool isZeroTensor(Operation *defOp) {
+// Recurses into isZeroValue for operands and isZeroAttr for attributes
+static bool isZeroOp(Operation *defOp, Operation *userOp) {
   if (!defOp)
     return false;
 
-  // TODO: add more possible sources of zero filled tensors
-  // TODO: propagate operands of other operations that do not modify underlying
-  //       data values
   return TypeSwitch<Operation *, bool>(defOp)
+      .Case<arith::ConstantOp>([&](auto op) {
+        // Dense attributes don't match APFloat.isZero()
+        auto attr = op.getValue();
+        attr.dump();
+        return isZeroAttr(attr);
+      })
       .Case<linalg::FillOp>([&](auto op) {
-        auto inputs = op.getInputs();
-        return inputs.size() == 1 ? isValConstZero(inputs[0]) : false;
+        if (op.getInputs().size() != 1)
+          return false;
+        return isZeroValue(op.getInputs()[0], op);
       })
       .Case<linalg::CopyOp>([&](auto op) {
-        auto inputs = op.getInputs();
-        return inputs.size() == 1 &&
-               (isZeroTensor(inputs[0]) ||
-                isZeroTensor(
-                    getPrevUser(inputs[0].getDefiningOp(), op.getOperation())));
+        if (op.getInputs().size() != 1)
+          return false;
+        return isZeroValue(op.getInputs()[0], op);
       })
       .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
             tensor::ExtractSliceOp>([&](auto op) {
-        return isZeroTensor(op.getSource()) ||
-               isZeroTensor(getPrevUser(op.getSource().getDefiningOp(),
-                                        op.getOperation()));
+        return isZeroValue(op.getSource(), op);
+      })
+      .Case<memref::GetGlobalOp>([&](auto op) {
+        auto name = op.getName();
+        auto module = defOp->getParentOfType<ModuleOp>();
+        auto global = module.lookupSymbol<memref::GlobalOp>(name);
+        auto attr = global.getInitialValueAttr();
+        return isZeroAttr(attr);
       })
       .Default([&](Operation *op) { return false; });
-}
-
-bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
-  if (!isa<linalg::GenericOp>(linalgOp))
-    return false;
-
-  auto genOp = cast<linalg::GenericOp>(linalgOp);
-  if (!genOp.getRegion().hasOneBlock())
-    return false;
-
-  for (Operation &op : genOp.getRegion().front()) {
-    if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
-      // Only check rhs for const value as this should be sufficient
-      // for the op's canonical form.
-      // Otherwise, check both operands if either one is a zero filled tensor.
-      if (isValConstZero(maxfOp.getRhs()) || isZeroTensor(maxfOp.getLhs()) ||
-          isZeroTensor(maxfOp.getRhs())) {
-        return true;
-      }
-
-      // Check if maxf directly uses one of the linalg.generic operands.
-      for (auto arg : genOp.getRegion().getArguments()) {
-        if (arg != maxfOp.getLhs() && arg != maxfOp.getRhs())
-          continue;
-
-        if (auto argOp = genOp.getMatchingOpOperand(arg)) {
-          // Check the operand itself and the operand's def-use chain to
-          // detect more indirect dependencies such as a copy of a zero
-          // tensor into this operand.
-          if (isZeroTensor(argOp->get()) ||
-              isZeroTensor(getPrevUser(argOp->get().getDefiningOp(),
-                                       genOp.getOperation()))) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-
-  return false;
 }
 
 // Returns true if the linalg.generic maps to a tpp.gemm.
@@ -369,15 +365,33 @@ static bool isUnaryOp(linalg::GenericOp linalgOp) {
   return false;
 }
 
+static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
+  if (!isa<linalg::GenericOp>(linalgOp))
+    return false;
+
+  auto genOp = cast<linalg::GenericOp>(linalgOp);
+  if (!hasOnlyOp<arith::MaxFOp>(genOp.getRegion()))
+    return false;
+
+  for (Operation &op : genOp.getRegion().front()) {
+    if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
+      // Check both operands if either one is a zero filled tensor.
+      if (isZeroTensor(maxfOp.getLhs()) || isZeroTensor(maxfOp.getRhs()))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp) {
   if (!hasMappingToTppConditions(linalgOp))
     return false;
-  if (!isUnaryOp(linalgOp))
+  if (!isUnaryOp(linalgOp) && !isBinaryOp(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasMaxfZeroOp(linalgOp) &&
-         hasOnlyOp<arith::MaxFOp>(linalgOp.getRegion());
+         hasMaxfZeroOp(linalgOp);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.
