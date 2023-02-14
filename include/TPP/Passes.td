@@ -197,7 +197,11 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   }];
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
+    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
+    Option<"maxDepth", "max-depth", "int64_t", "5", 
+           "Get producers till maxDepth">,
+    Option<"immediateConsumer", "start-from-immediate-conusmer", "bool",
+           "true", "Fuse from the immediate consumer of the current target">
   ];
 }
 
@@ -259,6 +263,11 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
     Reduce pack overhead by folding tensor.pack into constants.
   }];
   let constructor = "mlir::tpp::createConstantFoldPackPass()";
+}
+
+def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
+  let summary = "Run linalg element-wise fusion";
+  let constructor = "mlir::tpp::createElementWiseFusionPass()";
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

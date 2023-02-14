@@ -191,6 +191,8 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
+// Note that %2 has two users, and we cannot fuse across fusion groups. Thus
+// we expect not to fuse this matmul.
 func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
@@ -225,19 +227,8 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   return %7 : tensor<32x32xf32>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<() -> ()>
 // CHECK: func.func @matmul_sequence_fusion(
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-1: linalg.matmul
-// CHECK-COUNT-3: linalg.generic
-// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
-// CHECK-NEXT: }
-// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
-// CHECK-NEXT: }
+// CHECK-NOT: scf.for
 
 // -----
 
@@ -264,6 +255,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32x
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: linalg.matmul
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-COUNT-1: linalg.matmul
