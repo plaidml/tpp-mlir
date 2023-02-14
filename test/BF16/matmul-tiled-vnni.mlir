@@ -1,10 +1,8 @@
-// RUN: tpp-opt %s --pack-vnni | FileCheck %s
+// RUN: tpp-opt %s --pack-vnni| FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-#map3 = affine_map<(d0, d1) -> (d0, d1)>
-#map4 = affine_map<(d0, d1) -> (d1)>
 module {
   func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %arg2: tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16> {
     %c128 = arith.constant 128 : index
