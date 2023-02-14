@@ -448,7 +448,7 @@ getImmediateElementWiseConsumer(linalg::LinalgOp linalgOp) {
   assert(linalgOp->getNumResults() == 1);
   Value res = linalgOp->getResult(0);
   // If we allow use, we may end up doing recomputation. Unclear if it is
-  // profitablem thus disallow for now.
+  // profitable thus disallow for now.
   if (!res.hasOneUse())
     return failure();
   Operation *consumer = *(res.getUsers().begin());

@@ -48,3 +48,6 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]]
 // CHECK-SAME:  iterator_types = ["parallel", "parallel"]
+// CHECK: ^bb0(
+// CHECK-NEXT:  %{{.+}} = arith.addf
+// CHECK-NEXT:  %{{.+}} = arith.maxf
