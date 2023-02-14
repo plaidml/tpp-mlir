@@ -107,11 +107,8 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     maps.push_back(map.getMinorSubMap(2));
   }
 
-  llvm::errs() << "compressed dims maps\n";
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  for (auto dimMap : compressedDimMaps)
-    dimMap.dump();
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
   AffineExpr r1, p4, p5, r2, r3;
   SmallVector<AffineMap> expectedMaps;
