@@ -44,6 +44,15 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
+def DecomposeLinalgOpsPass : Pass<"decompose-linalg-ops", "func::FuncOp"> {
+  let summary = "Decompose linalg ops";
+  let constructor = "mlir::tpp::createDecomposeLinalgOpsPass()";
+  let description = [{
+    Decompose linalg ops.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let summary = "Convert tpp to xsmm";
   let constructor = "mlir::tpp::createConvertTppToXsmmPass()";

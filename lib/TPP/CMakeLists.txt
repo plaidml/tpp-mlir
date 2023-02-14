@@ -17,6 +17,7 @@ add_mlir_library(MLIRTPP
     ConstantFoldPack.cpp
     ConvInitSimplify.cpp
     ConvertForAllToParallelOp.cpp
+    DecomposeLinalgOpsPass.cpp
 
   # Utils
     TensorInit.cpp
