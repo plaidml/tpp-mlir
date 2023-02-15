@@ -598,82 +598,6 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
 namespace {
 
 //===----------------------------------------------------------------------===//
-// PropagateThroughPadOp
-//===----------------------------------------------------------------------===//
-
-// Returns a vector that interchanges `elements` starting at offset `offset`
-// based on the indexes in `interchangeVector`.
-template <typename T>
-SmallVector<T> interchange(ArrayRef<T> elements,
-                           ArrayRef<int64_t> interchangeVector,
-                           int offset = 0) {
-  SmallVector<T> vec = llvm::to_vector(elements);
-  for (auto en : llvm::enumerate(interchangeVector)) {
-    vec[en.index() + offset] = elements[en.value() + offset];
-  }
-  return vec;
-}
-
-// The idea is to add as many zero padding dimensions in `high` and `low` based
-// on the number of point loops.
-struct PropagateThroughPadOp : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PadOp padOp,
-                                PatternRewriter &rewriter) const override {
-    Value inputPad = padOp.getSource();
-    tensor::UnPackOp unpackOp = inputPad.getDefiningOp<tensor::UnPackOp>();
-    if (!unpackOp)
-      return failure();
-
-    // bail out if one of the padded dimension is a tiled one.
-    llvm::SmallBitVector paddedDims = padOp.getPaddedDims();
-    ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
-    llvm::SmallBitVector innerDims(paddedDims.size());
-    for (int64_t dim : innerDimsPos)
-      paddedDims.flip(dim);
-    if (paddedDims.anyCommon(innerDims))
-      return failure();
-
-    ArrayRef<int64_t> outerDimsPerm = unpackOp.getOuterDimsPerm();
-    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
-    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
-    if (!outerDimsPerm.empty()) {
-      lowPad = interchange<OpFoldResult>(lowPad, outerDimsPerm);
-      highPad = interchange<OpFoldResult>(highPad, outerDimsPerm);
-    }
-    size_t innerDimsPosSize = innerDimsPos.size();
-    lowPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
-    highPad.append(innerDimsPosSize, rewriter.getIndexAttr(0));
-
-    auto newPadOp = rewriter.create<tensor::PadOp>(
-        padOp.getLoc(), /*result type=*/nullptr, unpackOp.getSource(), lowPad,
-        highPad, padOp.getNofold());
-    SmallVector<Type> padArgsType(lowPad.size(), rewriter.getIndexType());
-    SmallVector<Location> locs(lowPad.size(), padOp.getLoc());
-    // Well, why this is not done by the builder?
-    {
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.createBlock(&newPadOp.getRegion(), newPadOp.getRegion().begin(),
-                           padArgsType, locs);
-      rewriter.create<tensor::YieldOp>(padOp.getLoc(),
-                                       padOp.getConstantPaddingValue());
-    }
-    Value padOpRes = newPadOp.getResult();
-    ShapedType padResultType = padOp.getResultType();
-    Value outputUnPack = rewriter.create<tensor::EmptyOp>(
-        padOp.getLoc(), padResultType.getShape(),
-        padResultType.getElementType());
-    Value replacement = toUnPackLayoutImpl(
-        rewriter, padOp.getLoc(), padOpRes, outputUnPack,
-        unpackOp.getMixedTiles(), innerDimsPos, unpackOp.getOuterDimsPerm());
-
-    rewriter.replaceOp(padOp, replacement);
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
 // BubbleUpThroughFillOp
 //===----------------------------------------------------------------------===//
 
@@ -919,8 +843,7 @@ struct PropagatePackUnPack
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(patterns);
-  patterns.add<PropagateThroughPadOp, BubbleUpThroughFillOp>(
-      patterns.getContext());
+  patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
