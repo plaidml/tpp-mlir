@@ -181,10 +181,12 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
     FailureOr<Value> slicedOperand;
     AffineMap map = linalgOp.getMatchingIndexingMap(operand);
-    if (isVNNILoop && map.getNumResults() == 5) {
+    if (isVNNILoop && operand->getOperandNumber() == 1) {
+      assert(map.getNumResults() >= 4);
       slicedOperand = linalgx::utils::getSliceOperand(
           builder, operand, linalgOp, localIvs, valuesToUse, 4);
     } else {
+      assert(map.getNumResults() >= 3);
       slicedOperand = linalgx::utils::getSliceOperand(
           builder, operand, linalgOp, localIvs, valuesToUse, 3);
     }
