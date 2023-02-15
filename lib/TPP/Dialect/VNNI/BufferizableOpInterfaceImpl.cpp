@@ -37,7 +37,7 @@ struct MatmulLayoutInterface
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 2)
       return {};
-    return {op->getResult(0)};
+    return {{op->getResult(0), BufferRelation::Equivalent}};
   }
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
@@ -91,7 +91,7 @@ struct BRGemmLayoutInterface
                                             const AnalysisState &state) const {
     if (opOperand.getOperandNumber() < 2)
       return {};
-    return {op->getResult(0)};
+    return {{op->getResult(0), BufferRelation::Equivalent}};
   }
 
   BufferRelation bufferRelation(Operation *op, OpResult opResult,
