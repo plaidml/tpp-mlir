@@ -285,7 +285,7 @@ static bool isBinaryOp(linalg::GenericOp linalgOp) {
 }
 
 bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
-  assert(types.size() > 1 && "expect one or more types");
+  assert(types.size() > 0 && "expect one or more types");
   if (!types[0].isa<MemRefType>())
     return false;
   auto firstOperandType = types[0].cast<MemRefType>();
@@ -377,6 +377,8 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
   if (!hasMappingToTppConditions(linalgOp))
     return false;
   if (!isUnaryOp(linalgOp) && !isBinaryOp(linalgOp))
+    return false;
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasMaxfZeroOp(linalgOp);
