@@ -305,27 +305,43 @@ static bool isBinaryOp(linalg::GenericOp linalgOp) {
 // strided<[32, 1], offset: ?>> B: memref<56x32xf32> allOperandsHaveSameShape(A,
 // B) return true. C: memref<1x32xf32> allOperandsHaveSameShape(A, C) return
 // false.
-static bool allOperandsHaveSameShape(linalg::GenericOp linalgOp) {
-  if (!hasStaticShape(linalgOp))
+static bool allOperandsHaveSameShapeAndStrides(linalg::GenericOp linalgOp) {
+  auto operandType = linalgOp->getOperand(0).getType();
+  if (!operandType.isa<MemRefType>())
     return false;
-  Type operandType = linalgOp->getOperand(0).getType();
-  if (!operandType.isa<ShapedType>())
-    return false;
-  // Validate rank.
-  int64_t rankOperand = operandType.cast<ShapedType>().getRank();
+  auto firstOperandType = operandType.cast<MemRefType>();
+
+  // Step1. Validate rank.
+  int64_t rankOperand = firstOperandType.getRank();
   for (Value operand : linalgOp->getOperands()) {
     Type currentType = operand.getType();
-    if (!currentType.isa<ShapedType>())
+    if (!currentType.isa<MemRefType>())
       return false;
-    if (currentType.cast<ShapedType>().getRank() != rankOperand)
+    if (currentType.cast<MemRefType>().getRank() != rankOperand)
       return false;
   }
-  // Validate shape.
-  ArrayRef<int64_t> shapeOperand = operandType.cast<ShapedType>().getShape();
+
+  // Step2. Validate shape, and strides.
+  // Get stride and offset for the first operand.
+  int64_t offsetFirstOperand = 0;
+  SmallVector<int64_t> stridesFirstOperand;
+  if (failed(getStridesAndOffset(firstOperandType, stridesFirstOperand,
+                                 offsetFirstOperand)))
+    return false;
+  ArrayRef<int64_t> shapeOperand = firstOperandType.getShape();
   for (Value operand : linalgOp->getOperands()) {
-    ArrayRef<int64_t> shapeCurrentOperand =
-        operand.getType().cast<ShapedType>().getShape();
+    // Compare the shape.
+    auto currentOperandType = operand.getType().cast<MemRefType>();
+    ArrayRef<int64_t> shapeCurrentOperand = currentOperandType.getShape();
     if (shapeCurrentOperand != shapeOperand)
+      return false;
+    int64_t offsetCurrentOperand = 0;
+    SmallVector<int64_t> stridesCurrentOperand;
+    // Compare the strides.
+    if (failed(getStridesAndOffset(currentOperandType, stridesCurrentOperand,
+                                   offsetCurrentOperand)))
+      return false;
+    if (stridesFirstOperand != stridesCurrentOperand)
       return false;
   }
   return true;
@@ -337,7 +353,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
-  if (!allOperandsHaveSameShape(linalgOp))
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());

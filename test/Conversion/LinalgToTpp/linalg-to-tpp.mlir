@@ -502,3 +502,36 @@ func.func @entry() -> memref<28x32xf32> {
   memref.dealloc %alloc_0 : memref<55x32xf32>
   return %alloc_1 : memref<28x32xf32>
 }
+
+// -----
+
+// Stride 2 in the fast varying dimension, fail to match.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @add_non_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
+  // CHECK-NOT: tpp.add
+  linalg.generic {indexing_maps = [#map, #map, #map], 
+                  iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0: memref<4x4xf32>, memref<4x4xf32>) 
+    outs(%arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.addf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @add_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+  // CHECK: tpp.add
+  linalg.generic {indexing_maps = [#map, #map, #map], 
+                  iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0: memref<4x4xf32>, memref<4x4xf32>) 
+    outs(%arg1: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.addf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
