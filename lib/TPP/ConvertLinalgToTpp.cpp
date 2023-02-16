@@ -305,6 +305,13 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                               operands[1], output);
       return success();
     }
+    if (tpp::utils::isTppAddBCast(linalgOp)) {
+      Value output =
+          (linalgOp.getNumOperands() == 3) ? operands[2] : operands[1];
+      rewriter.replaceOpWithNewOp<tpp::AddBCastOp>(linalgOp, operands[0],
+                                                   operands[1], output);
+      return success();
+    }
     if (tpp::utils::isTppMatmul(linalgOp)) {
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(linalgOp, operands[0],
                                                  operands[1], operands[2]);

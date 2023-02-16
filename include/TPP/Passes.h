@@ -74,6 +74,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToFuncPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();

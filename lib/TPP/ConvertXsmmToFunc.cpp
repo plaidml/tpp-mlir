@@ -190,6 +190,30 @@ private:
   bool useMeta = false;
 };
 
+struct ConvertQuarternaryXsmmOp : public OpRewritePattern<QuarternaryOp> {
+  ConvertQuarternaryXsmmOp(MLIRContext *context, bool useMeta,
+                           PatternBenefit benefit = 1)
+      : OpRewritePattern<QuarternaryOp>(context, benefit), useMeta(useMeta) {}
+
+  LogicalResult matchAndRewrite(QuarternaryOp quarternaryOp,
+                                PatternRewriter &rewriter) const override {
+    auto type = (uint64_t)quarternaryOp.getDataType();
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    std::string funcName =
+        "xsmm_" + stringifyEnum(quarternaryOp.getCallee()).str() + "_invoke";
+    if (succeeded(buildInvokeCall(quarternaryOp.getLoc(), funcName,
+                                  quarternaryOp, useMeta, rewriter,
+                                  typeAttr))) {
+      rewriter.eraseOp(quarternaryOp);
+      return success();
+    }
+    return failure();
+  }
+
+private:
+  bool useMeta = false;
+};
+
 struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
   ConvertUnaryXsmmOp(MLIRContext *context, bool useMeta,
                      PatternBenefit benefit = 1)
@@ -270,7 +294,6 @@ static func::CallOp buildDispatchCall(Location loc,
       dispatchOperands);
   return call;
 }
-
 struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
   ConvertTernaryDispatch(MLIRContext *context, bool useMeta,
                          PatternBenefit benefit = 1)
@@ -293,6 +316,56 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
                                          (int64_t)(dispatchOp.getDataType()));
     dispatchOperands.push_back(
         rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
+    dispatchOperandTypes.push_back(integer64);
+
+    BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
+    IntegerType boolType = IntegerType::get(rewriter.getContext(), 1);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, boolType, isVNNIAttr));
+    dispatchOperandTypes.push_back(boolType);
+
+    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
+    size_t arrayAttrSize = integers.size();
+    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
+      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
+      dispatchOperands.push_back(
+          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
+      dispatchOperandTypes.push_back(integer64);
+    }
+    func::CallOp call =
+        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
+                          fnName, useMeta, rewriter);
+    rewriter.replaceOp(dispatchOp, call.getResult(0));
+    return success();
+  }
+
+private:
+  bool useMeta = false;
+};
+
+struct ConvertQuarternaryDispatch
+    : public OpRewritePattern<QuarternaryDispatchOp> {
+  ConvertQuarternaryDispatch(MLIRContext *context, bool useMeta,
+                             PatternBenefit benefit = 1)
+      : OpRewritePattern<QuarternaryDispatchOp>(context, benefit),
+        useMeta(useMeta) {}
+
+  LogicalResult matchAndRewrite(QuarternaryDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = dispatchOp.getLoc();
+    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
+    auto type = (uint64_t)(dispatchOp.getDataType());
+    kindAsString = "xsmm_" + kindAsString + "_dispatch";
+    FlatSymbolRefAttr fnName =
+        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
+
+    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
+    SmallVector<Value, 10> dispatchOperands;
+    SmallVector<Type, 10> dispatchOperandTypes;
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
     dispatchOperandTypes.push_back(integer64);
 
     BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
@@ -445,11 +518,12 @@ struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
 
 void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                            bool useExtractMetaData) {
-  patterns.add<ConvertTernaryXsmmOp, ConvertBinaryXsmmOp, ConvertUnaryXsmmOp>(
+  patterns.add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp,
+               ConvertBinaryXsmmOp, ConvertUnaryXsmmOp>(patterns.getContext(),
+                                                        useExtractMetaData);
+  patterns.add<ConvertQuarternaryDispatch, ConvertTernaryDispatch,
+               ConvertBinaryDispatch, ConvertUnaryDispatch>(
       patterns.getContext(), useExtractMetaData);
-  patterns
-      .add<ConvertTernaryDispatch, ConvertBinaryDispatch, ConvertUnaryDispatch>(
-          patterns.getContext(), useExtractMetaData);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>

@@ -33,7 +33,6 @@ def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
-
 // Class for tpp binary operations.
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [])> {
@@ -45,6 +44,19 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
         `out` `(` $out `:` type($out) `)` attr-dict
   }];
 }
+
+// Class for tpp binary operations with broadcast operands.
+class Tpp_BinaryBCastOp<string mnemonic, list<Trait> traits = []> :
+  Tpp_Op<mnemonic, []> {
+
+  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
+
+  let assemblyFormat = [{
+        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
+        `out` `(` $out `:` type($out) `)` attr-dict
+  }];
+}
+
 
 // Class for tpp.unary operations.
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
@@ -91,6 +103,41 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 
   let hasVerifier = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// Add_BCastOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_AddBCastOp : Tpp_BinaryBCastOp<"add_bcast"> {
+  let summary = "Element-wise addition with one of the operands marked as broadcastable.";
+  let description = [{
+    The `tpp.add_bcast` operation performs element-wise addition on two-dimensional
+    memrefs, with one of the operands marked as broadcastable, writing the result on
+    the output memref. No checks or assumption are made on the input/output arguments 
+    so the same memref can be passed both as input and output. 
+
+    Example:
+
+    ```mlir
+
+    // A = A + A_BCast
+    tpp.add_bcast ins(%1 : memref<2x2xf32>, %1: memref<2xf32>)
+            out(%1 : memref<2x2xf32>)
+
+    // A = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>) 
+            out(%2: memref<2x2xf32>)
+
+    // C = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>)
+            out(%3 : memref<2x2xf32>)
+
+    ```
+  }];
+
+  let hasVerifier = 1;
+}
+
 
 //===----------------------------------------------------------------------===//
 // IdentityOp
@@ -298,8 +345,8 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
 
 def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let summary = [{
-    Performs batch reduced matrix multiplication of two inputs with first
-    input in VNNI format}];
+    Performs batch reduced matrix multiplication of two inputs with second
+    input (weight) in VNNI format}];
 
   let description = [{
     The `tpp.vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
@@ -320,6 +367,113 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `)`
+      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() {
+      return getMatrixC().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixAType() {
+      return getBatchMatrixA().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixBType() {
+      return getBatchMatrixB().getType().cast<MemRefType>();
+    }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// FusedBrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
+  let summary = [{
+    Performs batch reduced matrix multiplication followed by bias addition and relu}];
+
+  let description = [{
+    The `tpp.fused_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+
+    Example:
+
+    ```mlir
+
+      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>)
+                      out(%3: memref<6x4xf32>)
+    ```
+  }];
+
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
+                       TppBRGEMMemrefInput:$batchMatrixB,
+                       TppMemRef: $bias,
+		       TppMemRef:$matrixC);
+
+  let assemblyFormat = [{
+      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
+                $batchMatrixB `:` type($batchMatrixB) `,`
+		$bias `:` type($bias)  `)`
+      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() {
+      return getMatrixC().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixAType() {
+      return getBatchMatrixA().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixBType() {
+      return getBatchMatrixB().getType().cast<MemRefType>();
+    }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// FusedVNNIBrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
+  let summary = [{
+    Performs batch reduced matrix multiplication followed by bias addition and relu
+    with second operand in VNNI format}];
+
+  let description = [{
+    The `tpp.fused_vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+
+    Example:
+
+    ```mlir
+
+      tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, %2: memref<3x2x4x2xbf16>, %3: memref<4xbf16>)
+                      out(%3: memref<6x4xbf16>)
+    ```
+  }];
+
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
+                       TppBRGEMMVNNIMemrefInput:$batchMatrixB,
+                       TppMemRef: $bias,
+		       TppMemRef:$matrixC);
+
+  let assemblyFormat = [{
+      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
+                $batchMatrixB `:` type($batchMatrixB) `,`
+		$bias `:` type($bias) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 

@@ -54,6 +54,9 @@ bool isTppMatmul(linalg::LinalgOp linalgOp);
 // Returns true if the linalg operation can convert to a tpp.add.
 bool isTppAdd(linalg::GenericOp linalgOp);
 
+// Returns true if the linalg operation can convert to a tpp.add_bcast.
+bool isTppAddBCast(linalg::GenericOp linalgOp);
+
 // Returns true if the linalg.generic can convert to a tpp.identity.
 bool isTppIdentity(linalg::GenericOp linalgOp);
 
