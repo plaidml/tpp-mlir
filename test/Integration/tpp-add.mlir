@@ -1,20 +1,17 @@
 // RUN: tpp-opt %s -convert-linalg-to-tpp -convert-linalg-to-loops -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | FileCheck %s -check-prefix=EXE
-//
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXE
 
 // RUN: tpp-opt %s -convert-linalg-to-loops -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | FileCheck %s -check-prefix=EXE
-//
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXE
 
 // RUN: tpp-opt %s -convert-linalg-to-loops -convert-tpp-to-loops -convert-tpp-to-xsmm -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext | FileCheck %s -check-prefix=EXE
-//
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXE
 
 // RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck %s
 

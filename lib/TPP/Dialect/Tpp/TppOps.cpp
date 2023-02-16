@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
@@ -139,11 +140,10 @@ LogicalResult AddOp::verify() {
   if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
       (!outputType.isa<ShapedType>()))
     return emitOpError("expects all operands to be shaped type");
-  ArrayRef<int64_t> shapeLhs = lhsType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> shapeRhs = rhsType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> shapeOut = outputType.cast<ShapedType>().getShape();
-  if ((shapeLhs != shapeRhs) || (shapeRhs != shapeOut))
-    return emitOpError("requires all operands to have the same shape");
+  if (!utils::allOperandsHaveSameShapeAndStrides(
+          {lhsType, rhsType, outputType}))
+    return emitOpError(
+        "requires all operands to have the same shape or strides");
   return success();
 }
 

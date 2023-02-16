@@ -14,6 +14,7 @@
 #include <string>
 
 namespace mlir {
+class TypeRange;
 
 namespace linalg {
 class LinalgOp;
@@ -81,6 +82,12 @@ bool isValConstZero(Value val);
 
 // Returns true if the op defining `val` represents a zero filled tensor.
 bool isZeroTensor(Value val);
+
+// Returns true if `types` have the same shape and strides. For example: A:
+// memref<56x32xf32, strided<[32, 1], offset: ?>> B: memref<56x32xf32>
+// allOperandsHaveSameShape(A, B) return true. C: memref<1x32xf32>
+// allOperandsHaveSameShape(A, C) return false.
+bool allOperandsHaveSameShapeAndStrides(TypeRange types);
 
 } // namespace utils
 } // namespace tpp
