@@ -24,7 +24,6 @@ namespace tpp {
 namespace utils {
 
 // Prototypes
-static bool isZeroTensor(Value op);
 static bool isZeroTensor(Operation *defOp);
 
 // taken from LinalgInterfaces.cpp
@@ -131,20 +130,12 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
   return libraryCall.compare(target) == 0;
 }
 
-// Returns true if the region of the linalgOp has only a single operation
-// (linalg.yieldOp).
-static bool hasOnlyYieldOp(Region &region) {
-  if (!region.hasOneBlock())
-    return false;
-  return std::distance(region.front().begin(), region.front().end()) == 1;
-}
-
 bool hasCopySemantics(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
     return false;
   if ((linalgOp->getNumOperands() != 2) || (linalgOp.getNumDpsInputs() != 1))
     return false;
-  return hasOnlyYieldOp(linalgOp->getRegion(0));
+  return hasOnlyOp<linalg::YieldOp>(linalgOp->getRegion(0));
 }
 
 // Returns the closest earlier user of a given operation op relative
@@ -172,13 +163,11 @@ static Operation *getPrevUser(Operation *op, Operation *currentUser) {
   return nullptr;
 }
 
-// Returns true if the value is a constant float or integer.
-static bool isValConstZero(Value val) {
+bool isValConstZero(Value val) {
   return matchPattern(val, m_AnyZeroFloat()) || matchPattern(val, m_Zero());
 }
 
-// Returns true if the value represents a zero filled tensor.
-static bool isZeroTensor(Value op) { return isZeroTensor(op.getDefiningOp()); }
+bool isZeroTensor(Value val) { return isZeroTensor(val.getDefiningOp()); }
 
 // Returns true if the operation represents a zero filled tensor
 static bool isZeroTensor(Operation *defOp) {
@@ -247,29 +236,6 @@ bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   }
 
   return false;
-}
-
-// Returns true if: 1) the region has a single block. 2) The block has two
-// operations only (linalg.YieldOp and OP). 3) The operation result types are
-// int or float.
-// TODO: For now we assume the region to have only two operations: The YieldOp
-// and the 'OP', meaning that the entire linalg.generic will map to a single
-// tpp operation. If we do element-wise fusion at the linalg level this
-// assumption does not hold anymore as now a linalg.generic can map to n tpp
-// operations. If we support 1:n matching what should we do if the entire
-// linalg.op cannot be replace by tpp operations?
-template <typename OP> static bool hasOnlyScalarElementwiseOp(Region &region) {
-  if (!region.hasOneBlock())
-    return false;
-  if (std::distance(region.front().begin(), region.front().end()) != 2)
-    return false;
-  for (Operation &op : region.front()) {
-    if (!isa<OP, linalg::YieldOp>(op) ||
-        llvm::any_of(op.getResultTypes(),
-                     [](Type type) { return !type.isIntOrFloat(); }))
-      return false;
-  }
-  return true;
 }
 
 // Returns true if the linalg.generic maps to a tpp.gemm.
@@ -354,7 +320,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
   if (!allOperandsHaveSameType(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
+         hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
 // Return true if the operation is unary.
@@ -380,7 +346,7 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasMaxfZeroOp(linalgOp) &&
-         hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
+         hasOnlyOp<arith::MaxFOp>(linalgOp.getRegion());
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.

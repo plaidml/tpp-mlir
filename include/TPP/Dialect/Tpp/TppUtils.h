@@ -9,6 +9,8 @@
 #ifndef TPP_DIALECT_TPP_TPPUTILS_H
 #define TPP_DIALECT_TPP_TPPUTILS_H
 
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Region.h"
 #include <string>
 
 namespace mlir {
@@ -16,6 +18,7 @@ namespace mlir {
 namespace linalg {
 class LinalgOp;
 class GenericOp;
+class YieldOp;
 } // end namespace linalg
 
 namespace tpp {
@@ -52,6 +55,32 @@ bool isTppIdentity(linalg::GenericOp linalgOp);
 
 // Returns true if the linalg.generic can convert to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp);
+
+// Returns true if: 1) the region has a single block. 2) The block has a single
+// operation `OP`. 3) The operation result types are int or float.
+template <typename OP> static bool hasOnlyOp(Region &region) {
+  if (!region.hasOneBlock())
+    return false;
+  unsigned numberOfOpsInRegion = 2;
+  if (std::is_same<OP, linalg::YieldOp>::value)
+    numberOfOpsInRegion = 1;
+  if (std::distance(region.front().begin(), region.front().end()) !=
+      numberOfOpsInRegion)
+    return false;
+  for (Operation &op : region.front()) {
+    if (!isa<OP, linalg::YieldOp>(op) ||
+        llvm::any_of(op.getResultTypes(),
+                     [](Type type) { return !type.isIntOrFloat(); }))
+      return false;
+  }
+  return true;
+}
+
+// Returns true if the value is a constant float or integer.
+bool isValConstZero(Value val);
+
+// Returns true if the op defining `val` represents a zero filled tensor.
+bool isZeroTensor(Value val);
 
 } // namespace utils
 } // namespace tpp

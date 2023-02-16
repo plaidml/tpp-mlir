@@ -270,4 +270,14 @@ def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let constructor = "mlir::tpp::createElementWiseFusionPass()";
 }
 
+def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
+  let summary = "Simplify initialization for convolution";
+  let description = [{
+    Perform a graph-rewrite to simplify initialization for a Conv2DNhwcHwcfOp
+    operation. Specifically, instead of initializing the output of a convolution
+    with zero and then adding the bias, initialize the output with the bias.  
+  }];
+  let constructor = "mlir::tpp::createConvInitSimplifyPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
