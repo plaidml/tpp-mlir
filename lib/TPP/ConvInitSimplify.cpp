@@ -26,7 +26,7 @@ namespace {
 static bool isBroadCastOp(linalg::GenericOp linalgOp) {
   if (linalgOp->getNumOperands() != 2 || linalgOp->getNumResults() != 1)
     return false;
-  if (!tpp::utils::hasOnlyYieldOp(linalgOp.getRegion()))
+  if (!tpp::utils::hasOnlyOp<linalg::YieldOp>(linalgOp.getRegion()))
     return false;
   SmallVector<unsigned> perm;
   return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInputOperand(0))
@@ -62,8 +62,7 @@ struct EliminateZeroInitAndAddBiasToInit
       return failure();
 
     if (!linalg::isElementwise(linalgOp) ||
-        !tpp::utils::hasOnlyScalarElementwiseOp<arith::AddFOp>(
-            linalgOp.getRegion()))
+        !tpp::utils::hasOnlyOp<arith::AddFOp>(linalgOp.getRegion()))
       return failure();
 
     OpOperand *lhs = linalgOp.getDpsInputOperand(0);

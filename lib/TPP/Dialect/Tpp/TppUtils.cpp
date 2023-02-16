@@ -131,21 +131,12 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
   return libraryCall.compare(target) == 0;
 }
 
-bool hasOnlyYieldOp(Region &region) {
-  if (!region.hasOneBlock())
-    return false;
-  if (std::distance(region.front().begin(), region.front().end()) != 1)
-    return false;
-  Operation &op = region.front().front();
-  return isa<linalg::YieldOp>(op);
-}
-
 bool hasCopySemantics(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
     return false;
   if ((linalgOp->getNumOperands() != 2) || (linalgOp.getNumDpsInputs() != 1))
     return false;
-  return hasOnlyYieldOp(linalgOp->getRegion(0));
+  return hasOnlyOp<linalg::YieldOp>(linalgOp->getRegion(0));
 }
 
 // Returns the closest earlier user of a given operation op relative
@@ -331,7 +322,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
   if (!allOperandsHaveSameType(linalgOp))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasOnlyScalarElementwiseOp<arith::AddFOp>(linalgOp.getRegion());
+         hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
 // Return true if the operation is unary.
@@ -357,7 +348,7 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasMaxfZeroOp(linalgOp) &&
-         hasOnlyScalarElementwiseOp<arith::MaxFOp>(linalgOp.getRegion());
+         hasOnlyOp<arith::MaxFOp>(linalgOp.getRegion());
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.
