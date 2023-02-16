@@ -40,14 +40,6 @@ static std::optional<linalg::GenericOp> getBroadCastProdcuer(OpOperand *rhs) {
   return broadcastOp;
 }
 
-static bool isFillWithZeros(linalg::Conv2DNhwcHwcfOp convOp) {
-  auto fillOp =
-      convOp.getDpsInitOperand(0)->get().getDefiningOp<linalg::FillOp>();
-  if (!fillOp)
-    return false;
-  return tpp::utils::isValConstZero(fillOp.getInputs()[0]);
-}
-
 // Instead of initializing the output of a convolution with zero and then add a
 // bias, initialize the output of the convolution with the bias.
 struct EliminateZeroInitAndAddBiasToInit
@@ -70,7 +62,8 @@ struct EliminateZeroInitAndAddBiasToInit
 
     auto convProducer = lhs->get().getDefiningOp<linalg::Conv2DNhwcHwcfOp>();
     auto broadCastProducer = getBroadCastProdcuer(rhs);
-    if (!convProducer || !broadCastProducer || !isFillWithZeros(convProducer) ||
+    if (!convProducer || !broadCastProducer ||
+        !tpp::utils::isZeroTensor(convProducer.getDpsInitOperand(0)->get()) ||
         !convProducer.getTiedOpResult(convProducer.getDpsInitOperand(0)))
       return failure();
 

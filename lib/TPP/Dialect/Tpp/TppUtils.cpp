@@ -24,7 +24,6 @@ namespace tpp {
 namespace utils {
 
 // Prototypes
-static bool isZeroTensor(Value op);
 static bool isZeroTensor(Operation *defOp);
 
 // taken from LinalgInterfaces.cpp
@@ -168,8 +167,7 @@ bool isValConstZero(Value val) {
   return matchPattern(val, m_AnyZeroFloat()) || matchPattern(val, m_Zero());
 }
 
-// Returns true if the value represents a zero filled tensor.
-static bool isZeroTensor(Value op) { return isZeroTensor(op.getDefiningOp()); }
+bool isZeroTensor(Value val) { return isZeroTensor(val.getDefiningOp()); }
 
 // Returns true if the operation represents a zero filled tensor
 static bool isZeroTensor(Operation *defOp) {

@@ -79,6 +79,9 @@ template <typename OP> static bool hasOnlyOp(Region &region) {
 // Returns true if the value is a constant float or integer.
 bool isValConstZero(Value val);
 
+// Returns true if the op defining `val` represents a zero filled tensor.
+bool isZeroTensor(Value val);
+
 } // namespace utils
 } // namespace tpp
 } // namespace mlir
