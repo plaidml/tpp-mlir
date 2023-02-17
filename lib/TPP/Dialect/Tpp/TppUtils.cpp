@@ -342,20 +342,13 @@ bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
   return true;
 }
 
-static bool allOperandsHaveSameShapeAndStrides(linalg::GenericOp linalgOp) {
-  SmallVector<Type> types;
-  for (Value operand : linalgOp->getOperands())
-    types.push_back(operand.getType());
-  return allOperandsHaveSameShapeAndStrides(types);
-}
-
 // Return true if the linalg.generic can be mapped to a tpp.add.
 bool isTppAdd(linalg::GenericOp linalgOp) {
   if (!hasMappingToTppConditions(linalgOp))
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
-  if (!allOperandsHaveSameShapeAndStrides(linalgOp))
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
