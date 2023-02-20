@@ -114,7 +114,7 @@ transform::RewriteToBrgemmOp::applyToOne(linalg::LinalgOp target,
     return DiagnosedSilenceableFailure::success();
   TrivialPatternRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  FailureOr<SmallVector<Value>> brgemmLoops = mlir::linalgx::rewriteToBRGEMMOp(
+  FailureOr<SmallVector<Value>> brgemmLoops = mlir::linalgx::rewriteToBRGemmOp(
       rewriter, cast<linalg::GenericOp>(target));
   return DiagnosedSilenceableFailure::success();
 }

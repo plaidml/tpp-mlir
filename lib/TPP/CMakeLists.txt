@@ -5,7 +5,7 @@ get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 add_mlir_library(MLIRTPP
   # Passes 
     ToBlockLayoutAndBack.cpp
-    RewriteToBatchReduceGEMM.cpp
+    RewriteToBatchReduceGemm.cpp
     TransformDialectInterpreter.cpp
     IteratorCollapsing.cpp
     RewriteConvToMatmulImpl.cpp

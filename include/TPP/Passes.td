@@ -172,19 +172,20 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
 }
 
-def RewriteToBatchReduceGEMM : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
-  let summary = "Rewrite a linalg.generic to BRGEMM";
+def RewriteToBatchReduceGemm : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
+  let summary = "Rewrite a linalg.generic to BRGemm";
   let description = [{
     Rewrite a linalg.generic to a linalg.batch_reduce_matmul.
-    Example: Given a GEMM in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
-    [KB][CB][cb][kb] map it to a batch-reduce GEMM by splitting out the two
+    Example: Given a Gemm in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
+    [KB][CB][cb][kb] map it to a batch-reduce Gemm by splitting out the two
     outermost parallel dimensions (as scf.for) and rewrite the body to a
     linalg.batch_reduce_matmul. 
 
     The pass works on any linalg.generic and attempts to map the innermost
-    loops to BRGEMM.  It works both a memref and tensor level.
+    loops to BRGemm.  It works both a memref and tensor level. When the element
+    type is bf16 the VNNI layout is used.
   }];
-  let constructor = "mlir::tpp::createRewriteToBatchReduceGEMMPass()";
+  let constructor = "mlir::tpp::createRewriteToBatchReduceGemmPass()";
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 

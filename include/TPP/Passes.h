@@ -80,7 +80,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createRewriteToBatchReduceGEMMPass();
+createRewriteToBatchReduceGemmPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
