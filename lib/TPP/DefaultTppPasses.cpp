@@ -108,7 +108,7 @@ private:
     // The mapping is done after bufferization as the buffer semantics
     // allow direct use of scf.parallel loops. This prevents different
     // lowering outputs between input linalg on tensors and memrefs.
-    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGEMMPass());
+    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
 
     // Convert all higher level dialects to TPP.
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());

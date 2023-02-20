@@ -1,4 +1,4 @@
-//===- MapToBatchReduceGEMM.cpp ----------------------------------*- C++-*-===//
+//===- MapToBatchReduceGemm.cpp ----------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -172,7 +172,7 @@ static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
 static FailureOr<SmallVector<Value>>
 getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
                   linalg::LinalgOp linalgOp, ValueRange valuesToUse,
-                  bool isVNNILoop) {
+                  bool isVNNILoop = false) {
   assert(linalgOp->getNumOperands() == 3 && "expect 3 input/output operands");
   assert(linalgOp.getDpsInputOperands().size() == 2 &&
          "expect 2 input operands");
@@ -228,6 +228,30 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
           *blockingFactor);
 }
 
+// Walk `ivs` and return the outermost loop.
+static Operation *getOuterMostLoop(ArrayRef<Value> ivs) {
+  // See: `Tiling.cpp` in Linalg/Transforms.
+  // Gather the newly created loops and return them with the new op.
+  // TODO: make utils:
+  SmallVector<Operation *, 8> loops;
+  loops.reserve(ivs.size());
+  for (Value iv : ivs) {
+    if (iv.isa<BlockArgument>()) {
+      loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
+      assert(loops.back() && "no owner found for induction variable!");
+    } else {
+      loops.push_back(nullptr);
+    }
+  }
+
+  Operation *outermostLoop = nullptr;
+  for (Operation *loop : loops)
+    if ((outermostLoop = loop))
+      break;
+
+  return outermostLoop;
+}
+
 // Rewrite a generic operation to BRGEMM. The following conditions apply:
 // 1. The generic has a single region. The region performs a scalar GEMM
 // operation.
@@ -235,7 +259,7 @@ static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
 // reduction p = parallel. Outermost dimensions must be parallel.
 // 3. Access pattern must be [p3, p4] += [r1, p3, r2] * [r1, r2, p4].
 FailureOr<SmallVector<Value>>
-mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
+mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
                                  linalg::LinalgOp linalgOp) {
 
   if (!isa<linalg::GenericOp>(linalgOp))
@@ -244,22 +268,18 @@ mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
 
-  bool isVNNILoop = isLinalgOpVNNI(linalgOp);
-  if ((!isVNNILoop && failed(checkStructure(linalgOp))) ||
-      (isVNNILoop && failed(checkVNNIStructure(linalgOp))))
+  if (failed(checkStructure(linalgOp))) {
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match structurally with BRGEMM");
+  }
 
-  if ((!isVNNILoop && failed(checkAccessPatterns(linalgOp))) ||
-      (isVNNILoop && failed(checkVNNIAccessPatterns(linalgOp))))
+  if (failed(checkAccessPatterns(linalgOp))) {
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match BRGEMM access patterns");
+  }
 
-  // Materialize outer loops
+  // Materialize outer loops.
   unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/4;
-  // VNNI loop
-  if (isVNNILoop)
-    upTo--;
 
   FailureOr<SmallVector<Range>> maybeLoopRanges =
       linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
@@ -276,41 +296,30 @@ mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
                static_cast<size_t>(linalgOp->getNumOperands()) &&
            "expect the number of operands and inputs and outputs to match");
     ivs.assign(localIvs.begin(), localIvs.end());
-    FailureOr<SmallVector<Value>> maybeSlicedOperands = getSlicedOperands(
-        builder, loc, localIvs, linalgOp, operandValuesToUse, isVNNILoop);
+    FailureOr<SmallVector<Value>> maybeSlicedOperands =
+        getSlicedOperands(builder, loc, localIvs, linalgOp, operandValuesToUse);
     if (failed(maybeSlicedOperands)) {
       assert(0 && "failed to generate loops");
       return {};
     }
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
-    if (isVNNILoop) {
-      vnni::BRGemmOp brgemm =
-          (linalgOp.hasTensorSemantics())
-              ? builder.create<vnni::BRGemmOp>(
-                    loc, slicedOperands[2].getType(), slicedOperands[0],
-                    slicedOperands[1], slicedOperands[2])
-              : builder.create<vnni::BRGemmOp>(loc, slicedOperands[0],
-                                               slicedOperands[1],
-                                               slicedOperands[2]);
-      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                       brgemm->getResults());
-    } else {
-      linalg::BatchReduceMatmulOp brgemm =
-          (linalgOp.hasTensorSemantics())
-              ? builder.create<linalg::BatchReduceMatmulOp>(
-                    loc, slicedOperands[2].getType(),
-                    ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2])
-              : builder.create<linalg::BatchReduceMatmulOp>(
-                    loc, ValueRange{slicedOperands[0], slicedOperands[1]},
-                    slicedOperands[2]);
-      tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                       brgemm->getResults());
-    }
+
+    linalg::BatchReduceMatmulOp brgemm =
+        (linalgOp.hasTensorSemantics())
+            ? builder.create<linalg::BatchReduceMatmulOp>(
+                  loc, slicedOperands[2].getType(),
+                  ValueRange{slicedOperands[0], slicedOperands[1]},
+                  slicedOperands[2])
+            : builder.create<linalg::BatchReduceMatmulOp>(
+                  loc, ValueRange{slicedOperands[0], slicedOperands[1]},
+                  slicedOperands[2]);
+    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                     brgemm->getResults());
 
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };
+
   if (linalgOp.hasBufferSemantics()) {
     linalg::GenerateLoopNest<scf::ParallelOp>::doit(
         rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
@@ -320,25 +329,87 @@ mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
         rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
         linalgOp.getIteratorTypesArray(), brgemmBuilder);
   }
-  // see: `Tiling.cpp` in Linalg/Transforms
-  // gather the newly created loops and return them with the new op.
-  SmallVector<Operation *, 8> loops;
-  loops.reserve(ivs.size());
-  for (Value iv : ivs) {
-    if (iv.isa<BlockArgument>()) {
-      loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
-      assert(loops.back() && "no owner found for induction variable!");
-    } else {
-      loops.push_back(nullptr);
-    }
+
+  Operation *outermostLoop = getOuterMostLoop(ivs);
+
+  rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
+                                             : tensorResults);
+  return outermostLoop ? outermostLoop->getResults() : tensorResults;
+}
+
+// Rewrite a generic operation to BRGEMM using VNNI format.
+static FailureOr<SmallVector<Value>>
+rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
+
+  if (!isa<linalg::GenericOp>(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "expects a linalg.generic");
+
+  if (failed(checkBody(linalgOp)))
+    return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
+
+  if (!isLinalgOpVNNI(linalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "non-VNNI format");
+
+  if (failed(checkVNNIStructure(linalgOp))) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match structurally with BRGEMM");
   }
 
-  // get the tensor results from the outermost loop.
-  Operation *outermostLoop = nullptr;
-  for (Operation *loop : loops)
-    if ((outermostLoop = loop))
-      break;
+  if (failed(checkVNNIAccessPatterns(linalgOp))) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "failed to match BRGEMM access patterns");
+  }
 
+  // Materialize outer loops.
+  unsigned upTo = linalgOp.getNumLoops() - /*BRGEMM loops=*/5;
+
+  FailureOr<SmallVector<Range>> maybeLoopRanges =
+      linalgx::utils::getLoopsToMaterialize(rewriter, linalgOp, upTo);
+  if (failed(maybeLoopRanges))
+    return failure();
+  SmallVector<Range> loopRanges = *maybeLoopRanges;
+
+  // Replace linalgOp with BRGEMM.
+  SmallVector<Value> ivs, tensorResults;
+  auto brgemmBuilder = [&](OpBuilder &builder, Location loc,
+                           ValueRange localIvs,
+                           ValueRange operandValuesToUse) -> scf::ValueVector {
+    assert(operandValuesToUse.size() ==
+               static_cast<size_t>(linalgOp->getNumOperands()) &&
+           "expect the number of operands and inputs and outputs to match");
+    ivs.assign(localIvs.begin(), localIvs.end());
+    FailureOr<SmallVector<Value>> maybeSlicedOperands =
+        getSlicedOperands(builder, loc, localIvs, linalgOp, operandValuesToUse,
+                          /*VNNILoop=*/true);
+    if (failed(maybeSlicedOperands)) {
+      assert(0 && "failed to generate loops");
+      return {};
+    }
+    SmallVector<Value> slicedOperands = *maybeSlicedOperands;
+    assert(slicedOperands.size() == 3 && "expect three operands");
+    vnni::BRGemmOp brgemm =
+        (linalgOp.hasTensorSemantics())
+            ? builder.create<vnni::BRGemmOp>(
+                  loc, slicedOperands[2].getType(), slicedOperands[0],
+                  slicedOperands[1], slicedOperands[2])
+            : builder.create<vnni::BRGemmOp>(
+                  loc, slicedOperands[0], slicedOperands[1], slicedOperands[2]);
+    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                                     brgemm->getResults());
+    return scf::ValueVector(tensorResults.begin(), tensorResults.end());
+  };
+
+  if (linalgOp.hasBufferSemantics()) {
+    linalg::GenerateLoopNest<scf::ParallelOp>::doit(
+        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+        linalgOp.getIteratorTypesArray(), brgemmBuilder);
+  } else {
+    linalg::GenerateLoopNest<scf::ForOp>::doit(
+        rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
+        linalgOp.getIteratorTypesArray(), brgemmBuilder);
+  }
+
+  Operation *outermostLoop = getOuterMostLoop(ivs);
   rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
                                              : tensorResults);
   return outermostLoop ? outermostLoop->getResults() : tensorResults;
@@ -350,7 +421,8 @@ mlir::linalgx::rewriteToBRGEMMOp(RewriterBase &rewriter,
 
 namespace {
 
-struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
+struct RewriteToBatchReduceGemmImpl
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   // Map a generic operation to BRGEMM. The following conditions apply:
@@ -363,18 +435,34 @@ struct DoItOnGeneric : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::linalgx::rewriteToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::rewriteToBRGemmOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();
   }
 };
 
-struct RewriteToBatchReduceGEMM
-    : public RewriteToBatchReduceGEMMBase<RewriteToBatchReduceGEMM> {
+struct RewriteToBatchReduceGemmVnniImpl
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
+        rewriteToBrGemmVnniOp(rewriter, linalgOp);
+    if (failed(maybeLoopsOrGenericRes))
+      return failure();
+    return success();
+  }
+};
+
+struct RewriteToBatchReduceGemm
+    : public RewriteToBatchReduceGemmBase<RewriteToBatchReduceGemm> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
-    patterns.add<DoItOnGeneric>(patterns.getContext());
+    patterns
+        .add<RewriteToBatchReduceGemmImpl, RewriteToBatchReduceGemmVnniImpl>(
+            patterns.getContext());
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     return;
@@ -384,6 +472,6 @@ struct RewriteToBatchReduceGEMM
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createRewriteToBatchReduceGEMMPass() {
-  return std::make_unique<RewriteToBatchReduceGEMM>();
+mlir::tpp::createRewriteToBatchReduceGemmPass() {
+  return std::make_unique<RewriteToBatchReduceGemm>();
 }

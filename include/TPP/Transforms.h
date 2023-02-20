@@ -35,7 +35,7 @@ namespace linalgx {
 
 // Attempt to map the current linalgOp to a BRGEMM.
 // On success the returned values are the materialzed loops with BRGEMM inside.
-FailureOr<SmallVector<Value>> rewriteToBRGEMMOp(RewriterBase &rewriter,
+FailureOr<SmallVector<Value>> rewriteToBRGemmOp(RewriterBase &rewriter,
                                                 linalg::LinalgOp linalgOp);
 
 // Rewrite a convolution to a matmul operation. We support the following

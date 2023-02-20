@@ -553,7 +553,7 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
             linalgOp, "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
       return failure();
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
-        mlir::linalgx::rewriteToBRGEMMOp(rewriter, linalgOp);
+        mlir::linalgx::rewriteToBRGemmOp(rewriter, linalgOp);
     if (failed(maybeLoopsOrGenericRes))
       return failure();
     return success();
