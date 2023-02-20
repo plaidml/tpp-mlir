@@ -128,7 +128,7 @@ func.func @add_mapping(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 
 // Scalar operands we don't expect any mapping to tpp.
 #map = affine_map<() -> ()>
-func.func @add_mapping(%arg0: memref<f32>, %arg1: memref<f32>) {
+func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
   // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map], 
@@ -146,7 +146,7 @@ func.func @add_mapping(%arg0: memref<f32>, %arg1: memref<f32>) {
 // We don't support broadcast for tpp.add. All operands must have the same type.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
-func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
+func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
   // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map1],
@@ -501,4 +501,37 @@ func.func @entry() -> memref<28x32xf32> {
   memref.dealloc %alloc : memref<28x55xf32>
   memref.dealloc %alloc_0 : memref<55x32xf32>
   return %alloc_1 : memref<28x32xf32>
+}
+
+// -----
+
+// Stride 2 in the fast varying dimension, fail to match.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @add_non_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
+  // CHECK-NOT: tpp.add
+  linalg.generic {indexing_maps = [#map, #map, #map], 
+                  iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0: memref<4x4xf32>, memref<4x4xf32>) 
+    outs(%arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.addf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @add_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+  // CHECK: tpp.add
+  linalg.generic {indexing_maps = [#map, #map, #map], 
+                  iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0: memref<4x4xf32>, memref<4x4xf32>) 
+    outs(%arg1: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.addf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  }
+  return
 }

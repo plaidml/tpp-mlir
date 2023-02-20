@@ -3,7 +3,7 @@
 func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
                            %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
 
-  // expected-error @below {{'tpp.add' op requires all operands to have the same type}}
+  // expected-error @below {{'tpp.add' op requires all operands to have the same shape or strides}}
   tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) out(%arg1: memref<2x2xf32>)
   return %arg1: memref<2x2xf32>
 }
@@ -112,4 +112,12 @@ func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
   // expected-error @below {{'tpp.matmul' op requires the same element type for all operands}}
   tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>) out(%arg2: memref<3x3xbf16>)
   return %arg2: memref<3x3xbf16>
+}
+
+// -----
+
+func.func @tpp_add_wrong_strides(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
+  // expected-error @below {{'tpp.add' op requires all operands to have the same shape or strides}}
+  tpp.add ins(%arg0: memref<4x4xf32>, %arg0: memref<4x4xf32>) out(%arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>)
+  return
 }

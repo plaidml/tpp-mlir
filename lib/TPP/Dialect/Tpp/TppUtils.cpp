@@ -300,12 +300,43 @@ static bool isBinaryOp(linalg::GenericOp linalgOp) {
   return false;
 }
 
-// Return true if the operands are all the same.
-static bool allOperandsHaveSameType(linalg::GenericOp linalgOp) {
-  Type operandType = linalgOp->getOperand(0).getType();
-  for (Value operand : linalgOp->getOperands()) {
-    Type currentType = operand.getType();
-    if (currentType != operandType)
+bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
+  assert(types.size() > 1 && "expect one or more types");
+  if (!types[0].isa<MemRefType>())
+    return false;
+  auto firstOperandType = types[0].cast<MemRefType>();
+
+  // Step1. Validate rank.
+  int64_t rankOperand = firstOperandType.getRank();
+  for (Type currentType : types) {
+    if (!currentType.isa<MemRefType>())
+      return false;
+    if (currentType.cast<MemRefType>().getRank() != rankOperand)
+      return false;
+  }
+
+  // Step2. Validate shape, and strides.
+  // Get stride and offset for the first operand.
+  int64_t offsetFirstOperand = 0;
+  SmallVector<int64_t> stridesFirstOperand;
+  if (failed(getStridesAndOffset(firstOperandType, stridesFirstOperand,
+                                 offsetFirstOperand)))
+    return false;
+  ArrayRef<int64_t> shapeFirstOperand = firstOperandType.getShape();
+  for (Type currentOperandType : types) {
+    // Compare the shape.
+    ArrayRef<int64_t> shapeCurrentOperand =
+        currentOperandType.cast<MemRefType>().getShape();
+    if (shapeCurrentOperand != shapeFirstOperand)
+      return false;
+    int64_t offsetCurrentOperand = 0;
+    SmallVector<int64_t> stridesCurrentOperand;
+    // Compare the strides.
+    if (failed(getStridesAndOffset(currentOperandType.cast<MemRefType>(),
+                                   stridesCurrentOperand,
+                                   offsetCurrentOperand)))
+      return false;
+    if (stridesFirstOperand != stridesCurrentOperand)
       return false;
   }
   return true;
@@ -317,7 +348,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
-  if (!allOperandsHaveSameType(linalgOp))
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
     return false;
   return allIndexingsAreProjectedPermutation(linalgOp) &&
          hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());

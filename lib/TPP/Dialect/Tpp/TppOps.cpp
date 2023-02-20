@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
@@ -139,6 +140,10 @@ LogicalResult AddOp::verify() {
   if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
       (!outputType.isa<ShapedType>()))
     return emitOpError("expects all operands to be shaped type");
+  if (!utils::allOperandsHaveSameShapeAndStrides(
+          {lhsType, rhsType, outputType}))
+    return emitOpError(
+        "requires all operands to have the same shape or strides");
   return success();
 }
 
