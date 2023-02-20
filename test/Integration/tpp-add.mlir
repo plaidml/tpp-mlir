@@ -1,15 +1,13 @@
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXE
+
+// RUN: tpp-opt %s -convert-linalg-to-loops | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
 
-// RUN: tpp-opt %s -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
-// RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=EXE
-
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
 
