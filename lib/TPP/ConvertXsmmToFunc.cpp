@@ -205,9 +205,6 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
-    if (unaryOp.getCallee() == xsmm::UnaryKind::RELU) {
-      funcName = funcName + "_inline";
-    }
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
                                   rewriter, typeAttr))) {
       rewriter.eraseOp(unaryOp);

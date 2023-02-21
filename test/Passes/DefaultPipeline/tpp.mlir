@@ -103,7 +103,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 func.func @relu(%arg0: memref<3x3xf32>) {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
   tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
 
   return
@@ -119,7 +119,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
   // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
+  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast]]
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c1 = arith.constant 1 : index
@@ -297,7 +297,7 @@ module @predict_function  {
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
     tpp.relu ins(%arg3 : memref<128x512xf32>) out(%arg3 : memref<128x512xf32>)
 
     return

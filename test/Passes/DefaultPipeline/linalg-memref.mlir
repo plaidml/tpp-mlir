@@ -100,7 +100,7 @@ func.func @relu_3d(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
   // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
+  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast]]
   %c0 = arith.constant 0.0 : f32
   linalg.generic {
     indexing_maps = [#map5],
@@ -123,7 +123,7 @@ func.func @relu_3d(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
 func.func @relu_mapping_inplace(%arg0: memref<10x10xf32>) {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
-  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast]]
   %c0 = arith.constant 0.0 : f32
   linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg0: memref<10x10xf32>) {
     ^bb0(%out : f32):
@@ -144,7 +144,7 @@ func.func @relu_mapping_inplace(%arg0: memref<10x10xf32>) {
 func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[cast:.*]] = memref.cast %[[ARG1]]
-  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast]]
   %c0 = arith.constant 0.0 : f32
   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1: memref<10x10xf32>) outs(%arg0: memref<10x10xf32>) {
     ^bb0(%in : f32, %out : f32):
@@ -305,7 +305,7 @@ module @predict_function  {
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
     %cst = arith.constant 0.000000e+00 : f32
     linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%arg3 : memref<128x512xf32>) {
     ^bb0(%out: f32):
