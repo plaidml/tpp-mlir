@@ -163,7 +163,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
 
   // Relu
   // CHECK: call @xsmm_unary_dispatch
-  // CHECK: call @xsmm_unary_invoke_inline({{.*}}%[[cast0]], %[[cast0]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
   %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
