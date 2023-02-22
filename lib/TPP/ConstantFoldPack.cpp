@@ -112,12 +112,13 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
       if (!areStaticValues(tilesSizes))
         return;
       for (int i = 0; i < packOp.getDestType().getRank() - pointLoops; i++) {
-        if (i < startTiledLoop)
+        if (i < startTiledLoop) {
           delSourceIndexes.push_back(delDestIndexes[i]);
-        else
+        } else {
           delSourceIndexes.push_back(delDestIndexes[i] *
                                          tilesSizes[tilePosIdx++] +
                                      delDestIndexes[i + 2]);
+        }
       }
       assert(delSourceIndexes.size() ==
              static_cast<size_t>(packOp.getSourceType().getRank()));
@@ -130,9 +131,10 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                  << " map to source index: " << sourceLinearizedIdx << "\n");
 
       // Step3. Do the packing.
-      for (int j = 0; j < bytes; j++)
+      for (int j = 0; j < bytes; j++) {
         destRawData[destLinearizedIdx * bytes + j] =
             rawData[sourceLinearizedIdx * bytes + j];
+      }
     }
 
     auto newDense =
