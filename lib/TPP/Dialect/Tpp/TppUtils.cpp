@@ -141,12 +141,12 @@ bool isValConstZero(Value val) {
 }
 
 // Prototypes
-static bool isZeroOp(Operation *, Operation *);
+static bool isZeroOp(Operation *);
 
 // Returns true if the value represents a zero filled tensor.
-// Recurse into isZeroOp for defining ops if not imediately obvious
+// Recurse into isZeroOp for defining ops if not immediately obvious
 // Looks past linalg generic's argument (which don't have defining ops)
-static bool isZeroValue(Value val, Operation *userOp) {
+bool isZeroTensor(Value val) {
   if (!val)
     return false;
   if (isValConstZero(val))
@@ -167,11 +167,8 @@ static bool isZeroValue(Value val, Operation *userOp) {
     defOp = val.getDefiningOp();
   }
 
-  return isZeroOp(defOp, userOp);
+  return isZeroOp(defOp);
 }
-
-// This is a wrapper to isZeroValue as the entry point of the recursive pattern
-bool isZeroTensor(Value val) { return isZeroValue(val, nullptr); }
 
 // Returns true if the attribute represent "all zeros"
 bool isZeroAttr(Attribute attribute) {
@@ -187,19 +184,15 @@ bool isZeroAttr(Attribute attribute) {
           return false;
         if (!attr.isSplat())
           return false;
-        auto value = attr.template getSplatValue<Attribute>();
-        if (auto floatAttr = dyn_cast<FloatAttr>(value)) {
-          if (floatAttr.getValueAsDouble() == 0.0)
-            return true;
-        }
-        return false;
+        auto splat = attr.template getSplatValue<Attribute>();
+        return isZeroAttr(splat);
       })
       .Default([](auto attr) { return false; });
 }
 
 // Returns true if the operation represents a zero filled tensor
-// Recurses into isZeroValue for operands and isZeroAttr for attributes
-static bool isZeroOp(Operation *defOp, Operation *userOp) {
+// Recurses into isZeroTensor for operands and isZeroAttr for attributes
+static bool isZeroOp(Operation *defOp) {
   if (!defOp)
     return false;
 
@@ -210,19 +203,14 @@ static bool isZeroOp(Operation *defOp, Operation *userOp) {
         attr.dump();
         return isZeroAttr(attr);
       })
-      .Case<linalg::FillOp>([&](auto op) {
+      .Case<linalg::FillOp, linalg::CopyOp>([&](auto op) {
         if (op.getInputs().size() != 1)
           return false;
-        return isZeroValue(op.getInputs()[0], op);
-      })
-      .Case<linalg::CopyOp>([&](auto op) {
-        if (op.getInputs().size() != 1)
-          return false;
-        return isZeroValue(op.getInputs()[0], op);
+        return isZeroTensor(op.getInputs()[0]);
       })
       .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
             tensor::ExtractSliceOp>([&](auto op) {
-        return isZeroValue(op.getSource(), op);
+        return isZeroTensor(op.getSource());
       })
       .Case<memref::GetGlobalOp>([&](auto op) {
         auto name = op.getName();
