@@ -15,6 +15,8 @@
 
 namespace mlir {
 class TypeRange;
+class Operation;
+class Value;
 
 namespace linalg {
 class LinalgOp;
@@ -29,6 +31,10 @@ namespace utils {
 // dimensions.
 bool hasStaticShape(linalg::LinalgOp linalgOp);
 
+// Returns true if the linalg operation indexing maps are projected permutation
+// maps.
+bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp);
+
 // Returns true if the linalg operation has been marked by the tpp detection
 // pass and the operation can be mapped to a tpp operation.
 bool hasTppMark(linalg::LinalgOp linalgOp);
@@ -36,11 +42,33 @@ bool hasTppMark(linalg::LinalgOp linalgOp);
 // Returns true if the linalg operation is marked with 'target'.
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
+// Returns true if the linalg operation matches general tpp mapping
+// prerequisites.
+bool hasMappingToTppConditions(linalg::GenericOp linalgOp);
+
 // Returns true if the linalg operation has a Matmul region.
 bool hasMatmulBody(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
+
+// Returns true if the op is a maxf(x, 0) operation.
+bool isMaxfZeroOp(Operation *op);
+
+// Returns true if linalg generic region contains a maxf(x, 0) operation.
+bool hasMaxfZeroOp(linalg::LinalgOp linalgOp);
+
+// Returns the number of value users.
+int getNumUsers(Value val);
+
+// Returns true if the value has exactly one user.
+bool hasOneUser(Value val);
+
+// Returns true if the value has no users.
+bool hasZeroUser(Value val);
+
+// Returns true if the value has no more than the specified number of users.
+bool hasMaxNumUsers(Value val, int numUsers);
 
 // Returns true if the linalg operation can convert to a tpp.matmul.
 bool isTppMatmul(linalg::LinalgOp linalgOp);

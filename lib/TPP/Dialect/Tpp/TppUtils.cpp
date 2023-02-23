@@ -159,7 +159,7 @@ bool isZeroTensor(Value val) {
     // We need to find the argument to the linalg on the same order as this one
     auto *linalgOp = arg.getParentRegion()->getParentOp();
     if (!isa<linalg::GenericOp>(linalgOp))
-        return false;
+      return false;
     auto index = arg.getArgNumber();
     auto linalgArg = linalgOp->getOperand(index);
     defOp = linalgArg.getDefiningOp();
@@ -173,12 +173,8 @@ bool isZeroTensor(Value val) {
 // Returns true if the attribute represent "all zeros"
 bool isZeroAttr(Attribute attribute) {
   return TypeSwitch<Attribute, bool>(attribute)
-      .Case<FloatAttr>([](auto attr) {
-          return attr.getValueAsDouble() == 0.0;
-      })
-      .Case<IntegerAttr>([](auto attr) {
-          return attr.getInt() == 0;
-      })
+      .Case<FloatAttr>([](auto attr) { return attr.getValueAsDouble() == 0.0; })
+      .Case<IntegerAttr>([](auto attr) { return attr.getInt() == 0; })
       .Case<DenseElementsAttr>([](auto attr) {
         if (!attr.getElementType().isIntOrFloat())
           return false;
@@ -209,9 +205,8 @@ static bool isZeroOp(Operation *defOp) {
         return isZeroTensor(op.getInputs()[0]);
       })
       .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
-            tensor::ExtractSliceOp>([&](auto op) {
-        return isZeroTensor(op.getSource());
-      })
+            tensor::ExtractSliceOp>(
+          [&](auto op) { return isZeroTensor(op.getSource()); })
       .Case<memref::GetGlobalOp>([&](auto op) {
         auto name = op.getName();
         auto module = defOp->getParentOfType<ModuleOp>();
@@ -247,7 +242,7 @@ bool isTppMatmul(linalg::LinalgOp linalgOp) {
   return hasMatmulBody(linalgOp);
 }
 
-static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
+bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
   return llvm::all_of(genericOp.getIndexingMapsArray(), [](AffineMap m) {
     return m.isProjectedPermutation(/*allowZeroInResults=*/true);
   });
@@ -262,12 +257,16 @@ bool hasMappingToTppConditions(linalg::GenericOp linalgOp) {
   return hasStaticShape(linalgOp);
 }
 
-static bool hasOneUser(Value val) {
-  return std::distance(val.getUsers().begin(), val.getUsers().end()) == 1;
+int getNumUsers(Value val) {
+  return std::distance(val.getUsers().begin(), val.getUsers().end());
 }
 
-static bool hasZeroUser(Value val) {
-  return std::distance(val.getUsers().begin(), val.getUsers().end()) == 0;
+bool hasOneUser(Value val) { return getNumUsers(val) == 1; }
+
+bool hasZeroUser(Value val) { return getNumUsers(val) == 0; }
+
+bool hasMaxNumUsers(Value val, int numUsers) {
+  return getNumUsers(val) <= numUsers;
 }
 
 // Return true if the operation is binary.
@@ -353,7 +352,17 @@ static bool isUnaryOp(linalg::GenericOp linalgOp) {
   return false;
 }
 
-static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
+bool isMaxfZeroOp(Operation *op) {
+  if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
+    // Check both operands if either one is a zero filled tensor.
+    if (isZeroTensor(maxfOp.getLhs()) || isZeroTensor(maxfOp.getRhs()))
+      return true;
+  }
+
+  return false;
+}
+
+bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   if (!isa<linalg::GenericOp>(linalgOp))
     return false;
 
@@ -362,11 +371,8 @@ static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
     return false;
 
   for (Operation &op : genOp.getRegion().front()) {
-    if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
-      // Check both operands if either one is a zero filled tensor.
-      if (isZeroTensor(maxfOp.getLhs()) || isZeroTensor(maxfOp.getRhs()))
-        return true;
-    }
+    if (isMaxfZeroOp(&op))
+      return true;
   }
 
   return false;
