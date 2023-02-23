@@ -285,43 +285,46 @@ static bool isBinaryOp(linalg::GenericOp linalgOp) {
 
 bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
   assert(types.size() > 0 && "expect one or more types");
-  if (!types[0].isa<MemRefType>())
+  if (!types[0].isa<ShapedType>())
     return false;
-  auto firstOperandType = types[0].cast<MemRefType>();
+  auto firstOperandType = types[0].cast<ShapedType>();
 
   // Step1. Validate rank.
   int64_t rankOperand = firstOperandType.getRank();
   for (Type currentType : types) {
-    if (!currentType.isa<MemRefType>())
+    if (!currentType.isa<ShapedType>())
       return false;
-    if (currentType.cast<MemRefType>().getRank() != rankOperand)
+    if (currentType.cast<ShapedType>().getRank() != rankOperand)
       return false;
   }
 
-  // Step2. Validate shape, and strides.
-  // Get stride and offset for the first operand.
-  int64_t offsetFirstOperand = 0;
-  SmallVector<int64_t> stridesFirstOperand;
-  if (failed(getStridesAndOffset(firstOperandType, stridesFirstOperand,
-                                 offsetFirstOperand)))
-    return false;
-  ArrayRef<int64_t> shapeFirstOperand = firstOperandType.getShape();
-  for (Type currentOperandType : types) {
-    // Compare the shape.
-    ArrayRef<int64_t> shapeCurrentOperand =
-        currentOperandType.cast<MemRefType>().getShape();
-    if (shapeCurrentOperand != shapeFirstOperand)
+  if (firstOperandType.isa<MemRefType>()) {
+    // Step2. Validate shape, and strides.
+    // Get stride and offset for the first operand.
+    int64_t offsetFirstOperand = 0;
+    SmallVector<int64_t> stridesFirstOperand;
+    if (failed(getStridesAndOffset(firstOperandType.cast<MemRefType>(),
+                                   stridesFirstOperand, offsetFirstOperand)))
       return false;
-    int64_t offsetCurrentOperand = 0;
-    SmallVector<int64_t> stridesCurrentOperand;
-    // Compare the strides.
-    if (failed(getStridesAndOffset(currentOperandType.cast<MemRefType>(),
-                                   stridesCurrentOperand,
-                                   offsetCurrentOperand)))
-      return false;
-    if (stridesFirstOperand != stridesCurrentOperand)
-      return false;
+    ArrayRef<int64_t> shapeFirstOperand = firstOperandType.getShape();
+    for (Type currentOperandType : types) {
+      // Compare the shape.
+      ArrayRef<int64_t> shapeCurrentOperand =
+          currentOperandType.cast<MemRefType>().getShape();
+      if (shapeCurrentOperand != shapeFirstOperand)
+        return false;
+      int64_t offsetCurrentOperand = 0;
+      SmallVector<int64_t> stridesCurrentOperand;
+      // Compare the strides.
+      if (failed(getStridesAndOffset(currentOperandType.cast<MemRefType>(),
+                                     stridesCurrentOperand,
+                                     offsetCurrentOperand)))
+        return false;
+      if (stridesFirstOperand != stridesCurrentOperand)
+        return false;
+    }
   }
+
   return true;
 }
 
