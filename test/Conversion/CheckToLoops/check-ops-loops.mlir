@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-check-to-loops | FileCheck %s
+// RUN: tpp-opt %s -bufferize -convert-check-to-loops | FileCheck %s
 
 func.func @entry() {
  %b = arith.constant dense<[

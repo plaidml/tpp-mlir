@@ -1,9 +1,8 @@
 // RUN: tpp-opt %s \
-// RUN: -linalg-generalize-named-ops \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
+// RUN: -linalg-generalize-named-ops -bufferize \
 // RUN: -convert-linalg-to-loops \
 // RUN: -convert-vector-to-scf -convert-scf-to-cf \
-// RUN: -finalizing-bufferize -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm \
+// RUN: -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm \
 // RUN: -convert-func-to-llvm -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \

@@ -1,4 +1,4 @@
-// RUN: tpp-opt -pack-vnni -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -convert-vnni-to-tpp %s | FileCheck %s
+// RUN: tpp-opt -pack-vnni -generalize-tensor-pack-unpack -bufferize -convert-vnni-to-tpp %s | FileCheck %s
 
 // RUN: tpp-opt -pack-vnni %s | FileCheck %s -check-prefix=PACK
 
