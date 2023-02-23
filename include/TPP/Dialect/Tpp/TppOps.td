@@ -125,7 +125,7 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_ReluOp : Tpp_UnaryOp<"relu", [SameTypeOperands]> {
+def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
   let summary = "Applies a Rectified Linear Unit function in place.";
   let description = [{
     The `tpp.relu` applies a Rectified Linear Unit function in place 

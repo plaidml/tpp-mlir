@@ -483,7 +483,7 @@ func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: me
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func.func @entry() -> memref<28x32xf32> {
+func.func @matmul_mapping() -> memref<28x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %alloc = memref.alloc() : memref<28x55xf32>
   %alloc_0 = memref.alloc() : memref<55x32xf32>
@@ -533,5 +533,26 @@ func.func @add_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, stride
       %0 = arith.addf %in, %in_1 : f32
       linalg.yield %0 : f32
   }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: func.func @relu_mapping_strided(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<4x4xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<4x4xf32, strided<[4, 1], offset: ?>>)
+func.func @relu_mapping_strided(%i: memref<4x4xf32>, %o: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+  %cst = arith.constant 0.000000e+00 : f32 
+  // CHECK: tpp.relu ins(%[[ARG0]]
+  // CHECK-SAME:  out(%[[ARG1]]
+  linalg.generic {
+    indexing_maps = [#map, #map], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%i : memref<4x4xf32>) outs(%o : memref<4x4xf32, strided<[4, 1], offset: ?>>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.maxf %in, %cst : f32
+        linalg.yield %0 : f32
+    }
   return
 }
