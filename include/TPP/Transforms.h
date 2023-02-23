@@ -73,6 +73,8 @@ FailureOr<linalg::GenericOp>
 collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
                   ArrayRef<SmallVector<int64_t, 2>> reassociation);
 
+void populateDecomposeLinalgOpsPattern(RewritePatternSet &patterns,
+                                       bool removeDeadArgsAndResults = true);
 } // namespace linalgx
 
 namespace tpp {
