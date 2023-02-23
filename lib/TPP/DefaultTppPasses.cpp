@@ -91,18 +91,7 @@ private:
     pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 
     // Run bufferization as the rest of the passes prefer working on memref.
-    bufferization::OneShotBufferizationOptions buffOpts;
-    buffOpts.allowReturnAllocs = true;
-    buffOpts.bufferizeFunctionBoundaries = true;
-    buffOpts.functionBoundaryTypeConversion =
-        bufferization::LayoutMapOption::IdentityLayoutMap;
-    pm.addPass(bufferization::createOneShotBufferizePass(buffOpts));
-    pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
-    pm.addNestedPass<func::FuncOp>(
-        bufferization::createFinalizingBufferizePass());
-    // Clean up after bufferization.
-    pm.addPass(bufferization::createBufferDeallocationPass());
-    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addPass(createBufferizePass());
 
     // Convert generics to BRGEMM.
     // The mapping is done after bufferization as the buffer semantics

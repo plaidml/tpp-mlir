@@ -1,6 +1,5 @@
 // RUN: tpp-opt %s \
-// RUN: -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" \
-// RUN: -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize \
+// RUN: -bufferize  \
 // RUN: -convert-linalg-to-tpp | FileCheck %s
 
 func.func @entry(%A: tensor<4x8xf32>,

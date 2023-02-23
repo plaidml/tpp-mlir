@@ -1,4 +1,4 @@
-// RUN: tpp-opt -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" -convert-vnni-to-tpp %s | FileCheck %s 
+// RUN: tpp-opt -split-input-file -generalize-tensor-pack-unpack -bufferize -convert-vnni-to-tpp %s | FileCheck %s 
 
 func.func @matmul_static(%arg0: tensor<256x512xbf16>, %arg1: tensor<512x1024xbf16>, %arg2: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
   %0 = tensor.empty() : tensor<256x1024x2xbf16>

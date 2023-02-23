@@ -281,4 +281,9 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
   let constructor = "mlir::tpp::createConvInitSimplifyPass()";
 }
 
+def Bufferize : Pass<"bufferize", "ModuleOp"> {
+  let summary = "Bufferize tensor to memref for the entire module";
+  let constructor = "mlir::tpp::createBufferizePass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
