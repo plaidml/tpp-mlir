@@ -7,6 +7,7 @@ configure_lit_site_cfg(
 
 set(TPP_OPT_TEST_DEPENDS
         FileCheck count not
+        mlp-gen
         tpp-opt
         tpp-run
         )

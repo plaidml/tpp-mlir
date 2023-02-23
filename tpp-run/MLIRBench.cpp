@@ -29,6 +29,7 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "TPP/BuilderUtils.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
@@ -164,17 +165,14 @@ LogicalResult MLIRBench::createKernelArgs() {
     auto arg = TypeSwitch<Type, llvm::Optional<Value>>(ty)
                    .Case<MemRefType>([&](auto memRefTy) {
                      // Create a memref global
-                     auto name = createGlobal(memRefTy);
-                     // Get the created global value and use it
-                     // as an input to the kernel
-                     auto nameAttr = builder.getStringAttr(name);
-                     return builder.create<memref::GetGlobalOp>(
-                         unkLoc, memRefTy, nameAttr);
+                     return createDenseMemref(builder, module, initType,
+                                              memRefTy, seed);
                    })
                    .Case<TensorType>([&](auto tensorTy) {
                      // Create a dense const tensor and use it directly
                      // as an input to the kernel
-                     return createDenseTensor(tensorTy);
+                     return createDenseTensor(builder, initType, tensorTy,
+                                              seed);
                    })
                    .Default([&](auto t) { return std::nullopt; });
 
@@ -185,20 +183,6 @@ LogicalResult MLIRBench::createKernelArgs() {
   }
 
   builder.setInsertionPointToEnd(&mainBody);
-
-  return success();
-}
-
-LogicalResult
-MLIRBench::createGlobals(llvm::SmallVector<llvm::StringRef> &list) {
-  auto funcType = kernel.getFunctionType();
-  for (auto &ty : funcType.getInputs()) {
-    auto shapedTy = cast<ShapedType>(ty);
-    auto memRefTy =
-        MemRefType::get(shapedTy.getShape(), shapedTy.getElementType());
-
-    list.push_back(createGlobal(memRefTy));
-  }
 
   return success();
 }
@@ -242,7 +226,7 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
 
 Value MLIRBench::createTimerLoop(unsigned n) {
   // Allocates buffer for results
-  auto count = getConstant(builder.getI64Type(), n);
+  auto count = getConstInt(builder, n, 64);
   auto memrefType = MemRefType::get({n}, builder.getF64Type());
   auto acc = builder.create<memref::AllocOp>(unkLoc, memrefType);
 
@@ -267,7 +251,7 @@ Value MLIRBench::getTimerStats(Value acc) {
   auto dev = callDev.getStdev();
 
   // Create a vector<2xf64> so we can print
-  auto zeroF = getConstant(builder.getF64Type(), 0.0);
+  auto zeroF = getConstFloat(builder, 0.0, 64);
   auto vectorType = VectorType::get({2}, builder.getF64Type());
   auto stats = builder.create<vector::SplatOp>(unkLoc, vectorType, zeroF);
 
@@ -339,9 +323,9 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   }
 
   // Loop through the shaped type, transfer each dim to vector
-  auto count = getConstant(builder.getIndexType(), outerDims[0]);
-  auto zero = getConstant(builder.getIndexType(), 0);
-  auto one = getConstant(builder.getIndexType(), 1);
+  auto count = getConstIndex(builder, outerDims[0]);
+  auto zero = getConstIndex(builder, 0);
+  auto one = getConstIndex(builder, 1);
   auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
   builder.setInsertionPointToStart(loop.getBody());
 
@@ -426,61 +410,6 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
 }
 
 //----------------------- Helpers & private methods
-
-template <class ValueT>
-arith::ConstantOp MLIRBench::getConstant(Type type, ValueT value) {
-  Attribute attr;
-  if constexpr (std::numeric_limits<ValueT>::is_integer) {
-    attr = builder.getIntegerAttr(type, value);
-  } else if constexpr (llvm::is_one_of<ValueT, float, double>()) {
-    attr = builder.getFloatAttr(type, value);
-  }
-  assert(attr && "Unsupported ConstantOp type");
-  return builder.create<arith::ConstantOp>(unkLoc, type, attr);
-}
-
-DenseElementsAttr MLIRBench::getDenseAttribute(ShapedType shape) {
-  auto init = getTensorInit(initType, shape.getElementType(), seed);
-  return init->get(shape);
-}
-
-llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
-  // Create global dense memrefs (Module insertion point)
-  OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(&getModuleBlock());
-
-  // Simple auto increment
-  static unsigned order = 0;
-
-  // Create global dense memrefs (Module insertion point)
-  auto privAttr = builder.getStringAttr("private");
-
-  // Auto incremental naming system
-  std::string name = "__wrapper_" + std::to_string(order++);
-
-  auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
-  auto floatInit = getDenseAttribute(type);
-
-  // Create the global object in the Module's region
-  auto global = builder.create<memref::GlobalOp>(unkLoc, StringRef(name),
-                                                 privAttr, type, floatInit,
-                                                 /*constant=*/false, alignment);
-
-  return global.getName();
-}
-
-MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
-  auto op = module.lookupSymbol<memref::GlobalOp>(name);
-  assert(op && "memref::Global not found");
-  auto memRefTy = dyn_cast_or_null<MemRefType>(op.getType());
-  assert(memRefTy && "memref::Global type not a memref?");
-  return memRefTy;
-}
-
-Value MLIRBench::createDenseTensor(TensorType type) {
-  auto floatInit = getDenseAttribute(type);
-  return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
-}
 
 Block &MLIRBench::getModuleBlock() {
   return module->getRegions().front().front();

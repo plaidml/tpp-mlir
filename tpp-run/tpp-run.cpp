@@ -237,7 +237,7 @@ std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
   auto optPipeline =
       makeOptimizingTransformer(optLevel, sizeLevel, targetMachine.get());
   if (auto err = optPipeline(llvmModule.get())) {
-    llvmModule->print(llvm::errs(), nullptr);
+    llvmModule->dump();
     llvm::errs() << "Error while passing through the LLVM pipeline: ";
     llvm::errs() << err << "\n";
     return nullptr;
