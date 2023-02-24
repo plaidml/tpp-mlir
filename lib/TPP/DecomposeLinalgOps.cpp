@@ -445,18 +445,9 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
         genericOp, "expected all operands to have static shape");
   }
 
-  // if (!tpp::utils::allOperandsHaveSameShapeAndStrides(
-  //         genericOp->getOperands().getTypes())) {
-  //   return rewriter.notifyMatchFailure(
-  //       genericOp, "expected all operands to have the same shape and
-  //       strides");
-  // }
-
   GenericOp peeledGenericOp = createPeeledGenericOp(genericOp, rewriter);
   GenericOp residualGenericOp =
       createResidualGenericOp(genericOp, peeledGenericOp, rewriter);
-  // llvm::dbgs() << "CREATED generic op:\n";
-  // residualGenericOp.dump();
 
   /// Move the first statement of the original operation into the body of the
   /// generic op for the peeled operation.
@@ -468,22 +459,6 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
       peeledGenericOpBody->begin(), body->getOperations(), body->begin());
   residualGenericOpBody->getOperations().splice(residualGenericOpBody->begin(),
                                                 body->getOperations());
-
-  // for (auto inputOp : residualGenericOp.getRegionInputArgs()) {
-  //   for (auto outputOp : residualGenericOp.getRegionOutputArgs()) {
-  //     llvm::dbgs() << "inputOp: " << inputOp << "\n";
-  //     llvm::dbgs() << "outputOp: " << outputOp << "\n";
-  //     if (residualGenericOp.getMatchingOpOperand(inputOp)->get() ==
-  //         residualGenericOp.getMatchingOpOperand(outputOp)->get()) {
-  //       llvm::dbgs() << "### Matched input and output\n";
-  //       // auto inArg = residualGenericOp.getMatchingBlockArgument(inputOp);
-  //       // auto outArg =
-  //       residualGenericOp.getMatchingBlockArgument(outputOp);
-  //       // inArg.replaceAllUsesWith(outArg);
-  //       inputOp.replaceAllUsesWith(outputOp);
-  //     }
-  //   }
-  // }
 
   Operation *peeledScalarOperation = &(*peeledGenericOpBody->begin());
   auto *yieldOp = residualGenericOpBody->getTerminator();
@@ -505,14 +480,6 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
 
   /// In the split operations, replace block arguments uses that refer to
   /// original operation to the block arguments of the newly created operation.
-  unsigned origNumInputs = genericOp.getNumDpsInputs();
-  unsigned origNumOutputs = genericOp.getNumDpsInits();
-  // llvm::dbgs() << "Orig op:\n";
-  // genericOp.dump();
-  // llvm::dbgs() << "Peeled op:\n";
-  // peeledGenericOp.dump();
-  // llvm::dbgs() << "Residual op:\n";
-  // residualGenericOp.dump();
   for (const auto &inputBlockArg :
        llvm::enumerate(genericOp.getBody()->getArguments())) {
     Value residualOpReplacementArg =
@@ -524,18 +491,8 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
 
     Value peeledOpReplacementArg =
         peeledGenericOpBody->getArgument(inputBlockArg.index());
-
-    // llvm::dbgs() << "Replace #" << inputBlockArg.index() << "\n";
-    // llvm::dbgs() << "  - inputBlockArg: " << inputBlockArg.value() << "\n";
-    // llvm::dbgs() << "  - peeledOpReplacementArg: " << peeledOpReplacementArg
-    //              << "\n";
-
     inputBlockArg.value().replaceUsesWithIf(
         peeledOpReplacementArg, [&](OpOperand &use) {
-          if (use.getOwner()->getBlock() == peeledGenericOpBody) {
-            // llvm::dbgs() << "  -> Replaced #" << inputBlockArg.index() <<
-            // "\n";
-          }
           return use.getOwner()->getBlock() == peeledGenericOpBody;
         });
   }
@@ -555,90 +512,39 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
 
   /// Update all uses of the peeled scalar operation results in the residual op
   /// to the newly added arguments.
-  {
-    SmallVector<Value> scalarReplacements;
-    unsigned peeledScalarOpNumResults = peeledScalarOperation->getNumResults();
-    // llvm::dbgs() << "peeledScalarOpNumResults: " << peeledScalarOpNumResults
-    // << "\n";
+  unsigned origNumInputs = genericOp.getNumDpsInputs();
+  unsigned origNumOutputs = genericOp.getNumDpsInits();
+  SmallVector<Value> scalarReplacements;
+  unsigned peeledScalarOpNumResults = peeledScalarOperation->getNumResults();
 
-    scalarReplacements.reserve(peeledScalarOpNumResults);
-    for (auto num : llvm::seq<unsigned>(0, peeledScalarOpNumResults))
-      scalarReplacements.push_back(residualGenericOpBody->getArgument(
-          num + origNumInputs + origNumOutputs));
-    bool allUsesReplaced = false;
-    rewriter.replaceOpWithinBlock(peeledScalarOperation, scalarReplacements,
-                                  residualGenericOpBody, &allUsesReplaced);
-    assert(!allUsesReplaced &&
-           "peeled scalar operation is erased when it wasnt expected to be");
-  }
+  scalarReplacements.reserve(peeledScalarOpNumResults);
+  for (auto num : llvm::seq<unsigned>(0, peeledScalarOpNumResults))
+    scalarReplacements.push_back(residualGenericOpBody->getArgument(
+        num + origNumInputs + origNumOutputs));
+  bool allUsesReplaced = false;
+  rewriter.replaceOpWithinBlock(peeledScalarOperation, scalarReplacements,
+                                residualGenericOpBody, &allUsesReplaced);
+  assert(!allUsesReplaced &&
+         "peeled scalar operation is erased when it wasnt expected to be");
 
-  // llvm::dbgs() << "ARGS analysis\n";
-  // for (auto inputOp :
-  //      llvm::enumerate(residualGenericOp.getDpsInputOperands())) {
-  //   for (auto outputOp :
-  //        llvm::enumerate(residualGenericOp.getDpsInitOperands())) {
-  //     llvm::dbgs() << "inputOp: " << inputOp.value()->get() << "\n";
-  //     llvm::dbgs() << "outputOp: " << outputOp.value()->get() << "\n";
-  //     if (inputOp.value()->get() == outputOp.value()->get()) {
-  //       llvm::dbgs() << "### Matched input: "
-  //                    << residualGenericOpBody->getArgument(inputOp.index())
-  //                    << "\n";
-  //       llvm::dbgs() << "and output: "
-  //                    << residualGenericOpBody->getArgument(
-  //                           residualGenericOp.getNumDpsInputs() +
-  //                           outputOp.index())
-  //                    << "\n";
-  //       auto inArg = residualGenericOpBody->getArgument(inputOp.index());
-  //       auto outArg = residualGenericOpBody->getArgument(
-  //           residualGenericOp.getNumDpsInputs() + outputOp.index());
-  //       llvm::dbgs() << "InputNumUsers: "
-  //                    << std::distance(inArg.getUsers().begin(),
-  //                                     inArg.getUsers().end())
-  //                    << "\n";
-  //       llvm::dbgs() << "OutputNumUsers: "
-  //                    << std::distance(outArg.getUsers().begin(),
-  //                                     outArg.getUsers().end())
-  //                    << "\n";
-  //       // auto inArg = residualGenericOp.getMatchingBlockArgument(inputOp);
-  //       // auto outArg =
-  //       // residualGenericOp.getMatchingBlockArgument(outputOp);
-  //       inArg.replaceAllUsesWith(outArg);
-  //       // residualGenericOpBody->getArgument(inputOp.index())
-  //       //     .replaceAllUsesWith(residualGenericOpBody->getArgument(
-  //       //         residualGenericOp.getNumDpsInputs() + outputOp.index()));
-  //     }
-  //   }
-  // }
-
-  // llvm::dbgs() << "ARGS analysis\n";
+  // In case the same value is used both as the input and output,
+  // replace all uses with the output-mapped block argument to
+  // more easily capture the output data read-write dependencies.
   for (auto inputOp : residualGenericOp.getRegionInputArgs()) {
     for (auto outputOp : residualGenericOp.getRegionOutputArgs()) {
-      // llvm::dbgs() << "inputOp: " << inputOp << "\n";
-      // llvm::dbgs() << "outputOp: " << outputOp << "\n";
       if (residualGenericOp.getMatchingOpOperand(inputOp)->get() ==
-          residualGenericOp.getMatchingOpOperand(outputOp)->get()) {
-        // llvm::dbgs() << "### Matched input and output\n";
-        // auto inArg = residualGenericOp.getMatchingBlockArgument(inputOp);
-        // auto outArg =
-        // residualGenericOp.getMatchingBlockArgument(outputOp);
-        // inArg.replaceAllUsesWith(outArg);
+          residualGenericOp.getMatchingOpOperand(outputOp)->get())
         inputOp.replaceAllUsesWith(outputOp);
-      }
     }
   }
 
-  // llvm::dbgs() << "Peeled AFTER op:\n";
-  // peeledGenericOp.dump();
-  // llvm::dbgs() << "Residual AFTER op:\n";
-  // residualGenericOp.dump();
-
-  // Replace the original operation
-  // genericOp.getOperation()->getParentOp()->dump();
-  // llvm::dbgs() << "numReplacements: " << replacements.size() << "\n";
+  // Replace the original operation tensor results
+  // or just remove the original op with memrefs
   if (genericOp.hasTensorSemantics())
     rewriter.replaceOp(genericOp, replacements);
   else
     rewriter.eraseOp(genericOp);
+
   return success();
 }
 
