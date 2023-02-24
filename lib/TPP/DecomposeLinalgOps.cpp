@@ -347,44 +347,29 @@ GenericOp
 DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
                                            GenericOp peeledGenericOp,
                                            PatternRewriter &rewriter) const {
-  // llvm::dbgs() << "INPUT generic op:\n";
-  // genericOp.dump();
+  bool isTensor = genericOp.hasTensorSemantics();
+
   /// Append all results from the peeledGenericOps as `ins` operand for the
   /// residual generic op.
-  bool isTensor = genericOp.hasTensorSemantics();
-  SmallVector<Value> residualGenericOpOperands = genericOp.getInputs();
-  SmallVector<Value> origOuts = genericOp.getOutputs();
-  residualGenericOpOperands.append(origOuts);
-  unsigned origNumResults =
-      isTensor ? genericOp.getNumResults() : genericOp.getOutputs().size();
-  unsigned peeledGenericOpNumResults =
-      isTensor ? peeledGenericOp.getNumResults()
-               : peeledGenericOp.getOutputs().size();
-  // llvm::dbgs() << "origNumResults: " << origNumResults << "\n";
-  // llvm::dbgs() << "peeledGenericOpNumResults: " << peeledGenericOpNumResults
-  // << "\n";
+  SmallVector<Value> residualGenericInOperands = genericOp.getOperands();
   SmallVector<Value> extraIns =
       isTensor ? llvm::to_vector(
                      llvm::map_range(peeledGenericOp->getResults(),
                                      [](OpResult opr) -> Value { return opr; }))
                : peeledGenericOp.getOutputs();
-  // // llvm::dbgs() << "resultNums: ";
-  // for (auto resultNum : llvm::seq<unsigned>(0, peeledGenericOpNumResults)) {
-  //   // llvm::dbgs() << resultNum << " ";
-  //   extraIns.push_back(isTensor ? peeledGenericOp->getResult(resultNum)
-  //                               : peeledGenericOp.getOutputs()[resultNum]);
-  // }
-  // // llvm::dbgs() << "\n";
-  residualGenericOpOperands.append(extraIns);
+  residualGenericInOperands.append(extraIns);
 
-  /// Add indexing maps for the newly added operands. Use the same map
-  /// as those used for the new results of the peeledGenericOp.
+  /// Add indexing maps for the inputs.
   auto indexingMaps = llvm::to_vector(
       llvm::map_range(genericOp.getDpsInputOperands(), [&](OpOperand *operand) {
         return genericOp.getMatchingIndexingMap(operand);
       }));
   for (OpOperand *outOperand : genericOp.getDpsInitOperands())
     indexingMaps.push_back(genericOp.getMatchingIndexingMap(outOperand));
+
+  unsigned peeledGenericOpNumResults =
+      isTensor ? peeledGenericOp.getNumResults()
+               : peeledGenericOp.getOutputs().size();
   for (auto resultNum : llvm::seq<unsigned>(0, peeledGenericOpNumResults)) {
     if (isTensor) {
       OpResult result = peeledGenericOp.getResult(resultNum).cast<OpResult>();
@@ -395,13 +380,16 @@ DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
       indexingMaps.push_back(peeledGenericOp.getMatchingIndexingMap(operand));
     }
   }
+
+  /// Reuse the original outputs and add their indexing maps.
+  SmallVector<Value> residualGenericOutOperands = genericOp.getOutputs();
   for (OpOperand *outOperand : genericOp.getDpsInitOperands())
     indexingMaps.push_back(genericOp.getMatchingIndexingMap(outOperand));
 
   auto indexingMapAttr = rewriter.getAffineMapArrayAttr(indexingMaps);
   return rewriter.create<GenericOp>(
       genericOp->getLoc(), genericOp->getResultTypes(),
-      residualGenericOpOperands, genericOp.getOutputs(), indexingMapAttr,
+      residualGenericInOperands, residualGenericOutOperands, indexingMapAttr,
       genericOp.getIteratorTypes(),
       /*doc=*/nullptr, /*libraryCall=*/nullptr,
       [](OpBuilder, Location, ValueRange) {});
