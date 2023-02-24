@@ -282,12 +282,17 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
          llvm::equal(peeledOutSizes, origOutSizes))) {
       // llvm::dbgs() << "resultNumber: " << *resultNumber << "\n";
       resultNumber = resultNumber ? *resultNumber : scalarOpResult.index();
-      newInitValues.push_back(
-          genericOp.getDpsInitOperand(*resultNumber)->get());
-      OpResult result = genericOp.getResult(*resultNumber).cast<OpResult>();
-      newResultTypes.push_back(result.getType());
-      peeledGenericOpIndexingMaps.push_back(
-          genericOp.getIndexingMapMatchingResult(result));
+      auto origOutOp = genericOp.getDpsInitOperand(*resultNumber);
+      newInitValues.push_back(origOutOp->get());
+      if (genericOp.hasTensorSemantics()) {
+        OpResult result = genericOp.getResult(*resultNumber).cast<OpResult>();
+        newResultTypes.push_back(result.getType());
+        peeledGenericOpIndexingMaps.push_back(
+            genericOp.getIndexingMapMatchingResult(result));
+      } else {
+        peeledGenericOpIndexingMaps.push_back(
+            genericOp.getMatchingIndexingMap(origOutOp));
+      }
       continue;
     }
 
