@@ -146,41 +146,12 @@ static SmallVector<OpFoldResult> getGenericOpLoopRange(OpBuilder &b,
                                                   allShapesSizes);
 }
 
-/// Helper method to permute the list of `values` based on the `map`.
-static SmallVector<OpFoldResult> permuteValues(ArrayRef<OpFoldResult> values,
-                                               AffineMap map) {
-  assert(map.isPermutation());
-  SmallVector<OpFoldResult> permutedValues(values.size());
-  for (const auto &position :
-       llvm::enumerate(llvm::map_range(map.getResults(), [](AffineExpr expr) {
-         return expr.cast<AffineDimExpr>().getPosition();
-       })))
-    permutedValues[position.value()] = values[position.index()];
-  return permutedValues;
-}
-
-/// Get zero value for an element type.
-static Value getZero(OpBuilder &b, Location loc, Type elementType) {
-  assert(elementType.isIntOrIndexOrFloat() &&
-         "expected scalar type while computing zero value");
-  if (elementType.isa<IntegerType>())
-    return b.create<arith::ConstantIntOp>(loc, 0, elementType);
-  if (elementType.isIndex())
-    return b.create<arith::ConstantIndexOp>(loc, 0);
-  // Assume float.
-  auto floatType = elementType.cast<FloatType>();
-  return b.create<arith::ConstantFloatOp>(
-      loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-}
-
-bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
-                    Operation *bodyOp, Value bodyOpResult) {
+static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
+                           Operation *bodyOp, Value bodyOpResult) {
   assert(bodyOp->getParentOp() == genericOp.getOperation() &&
          "expected body op to belong to the generic");
   int numUses = 0;
   for (auto operand : bodyOp->getOperands()) {
-    // llvm::dbgs() << "operand: " << operand << "\n";
-    // llvm::dbgs() << "outOperand: " << genericOpOutput << "\n";
     if (operand == genericOpOutput)
       ++numUses;
   }
@@ -212,17 +183,16 @@ bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
 GenericOp
 DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
                                          PatternRewriter &rewriter) const {
+  bool isTensor = genericOp.hasTensorSemantics();
+
   Block *body = genericOp.getBody();
   Operation *peeledScalarOperation = &(*body->begin());
   SmallVector<AffineMap> peeledGenericOpIndexingMaps =
       genericOp.getIndexingMapsArray();
 
-  SmallVector<Value> insOperands = genericOp.getInputs();
+  SmallVector<Value> newInputValues = genericOp.getInputs();
   SmallVector<Value> origOuts = genericOp.getOutputs();
-  insOperands.append(origOuts);
-  // for (OpOperand *outOperand : genericOp.getDpsInitOperands())
-  //   peeledGenericOpIndexingMaps.push_back(
-  //       genericOp.getMatchingIndexingMap(outOperand));
+  newInputValues.append(origOuts);
 
   /// Compute the loop ranges for operation. This is the shape of the result of
   /// the generic op for the peeled operation.
@@ -231,26 +201,20 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
   SmallVector<Value> newInitValues;
   SmallVector<Type> newResultTypes;
 
+  SmallVector<int64_t> peeledOutSizes;
+  for (auto shapeSize : domain) {
+    peeledOutSizes.push_back(*getConstantIntValue(shapeSize));
+  }
   auto origRegionOuts = genericOp.getRegionOutputArgs();
   auto numScalarOpResults = peeledScalarOperation->getResults().size();
-
-  int numOutUsers = 0;
-  if (origRegionOuts.size() == numScalarOpResults) {
-    for (auto &outArg : origRegionOuts) {
-      if (!tpp::utils::hasZeroUser(outArg))
-        ++numOutUsers;
-    }
-  }
 
   // Add as many new results as the number of results of the peeled scalar op.
   for (auto scalarOpResult :
        llvm::enumerate(peeledScalarOperation->getResults())) {
     // If the result is yielded by the original op, use the operand, indexing
     // map and result type that correspond to the yielded value.
-    // llvm::dbgs() << "scalarOpResult: " << scalarOpResult << "\n";
     std::optional<unsigned> resultNumber;
     for (auto *user : scalarOpResult.value().getUsers()) {
-      // llvm::dbgs() << "user: " << *user << "\n";
       if (auto yieldOp = dyn_cast<YieldOp>(user)) {
         // Find the first use of the `scalarOpResult` in the yield op.
         for (OpOperand &yieldOperand : yieldOp->getOpOperands()) {
@@ -264,27 +228,32 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
       }
     }
 
-    SmallVector<int64_t> peeledOutSizes;
-    for (auto shapeSize : domain) {
-      peeledOutSizes.push_back(*getConstantIntValue(shapeSize));
-    }
-    auto origOutBuf = genericOp.getRegionOutputArgs()[scalarOpResult.index()];
+    auto origOutBuf = origRegionOuts[scalarOpResult.index()];
     auto origOutSizes = genericOp.getMatchingOpOperand(origOutBuf)
                             ->get()
                             .getType()
                             .cast<ShapedType>()
                             .getShape();
 
+    /// Reuse the original output buffer in the following cases:
+    /// 1) reuse the operand matching the original yield
+    /// 2) reuse the same output buffer if:
+    ///     - there is at least the same number of output buffers as the scalar
+    ///       operation results
+    ///     - the output buffer has the same shape as the current intermediate
+    ///       result
+    ///     - the output buffer has no consumers other than the current peeled
+    ///       operation
     if (resultNumber ||
         ((origRegionOuts.size() >= numScalarOpResults) &&
+         llvm::equal(peeledOutSizes, origOutSizes) &&
          canReuseOutput(genericOp, origOutBuf, peeledScalarOperation,
-                        scalarOpResult.value()) &&
-         llvm::equal(peeledOutSizes, origOutSizes))) {
-      // llvm::dbgs() << "resultNumber: " << *resultNumber << "\n";
+                        scalarOpResult.value()))) {
       resultNumber = resultNumber ? *resultNumber : scalarOpResult.index();
       auto origOutOp = genericOp.getDpsInitOperand(*resultNumber);
       newInitValues.push_back(origOutOp->get());
-      if (genericOp.hasTensorSemantics()) {
+
+      if (isTensor) {
         OpResult result = genericOp.getResult(*resultNumber).cast<OpResult>();
         newResultTypes.push_back(result.getType());
         peeledGenericOpIndexingMaps.push_back(
@@ -296,49 +265,37 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
       continue;
     }
 
-    // Fall back path, use an `init_tensor` and identity indexing map.
+    /// Fall back path - allocate a new temporary buffer to store intermediate
+    /// results.
     AffineMap indexingMap = rewriter.getMultiDimIdentityMap(domain.size());
     auto elementType = scalarOpResult.value().getType();
     Value emptyBuf;
-    if (genericOp.hasTensorSemantics()) {
+    if (isTensor) {
       emptyBuf = rewriter.create<tensor::EmptyOp>(loc, domain, elementType);
+      newResultTypes.push_back(emptyBuf.getType());
     } else {
       auto allocationType = MemRefType::get(peeledOutSizes, elementType);
       emptyBuf = rewriter.create<memref::AllocOp>(loc, allocationType);
 
-      // Release the temporary buffer after the last split generic op
+      /// Release the temporary buffer after the original operation
+      /// to ensure that the buffer's lifetime exceeds the create residual
+      /// generic op.
       {
         OpBuilder::InsertionGuard g(rewriter);
         rewriter.setInsertionPointAfter(genericOp.getOperation());
         rewriter.create<memref::DeallocOp>(loc, emptyBuf);
       }
     }
-    // auto fillOp = rewriter.create<linalg::FillOp>(
-    //     loc, getZero(rewriter, loc, elementType), emptyBuf);
-
-    // // In case of tensors, pass the initialized tensor as the new generic op
-    // // output
-    // if (genericOp.hasTensorSemantics())
-    //   emptyBuf = fillOp.result();
 
     newInitValues.push_back(emptyBuf);
-    newResultTypes.push_back(emptyBuf.getType());
     peeledGenericOpIndexingMaps.push_back(indexingMap);
   }
 
   /// Create the peeled generic op with an empty body.
-  SmallVector<Value> outsOperands;
-  outsOperands.append(newInitValues.begin(), newInitValues.end());
-
-  SmallVector<Type>
-      resultTypes; //= llvm::to_vector(genericOp.getResultTypes());
-  if (genericOp.hasTensorSemantics()) {
-    resultTypes.append(newResultTypes.begin(), newResultTypes.end());
-  }
   auto indexingMapAttr =
       rewriter.getAffineMapArrayAttr(peeledGenericOpIndexingMaps);
   return rewriter.create<GenericOp>(
-      loc, resultTypes, insOperands, outsOperands, indexingMapAttr,
+      loc, newResultTypes, newInputValues, newInitValues, indexingMapAttr,
       genericOp.getIteratorTypes(), /*doc=*/nullptr, /*libraryCall=*/nullptr,
       [](OpBuilder, Location, ValueRange) {});
 }
