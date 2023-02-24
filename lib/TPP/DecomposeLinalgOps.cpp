@@ -220,9 +220,9 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
   SmallVector<Value> insOperands = genericOp.getInputs();
   SmallVector<Value> origOuts = genericOp.getOutputs();
   insOperands.append(origOuts);
-  for (OpOperand *outOperand : genericOp.getDpsInitOperands())
-    peeledGenericOpIndexingMaps.push_back(
-        genericOp.getMatchingIndexingMap(outOperand));
+  // for (OpOperand *outOperand : genericOp.getDpsInitOperands())
+  //   peeledGenericOpIndexingMaps.push_back(
+  //       genericOp.getMatchingIndexingMap(outOperand));
 
   /// Compute the loop ranges for operation. This is the shape of the result of
   /// the generic op for the peeled operation.
@@ -264,35 +264,41 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
       }
     }
 
+    SmallVector<int64_t> peeledOutSizes;
+    for (auto shapeSize : domain) {
+      peeledOutSizes.push_back(*getConstantIntValue(shapeSize));
+    }
+    auto origOutBuf = genericOp.getRegionOutputArgs()[scalarOpResult.index()];
+    auto origOutSizes = genericOp.getMatchingOpOperand(origOutBuf)
+                            ->get()
+                            .getType()
+                            .cast<ShapedType>()
+                            .getShape();
+
     if (resultNumber ||
         ((origRegionOuts.size() >= numScalarOpResults) &&
-         canReuseOutput(genericOp,
-                        genericOp.getRegionOutputArgs()[scalarOpResult.index()],
-                        peeledScalarOperation, scalarOpResult.value()))) {
+         canReuseOutput(genericOp, origOutBuf, peeledScalarOperation,
+                        scalarOpResult.value()) &&
+         llvm::equal(peeledOutSizes, origOutSizes))) {
       // llvm::dbgs() << "resultNumber: " << *resultNumber << "\n";
       resultNumber = resultNumber ? *resultNumber : scalarOpResult.index();
       newInitValues.push_back(
           genericOp.getDpsInitOperand(*resultNumber)->get());
       OpResult result = genericOp.getResult(*resultNumber).cast<OpResult>();
       newResultTypes.push_back(result.getType());
-      // peeledGenericOpIndexingMaps.push_back(
-      //     genericOp.getIndexingMapMatchingResult(result));
+      peeledGenericOpIndexingMaps.push_back(
+          genericOp.getIndexingMapMatchingResult(result));
       continue;
     }
 
     // Fall back path, use an `init_tensor` and identity indexing map.
-    // AffineMap indexingMap = rewriter.getMultiDimIdentityMap(domain.size());
+    AffineMap indexingMap = rewriter.getMultiDimIdentityMap(domain.size());
     auto elementType = scalarOpResult.value().getType();
     Value emptyBuf;
     if (genericOp.hasTensorSemantics()) {
       emptyBuf = rewriter.create<tensor::EmptyOp>(loc, domain, elementType);
     } else {
-      SmallVector<int64_t> sizes;
-      for (auto shapeSize : domain) {
-        sizes.push_back(*getConstantIntValue(shapeSize));
-      }
-
-      auto allocationType = MemRefType::get(sizes, elementType);
+      auto allocationType = MemRefType::get(peeledOutSizes, elementType);
       emptyBuf = rewriter.create<memref::AllocOp>(loc, allocationType);
 
       // Release the temporary buffer after the last split generic op
@@ -312,7 +318,7 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
 
     newInitValues.push_back(emptyBuf);
     newResultTypes.push_back(emptyBuf.getType());
-    // peeledGenericOpIndexingMaps.push_back(indexingMap);
+    peeledGenericOpIndexingMaps.push_back(indexingMap);
   }
 
   /// Create the peeled generic op with an empty body.
@@ -434,11 +440,12 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
         genericOp, "expected all operands to have static shape");
   }
 
-  if (!tpp::utils::allOperandsHaveSameShapeAndStrides(
-          genericOp->getOperands().getTypes())) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "expected all operands to have the same shape and strides");
-  }
+  // if (!tpp::utils::allOperandsHaveSameShapeAndStrides(
+  //         genericOp->getOperands().getTypes())) {
+  //   return rewriter.notifyMatchFailure(
+  //       genericOp, "expected all operands to have the same shape and
+  //       strides");
+  // }
 
   GenericOp peeledGenericOp = createPeeledGenericOp(genericOp, rewriter);
   GenericOp residualGenericOp =
