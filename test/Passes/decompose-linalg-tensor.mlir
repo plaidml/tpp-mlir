@@ -2,10 +2,9 @@
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @two_adds() -> tensor<28x32xf32> {
+func.func @two_adds(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 1.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -23,7 +22,7 @@ func.func @two_adds() -> tensor<28x32xf32> {
 // The original output buffer should be reused in all generics.
 
 // CHECK: func.func @two_adds(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.addf
@@ -37,11 +36,9 @@ func.func @two_adds() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @add_max() -> tensor<28x32xf32> {
+func.func @add_max(%in1 : tensor<28x32xf32>, %in2 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
-  %in2 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -60,8 +57,8 @@ func.func @add_max() -> tensor<28x32xf32> {
 // The original output buffer should be reused in all generics.
 
 // CHECK: func.func @add_max(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
-// CHECK: %[[IN1:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>,
+// CHECK-SAME:    %[[IN1:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]], %[[IN1]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.addf
@@ -75,8 +72,7 @@ func.func @add_max() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @two_ops_output_consumer() -> tensor<28x32xf32> {
-  %in1 = tensor.empty() : tensor<28x32xf32>
+func.func @two_ops_output_consumer(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -94,7 +90,7 @@ func.func @two_ops_output_consumer() -> tensor<28x32xf32> {
 // The original output buffer should be reused in all generics.
 
 // CHECK: func.func @two_ops_output_consumer(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]], %[[OUT]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.addf
@@ -108,10 +104,9 @@ func.func @two_ops_output_consumer() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @two_ops_output_consumer2() -> tensor<28x32xf32> {
+func.func @two_ops_output_consumer2(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 1.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -129,7 +124,7 @@ func.func @two_ops_output_consumer2() -> tensor<28x32xf32> {
 // The first partial result should be stored in a temporary buffer.
 
 // CHECK: func.func @two_ops_output_consumer2(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[G0:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[G0]] :{{.*}}) {
@@ -144,10 +139,9 @@ func.func @two_ops_output_consumer2() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @two_ops_output_consumer3() -> tensor<28x32xf32> {
+func.func @two_ops_output_consumer3(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 1.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -165,7 +159,7 @@ func.func @two_ops_output_consumer3() -> tensor<28x32xf32> {
 // The first partial result should be stored in a temporary buffer.
 
 // CHECK: func.func @two_ops_output_consumer3(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[G0:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]], %[[OUT]] :{{.*}}){{.*}}outs(%[[G0]] :{{.*}}) {
@@ -180,10 +174,9 @@ func.func @two_ops_output_consumer3() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @produce_consume_chain() -> tensor<28x32xf32> {
+func.func @produce_consume_chain(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -204,7 +197,7 @@ func.func @produce_consume_chain() -> tensor<28x32xf32> {
 // The original output buffer should be reused in all generics.
 
 // CHECK: func.func @produce_consume_chain(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.maxf
@@ -227,10 +220,9 @@ func.func @produce_consume_chain() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @produce_multi_consume() -> tensor<28x32xf32> {
+func.func @produce_multi_consume(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -251,7 +243,7 @@ func.func @produce_multi_consume() -> tensor<28x32xf32> {
 // The partial result is expected to be stored in a separate temporary buffer.
 
 // CHECK: func.func @produce_multi_consume(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.maxf
@@ -277,10 +269,9 @@ func.func @produce_multi_consume() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @produce_delayed_consume() -> tensor<28x32xf32> {
+func.func @produce_delayed_consume(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -301,7 +292,7 @@ func.func @produce_delayed_consume() -> tensor<28x32xf32> {
 // The partial result is expected to be stored in a separate temporary buffer.
 
 // CHECK: func.func @produce_delayed_consume(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[OUT]] :{{.*}}) {
 // CHECK:   arith.maxf
@@ -327,10 +318,9 @@ func.func @produce_delayed_consume() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @output_multi_consumers() -> tensor<28x32xf32> {
+func.func @output_multi_consumers(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -352,7 +342,7 @@ func.func @output_multi_consumers() -> tensor<28x32xf32> {
 // to avoid corrupting the input values held by the original output buffer.
 
 // CHECK: func.func @output_multi_consumers(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[G0:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[G0]] :{{.*}}) {
@@ -379,10 +369,9 @@ func.func @output_multi_consumers() -> tensor<28x32xf32> {
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @output_multi_consumers2() -> tensor<28x32xf32> {
+func.func @output_multi_consumers2(%in1 : tensor<28x32xf32>) -> tensor<28x32xf32> {
   %cst = arith.constant 0.0 : f32
 
-  %in1 = tensor.empty() : tensor<28x32xf32>
   %out = tensor.empty() : tensor<28x32xf32>
 
   %0 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]}
@@ -404,7 +393,7 @@ func.func @output_multi_consumers2() -> tensor<28x32xf32> {
 // to avoid corrupting the input values held by the original output buffer.
 
 // CHECK: func.func @output_multi_consumers2(
-// CHECK: %[[IN:.+]] = tensor.empty() : tensor<28x32xf32>
+// CHECK-SAME:    %[[IN:.+]]: tensor<28x32xf32>
 // CHECK: %[[OUT:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[G0:.+]] = tensor.empty() : tensor<28x32xf32>
 // CHECK: %[[OUT_0:.+]] = linalg.generic{{.*}}ins(%[[IN]] :{{.*}}){{.*}}outs(%[[G0]] :{{.*}}) {
@@ -427,3 +416,66 @@ func.func @output_multi_consumers2() -> tensor<28x32xf32> {
 // CHECK:   arith.addf
 // CHECK: }
 // CHECK: return %[[OUT_RES]]
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+#map2 = affine_map<(d0, d1) -> (d1, d0)>
+func.func @different_shapes(%arg0 : tensor<10x20xf32>, %arg1 : tensor<10xi32>) -> tensor<20x10xf64> {
+  %init = tensor.empty() : tensor<20x10xf64>
+  %0 = linalg.generic {
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : tensor<10x20xf32>, tensor<10xi32>)
+    outs(%init : tensor<20x10xf64>) {
+    ^bb0(%b0 : f32, %b1 : i32, %b2 : f64):
+      %1 = arith.sitofp %b1 : i32 to f64
+      %2 = arith.extf %b0 : f32 to f64
+      %3 = arith.addf %1, %2 : f64
+      linalg.yield %3 : f64
+    } -> tensor<20x10xf64>
+  return %0 : tensor<20x10xf64>
+}
+
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+//      CHECK: func @different_shapes(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<10xi32>)
+//  CHECK-DAG:   %[[INIT0:.+]] = tensor.empty() : tensor<20x10xf64>
+//  CHECK-DAG:   %[[INIT1:.+]] = tensor.empty() : tensor<10x20xf64>
+//      CHECK:   %[[GENERIC0:.+]] = linalg.generic
+// CHECK-SAME:       indexing_maps = [#[[MAP0]], #[[MAP1]]]
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:       ins(%[[ARG1]] :
+// CHECK-SAME:       outs(%[[INIT1]] :
+// CHECK-NEXT:     ^bb0(
+// CHECK-SAME:         %[[B0:.+]]: i32
+// CHECK-SAME:         %[[B1:.+]]: f64
+// CHECK-NEXT:       %[[S0:.+]] = arith.sitofp %[[B0]] : i32 to f64
+// CHECK-NEXT:       linalg.yield %[[S0]]
+//  CHECK:       %[[INIT2:.+]] = tensor.empty() : tensor<10x20xf64>
+//      CHECK:   %[[GENERIC1:.+]] = linalg.generic
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:       ins(%[[ARG0]] :
+// CHECK-SAME:       outs(%[[INIT2]] :
+// CHECK-NEXT:     ^bb0(
+// CHECK-SAME:         %[[B2:.+]]: f32
+// CHECK-SAME:         %[[B3:.+]]: f64
+// CHECK-NEXT:       %[[S1:.+]] = arith.extf %[[B2]] : f32 to f64
+// CHECK-NEXT:       linalg.yield %[[S1]]
+//      CHECK:   %[[GENERIC2:.+]] = linalg.generic
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:       iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:       ins(%[[GENERIC0]], %[[GENERIC1]] :
+// CHECK-SAME:       outs(%[[INIT0]] :
+// CHECK-NEXT:     ^bb0(
+// CHECK-SAME:         %[[B4:[a-zA-Z0-9_]+]]: f64
+// CHECK-SAME:         %[[B5:[a-zA-Z0-9_]+]]: f64
+// CHECK-SAME:         %[[B6:.+]]: f64
+// CHECK-NEXT:       %[[S2:.+]] = arith.addf %[[B4]], %[[B5]] : f64
+// CHECK-NEXT:       linalg.yield %[[S2]]
+//      CHECK:   return %[[GENERIC2]]
