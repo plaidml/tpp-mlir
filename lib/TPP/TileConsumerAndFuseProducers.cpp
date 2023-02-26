@@ -363,7 +363,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   llvm::SmallDenseSet<Operation *> worklist =
       collectFusableProducers(consumer, tileSizes, alreadyFusedOps, maxDepth);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
-  if (worklist.size() == 0)
+  if (worklist.size() < 2 /*&& maxDepth != 0*/)
     return failure();
 
   // Step 4. Tile the consumer.
@@ -443,18 +443,45 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
 
 static SmallVector<int64_t> getDefaultTileSizes() { return {32, 32}; }
 
-static FailureOr<Operation *>
-getImmediateElementWiseConsumer(linalg::LinalgOp linalgOp) {
-  assert(linalgOp->getNumResults() == 1);
-  Value res = linalgOp->getResult(0);
+static Operation *
+getLastFusableConsumer(linalg::LinalgOp linalgOp,
+                       llvm::SmallDenseSet<Operation *> &visitedConsumers) {
+  assert(linalgOp->getNumResults() == 1 && "Expect single result operation");
+  Value linalgOpRes = linalgOp->getResult(0);
   // If we allow use, we may end up doing recomputation. Unclear if it is
-  // profitable thus disallow for now.
-  if (!res.hasOneUse())
-    return failure();
-  Operation *consumer = *(res.getUsers().begin());
-  if (!isa<linalg::LinalgOp>(consumer) || !linalg::isElementwise(consumer))
-    return failure();
-  return consumer;
+  // profitablem thus disallow for now.
+  if (!linalgOpRes.hasOneUse())
+    return linalgOp;
+
+  // Start checking consumers.
+  Operation *nextConsumer = *(linalgOpRes.getUsers().begin());
+  Operation *currentConsumer = linalgOp;
+  visitedConsumers.insert(currentConsumer);
+
+  auto isValidEltWiseConsumer = [&](Operation *op) {
+    // Make sure we visit each consumer only once.
+    if (visitedConsumers.count(op))
+      return false;
+
+    if (!isa<linalg::LinalgOp>(op) || !linalg::isElementwise(op))
+      return false;
+    // Require same iteration space.
+    if (cast<linalg::LinalgOp>(op).getNumParallelLoops() !=
+        cast<linalg::LinalgOp>(currentConsumer).getNumParallelLoops())
+      return false;
+
+    return op->getNumResults() == 1;
+  };
+
+  while (isValidEltWiseConsumer(nextConsumer)) {
+    Value resNextConsumer = nextConsumer->getResult(0);
+    if (!resNextConsumer.hasOneUse())
+      return currentConsumer;
+    currentConsumer = nextConsumer;
+    visitedConsumers.insert(currentConsumer);
+    nextConsumer = *(resNextConsumer.getUsers().begin());
+  }
+  return currentConsumer;
 }
 
 struct TileConsumerAndFuseProducers
@@ -480,32 +507,35 @@ struct TileConsumerAndFuseProducers
         linalgOperations.push_back(linalgOp.getOperation());
     });
 
-    llvm::SmallDenseSet<Operation *> immediateConsumers;
-    if (this->immediateConsumer) {
+    llvm::SmallDenseSet<Operation *> visitedConsumers;
+    llvm::SmallDenseSet<Operation *> fusionRoots;
+    if (this->startFromLastFusableConsumer) {
       for (linalg::LinalgOp linalgOp : linalgOperations) {
-        FailureOr<Operation *> immediateConsumer =
-            getImmediateElementWiseConsumer(linalgOp);
-        if (failed(immediateConsumer))
-          continue;
-        // If we alredy have the consumer in the set, it is already processed,
-        // move to the next.
-        if (immediateConsumers.count(*immediateConsumer))
-          continue;
-        immediateConsumers.insert(*immediateConsumer);
+        fusionRoots.insert(getLastFusableConsumer(linalgOp, visitedConsumers));
       }
     } else {
       for (Operation *currentOp : linalgOperations)
-        immediateConsumers.insert(currentOp);
+        fusionRoots.insert(currentOp);
     }
 
-    func->walk([&](linalg::LinalgOp linalgOp) {
-      if (immediateConsumers.count(linalgOp.getOperation())) {
+    LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
+
+    SmallVector<Operation *> allLinalgOps;
+    func->walk(
+        [&](linalg::LinalgOp linalgOp) { allLinalgOps.push_back(linalgOp); });
+
+    // We want to walk operations in reverse order as fusion will likely find
+    // larger cluster of operations to fuse if we go bottom-up.
+    std::reverse(allLinalgOps.begin(), allLinalgOps.end());
+
+    for (Operation *linalgOp : allLinalgOps) {
+      if (fusionRoots.count(linalgOp)) {
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (this->tileSizes.empty())
           this->tileSizes = getDefaultTileSizes();
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
             fuseWithEltwise(
-                rewriter, cast<TilingInterface>(linalgOp.getOperation()),
+                rewriter, cast<TilingInterface>(linalgOp),
                 getAsOpFoldResult(rewriter.getI64ArrayAttr(this->tileSizes)),
                 fusedOps, this->maxDepth);
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
@@ -515,7 +545,7 @@ struct TileConsumerAndFuseProducers
               (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
         }
       }
-    });
+    }
 
     RewritePatternSet patterns(&getContext());
     // fold unit-extent dims for linalg on tensors.

@@ -25,19 +25,19 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   return %3 : tensor<32x32xf32>
 }
 
+// The fusion cost-fuction requires to have at least 2 fusion candidates.
+// Using depth 0 will always force a single candidate in the worklist, expect
+// no fusion.
 // DEPTH0: func.func @matmul_sequence_fusion(
-// DEPTH0-DAG: %[[C0:.+]] = arith.constant 0 : index
-// DEPTH0-DAG: %[[C32:.+]] = arith.constant 32 : index
-// DEPTH0-DAG: %[[C1:.+]] = arith.constant 1 : index
+// DEPTH0-NOT: scf.for
 // DEPTH0-COUNT-3: linalg.matmul
-// DEPTH0: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
 // DEPTH0-COUNT-1: linalg.generic
-
 
 // DEPTH1: func.func @matmul_sequence_fusion(
 // DEPTH1-DAG: %[[C0:.+]] = arith.constant 0 : index
 // DEPTH1-DAG: %[[C32:.+]] = arith.constant 32 : index
 // DEPTH1-DAG: %[[C1:.+]] = arith.constant 1 : index
+// DEPTH1: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
 // DEPTH1-COUNT-2: linalg.matmul
 // DEPTH1: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
 // DEPTH1-COUNT-1: linalg.matmul
