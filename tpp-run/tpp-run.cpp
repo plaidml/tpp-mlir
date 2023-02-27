@@ -28,6 +28,7 @@
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/ValueRange.h"
@@ -64,6 +65,12 @@ llvm::cl::opt<bool> printKernelResult("print",
 llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
                                llvm::cl::desc("Lower TPP to loops"),
                                llvm::cl::init(false));
+
+// Replace dense splat tensors with random dense
+llvm::cl::opt<bool>
+    splatRandom("splat-to-random",
+                llvm::cl::desc("Replace splat dense tensors with random value"),
+                llvm::cl::init(false));
 
 // Random seed, if zero, don't emit randominputs
 llvm::cl::opt<int> seed("seed",
@@ -106,7 +113,12 @@ llvm::cl::opt<bool> dumpLLVM("dump-llvm",
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
+  // Benchmark object
   MLIRBench bench(op, seed, tppToLoops);
+
+  // Input validation
+  if (splatRandom && !seed)
+    return bench.emitError("Cannot replace splats with random without seed");
 
   // Basic checks
   if (options.mainFuncType != "void")
@@ -119,6 +131,9 @@ static LogicalResult prepareMLIRKernel(Operation *op,
 
   if (failed(bench.checkKernelSignature()))
     return bench.finalize(dumpMLIR);
+
+  if (splatRandom && failed(bench.replaceSplatWithRandom()))
+    return bench.emitError("Error converting splat tensors with random values");
 
   // Move the kernel to a local name, so we can create `main` with the same
   // name as the pre-defined entry point (since we can't change it)

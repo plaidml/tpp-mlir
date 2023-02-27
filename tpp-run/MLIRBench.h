@@ -99,6 +99,9 @@ public:
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
 
+  /// Replace all dense splat tensors/memrefs with random values in the kernel
+  LogicalResult replaceSplatWithRandom();
+
   /// Create and initialize the kernel input arguments
   /// The values are cached locally in a kernel argument list, in order
   LogicalResult createKernelArgs();

@@ -94,6 +94,46 @@ LogicalResult MLIRBench::checkKernelSignature() {
   return success();
 }
 
+LogicalResult MLIRBench::replaceSplatWithRandom() {
+  if (!seed)
+    return module.emitError("No seed for random init");
+
+  // Only replace attribute if it's a dense splat
+  auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
+    auto value = dyn_cast<DenseElementsAttr>(attr);
+    if (!value || !value.isSplat())
+      return attr;
+    auto dataType = TensorInit::DataType::FP32;
+    if (shape.getElementType().isBF16())
+      dataType = TensorInit::DataType::BF16;
+    NormalTensorInit init(dataType, seed);
+    return init.get(shape);
+  };
+
+  // Memrefs are memref.global values
+  for (auto &op : module->getRegion(0).getOps()) {
+    // Only replace the global
+    auto global = dyn_cast<memref::GlobalOp>(op);
+    if (!global)
+      continue;
+    auto newAttr = replaceSplat(global.getType(), global.getInitialValueAttr());
+    global.setInitialValueAttr(newAttr);
+  }
+
+  // Tensors are arith.constant values
+  for (auto &op : kernel->getRegion(0).getOps()) {
+    // Only replace the global
+    auto constant = dyn_cast<arith::ConstantOp>(op);
+    if (!constant)
+      continue;
+    auto newAttr = replaceSplat(constant.getType(), constant.getValueAttr());
+    constant.setValueAttr(newAttr);
+  }
+
+
+  return success();
+}
+
 LogicalResult MLIRBench::renameKernel() {
   // Rename the entry point to something else and make the main the entry point
   // This is required because we can't change the original Name
