@@ -31,65 +31,14 @@ namespace {
 /// a second GenericOp with the remaining statements (i.e. residual operations).
 
 /// - The result of the first GenericOp has the same shape as the iteration
-///   space of the GenericOp. The body of the op yields as many values as the
-///   original op plus all the results of the peeled operation.
-/// - The second GenericOp has as many operands as the original operation plus
-/// all the results of the first Generic Op. It has the same number of yields as
-/// the original op.
+///   space of the GenericOp. The body of the op yields all the results of the
+///   peeled operation.
+/// - The second GenericOp has as many operands as the original operation
+///   (all the original inputs and outputs) plus all the results of the first
+///   Generic Op. It has the same number of yields as the original op.
 /// - If the result of the peeled operation was yielded by the original
 ///   GenericOp the uses of the corresponding results will be replaced with the
 ///   result of the first GenericOp created.
-///
-///  Example
-///
-/// ```mlir
-///  %result:2 = linalg.generic ... ins(%arg0, %arg1, %arg2 : ...)
-///      outs(%init0, %init1 : ...) {
-///    ^bb0(%b0: ... , %b1: ... , %b2: ... , %b3: ..., %b4: ...):
-///      %0 = <s0> %b0, %b1 : ...
-///      %1 = <s1> %0, %b2 : ...
-///      linalg.yield %0, %1 : ...
-///  } -> (..., ...)
-///  return %result#0, %result#1
-/// ```
-///
-/// gets split into
-///
-/// ```mlir
-/// %init = tensor.empty ...
-/// %op0:3 = linalg.generic ... ins(%arg0, %arg1, %arg2 : ...)
-///      outs(%init0, %init1, %init : ...)
-///    ^bb0(%b0: ... , %b1: ... , %b2: ... , %b3: ..., %b4: ..., %b5: ...):
-///      %0 = <s0> %b0, %b1 : ...
-///      linalg.yield %0, %..., %0 : ...
-///  } -> (..., ..., ...)
-/// %op1:2 = linalg.generic ... ins(%arg0, %arg1, %arg2, %op0#2 : ...)
-///      outs(%init0, %init1 : ...) {
-///    ^bb0(%b0: ... , %b1: ... , %b2: ... , %b3: ..., %b4: ..., %b5: ...):
-///      %1 = <s1> %b3, %b2 : ...
-///      linalg.yield %..., %1 : ...
-///  } -> (..., ...)
-///  return %op0#0, %op1#1
-/// ```
-///
-/// After canonicalization this is expected to be
-///
-/// ```mlir
-/// %init = tensor.empty ...
-/// %op0 = linalg.generic ... ins(%arg0, %arg1, : ...)
-///      outs(%init : ...)
-///    ^bb0(%b0: ... , %b1: ... , %b2: ...):
-///      %0 = <s0> %b0, %b1 : ...
-///      linalg.yield %0 : ...
-///  } -> ...
-/// %op1 = linalg.generic ... ins(%arg2, %op0#2 : ...)
-///      outs(%init1 : ...) {
-///    ^bb0(%b0: ... , %b1: ... , %b2: ...):
-///      %1 = <s1> %b1, %b0 : ...
-///      linalg.yield %..., %1 : ...
-///  } -> ...
-///  return %op0, %op1
-/// ```
 struct DecomposeLinalgOp : public OpRewritePattern<GenericOp> {
   using OpRewritePattern<GenericOp>::OpRewritePattern;
 
@@ -146,6 +95,9 @@ static SmallVector<OpFoldResult> getGenericOpLoopRange(OpBuilder &b,
                                                   allShapesSizes);
 }
 
+/// Helper method to analyse generic op to determine whether the given output
+/// buffer can be use to store intermediate result of the provided scalar body
+/// operation.
 static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
                            Operation *bodyOp, Value bodyOpResult) {
   assert(bodyOp->getParentOp() == genericOp.getOperation() &&
@@ -183,6 +135,8 @@ static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
 GenericOp
 DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
                                          PatternRewriter &rewriter) const {
+  // Depending whether tensors or memrefs are used, the generic op results
+  // or outputs have to be used, respectively.
   bool isTensor = genericOp.hasTensorSemantics();
 
   Block *body = genericOp.getBody();
@@ -190,6 +144,7 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
   SmallVector<AffineMap> peeledGenericOpIndexingMaps =
       genericOp.getIndexingMapsArray();
 
+  /// Use all the same input and output operands as the original operation.
   SmallVector<Value> newInputValues = genericOp.getInputs();
   SmallVector<Value> origOuts = genericOp.getOutputs();
   newInputValues.append(origOuts);
@@ -304,6 +259,8 @@ GenericOp
 DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
                                            GenericOp peeledGenericOp,
                                            PatternRewriter &rewriter) const {
+  // Depending whether tensors or memrefs are used, the generic op results
+  // or outputs have to be used, respectively.
   bool isTensor = genericOp.hasTensorSemantics();
 
   /// Append all results from the peeledGenericOps as `ins` operand for the
