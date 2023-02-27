@@ -19,6 +19,7 @@ add_mlir_library(MLIRTPP
     ConvInitSimplify.cpp
 
   # Utils
+    TensorInit.cpp
     TransformUtils.cpp
     VNNIUtils.cpp
 

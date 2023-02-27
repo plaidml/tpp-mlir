@@ -32,6 +32,7 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
+#include "TPP/TensorInit.h"
 
 using namespace mlir;
 
@@ -315,12 +316,15 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(getKernelResult(kernelCall));
 }
 
-LogicalResult MLIRBench::finalize() {
+LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
     builder.create<func::ReturnOp>(unkLoc);
   }
+
+  if (dumpMLIR)
+    module->dump();
 
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
@@ -378,22 +382,16 @@ arith::ConstantOp MLIRBench::getConstant(Type type, ValueT value) {
 }
 
 DenseElementsAttr MLIRBench::getDenseAttribute(ShapedType shape) {
-  // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0F);
+  auto dataType = TensorInit::DataType::FP32;
+  if (shape.getElementType().isBF16())
+    dataType = TensorInit::DataType::BF16;
 
-  if (shape.getElementType().isBF16()) {
-    bool ignored;
-    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &ignored);
-  } else {
-    assert(shape.getElementType().isF32() && "Element type not supported");
+  if (seed) {
+    NormalTensorInit init(dataType, seed);
+    return init.get(shape);
   }
-
-  // For some reason, memref global op needs dense tensor type
-  // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-  auto tensorType =
-      RankedTensorType::get(shape.getShape(), shape.getElementType());
-  return mlir::DenseElementsAttr::get(tensorType, floatValue);
+  ConstantTensorInit init(dataType);
+  return init.get(shape);
 }
 
 llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
@@ -430,25 +428,6 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
 }
 
 Value MLIRBench::createDenseTensor(TensorType type) {
-  // If seed is not zero, generate a random fill tensor
-  if (seed) {
-    assert(type.getRank() == 2 && "Wrong shape to random fill");
-
-    // Inputs (min, max, seed)
-    Value zero = getConstant(builder.getF64Type(), 0.0);
-    Value one = getConstant(builder.getF64Type(), 1.0);
-    Value randSeed = getConstant(builder.getI32Type(), seed);
-
-    // Output tensor
-    Value out = builder.create<tensor::EmptyOp>(unkLoc, type, ValueRange{});
-
-    // Fill
-    auto fill = builder.create<linalg::FillRng2DOp>(unkLoc,
-        ValueRange{zero, one, randSeed}, ValueRange{out});
-    return fill.getResult(0);
-  }
-
-  // Otherwise, just get a const tensor
   auto floatInit = getDenseAttribute(type);
   return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }
