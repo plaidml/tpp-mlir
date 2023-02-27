@@ -7,7 +7,11 @@ DenseElementsAttr TensorInit::get(ShapedType shape) {
   for (size_t dim=0, rank = shape.getRank(); dim<rank; dim++)
     size *= shape.getDimSize(dim);
   fillData();
-  return mlir::DenseElementsAttr::get(shape, buffer);
+  // For some reason, memref global op needs dense tensor type
+  // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
+  auto tensorType =
+      RankedTensorType::get(shape.getShape(), shape.getElementType());
+  return mlir::DenseElementsAttr::get(tensorType, buffer);
 }
 
 void TensorInit::insert(size_t index, float value) {

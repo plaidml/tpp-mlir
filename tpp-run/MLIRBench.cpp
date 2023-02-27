@@ -94,6 +94,52 @@ LogicalResult MLIRBench::checkKernelSignature() {
   return success();
 }
 
+LogicalResult MLIRBench::replaceSplatWithRandom() {
+  if (!seed)
+    return module.emitError("No seed for random init");
+
+  // Only replace attribute if it's a dense splat
+  auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
+    // We only change float types
+    auto elmTy = shape.getElementType();
+    if (!elmTy.isBF16() && !elmTy.isF32())
+      return attr;
+    // We only change dense attributes that are splat
+    auto value = dyn_cast<DenseElementsAttr>(attr);
+    if (!value || !value.isSplat())
+      return attr;
+    // Get the right float data type
+    auto widthInBits = elmTy.getIntOrFloatBitWidth();
+    TensorInit::DataType dataType = TensorInit::getFloatDataType(widthInBits);
+    // Generate a new random dense and return
+    NormalTensorInit init(dataType, seed);
+    return init.get(shape);
+  };
+
+  // Memrefs are memref.global values
+  for (auto &op : module->getRegion(0).getOps()) {
+    // Only replace the global
+    auto global = dyn_cast<memref::GlobalOp>(op);
+    if (!global)
+      continue;
+    auto newAttr = replaceSplat(global.getType(), global.getInitialValueAttr());
+    global.setInitialValueAttr(newAttr);
+  }
+
+  // Tensors are arith.constant values
+  for (auto &op : kernel->getRegion(0).getOps()) {
+    // Only replace the global
+    auto constant = dyn_cast<arith::ConstantOp>(op);
+    if (!constant)
+      continue;
+    auto newAttr = replaceSplat(constant.getType(), constant.getValueAttr());
+    constant.setValueAttr(newAttr);
+  }
+
+
+  return success();
+}
+
 LogicalResult MLIRBench::renameKernel() {
   // Rename the entry point to something else and make the main the entry point
   // This is required because we can't change the original Name
