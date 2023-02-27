@@ -9,6 +9,8 @@ func.func @entry(%input: tensor<4x2xf32>) {
   %0 = arith.constant dense<1.0> : tensor<2x16xf32>
   %1 = arith.constant dense<2.0> : tensor<4x16xf32>
   %2 = arith.constant dense<0.0> : tensor<4x8xf32>
+  %3 = arith.constant dense<[[0.0, 1.0],[2.0, 3.0]]> : tensor<2x2xf32>
+  %4 = arith.constant dense<0> : tensor<4x8xi32>
   return
 }
 // Constants
@@ -16,6 +18,8 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // SPLAT: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // SPLAT: arith.constant dense<2.000000e+00> : tensor<4x16xf32>
 // SPLAT: arith.constant dense<0.000000e+00> : tensor<4x8xf32>
+// SPLAT: arith.constant dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
+// SPLAT: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // SPLAT-LABEL: @entry
 // SPLAT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>
@@ -25,6 +29,8 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // RANDOM: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // RANDOM: arith.constant dense<2.000000e+00> : tensor<4x16xf32>
 // RANDOM: arith.constant dense<0.000000e+00> : tensor<4x8xf32>
+// RANDOM: arith.constant dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
+// RANDOM: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // RANDOM-LABEL: @entry
 // RANDOM-NOT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>
@@ -34,6 +40,8 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // RANDOM-SPLAT-NOT: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // RANDOM-SPLAT-NOT: arith.constant dense<2.000000e+00> : tensor<4x16xf32>
 // RANDOM-SPLAT-NOT: arith.constant dense<0.000000e+00> : tensor<4x8xf32>
+// RANDOM-SPLAT: arith.constant dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
+// RANDOM-SPLAT: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // RANDOM-SPLAT-LABEL: @entry
 // RANDOM-SPLAT-NOT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>

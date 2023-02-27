@@ -100,12 +100,18 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
 
   // Only replace attribute if it's a dense splat
   auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
+    // We only change float types
+    auto elmTy = shape.getElementType();
+    if (!elmTy.isBF16() && !elmTy.isF32())
+      return attr;
+    // We only change dense attributes that are splat
     auto value = dyn_cast<DenseElementsAttr>(attr);
     if (!value || !value.isSplat())
       return attr;
-    auto dataType = TensorInit::DataType::FP32;
-    if (shape.getElementType().isBF16())
-      dataType = TensorInit::DataType::BF16;
+    // Get the right float data type
+    auto widthInBits = elmTy.getIntOrFloatBitWidth();
+    TensorInit::DataType dataType = TensorInit::getFloatDataType(widthInBits);
+    // Generate a new random dense and return
     NormalTensorInit init(dataType, seed);
     return init.get(shape);
   };

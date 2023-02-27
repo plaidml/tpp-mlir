@@ -21,8 +21,20 @@
 struct TensorInit {
   /// Data type (TODO: Support 64/8-bit data types)
   enum DataType {
-    FP32, BF16
+    INVALID, FP32, BF16
   };
+
+  /// Get the data type for the float with width bits
+  static DataType getFloatDataType(unsigned widthInBits) {
+    switch (widthInBits) {
+      case 16:
+        return BF16;
+      case 32:
+        return FP32;
+      default:
+        return INVALID;
+    }
+  }
 
 protected:
   /// BF16 conversion (by reference)
