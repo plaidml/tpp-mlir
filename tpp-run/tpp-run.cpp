@@ -216,7 +216,7 @@ lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
   auto optPipeline =
       makeOptimizingTransformer(optLevel, sizeLevel, targetMachine.get());
   if (auto err = optPipeline(llvmModule.get())) {
-    llvmModule->dump();
+    llvmModule->print(llvm::errs(), nullptr);
     llvm::errs() << "Error while passing through the LLVM pipeline: ";
     llvm::errs() << err << "\n";
     return nullptr;
@@ -229,7 +229,7 @@ lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
   }
 
   if (dumpLLVM)
-    llvmModule->dump();
+    llvmModule->print(llvm::outs(), nullptr);
 
   return llvmModule;
 }
