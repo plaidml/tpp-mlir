@@ -32,13 +32,13 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
-#include "TPP/TensorInit.h"
 
 using namespace mlir;
 
-MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops)
+MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops,
+                     TensorInitType initType)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()), seed(seed),
-      tppToLoops(tppToLoops) {
+      tppToLoops(tppToLoops), initType(initType) {
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
   auto *ctx = module->getContext();
@@ -108,17 +108,17 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
     auto value = dyn_cast<DenseElementsAttr>(attr);
     if (!value || !value.isSplat())
       return attr;
-    // Get the right float data type
-    auto widthInBits = elmTy.getIntOrFloatBitWidth();
-    TensorInit::DataType dataType = TensorInit::getFloatDataType(widthInBits);
+    // Only positive float data type (zero may be for ReLU, -1 for fill)
+    auto elm = value.getSplatValue<FloatAttr>().getValueAsDouble();
+    if (elm <= 0.0)
+      return attr;
     // Generate a new random dense and return
-    NormalTensorInit init(dataType, seed);
-    return init.get(shape);
+    auto init = getTensorInit(initType, elmTy, seed);
+    return init->get(shape);
   };
 
   // Memrefs are memref.global values
   for (auto &op : module->getRegion(0).getOps()) {
-    // Only replace the global
     auto global = dyn_cast<memref::GlobalOp>(op);
     if (!global)
       continue;
@@ -128,7 +128,6 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
 
   // Tensors are arith.constant values
   for (auto &op : kernel->getRegion(0).getOps()) {
-    // Only replace the global
     auto constant = dyn_cast<arith::ConstantOp>(op);
     if (!constant)
       continue;
@@ -428,16 +427,8 @@ arith::ConstantOp MLIRBench::getConstant(Type type, ValueT value) {
 }
 
 DenseElementsAttr MLIRBench::getDenseAttribute(ShapedType shape) {
-  auto dataType = TensorInit::DataType::FP32;
-  if (shape.getElementType().isBF16())
-    dataType = TensorInit::DataType::BF16;
-
-  if (seed) {
-    NormalTensorInit init(dataType, seed);
-    return init.get(shape);
-  }
-  ConstantTensorInit init(dataType);
-  return init.get(shape);
+  auto init = getTensorInit(initType, shape.getElementType(), seed);
+  return init->get(shape);
 }
 
 llvm::StringRef MLIRBench::createGlobal(MemRefType type) {

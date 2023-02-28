@@ -21,20 +21,8 @@
 struct TensorInit {
   /// Data type (TODO: Support 64/8-bit data types)
   enum DataType {
-    INVALID, FP32, BF16
+    FP32, BF16
   };
-
-  /// Get the data type for the float with width bits
-  static DataType getFloatDataType(unsigned widthInBits) {
-    switch (widthInBits) {
-      case 16:
-        return BF16;
-      case 32:
-        return FP32;
-      default:
-        return INVALID;
-    }
-  }
 
 protected:
   /// BF16 conversion (by reference)
@@ -58,7 +46,7 @@ protected:
   void insert(size_t index, float value);
 
   /// Insert element at the end of the buffer
-  void push_back(float value);
+  void push(float value);
 
   /// Actual implementation that fills the buffer
   /// To be implemented by derived classes.
@@ -108,11 +96,6 @@ struct RandomTensorInit : TensorInit {
   RandomTensorInit(DataType type, int seed)
       : TensorInit(type), generator(seed), distribution(0.0, 1.0) {}
 
-  /// Random generator
-  std::default_random_engine generator;
-  /// Random distribution
-  std::uniform_real_distribution<float> distribution;
-
   /// Next random uniform number
   float next() {
     return distribution(generator);
@@ -120,17 +103,18 @@ struct RandomTensorInit : TensorInit {
 
   /// Return a dense<uniform(0.0, 1.0)> throughout the shape
   void fillData() override;
+
+private:
+  /// Random generator
+  std::default_random_engine generator;
+  /// Random distribution
+  std::uniform_real_distribution<float> distribution;
 };
 
 /// Random init (normal)
 struct NormalTensorInit : TensorInit {
   NormalTensorInit(DataType type, int seed)
       : TensorInit(type), generator(seed), distribution(0.0, 0.2) {}
-
-  /// Random generator
-  std::default_random_engine generator;
-  /// Random distribution
-  std::normal_distribution<float> distribution;
 
   /// Next random number
   float next() {
@@ -141,6 +125,40 @@ struct NormalTensorInit : TensorInit {
 
   /// Return a dense<normal(0.0, 1.0)> throughout the shape
   void fillData() override;
+
+private:
+  /// Random generator
+  std::default_random_engine generator;
+  /// Random distribution
+  std::normal_distribution<float> distribution;
 };
+
+/// Initialization type, to use with the getter below
+enum class TensorInitType {
+  Auto,
+  Constant,
+  Simple,
+  Continuous,
+  Random,
+  Normal,
+  Invalid
+};
+
+/// Unique pointer for tensor init to help with memory management
+using TensorInitPtr = std::unique_ptr<TensorInit>;
+
+/// Parse init type string into TensorInitType
+TensorInitType parseTensorInitType(llvm::StringRef name);
+
+/// Return an initializer smart pointer (via init type)
+TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType,
+                            int seed = 0);
+
+/// Return an initializer smart pointer (via string init)
+TensorInitPtr getTensorInit(llvm::StringRef type, mlir::Type elmType,
+                            int seed = 0);
+
+/// Get data type from element type
+TensorInit::DataType getTensorInitDataType(mlir::Type type);
 
 #endif

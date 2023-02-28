@@ -35,7 +35,7 @@ func.func @entry(%input: memref<4x2xf32>) {
 // RANDOM-SPLAT-NOT: @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // RANDOM-SPLAT-NOT: constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00>
 // RANDOM-SPLAT-NOT: constant @__constant_4x16xf32 : memref<4x16xf32> = dense<2.000000e+00>
-// RANDOM-SPLAT-NOT: constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.000000e+00>
+// RANDOM-SPLAT: constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.000000e+00>
 // RANDOM-SPLAT: constant @__constant_non_splat : memref<2x2xf32> = dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
 // RANDOM-SPLAT: constant @__constant_4x8xi32 : memref<4x8xi32> = dense<0>
 // RANDOM-SPLAT-LABEL: @_entry

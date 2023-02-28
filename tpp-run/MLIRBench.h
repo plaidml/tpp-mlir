@@ -18,6 +18,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "TPP/TensorInit.h"
+
 namespace mlir {
 class ModuleOp;
 class MemRefType;
@@ -64,6 +66,9 @@ class MLIRBench {
   /// Lower TPP to loops for validation purposes
   bool tppToLoops;
 
+  /// Tensor init type
+  TensorInitType initType;
+
   /// Create a random global based on the memref type
   llvm::StringRef createGlobal(MemRefType);
 
@@ -87,7 +92,7 @@ class MLIRBench {
 
 public:
   /// Creates context, builder
-  MLIRBench(Operation *op, int seed, bool tppToLoops);
+  MLIRBench(Operation *op, int seed, bool tppToLoops, TensorInitType initType);
 
   /// Finds the kernel method, checks correct name and shape
   LogicalResult findKernel(llvm::StringRef);
