@@ -115,12 +115,13 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                     return;
                   for (int i = 0;
                        i < packOp.getDestType().getRank() - pointLoops; i++) {
-                    if (i < startTiledLoop)
+                    if (i < startTiledLoop) {
                       delSourceIndexes.push_back(delDestIndexes[i]);
-                    else
+                    } else {
                       delSourceIndexes.push_back(delDestIndexes[i] *
                                                      tilesSizes[tilePosIdx++] +
                                                  delDestIndexes[i + 2]);
+                    }
                   }
                   assert(delSourceIndexes.size() ==
                          static_cast<size_t>(packOp.getSourceType().getRank()));
@@ -133,9 +134,10 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                                           << sourceLinearizedIdx << "\n");
 
                   // Step3. Do the packing.
-                  for (int j = 0; j < bytes; j++)
+                  for (int j = 0; j < bytes; j++) {
                     destRawData[destLinearizedIdx * bytes + j] =
                         rawData[sourceLinearizedIdx * bytes + j];
+                  }
                 });
 
     bool detectSpalt = false;
