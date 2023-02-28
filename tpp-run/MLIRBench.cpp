@@ -370,7 +370,7 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   }
 
   if (dumpMLIR)
-    module->dump();
+    module->print(llvm::outs());
 
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
@@ -407,7 +407,7 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   auto result = passManager.run(module);
   if (failed(result)) {
     llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
-    module->dump();
+    module->print(llvm::errs());
   }
 
   return result;
