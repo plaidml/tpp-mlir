@@ -114,7 +114,7 @@ void SimpleTensorInit::fillData() {
 
 void ContinuousTensorInit::fillData() {
   assert(buffer.size() == 0 && "Buffer not empty");
-  float normFactor = static_cast<float>(buffer.size());
+  float normFactor = static_cast<float>(size);
   for (size_t i=0; i<size; i++)
     push(static_cast<float>(i) / normFactor);
 }

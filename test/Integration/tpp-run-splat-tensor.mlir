@@ -73,8 +73,8 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // OPT-SIMPLE: arith.constant dense<0> : tensor<4x8xi32>
 
 // OPT-CONT-LABEL: @_entry
-// OPT-CONT: arith.constant dense<{{.*}}0xFFC00000, 0x7F800000, 0x7F800000, {{.*}}> : tensor<2x16xf32>
-// OPT-CONT: arith.constant dense<{{.*}}0xFFC00000, 0x7F800000, 0x7F800000, {{.*}}> : tensor<4x16xf32>
+// OPT-CONT: arith.constant dense<{{.*}}0.000000e+00, 3.125000e-02, 6.250000e-02, {{.*}}> : tensor<2x16xf32>
+// OPT-CONT: arith.constant dense<{{.*}}0.000000e+00, 1.562500e-02, 3.125000e-02,  {{.*}}> : tensor<4x16xf32>
 // OPT-CONT: arith.constant dense<0.000000e+00> : tensor<4x8xf32>
 // OPT-CONT: arith.constant dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
 // OPT-CONT: arith.constant dense<0> : tensor<4x8xi32>
