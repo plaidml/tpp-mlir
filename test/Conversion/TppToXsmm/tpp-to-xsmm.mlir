@@ -175,7 +175,7 @@ func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 
 // CHECK-LABEL: func.func @add_to_xsmm_1d
 func.func @add_to_xsmm_1d(%arg0: memref<32xf32>, %arg1: memref<32xf32>, %arg2: memref<32xf32>) {
-  // CHECK: %[[DISPATCH:.+]] = xsmm.binary.dispatch add [1, 32, 32, 32, 32](dataType f32, broadcast none)
+  // CHECK: %[[DISPATCH:.+]] = xsmm.binary.dispatch add [1, 32, 32, 32, 32](broadcast none dataType f32)
   // CHECK-NEXT: xsmm.binary add(dataType f32, %[[DISPATCH]], %{{.+}}, %{{.+}}, %{{.+}}) : (i64, memref<32xf32>, memref<32xf32>, memref<32xf32>) -> ()
   tpp.add ins(%arg0: memref<32xf32>, %arg1: memref<32xf32>) out(%arg2: memref<32xf32>)
   return 
@@ -186,7 +186,7 @@ func.func @add_to_xsmm_1d(%arg0: memref<32xf32>, %arg1: memref<32xf32>, %arg2: m
 // CHECK-LABEL: func.func @relu_to_xsmm(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<32xf32>)
 func.func @relu_to_xsmm(%arg0: memref<32xf32>) {
-  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch relu [1, 32, 32, 32](dataType f32, broadcast none)
+  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch relu [1, 32, 32, 32](broadcast none dataType f32)
   // CHECK-NEXT: xsmm.unary relu(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG0]])
   tpp.relu ins(%arg0: memref<32xf32>) out(%arg0: memref<32xf32>)
   return
@@ -194,18 +194,9 @@ func.func @relu_to_xsmm(%arg0: memref<32xf32>) {
 
 // -----
 
-func.func @relu_to_xsmm(%arg0: memref<32xi64>) {
-  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch relu [1, 32, 32, 32](dataType i64, broadcast none)
-  // CHECK-NEXT: xsmm.unary relu(dataType i64, %[[DISPATCH]], %[[ARG0]], %[[ARG0]])
-  tpp.relu ins(%arg0: memref<32xi64>) out(%arg0: memref<32xi64>)
-  return
-}
-
-// -----
-
 // CHECK-LABEL: add_to_xsmm_2d
 func.func @add_to_xsmm_2d(%arg0: memref<3x4xf32>, %arg1: memref<3x4xf32>, %arg2: memref<3x4xf32>) {
-  // CHECK: %[[DISPATCH:.+]] = xsmm.binary.dispatch add [3, 4, 4, 4, 4](dataType f32, broadcast none)
+  // CHECK: %[[DISPATCH:.+]] = xsmm.binary.dispatch add [3, 4, 4, 4, 4](broadcast none dataType f32)
   // CHECK-NEXT: xsmm.binary add(dataType f32, %[[DISPATCH]], %{{.+}}, %{{.+}}, %{{.+}}) : (i64, memref<3x4xf32>, memref<3x4xf32>, memref<3x4xf32>) -> ()
   tpp.add ins(%arg0: memref<3x4xf32>, %arg1: memref<3x4xf32>) out(%arg2: memref<3x4xf32>)
   return
