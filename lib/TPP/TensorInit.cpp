@@ -2,6 +2,60 @@
 
 using namespace mlir;
 
+TensorInit::DataType getTensorInitDataType(mlir::Type type) {
+  if (type.isBF16())
+    return TensorInit::BF16;
+  if (type.isF32())
+    return TensorInit::FP32;
+  assert(false && "Invalid tensor init data type (only FP32, BF16)");
+}
+
+TensorInitType parseTensorInitType(StringRef name) {
+  auto type = StringSwitch<TensorInitType>(name)
+    .Case("", TensorInitType::Auto)
+    .Case("const", TensorInitType::Constant)
+    .Case("simple",  TensorInitType::Simple)
+    .Case("cont",  TensorInitType::Continuous)
+    .Case("random", TensorInitType::Random)
+    .Case("normal", TensorInitType::Normal)
+    .Default(TensorInitType::Invalid);
+  return type;
+}
+
+TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType,
+                            int seed) {
+  auto dataType = getTensorInitDataType(elmType);
+  // Defaults for seed or not
+  if (type == TensorInitType::Auto) {
+    if (seed)
+      type = TensorInitType::Normal;
+    else
+      type = TensorInitType::Constant;
+  }
+  switch (type) {
+    case TensorInitType::Constant:
+      return std::make_unique<ConstantTensorInit>(dataType);
+    case TensorInitType::Simple:
+      return std::make_unique<SimpleTensorInit>(dataType);
+    case TensorInitType::Continuous:
+      return std::make_unique<ContinuousTensorInit>(dataType);
+    case TensorInitType::Random:
+      assert(seed && "Can't call random initializers without seed");
+      return std::make_unique<RandomTensorInit>(dataType, seed);
+    case TensorInitType::Normal:
+      assert(seed && "Can't call random initializers without seed");
+      return std::make_unique<NormalTensorInit>(dataType, seed);
+    default:
+      assert(false && "Invalid tensor initializer type");
+  }
+}
+
+TensorInitPtr getTensorInit(StringRef type, mlir::Type elmType,
+                            int seed) {
+  auto initType = parseTensorInitType(type);
+  return getTensorInit(initType, elmType, seed);
+}
+
 DenseElementsAttr TensorInit::get(ShapedType shape) {
   buffer.clear();
   for (size_t dim=0, rank = shape.getRank(); dim<rank; dim++)
@@ -20,7 +74,7 @@ void TensorInit::insert(size_t index, float value) {
     toBF16(buffer[index]);
 }
 
-void TensorInit::push_back(float value) {
+void TensorInit::push(float value) {
   buffer.push_back(llvm::APFloat(value));
   if (type == DataType::BF16)
     toBF16(buffer.back());
@@ -55,24 +109,24 @@ void SimpleTensorInit::fillData() {
   assert(buffer.size() == 0 && "Buffer not empty");
   float data[3] = { 0.3f, 0.6f, 0.9f };
   for (size_t i=0; i<size; i++)
-    push_back(data[i % 3]);
+    push(data[i % 3]);
 }
 
 void ContinuousTensorInit::fillData() {
   assert(buffer.size() == 0 && "Buffer not empty");
   float normFactor = static_cast<float>(buffer.size());
   for (size_t i=0; i<size; i++)
-    push_back(static_cast<float>(i) / normFactor);
+    push(static_cast<float>(i) / normFactor);
 }
 
 void RandomTensorInit::fillData() {
   assert(buffer.size() == 0 && "Buffer not empty");
   for (size_t i=0; i<size; i++)
-    push_back(next());
+    push(next());
 }
 
 void NormalTensorInit::fillData() {
   assert(buffer.size() == 0 && "Buffer not empty");
   for (size_t i=0; i<size; i++)
-    push_back(next());
+    push(next());
 }

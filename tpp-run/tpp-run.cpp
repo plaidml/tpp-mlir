@@ -16,6 +16,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
+#include "TPP/TensorInit.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -99,6 +100,13 @@ llvm::cl::opt<std::string>
     fpuName("fpu", llvm::cl::desc("FPU name (avx, avx2, avx512bf16)"),
             llvm::cl::init("avx2"));
 
+// Initializer type
+// Default const if seed == 0, and normal otherwise
+llvm::cl::opt<std::string> initType(
+    "init-type",
+    llvm::cl::desc("Initializer type (const, simple, cont, rand, normal)"),
+    llvm::cl::init(""));
+
 // Dump MLIR before lowering
 llvm::cl::opt<bool> dumpMLIR("dump-mlir",
                                llvm::cl::desc("Dump MLIR before lowering"),
@@ -114,11 +122,7 @@ llvm::cl::opt<bool> dumpLLVM("dump-llvm",
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
   // Benchmark object
-  MLIRBench bench(op, seed, tppToLoops);
-
-  // Input validation
-  if (splatRandom && !seed)
-    return bench.emitError("Cannot replace splats with random without seed");
+  MLIRBench bench(op, seed, tppToLoops, parseTensorInitType(initType));
 
   // Basic checks
   if (options.mainFuncType != "void")
@@ -234,7 +238,34 @@ lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
   return llvmModule;
 }
 
+LogicalResult emitError(StringRef msg) {
+  llvm::errs() << "ERROR: " << msg << "\n";
+  return failure();
+}
+
+// Input validation
+LogicalResult validateInput() {
+  // Randon options need seed
+  if (!seed) {
+    if (splatRandom)
+      return emitError("Cannot replace splats with random without seed");
+    if (initType == "random" || initType == "normal")
+      return emitError("Cannot init random tensors without seed");
+  }
+
+  // Parse tensor init
+  auto init = parseTensorInitType(initType);
+  if (init == TensorInitType::Invalid)
+    return emitError("Invalid tensor init " + initType);
+
+  return success();
+}
+
 int main(int argc, char **argv) {
+  // Make sure the args are compatible
+  if (failed(validateInput()))
+    return 1;
+
   // Initialize the LLVM machinery
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
