@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,1" -cse | FileCheck %s
 
-// CHECK: func.func @matmul_sequence_fusion
-func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
+// CHECK: func.func @matmul_sequence_fusion_expect_no_fusion
+func.func @matmul_sequence_fusion_expect_no_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>)
@@ -19,7 +19,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
+func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>)
@@ -35,7 +35,7 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 }
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<() -> ()>
-// CHECK: func.func @matmul_eletwise
+// CHECK: func.func @matmul_eletwise_matmul_and_relu
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -55,7 +55,7 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
-func.func @matmul_eletwise(%arg0: tensor<4x4x32x32xf32>, %arg1: tensor<4x4x32x32xf32>,
+func.func @matmul_eletwise_blk_matmul(%arg0: tensor<4x4x32x32xf32>, %arg1: tensor<4x4x32x32xf32>,
     %arg2: tensor<4x4x32x32xf32>) -> tensor<4x4x32x32xf32> {
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
@@ -83,7 +83,7 @@ func.func @matmul_eletwise(%arg0: tensor<4x4x32x32xf32>, %arg1: tensor<4x4x32x32
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK: #[[MAP3:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: func.func @matmul_eletwise(
+// CHECK: func.func @matmul_eletwise_blk_matmul(
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -99,7 +99,7 @@ func.func @matmul_eletwise(%arg0: tensor<4x4x32x32xf32>, %arg1: tensor<4x4x32x32
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
+func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
   %c0 = arith.constant 0.0 : f32
@@ -120,7 +120,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 }
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<() -> ()>
-// CHECK: func.func @matmul_sequence_fusion
+// CHECK: func.func @matmul_sequence_fusion_with_relu
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -137,7 +137,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
+func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
   %c0 = arith.constant 0.0 : f32
@@ -172,20 +172,27 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 }
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<() -> ()>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: func.func @matmul_sequence_fusion
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-LABEL: matmul_sequence_fusion_with_eltwise
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-1: linalg.matmul
-// CHECK-COUNT-1: linalg.generic {indexing_maps = [#[[MAP]]], iterator_types = []} outs({{.+}} : tensor<f32>)
-// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
-// CHECK-NEXT: }
-// CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
-// CHECK-NEXT: }
-// CHECK-COUNT-2: linalg.generic
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK: linalg.matmul
+// CHECK-NEXT: linalg.matmul
+// CHECK: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK-NEXT: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK: linalg.matmul
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]]], iterator_types = []
+// CHECK: ^bb0(
+// CHECK-NEXT: arith.maxf
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]]], iterator_types = []
+// CHECK: ^bb0(
+// CHECK-NEXT: arith.maxf
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = []
+// CHECK: ^bb0(
+// CHECK-NEXT: arith.addf
 
 // -----
 
@@ -258,8 +265,10 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32x
 // CHECK: linalg.matmul
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK-COUNT-1: linalg.matmul
-// CHECK-COUNT-1: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = []} ins({{.+}}: tensor<f32>) outs({{.+}} : tensor<f32>)
+// CHECK: linalg.matmul
+// CHECK: linalg.generic 
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = []} 
+// CHECK-SAME:  ins({{.+}}: tensor<f32>) outs({{.+}} : tensor<f32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
