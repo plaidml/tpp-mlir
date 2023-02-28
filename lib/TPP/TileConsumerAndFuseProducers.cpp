@@ -363,7 +363,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   llvm::SmallDenseSet<Operation *> worklist =
       collectFusableProducers(consumer, tileSizes, alreadyFusedOps, maxDepth);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
-  if (worklist.size() < 2 /*&& maxDepth != 0*/)
+  if (worklist.size() < 2)
     return failure();
 
   // Step 4. Tile the consumer.

@@ -197,7 +197,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     or conv-like patterns allows two additional options to control how many
     producers fuse together with the latched operation and how many consumers.
     Precisely, `max-depth` controls how many producers should be considered, while
-    `start-from-last-conusmer` allows to move the achor point to the last fusbale
+    `start-from-last-consumer` allows to move the anchor point to the last fusable
     consumer of the conv or matmul-like pattern.
   }];
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
@@ -205,7 +205,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
     Option<"maxDepth", "max-depth", "int64_t", "5", 
            "Get producers till maxDepth">,
-    Option<"startFromLastFusableConsumer", "start-from-last-conusmer", "bool",
+    Option<"startFromLastFusableConsumer", "start-from-last-consumer", "bool",
            "true", "Fuse from the last fusable consumer of the current target">
   ];
 }
