@@ -79,8 +79,12 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // CHECK-NOT: scf.for
 
 // TILE: func.func @matmul_sequence_fusion
-// TILE-NOT: scf.for
+// TILE-DAG:  %[[C32:.+]] = arith.constant 32 : index
+// TILE-DAG:  %[[C1:.+]] = arith.constant 1 : index
+// TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
+// TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // TILE-COUNT-3: linalg.matmul
+// TILE: scf.yield %{{.+}} : tensor<32x32xf32>
 // TILE-COUNT-3: linalg.generic
 
 // -----
@@ -131,6 +135,5 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // TILE-DAG:  %[[C0:.+]] = arith.constant 0 : index
 // TILE-COUNT-1: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // TILE-COUNT-3: linalg.matmul
-// TILE: linalg.generic
+// TILE-COUNT-3: linalg.generic
 // TILE: scf.yield %{{.+}} : tensor<32x32xf32>
-// TILE-COUNT-2: linalg.generic

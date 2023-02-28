@@ -1384,7 +1384,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   // CHECK: %[[subview:.*]] = memref.subview
   // CHECK: %[[subview1:.*]] = memref.subview
   // CHECK: %[[subview2:.*]] = memref.subview
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c1_i64]], %[[c1_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
   // CHECK: %[[cast:.*]] = memref.cast %[[subview]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[subview1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[subview2]]

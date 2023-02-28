@@ -16,6 +16,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
+#include "TPP/TensorInit.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -28,6 +29,7 @@
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/ValueRange.h"
@@ -65,6 +67,12 @@ llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
                                llvm::cl::desc("Lower TPP to loops"),
                                llvm::cl::init(false));
 
+// Replace dense splat tensors with random dense
+llvm::cl::opt<bool>
+    splatRandom("splat-to-random",
+                llvm::cl::desc("Replace splat dense tensors with random value"),
+                llvm::cl::init(false));
+
 // Random seed, if zero, don't emit randominputs
 llvm::cl::opt<int> seed("seed",
                         llvm::cl::desc("Random seed, default 0 (no random)"),
@@ -92,6 +100,13 @@ llvm::cl::opt<std::string>
     fpuName("fpu", llvm::cl::desc("FPU name (avx, avx2, avx512bf16)"),
             llvm::cl::init("avx2"));
 
+// Initializer type
+// Default const if seed == 0, and normal otherwise
+llvm::cl::opt<std::string> initType(
+    "init-type",
+    llvm::cl::desc("Initializer type (const, simple, cont, rand, normal)"),
+    llvm::cl::init(""));
+
 // Dump MLIR before lowering
 llvm::cl::opt<bool> dumpMLIR("dump-mlir",
                                llvm::cl::desc("Dump MLIR before lowering"),
@@ -106,7 +121,8 @@ llvm::cl::opt<bool> dumpLLVM("dump-llvm",
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
-  MLIRBench bench(op, seed, tppToLoops);
+  // Benchmark object
+  MLIRBench bench(op, seed, tppToLoops, parseTensorInitType(initType));
 
   // Basic checks
   if (options.mainFuncType != "void")
@@ -118,7 +134,10 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
 
   if (failed(bench.checkKernelSignature()))
-    return bench.finalize();
+    return bench.finalize(dumpMLIR);
+
+  if (splatRandom && failed(bench.replaceSplatWithRandom()))
+    return bench.emitError("Error converting splat tensors with random values");
 
   // Move the kernel to a local name, so we can create `main` with the same
   // name as the pre-defined entry point (since we can't change it)
@@ -154,14 +173,11 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   }
 
   // Finally lower to LLVM Dialect
-  return bench.finalize();
+  return bench.finalize(dumpMLIR);
 }
 
 std::unique_ptr<llvm::Module>
 lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
-  if (dumpMLIR)
-    module->dump();
-
   // Default lowering for mlir-cpu-runner
   auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
   assert(llvmModule);
@@ -204,7 +220,7 @@ lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
   auto optPipeline =
       makeOptimizingTransformer(optLevel, sizeLevel, targetMachine.get());
   if (auto err = optPipeline(llvmModule.get())) {
-    llvmModule->dump();
+    llvmModule->print(llvm::errs(), nullptr);
     llvm::errs() << "Error while passing through the LLVM pipeline: ";
     llvm::errs() << err << "\n";
     return nullptr;
@@ -217,12 +233,39 @@ lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
   }
 
   if (dumpLLVM)
-    llvmModule->dump();
+    llvmModule->print(llvm::outs(), nullptr);
 
   return llvmModule;
 }
 
+LogicalResult emitError(StringRef msg) {
+  llvm::errs() << "ERROR: " << msg << "\n";
+  return failure();
+}
+
+// Input validation
+LogicalResult validateInput() {
+  // Randon options need seed
+  if (!seed) {
+    if (splatRandom)
+      return emitError("Cannot replace splats with random without seed");
+    if (initType == "random" || initType == "normal")
+      return emitError("Cannot init random tensors without seed");
+  }
+
+  // Parse tensor init
+  auto init = parseTensorInitType(initType);
+  if (init == TensorInitType::Invalid)
+    return emitError("Invalid tensor init " + initType);
+
+  return success();
+}
+
 int main(int argc, char **argv) {
+  // Make sure the args are compatible
+  if (failed(validateInput()))
+    return 1;
+
   // Initialize the LLVM machinery
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();

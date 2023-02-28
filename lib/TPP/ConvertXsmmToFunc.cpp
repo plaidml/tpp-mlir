@@ -70,12 +70,12 @@ extractInvokeOperandTypesForMeta(OperandRange operands, IndexType indexType,
 // and have a single function signature in the runtime.
 static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
                                             ValueRange operands,
-                                            IntegerAttr typeAttr) {
+                                            IntegerAttr dataTypeAttr) {
   SmallVector<Value> res;
   // One extra operand for datatype
   res.reserve(operands.size() + 1);
   IntegerType integer64 = IntegerType::get(b.getContext(), 64);
-  res.push_back(b.create<arith::ConstantOp>(loc, integer64, typeAttr));
+  res.push_back(b.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
   for (Value op : operands) {
     auto memrefType = op.getType().dyn_cast<MemRefType>();
     if (!memrefType)
@@ -91,13 +91,13 @@ static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
   return res;
 }
 
-static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
-                                                         Location loc,
-                                                         ValueRange operands,
-                                                         IntegerAttr typeAttr) {
+static SmallVector<Value>
+getMemRefOperandsUsingMetadata(OpBuilder &builder, Location loc,
+                               ValueRange operands, IntegerAttr dataTypeAttr) {
   SmallVector<Value> res;
   IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
-  res.push_back(builder.create<arith::ConstantOp>(loc, integer64, typeAttr));
+  res.push_back(
+      builder.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
 
   for (Value operand : operands) {
     auto memrefType = operand.getType().dyn_cast<MemRefType>();
@@ -132,7 +132,7 @@ static SmallVector<Value> getMemRefOperandsUsingMetadata(OpBuilder &builder,
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                      Operation *op, bool useMeta,
                                      PatternRewriter &rewriter,
-                                     IntegerAttr typeAttr) {
+                                     IntegerAttr dataTypeAttr) {
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
@@ -160,9 +160,10 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
 
   rewriter.create<func::CallOp>(
       loc, fnName.getValue(), TypeRange(),
-      (!useMeta) ? getMemRefOperands(rewriter, loc, op->getOperands(), typeAttr)
-                 : getMemRefOperandsUsingMetadata(rewriter, loc,
-                                                  op->getOperands(), typeAttr));
+      (!useMeta)
+          ? getMemRefOperands(rewriter, loc, op->getOperands(), dataTypeAttr)
+          : getMemRefOperandsUsingMetadata(rewriter, loc, op->getOperands(),
+                                           dataTypeAttr));
   return success();
 }
 
@@ -173,12 +174,12 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    auto type = (uint64_t)ternaryOp.getDataType();
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
+                                         (int64_t)ternaryOp.getDataType());
     std::string funcName =
         "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
-                                  useMeta, rewriter, typeAttr))) {
+                                  useMeta, rewriter, dataTypeAttr))) {
       rewriter.eraseOp(ternaryOp);
       return success();
     }
@@ -200,13 +201,13 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // in MLIR (thus we need to change the function name from
     // "unary" to "unary_scalar"). We also don't want to convert
     // the scalar to a memref by using an alloc/alloca.
-    auto type = (uint64_t)unaryOp.getDataType();
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    auto dataTypeAttr =
+        IntegerAttr::get(rewriter.getI64Type(), (int64_t)unaryOp.getDataType());
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
-                                  rewriter, typeAttr))) {
+                                  rewriter, dataTypeAttr))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
@@ -224,12 +225,11 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    auto type = (uint64_t)binaryOp.getDataType();
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
-
+    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
+                                         (int64_t)binaryOp.getDataType());
     std::string funcName = "xsmm_binary_invoke";
     if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
-                                  useMeta, rewriter, typeAttr))) {
+                                  useMeta, rewriter, dataTypeAttr))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }
@@ -281,7 +281,6 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    auto type = (uint64_t)(dispatchOp.getDataType());
     kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
@@ -290,9 +289,10 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
+                                         (int64_t)(dispatchOp.getDataType()));
     dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
     dispatchOperandTypes.push_back(integer64);
 
     BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
@@ -333,16 +333,15 @@ struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
 
-    auto type = (uint64_t)(dispatchOp.getDataType());
-
     ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
+                                         (int64_t)(dispatchOp.getDataType()));
     dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
     dispatchOperandTypes.push_back(integer64);
 
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
@@ -384,7 +383,6 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = "xsmm_unary_dispatch";
-    auto type = (uint64_t)dispatchOp.getDataType();
 
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
@@ -394,9 +392,10 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
+    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
+                                         (int64_t)dispatchOp.getDataType());
     dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
     dispatchOperandTypes.push_back(integer64);
 
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();

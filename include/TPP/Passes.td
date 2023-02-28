@@ -192,17 +192,21 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
                                         "func::FuncOp"> {
   let summary = "Tile consumers and fuse producers";
   let description = [{
-    The pass uses `TileConsumerAndFuseProducersUsingSCFForOp` to tile
-    the consumer and fuse the consumer with the producers. We restrict
-    the pattern to relu operations whose producers are matmul or conv.
+    The pass uses `TileConsumerAndFuseProducersUsingSCFForOp` to tile the
+    consumer and fuse the consumer with the producers. The fusion anchor to matmul
+    or conv-like patterns allows two additional options to control how many
+    producers fuse together with the latched operation and how many consumers.
+    Precisely, `max-depth` controls how many producers should be considered, while
+    `start-from-last-consumer` allows to move the anchor point to the last fusable
+    consumer of the conv or matmul-like pattern.
   }];
   let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
     Option<"maxDepth", "max-depth", "int64_t", "5", 
            "Get producers till maxDepth">,
-    Option<"immediateConsumer", "start-from-immediate-conusmer", "bool",
-           "true", "Fuse from the immediate consumer of the current target">
+    Option<"startFromLastFusableConsumer", "start-from-last-consumer", "bool",
+           "true", "Fuse from the last fusable consumer of the current target">
   ];
 }
 

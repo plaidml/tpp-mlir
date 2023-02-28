@@ -35,9 +35,10 @@
 
 using namespace mlir;
 
-MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops)
+MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops,
+                     TensorInitType initType)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()), seed(seed),
-      tppToLoops(tppToLoops) {
+      tppToLoops(tppToLoops), initType(initType) {
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
   auto *ctx = module->getContext();
@@ -89,6 +90,51 @@ LogicalResult MLIRBench::checkKernelSignature() {
   auto funcType = kernel.getFunctionType();
   if (funcType.getNumInputs() == 0 && funcType.getNumResults() == 0)
     return failure();
+
+  return success();
+}
+
+LogicalResult MLIRBench::replaceSplatWithRandom() {
+  if (!seed)
+    return module.emitError("No seed for random init");
+
+  // Only replace attribute if it's a dense splat
+  auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
+    // We only change float types
+    auto elmTy = shape.getElementType();
+    if (!elmTy.isBF16() && !elmTy.isF32())
+      return attr;
+    // We only change dense attributes that are splat
+    auto value = dyn_cast<DenseElementsAttr>(attr);
+    if (!value || !value.isSplat())
+      return attr;
+    // Only positive float data type (zero may be for ReLU, -1 for fill)
+    auto elm = value.getSplatValue<FloatAttr>().getValueAsDouble();
+    if (elm <= 0.0)
+      return attr;
+    // Generate a new random dense and return
+    auto init = getTensorInit(initType, elmTy, seed);
+    return init->get(shape);
+  };
+
+  // Memrefs are memref.global values
+  for (auto &op : module->getRegion(0).getOps()) {
+    auto global = dyn_cast<memref::GlobalOp>(op);
+    if (!global)
+      continue;
+    auto newAttr = replaceSplat(global.getType(), global.getInitialValueAttr());
+    global.setInitialValueAttr(newAttr);
+  }
+
+  // Tensors are arith.constant values
+  for (auto &op : kernel->getRegion(0).getOps()) {
+    auto constant = dyn_cast<arith::ConstantOp>(op);
+    if (!constant)
+      continue;
+    auto newAttr = replaceSplat(constant.getType(), constant.getValueAttr());
+    constant.setValueAttr(newAttr);
+  }
+
 
   return success();
 }
@@ -315,12 +361,15 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(getKernelResult(kernelCall));
 }
 
-LogicalResult MLIRBench::finalize() {
+LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
     builder.create<func::ReturnOp>(unkLoc);
   }
+
+  if (dumpMLIR)
+    module->print(llvm::outs());
 
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
@@ -357,7 +406,7 @@ LogicalResult MLIRBench::finalize() {
   auto result = passManager.run(module);
   if (failed(result)) {
     llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
-    module->dump();
+    module->print(llvm::errs());
   }
 
   return result;
@@ -378,22 +427,8 @@ arith::ConstantOp MLIRBench::getConstant(Type type, ValueT value) {
 }
 
 DenseElementsAttr MLIRBench::getDenseAttribute(ShapedType shape) {
-  // TODO: Use some random initialiser
-  auto floatValue = APFloat(1.0F);
-
-  if (shape.getElementType().isBF16()) {
-    bool ignored;
-    floatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                       &ignored);
-  } else {
-    assert(shape.getElementType().isF32() && "Element type not supported");
-  }
-
-  // For some reason, memref global op needs dense tensor type
-  // See: lib/Dialect/MemRef/IR/MemRefOps.cpp :: GlobalOp::verify
-  auto tensorType =
-      RankedTensorType::get(shape.getShape(), shape.getElementType());
-  return mlir::DenseElementsAttr::get(tensorType, floatValue);
+  auto init = getTensorInit(initType, shape.getElementType(), seed);
+  return init->get(shape);
 }
 
 llvm::StringRef MLIRBench::createGlobal(MemRefType type) {
@@ -430,25 +465,6 @@ MemRefType MLIRBench::getGlobalType(llvm::StringRef name) {
 }
 
 Value MLIRBench::createDenseTensor(TensorType type) {
-  // If seed is not zero, generate a random fill tensor
-  if (seed) {
-    assert(type.getRank() == 2 && "Wrong shape to random fill");
-
-    // Inputs (min, max, seed)
-    Value zero = getConstant(builder.getF64Type(), 0.0);
-    Value one = getConstant(builder.getF64Type(), 1.0);
-    Value randSeed = getConstant(builder.getI32Type(), seed);
-
-    // Output tensor
-    Value out = builder.create<tensor::EmptyOp>(unkLoc, type, ValueRange{});
-
-    // Fill
-    auto fill = builder.create<linalg::FillRng2DOp>(unkLoc,
-        ValueRange{zero, one, randSeed}, ValueRange{out});
-    return fill.getResult(0);
-  }
-
-  // Otherwise, just get a const tensor
   auto floatInit = getDenseAttribute(type);
   return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }

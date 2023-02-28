@@ -18,6 +18,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "TPP/TensorInit.h"
+
 namespace mlir {
 class ModuleOp;
 class MemRefType;
@@ -64,6 +66,9 @@ class MLIRBench {
   /// Lower TPP to loops for validation purposes
   bool tppToLoops;
 
+  /// Tensor init type
+  TensorInitType initType;
+
   /// Create a random global based on the memref type
   llvm::StringRef createGlobal(MemRefType);
 
@@ -87,7 +92,7 @@ class MLIRBench {
 
 public:
   /// Creates context, builder
-  MLIRBench(Operation *op, int seed, bool tppToLoops);
+  MLIRBench(Operation *op, int seed, bool tppToLoops, TensorInitType initType);
 
   /// Finds the kernel method, checks correct name and shape
   LogicalResult findKernel(llvm::StringRef);
@@ -98,6 +103,9 @@ public:
 
   /// Renames the kernel to _name, so that we can create the wrapper
   LogicalResult renameKernel();
+
+  /// Replace all dense splat tensors/memrefs with random values in the kernel
+  LogicalResult replaceSplatWithRandom();
 
   /// Create and initialize the kernel input arguments
   /// The values are cached locally in a kernel argument list, in order
@@ -134,7 +142,7 @@ public:
   LogicalResult printResult(Operation *kernelCall);
 
   /// Terminates the function, issuing a return, lower to LLVM
-  LogicalResult finalize();
+  LogicalResult finalize(bool dump);
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);
