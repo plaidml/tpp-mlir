@@ -27,6 +27,11 @@ using namespace mlir;
 namespace {
 
 static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
+  // For 1d memref we cannot use the stride as leading dimension, but the
+  // leading dimension is the dimension itself.
+  if (memref.getRank() == 1)
+    return memref.getShape()[0];
+
   SmallVector<int64_t> strides;
   int64_t offset;
   if (failed(getStridesAndOffset(memref, strides, offset)))
