@@ -202,14 +202,14 @@ DecomposeLinalgOp::createPeeledGenericOp(linalg::GenericOp genericOp,
                             .getShape();
 
     // Reuse the original output buffer in the following cases:
-    // 1) reuse the operand matching the original yield
-    // 2) reuse the same output buffer if:
-    //     - there is at least the same number of output buffers as the scalar
-    //       operation results
-    //     - the output buffer has the same shape as the current intermediate
-    //       result
-    //     - the output buffer has no consumers other than the current peeled
-    //       operation
+    // 1) Reuse the operand matching the original yield.
+    // 2) Reuse the same output buffer if:
+    //      - There is at least the same number of output buffers as the scalar
+    //        operation results.
+    //      - The output buffer has the same shape as the current intermediate
+    //        result.
+    //      - The output buffer has no consumers other than the current peeled
+    //        operation.
     if (resultNumber ||
         ((origRegionOuts.size() >= numScalarOpResults) &&
          llvm::equal(peeledOutSizes, origOutSizes) &&
