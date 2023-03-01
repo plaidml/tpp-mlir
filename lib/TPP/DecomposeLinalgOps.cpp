@@ -96,36 +96,47 @@ static SmallVector<OpFoldResult> getGenericOpLoopRange(OpBuilder &b,
 }
 
 /// Helper method to analyse generic op to determine whether the given output
-/// buffer can be use to store intermediate result of the provided scalar body
+/// buffer can be use to store an intermediate result of the peeled scalar body
 /// operation.
 static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
-                           Operation *bodyOp, Value bodyOpResult) {
-  assert(bodyOp->getParentOp() == genericOp.getOperation() &&
+                           Operation *peeledBodyOp, Value peeledBodyOpResult) {
+  assert(peeledBodyOp->getParentOp() == genericOp.getOperation() &&
          "expected body op to belong to the generic");
+
+  /// To reuse a generic op output buffer, it should have no users or be used
+  /// only by the peeled body op. Otherwise, other operations still require the
+  /// output buffer and its values cannot be overwritten.
   int numUses = 0;
-  for (auto operand : bodyOp->getOperands()) {
+  for (auto operand : peeledBodyOp->getOperands()) {
     if (operand == genericOpOutput)
       ++numUses;
   }
   if (numUses != (tpp::utils::getNumUsers(genericOpOutput)))
     return false;
 
-  auto numOpResultUsers = tpp::utils::getNumUsers(bodyOpResult);
-  if (numOpResultUsers > 1) {
+  /// If the body op has multiple consumers, preemptively exit to force usage of
+  /// an intermediate buffer as the current output buffer cannot be reused after
+  /// this body op, anyway.
+  auto numOpResultUsers = tpp::utils::getNumUsers(peeledBodyOpResult);
+  if (numOpResultUsers > 1)
     return false;
-  }
 
+  /// If the body op result is not consumed immediately by the next operation,
+  /// the result has to be stored in a temporary buffer. Otherwise, the
+  /// next decomposition might incorrectly overwrite the stored intermediate
+  /// results as the dependency analysis does not look at earlier ops.
   if (numOpResultUsers == 1) {
     Operation *nextBodyOp = nullptr;
+
     auto *body = genericOp.getBody();
     for (auto op = body->begin(); op != std::prev(body->end()); ++op) {
-      if (&(*op) == bodyOp) {
+      if (&(*op) == peeledBodyOp) {
         nextBodyOp = &(*std::next(op));
         break;
       }
     }
 
-    if (!nextBodyOp || (*bodyOpResult.getUsers().begin() != nextBodyOp))
+    if (!nextBodyOp || (*peeledBodyOpResult.getUsers().begin() != nextBodyOp))
       return false;
   }
 
@@ -342,6 +353,7 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
         "expected return type to be only int, index or float");
   }
 
+  // Current generic operand analysis cannot handle dynamic shapes.
   if (!tpp::utils::hasStaticShape(genericOp)) {
     return rewriter.notifyMatchFailure(
         genericOp, "expected all operands to have static shape");
