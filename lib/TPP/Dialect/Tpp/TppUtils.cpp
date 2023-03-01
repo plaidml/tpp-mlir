@@ -321,18 +321,6 @@ bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
   return true;
 }
 
-// Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp) {
-  if (!hasMappingToTppConditions(linalgOp))
-    return false;
-  if (!isBinaryOp(linalgOp))
-    return false;
-  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
-    return false;
-  return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
-}
-
 // Return true if the operation is unary.
 static bool isUnaryOp(linalg::GenericOp linalgOp) {
   if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1)) {
@@ -365,6 +353,18 @@ static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   }
 
   return false;
+}
+
+// Return true if the linalg.generic can be mapped to a tpp.add.
+bool isTppAdd(linalg::GenericOp linalgOp) {
+  if (!hasMappingToTppConditions(linalgOp))
+    return false;
+  if (!isBinaryOp(linalgOp))
+    return false;
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
+    return false;
+  return allIndexingsAreProjectedPermutation(linalgOp) &&
+         hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.relu.
