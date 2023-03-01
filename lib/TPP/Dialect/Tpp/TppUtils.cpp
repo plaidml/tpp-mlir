@@ -159,7 +159,7 @@ bool isZeroTensor(Value val) {
     // We need to find the argument to the linalg on the same order as this one
     auto *linalgOp = arg.getParentRegion()->getParentOp();
     if (!isa<linalg::GenericOp>(linalgOp))
-        return false;
+      return false;
     auto index = arg.getArgNumber();
     auto linalgArg = linalgOp->getOperand(index);
     defOp = linalgArg.getDefiningOp();
@@ -173,12 +173,8 @@ bool isZeroTensor(Value val) {
 // Returns true if the attribute represent "all zeros"
 bool isZeroAttr(Attribute attribute) {
   return TypeSwitch<Attribute, bool>(attribute)
-      .Case<FloatAttr>([](auto attr) {
-          return attr.getValueAsDouble() == 0.0;
-      })
-      .Case<IntegerAttr>([](auto attr) {
-          return attr.getInt() == 0;
-      })
+      .Case<FloatAttr>([](auto attr) { return attr.getValueAsDouble() == 0.0; })
+      .Case<IntegerAttr>([](auto attr) { return attr.getInt() == 0; })
       .Case<DenseElementsAttr>([](auto attr) {
         if (!attr.getElementType().isIntOrFloat())
           return false;
@@ -209,9 +205,8 @@ static bool isZeroOp(Operation *defOp) {
         return isZeroTensor(op.getInputs()[0]);
       })
       .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
-            tensor::ExtractSliceOp>([&](auto op) {
-        return isZeroTensor(op.getSource());
-      })
+            tensor::ExtractSliceOp>(
+          [&](auto op) { return isZeroTensor(op.getSource()); })
       .Case<memref::GetGlobalOp>([&](auto op) {
         auto name = op.getName();
         auto module = defOp->getParentOfType<ModuleOp>();
