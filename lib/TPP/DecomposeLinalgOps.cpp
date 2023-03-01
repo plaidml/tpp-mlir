@@ -11,6 +11,7 @@
 #include "TPP/Transforms.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -19,43 +20,42 @@
 #include <optional>
 
 using namespace mlir;
-using namespace mlir::linalg;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
 namespace {
 
-/// Pattern to decompose a GenericOp that has more than two statements
-/// into one GenericOp with the first statement (i.e. peeled operation), and
-/// a second GenericOp with the remaining statements (i.e. residual operations).
+// Pattern to decompose a GenericOp that has more than two statements
+// into one GenericOp with the first statement (i.e. peeled operation), and
+// a second GenericOp with the remaining statements (i.e. residual operations).
 
-/// - The result of the first GenericOp has the same shape as the iteration
-///   space of the GenericOp. The body of the op yields all the results of the
-///   peeled operation.
-/// - The second GenericOp has as many operands as the original operation
-///   (all the original inputs and outputs) plus all the results of the first
-///   Generic Op. It has the same number of yields as the original op.
-/// - If the result of the peeled operation was yielded by the original
-///   GenericOp the uses of the corresponding results will be replaced with the
-///   result of the first GenericOp created.
-struct DecomposeLinalgOp : public OpRewritePattern<GenericOp> {
-  using OpRewritePattern<GenericOp>::OpRewritePattern;
+// - The result of the first GenericOp has the same shape as the iteration
+//   space of the GenericOp. The body of the op yields all the results of the
+//   peeled operation.
+// - The second GenericOp has as many operands as the original operation
+//   (all the original inputs and outputs) plus all the results of the first
+//   Generic Op. It has the same number of yields as the original op.
+// - If the result of the peeled operation was yielded by the original
+//   GenericOp the uses of the corresponding results will be replaced with the
+//   result of the first GenericOp created.
+struct DecomposeLinalgOp : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(GenericOp genericOp,
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override;
 
 private:
-  /// Helper method to create a generic op for the peeled scalar operation. The
-  /// created op has an empty region.
-  GenericOp createPeeledGenericOp(GenericOp genericOp,
-                                  PatternRewriter &rewriter) const;
+  // Helper method to create a generic op for the peeled scalar operation. The
+  // created op has an empty region.
+  linalg::GenericOp createPeeledGenericOp(linalg::GenericOp genericOp,
+                                          PatternRewriter &rewriter) const;
 
-  /// Helper method to create a generic op for the residual scalar operation.
-  /// The created op has the same region as the original op.
-  GenericOp createResidualGenericOp(GenericOp genericOp,
-                                    GenericOp peeledGenericOp,
-                                    PatternRewriter &rewriter) const;
+  // Helper method to create a generic op for the residual scalar operation.
+  // The created op has the same region as the original op.
+  linalg::GenericOp createResidualGenericOp(linalg::GenericOp genericOp,
+                                            linalg::GenericOp peeledGenericOp,
+                                            PatternRewriter &rewriter) const;
 };
 
 // Expose the decomposition pattern as a pass.
@@ -81,31 +81,31 @@ struct DecomposeDefaultPass
 };
 } // namespace
 
-/// Helper method to compute the range of a generic op.
+// Helper method to compute the range of a generic op.
 static SmallVector<OpFoldResult> getGenericOpLoopRange(OpBuilder &b,
-                                                       GenericOp op) {
+                                                       linalg::GenericOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = op.getLoc();
-  auto allShapesSizes =
-      cast<LinalgOp>(op.getOperation()).createFlatListOfOperandDims(b, loc);
+  auto allShapesSizes = cast<linalg::LinalgOp>(op.getOperation())
+                            .createFlatListOfOperandDims(b, loc);
   AffineMap map = op.getShapesToLoopsMap();
   IRRewriter rewriter(b);
   return makeComposedFoldedMultiResultAffineApply(rewriter, loc, map,
                                                   allShapesSizes);
 }
 
-/// Helper method to analyse generic op to determine whether the given output
-/// buffer can be use to store an intermediate result of the peeled scalar body
-/// operation.
-static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
+// Helper method to analyse generic op to determine whether the given output
+// buffer can be use to store an intermediate result of the peeled scalar body
+// operation.
+static bool canReuseOutput(linalg::GenericOp genericOp, Value genericOpOutput,
                            Operation *peeledBodyOp, Value peeledBodyOpResult) {
   assert(peeledBodyOp->getParentOp() == genericOp.getOperation() &&
          "expected body op to belong to the generic");
 
-  /// To reuse a generic op output buffer, it should have no users or be used
-  /// only by the peeled body op. Otherwise, other operations still require the
-  /// output buffer and its values cannot be overwritten.
+  // To reuse a generic op output buffer, it should have no users or be used
+  // only by the peeled body op. Otherwise, other operations still require the
+  // output buffer and its values cannot be overwritten.
   int numUses = 0;
   for (auto operand : peeledBodyOp->getOperands()) {
     if (operand == genericOpOutput)
@@ -114,17 +114,17 @@ static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
   if (numUses != (tpp::utils::getNumUsers(genericOpOutput)))
     return false;
 
-  /// If the body op has multiple consumers, preemptively exit to force usage of
-  /// an intermediate buffer as the current output buffer cannot be reused after
-  /// this body op, anyway.
+  // If the body op has multiple consumers, preemptively exit to force usage of
+  // an intermediate buffer as the current output buffer cannot be reused after
+  // this body op, anyway.
   auto numOpResultUsers = tpp::utils::getNumUsers(peeledBodyOpResult);
   if (numOpResultUsers > 1)
     return false;
 
-  /// If the body op result is not consumed immediately by the next operation,
-  /// the result has to be stored in a temporary buffer. Otherwise, the
-  /// next decomposition might incorrectly overwrite the stored intermediate
-  /// results as the dependency analysis does not look at earlier ops.
+  // If the body op result is not consumed immediately by the next operation,
+  // the result has to be stored in a temporary buffer. Otherwise, the
+  // next decomposition might incorrectly overwrite the stored intermediate
+  // results as the dependency analysis does not look at earlier ops.
   if (numOpResultUsers == 1) {
     Operation *nextBodyOp = nullptr;
 
@@ -143,8 +143,8 @@ static bool canReuseOutput(GenericOp genericOp, Value genericOpOutput,
   return true;
 }
 
-GenericOp
-DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
+linalg::GenericOp
+DecomposeLinalgOp::createPeeledGenericOp(linalg::GenericOp genericOp,
                                          PatternRewriter &rewriter) const {
   // Depending whether tensors or memrefs are used, the generic op results
   // or outputs have to be used, respectively.
@@ -155,13 +155,13 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
   SmallVector<AffineMap> peeledGenericOpIndexingMaps =
       genericOp.getIndexingMapsArray();
 
-  /// Use all the same input and output operands as the original operation.
+  // Use all the same input and output operands as the original operation.
   SmallVector<Value> newInputValues = genericOp.getInputs();
   SmallVector<Value> origOuts = genericOp.getOutputs();
   newInputValues.append(origOuts);
 
-  /// Compute the loop ranges for operation. This is the shape of the result of
-  /// the generic op for the peeled operation.
+  // Compute the loop ranges for operation. This is the shape of the result of
+  // the generic op for the peeled operation.
   Location loc = genericOp.getLoc();
   SmallVector<OpFoldResult> domain = getGenericOpLoopRange(rewriter, genericOp);
   SmallVector<Value> newInitValues;
@@ -181,7 +181,7 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
     // map and result type that correspond to the yielded value.
     std::optional<unsigned> resultNumber;
     for (auto *user : scalarOpResult.value().getUsers()) {
-      if (auto yieldOp = dyn_cast<YieldOp>(user)) {
+      if (auto yieldOp = dyn_cast<linalg::YieldOp>(user)) {
         // Find the first use of the `scalarOpResult` in the yield op.
         for (OpOperand &yieldOperand : yieldOp->getOpOperands()) {
           if (yieldOperand.get() == scalarOpResult.value()) {
@@ -201,15 +201,15 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
                             .cast<ShapedType>()
                             .getShape();
 
-    /// Reuse the original output buffer in the following cases:
-    /// 1) reuse the operand matching the original yield
-    /// 2) reuse the same output buffer if:
-    ///     - there is at least the same number of output buffers as the scalar
-    ///       operation results
-    ///     - the output buffer has the same shape as the current intermediate
-    ///       result
-    ///     - the output buffer has no consumers other than the current peeled
-    ///       operation
+    // Reuse the original output buffer in the following cases:
+    // 1) reuse the operand matching the original yield
+    // 2) reuse the same output buffer if:
+    //     - there is at least the same number of output buffers as the scalar
+    //       operation results
+    //     - the output buffer has the same shape as the current intermediate
+    //       result
+    //     - the output buffer has no consumers other than the current peeled
+    //       operation
     if (resultNumber ||
         ((origRegionOuts.size() >= numScalarOpResults) &&
          llvm::equal(peeledOutSizes, origOutSizes) &&
@@ -231,8 +231,8 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
       continue;
     }
 
-    /// Fall back path - allocate a new temporary buffer to store intermediate
-    /// results.
+    // Fall back path - allocate a new temporary buffer to store intermediate
+    // results.
     AffineMap indexingMap = rewriter.getMultiDimIdentityMap(domain.size());
     auto elementType = scalarOpResult.value().getType();
     Value emptyBuf;
@@ -243,9 +243,9 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
       auto allocationType = MemRefType::get(peeledOutSizes, elementType);
       emptyBuf = rewriter.create<memref::AllocOp>(loc, allocationType);
 
-      /// Release the temporary buffer after the original operation
-      /// to ensure that the buffer's lifetime exceeds the create residual
-      /// generic op.
+      // Release the temporary buffer after the original operation
+      // to ensure that the buffer's lifetime exceeds the create residual
+      // generic op.
       {
         OpBuilder::InsertionGuard g(rewriter);
         rewriter.setInsertionPointAfter(genericOp.getOperation());
@@ -257,25 +257,25 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
     peeledGenericOpIndexingMaps.push_back(indexingMap);
   }
 
-  /// Create the peeled generic op with an empty body.
+  // Create the peeled generic op with an empty body.
   auto indexingMapAttr =
       rewriter.getAffineMapArrayAttr(peeledGenericOpIndexingMaps);
-  return rewriter.create<GenericOp>(
+  return rewriter.create<linalg::GenericOp>(
       loc, newResultTypes, newInputValues, newInitValues, indexingMapAttr,
       genericOp.getIteratorTypes(), /*doc=*/nullptr, /*libraryCall=*/nullptr,
       [](OpBuilder, Location, ValueRange) {});
 }
 
-GenericOp
-DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
-                                           GenericOp peeledGenericOp,
+linalg::GenericOp
+DecomposeLinalgOp::createResidualGenericOp(linalg::GenericOp genericOp,
+                                           linalg::GenericOp peeledGenericOp,
                                            PatternRewriter &rewriter) const {
   // Depending whether tensors or memrefs are used, the generic op results
   // or outputs have to be used, respectively.
   bool isTensor = genericOp.hasTensorSemantics();
 
-  /// Append all results from the peeledGenericOps as `ins` operand for the
-  /// residual generic op.
+  // Append all results from the peeledGenericOps as `ins` operand for the
+  // residual generic op.
   SmallVector<Value> residualGenericInOperands = genericOp.getOperands();
   SmallVector<Value> extraIns =
       isTensor ? llvm::to_vector(
@@ -284,7 +284,7 @@ DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
                : peeledGenericOp.getOutputs();
   residualGenericInOperands.append(extraIns);
 
-  /// Add indexing maps for the inputs.
+  // Add indexing maps for the inputs.
   auto indexingMaps = llvm::to_vector(
       llvm::map_range(genericOp.getDpsInputOperands(), [&](OpOperand *operand) {
         return genericOp.getMatchingIndexingMap(operand);
@@ -306,13 +306,13 @@ DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
     }
   }
 
-  /// Reuse the original outputs and add their indexing maps.
+  // Reuse the original outputs and add their indexing maps.
   SmallVector<Value> residualGenericOutOperands = genericOp.getOutputs();
   for (OpOperand *outOperand : genericOp.getDpsInitOperands())
     indexingMaps.push_back(genericOp.getMatchingIndexingMap(outOperand));
 
   auto indexingMapAttr = rewriter.getAffineMapArrayAttr(indexingMaps);
-  return rewriter.create<GenericOp>(
+  return rewriter.create<linalg::GenericOp>(
       genericOp->getLoc(), genericOp->getResultTypes(),
       residualGenericInOperands, residualGenericOutOperands, indexingMapAttr,
       genericOp.getIteratorTypes(),
@@ -321,9 +321,9 @@ DecomposeLinalgOp::createResidualGenericOp(GenericOp genericOp,
 }
 
 LogicalResult
-DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
+DecomposeLinalgOp::matchAndRewrite(linalg::GenericOp genericOp,
                                    PatternRewriter &rewriter) const {
-  /// For now only match on operations where the iterator types are all parallel
+  // For now only match on operations where the iterator types are all parallel.
   if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
     return rewriter.notifyMatchFailure(genericOp,
                                        "unhandled decomposition of operation "
@@ -338,14 +338,14 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
                    "accessed using a permutation");
   }
 
-  /// If the op has only a single statement (apart from the yield), do nothing.
+  // If the op has only a single statement (apart from the yield), do nothing.
   Block *body = genericOp.getBody();
   if (body->getOperations().size() <= 2) {
     return rewriter.notifyMatchFailure(genericOp,
                                        "operation has less than 3 statements");
   }
 
-  /// Check that the peeled statement has a scalar element type.
+  // Check that the peeled statement has a scalar element type.
   if (llvm::any_of(body->getOperations().begin()->getResultTypes(),
                    [](Type t) { return !t.isIntOrIndexOrFloat(); })) {
     return rewriter.notifyMatchFailure(
@@ -359,12 +359,13 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
         genericOp, "expected all operands to have static shape");
   }
 
-  GenericOp peeledGenericOp = createPeeledGenericOp(genericOp, rewriter);
-  GenericOp residualGenericOp =
+  linalg::GenericOp peeledGenericOp =
+      createPeeledGenericOp(genericOp, rewriter);
+  linalg::GenericOp residualGenericOp =
       createResidualGenericOp(genericOp, peeledGenericOp, rewriter);
 
-  /// Move the first statement of the original operation into the body of the
-  /// generic op for the peeled operation.
+  // Move the first statement of the original operation into the body of the
+  // generic op for the peeled operation.
   Block *peeledGenericOpBody = peeledGenericOp.getBody();
   Block *residualGenericOpBody = residualGenericOp.getBody();
   assert(peeledGenericOpBody->empty() && residualGenericOpBody->empty() &&
@@ -389,11 +390,11 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
     yieldedVals.append(llvm::to_vector(
         llvm::map_range(peeledScalarOperation->getResults(),
                         [](OpResult opr) -> Value { return opr; })));
-    rewriter.create<YieldOp>(genericOp.getLoc(), yieldedVals);
+    rewriter.create<linalg::YieldOp>(genericOp.getLoc(), yieldedVals);
   }
 
-  /// In the split operations, replace block arguments uses that refer to
-  /// original operation to the block arguments of the newly created operation.
+  // In the split operations, replace block arguments uses that refer to
+  // original operation to the block arguments of the newly created operation.
   for (const auto &inputBlockArg :
        llvm::enumerate(genericOp.getBody()->getArguments())) {
     Value residualOpReplacementArg =
@@ -411,10 +412,10 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
         });
   }
 
-  /// Before fixing up the residual operation, track what values are yielded. If
-  /// any of those are from the peeled scalar operation, the uses of the
-  /// corresponding result have to be remapped to result of the generic op for
-  /// the peeled operation.
+  // Before fixing up the residual operation, track what values are yielded. If
+  // any of those are from the peeled scalar operation, the uses of the
+  // corresponding result have to be remapped to result of the generic op for
+  // the peeled operation.
   SmallVector<Value> replacements;
   for (const auto &yieldValue : llvm::enumerate(yieldOp->getOperands())) {
     OpResult opr = yieldValue.value().dyn_cast<OpResult>();
@@ -424,8 +425,8 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
       replacements.push_back(peeledGenericOp->getResult(yieldValue.index()));
   }
 
-  /// Update all uses of the peeled scalar operation results in the residual op
-  /// to the newly added arguments.
+  // Update all uses of the peeled scalar operation results in the residual op
+  // to the newly added arguments.
   unsigned origNumInputs = genericOp.getNumDpsInputs();
   unsigned origNumOutputs = genericOp.getNumDpsInits();
   SmallVector<Value> scalarReplacements;
@@ -439,7 +440,7 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
   rewriter.replaceOpWithinBlock(peeledScalarOperation, scalarReplacements,
                                 residualGenericOpBody, &allUsesReplaced);
   assert(!allUsesReplaced &&
-         "peeled scalar operation is erased when it wasnt expected to be");
+         "peeled scalar operation is erased when it wasn't expected to be");
 
   // In case the same value is used both as the input and output,
   // replace all uses with the output-mapped block argument to
@@ -453,7 +454,7 @@ DecomposeLinalgOp::matchAndRewrite(GenericOp genericOp,
   }
 
   // Replace the original operation tensor results
-  // or just remove the original op with memrefs
+  // or just remove the original op with memrefs.
   if (genericOp.hasTensorSemantics())
     rewriter.replaceOp(genericOp, replacements);
   else
@@ -467,15 +468,15 @@ void mlir::linalgx::populateDecomposeLinalgOpsPattern(
   patterns.insert<DecomposeLinalgOp>(patterns.getContext());
   // Add the patterns to clean up the dead operands and results.
   if (removeDeadArgsAndResults)
-    populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createDecomposeLinalgPass() {
   return std::make_unique<DecomposeLinalgPass>();
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createDecomposeDefaultPass() {
   return std::make_unique<DecomposeDefaultPass>();
 }

@@ -95,8 +95,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvInitSimplifyPass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizePass();
-std::unique_ptr<OperationPass<ModuleOp>> createDecomposeLinalgPass();
-std::unique_ptr<OperationPass<ModuleOp>> createDecomposeDefaultPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeLinalgPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeDefaultPass();
 
 } // namespace tpp
 } // namespace mlir

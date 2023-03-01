@@ -290,7 +290,7 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let constructor = "mlir::tpp::createBufferizePass()";
 }
 
-def DecomposeLinalgPass : Pass<"decompose-linalg", "ModuleOp"> {
+def DecomposeLinalgPass : Pass<"decompose-linalg", "func::FuncOp"> {
   let summary = "Custom linalg decomposition pattern";
   let description = [{
     Decompose a GenericOp into multiple ops.
@@ -301,7 +301,7 @@ def DecomposeLinalgPass : Pass<"decompose-linalg", "ModuleOp"> {
   let constructor = "mlir::tpp::createDecomposeLinalgPass()";
 }
 
-def DecomposeDefaultPass : Pass<"decompose-default", "ModuleOp"> {
+def DecomposeDefaultPass : Pass<"decompose-default", "func::FuncOp"> {
   let summary = "Default linalg decomposition pattern";
   let description = [{
     Invoke upstream linalg decomposition pattern.
