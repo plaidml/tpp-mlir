@@ -33,15 +33,11 @@ using namespace mlir::tpp;
 
 namespace {
 
-// Prototypes
-std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass();
-std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
-std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass();
-std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
-std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass();
+class UtilityPassBase {
+public:
+  UtilityPassBase() = default;
+  virtual ~UtilityPassBase() = default;
 
-template <typename DerivedT, typename OpT = ModuleOp>
-class UtilityPassBase : public PassWrapper<DerivedT, OperationPass<OpT>> {
 protected:
   OpPassManager pm;
 
@@ -52,9 +48,7 @@ protected:
 // A general cleanup pass that performs general IR normalization and
 // generic optimizations without any lowering or any logical changes.
 // Commonly applied after other major passes.
-struct CleanupPass : public UtilityPassBase<CleanupPass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CleanupPass)
-
+struct CleanupPass : public CleanupBase<CleanupPass>, UtilityPassBase {
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -76,14 +70,8 @@ private:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass() {
-  return std::make_unique<CleanupPass>();
-}
-
 // Apply any present transforms and remove transform blocks afterwards.
-struct TransformPass : public UtilityPassBase<TransformPass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformPass)
-
+struct TransformPass : public TransformBase<TransformPass>, UtilityPassBase {
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -106,58 +94,11 @@ private:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createTransformPass() {
-  return std::make_unique<TransformPass>();
-}
-
-// Apply global bufferization - convert all tensors to memrefs.
-// Uses TPP-specific bufferization options.
-struct BufferizationPass : public UtilityPassBase<BufferizationPass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BufferizationPass)
-
-  void runOnOperation() override {
-    ModuleOp module = getOperation();
-
-    // Initialize the pipeline if needed.
-    // Otherwise, just run the cached one.
-    if (pm.empty())
-      constructPipeline();
-
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
-  }
-
-private:
-  void constructPipeline() override {
-    pm.clear();
-
-    // Run bufferization as the rest of the passes prefer working on memref.
-    bufferization::OneShotBufferizationOptions buffOpts;
-    buffOpts.allowReturnAllocs = true;
-    buffOpts.bufferizeFunctionBoundaries = true;
-    buffOpts.functionBoundaryTypeConversion =
-        bufferization::LayoutMapOption::IdentityLayoutMap;
-
-    pm.addPass(bufferization::createOneShotBufferizePass(buffOpts));
-    pm.addPass(bufferization::createDropEquivalentBufferResultsPass());
-    pm.addNestedPass<func::FuncOp>(
-        bufferization::createFinalizingBufferizePass());
-
-    // Clean up after bufferization.
-    pm.addPass(bufferization::createBufferDeallocationPass());
-  }
-};
-
-std::unique_ptr<OperationPass<ModuleOp>> createBufferizationPass() {
-  return std::make_unique<BufferizationPass>();
-}
-
 // Lower all local dialects (XSMM, check etc.) to standard dialects
 // and function calls.
 struct LocalDialectsLoweringPass
-    : public UtilityPassBase<LocalDialectsLoweringPass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LocalDialectsLoweringPass)
-
+    : public LocalDialectsLoweringBase<LocalDialectsLoweringPass>,
+      UtilityPassBase {
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -181,15 +122,10 @@ private:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass() {
-  return std::make_unique<LocalDialectsLoweringPass>();
-}
-
 // Apply various postprocessing passes such as LICM, parallel loop fusion,
 // buffer deallocation, general cleanup etc.
-struct PostprocessingPass : public UtilityPassBase<PostprocessingPass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PostprocessingPass)
-
+struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
+                            UtilityPassBase {
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -219,10 +155,6 @@ private:
     pm.addPass(createCleanupPass());
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass() {
-  return std::make_unique<PostprocessingPass>();
-}
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
   DefaultTppPasses() : DefaultTppPasses(false, false){};
@@ -330,6 +262,23 @@ private:
 };
 
 } // namespace
+
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createCleanupPass() {
+  return std::make_unique<CleanupPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTransformPass() {
+  return std::make_unique<TransformPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createLocalDialectsLoweringPass() {
+  return std::make_unique<LocalDialectsLoweringPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createPostprocessingPass() {
+  return std::make_unique<PostprocessingPass>();
+}
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createDefaultTppPass(bool tppLoops, bool linalgLoops) {

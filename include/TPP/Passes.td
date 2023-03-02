@@ -293,4 +293,28 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let constructor = "mlir::tpp::createBufferizePass()";
 }
 
+def Cleanup : Pass<"cleanup", "ModuleOp"> {
+  let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
+  let constructor = "mlir::tpp::createCleanupPass()";
+}
+
+def Transform : Pass<"transform", "ModuleOp"> {
+  let summary = "Runs transformation schedules and then drops them.";
+  let constructor = "mlir::tpp::createTransformPass()";
+}
+
+def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
+  let summary = "Lower all local dialects (XSMM, check etc.).";
+  let constructor = "mlir::tpp::createLocalDialectsLoweringPass()";
+}
+
+def Postprocessing : Pass<"postprocess", "ModuleOp"> {
+  let summary = "IR postprocessing pass";
+  let description = [{
+    Apply various postprocessing passes such as LICM, parallel loop fusion,
+    buffer deallocation, general cleanup etc.
+  }];
+  let constructor = "mlir::tpp::createPostprocessingPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
