@@ -435,7 +435,7 @@ func.func @extract_results_for_printing(%input : !second_conv1x1_output_tensor_t
 
 //
 // CHECK-LABEL: @resnet50_bottleneck_block(
-// CHECK-SAME: %[[input:.*]]: memref<1x7x7x2048xf32>, %[[output:.*]]: memref<1x8xf32>) {
+// CHECK-SAME: %[[input:.*]]: memref<1x7x7x2048xf32>, %[[output:.*]]: memref<1x8xf32>) -> memref<1x8xf32> {
 //
 func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %output : !tensor_print_t) -> !tensor_print_t {
 
