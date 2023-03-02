@@ -86,6 +86,19 @@ bool isZeroTensor(Value val);
 // allOperandsHaveSameShape(A, C) return false.
 bool allOperandsHaveSameShapeAndStrides(TypeRange types);
 
+// Check if tpp.identity satisfies broadcasting rules.
+// see: https://numpy.org/doc/stable/reference/ufuncs.html#broadcasting
+// TODO: Make this function general enough for other tpp ops when we support
+// broadcasting.
+enum class MatchBroadcastRuleResult {
+  Success = 0,
+  OutputNotShapedType,
+  WrongOutputRank,
+  FailedToVerifyRules,
+};
+MatchBroadcastRuleResult verifyTppIdentityBroadcastingRules(Type input,
+                                                            Type output);
+
 } // namespace utils
 } // namespace tpp
 } // namespace mlir
