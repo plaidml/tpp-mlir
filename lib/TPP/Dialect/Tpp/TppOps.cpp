@@ -21,38 +21,26 @@ using namespace mlir::tpp;
 // IdentityOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult IdentityOp::verify() {
-  Type inputType = getInput().getType();
-  Type outputType = getOutput().getType();
-
-  // input scalar, just return.
-  if (!inputType.isa<ShapedType>())
-    return success();
-
-  // if the input is not a scalar the output rank should be >= of the input
-  // rank.
-  unsigned rankInput = inputType.cast<ShapedType>().getRank();
-  if (!outputType.isa<ShapedType>())
-    return emitOpError("expects a shape type for output");
-  unsigned rankOutput = outputType.cast<ShapedType>().getRank();
-  if (rankOutput < rankInput)
-    return emitOpError("expects output rank to be >= of input rank");
-
-  // check if the shape are broadcast compatible.
-  ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
-
-  for (int64_t i = rankInput - 1, j = rankOutput - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    int64_t inputDim = shapeInput[i];
-    int64_t outputDim = shapeOutput[j];
-
-    if (inputDim == outputDim)
-      continue;
-    if (inputDim == 1 && outputDim > 1)
-      continue;
-    return emitOpError("fails to verify broadcasting rules");
+StringRef getMatchBroadcastRuleMessage(utils::MatchBroadcastRuleResult res) {
+  switch (res) {
+  case utils::MatchBroadcastRuleResult::OutputNotShapedType:
+    return "expect shaped shaped type for output";
+  case utils::MatchBroadcastRuleResult::WrongOutputRank:
+    return "wrong rank on output";
+  case utils::MatchBroadcastRuleResult::FailedToVerifyRules:
+    return "fails to verify broadcasting rules";
+  case utils::MatchBroadcastRuleResult::Success:
+    return "";
   }
+  llvm_unreachable("unhandled MatchBroadcastRuleResult case");
+}
+
+LogicalResult IdentityOp::verify() {
+  utils::MatchBroadcastRuleResult res =
+      utils::verifyTppIdentityBroadcastingRules(getInput().getType(),
+                                                getOutput().getType());
+  if (res != utils::MatchBroadcastRuleResult::Success)
+    return emitOpError(getMatchBroadcastRuleMessage(res));
   return success();
 }
 
