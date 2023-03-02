@@ -475,12 +475,12 @@ getLastFusableConsumer(linalg::LinalgOp linalgOp,
 
   while (isValidEltWiseConsumer(nextConsumer)) {
     Value resNextConsumer = nextConsumer->getResult(0);
-    if (!resNextConsumer.hasOneUse())
-      return currentConsumer;
     currentConsumer = nextConsumer;
     visitedConsumers.insert(currentConsumer);
     nextConsumer = *(resNextConsumer.getUsers().begin());
   }
+  LLVM_DEBUG(llvm::dbgs() << "LAST FUSABLE CONSUMER: " << currentConsumer
+                          << "\n");
   return currentConsumer;
 }
 
@@ -507,6 +507,7 @@ struct TileConsumerAndFuseProducers
         linalgOperations.push_back(linalgOp.getOperation());
     });
 
+    std::reverse(linalgOperations.begin(), linalgOperations.end());
     llvm::SmallDenseSet<Operation *> visitedConsumers;
     llvm::SmallDenseSet<Operation *> fusionRoots;
     if (this->startFromLastFusableConsumer) {
