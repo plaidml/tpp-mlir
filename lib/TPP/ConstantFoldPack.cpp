@@ -110,7 +110,7 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                       packOp.getDestType().getRank() - 2 * pointLoops;
                   SmallVector<int64_t> delSourceIndexes;
                   size_t tilePosIdx = 0;
-                  ArrayRef<int64_t> tilesSizes = packOp.getStaticTiles();
+                  SmallVector<int64_t> tilesSizes = packOp.getStaticTiles();
                   if (!areStaticValues(tilesSizes))
                     return;
                   for (int i = 0;
