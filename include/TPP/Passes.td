@@ -311,7 +311,7 @@ def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
 def Postprocessing : Pass<"postprocess", "ModuleOp"> {
   let summary = "IR postprocessing pass";
   let description = [{
-    Apply various postprocessing passes such as LICM, parallel loop fusion,
+    Apply various postprocessing passes such parallel loop fusion,
     buffer deallocation, general cleanup etc.
   }];
   let constructor = "mlir::tpp::createPostprocessingPass()";

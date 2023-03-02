@@ -117,8 +117,16 @@ private:
     pm.clear();
 
     pm.addPass(createConvertCheckToLoopsPass());
-    pm.addPass(createConvertXsmmToFuncPass());
     pm.addPass(createConvertPerfToLoopsPass());
+
+    // Note that LICM should be performed before any function calls are
+    // generated
+    // to ensure that ops which map directly to functions also get moved outside
+    // of loops, if possible. This approach assumes that the function calls do
+    // not have any side effects and can be safely moved outside of loop body.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+
+    pm.addPass(createConvertXsmmToFuncPass());
     pm.addPass(createConvertPerfToFuncPass());
   }
 };
@@ -143,8 +151,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Postprocess generated loops.
-    pm.addPass(createLoopInvariantCodeMotionPass());
+    // Postprocess loops.
     pm.addPass(createRaiseToParallelLoopPass());
     pm.addPass(createParallelLoopFusionPass());
 
