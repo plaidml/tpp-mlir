@@ -25,23 +25,28 @@
 !multi_head_attention_output_tensor_t  = tensor<32x8x128xf32> // batch_size, embedding_size, seq_length
 
 //
-// CHECK: #[[map:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-DAG: #[[map1:.*]] = affine_map<(d0, d1) -> (0, 0, d0, d1)>
-// CHECK-DAG: #[[map2:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 64 + d1 + s0)>
-// CHECK-DAG: #[[map3:.*]] = affine_map<(d0, d1) -> ()>
-// CHECK-DAG: #[[map4:.*]] = affine_map<(d0, d1) -> (0, d0, 0, d1)>
-// CHECK-DAG: #[[map5:.*]] = affine_map<(d0, d1) -> (0, d1, 0, d0)>
-// CHECK-DAG: #[[map6:.*]] = affine_map<(d0, d1) -> (0, 0, d1, d0)>
-// CHECK-DAG: #[[map7:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 8 + d1 + s0)>
-// CHECK-DAG: #[[map8:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-DAG: #[[map9:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-DAG: #[[map10:.*]] = affine_map<(d0, d1) -> (0, 0, d0, 0)>
-// CHECK-DAG: #[[map11:.*]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-DAG: #[[map12:.*]] = affine_map<(d0, d1) -> (0, d0, d1)>
-// CHECK-DAG: #[[map13:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 128 + d1 + s0)>
+// CHECK-DAG: #[[map:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 128)>
+// CHECK-DAG: #[[map1:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 64 + d1 + s0)>
+// CHECK-DAG: #[[map2:.*]] = affine_map<(d0, d1) -> ()>
+// CHECK-DAG: #[[map3:.*]] = affine_map<(d0, d1) -> (0, 0, d0, d1)>
+// CHECK-DAG: #[[map4:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 64)>
+// CHECK-DAG: #[[map5:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 512)>
+// CHECK-DAG: #[[map6:.*]] = affine_map<(d0, d1) -> (0, d0, 0, d1)>
+// CHECK-DAG: #[[map7:.*]] = affine_map<(d0, d1) -> (0, d1, 0, d0)>
+// CHECK-DAG: #[[map8:.*]] = affine_map<()[s0, s1] -> (s0 * 128 + s1 * 64)>
+// CHECK-DAG: #[[map9:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 8 + d1 + s0)>
+// CHECK-DAG: #[[map10:.*]] = affine_map<()[s0] -> (s0 * 64)>
+// CHECK-DAG: #[[map11:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[map12:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-DAG: #[[map13:.*]] = affine_map<()[s0, s1] -> (s0 * 16 + s1 * 8)>
+// CHECK-DAG: #[[map14:.*]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-DAG: #[[map15:.*]] = affine_map<()[s0] -> (s0 * 1024)>
+// CHECK-DAG: #[[map16:.*]] = affine_map<(d0, d1)[s0] -> (d0 * 128 + d1 + s0)>
 //
 // CHECK: func.func private @xsmm_binary_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK-NEXT: func.func private @xsmm_binary_dispatch(i64, i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
+// CHECK-NEXT: func.func private @xsmm_unary_invoke(i64, i64, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
+// CHECK-NEXT: func.func private @xsmm_unary_dispatch(i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 // CHECK-NEXT: func.func private @xsmm_matmul_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK-NEXT: func.func private @xsmm_matmul_dispatch(i64, i1, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 //
@@ -67,6 +72,7 @@ func.func @multi_head_attention(
     %cst_13 = arith.constant dense<9.99999996E-13> : tensor<f32>
     //
     // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+    // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
     // CHECK-DAG: %[[false:.*]] = arith.constant false
     // CHECK-DAG: %[[c256_i64:.*]] = arith.constant 256 : i64
     // CHECK-DAG: %[[c128_i64:.*]] = arith.constant 128 : i64
@@ -120,6 +126,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x2x64xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %86 = tensor.empty() : tensor<32x8x2x64xf32>
     %87 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_22, %85 : tensor<32x8x2x64xf32>, tensor<32x8x2x64xf32>) outs(%86 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -129,9 +144,9 @@ func.func @multi_head_attention(
     //
     // CHECK: %[[ret:.*]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
-    // CHECK: %[[cast_51:.*]] = memref.cast %[[subview:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[subview_49:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[subview_50:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
+    // CHECK: %[[cast_51:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[z:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
     // CHECK-NEXT: func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast_51]], %[[cast_52]], %[[cast_53]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     // CHECK-NEXT: scf.yield
     // CHECK-NEXT: }
@@ -153,6 +168,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x2x64xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %93 = tensor.empty() : tensor<32x8x2x64xf32>
     %94 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_24, %92 : tensor<32x8x2x64xf32>, tensor<32x8x2x64xf32>) outs(%93 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -162,9 +186,9 @@ func.func @multi_head_attention(
     //
     // CHECK: %[[ret:.*]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
-    // CHECK: %[[cast_51:.*]] = memref.cast %[[subview:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[subview_49:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[subview_50:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
+    // CHECK: %[[cast_51:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[z:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
     // CHECK-NEXT: func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast_51]], %[[cast_52]], %[[cast_53]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     // CHECK-NEXT: scf.yield
     // CHECK-NEXT: }
@@ -209,11 +233,29 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x2x8x8xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c2]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %108 = tensor.empty() : tensor<32x2x8x8xf32>
     %109 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, 0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%input_mask : tensor<32x1x8x8xf32>) outs(%108 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x2x8x8xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c2]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
 
     // Encoder 1 - Multi-head attention - Add of Mask to MatMul(linear(Key), linear(Query))
     %110 = tensor.empty() : tensor<32x2x8x8xf32>
@@ -225,9 +267,9 @@ func.func @multi_head_attention(
     //
     // CHECK: %[[ret:.*]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c2]]) step (%[[c1]], %[[c1]]) {
-    // CHECK: %[[cast_51:.*]] = memref.cast %[[subview:.*]] : memref<8x8xf32, #[[map7]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[subview_49:.*]] : memref<8x8xf32, #[[map7]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[subview_50:.*]] : memref<8x8xf32, #[[map7]]> to memref<*xf32>
+    // CHECK: %[[cast_51:.*]] = memref.cast %[[x:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[y:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[z:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
     // CHECK-NEXT: func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast_51]], %[[cast_52]], %[[cast_53]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     // CHECK-NEXT: scf.yield
     // CHECK-NEXT: }
@@ -247,6 +289,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x2x8x8xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c2]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<8xf32, #[[map14]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %117 = tensor.empty() : tensor<32x2x8x8xf32>
     %118 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%111, %116 : tensor<32x2x8x8xf32>, tensor<32x2x8x8xf32>) outs(%117 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -275,6 +326,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x2x8x8xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c2]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<8xf32, #[[map14]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<8x8xf32, #[[map9]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %126 = tensor.empty() : tensor<32x2x8x8xf32>
     %127 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%120, %125 : tensor<32x2x8x8xf32>, tensor<32x2x8x8xf32>) outs(%126 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -298,6 +358,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x2x64xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %133 = tensor.empty() : tensor<32x8x2x64xf32>
     %134 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_31, %132 : tensor<32x8x2x64xf32>, tensor<32x8x2x64xf32>) outs(%133 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -307,9 +376,9 @@ func.func @multi_head_attention(
     //
     // CHECK: %[[ret:.*]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (%[[c0]], %[[c0]]) to (%[[c32]], %[[c8]]) step (%[[c1]], %[[c1]]) {
-    // CHECK: %[[cast_51:.*]] = memref.cast %[[subview:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[subview_49:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[subview_50:.*]] : memref<2x64xf32, #[[map2]]> to memref<*xf32>
+    // CHECK: %[[cast_51:.*]] = memref.cast %[[x:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[y:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[z:.*]] : memref<2x64xf32, #[[map1]]> to memref<*xf32>
     // CHECK-NEXT: func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast_51]], %[[cast_52]], %[[cast_53]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     // CHECK-NEXT: scf.yield
     // CHECK-NEXT: }
@@ -354,6 +423,15 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x128xf32>
+    //
+    // CHECK: %[[ret:.*]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel (%[[arg1:.*]]) = (%[[c0]]) to (%[[c32]]) step (%[[c1]]) {
+    // CHECK: %[[cast_43:.*]] = memref.cast %[[x:.*]] : memref<128xf32> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_44:.*]] = memref.cast %[[y:.*]] : memref<8x128xf32, #[[map16]]> to memref<*xf32>
+    // CHECK-NEXT: func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast_43]], %[[cast_44]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: scf.yield
+    // CHECK-NEXT: }
+    //
     %147 = tensor.empty() : tensor<32x8x128xf32>
     %148 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded_37, %146 : tensor<32x8x128xf32>, tensor<32x8x128xf32>) outs(%147 : tensor<32x8x128xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -363,9 +441,9 @@ func.func @multi_head_attention(
     //
     // CHECK: %[[ret:.*]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel (%[[arg1:.*]]) = (%[[c0]]) to (%[[c32]]) step (%[[c1]]) {
-    // CHECK: %[[cast_51:.*]] = memref.cast %[[subview:.*]] : memref<8x128xf32, #[[map13]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[subview_49:.*]] : memref<8x128xf32, #[[map13]]> to memref<*xf32>
-    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[subview_50:.*]] : memref<8x128xf32, #[[map13]]> to memref<*xf32>
+    // CHECK: %[[cast_51:.*]] = memref.cast %[[x:.*]] : memref<8x128xf32, #[[map16]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_52:.*]] = memref.cast %[[y:.*]] : memref<8x128xf32, #[[map16]]> to memref<*xf32>
+    // CHECK-NEXT: %[[cast_53:.*]] = memref.cast %[[z:.*]] : memref<8x128xf32, #[[map16]]> to memref<*xf32>
     // CHECK-NEXT: func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast_51]], %[[cast_52]], %[[cast_53]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     // CHECK-NEXT: scf.yield
     // CHECK-NEXT: }
