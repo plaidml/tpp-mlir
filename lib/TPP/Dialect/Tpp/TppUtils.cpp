@@ -132,6 +132,12 @@ bool hasCopySemantics(linalg::LinalgOp linalgOp) {
     return false;
   if ((linalgOp->getNumOperands() != 2) || (linalgOp.getNumDpsInputs() != 1))
     return false;
+  if (!allIndexingsAreProjectedPermutation(linalgOp))
+    return false;
+  AffineMap outputIndexingMap =
+      linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(0));
+  if (!outputIndexingMap.isIdentity())
+    return false;
   return hasOnlyOp<linalg::YieldOp>(linalgOp->getRegion(0));
 }
 
@@ -159,7 +165,7 @@ bool isZeroTensor(Value val) {
     // We need to find the argument to the linalg on the same order as this one
     auto *linalgOp = arg.getParentRegion()->getParentOp();
     if (!isa<linalg::GenericOp>(linalgOp))
-        return false;
+      return false;
     auto index = arg.getArgNumber();
     auto linalgArg = linalgOp->getOperand(index);
     defOp = linalgArg.getDefiningOp();
@@ -173,12 +179,8 @@ bool isZeroTensor(Value val) {
 // Returns true if the attribute represent "all zeros"
 bool isZeroAttr(Attribute attribute) {
   return TypeSwitch<Attribute, bool>(attribute)
-      .Case<FloatAttr>([](auto attr) {
-          return attr.getValueAsDouble() == 0.0;
-      })
-      .Case<IntegerAttr>([](auto attr) {
-          return attr.getInt() == 0;
-      })
+      .Case<FloatAttr>([](auto attr) { return attr.getValueAsDouble() == 0.0; })
+      .Case<IntegerAttr>([](auto attr) { return attr.getInt() == 0; })
       .Case<DenseElementsAttr>([](auto attr) {
         if (!attr.getElementType().isIntOrFloat())
           return false;
@@ -209,9 +211,8 @@ static bool isZeroOp(Operation *defOp) {
         return isZeroTensor(op.getInputs()[0]);
       })
       .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
-            tensor::ExtractSliceOp>([&](auto op) {
-        return isZeroTensor(op.getSource());
-      })
+            tensor::ExtractSliceOp>(
+          [&](auto op) { return isZeroTensor(op.getSource()); })
       .Case<memref::GetGlobalOp>([&](auto op) {
         auto name = op.getName();
         auto module = defOp->getParentOfType<ModuleOp>();
@@ -259,7 +260,8 @@ bool hasMappingToTppConditions(linalg::GenericOp linalgOp) {
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
-  return hasStaticShape(linalgOp);
+  return hasStaticShape(linalgOp) &&
+         allIndexingsAreProjectedPermutation(linalgOp);
 }
 
 static bool hasOneUser(Value val) {
@@ -326,18 +328,6 @@ bool allOperandsHaveSameShapeAndStrides(TypeRange types) {
   return true;
 }
 
-// Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp) {
-  if (!hasMappingToTppConditions(linalgOp))
-    return false;
-  if (!isBinaryOp(linalgOp))
-    return false;
-  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
-    return false;
-  return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
-}
-
 // Return true if the operation is unary.
 static bool isUnaryOp(linalg::GenericOp linalgOp) {
   if ((linalgOp.getNumDpsInputs() == 0) && (linalgOp.getNumDpsInits() == 1)) {
@@ -372,6 +362,52 @@ static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   return false;
 }
 
+MatchBroadcastRuleResult verifyTppIdentityBroadcastingRules(Type inputType,
+                                                            Type outputType) {
+  // input scalar, just return.
+  if (!inputType.isa<ShapedType>())
+    return MatchBroadcastRuleResult::Success;
+
+  // if the input is not a scalar the output rank should be >= of the input
+  // rank.
+  auto shapedInputType = inputType.cast<ShapedType>();
+  unsigned rankInput = shapedInputType.getRank();
+  if (!outputType.isa<ShapedType>())
+    return MatchBroadcastRuleResult::OutputNotShapedType;
+  auto shapedOutputType = outputType.cast<ShapedType>();
+  unsigned rankOutput = shapedOutputType.getRank();
+  if (rankOutput < rankInput)
+    return MatchBroadcastRuleResult::WrongOutputRank;
+
+  // check if the shape are broadcast compatible.
+  ArrayRef<int64_t> shapeInput = shapedInputType.getShape();
+  ArrayRef<int64_t> shapeOutput = shapedOutputType.getShape();
+
+  for (int64_t i = rankInput - 1, j = rankOutput - 1; i >= 0 && j >= 0;
+       i--, j--) {
+    int64_t inputDim = shapeInput[i];
+    int64_t outputDim = shapeOutput[j];
+
+    if (inputDim == outputDim)
+      continue;
+    if (inputDim == 1 && outputDim > 1)
+      continue;
+    return MatchBroadcastRuleResult::FailedToVerifyRules;
+  }
+  return MatchBroadcastRuleResult::Success;
+}
+
+// Return true if the linalg.generic can be mapped to a tpp.add.
+bool isTppAdd(linalg::GenericOp linalgOp) {
+  if (!hasMappingToTppConditions(linalgOp))
+    return false;
+  if (!isBinaryOp(linalgOp))
+    return false;
+  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
+    return false;
+  return hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
+}
+
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp) {
   if (!hasMappingToTppConditions(linalgOp))
@@ -380,8 +416,7 @@ bool isTppRelu(linalg::GenericOp linalgOp) {
     return false;
   if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
     return false;
-  return allIndexingsAreProjectedPermutation(linalgOp) &&
-         hasMaxfZeroOp(linalgOp);
+  return hasMaxfZeroOp(linalgOp);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.
@@ -390,7 +425,12 @@ bool isTppIdentity(linalg::GenericOp linalgOp) {
     return false;
   if (!isUnaryOp(linalgOp))
     return false;
-  return hasCopySemantics(linalgOp);
+  if (!hasCopySemantics(linalgOp))
+    return false;
+  assert(linalgOp.getNumOperands() == 2);
+  auto res = verifyTppIdentityBroadcastingRules(
+      linalgOp.getOperand(0).getType(), linalgOp.getOperand(1).getType());
+  return res == MatchBroadcastRuleResult::Success;
 }
 
 } // namespace utils

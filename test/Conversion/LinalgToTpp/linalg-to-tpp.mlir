@@ -556,3 +556,171 @@ func.func @relu_mapping_strided(%i: memref<4x4xf32>, %o: memref<4x4xf32, strided
     }
   return
 }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+
+// CHECK-LABEL: func.func @broadcast_row_identity
+// CHECK-SAME: %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<32xf32>
+func.func @broadcast_row_identity(%arg0: memref<8x32xf32>, %arg1: memref<32xf32>) {
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<32xf32>) out(%[[ARG0:.+]] : memref<8x32xf32>)
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<32xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0, 0)>
+
+// CHECK-LABEL: func.func @broadcast_col_identity
+// CHECK-SAME:  %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<8x1xf32>
+func.func @broadcast_col_identity(%arg0: memref<8x32xf32>, %arg1: memref<8x1xf32>) {
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<8x1xf32>) out(%[[ARG0]] : memref<8x32xf32>)
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<8x1xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+
+// CHECK-LABEL: func.func @transpose
+func.func @transpose(%arg0: memref<8x32xf32>, %arg1: memref<32x8xf32>) {
+  // CHECK-NOT: tpp.identity
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<32x8xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @transpose_no_output_identity
+func.func @transpose_no_output_identity(%arg0: memref<8x32xf32>, %arg1: memref<32x8xf32>) {
+  // CHECK-NOT: tpp.identity
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<32x8xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @empty_map_identity
+// CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<8x32xf32>
+func.func @empty_map_identity(%arg0 : f32, %arg1: memref<8x32xf32>) {
+  // CHECK: tpp.identity ins(%[[ARG0]] : f32) out(%[[ARG1]] : memref<8x32xf32>)
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : f32) outs(%arg1: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (5, 5)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @non_zero_constant_identity
+func.func @non_zero_constant_identity(%arg0 : memref<8x32xf32>, %arg1: memref<8x32xf32>) {
+  // CHECK-NOT: tpp.identity
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : memref<8x32xf32>) outs(%arg1: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (0, d1)>
+
+// CHECK-LABEL: func.func @broadcast_row_identity
+// CHECK-SAME: %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<1x32xf32>
+func.func @broadcast_row_identity(%arg0: memref<8x32xf32>, %arg1: memref<1x32xf32>) {
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<1x32xf32>) out(%[[ARG0]] : memref<8x32xf32>)
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<1x32xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: func.func @transpose_4d
+func.func @transpose_4d(%arg0: memref<32x8x2x64xf32>, %arg1: memref<32x2x64x8xf32>) {
+  // CHECK-NOT: tpp.identity
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%arg0: memref<32x8x2x64xf32>) outs(%arg1: memref<32x2x64x8xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+
+// This should be fixed, as this op is a valid tpp.identity.
+// Currently, it fails broadcasting rules.
+// CHECK-LABEL: func.func @broadcast_col_identity
+func.func @broadcast_col_identity(%arg0: memref<8x32xf32>, %arg1: memref<8xf32>) {
+  // CHECK-NOT: tpp.identity
+  linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: memref<8xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    }
+  return
+}
