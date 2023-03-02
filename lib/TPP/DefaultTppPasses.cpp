@@ -35,7 +35,8 @@ namespace {
 
 class UtilityPassBase {
 public:
-  UtilityPassBase() = default;
+  UtilityPassBase()
+      : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit){};
   virtual ~UtilityPassBase() = default;
 
 protected:
@@ -156,10 +157,98 @@ private:
   }
 };
 
-struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
+// Apply collection of high-level passes that map operations to
+// TPP-compatible forms.
+struct TppMappingPass : public TppMappingBase<TppMappingPass>, UtilityPassBase {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  void constructPipeline() override {
+    pm.clear();
+
+    // Preprocess convolutions.
+    pm.addNestedPass<func::FuncOp>(createRewriteConvToMatmulOrBrgemmPass());
+
+    // Generalize tensor.pack and tensor.unpack.
+    pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
+  }
+};
+
+// Convert all matching operations to TPP.
+struct TppConversionPass : public TppConversionBase<TppConversionPass>,
+                           UtilityPassBase {
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  void constructPipeline() override {
+    pm.clear();
+
+    // Convert generics to BRGEMM.
+    // The mapping is done after bufferization as the buffer semantics
+    // allow direct use of scf.parallel loops. This prevents different
+    // lowering outputs between input linalg on tensors and memrefs.
+    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
+
+    // Convert all higher level dialects to TPP.
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+    pm.addPass(createConvertVNNIToTppPass());
+  }
+};
+
+// Convert all matching ops to TPP.
+struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
+                         UtilityPassBase {
+  TppLoweringPass() : TppLoweringPass(false){};
+  TppLoweringPass(bool tppToLoops) { this->tppToLoops = tppToLoops; };
+
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  void constructPipeline() override {
+    pm.clear();
+
+    // Lower all TPP ops.
+    if (tppToLoops)
+      pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+    else
+      pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+  }
+};
+
+struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
+                          UtilityPassBase {
   DefaultTppPasses() : DefaultTppPasses(false, false){};
-  DefaultTppPasses(bool tppToLoops, bool linalgToLoops)
-      : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit) {
+  DefaultTppPasses(bool tppToLoops, bool linalgToLoops) {
     this->tppToLoops = tppToLoops;
     this->linalgToLoops = linalgToLoops;
   };
@@ -195,10 +284,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
   }
 
 private:
-  OpPassManager pm;
-
-  // Create the default processing pipeline.
-  void constructPipeline() {
+  void constructPipeline() override {
     pm.clear();
 
     // Run transforms first and clean them up afterwards.
@@ -278,6 +364,19 @@ mlir::tpp::createLocalDialectsLoweringPass() {
 
 std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createPostprocessingPass() {
   return std::make_unique<PostprocessingPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppMappingPass() {
+  return std::make_unique<TppMappingPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppConversionPass() {
+  return std::make_unique<TppConversionPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createTppLoweringPass(bool loops) {
+  return std::make_unique<TppLoweringPass>(loops);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>

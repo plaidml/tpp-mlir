@@ -317,4 +317,35 @@ def Postprocessing : Pass<"postprocess", "ModuleOp"> {
   let constructor = "mlir::tpp::createPostprocessingPass()";
 }
 
+def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
+  let summary = "Map operations to be TPP compatible";
+  let description = [{
+    Apply collection of TPP rewriting passes to map eligble operations
+    into equivalent TPP-compatible forms.
+  }];
+  let constructor = "mlir::tpp::createTppMappingPass()";
+}
+
+def TppConversion : Pass<"tpp-conversion", "ModuleOp"> {
+  let summary = "Convert operations to TPP";
+  let description = [{
+    Convert all eligble operations into TPP operations.
+  }];
+  let constructor = "mlir::tpp::createTppConversionPass()";
+}
+
+def TppLowering : Pass<"tpp-lowering", "ModuleOp"> {
+  let summary = "Lower TPP operations";
+  let description = [{
+    Lower all TPP operations into combination of operations from
+    standard and local dialects.
+  }];
+  let constructor = "mlir::tpp::createTppLoweringPass()";
+  let options= [
+    Option<"tppToLoops", "tpp-to-loops",
+           "bool", /*default=*/"0",
+           "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
