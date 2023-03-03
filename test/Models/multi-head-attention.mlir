@@ -114,11 +114,11 @@ func.func @multi_head_attention(
     //
     %83 = linalg.matmul ins(%collapsed_20, %collapsed_21 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%82 : tensor<256x128xf32>) -> tensor<256x128xf32>
     //
-    // CHECK: %[[ret:.*]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[matDis:.*]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK-NEXT: %[[cast:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
     // CHECK-NEXT: %[[cast1:.*]] = memref.cast %[[y:.*]] : memref<128x128xf32> to memref<*xf32>
     // CHECK-NEXT: %[[cast2:.*]] = memref.cast %[[z:.*]] : memref<256x128xf32> to memref<*xf32>
-    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     %expanded_22 = tensor.expand_shape %83 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
     %84 = tensor.empty() : tensor<32x8x2x64xf32>
@@ -158,9 +158,8 @@ func.func @multi_head_attention(
     %89 = linalg.fill ins(%cst_1 : f32) outs(%88 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %90 = linalg.matmul ins(%collapsed_20, %collapsed_23 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%89 : tensor<256x128xf32>) -> tensor<256x128xf32>
     //
-    // CHECK: %[[ret:.*]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK-NEXT: %[[cast7:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
-    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast7]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[cast7:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
+    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis]], %[[cast]], %[[cast1]], %[[cast7]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     %expanded_24 = tensor.expand_shape %90 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
     %91 = tensor.empty() : tensor<32x8x2x64xf32>
@@ -348,9 +347,8 @@ func.func @multi_head_attention(
     %129 = linalg.fill ins(%cst_1 : f32) outs(%128 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %130 = linalg.matmul ins(%collapsed_20, %collapsed_30 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%129 : tensor<256x128xf32>) -> tensor<256x128xf32>
     //
-    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK-NEXT: %[[cast32:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
-    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast32]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK: %[[cast32:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
+    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis]], %[[cast]], %[[cast1]], %[[cast32]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     %expanded_31 = tensor.expand_shape %130 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
     %131 = tensor.empty() : tensor<32x8x2x64xf32>
@@ -412,10 +410,9 @@ func.func @multi_head_attention(
     %143 = linalg.fill ins(%cst_1 : f32) outs(%142 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %144 = linalg.matmul ins(%collapsed_35, %collapsed_36 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%143 : tensor<256x128xf32>) -> tensor<256x128xf32>
     //
-    // CHECK: %[[ret:.*]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-    // CHECK-NEXT: %[[cast44:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
+    // CHECK: %[[cast44:.*]] = memref.cast %[[x:.*]] : memref<256x128xf32> to memref<*xf32>
     // CHECK-NEXT: %[[cast45:.*]] = memref.cast %[[y:.*]] : memref<256x128xf32> to memref<*xf32>
-    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast44]], %[[cast1]], %[[cast45]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK-NEXT: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis]], %[[cast44]], %[[cast1]], %[[cast45]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
     //
     %expanded_37 = tensor.expand_shape %144 [[0, 1], [2]] : tensor<256x128xf32> into tensor<32x8x128xf32>
     %145 = tensor.empty() : tensor<32x8x128xf32>
