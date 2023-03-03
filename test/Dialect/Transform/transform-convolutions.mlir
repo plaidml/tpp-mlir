@@ -249,8 +249,6 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-NEXT:   scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:     scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
   // CHECK-NEXT:       scf.for {{.*}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args
-  // CHECK: linalg.generic 
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
   // CHECK:               scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
   // CHECK-NEXT:            scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK-NEXT:              scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args

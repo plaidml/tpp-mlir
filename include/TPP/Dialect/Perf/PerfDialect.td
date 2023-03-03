@@ -24,7 +24,6 @@ def Perf_Dialect : Dialect {
     }];
     let cppNamespace = "::mlir::perf";
     let useDefaultTypePrinterParser = 1;
-    let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//
