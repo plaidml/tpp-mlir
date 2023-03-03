@@ -296,10 +296,10 @@ private:
 
     // Run transforms first and clean them up afterwards.
     pm.addPass(createTransformPass());
-    pm.addPass(createCleanupPass());
+    // pm.addPass(createCleanupPass());
 
     pm.addPass(createTppMappingPass());
-    pm.addPass(createCleanupPass());
+    // pm.addPass(createCleanupPass());
 
     // Run bufferization as the rest of the passes prefer working on memref.
     pm.addPass(createBufferizePass());
