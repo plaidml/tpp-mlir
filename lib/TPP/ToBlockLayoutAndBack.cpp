@@ -572,7 +572,7 @@ struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
       return failure();
 
     // Replace result with output.
-    fillRes.replaceAllUsesWith(fillOp.getOutputs()[0]);
+    rewriter.replaceAllUsesWith(fillRes, fillOp.getOutputs()[0]);
     auto empty = tensor::PackOp::createDestinationTensor(
         rewriter, packOp.getLoc(), source, packOp.getMixedTiles(),
         packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
