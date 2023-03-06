@@ -124,6 +124,7 @@ func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: ten
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-COUNT-2: linalg.matmul
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-COUNT-1: linalg.matmul
