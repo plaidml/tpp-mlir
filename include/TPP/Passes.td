@@ -234,6 +234,9 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"tppToLoops", "tpp-to-loops",
            "bool", /*default=*/"0",
            "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
+    Option<"linalgToLoops", "linalg-to-loops",
+           "bool", /*default=*/"0",
+           "By default linalg ops are lowered to TPP. Lower linalg to loops instead.">,
   ];
 }
 

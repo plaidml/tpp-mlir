@@ -66,6 +66,9 @@ class MLIRBench {
   /// Lower TPP to loops for validation purposes
   bool tppToLoops;
 
+  /// Lower linalg to loops for validation purposes
+  bool linalgToLoops;
+
   /// Tensor init type
   TensorInitType initType;
 
@@ -92,7 +95,8 @@ class MLIRBench {
 
 public:
   /// Creates context, builder
-  MLIRBench(Operation *op, int seed, bool tppToLoops, TensorInitType initType);
+  MLIRBench(Operation *op, int seed, bool tppToLoops, bool linalgToLoops,
+            TensorInitType initType);
 
   /// Finds the kernel method, checks correct name and shape
   LogicalResult findKernel(llvm::StringRef);

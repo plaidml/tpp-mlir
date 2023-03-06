@@ -85,7 +85,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();
-std::unique_ptr<OperationPass<ModuleOp>> createDefaultTppPass(bool loops=false);
+std::unique_ptr<OperationPass<ModuleOp>>
+createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGeneralizeTensorPackAndUnPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createRaiseToParallelLoopPass();

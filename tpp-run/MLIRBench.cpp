@@ -36,9 +36,9 @@
 using namespace mlir;
 
 MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops,
-                     TensorInitType initType)
+                     bool linalgToLoops, TensorInitType initType)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()), seed(seed),
-      tppToLoops(tppToLoops), initType(initType) {
+      tppToLoops(tppToLoops), linalgToLoops(linalgToLoops), initType(initType) {
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
   auto *ctx = module->getContext();
@@ -134,7 +134,6 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
     auto newAttr = replaceSplat(constant.getType(), constant.getValueAttr());
     constant.setValueAttr(newAttr);
   }
-
 
   return success();
 }
@@ -376,7 +375,7 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   applyPassManagerCLOptions(passManager);
 
   // Apply the default preprocessing pass
-  passManager.addPass(tpp::createDefaultTppPass(tppToLoops));
+  passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
 
   // Bufferization, if needed
   passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());

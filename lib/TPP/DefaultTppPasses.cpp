@@ -34,10 +34,11 @@ using namespace mlir::tpp;
 namespace {
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
-  DefaultTppPasses() : DefaultTppPasses(false){};
-  DefaultTppPasses(bool tppToLoops)
+  DefaultTppPasses() : DefaultTppPasses(false, false){};
+  DefaultTppPasses(bool tppToLoops, bool linalgToLoops)
       : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit) {
     this->tppToLoops = tppToLoops;
+    this->linalgToLoops = linalgToLoops;
   };
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -100,7 +101,11 @@ private:
     pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
 
     // Convert all higher level dialects to TPP.
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+    if (linalgToLoops)
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+    else
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
+
     pm.addPass(createConvertVNNIToTppPass());
 
     // Lower all TPP ops.
@@ -134,6 +139,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createDefaultTppPass(bool loops) {
-  return std::make_unique<DefaultTppPasses>(loops);
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createDefaultTppPass(bool tppLoops, bool linalgLoops) {
+  return std::make_unique<DefaultTppPasses>(tppLoops, linalgLoops);
 }

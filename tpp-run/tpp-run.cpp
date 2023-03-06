@@ -62,10 +62,15 @@ llvm::cl::opt<bool> printKernelResult("print",
                                       llvm::cl::desc("Print kernel result"),
                                       llvm::cl::init(false));
 
-// Lower to loops (for validation purposes)
+// Lower TPP to loops (for validation purposes)
 llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
                                llvm::cl::desc("Lower TPP to loops"),
                                llvm::cl::init(false));
+
+// Lower Linalg directly to loops without TPP (for validation purposes)
+llvm::cl::opt<bool> linalgToLoops("linalg-to-loops",
+                                  llvm::cl::desc("Lower linalg to loops"),
+                                  llvm::cl::init(false));
 
 // Replace dense splat tensors with random dense
 llvm::cl::opt<bool>
@@ -109,20 +114,21 @@ llvm::cl::opt<std::string> initType(
 
 // Dump MLIR before lowering
 llvm::cl::opt<bool> dumpMLIR("dump-mlir",
-                               llvm::cl::desc("Dump MLIR before lowering"),
-                               llvm::cl::init(false));
+                             llvm::cl::desc("Dump MLIR before lowering"),
+                             llvm::cl::init(false));
 
 // Dump LLVM IR before lowering
 llvm::cl::opt<bool> dumpLLVM("dump-llvm",
-                               llvm::cl::desc("Dump LLVM IR before lowering"),
-                               llvm::cl::init(false));
+                             llvm::cl::desc("Dump LLVM IR before lowering"),
+                             llvm::cl::init(false));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
   // Benchmark object
-  MLIRBench bench(op, seed, tppToLoops, parseTensorInitType(initType));
+  MLIRBench bench(op, seed, tppToLoops, linalgToLoops,
+                  parseTensorInitType(initType));
 
   // Basic checks
   if (options.mainFuncType != "void")
@@ -176,8 +182,8 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   return bench.finalize(dumpMLIR);
 }
 
-std::unique_ptr<llvm::Module>
-lowerToLLVMIR(Operation* module, llvm::LLVMContext &llvmContext) {
+std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
+                                            llvm::LLVMContext &llvmContext) {
   // Default lowering for mlir-cpu-runner
   auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
   assert(llvmModule);
