@@ -238,7 +238,7 @@ tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
   auto tileSizeComputationFunction = [tileSizes](OpBuilder &builder,
                                                  Operation *op) {
     OpBuilder::InsertionGuard guard(builder);
-    return getAsValues(builder, op->getLoc(), tileSizes);
+    return getValueOrCreateConstantIndexOp(builder, op->getLoc(), tileSizes);
   };
   auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
       tileSizeComputationFunction);
