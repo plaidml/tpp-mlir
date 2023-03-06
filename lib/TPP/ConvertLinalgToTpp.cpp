@@ -243,15 +243,14 @@ static LogicalResult tileLinalgOp(linalg::GenericOp linalgOp,
 // while shaped type with rank > 2 are rank reduced by dropping unit
 // dimensions.  Note that the rank-reduce may fail thus the caller needs to
 // check if the returned operand is valid using 'checkOperandForTpp'.
-static Value getOperandForTpp(Value operand, PatternRewriter &rewriter,
-                              Location loc) {
+static Value getOperandForTpp(OpBuilder &builder, Location loc, Value operand) {
   Type operandType = operand.getType();
   if (!operandType.isa<ShapedType>())
     return operand;
   if (operandType.cast<ShapedType>().getRank() <= 2)
     return operand;
   // Attempt to rank reduce, it may fail.
-  return rankReducingSubviewDroppingUnitDims(rewriter, loc, operand);
+  return rankReducingSubviewDroppingUnitDims(builder, loc, operand);
 }
 
 // Given an operand 'operand' check if it is a scalar
@@ -322,7 +321,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     Location loc = linalgOp.getLoc();
     SmallVector<Value, 4> newOperands;
     for (Value operand : linalgOp->getOperands()) {
-      Value newOperand = getOperandForTpp(operand, rewriter, loc);
+      Value newOperand = getOperandForTpp(rewriter, loc, operand);
       if (failed(checkOperandForTpp(newOperand)))
         return rewriter.notifyMatchFailure(
             linalgOp, "Expect scalar or rank 2 memref when mapping to tpp");
