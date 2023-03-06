@@ -15,6 +15,7 @@
 
 namespace mlir {
 class TypeRange;
+class Value;
 
 namespace linalg {
 class LinalgOp;
@@ -24,6 +25,11 @@ class YieldOp;
 
 namespace tpp {
 namespace utils {
+
+struct OperandInfo {
+  SmallVector<Value> inputs;
+  SmallVector<Value> outputs;
+};
 
 // Returns true if all the operands of the linalg operation have static
 // dimensions.
@@ -52,7 +58,7 @@ bool isTppAdd(linalg::GenericOp linalgOp);
 bool isTppIdentity(linalg::GenericOp linalgOp);
 
 // Returns true if the linalg.generic can convert to a tpp.relu.
-bool isTppRelu(linalg::GenericOp linalgOp);
+bool isTppRelu(linalg::GenericOp linalgOp, OperandInfo &info);
 
 // Returns true if: 1) the region has a single block. 2) The block has a single
 // operation `OP`. 3) The operation result types are int or float.

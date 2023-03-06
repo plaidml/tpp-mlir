@@ -260,6 +260,8 @@ bool hasMappingToTppConditions(linalg::GenericOp linalgOp) {
     return false;
   if (linalgOp.hasTensorSemantics())
     return false;
+  if (linalgOp.getNumDpsInits() != 1)
+    return false;
   return hasStaticShape(linalgOp) &&
          allIndexingsAreProjectedPermutation(linalgOp);
 }
@@ -343,7 +345,7 @@ static bool isUnaryOp(linalg::GenericOp linalgOp) {
   return false;
 }
 
-static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
+static bool matchReluBody(linalg::LinalgOp linalgOp, OperandInfo &info) {
   if (!isa<linalg::GenericOp>(linalgOp))
     return false;
 
@@ -351,14 +353,33 @@ static bool hasMaxfZeroOp(linalg::LinalgOp linalgOp) {
   if (!hasOnlyOp<arith::MaxFOp>(genOp.getRegion()))
     return false;
 
-  for (Operation &op : genOp.getRegion().front()) {
-    if (auto maxfOp = dyn_cast_or_null<arith::MaxFOp>(op)) {
-      // Check both operands if either one is a zero filled tensor.
-      if (isZeroTensor(maxfOp.getLhs()) || isZeroTensor(maxfOp.getRhs()))
-        return true;
-    }
-  }
+  Operation *regionOp = &genOp.getRegion().front().front();
+  auto maxfOp = cast<arith::MaxFOp>(regionOp);
+  Value maxfLhs = maxfOp.getLhs();
+  Value maxfRhs = maxfOp.getRhs();
 
+  if (isZeroTensor(maxfLhs) && isZeroTensor(maxfRhs))
+    return false;
+
+  if (isZeroTensor(maxfLhs)) {
+    if (!isa<BlockArgument>(maxfRhs))
+      return false;
+    OpOperand *nonCst =
+        genOp.getMatchingOpOperand(cast<BlockArgument>(maxfRhs));
+    info.inputs.push_back(nonCst->get());
+    info.outputs.push_back(genOp.getDpsInitOperand(0)->get());
+
+    return true;
+  }
+  if (isZeroTensor(maxfRhs)) {
+    if (!isa<BlockArgument>(maxfLhs))
+      return false;
+    OpOperand *nonCst =
+        genOp.getMatchingOpOperand(cast<BlockArgument>(maxfLhs));
+    info.inputs.push_back(nonCst->get());
+    info.outputs.push_back(genOp.getDpsInitOperand(0)->get());
+    return true;
+  }
   return false;
 }
 
@@ -409,14 +430,12 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.relu.
-bool isTppRelu(linalg::GenericOp linalgOp) {
+bool isTppRelu(linalg::GenericOp linalgOp, OperandInfo &operandInfo) {
   if (!hasMappingToTppConditions(linalgOp))
-    return false;
-  if (!isUnaryOp(linalgOp) && !isBinaryOp(linalgOp))
     return false;
   if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()))
     return false;
-  return hasMaxfZeroOp(linalgOp);
+  return matchReluBody(linalgOp, operandInfo);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.identity.

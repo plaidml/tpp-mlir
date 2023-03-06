@@ -274,21 +274,21 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
-                               ArrayRef<Value> operands,
+                               ArrayRef<Value> operands, IRMapping &mapping,
                                PatternRewriter &rewriter) const {
+    tpp::utils::OperandInfo operandInfo;
     if (tpp::utils::isTppIdentity(linalgOp)) {
       assert(operands.size() == 2 && "Expect two operands");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
     }
-    if (tpp::utils::isTppRelu(linalgOp)) {
-      // Allow either:
-      // 1. relu(A)
-      // 2. B = relu(A)
-      Value output =
-          (linalgOp.getNumOperands() == 2) ? operands[1] : operands[0];
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0], output);
+    if (tpp::utils::isTppRelu(linalgOp, operandInfo)) {
+      assert(operandInfo.inputs.size() == 1);
+      assert(operandInfo.outputs.size() == 1);
+      rewriter.replaceOpWithNewOp<tpp::ReluOp>(
+          linalgOp, mapping.lookup(operandInfo.inputs[0]),
+          mapping.lookup(operandInfo.outputs[0]));
       return success();
     }
     if (tpp::utils::isTppAdd(linalgOp)) {
@@ -319,15 +319,17 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, "Expect static shape when mapping to tpp");
 
     Location loc = linalgOp.getLoc();
-    SmallVector<Value, 4> newOperands;
+    SmallVector<Value> newOperands;
+    IRMapping mapping;
     for (Value operand : linalgOp->getOperands()) {
       Value newOperand = getOperandForTpp(rewriter, loc, operand);
       if (failed(checkOperandForTpp(newOperand)))
         return rewriter.notifyMatchFailure(
             linalgOp, "Expect scalar or rank 2 memref when mapping to tpp");
       newOperands.push_back(newOperand);
+      mapping.map(operand, newOperand);
     }
-    return rewriteToTppOp(linalgOp, newOperands, rewriter);
+    return rewriteToTppOp(linalgOp, newOperands, mapping, rewriter);
   }
 };
 

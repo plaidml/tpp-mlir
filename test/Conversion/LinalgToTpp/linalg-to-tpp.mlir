@@ -368,7 +368,8 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 // Expect not to map as the operation is not a relu see: arith.maxf %in %out.
-func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
+// CHECK-LABEL: func.func @relu_max_with_no_zero
+func.func @relu_max_with_no_zero(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
   // CHECK-NOT: tpp.relu
   linalg.generic {
     indexing_maps = [#map, #map], 
@@ -386,7 +387,8 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
 #map = affine_map<(d0) -> (d0)>
 
 // Expect not to map as not a relu see: arith.maxf %c0 %c0.
-func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
+// CHECK-LABEL: func.func @relu_max_with_only_zeros
+func.func @relu_max_with_only_zeros(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
   %c0 = arith.constant 0.0 : f32
   // CHECK-NOT: tpp.relu
   linalg.generic {
@@ -404,10 +406,11 @@ func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3x
 
 #map = affine_map<(d0) -> (d0)>
 
-// Expect not to map as the input %arg0 is not use in the computation.
+// CHECK-LABEL: func.func @relu_mapping
+// CHECK-SAME: %[[ARG0:.+]]: memref<3xf32>, %[[ARG1:.+]]: memref<3xf32>
 func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
   %c0 = arith.constant 0.0 : f32
-  // CHECK-NOT: tpp.relu
+  // CHECK: tpp.relu ins(%[[ARG1]] : memref<3xf32>) out(%[[ARG1]] : memref<3xf32>)
   linalg.generic {
     indexing_maps = [#map, #map],
     iterator_types = ["parallel"]}
@@ -424,7 +427,8 @@ func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3x
 #map = affine_map<(d0) -> (d0)>
 
 // Expect not to map as the operation is not a relu see: arith.maxf %arg3 %arg3.
-func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
+// CHECK-LABEL: func.func @relu_max_with_no_zero2
+func.func @relu_max_with_no_zero2(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
   %c0 = arith.constant 0.0 : f32
   // CHECK-NOT: tpp.relu
   linalg.generic {
