@@ -206,7 +206,8 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     Option<"maxDepth", "max-depth", "int64_t", "5", 
            "Get producers till maxDepth">,
     Option<"startFromLastFusableConsumer", "start-from-last-consumer", "bool",
-           "true", "Fuse from the last fusable consumer of the current target">
+           "true", "Fuse from the last fusable consumer of the current target">,
+    Option<"useForAll", "use-for-all", "bool", "false", "Use parallel forAll">
   ];
 }
 
