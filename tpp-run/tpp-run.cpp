@@ -127,8 +127,9 @@ llvm::cl::opt<bool> dumpLLVM("dump-llvm",
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
   // Benchmark object
-  MLIRBench bench(op, seed, tppToLoops, linalgToLoops,
-                  parseTensorInitType(initType));
+  MLIRBenchConfig config(seed, tppToLoops, linalgToLoops,
+                         parseTensorInitType(initType));
+  MLIRBench bench(op, config);
 
   // Basic checks
   if (options.mainFuncType != "void")

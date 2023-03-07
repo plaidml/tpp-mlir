@@ -35,10 +35,13 @@
 
 using namespace mlir;
 
-MLIRBench::MLIRBench(mlir::Operation *op, int seed, bool tppToLoops,
-                     bool linalgToLoops, TensorInitType initType)
-    : builder(op->getContext()), unkLoc(builder.getUnknownLoc()), seed(seed),
-      tppToLoops(tppToLoops), linalgToLoops(linalgToLoops), initType(initType) {
+MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
+    : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
+  seed = config.seed;
+  tppToLoops = config.tppToLoops;
+  linalgToLoops = config.linalgToLoops;
+  initType = config.initType;
+
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
   auto *ctx = module->getContext();
