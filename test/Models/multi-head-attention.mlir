@@ -1,6 +1,14 @@
 // RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
 // RUN: FileCheck %s
 
+// RUN: tpp-run %s -linalg-to-loops \
+// RUN:         -n 10 -print -e multi_head_attention -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXEC
+
+// RUN: tpp-run %s \
+// RUN:         -n 10 -print -e multi_head_attention -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXEC
+
 //////////////////////////////////////////////////////////////////////////////
 // This multi-head attention layer is extracted out from TensorFlow's
 // pre-trained BERT model. The BERT model is obtained from here - 
@@ -23,6 +31,7 @@
 
 !multi_head_attention_input_tensor_t  = tensor<32x8x128xf32> // batch_size, embedding_size, seq_length
 !multi_head_attention_output_tensor_t  = tensor<32x8x128xf32> // batch_size, embedding_size, seq_length
+!tensor_print_t = tensor<1x8xf32>
 
 //
 // CHECK-DAG: #[[map:.*]] = affine_map<()[s0, s1] -> (s0 * 1024 + s1 * 128)>
@@ -51,10 +60,10 @@
 // CHECK-NEXT: func.func private @xsmm_matmul_dispatch(i64, i1, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 //
 // CHECK-LABEL: @multi_head_attention(
-// CHECK-SAME: %[[arg:.*]]: memref<32x8x128xf32>) -> memref<32x8x128xf32> {
+// CHECK-SAME: %[[arg:.*]]: memref<32x8x128xf32>, %[[arg1:.*]]: memref<1x8xf32>) {
 //
 func.func @multi_head_attention(
-        %input : !multi_head_attention_input_tensor_t) -> !multi_head_attention_output_tensor_t {
+        %input : !multi_head_attention_input_tensor_t, %output : !tensor_print_t) -> !tensor_print_t {
     %cst = arith.constant 0xFF800000 : f32
     %cst_0 = arith.constant -0.000000e+00 : f32
     %cst_1 = arith.constant 0.000000e+00 : f32
@@ -449,5 +458,18 @@ func.func @multi_head_attention(
     // CHECK-NEXT: }
     //
 
-    return %148 : !multi_head_attention_output_tensor_t
+    // Extract a 2D slice for printing
+    %149 = tensor.extract_slice %148[0, 0, 0][1, 1, 8][1, 1, 1] : tensor<32x8x128xf32> to !tensor_print_t
+    // Copy the slice to the argument output tensor
+    // This ensures that no allocated buffers are returned from the test kernel which prevent memory leaks
+    %ret = linalg.copy ins(%149 : !tensor_print_t) outs(%output : !tensor_print_t) -> !tensor_print_t
+
+    return %ret : !tensor_print_t
 }
+
+// Output
+// EXEC:      ( 35651.7, 35651.7, 35651.7, 35651.7,
+// EXEC-SAME:   35651.7, 35651.7, 35651.7, 35651.7 )
+//
+// Stats
+// EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
