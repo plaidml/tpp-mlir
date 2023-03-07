@@ -1,6 +1,89 @@
 // RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -split-input-file | FileCheck %s
 
 // CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_add(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>
+func.func @tpp_add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     arith.addf
+  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_identity(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<1x1xf32>
+func.func @tpp_identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     memref.load
+  // CHECK:     memref.store
+  tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
+
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_relu(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+func.func @tpp_relu(%arg0: memref<3x3xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     arith.maxf
+  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
+
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_brgemm(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>
+func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     scf.for
+  // CHECK:       scf.for
+  // CHECK:         arith.mulf
+  // CHECK:         arith.addf
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
+
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_matmul(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
+func.func @tpp_matmul(%A: memref<4x8xf32>,
+          %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     scf.for
+  // CHECK:       arith.mulf
+  // CHECK:       arith.addf
+  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) out(%C : memref<4x4xf32>)
+
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
 // CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
