@@ -90,14 +90,14 @@ func.func @multi_head_attention(
     // CHECK-DAG: %[[cst_1:.*]] = arith.constant 0xFF800000 : f32
     //
 
-    %transformer_layer_0_self_attention_attention_output_bias = arith.constant dense <1.0> : tensor<128xf32>
-    %transformer_layer_0_self_attention_attention_output_kernel = arith.constant dense <1.0> : tensor<2x64x128xf32>
-    %transformer_layer_0_self_attention_key_bias = arith.constant dense <1.0> : tensor<2x64xf32>
-    %transformer_layer_0_self_attention_key_kernel = arith.constant dense<1.0> : tensor<128x2x64xf32>
-    %transformer_layer_0_self_attention_query_bias = arith.constant dense<1.0> : tensor<2x64xf32>
-    %transformer_layer_0_self_attention_query_kernel = arith.constant dense<1.0> : tensor<128x2x64xf32>
-    %transformer_layer_0_self_attention_value_bias = arith.constant dense<1.0> : tensor<2x64xf32>
-    %transformer_layer_0_self_attention_value_kernel = arith.constant dense<1.0> : tensor<128x2x64xf32>
+    %transformer_layer_0_self_attention_attention_output_bias = arith.constant dense<1.1> : tensor<128xf32>
+    %transformer_layer_0_self_attention_attention_output_kernel = arith.constant dense<1.2> : tensor<2x64x128xf32>
+    %transformer_layer_0_self_attention_key_bias = arith.constant dense<1.3> : tensor<2x64xf32>
+    %transformer_layer_0_self_attention_key_kernel = arith.constant dense<1.4> : tensor<128x2x64xf32>
+    %transformer_layer_0_self_attention_query_bias = arith.constant dense<1.5> : tensor<2x64xf32>
+    %transformer_layer_0_self_attention_query_kernel = arith.constant dense<1.6> : tensor<128x2x64xf32>
+    %transformer_layer_0_self_attention_value_bias = arith.constant dense<1.7> : tensor<2x64xf32>
+    %transformer_layer_0_self_attention_value_kernel = arith.constant dense<1.8> : tensor<128x2x64xf32>
     
     // Using a dummy value for mask - TBD the right value
     %input_mask = arith.constant dense <0.0>: tensor<32x1x8x8xf32>
