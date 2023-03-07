@@ -298,17 +298,25 @@ private:
     pm.addPass(createTransformPass());
     pm.addPass(createCleanupPass());
 
-    pm.addPass(createTppMappingPass());
-    pm.addPass(createCleanupPass());
+    if (linalgToLoops) {
+      // Lower linalg directly to loops.
+      // Skip all TPP transformations.
+      pm.addPass(createBufferizePass());
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+      pm.addPass(createCleanupPass());
+    } else {
+      pm.addPass(createTppMappingPass());
+      pm.addPass(createCleanupPass());
 
-    // Run bufferization as the rest of the passes prefer working on memref.
-    pm.addPass(createBufferizePass());
+      // Run bufferization as the rest of the passes prefer working on memref.
+      pm.addPass(createBufferizePass());
 
-    pm.addPass(createTppConversionPass());
-    pm.addPass(createCleanupPass());
+      pm.addPass(createTppConversionPass());
+      pm.addPass(createCleanupPass());
 
-    pm.addPass(createTppLoweringPass(tppToLoops));
-    pm.addPass(createCleanupPass());
+      pm.addPass(createTppLoweringPass(tppToLoops));
+      pm.addPass(createCleanupPass());
+    }
 
     pm.addPass(createLocalDialectsLoweringPass());
     pm.addPass(createPostprocessingPass());
