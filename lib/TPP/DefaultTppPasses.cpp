@@ -73,6 +73,10 @@ private:
 
 // Apply any present transforms and remove transform blocks afterwards.
 struct TransformPass : public TransformBase<TransformPass>, UtilityPassBase {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<transform::TransformDialect>();
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -100,6 +104,20 @@ private:
 struct LocalDialectsLoweringPass
     : public LocalDialectsLoweringBase<LocalDialectsLoweringPass>,
       UtilityPassBase {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry
+        .insert<AffineDialect,
+                arith::ArithDialect,
+                func::FuncDialect,
+                memref::MemRefDialect,
+                check::CheckDialect,
+                perf::PerfDialect,
+                scf::SCFDialect,
+                tensor::TensorDialect>();
+    // clang-format on
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -135,6 +153,18 @@ private:
 // buffer deallocation, general cleanup etc.
 struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
                             UtilityPassBase {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry
+        .insert<bufferization::BufferizationDialect,
+                memref::MemRefDialect,
+                scf::SCFDialect>();
+    // clang-format on
+    check::registerBufferizableOpInterfaceExternalModels(registry);
+    vnni::registerBufferizableOpInterfaceExternalModels(registry);
+    perf::registerBufferizableOpInterfaceExternalModels(registry);
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -167,6 +197,18 @@ private:
 // Apply collection of high-level passes that map operations to
 // TPP-compatible forms.
 struct TppMappingPass : public TppMappingBase<TppMappingPass>, UtilityPassBase {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry
+        .insert<linalg::LinalgDialect,
+                memref::MemRefDialect,
+                tensor::TensorDialect>();
+    // clang-format on
+    check::registerBufferizableOpInterfaceExternalModels(registry);
+    vnni::registerBufferizableOpInterfaceExternalModels(registry);
+    perf::registerBufferizableOpInterfaceExternalModels(registry);
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -194,6 +236,15 @@ private:
 // Convert all matching operations to TPP.
 struct TppConversionPass : public TppConversionBase<TppConversionPass>,
                            UtilityPassBase {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry
+        .insert<linalg::LinalgDialect,
+                vnni::VNNIDialect,
+                tpp::TppDialect>();
+    // clang-format on
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
 
@@ -227,6 +278,15 @@ struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
                          UtilityPassBase {
   TppLoweringPass() : TppLoweringPass(false){};
   TppLoweringPass(bool tppToLoops) { this->tppToLoops = tppToLoops; };
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry
+        .insert<xsmm::XsmmDialect,
+                scf::SCFDialect,
+                tpp::TppDialect>();
+    // clang-format on
+  }
 
   void runOnOperation() override {
     ModuleOp module = getOperation();
