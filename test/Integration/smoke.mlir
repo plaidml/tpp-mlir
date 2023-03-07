@@ -11,6 +11,11 @@
 //
 
 // Validate default pipeline
+// RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes="linalg-to-loops" | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 // RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes="tpp-to-loops" | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \

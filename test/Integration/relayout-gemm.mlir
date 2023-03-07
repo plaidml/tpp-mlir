@@ -6,8 +6,11 @@
 //
 
 // Validate default pipeline
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 

@@ -34,10 +34,11 @@ using namespace mlir::tpp;
 namespace {
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses> {
-  DefaultTppPasses() : DefaultTppPasses(false){};
-  DefaultTppPasses(bool tppToLoops)
+  DefaultTppPasses() : DefaultTppPasses(false, false){};
+  DefaultTppPasses(bool tppToLoops, bool linalgToLoops)
       : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit) {
     this->tppToLoops = tppToLoops;
+    this->linalgToLoops = linalgToLoops;
   };
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -81,33 +82,38 @@ private:
     pm.addPass(createTransformDialectInterpreterPass());
     pm.addPass(createTransformDropSchedulePass());
 
-    // Preprocess convolutions.
-    pm.addNestedPass<func::FuncOp>(createRewriteConvToMatmulOrBrgemmPass());
+    if (linalgToLoops) {
+      // Lower linalg directly to loops.
+      // Skip all TPP transformations.
+      pm.addPass(createBufferizePass());
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+    } else {
+      // Preprocess convolutions.
+      pm.addNestedPass<func::FuncOp>(createRewriteConvToMatmulOrBrgemmPass());
 
-    // Generalize tensor.pack and tensor.unpack.
-    pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
+      // Generalize tensor.pack and tensor.unpack.
+      pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
 
-    // Preprocess tensors.
-    pm.addPass(bufferization::createEmptyTensorToAllocTensorPass());
+      // Run bufferization as the rest of the passes prefer working on memref.
+      pm.addPass(createBufferizePass());
 
-    // Run bufferization as the rest of the passes prefer working on memref.
-    pm.addPass(createBufferizePass());
+      // Convert generics to BRGEMM.
+      // The mapping is done after bufferization as the buffer semantics
+      // allow direct use of scf.parallel loops. This prevents different
+      // lowering outputs between input linalg on tensors and memrefs.
+      pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
 
-    // Convert generics to BRGEMM.
-    // The mapping is done after bufferization as the buffer semantics
-    // allow direct use of scf.parallel loops. This prevents different
-    // lowering outputs between input linalg on tensors and memrefs.
-    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
+      // Convert all higher level dialects to TPP.
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
 
-    // Convert all higher level dialects to TPP.
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
-    pm.addPass(createConvertVNNIToTppPass());
+      pm.addPass(createConvertVNNIToTppPass());
 
-    // Lower all TPP ops.
-    if (tppToLoops)
-      pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
-    else
-      pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+      // Lower all TPP ops.
+      if (tppToLoops)
+        pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass());
+      else
+        pm.addNestedPass<func::FuncOp>(createConvertTppToXsmmPass());
+    }
 
     // Lower all Check ops.
     pm.addPass(createConvertCheckToLoopsPass());
@@ -134,6 +140,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createDefaultTppPass(bool loops) {
-  return std::make_unique<DefaultTppPasses>(loops);
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createDefaultTppPass(bool tppLoops, bool linalgLoops) {
+  return std::make_unique<DefaultTppPasses>(tppLoops, linalgLoops);
 }

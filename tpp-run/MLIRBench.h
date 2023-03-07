@@ -29,6 +29,21 @@ namespace func {
 class FuncOp;
 } // namespace func
 
+// MLIRBench settings that control benchmark code generation and lowering
+// pipeline.
+struct MLIRBenchConfig {
+  MLIRBenchConfig() = default;
+  MLIRBenchConfig(int seed, bool tppToLoops, bool linalgToLoops,
+                  TensorInitType initType)
+      : seed(seed), tppToLoops(tppToLoops), linalgToLoops(linalgToLoops),
+        initType(initType) {}
+
+  int seed = 0;
+  bool tppToLoops = false;
+  bool linalgToLoops = false;
+  TensorInitType initType = TensorInitType::Auto;
+};
+
 /// MLIRBench - Creates wrapper for calling kernel methods.
 ///
 /// Note: This class is a mix between a utility class and a driver
@@ -66,6 +81,9 @@ class MLIRBench {
   /// Lower TPP to loops for validation purposes
   bool tppToLoops;
 
+  /// Lower linalg to loops for validation purposes
+  bool linalgToLoops;
+
   /// Tensor init type
   TensorInitType initType;
 
@@ -92,7 +110,7 @@ class MLIRBench {
 
 public:
   /// Creates context, builder
-  MLIRBench(Operation *op, int seed, bool tppToLoops, TensorInitType initType);
+  MLIRBench(Operation *op, const MLIRBenchConfig &config);
 
   /// Finds the kernel method, checks correct name and shape
   LogicalResult findKernel(llvm::StringRef);
