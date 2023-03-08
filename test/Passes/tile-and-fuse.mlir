@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,1" -cse | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,1 use-for-all=false" -cse | FileCheck %s
 
 // CHECK: func.func @matmul_sequence_fusion_expect_no_fusion
 func.func @matmul_sequence_fusion_expect_no_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,

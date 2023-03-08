@@ -1,6 +1,6 @@
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=4,4" -cse | FileCheck -check-prefix=CONF1 %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=4,4 use-for-all=false" -cse | FileCheck -check-prefix=CONF1 %s
 
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,1,1" -cse -canonicalize | FileCheck -check-prefix=CONF2 %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,1,1 use-for-all=false" -cse -canonicalize | FileCheck -check-prefix=CONF2 %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 

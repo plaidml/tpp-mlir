@@ -40,7 +40,7 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
     auto metadata = forOp->getAttrOfType<StringAttr>("fusion");
-    if (metadata && metadata.getValue() != "root")
+    if (!metadata || metadata.getValue() != "root")
       return failure();
     if (forOp.getNumRegionIterArgs() != 1)
       return failure();
@@ -66,7 +66,8 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
         /*mapping=*/std::nullopt,
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange regionArgs) {
           IRMapping mapping;
-          assert(loopArgs.size() == regionArgs.size());
+          assert(loopArgs.size() == regionArgs.size() &&
+                 "expect same region args");
           mapping.map(loopArgs, regionArgs);
           Block *innerLoopBlock = nestedLoops[nestedLoops.size() - 1].getBody();
           auto yieldOp = cast<scf::YieldOp>(innerLoopBlock->getTerminator());
@@ -338,9 +339,10 @@ bool hasAllUsersInWorklist(Operation *op,
                            const llvm::SmallDenseSet<Operation *> &worklist) {
   assert(op->getNumResults() == 1 && "expect single result op");
   Value result = op->getResult(0);
-  for (Operation *user : result.getUsers())
+  for (Operation *user : result.getUsers()) {
     if (worklist.count(user) == 0)
       return false;
+  }
   return true;
 }
 
@@ -391,6 +393,9 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
           hasAllUsersInWorklist(producer, worklist)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "WORKLIST INSERT PRODUCER: " << producer << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "=============================\n";
+            llvm::dbgs() << *producer << "\n";
+            llvm::dbgs() << "=============================\n";);
         nextProcessingQueue.push(producer);
         incDepthAndSwap(processingQueue, nextProcessingQueue, depth);
         worklist.insert(producer);
@@ -591,7 +596,8 @@ struct TileConsumerAndFuseProducers
 
     SmallVector<Operation *> linalgOperations;
     func->walk([&](linalg::LinalgOp linalgOp) {
-      if (isConvolutionLike(linalgOp) || isMatmulLike(linalgOp))
+      if ((isConvolutionLike(linalgOp) || isMatmulLike(linalgOp)) &&
+          linalgOp.hasTensorSemantics())
         linalgOperations.push_back(linalgOp.getOperation());
     });
 
