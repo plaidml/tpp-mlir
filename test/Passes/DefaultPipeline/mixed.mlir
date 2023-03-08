@@ -111,3 +111,20 @@ func.func @raise_to_parallel(%lb: index, %ub: index, %step: index,
 
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @tensor_forall
+func.func @tensor_forall(%arg0: tensor<32x32xbf16>) -> tensor<8x112x32x32xbf16> {
+  %c8 = arith.constant 8 : index
+  %c112 = arith.constant 112 : index
+  %0 = tensor.empty() : tensor<8x112x32x32xbf16>
+  // CHECK-NOT: scf.forall
+  // CHECK: scf.parallel
+  %1 = scf.forall (%i, %j) in (%c8, %c112) shared_outs(%k = %0) -> (tensor<8x112x32x32xbf16>) {
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %arg0 into %k[%i, %j, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<8x112x32x32xbf16>
+    }
+  }
+  return %1 : tensor<8x112x32x32xbf16>
+}
