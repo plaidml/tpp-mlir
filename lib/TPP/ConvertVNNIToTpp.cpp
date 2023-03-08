@@ -74,7 +74,7 @@ struct ConvertVNNIToTpp : public ConvertVNNIToTppBase<ConvertVNNIToTpp> {
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertVNNIToTppPass() {
   return std::make_unique<ConvertVNNIToTpp>();
 }

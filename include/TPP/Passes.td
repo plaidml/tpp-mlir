@@ -75,7 +75,7 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "ModuleOp"> {
+def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "func::FuncOp"> {
   let summary = "Convert VNNI to TPP";
   let constructor = "mlir::tpp::createConvertVNNIToTppPass()";
   let description = [{
@@ -91,7 +91,7 @@ def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleO
   }];
 }
 
-def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "ModuleOp"> {
+def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
   let summary = "Convert perf to loops";
   let constructor = "mlir::tpp::createConvertPerfToLoopsPass()";
   let description = [{
@@ -291,6 +291,61 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let constructor = "mlir::tpp::createBufferizePass()";
+}
+
+def Cleanup : Pass<"cleanup", "func::FuncOp"> {
+  let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
+  let constructor = "mlir::tpp::createCleanupPass()";
+}
+
+def Transform : Pass<"transform", "ModuleOp"> {
+  let summary = "Runs transformation schedules and then drops them.";
+  let constructor = "mlir::tpp::createTransformPass()";
+}
+
+def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
+  let summary = "Lower all local dialects (XSMM, check etc.).";
+  let constructor = "mlir::tpp::createLocalDialectsLoweringPass()";
+}
+
+def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
+  let summary = "IR postprocessing pass";
+  let description = [{
+    Apply various postprocessing passes such parallel loop fusion,
+    buffer deallocation, general cleanup etc.
+  }];
+  let constructor = "mlir::tpp::createPostprocessingPass()";
+}
+
+def TppMapping : Pass<"tpp-mapping", "func::FuncOp"> {
+  let summary = "Map operations to be TPP compatible";
+  let description = [{
+    Apply collection of TPP rewriting passes to map eligble operations
+    into equivalent TPP-compatible forms.
+  }];
+  let constructor = "mlir::tpp::createTppMappingPass()";
+}
+
+def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
+  let summary = "Convert operations to TPP";
+  let description = [{
+    Convert all eligble operations into TPP operations.
+  }];
+  let constructor = "mlir::tpp::createTppConversionPass()";
+}
+
+def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
+  let summary = "Lower TPP operations";
+  let description = [{
+    Lower all TPP operations into combination of operations from
+    standard and local dialects.
+  }];
+  let constructor = "mlir::tpp::createTppLoweringPass()";
+  let options= [
+    Option<"tppToLoops", "tpp-to-loops",
+           "bool", /*default=*/"0",
+           "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
+  ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
