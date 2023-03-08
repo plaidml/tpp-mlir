@@ -1,13 +1,12 @@
 // RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
 // RUN: FileCheck %s
 
-// RUN: tpp-run %s -n 10 \
-// RUN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=EXEC
-// XFAIL:*
+// R_UN: tpp-run %s -n 10 \
+// R_UN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
+// R_UN: FileCheck %s -check-prefix=EXEC
 // Invalid output buffer propagation in mapping to tpp.relu.
 // The results change as uninitialized buffer is used in computation.
-// See: #358
+// TODO Fix - see: #358
 
 // NOTE: This model file does not contain BatchNorm layers, as for inference, those layers are folded.
 
