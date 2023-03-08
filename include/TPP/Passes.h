@@ -95,13 +95,13 @@ std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvInitSimplifyPass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizePass();
-std::unique_ptr<OperationPass<ModuleOp>> createCleanupPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
-std::unique_ptr<OperationPass<ModuleOp>> createPostprocessingPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool loops = false);
 
 } // namespace tpp
