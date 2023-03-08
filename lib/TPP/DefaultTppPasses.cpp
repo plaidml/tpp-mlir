@@ -185,7 +185,6 @@ private:
     pm.clear();
 
     // Postprocess loops.
-    pm.addPass(createConvertForAllToParallelOpPass());
     pm.addPass(createParallelLoopFusionPass());
 
     // Postprocess buffers.
@@ -231,6 +230,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
+    pm.addPass(createTileConsumerAndFuseProducersPass());
     // Preprocess convolutions.
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
@@ -267,6 +267,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
+    pm.addPass(createConvertForAllToParallelOpPass());
     // Convert generics to BRGEMM.
     // The mapping is done after bufferization as the buffer semantics
     // allow direct use of scf.parallel loops. This prevents different
@@ -365,6 +366,10 @@ private:
     pm.addPass(createTransformPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
       
+    // TODO: Add here propagation, constant fold and blocking.
+    // Run tile and fusion pass.
+    // pm.addPass(createTileConsumerAndFuseProducersPass());
+
     if (linalgToLoops) {
       // Lower linalg directly to loops.
       // Skip all TPP transformations.

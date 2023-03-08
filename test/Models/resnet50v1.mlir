@@ -119,7 +119,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %cst_15 = arith.constant dense<0.000000e+00> : tensor<1x56x56x64xf32>
   %cst_16 = arith.constant dense<0.000000e+00> : tensor<1x112x112x64xf32>
 
-  //
+  // TODO: Why are we checking these?????????
   // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
   // CHECK-DAG: %[[false:.*]] = arith.constant false
   // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
@@ -127,7 +127,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
   // CHECK-DAG: %[[c6_i64:.*]] = arith.constant 6 : i64
   // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
-  // CHECK-DAG: %[[c8_i64:.*]] = arith.constant 8 : i64
   // CHECK-DAG: %[[c14_i64:.*]] = arith.constant 14 : i64
   // CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
   // CHECK-DAG: %[[c56_i64:.*]] = arith.constant 56 : i64

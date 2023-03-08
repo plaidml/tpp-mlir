@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers -cse | FileCheck %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="use-for-all=false" -cse | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 

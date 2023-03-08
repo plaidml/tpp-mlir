@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -element-wise-fusion -tile-consumer-and-fuse-producers="tile-sizes=1,1 max-depth=2" | FileCheck %s
+// RUN: tpp-opt %s -element-wise-fusion -tile-consumer-and-fuse-producers="tile-sizes=1,1 max-depth=2 use-for-all=false" | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>

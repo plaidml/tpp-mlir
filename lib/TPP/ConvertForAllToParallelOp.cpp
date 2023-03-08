@@ -24,7 +24,7 @@ struct ConvertForAllToParallelOpImpl : public OpRewritePattern<scf::ForallOp> {
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
-    if (forallOp->getNumResults() != 0 || !forallOp.isNormalized())
+    if (forallOp->getNumResults() != 0 /*|| !forallOp.isNormalized()*/)
       return failure();
     Location loc = forallOp.getLoc();
     SmallVector<Value> lowerBounds = getValueOrCreateConstantIndexOp(
