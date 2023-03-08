@@ -32,6 +32,7 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
+#include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 
@@ -363,19 +364,20 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(getKernelResult(kernelCall));
 }
 
-LogicalResult MLIRBench::finalize(bool dumpMLIR) {
+LogicalResult MLIRBench::finalize(PrintStage print) {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
     builder.create<func::ReturnOp>(unkLoc);
   }
 
-  if (dumpMLIR)
-    module->print(llvm::outs());
-
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
   applyPassManagerCLOptions(passManager);
+
+  // Print IR of unoptimized kernel and main
+  if (print == PrintStage::Early)
+    passManager.addPass(createPrintIRPass());
 
   // Apply the default preprocessing pass
   passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
@@ -396,6 +398,10 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   passManager.addPass(createConvertVectorToSCFPass());
   passManager.addPass(createConvertSCFToCFPass());
 
+  // Print IR of optimized kernel and main
+  if (print == PrintStage::Late)
+    passManager.addPass(createPrintIRPass());
+
   // Lower to LLVM
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
@@ -405,13 +411,18 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
+  // Print IR of kernel and main in LLVM dialect
+  if (print == PrintStage::LLVM)
+    passManager.addPass(createPrintIRPass());
+
   auto result = passManager.run(module);
   if (failed(result)) {
-    llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
+    llvm::errs() << "ERROR: Failed to lower IR to LLVM dialect\n";
     module->print(llvm::errs());
+    return result;
   }
 
-  return result;
+  return success();
 }
 
 //----------------------- Helpers & private methods

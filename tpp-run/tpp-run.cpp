@@ -112,15 +112,25 @@ llvm::cl::opt<std::string> initType(
     llvm::cl::desc("Initializer type (const, simple, cont, rand, normal)"),
     llvm::cl::init(""));
 
-// Dump MLIR before lowering
-llvm::cl::opt<bool> dumpMLIR("dump-mlir",
-                             llvm::cl::desc("Dump MLIR before lowering"),
+// Print MLIR before lowering
+llvm::cl::opt<std::string>
+    printMLIR("print-mlir", llvm::cl::desc("Print MLIR to stdout (early, late, llvm)"),
+                llvm::cl::init(""));
+
+// Print LLVM IR before lowering
+llvm::cl::opt<bool> printLLVM("print-llvm",
+                             llvm::cl::desc("print LLVM IR before lowering"),
                              llvm::cl::init(false));
 
-// Dump LLVM IR before lowering
-llvm::cl::opt<bool> dumpLLVM("dump-llvm",
-                             llvm::cl::desc("Dump LLVM IR before lowering"),
-                             llvm::cl::init(false));
+// Parses MLIR print stage
+MLIRBench::PrintStage parsePrintStage(StringRef stage) {
+  return StringSwitch<MLIRBench::PrintStage>(stage)
+    .Case("", MLIRBench::PrintStage::None)
+    .Case("early", MLIRBench::PrintStage::Early)
+    .Case("late", MLIRBench::PrintStage::Late)
+    .Case("llvm", MLIRBench::PrintStage::LLVM)
+    .Default(MLIRBench::PrintStage::Invalid);
+}
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
@@ -141,7 +151,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
 
   if (failed(bench.checkKernelSignature()))
-    return bench.finalize(dumpMLIR);
+    return bench.finalize(parsePrintStage(printMLIR));
 
   if (splatRandom && failed(bench.replaceSplatWithRandom()))
     return bench.emitError("Error converting splat tensors with random values");
@@ -180,7 +190,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   }
 
   // Finally lower to LLVM Dialect
-  return bench.finalize(dumpMLIR);
+  return bench.finalize(parsePrintStage(printMLIR));
 }
 
 std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
@@ -239,7 +249,7 @@ std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
     func.addFnAttr("unsafe-fp-math", "true");
   }
 
-  if (dumpLLVM)
+  if (printLLVM)
     llvmModule->print(llvm::outs(), nullptr);
 
   return llvmModule;
@@ -264,6 +274,11 @@ LogicalResult validateInput() {
   auto init = parseTensorInitType(initType);
   if (init == TensorInitType::Invalid)
     return emitError("Invalid tensor init " + initType);
+
+  // Parse print MLIR stage
+  auto stage = parsePrintStage(printMLIR);
+  if (stage == MLIRBench::PrintStage::Invalid)
+    return emitError("Invalid print MLIR stage " + printMLIR);
 
   return success();
 }

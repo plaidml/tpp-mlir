@@ -159,8 +159,17 @@ public:
   /// Prints the result of a kernel call
   LogicalResult printResult(Operation *kernelCall);
 
+  /// Enum to control what to dump when
+  enum class PrintStage {
+    None,
+    Early, // After main generation, before optimization
+    Late,  // After optimizaiton, before LLVM dialect
+    LLVM,  // Final MLIR, in LLVM dialect
+    Invalid,
+  };
+
   /// Terminates the function, issuing a return, lower to LLVM
-  LogicalResult finalize(bool dump);
+  LogicalResult finalize(PrintStage dump);
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);
