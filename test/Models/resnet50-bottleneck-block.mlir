@@ -1,9 +1,9 @@
 // RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
 // RUN: FileCheck %s
 
-// R_UN: tpp-run %s -n 10 \
-// R_UN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
-// R_UN: FileCheck %s -check-prefix=EXEC
+// RUN: tpp-run %s -n 10 \
+// RUN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
+// RUN: FileCheck %s -check-prefix=EXEC
 // Invalid output buffer propagation in mapping to tpp.relu.
 // The results change as uninitialized buffer is used in computation.
 // TODO Fix - see: #358
@@ -510,8 +510,8 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
 }
 
 // Output
-// EXEC:      ( 0.627451, 0.627451, 0.627451, 0.627451,
-// EXEC-SAME:   0.627451, 0.627451, 0.627451, 0.627451 )
+// TODO_FIXME_EXEC:      ( 0.627451, 0.627451, 0.627451, 0.627451,
+// TODO_FIXME_EXEC-SAME:   0.627451, 0.627451, 0.627451, 0.627451 )
 //
 // Stats
 // EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
