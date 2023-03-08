@@ -24,6 +24,7 @@
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -33,10 +34,10 @@ using namespace mlir::tpp;
 
 namespace {
 
-class UtilityPassBase {
+template <typename OpT> class UtilityPassBase {
 public:
   UtilityPassBase()
-      : pm("builtin.module", mlir::OpPassManager::Nesting::Implicit){};
+      : pm(OpT::getOperationName(), mlir::OpPassManager::Nesting::Implicit){};
   virtual ~UtilityPassBase() = default;
 
 protected:
@@ -49,9 +50,10 @@ protected:
 // A general cleanup pass that performs general IR normalization and
 // generic optimizations without any lowering or any logical changes.
 // Commonly applied after other major passes.
-struct CleanupPass : public CleanupBase<CleanupPass>, UtilityPassBase {
+struct CleanupPass : public CleanupBase<CleanupPass>,
+                     UtilityPassBase<ModuleOp> {
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -72,13 +74,14 @@ private:
 };
 
 // Apply any present transforms and remove transform blocks afterwards.
-struct TransformPass : public TransformBase<TransformPass>, UtilityPassBase {
+struct TransformPass : public TransformBase<TransformPass>,
+                       UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<transform::TransformDialect>();
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -103,7 +106,7 @@ private:
 // and function calls.
 struct LocalDialectsLoweringPass
     : public LocalDialectsLoweringBase<LocalDialectsLoweringPass>,
-      UtilityPassBase {
+      UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -119,7 +122,7 @@ struct LocalDialectsLoweringPass
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -152,7 +155,7 @@ private:
 // Apply various postprocessing passes such as LICM, parallel loop fusion,
 // buffer deallocation, general cleanup etc.
 struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
-                            UtilityPassBase {
+                            UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -166,7 +169,7 @@ struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -196,7 +199,8 @@ private:
 
 // Apply collection of high-level passes that map operations to
 // TPP-compatible forms.
-struct TppMappingPass : public TppMappingBase<TppMappingPass>, UtilityPassBase {
+struct TppMappingPass : public TppMappingBase<TppMappingPass>,
+                        UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -210,15 +214,17 @@ struct TppMappingPass : public TppMappingBase<TppMappingPass>, UtilityPassBase {
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
     if (pm.empty())
       constructPipeline();
 
-    if (failed(runPipeline(pm, module)))
+    if (failed(runPipeline(pm, module))) {
+      llvm::dbgs() << "Failed tpp mapping\n";
       return signalPassFailure();
+    }
   }
 
 private:
@@ -226,16 +232,16 @@ private:
     pm.clear();
 
     // Preprocess convolutions.
-    pm.addNestedPass<func::FuncOp>(createRewriteConvToMatmulOrBrgemmPass());
+    pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
     // Generalize tensor.pack and tensor.unpack.
-    pm.addNestedPass<func::FuncOp>(createGeneralizeTensorPackAndUnPackPass());
+    pm.addPass(createGeneralizeTensorPackAndUnPackPass());
   }
 };
 
 // Convert all matching operations to TPP.
 struct TppConversionPass : public TppConversionBase<TppConversionPass>,
-                           UtilityPassBase {
+                           UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -246,7 +252,7 @@ struct TppConversionPass : public TppConversionBase<TppConversionPass>,
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -275,7 +281,7 @@ private:
 
 // Convert all matching ops to TPP.
 struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
-                         UtilityPassBase {
+                         UtilityPassBase<ModuleOp> {
   TppLoweringPass() : TppLoweringPass(false){};
   TppLoweringPass(bool tppToLoops) { this->tppToLoops = tppToLoops; };
 
@@ -289,7 +295,7 @@ struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -313,7 +319,7 @@ private:
 };
 
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
-                          UtilityPassBase {
+                          UtilityPassBase<ModuleOp> {
   DefaultTppPasses() : DefaultTppPasses(false, false){};
   DefaultTppPasses(bool tppToLoops, bool linalgToLoops) {
     this->tppToLoops = tppToLoops;
@@ -339,7 +345,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    auto module = getOperation();
 
     // Initialize the pipeline if needed.
     // Otherwise, just run the cached one.
@@ -365,7 +371,7 @@ private:
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addPass(createCleanupPass());
     } else {
-      pm.addPass(createTppMappingPass());
+      pm.addNestedPass<func::FuncOp>(createTppMappingPass());
       pm.addPass(createCleanupPass());
 
       // Run bufferization as the rest of the passes prefer working on memref.
@@ -402,7 +408,7 @@ std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createPostprocessingPass() {
   return std::make_unique<PostprocessingPass>();
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppMappingPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createTppMappingPass() {
   return std::make_unique<TppMappingPass>();
 }
 
