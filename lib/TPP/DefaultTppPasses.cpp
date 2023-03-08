@@ -275,7 +275,7 @@ private:
 
     // Convert all higher level dialects to TPP.
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
-    pm.addPass(createConvertVNNIToTppPass());
+    pm.addNestedPass<func::FuncOp>(createConvertVNNIToTppPass());
   }
 };
 

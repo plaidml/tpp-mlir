@@ -75,7 +75,7 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "ModuleOp"> {
+def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "func::FuncOp"> {
   let summary = "Convert VNNI to TPP";
   let constructor = "mlir::tpp::createConvertVNNIToTppPass()";
   let description = [{
