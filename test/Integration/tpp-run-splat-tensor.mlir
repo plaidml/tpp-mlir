@@ -1,20 +1,20 @@
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early 2>&1 | \
 // RUN: FileCheck %s --check-prefix=SPLAT
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 2>&1 | \
 // RUN: FileCheck %s --check-prefix=RANDOM
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random 2>&1 | \
 // RUN: FileCheck %s --check-prefix=RANDOM-SPLAT
 
 // Options for -init-type
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=const | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=const 2>&1 | \
 // RUN: FileCheck %s --check-prefix=OPT-CONST
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=simple | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=simple 2>&1 | \
 // RUN: FileCheck %s --check-prefix=OPT-SIMPLE
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=cont | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=cont 2>&1 | \
 // RUN: FileCheck %s --check-prefix=OPT-CONT
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=random | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=random 2>&1 | \
 // RUN: FileCheck %s --check-prefix=OPT-RANDOM
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=normal | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random -init-type=normal 2>&1 | \
 // RUN: FileCheck %s --check-prefix=OPT-NORMAL
 
 func.func @entry(%input: tensor<4x2xf32>) {

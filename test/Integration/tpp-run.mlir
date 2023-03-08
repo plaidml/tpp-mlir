@@ -1,15 +1,15 @@
 // Print mlir
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early | FileCheck %s --check-prefix=EARLY
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late  | FileCheck %s --check-prefix=LATE
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=llvm  | FileCheck %s --check-prefix=LLVM
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early 2>&1 | FileCheck %s --check-prefix=EARLY
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late  2>&1 | FileCheck %s --check-prefix=LATE
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=llvm  2>&1 | FileCheck %s --check-prefix=LLVM
 
 // Loops options (should be the same for both cases in this small example)
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -tpp-to-loops | FileCheck %s --check-prefix=LOOPS
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -linalg-to-loops | FileCheck %s --check-prefix=LOOPS
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -tpp-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -linalg-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
 
 // Benchmark options
-// RUN: tpp-run %s -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=BENCH_PRINT
-// RUN: tpp-run %s -e entry -entry-point-result=void -n 10  | FileCheck %s --check-prefix=BENCH_STATS
+// RUN: tpp-run %s -e entry -entry-point-result=void -print 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 10  2>&1 | FileCheck %s --check-prefix=BENCH_STATS
 
 // CPU options can't be tested as even the LLVM IR is identical
 // Splat and init options in tpp-run-splat-* tests
