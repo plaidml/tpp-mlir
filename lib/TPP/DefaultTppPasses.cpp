@@ -186,6 +186,7 @@ private:
 
     // Postprocess loops.
     pm.addPass(createRaiseToParallelLoopPass());
+    pm.addPass(createConvertForAllToParallelOpPass());
     pm.addPass(createParallelLoopFusionPass());
 
     // Postprocess buffers.
@@ -364,7 +365,7 @@ private:
     // Run transforms first and clean them up afterwards.
     pm.addPass(createTransformPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
-
+      
     if (linalgToLoops) {
       // Lower linalg directly to loops.
       // Skip all TPP transformations.

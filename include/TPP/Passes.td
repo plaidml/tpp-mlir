@@ -349,4 +349,14 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
   ];
 }
 
+def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
+                                     "func::FuncOp"> {
+  let summary = "Convert scf.forall to scf.parallel";
+  let description = [{
+    Rewrite an scf.forall to scf.parallel after bufferization.
+    Requires scf.forall to be a normalized loop.
+  }];
+  let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

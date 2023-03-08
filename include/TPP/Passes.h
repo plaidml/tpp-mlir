@@ -103,6 +103,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool loops = false);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertForAllToParallelOpPass();
 
 } // namespace tpp
 } // namespace mlir
