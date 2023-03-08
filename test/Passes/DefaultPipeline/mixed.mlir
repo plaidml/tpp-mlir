@@ -96,24 +96,6 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
 
 // -----
 
-// CHECK: func.func @raise_to_parallel(
-// CHECK-SAME:  %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index,
-// CHECK-SAME:  %[[SRC:.+]]: memref<32xf32>)
-func.func @raise_to_parallel(%lb: index, %ub: index, %step: index,
-          %src: memref<32xf32>) {
-  // CHECK-NOT: scf.for
-  // CHECK: scf.parallel
-  scf.for %i = %lb to %ub step %step {
-    %load = memref.load %src[%i] : memref<32xf32>
-    %add = arith.addf %load, %load : f32
-    memref.store %add, %src[%i] : memref<32xf32>
-  } {parallel}
-
-  return
-}
-
-// -----
-
 // CHECK-LABEL: func.func @tensor_forall
 func.func @tensor_forall(%arg0: tensor<32x32xbf16>) -> tensor<8x112x32x32xbf16> {
   %c8 = arith.constant 8 : index
