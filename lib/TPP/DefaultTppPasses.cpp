@@ -279,7 +279,7 @@ private:
   }
 };
 
-// Convert all matching ops to TPP.
+// Lower TPP to into combination of standard and local dialects.
 struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
                          UtilityPassBase<func::FuncOp> {
   TppLoweringPass() : TppLoweringPass(false){};
@@ -318,6 +318,7 @@ private:
   }
 };
 
+// The default pipeline for TPP.
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
                           UtilityPassBase<ModuleOp> {
   DefaultTppPasses() : DefaultTppPasses(false, false){};
@@ -371,20 +372,26 @@ private:
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     } else {
+      // Lower IR through TPP operations.
+      // Transform operations to be TPP compatible.
       pm.addNestedPass<func::FuncOp>(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
-      // Run bufferization as the rest of the passes prefer working on memref.
       pm.addPass(createBufferizePass());
 
+      // Lower operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
+      // Lower all TPP operations.
       pm.addNestedPass<func::FuncOp>(createTppLoweringPass(tppToLoops));
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     }
 
+    // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLoweringPass());
+
+    // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessingPass());
   }
 };

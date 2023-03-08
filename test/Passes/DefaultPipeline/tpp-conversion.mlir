@@ -4,8 +4,8 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
-// Done after bufferization which is why it is not part of 'tpp-mapping'.
-// See the default pipeline in 'DefaultTppPasses' for details.
+// Rewriting to brgemm is done after bufferization which is why it is not part of 'tpp-mapping'.
+// See the default pipeline in 'DefaultTppPasses' for more details.
 func.func @generic_to_brgemm(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
   %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
     ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
