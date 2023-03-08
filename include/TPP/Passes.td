@@ -91,7 +91,7 @@ def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleO
   }];
 }
 
-def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "ModuleOp"> {
+def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
   let summary = "Convert perf to loops";
   let constructor = "mlir::tpp::createConvertPerfToLoopsPass()";
   let description = [{

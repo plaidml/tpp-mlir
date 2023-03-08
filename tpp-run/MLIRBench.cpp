@@ -388,7 +388,7 @@ LogicalResult MLIRBench::finalize(bool dumpMLIR) {
   // Partial Lowering
   passManager.addPass(memref::createExpandStridedMetadataPass());
   passManager.addPass(createLowerAffinePass());
-  passManager.addPass(tpp::createConvertPerfToLoopsPass());
+  passManager.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoopsPass());
   passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());

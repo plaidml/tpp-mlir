@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -108,7 +109,7 @@ struct ConvertPerfToLoops : public ConvertPerfToLoopsBase<ConvertPerfToLoops> {
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertPerfToLoopsPass() {
   return std::make_unique<ConvertPerfToLoops>();
 }
