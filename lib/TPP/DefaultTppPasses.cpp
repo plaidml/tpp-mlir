@@ -241,7 +241,7 @@ private:
 
 // Convert all matching operations to TPP.
 struct TppConversionPass : public TppConversionBase<TppConversionPass>,
-                           UtilityPassBase<ModuleOp> {
+                           UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -271,11 +271,11 @@ private:
     // The mapping is done after bufferization as the buffer semantics
     // allow direct use of scf.parallel loops. This prevents different
     // lowering outputs between input linalg on tensors and memrefs.
-    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
+    pm.addPass(createRewriteToBatchReduceGemmPass());
 
     // Convert all higher level dialects to TPP.
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToTppPass());
-    pm.addNestedPass<func::FuncOp>(createConvertVNNIToTppPass());
+    pm.addPass(createConvertLinalgToTppPass());
+    pm.addPass(createConvertVNNIToTppPass());
   }
 };
 
@@ -377,7 +377,7 @@ private:
       // Run bufferization as the rest of the passes prefer working on memref.
       pm.addPass(createBufferizePass());
 
-      pm.addPass(createTppConversionPass());
+      pm.addNestedPass<func::FuncOp>(createTppConversionPass());
       pm.addPass(createCleanupPass());
 
       pm.addPass(createTppLoweringPass(tppToLoops));
@@ -412,7 +412,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createTppMappingPass() {
   return std::make_unique<TppMappingPass>();
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppConversionPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createTppConversionPass() {
   return std::make_unique<TppConversionPass>();
 }
 

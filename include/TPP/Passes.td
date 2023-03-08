@@ -326,7 +326,7 @@ def TppMapping : Pass<"tpp-mapping", "func::FuncOp"> {
   let constructor = "mlir::tpp::createTppMappingPass()";
 }
 
-def TppConversion : Pass<"tpp-conversion", "ModuleOp"> {
+def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
   let summary = "Convert operations to TPP";
   let description = [{
     Convert all eligble operations into TPP operations.
