@@ -363,55 +363,77 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(getKernelResult(kernelCall));
 }
 
-LogicalResult MLIRBench::finalize(bool dumpMLIR) {
+LogicalResult MLIRBench::finalize(PrintStage print) {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
     builder.create<func::ReturnOp>(unkLoc);
   }
 
-  if (dumpMLIR)
+  // Print IR of unoptimized kernel and main
+  if (print == PrintStage::Early)
     module->print(llvm::outs());
 
-  // A set of default passes that lower any input IR to LLVM
-  PassManager passManager(module->getContext());
-  applyPassManagerCLOptions(passManager);
+  // We run the pass manager multiple times to get the IR from different stages
+  // This will change when the pass manager has multiple stages of its own
+  {
+    // A set of default passes that lower any input IR to LLVM
+    PassManager passManager(module->getContext());
+    applyPassManagerCLOptions(passManager);
 
-  // Apply the default preprocessing pass
-  passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
+    // Apply the default preprocessing pass
+    passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
 
-  // Bufferization, if needed
-  passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
+    // Partial Lowering
+    passManager.addPass(memref::createExpandStridedMetadataPass());
+    passManager.addPass(createLowerAffinePass());
+    passManager.addPass(tpp::createConvertPerfToLoopsPass());
+    passManager.addPass(tpp::createConvertPerfToFuncPass());
+    passManager.addPass(createConvertTensorToLinalgPass());
+    passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+    passManager.addPass(arith::createArithExpandOpsPass());
+    passManager.addPass(createConvertVectorToSCFPass());
+    passManager.addPass(createConvertSCFToCFPass());
 
-  // Partial Lowering
-  passManager.addPass(memref::createExpandStridedMetadataPass());
-  passManager.addPass(createLowerAffinePass());
-  passManager.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoopsPass());
-  passManager.addPass(tpp::createConvertPerfToFuncPass());
-  passManager.addPass(createConvertTensorToLinalgPass());
-  passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(arith::createArithExpandOpsPass());
-  passManager.addPass(createConvertVectorToSCFPass());
-  passManager.addPass(createConvertSCFToCFPass());
-
-  // Lower to LLVM
-  passManager.addPass(createConvertVectorToLLVMPass());
-  passManager.addPass(createConvertFuncToLLVMPass());
-  passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
-  passManager.addPass(createConvertMathToLLVMPass());
-  passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addPass(createReconcileUnrealizedCastsPass());
-
-  auto result = passManager.run(module);
-  if (failed(result)) {
-    llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
-    module->print(llvm::errs());
+    auto result = passManager.run(module);
+    if (failed(result)) {
+      llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
+      module->print(llvm::errs());
+      return result;
+    }
   }
 
-  return result;
+  // Print IR of optimized kernel and main
+  if (print == PrintStage::Late)
+    module->print(llvm::outs());
+
+  {
+    // Lower level passes only now
+    PassManager passManager(module->getContext());
+    applyPassManagerCLOptions(passManager);
+
+    // Lower to LLVM
+    passManager.addPass(createConvertVectorToLLVMPass());
+    passManager.addPass(createConvertFuncToLLVMPass());
+    passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
+    passManager.addPass(createConvertMathToLLVMPass());
+    passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addPass(createReconcileUnrealizedCastsPass());
+
+    auto result = passManager.run(module);
+    if (failed(result)) {
+      llvm::errs() << "ERROR: Failed to lower Module to LLVM dialect\n";
+      module->print(llvm::errs());
+      return result;
+    }
+  }
+
+  // Print IR of kernel and main in LLVM dialect
+  if (print == PrintStage::LLVM)
+    module->print(llvm::outs());
+
+  return success();
 }
 
 //----------------------- Helpers & private methods

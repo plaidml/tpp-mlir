@@ -1,8 +1,8 @@
-// RUN: tpp-run %s -e entry -entry-point-result=void -dump-mlir 2>&1 | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early | \
 // RUN: FileCheck %s --check-prefix=SPLAT
-// RUN: tpp-run %s -e entry -entry-point-result=void -dump-mlir -seed 123 2>&1 | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 | \
 // RUN: FileCheck %s --check-prefix=RANDOM
-// RUN: tpp-run %s -e entry -entry-point-result=void -dump-mlir -seed 123 -splat-to-random 2>&1 | \
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=early -seed 123 -splat-to-random | \
 // RUN: FileCheck %s --check-prefix=RANDOM-SPLAT
 
 memref.global "private" constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00> {alignment = 128 : i64}
