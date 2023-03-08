@@ -185,7 +185,6 @@ private:
     pm.clear();
 
     // Postprocess loops.
-    pm.addPass(createRaiseToParallelLoopPass());
     pm.addPass(createConvertForAllToParallelOpPass());
     pm.addPass(createParallelLoopFusionPass());
 

@@ -14,7 +14,6 @@ add_mlir_library(MLIRTPP
     RewriteConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp
     GeneralizeTensorPackAndUnPack.cpp
-    RaiseToParallelLoop.cpp
     ConstantFoldPack.cpp
     ConvInitSimplify.cpp
     ConvertForAllToParallelOp.cpp
