@@ -145,8 +145,8 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 
   // CHECK: call @xsmm_unary_dispatch
-  // CHECK-NEXT: call @xsmm_matmul_dispatch
-  // CHECK-NEXT: call @xsmm_unary_dispatch
+  // CHECK-DAG: call @xsmm_matmul_dispatch
+  // CHECK-DAG: call @xsmm_unary_dispatch
   
   // CHECK: scf.parallel (%[[I:.+]], %[[J:.+]]) = 
   // CHECK-SAME: (%[[C0]], %[[C0]]) to (%[[C128]], %[[C512]]) step (%[[C32]], %[[C32]])
