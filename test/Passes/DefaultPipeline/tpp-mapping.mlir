@@ -1,12 +1,47 @@
 // RUN: tpp-opt %s -tpp-mapping -split-input-file | FileCheck %s
 
-func.func @conv_to_matmul(%img: tensor<1x5x5x3xf32>, %filter: tensor<3x3x3x8xf32>, %out: tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32> {
+func.func @conv_2d_nhwc_hwcf(%img: tensor<1x5x5x3xf32>, %filter: tensor<3x3x3x8xf32>, %out: tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32> {
   %0 = linalg.conv_2d_nhwc_hwcf ins(%img, %filter: tensor<1x5x5x3xf32>, tensor<3x3x3x8xf32>) outs(%out: tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32>
   return %0: tensor<1x3x3x8xf32>
 }
 
-// CHECK-LABEL: func.func @conv_to_matmul(
+// CHECK-LABEL: func.func @conv_2d_nhwc_hwcf(
 // CHECK-NOT: linalg.conv_2d_nhwc_hwcf
+// CHECK: tensor.extract_slice
+// CHECK: tensor.extract_slice
+// CHECK: tensor.extract_slice
+// CHECK: linalg.matmul
+// CHECK: tensor.insert_slice
+
+// -----
+
+func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
+                %o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32> {
+  %0 = linalg.conv_2d_nchw_fchw ins(%i, %f: tensor<14x512x28x28xf32>, tensor<1024x512x1x1xf32>) outs(%o: tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
+  return %0: tensor<14x1024x28x28xf32>
+}
+
+// CHECK-LABEL: func.func @conv_2d_nchw_fchw(
+// CHECK-NOT: linalg.conv_2d_nchw_fchw
+// Generalized pack of the first input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Generalized pack of the second input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Generalized pack of the output
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Conv as matmul
 // CHECK: linalg.matmul
 
 // -----

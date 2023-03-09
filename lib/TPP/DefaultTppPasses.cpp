@@ -235,6 +235,7 @@ private:
 
     pm.addPass(createTileConsumerAndFuseProducersPass());
     // Preprocess convolutions.
+    pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
     // Pack matmuls.
