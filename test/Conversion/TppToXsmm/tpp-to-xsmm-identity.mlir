@@ -92,7 +92,10 @@ func.func @identity_to_xsmm(%arg0: memref<1x5xf32>, %arg1: memref<5x5xf32>) {
 // CHECK-SAME:  %[[ARG0:.+]]: f32,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<5x6xf32>)
 func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
-
+  // m = 5
+  // n = 6
+  // ldi = 1
+  // ldo = 6
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast scalar dataType f32)
   // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
   tpp.identity ins(%arg0: f32) out(%arg1: memref<5x6xf32>)
@@ -104,8 +107,42 @@ func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
 // CHECK-LABEL: @identity_to_xsmm(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<1x1xf32>, %[[ARG1:.+]]: memref<5x6xf32>)
 func.func @identity_to_xsmm(%arg0: memref<1x1xf32>, %arg1: memref<5x6xf32>) {
+  // m = 5
+  // n = 6
+  // ldi = 1
+  // ldo = 6
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast scalar dataType f32)
   // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
   tpp.identity ins(%arg0: memref<1x1xf32>) out(%arg1: memref<5x6xf32>)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @identity_1d
+// CHECK-SAME: %[[ARG0:.+]]: memref<8xf32, strided<[1]>>, %[[ARG1:.+]]: memref<8xf32, strided<[1]>>
+func.func @identity_1d(%arg0: memref<8xf32, strided<[1]>>, %arg1: memref<8xf32, strided<[1]>>) {
+  // m = 1
+  // n = 8
+  // ldi = 8
+  // ldo = 8
+  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [1, 8, 8, 8](broadcast none dataType f32)
+  // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]])
+  tpp.identity ins(%arg0 : memref<8xf32, strided<[1]>>) out(%arg1 : memref<8xf32, strided<[1]>>)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @identity_1d
+// CHECK-SAME: %[[ARG0:.+]]: memref<1xf32, strided<[1]>>, %[[ARG1:.+]]: memref<8xf32, strided<[1]>>
+func.func @identity_1d(%arg0: memref<1xf32, strided<[1]>>, %arg1: memref<8xf32, strided<[1]>>) {
+  // m = 1
+  // n = 8
+  // ldi = 1
+  // ldo = 8
+  // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [1, 8, 1, 8](broadcast scalar dataType f32)
+  // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]])
+  tpp.identity ins(%arg0 : memref<1xf32, strided<[1]>>) out(%arg1 : memref<8xf32, strided<[1]>>)
   return
 }

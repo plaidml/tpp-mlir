@@ -79,8 +79,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
         matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
     xsmm::DataTypeAttr dtype;
     if (memrefC.getElementType().isBF16()) {
-      dtype = xsmm::DataTypeAttr::get(matmulOp.getContext(),
-                                      xsmm::DataType::BF16);
+      dtype =
+          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
     } else {
       assert(memrefC.getElementType().isF32() &&
              "Element type neither bf16 nor f32");
@@ -192,8 +192,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
     if (memrefC.getElementType().isBF16()) {
-      dtype = xsmm::DataTypeAttr::get(brgemmOp.getContext(),
-                                      xsmm::DataType::BF16);
+      dtype =
+          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
     } else {
       assert(memrefC.getElementType().isF32() &&
              "Element type neither bf16 nor f32");
@@ -342,23 +342,40 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
     computeBcastShapeInput(shapeOutput, shapeInput, bShapeInput);
     assert(shapeOutput.size() == bShapeInput.size());
     shapeInput = bShapeInput;
+    assert(shapeInput.size() == 1 || shapeInput.size() == 2);
 
-    if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
-      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>(), 1);
-      return {ldi, bCast};
+    // Handle 2d-case.
+    if (shapeInput.size() == 2) {
+      if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
+        int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>(), 1);
+        return {ldi, bCast};
+      }
+
+      if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_COL;
+        int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>());
+        return {ldi, bCast};
+      }
+
+      if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
+        int64_t ldi = *getLeadingDim(inputType.cast<MemRefType>());
+        return {ldi, bCast};
+      }
     }
-
-    if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_COL;
-      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>());
-      return {ldi, bCast};
-    }
-
-    if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
-      int64_t ldi = *getLeadingDim(inputType.cast<MemRefType>());
-      return {ldi, bCast};
+    // Handle 1d-case.
+    if (shapeInput.size() == 1) {
+      if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
+        int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>());
+        return {ldi, bCast};
+      }
+      if (shapeInput[0] == shapeOutput[0]) {
+        xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
+        int64_t ldi = *getLeadingDim(inputType.cast<MemRefType>());
+        return {ldi, bCast};
+      }
     }
     assert(false && "failed to get ldi and bCast for identity");
   }
@@ -366,41 +383,44 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = identityOp.getLoc();
-    // no conversion if identity is a scalar operation.
     Type outputType = identityOp.getOutput().getType();
-    MemRefType outputMemRefType = outputType.dyn_cast<MemRefType>();
-    if (!outputMemRefType || outputMemRefType.getRank() != 2)
-      return rewriter.notifyMatchFailure(identityOp, "not a 2-D memref type");
+    assert(outputType.isa<MemRefType>() && "expect a memref type");
+    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
+           "expect memref with rank 1 or 2");
 
+    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
+    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
+                                              : outputMemRef.getShape()[0];
     int64_t outputOffset;
     SmallVector<int64_t> outputStrides;
-    if (failed(
-            getStridesAndOffset(outputMemRefType, outputStrides, outputOffset)))
+    if (failed(getStridesAndOffset(outputMemRef, outputStrides, outputOffset)))
       return rewriter.notifyMatchFailure(identityOp, "not a strided memref");
-    if (outputStrides.back() != 1)
+    if (outputStrides.back() != 1) {
       return rewriter.notifyMatchFailure(identityOp,
                                          "most minor stride is != 1");
+    }
+    auto ldo = getLeadingDim(outputMemRef);
+    if (failed(ldo))
+      return rewriter.notifyMatchFailure(identityOp, "failed to extract ldo");
 
-    int64_t m = outputMemRefType.getShape()[0];
-    int64_t n = outputMemRefType.getShape()[1];
-    int64_t ldo = outputStrides.front();
     std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
-        getLdiAndBCast(identityOp, ldo);
+        getLdiAndBCast(identityOp, *ldo);
     int64_t ldi = ldiAndBCast.first;
     xsmm::UnaryFlags bCast = ldiAndBCast.second;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     xsmm::UnaryKindAttr attr = xsmm::UnaryKindAttr::get(
         identityOp.getContext(), xsmm::UnaryKind::IDENTITY);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, *ldo});
     xsmm::UnaryFlagsAttr bCastAttr =
         xsmm::UnaryFlagsAttr::get(identityOp.getContext(), bCast);
     xsmm::DataTypeAttr dtype;
-    if (outputMemRefType.getElementType().isBF16()) {
+    if (outputMemRef.getElementType().isBF16()) {
       dtype = xsmm::DataTypeAttr::get(identityOp.getContext(),
                                       xsmm::DataType::BF16);
     } else {
-      assert(outputMemRefType.getElementType().isF32() &&
+      assert(outputMemRef.getElementType().isF32() &&
              "Element type neither bf16 nor f32");
       dtype =
           xsmm::DataTypeAttr::get(identityOp.getContext(), xsmm::DataType::F32);

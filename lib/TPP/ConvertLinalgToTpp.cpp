@@ -279,10 +279,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     tpp::utils::OperandInfo operandInfo;
     if (tpp::utils::isTppIdentity(linalgOp)) {
       assert(operands.size() == 2 && "Expect two operands");
-      // FIXME: We are not converting 1d to xsmm. See #375.
-      Type outputType = operands[1].getType();
-      if (outputType.cast<ShapedType>().getRank() != 2)
-        return failure();
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
