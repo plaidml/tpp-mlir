@@ -367,7 +367,6 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // TODO: Add here propagation, constant fold and blocking.
-    // Run tile and fusion pass.
 
     if (linalgToLoops) {
       // Lower linalg directly to loops.
