@@ -4,9 +4,6 @@
 // RUN: tpp-run %s -n 10 \
 // RUN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXEC
-// Invalid output buffer propagation in mapping to tpp.relu.
-// The results change as uninitialized buffer is used in computation.
-// TODO Fix - see: #358
 
 // NOTE: This model file does not contain BatchNorm layers, as for inference, those layers are folded.
 
@@ -441,7 +438,7 @@ func.func @extract_results_for_printing(%input : !second_conv1x1_output_tensor_t
 
 //
 // CHECK-LABEL: @resnet50_bottleneck_block(
-// CHECK-SAME: %[[input:.*]]: memref<1x7x7x2048xf32>, %[[output:.*]]: memref<1x8xf32>) -> memref<1x8xf32> {
+// CHECK-SAME: %[[input:.*]]: memref<1x7x7x2048xf32>, %[[output:.*]]: memref<1x8xf32>
 //
 func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %output : !tensor_print_t) -> !tensor_print_t {
 
@@ -494,11 +491,7 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
     //
 
     // Copy to output to avoid deallocation / double-free problem with the last result (see IR for more details)
-    %copy = linalg.generic { indexing_maps = [#map_print, #map_print], iterator_types = ["parallel", "parallel"] }
-        ins(%ret : !tensor_print_t) outs(%output : !tensor_print_t) {
-            ^bb0(%in: f32, %out: f32):
-                linalg.yield %in : f32
-    } -> !tensor_print_t
+    %copy = linalg.copy ins(%ret : !tensor_print_t) outs(%output : !tensor_print_t) -> !tensor_print_t
 
     // Cleanup temporary buffers
     bufferization.dealloc_tensor %first_conv1x1_output : !first_conv1x1_output_tensor_t
@@ -513,7 +506,7 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
 }
 
 // Output
-// E_XEC: ( 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923 )
+// EXEC: ( 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923 )
 //
 // Stats
 // EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
