@@ -32,3 +32,22 @@ func.func @memref_forall(%arg0: memref<32x32xbf16>) -> memref<8x112x32x32xbf16> 
   }
   return %alloc : memref<8x112x32x32xbf16>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @thread_forall
+// CHECK-SAME:  %{{.+}}: memref<1x5xf32>, 
+// CHECK-SAME:  %{{.+}}: memref<?x?xf32>, 
+// CHECK-SAME:  %[[ARG2:.+]]: index
+func.func @thread_forall(%arg0: memref<1x5xf32>, %arg1: memref<?x?xf32>, %arg2: index) -> index {
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: scf.parallel (%{{.+}}) = (%[[C0]]) to (%[[ARG2]]) step (%[[C1]])
+  scf.forall (%arg3) in (%arg2) {
+    %subview = memref.subview %arg1[%arg3, 0] [1, 5] [1, 1] : memref<?x?xf32> to memref<1x5xf32, strided<[?, 1], offset: ?>>
+    memref.copy %arg0, %subview : memref<1x5xf32> to memref<1x5xf32, strided<[?, 1], offset: ?>>
+  }
+  %dim = memref.dim %arg1, %c1 : memref<?x?xf32>
+  return %dim : index
+}

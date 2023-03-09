@@ -339,10 +339,9 @@ bool hasAllUsersInWorklist(Operation *op,
                            const llvm::SmallDenseSet<Operation *> &worklist) {
   assert(op->getNumResults() == 1 && "expect single result op");
   Value result = op->getResult(0);
-  for (Operation *user : result.getUsers()) {
+  for (Operation *user : result.getUsers())
     if (worklist.count(user) == 0)
       return false;
-  }
   return true;
 }
 
