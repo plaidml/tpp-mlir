@@ -794,13 +794,13 @@ mlir::tpp::createPackMatmulPass(ArrayRef<int64_t> blockingFactors) {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNchwFchwPass() {
-  return std::make_unique<PackConv2DNchwFchw>();
+mlir::tpp::createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackConv2DNchwFchw>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNhwcHwcfPass() {
-  return std::make_unique<PackConv2DNhwcHwcf>();
+mlir::tpp::createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackConv2DNhwcHwcf>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {
