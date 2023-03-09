@@ -237,6 +237,9 @@ private:
     // Preprocess convolutions.
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
+    // Map ops to VNNI layout.
+    pm.addPass(createPackVNNIPass());
+
     // Generalize tensor.pack and tensor.unpack.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
   }

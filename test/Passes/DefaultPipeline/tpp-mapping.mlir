@@ -33,3 +33,21 @@ func.func @generalize_pack_unpack(%arg0: tensor<12x2x56x56x32xf32>, %arg1: tenso
 // CHECK:     tensor.extract_slice
 // CHECK:     linalg.transpose
 // CHECK:     tensor.insert_slice
+
+// -----
+
+func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
+  %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1:tensor<32x4x4xbf16>, tensor<32x4x4xbf16>) outs(%arg2:tensor<4x4xbf16>) -> tensor<4x4xbf16>
+  return %0: tensor<4x4xbf16>
+}
+
+// CHECK-LABEL: func.func @pack_vnni(
+// CHECK-NOT: linalg.batch_reduce_matmul
+// CHECK-NOT: tensor.pack
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     scf.for
+// CHECK:       tensor.extract_slice
+// CHECK:       linalg.transpose
+// CHECK:       tensor.insert_slice
+// CHECK: vnni.brgemm
