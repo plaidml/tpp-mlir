@@ -237,6 +237,9 @@ private:
     // Preprocess convolutions.
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
+    // Pack matmuls.
+    pm.addPass(createPackMatmulPass({32, 32, 32}));
+
     // Map ops to VNNI layout.
     pm.addPass(createPackVNNIPass());
 

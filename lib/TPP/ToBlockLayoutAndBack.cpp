@@ -788,8 +788,9 @@ void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
-  return std::make_unique<PackMatmul>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createPackMatmulPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackMatmul>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

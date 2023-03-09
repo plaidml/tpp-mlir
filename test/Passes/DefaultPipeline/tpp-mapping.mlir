@@ -51,3 +51,39 @@ func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %ar
 // CHECK:       linalg.transpose
 // CHECK:       tensor.insert_slice
 // CHECK: vnni.brgemm
+
+// -----
+
+func.func @pack_matmul(
+  %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>)
+    -> tensor<128x128xf32> {
+  %0 = linalg.matmul  ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>)
+                     outs(%arg2: tensor<128x128xf32>)
+    -> tensor<128x128xf32>
+  return %0 : tensor<128x128xf32>
+}
+
+// CHECK-LABEL: func.func @pack_matmul(
+// CHECK-NOT: linalg.matmul
+// Generalized pack of the first input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Generalized pack of the second input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Generalized pack of the output
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice
+// Packed matmul
+// CHECK: linalg.generic
+// CHECK:   arith.mulf
+// CHECK:   arith.addf
