@@ -137,7 +137,8 @@ func.func @first_conv2d_1x1_biasadd_relu(
     // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel
     // CHECK:   %[[cast:.*]] = memref.cast
-    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     //
@@ -246,7 +247,8 @@ func.func @conv2d_3x3_biasadd_relu(
     // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel
     // CHECK:   %[[cast:.*]] = memref.cast
-    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     //
@@ -355,7 +357,8 @@ func.func @second_conv2d_1x1_biasadd_relu(
     // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
     // CHECK: scf.parallel
     // CHECK:   %[[cast:.*]] = memref.cast
-    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
     //
 
     //
@@ -510,8 +513,7 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
 }
 
 // Output
-// TODO_FIXME_EXEC:      ( 0.627451, 0.627451, 0.627451, 0.627451,
-// TODO_FIXME_EXEC-SAME:   0.627451, 0.627451, 0.627451, 0.627451 )
+// E_XEC: ( 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923 )
 //
 // Stats
 // EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
