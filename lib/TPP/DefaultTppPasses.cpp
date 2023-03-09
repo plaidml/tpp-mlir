@@ -365,10 +365,9 @@ private:
     // Run transforms first and clean them up afterwards.
     pm.addPass(createTransformPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
-      
+
     // TODO: Add here propagation, constant fold and blocking.
     // Run tile and fusion pass.
-    // pm.addPass(createTileConsumerAndFuseProducersPass());
 
     if (linalgToLoops) {
       // Lower linalg directly to loops.
