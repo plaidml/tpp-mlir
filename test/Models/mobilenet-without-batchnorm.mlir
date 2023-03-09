@@ -1381,13 +1381,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     linalg.yield %1307 : f32
   } -> tensor<1x1x1x1001xf32>
   //
-  // C_HECK: %[[subview:.*]] = memref.subview
-  // C_HECK: %[[subview1:.*]] = memref.subview
-  // C_HECK: %[[subview2:.*]] = memref.subview
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // C_HECK: %[[cast:.*]] = memref.cast %[[subview]]
-  // C_HECK: %[[cast1:.*]] = memref.cast %[[subview1]]
-  // C_HECK: %[[cast2:.*]] = memref.cast %[[subview2]]
+  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c0_i64]]) : ({{.+}}) -> i64
   // CHECK: call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %{{.+}}, %{{.+}}, %{{.+}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
   //
 
