@@ -358,29 +358,21 @@ static bool matchReluBody(linalg::LinalgOp linalgOp, OperandInfo &info) {
   Value maxfLhs = maxfOp.getLhs();
   Value maxfRhs = maxfOp.getRhs();
 
-  if (isZeroTensor(maxfLhs) && isZeroTensor(maxfRhs))
+  // If lhs is a zero get rhs as input for the relu if it is a block argument,
+  // return false otherwise.
+  auto getOperand = [&](Value lhs, Value rhs) -> bool {
+    if (isZeroTensor(lhs)) {
+      if (!isa<BlockArgument>(rhs))
+        return false;
+      OpOperand *operand = genOp.getMatchingOpOperand(cast<BlockArgument>(rhs));
+      info.inputs.push_back(operand->get());
+      info.outputs.push_back(genOp.getDpsInitOperand(0)->get());
+      return true;
+    }
     return false;
+  };
 
-  if (isZeroTensor(maxfLhs)) {
-    if (!isa<BlockArgument>(maxfRhs))
-      return false;
-    OpOperand *nonCst =
-        genOp.getMatchingOpOperand(cast<BlockArgument>(maxfRhs));
-    info.inputs.push_back(nonCst->get());
-    info.outputs.push_back(genOp.getDpsInitOperand(0)->get());
-
-    return true;
-  }
-  if (isZeroTensor(maxfRhs)) {
-    if (!isa<BlockArgument>(maxfLhs))
-      return false;
-    OpOperand *nonCst =
-        genOp.getMatchingOpOperand(cast<BlockArgument>(maxfLhs));
-    info.inputs.push_back(nonCst->get());
-    info.outputs.push_back(genOp.getDpsInitOperand(0)->get());
-    return true;
-  }
-  return false;
+  return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
 }
 
 MatchBroadcastRuleResult verifyTppIdentityBroadcastingRules(Type inputType,
