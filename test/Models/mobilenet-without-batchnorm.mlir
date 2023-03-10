@@ -75,47 +75,7 @@
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> ()>
 
-//
-// CHECK-LABEL: @mobilenet(
-// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1001xf32> {
-//
 func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
-  // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
-  // CHECK-DAG: %[[c0_i1:.*]] = arith.constant false
-  // CHECK-DAG: %[[c112_i64:.*]] = arith.constant 112 : i64
-  // CHECK-DAG: %[[c32_i64:.*]] = arith.constant 32 : i64
-  // CHECK-DAG: %[[c3_i64:.*]] = arith.constant 3 : i64
-  // CHECK-DAG: %[[c6_i64:.*]] = arith.constant 6 : i64
-  // CHECK-DAG: %[[c16_i64:.*]] = arith.constant 16 : i64
-  // CHECK-DAG: %[[c96_i64:.*]] = arith.constant 96 : i64
-  // CHECK-DAG: %[[c56_i64:.*]] = arith.constant 56 : i64
-  // CHECK-DAG: %[[c24_i64:.*]] = arith.constant 24 : i64
-  // CHECK-DAG: %[[c144_i64:.*]] = arith.constant 144 : i64
-  // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
-  // CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
-  // CHECK-DAG: %[[c192_i64:.*]] = arith.constant 192 : i64
-  // CHECK-DAG: %[[c14_i64:.*]] = arith.constant 14 : i64
-  // CHECK-DAG: %[[c64_i64:.*]] = arith.constant 64 : i64
-  // CHECK-DAG: %[[c384_i64:.*]] = arith.constant 384 : i64
-  // CHECK-DAG: %[[c576_i64:.*]] = arith.constant 576 : i64
-  // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
-  // CHECK-DAG: %[[c160_i64:.*]] = arith.constant 160 : i64
-  // CHECK-DAG: %[[c960_i64:.*]] = arith.constant 960 : i64
-  // CHECK-DAG: %[[c320_i64:.*]] = arith.constant 320 : i64
-  // CHECK-DAG: %[[c1280_i64:.*]] = arith.constant 1280 : i64
-  // CHECK-DAG: %[[c1001_i64:.*]] = arith.constant 1001 : i64
-  // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
-  // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[c224:.*]] = arith.constant 224 : index
-  // CHECK-DAG: %[[c112:.*]] = arith.constant 112 : index
-  // CHECK-DAG: %[[c56:.*]] = arith.constant 56 : index
-  // CHECK-DAG: %[[c28:.*]] = arith.constant 28 : index
-  // CHECK-DAG: %[[c14:.*]] = arith.constant 14 : index
-  // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
-  // CHECK-DAG: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
-  // CHECK-DAG: %[[c3:.*]] = arith.constant 3 : index
-  //
-
   %cst = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant dense<4.900000e+01> : tensor<f32>
   %cst_2 = arith.constant dense<6.000000e+00> : tensor<f32>
@@ -222,14 +182,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c112_i64]], %[[c32_i64]], %[[c3_i64]], %[[c6_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   // Layer 2 - Bottleneck block 1 - depthwise Conv2D, 3x3, stride 1, ReLU6
   %padded_18 = tensor.pad %32 low[0, 1, 1, 0] high[0, 1, 1, 0] {
@@ -249,22 +201,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   } -> tensor<1x112x112x32xf32>
   //
   // TODO: Update this check later when we support depthwise Conv2D.
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x114x114x32xf32>, memref<3x3x32xf32>) outs({{.*}} : memref<1x112x112x32xf32>) 
-  //
 
   // Layer 3 - Bottleneck block 1, second Conv2D, 1x1 filter, stride 1
   %58 = tensor.empty() : tensor<1x112x112x16xf32>
   %59 = linalg.fill ins(%cst : f32) outs(%58 : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
   %60 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%57, %bottleneck_block_1_project_weights : tensor<1x112x112x32xf32>, tensor<1x1x32x16xf32>) outs(%59 : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c112_i64]], %[[c16_i64]], %[[c32_i64]], %[[c32_i64]], %[[c16_i64]], %[[c16_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 4 - Bottleneck block 2, first Conv2D, 1x1 filter, stride 1, ReLU6
   %81 = tensor.empty() : tensor<1x112x112x96xf32>
@@ -277,14 +218,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c112_i64]], %[[c96_i64]], %[[c16_i64]], %[[c16_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_19 = tensor.pad %105 low[0, 0, 0, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -303,22 +236,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x96xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins({{.*}} : memref<1x113x113x96xf32>, memref<3x3x96xf32>) outs({{.*}} : memref<1x56x56x96xf32>)
-  //
 
   // Layer 6 - Bottleneck block 2, second Conv2D, 1x1 filter, stride 1
   %131 = tensor.empty() : tensor<1x56x56x24xf32>
   %132 = linalg.fill ins(%cst : f32) outs(%131 : tensor<1x56x56x24xf32>) -> tensor<1x56x56x24xf32>
   %133 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%130, %bottleneck_block_2_project_weights : tensor<1x56x56x96xf32>, tensor<1x1x96x24xf32>) outs(%132 : tensor<1x56x56x24xf32>) -> tensor<1x56x56x24xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c56_i64]], %[[c24_i64]], %[[c96_i64]], %[[c96_i64]], %[[c24_i64]], %[[c24_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 7 - Bottleneck block 3, first Conv2D, 1x1 filter, stride 1, ReLU6
   %154 = tensor.empty() : tensor<1x56x56x144xf32>
@@ -331,14 +253,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c56_i64]], %[[c144_i64]], %[[c24_i64]], %[[c24_i64]], %[[c144_i64]], %[[c144_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   %padded_21 = tensor.pad %178 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -357,22 +271,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x58x58x144xf32>, memref<3x3x144xf32>) outs({{.*}} : memref<1x56x56x144xf32>)
-  //
 
   // Layer 9 - Bottleneck block 3, second Conv2D, 1x1 filter, stride 1
   %204 = tensor.empty() : tensor<1x56x56x24xf32>
   %205 = linalg.fill ins(%cst : f32) outs(%204 : tensor<1x56x56x24xf32>) -> tensor<1x56x56x24xf32>
   %206 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%203, %bottleneck_block_3_project_weights : tensor<1x56x56x144xf32>, tensor<1x1x144x24xf32>) outs(%205 : tensor<1x56x56x24xf32>) -> tensor<1x56x56x24xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]],  %[[c56_i64]], %[[c24_i64]], %[[c144_i64]], %[[c144_i64]], %[[c24_i64]], %[[c24_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %227 = tensor.empty() : tensor<1x56x56x24xf32>
@@ -381,17 +284,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x56x56x24xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c24_i64]], %[[c24_i64]], %[[c24_i64]], %[[c24_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c56]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 10 - Bottleneck block 4, first Conv2D, 1x1 filter, stride 1, ReLU6
   %229 = tensor.empty() : tensor<1x56x56x144xf32>
@@ -404,14 +296,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c56_i64]], %[[c144_i64]], %[[c24_i64]], %[[c24_i64]], %[[c144_i64]], %[[c144_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_23 = tensor.pad %253 low[0, 0, 0, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -430,22 +314,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x144xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins({{.*}} : memref<1x57x57x144xf32>, memref<3x3x144xf32>) outs({{.*}} : memref<1x28x28x144xf32>)
-  //
 
   // Layer 12 - Bottleneck block 4, second Conv2D, 1x1 filter, stride 1
   %279 = tensor.empty() : tensor<1x28x28x32xf32>
   %280 = linalg.fill ins(%cst : f32) outs(%279 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
   %281 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%278, %bottleneck_block_4_project_weights : tensor<1x28x28x144xf32>, tensor<1x1x144x32xf32>) outs(%280 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c32_i64]], %[[c144_i64]], %[[c144_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 13 - Bottleneck block 5, first Conv2D, 1x1 filter, stride 1, ReLU%[[c0_i1]], 6
   %302 = tensor.empty() : tensor<1x28x28x192xf32>
@@ -458,14 +331,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_25 = tensor.pad %326 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -484,22 +349,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x30x30x192xf32>, memref<3x3x192xf32>) outs({{.*}} : memref<1x28x28x192xf32>)
-  //
 
   // Layer 15 - Bottleneck block 5, second Conv2D, 1x1 filter, stride 1
   %352 = tensor.empty() : tensor<1x28x28x32xf32>
   %353 = linalg.fill ins(%cst : f32) outs(%352 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
   %354 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%351, %bottleneck_block_5_project_weights : tensor<1x28x28x192xf32>, tensor<1x1x192x32xf32>) outs(%353 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %375 = tensor.empty() : tensor<1x28x28x32xf32>
@@ -508,17 +362,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x28x28x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c28]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 16 - Bottleneck block 6, first Conv2D, 1x1 filter, stride 1, ReLU6
   %377 = tensor.empty() : tensor<1x28x28x192xf32>
@@ -531,14 +374,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   %padded_27 = tensor.pad %401 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -557,22 +392,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x30x30x192xf32>, memref<3x3x192xf32>) outs({{.*}} : memref<1x28x28x192xf32>)
-  //
 
   // Layer 18 - Bottleneck block 6, second Conv2D, 1x1 filter, stride 1
   %427 = tensor.empty() : tensor<1x28x28x32xf32>
   %428 = linalg.fill ins(%cst : f32) outs(%427 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
   %429 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%426, %bottleneck_block_6_project_weights : tensor<1x28x28x192xf32>, tensor<1x1x192x32xf32>) outs(%428 : tensor<1x28x28x32xf32>) -> tensor<1x28x28x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %450 = tensor.empty() : tensor<1x28x28x32xf32>
@@ -581,17 +405,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x28x28x32xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c28]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 19 - Bottleneck block 7, first Conv2D, 1x1 filter, stride 1, ReLU6
   %452 = tensor.empty() : tensor<1x28x28x192xf32>
@@ -604,14 +417,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c28_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   %padded_29 = tensor.pad %476 low[0, 0, 0, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -630,22 +435,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x192xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins({{.*}} : memref<1x29x29x192xf32>, memref<3x3x192xf32>) outs({{.*}} : memref<1x14x14x192xf32>)
-  //
 
   // Layer 21 - Bottleneck block 7, second Conv2D, 1x1 filter, stride 1
   %502 = tensor.empty() : tensor<1x14x14x64xf32>
   %503 = linalg.fill ins(%cst : f32) outs(%502 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
   %504 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%501, %bottleneck_block_7_project_weights : tensor<1x14x14x192xf32>, tensor<1x1x192x64xf32>) outs(%503 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c64_i64]], %[[c192_i64]], %[[c192_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 22 - Bottleneck block 8, first Conv2D, 1x1 filter, stride 1, ReLU6
   %525 = tensor.empty() : tensor<1x14x14x384xf32>
@@ -658,14 +452,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_31 = tensor.pad %549 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -684,22 +470,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x384xf32>, memref<3x3x384xf32>) outs({{.*}} : memref<1x14x14x384xf32>)
-  //
 
   // Layer 24 - Bottleneck block 8, second Conv2D, 1x1 filter, stride 1
   %575 = tensor.empty() : tensor<1x14x14x64xf32>
   %576 = linalg.fill ins(%cst : f32) outs(%575 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
   %577 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%574, %bottleneck_block_8_project_weights : tensor<1x14x14x384xf32>, tensor<1x1x384x64xf32>) outs(%576 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %598 = tensor.empty() : tensor<1x14x14x64xf32>
@@ -708,17 +483,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c14]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 25 - Bottleneck block 9, first Conv2D, 1x1 filter, stride 1, ReLU6
   %600 = tensor.empty() : tensor<1x14x14x384xf32>
@@ -731,14 +495,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_33 = tensor.pad %624 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -757,22 +513,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x384xf32>, memref<3x3x384xf32>) outs({{.*}} : memref<1x14x14x384xf32>)
-  //
 
   // Layer 27 - Bottleneck block 9, second Conv2D, 1x1 filter, stride 1
   %650 = tensor.empty() : tensor<1x14x14x64xf32>
   %651 = linalg.fill ins(%cst : f32) outs(%650 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
   %652 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%649, %bottleneck_block_9_project_weights : tensor<1x14x14x384xf32>, tensor<1x1x384x64xf32>) outs(%651 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %673 = tensor.empty() : tensor<1x14x14x64xf32>
@@ -781,17 +526,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c14]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 28 - Bottleneck block 10, first Conv2D, 1x1 filter, stride 1, ReLU6
   %675 = tensor.empty() : tensor<1x14x14x384xf32>
@@ -804,14 +538,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_35 = tensor.pad %699 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -830,22 +556,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x384xf32>, memref<3x3x384xf32>) outs({{.*}} : memref<1x14x14x384xf32>)
-  //
 
   // Layer 30 - Bottleneck block 10, second Conv2D, 1x1 filter, stride 1
   %725 = tensor.empty() : tensor<1x14x14x64xf32>
   %726 = linalg.fill ins(%cst : f32) outs(%725 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
   %727 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%724, %bottleneck_block_10_project_weights : tensor<1x14x14x384xf32>, tensor<1x1x384x64xf32>) outs(%726 : tensor<1x14x14x64xf32>) -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %748 = tensor.empty() : tensor<1x14x14x64xf32>
@@ -854,17 +569,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x14x14x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c14]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 31 - Bottleneck block 11, first Conv2D, 1x1 filter, stride 1, ReLU6
   %750 = tensor.empty() : tensor<1x14x14x384xf32>
@@ -877,14 +581,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_37 = tensor.pad %774 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -903,22 +599,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x384xf32>, memref<3x3x384xf32>) outs({{.*}} : memref<1x14x14x384xf32>)
-  //
 
   // Layer 33 - Bottleneck block 11, second Conv2D, 1x1 filter, stride 1
   %800 = tensor.empty() : tensor<1x14x14x96xf32>
   %801 = linalg.fill ins(%cst : f32) outs(%800 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
   %802 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%799, %bottleneck_block_11_project_weights : tensor<1x14x14x384xf32>, tensor<1x1x384x96xf32>) outs(%801 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c96_i64]], %[[c384_i64]], %[[c384_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 34 - Bottleneck block 12, first Conv2D, 1x1 filter, stride 1, ReLU6
   %823 = tensor.empty() : tensor<1x14x14x576xf32>
@@ -931,14 +616,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_39 = tensor.pad %847 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -957,22 +634,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x576xf32>, memref<3x3x576xf32>) outs({{.*}} : memref<1x14x14x576xf32>)
-  // 
 
   // Layer 36 - Bottleneck block 12, second Conv2D, 1x1 filter, stride 1
   %873 = tensor.empty() : tensor<1x14x14x96xf32>
   %874 = linalg.fill ins(%cst : f32) outs(%873 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
   %875 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%872, %bottleneck_block_12_project_weights : tensor<1x14x14x576xf32>, tensor<1x1x576x96xf32>) outs(%874 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %896 = tensor.empty() : tensor<1x14x14x96xf32>
@@ -981,17 +647,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x14x14x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c14]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 37 - Bottleneck block 13, first Conv2D, 1x1 filter, stride 1, ReLU6
   %898 = tensor.empty() : tensor<1x14x14x576xf32>
@@ -1004,14 +659,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_41 = tensor.pad %922 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -1030,22 +677,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x16x16x576xf32>, memref<3x3x576xf32>) outs({{.*}} : memref<1x14x14x576xf32>)
-  //
 
   // Layer 39 - Bottleneck block 13, second Conv2D, 1x1 filter, stride 1
   %948 = tensor.empty() : tensor<1x14x14x96xf32>
   %949 = linalg.fill ins(%cst : f32) outs(%948 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
   %950 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%947, %bottleneck_block_13_project_weights : tensor<1x14x14x576xf32>, tensor<1x1x576x96xf32>) outs(%949 : tensor<1x14x14x96xf32>) -> tensor<1x14x14x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %971 = tensor.empty() : tensor<1x14x14x96xf32>
@@ -1054,17 +690,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x14x14x96xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c14]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 40 - Bottleneck block 14, first Conv2D, 1x1 filter, stride 1, ReLU6
   %973 = tensor.empty() : tensor<1x14x14x576xf32>
@@ -1077,14 +702,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c14_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_43 = tensor.pad %997 low[0, 0, 0, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -1103,22 +720,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x576xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins({{.*}} : memref<1x15x15x576xf32>, memref<3x3x576xf32>) outs({{.*}} : memref<1x7x7x576xf32>)
-  //
 
   // Layer 42 - Bottleneck block 14, second Conv2D, 1x1 filter, stride 1
   %1023 = tensor.empty() : tensor<1x7x7x160xf32>
   %1024 = linalg.fill ins(%cst : f32) outs(%1023 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
   %1025 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1022, %bottleneck_block_14_project_weights : tensor<1x7x7x576xf32>, tensor<1x1x576x160xf32>) outs(%1024 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c160_i64]], %[[c576_i64]], %[[c576_i64]], %[[c160_i64]], %[[c160_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 43 - Bottleneck block 15, first Conv2D, 1x1 filter, stride 1, ReLU6
   %1046 = tensor.empty() : tensor<1x7x7x960xf32>
@@ -1131,14 +737,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_45 = tensor.pad %1070 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -1157,22 +755,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x9x9x960xf32>, memref<3x3x960xf32>) outs({{.*}} : memref<1x7x7x960xf32>)
-  // 
 
   // Layer 45 - Bottleneck block 15, second Conv2D, 1x1 filter, stride 1
   %1096 = tensor.empty() : tensor<1x7x7x160xf32>
   %1097 = linalg.fill ins(%cst : f32) outs(%1096 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
   %1098 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1095, %bottleneck_block_15_project_weights : tensor<1x7x7x960xf32>, tensor<1x1x960x160xf32>) outs(%1097 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %1119 = tensor.empty() : tensor<1x7x7x160xf32>
@@ -1181,17 +768,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x7x7x160xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c7]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 46 - Bottleneck block 16, first Conv2D, 1x1 filter, stride 1, ReLU6
   %1121 = tensor.empty() : tensor<1x7x7x960xf32>
@@ -1204,14 +780,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_47 = tensor.pad %1145 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -1230,22 +798,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x9x9x960xf32>, memref<3x3x960xf32>) outs({{.*}} : memref<1x7x7x960xf32>)
-  //
 
   // Layer 48 - Bottleneck block 16, second Conv2D, 1x1 filter, stride 1
   %1171 = tensor.empty() : tensor<1x7x7x160xf32>
   %1172 = linalg.fill ins(%cst : f32) outs(%1171 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
   %1173 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1170, %bottleneck_block_16_project_weights : tensor<1x7x7x960xf32>, tensor<1x1x960x160xf32>) outs(%1172 : tensor<1x7x7x160xf32>) -> tensor<1x7x7x160xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // skip connection
   %1194 = tensor.empty() : tensor<1x7x7x160xf32>
@@ -1254,17 +811,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x7x7x160xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.parallel (%[[arg2:.*]]) = (%[[c0]]) to (%[[c7]]) step (%[[c1]]) {
-  // CHECK:   %[[subview:.*]] = memref.subview
-  // CHECK:   %[[subview1:.*]] = memref.subview
-  // CHECK:   %[[subview2:.*]] = memref.subview
-  // CHECK:   %[[cast:.*]] = memref.cast %[[subview]]
-  // CHECK:   %[[cast1:.*]] = memref.cast %[[subview1]]
-  // CHECK:   %[[cast2:.*]] = memref.cast %[[subview2]]
-  // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 49 - Bottleneck block 17, first Conv2D, 1x1 filter, stride 1, ReLU6
   %1196 = tensor.empty() : tensor<1x7x7x960xf32>
@@ -1277,14 +823,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %padded_49 = tensor.pad %1220 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -1303,22 +841,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
-  //
-  // CHECK: linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins({{.*}} : memref<1x9x9x960xf32>, memref<3x3x960xf32>) outs({{.*}} : memref<1x7x7x960xf32>)
-  //
 
   // Layer 51 - Bottleneck block 17, second Conv2D, 1x1 filter, stride 1
   %1246 = tensor.empty() : tensor<1x7x7x320xf32>
   %1247 = linalg.fill ins(%cst : f32) outs(%1246 : tensor<1x7x7x320xf32>) -> tensor<1x7x7x320xf32>
   %1248 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1245, %bottleneck_block_17_project_weights : tensor<1x7x7x960xf32>, tensor<1x1x960x320xf32>) outs(%1247 : tensor<1x7x7x320xf32>) -> tensor<1x7x7x320xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c320_i64]], %[[c960_i64]], %[[c960_i64]], %[[c320_i64]], %[[c320_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 52 - Conv2D, 1x1 filter, stride 1, ReLU6
   %1269 = tensor.empty() : tensor<1x7x7x1280xf32>
@@ -1331,14 +858,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x1280xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c7_i64]], %[[c1280_i64]], %[[c320_i64]], %[[c320_i64]], %[[c1280_i64]], %[[c1280_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 53 - Average pooling
   %1294 = tensor.empty() : tensor<7x7xf32>
@@ -1356,22 +875,11 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.divf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x1x1x1280xf32>
-  //
-  // linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%alloc_134, %alloc_135 : memref<1x7x7x1280xf32>, memref<7x7xf32>) outs(%alloc_136 : memref<1x1x1x1280xf32>)
-  // CHECK: linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-  //
   
   // Layer 54 - Conv2D, 1x1 filter, stride 1
   %1302 = tensor.empty() : tensor<1x1x1x1001xf32>
   %1303 = linalg.fill ins(%cst : f32) outs(%1302 : tensor<1x1x1x1001xf32>) -> tensor<1x1x1x1001xf32>
   %1304 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1301, %layer_54_logits_conv_weights : tensor<1x1x1x1280xf32>, tensor<1x1x1280x1001xf32>) outs(%1303 : tensor<1x1x1x1001xf32>) -> tensor<1x1x1x1001xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[c0_i1]], %[[c1_i64]], %[[c1001_i64]], %[[c1280_i64]], %[[c1280_i64]], %[[c1001_i64]], %[[c1001_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: %[[cast:.*]] = memref.cast
-  // CHECK: %[[cast1:.*]] = memref.cast
-  // CHECK: %[[cast2:.*]] = memref.cast
-  // CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   %expanded = tensor.expand_shape %layer_54_logits_conv_biases [[0, 1, 2, 3]] : tensor<1001xf32> into tensor<1x1x1x1001xf32>
   %1305 = tensor.empty() : tensor<1x1x1x1001xf32>
@@ -1380,11 +888,185 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.addf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x1x1x1001xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c0_i64]]) : ({{.+}}) -> i64
-  // CHECK: call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %{{.+}}, %{{.+}}, %{{.+}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %collapsed_51 = tensor.collapse_shape %1306 [[0], [1, 2, 3]] : tensor<1x1x1x1001xf32> into tensor<1x1001xf32>
   return %collapsed_51 : tensor<1x1001xf32>
 }
+
+// CHECK-DAG: func.func private @xsmm_binary_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>)
+// CHECK-DAG: func.func private @xsmm_binary_dispatch(i64, i64, i64, i64, i64, i64, i64, i64) -> i64 
+// CHECK-DAG: func.func private @xsmm_matmul_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>)
+// CHECK-DAG: func.func private @xsmm_matmul_dispatch(i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+//
+// CHECK-LABEL: @mobilenet(
+// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1001xf32> {
+//
+// Constant definitions
+// CHECK-DAG: %[[c1_i64:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[false:.+]] = arith.constant false
+// CHECK-DAG: %[[c112_i64:.+]] = arith.constant 112 : i64
+// CHECK-DAG: %[[c32_i64:.+]] = arith.constant 32 : i64
+// CHECK-DAG: %[[c3_i64:.+]] = arith.constant 3 : i64
+// CHECK-DAG: %[[c6_i64:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[c16_i64:.+]] = arith.constant 16 : i64
+// CHECK-DAG: %[[c96_i64:.+]] = arith.constant 96 : i64
+// CHECK-DAG: %[[c56_i64:.+]] = arith.constant 56 : i64
+// CHECK-DAG: %[[c24_i64:.+]] = arith.constant 24 : i64
+// CHECK-DAG: %[[c144_i64:.+]] = arith.constant 144 : i64
+// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[c28_i64:.+]] = arith.constant 28 : i64
+// CHECK-DAG: %[[c192_i64:.+]] = arith.constant 192 : i64
+// CHECK-DAG: %[[c14_i64:.+]] = arith.constant 14 : i64
+// CHECK-DAG: %[[c64_i64:.+]] = arith.constant 64 : i64
+// CHECK-DAG: %[[c384_i64:.+]] = arith.constant 384 : i64
+// CHECK-DAG: %[[c576_i64:.+]] = arith.constant 576 : i64
+// CHECK-DAG: %[[c7_i64:.+]] = arith.constant 7 : i64
+// CHECK-DAG: %[[c160_i64:.+]] = arith.constant 160 : i64
+// CHECK-DAG: %[[c960_i64:.+]] = arith.constant 960 : i64
+// CHECK-DAG: %[[c320_i64:.+]] = arith.constant 320 : i64
+// CHECK-DAG: %[[c1280_i64:.+]] = arith.constant 1280 : i64
+// CHECK-DAG: %[[c1001_i64:.+]] = arith.constant 1001 : i64
+// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[c224:.+]] = arith.constant 224 : index
+// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[c112:.+]] = arith.constant 112 : index
+// CHECK-DAG: %[[c56:.+]] = arith.constant 56 : index
+// CHECK-DAG: %[[c28:.+]] = arith.constant 28 : index
+// CHECK-DAG: %[[c14:.+]] = arith.constant 14 : index
+// CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
+// CHECK-DAG: %[[cst:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[c3:.+]] = arith.constant 3 : index
+//
+// Check all XSMM calls
+// CHECK: %[[xsmmDis34:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c32_i64]], %[[c3_i64]], %[[c6_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c112]] step %[[c1]] {
+// CHECK:         func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis34]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis35:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c16_i64]], %[[c32_i64]], %[[c32_i64]], %[[c16_i64]], %[[c16_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c112]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis35]]
+// CHECK: %[[xsmmDis36:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c96_i64]], %[[c16_i64]], %[[c16_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c112]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis36]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis37:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c24_i64]], %[[c96_i64]], %[[c96_i64]], %[[c24_i64]], %[[c24_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis37]]
+// CHECK: %[[xsmmDis38:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c144_i64]], %[[c24_i64]], %[[c24_i64]], %[[c144_i64]], %[[c144_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis38]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis39:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c24_i64]], %[[c144_i64]], %[[c144_i64]], %[[c24_i64]], %[[c24_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis39]]
+// CHECK: %[[xsmmDis40:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c24_i64]], %[[c24_i64]], %[[c24_i64]], %[[c24_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis40]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis38]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis41:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c32_i64]], %[[c144_i64]], %[[c144_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis41]]
+// CHECK: %[[xsmmDis42:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis42]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis43:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c32_i64]], %[[c192_i64]], %[[c192_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis43]]
+// CHECK: %[[xsmmDis44:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis44]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis42]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis43]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis44]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis42]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis45:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c64_i64]], %[[c192_i64]], %[[c192_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis45]]
+// CHECK: %[[xsmmDis46:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis46]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis47:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c64_i64]], %[[c384_i64]], %[[c384_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis47]]
+// CHECK: %[[xsmmDis48:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis48]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis46]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis47]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis48]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis46]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis47]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis48]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis46]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis49:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c96_i64]], %[[c384_i64]], %[[c384_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis49]]
+// CHECK: %[[xsmmDis50:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis50]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis51:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c96_i64]], %[[c576_i64]], %[[c576_i64]], %[[c96_i64]], %[[c96_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis51]]
+// CHECK: %[[xsmmDis52:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c96_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis52]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis50]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis51]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis52]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis50]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis53:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c160_i64]], %[[c576_i64]], %[[c576_i64]], %[[c160_i64]], %[[c160_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis53]]
+// CHECK: %[[xsmmDis54:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis54]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis55:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c160_i64]], %[[c960_i64]], %[[c960_i64]], %[[c160_i64]], %[[c160_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis55]]
+// CHECK: %[[xsmmDis56:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c160_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis56]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis54]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis55]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis56]]
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis54]]
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: %[[xsmmDis57:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c320_i64]], %[[c960_i64]], %[[c960_i64]], %[[c320_i64]], %[[c320_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis57]]
+// CHECK: %[[xsmmDis58:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c1280_i64]], %[[c320_i64]], %[[c320_i64]], %[[c1280_i64]], %[[c1280_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:     func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis58]]
+// CHECK: linalg.pooling_nhwc_sum
+// CHECK: %[[xsmmDis59:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1001_i64]], %[[c1280_i64]], %[[c1280_i64]], %[[c1001_i64]], %[[c1001_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis59]]
+// CHECK: %[[xsmmDis60:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1001_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis60]]
+//
+// No more XSMM dispatches or invokes should be present
+// CHECK-NOT: call @xsmm_
+//
+// CHECK: return

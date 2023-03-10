@@ -146,6 +146,9 @@ private:
     // of loops, if possible. This approach assumes that the function calls do
     // not have any side effects and can be safely moved outside of loop body.
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+    // Run cleanup after LICM to allow CSE to eliminate common operations now
+    // that they are hoisted out of loops.
+    pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     pm.addPass(createConvertXsmmToFuncPass());
     pm.addPass(createConvertPerfToFuncPass());
