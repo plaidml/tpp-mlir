@@ -18,6 +18,42 @@ def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [2]>]>;
 def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
 
 //===----------------------------------------------------------------------===//
+// QuarternaryOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary", []> {
+  let summary = "quarternary operation.";
+  let description = [{
+    Quarternary operation. The operation kind carries information about the name of
+    the LIBXSMM function to invoke. Additionally, the operation takes six
+    operands. The first is an I64 type representing the datatype. The second must be
+    an I64 type and must result from a dispatch operation (it represents the
+    function pointer to use during invocation). The other operands are of Float
+    types and represent the operands to use for computation.
+    For example, a fused brgemm has the following signature: dataType, I64, memref<MxNxf32>,
+    memref<BxMxKxf32>, memref<BxKxNxf32>, memref<Nxf32>.
+  }];
+
+  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_QuarternaryKind:$callee, Variadic<XsmmMemRef>:$inputs);
+
+  let assemblyFormat = [{
+    $callee `(` `dataType` $dataType `,` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
+
+//===----------------------------------------------------------------------===//
 // TernaryOp
 //===----------------------------------------------------------------------===//
 
@@ -51,6 +87,7 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
 
   let hasVerifier = 1;
 }
+
 
 //===----------------------------------------------------------------------===//
 // BinaryOp
@@ -101,6 +138,30 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// QuarternaryDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch",[Pure]> {
+  let summary = "dispatch quarternary operation.";
+  let description = [{
+    The 'kind' carries information about the name of the LIBXSMM function to
+    dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
+    dataType is passed to set the datatype in libxsmm call.
+    Additional I64 operands are passed based on the operation to
+    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
+    the pointer to call as I64.
+  }];
+
+  let arguments = (ins Xsmm_QuarternaryKind:$kind, DenseI64ArrayAttr:$inputs,
+                       Xsmm_DataType:$dataType, BoolAttr:$isVNNI);
+  let results = (outs I64:$results);
+
+  let assemblyFormat = [{
+    $kind $inputs `(` `dataType` $dataType `,` `isVNNI` $isVNNI `)` attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//

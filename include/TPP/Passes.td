@@ -109,6 +109,16 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
   let dependentDialects = ["func::FuncDialect"];
 }
 
+def CombineTppOps : Pass<"combine-tpp", "func::FuncOp"> {
+  let summary = "Combine tpps into bigger tpp";
+  let constructor = "mlir::tpp::createCombineTppPass()";
+  let description = [{
+    Convert tpp bias + brgemm + relu op to a larger op.
+  }];
+  let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
+}
+
+
 def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
