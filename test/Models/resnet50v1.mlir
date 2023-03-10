@@ -1742,11 +1742,9 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1000xf32> {
 //
 // Constant definitions
-// CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // CHECK-DAG: %[[false:.*]] = arith.constant false
 // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
 // CHECK-DAG: %[[c3_i64:.*]] = arith.constant 3 : i64
-// CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
 // CHECK-DAG: %[[c6_i64:.*]] = arith.constant 6 : i64
 // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
 // CHECK-DAG: %[[c14_i64:.*]] = arith.constant 14 : i64
@@ -1762,7 +1760,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
 // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
 // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
-// CHECK-DAG: %[[c3:.*]] = arith.constant 3 : index
 // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
 // CHECK-DAG: %[[c14:.*]] = arith.constant 14 : index
 // CHECK-DAG: %[[c28:.*]] = arith.constant 28 : index

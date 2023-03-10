@@ -278,16 +278,6 @@ func.func @multi_head_attention(
 // CHECK-DAG: %[[false:.+]] = arith.constant false
 // CHECK-DAG: %[[c256_i64:.+]] = arith.constant 256 : i64
 // CHECK-DAG: %[[c128_i64:.+]] = arith.constant 128 : i64
-// CHECK-DAG: %[[c2_i64:.+]] = arith.constant 2 : i64
-// CHECK-DAG: %[[c64_i64:.+]] = arith.constant 64 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[c8_i64:.+]] = arith.constant 8 : i64
-// CHECK-DAG: %[[c4_i64:.+]] = arith.constant 4 : i64
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[c8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[c2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[cst:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[cst_0:.+]] = arith.constant -0.000000e+00 : f32
 // CHECK-DAG: %[[cst_1:.+]] = arith.constant 0xFF800000 : f32

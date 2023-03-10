@@ -909,7 +909,6 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
 // CHECK-DAG: %[[c56_i64:.+]] = arith.constant 56 : i64
 // CHECK-DAG: %[[c24_i64:.+]] = arith.constant 24 : i64
 // CHECK-DAG: %[[c144_i64:.+]] = arith.constant 144 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
 // CHECK-DAG: %[[c28_i64:.+]] = arith.constant 28 : i64
 // CHECK-DAG: %[[c192_i64:.+]] = arith.constant 192 : i64
 // CHECK-DAG: %[[c14_i64:.+]] = arith.constant 14 : i64
@@ -923,15 +922,12 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
 // CHECK-DAG: %[[c1280_i64:.+]] = arith.constant 1280 : i64
 // CHECK-DAG: %[[c1001_i64:.+]] = arith.constant 1001 : i64
 // CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c224:.+]] = arith.constant 224 : index
 // CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[c112:.+]] = arith.constant 112 : index
 // CHECK-DAG: %[[c56:.+]] = arith.constant 56 : index
 // CHECK-DAG: %[[c28:.+]] = arith.constant 28 : index
 // CHECK-DAG: %[[c14:.+]] = arith.constant 14 : index
 // CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[cst:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-DAG: %[[c3:.+]] = arith.constant 3 : index
 //
 // Check all matmul calls
 // CHECK: %[[matDis34:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c32_i64]], %[[c3_i64]], %[[c6_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
