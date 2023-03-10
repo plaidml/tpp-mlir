@@ -278,21 +278,46 @@ func.func @multi_head_attention(
 // CHECK-DAG: %[[false:.+]] = arith.constant false
 // CHECK-DAG: %[[c256_i64:.+]] = arith.constant 256 : i64
 // CHECK-DAG: %[[c128_i64:.+]] = arith.constant 128 : i64
+// CHECK-DAG: %[[c2_i64:.+]] = arith.constant 2 : i64
+// CHECK-DAG: %[[c64_i64:.+]] = arith.constant 64 : i64
+// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[c8_i64:.+]] = arith.constant 8 : i64
+// CHECK-DAG: %[[c4_i64:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[cst:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[cst_0:.+]] = arith.constant -0.000000e+00 : f32
 // CHECK-DAG: %[[cst_1:.+]] = arith.constant 0xFF800000 : f32
 //
-// Check all matmul calls
-// CHECK: %[[matDis10:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis10]],{{.*}})
-// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis10]],{{.*}})
+// Check all XSMM calls
+// CHECK: %[[xsmmDis10:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c256_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis10]]
+// CHECK: %[[xsmmDis11:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis11]]
+// CHECK: %[[xsmmDis12:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c2_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis12]]
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis10]]
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis11]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis12]]
 // CHECK: linalg.batch_matmul
-// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis10]],{{.*}})
+// CHECK: %[[xsmmDis13:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis13]]
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis13]]
+// CHECK: %[[xsmmDis14:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis14]]
+// CHECK: %[[xsmmDis15:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c8_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis15]]
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis15]]
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis10]]
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis11]]
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis12]]
 // CHECK: linalg.batch_matmul
-// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis10]],{{.*}})
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis10]]
+// CHECK: %[[xsmmDis16:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis16]]
+// CHECK: %[[xsmmDis17:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c8_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK:     func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis17]]
 //
-// No more matmul dispatches or invokes should be present
-// CHECK-NOT: call @xsmm_matmul_
+// No more XSMM dispatches or invokes should be present
+// CHECK-NOT: call @xsmm_
 //
 // CHECK: return
 
