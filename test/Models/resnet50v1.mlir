@@ -95,10 +95,6 @@
 #map4 = affine_map<(d0, d1) -> (d0, d1)>
 #map5 = affine_map<(d0, d1) -> (d0)>
 
-//
-// CHECK-LABEL: @resnet50v1(
-// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1000xf32> {
-//
 func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %cst = arith.constant 0xFF800000 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -118,35 +114,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %cst_14 = arith.constant dense<0.000000e+00> : tensor<1x56x56x256xf32>
   %cst_15 = arith.constant dense<0.000000e+00> : tensor<1x56x56x64xf32>
   %cst_16 = arith.constant dense<0.000000e+00> : tensor<1x112x112x64xf32>
-
-  // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
-  // CHECK-DAG: %[[false:.*]] = arith.constant false
-  // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
-  // CHECK-DAG: %[[c3_i64:.*]] = arith.constant 3 : i64
-  // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
-  // CHECK-DAG: %[[c6_i64:.*]] = arith.constant 6 : i64
-  // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
-  // CHECK-DAG: %[[c14_i64:.*]] = arith.constant 14 : i64
-  // CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
-  // CHECK-DAG: %[[c56_i64:.*]] = arith.constant 56 : i64
-  // CHECK-DAG: %[[c64_i64:.*]] = arith.constant 64 : i64
-  // CHECK-DAG: %[[c112_i64:.*]] = arith.constant 112 : i64
-  // CHECK-DAG: %[[c128_i64:.*]] = arith.constant 128 : i64
-  // CHECK-DAG: %[[c256_i64:.*]] = arith.constant 256 : i64
-  // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
-  // CHECK-DAG: %[[c1000_i64:.*]] = arith.constant 1000 : i64
-  // CHECK-DAG: %[[c1024_i64:.*]] = arith.constant 1024 : i64
-  // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
-  // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
-  // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[c3:.*]] = arith.constant 3 : index
-  // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
-  // CHECK-DAG: %[[c14:.*]] = arith.constant 14 : index
-  // CHECK-DAG: %[[c28:.*]] = arith.constant 28 : index
-  // CHECK-DAG: %[[c56:.*]] = arith.constant 56 : index
-  // CHECK-DAG: %[[c112:.*]] = arith.constant 112 : index
-  // CHECK-DAG: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
-  // CHECK-DAG: %[[cst_0:.*]] = arith.constant 0xFF800000 : f32
   
   %layer-2.kernel = arith.constant dense<1.000000e+00> : tensor<7x7x3x64xf32>
   %layer-2.bias = arith.constant dense<5.000000e-01> : tensor<64xf32>
@@ -277,14 +244,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x112x112x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c64_i64]], %[[c3_i64]], %[[c6_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c112]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
   
   // ReLU
   %27 = tensor.empty() : tensor<1x112x112x64xf32>
@@ -304,9 +263,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %30 = tensor.empty() : tensor<1x56x56x64xf32>
   %31 = linalg.fill ins(%cst : f32) outs(%30 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   %32 = linalg.pooling_nhwc_max {dilations = dense<1> : vector<2xi64>, strides =  dense<2> : vector<2xi64>} ins(%padded_17, %29 : tensor<1x114x114x64xf32>, tensor<3x3xf32>) outs(%31 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: linalg.pooling_nhwc_max {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
-  //
   
   // Layer 3 - Conv block 1 - Conv2D, 1x1 filter, stride 1, BiasAdd
   %33 = tensor.empty() : tensor<1x56x56x256xf32>
@@ -323,14 +279,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 4 - Conv block 1 - Conv2D, 1x1 filter, stride 1, BiasAdd, ReLU
   %60 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -347,14 +295,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %87 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -384,14 +324,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %116 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -416,14 +348,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Conv block 1 - Add
   %145 = tensor.empty() : tensor<1x56x56x256xf32>
@@ -456,14 +380,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %176 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -493,14 +409,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %205 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -525,14 +433,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 1 - Add
   %234 = tensor.empty() : tensor<1x56x56x256xf32>
@@ -565,14 +465,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]],  %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]] 
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %265 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -602,14 +494,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x64xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %294 = tensor.empty() : tensor<1x56x56x64xf32>
@@ -634,14 +518,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x56x56x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c56]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 2 - Add
   %323 = tensor.empty() : tensor<1x56x56x256xf32>
@@ -674,14 +550,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c256_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 14 - Conv block 2 - Conv2D, 1x1 filter, stride 2, BiasAdd, ReLU.
   %354 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -698,14 +566,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c256_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %381 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -734,14 +594,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %410 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -766,14 +618,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Conv block 2 - Add
   %439 = tensor.empty() : tensor<1x28x28x512xf32>
@@ -806,14 +650,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %470 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -842,14 +678,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %499 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -874,14 +702,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %530 = tensor.empty() : tensor<1x28x28x512xf32>
@@ -906,14 +726,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %559 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -942,14 +754,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %588 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -974,14 +778,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]],  %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 4 - Add
   %617 = tensor.empty() : tensor<1x28x28x512xf32>
@@ -1014,14 +810,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %648 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -1050,14 +838,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x128xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %677 = tensor.empty() : tensor<1x28x28x128xf32>
@@ -1082,14 +862,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x28x28x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c28]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 5 - Add
   %706 = tensor.empty() : tensor<1x28x28x512xf32>
@@ -1122,14 +894,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 27 - Conv block 3 - Conv2D, 1x1 filter, stride 2, BiasAdd, ReLU
   %737 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1146,14 +910,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %764 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1182,14 +938,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %793 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1214,14 +962,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Conv block 3 - Add
   %822 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1254,14 +994,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %853 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1290,14 +1022,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %882 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1322,14 +1046,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 6 - Add
   %911 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1362,14 +1078,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %942 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1398,14 +1106,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %971 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1430,14 +1130,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 7 - Add
   %1000 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1470,14 +1162,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1031 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1506,14 +1190,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1060 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1538,14 +1214,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 8 - Add
   %1089 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1578,14 +1246,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1120 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1614,14 +1274,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1149 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1646,14 +1298,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 9 - Add
   %1178 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1686,14 +1330,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1209 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1722,14 +1358,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x256xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1238 = tensor.empty() : tensor<1x14x14x256xf32>
@@ -1754,14 +1382,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x14x14x1024xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c14]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 10 - Add
   %1267 = tensor.empty() : tensor<1x14x14x1024xf32>
@@ -1794,14 +1414,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Layer 46 - Conv block 4 - Conv2D, 1x1 filter, stride 2, BiasAdd, ReLU.
   %1298 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -1818,14 +1430,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1325 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -1854,14 +1458,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1354 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -1886,14 +1482,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Conv block 4 - Add
   %1383 = tensor.empty() : tensor<1x7x7x2048xf32>
@@ -1926,14 +1514,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1414 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -1962,14 +1542,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1443 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -1994,14 +1566,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 11 - Add
   %1472 = tensor.empty() : tensor<1x7x7x2048xf32>
@@ -2034,14 +1598,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1503 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -2070,14 +1626,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x512xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // ReLU
   %1532 = tensor.empty() : tensor<1x7x7x512xf32>
@@ -2102,14 +1650,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x7x7x2048xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: scf.for %[[arg2:.*]] = %[[c0]] to %[[c7]] step %[[c1]]
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   // Identity block 12 - Add
   %1561 = tensor.empty() : tensor<1x7x7x2048xf32>
@@ -2145,13 +1685,6 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %1570 = tensor.empty() : tensor<1x1000xf32>
   %1571 = linalg.fill ins(%cst_0 : f32) outs(%1570 : tensor<1x1000xf32>) -> tensor<1x1000xf32>
   %1572 = linalg.matmul ins(%1569, %layer-176.kernel : tensor<1x2048xf32>, tensor<2048x1000xf32>) outs(%1571 : tensor<1x1000xf32>) -> tensor<1x1000xf32>
-  //
-  // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-  // CHECK: %[[cast:.*]] = memref.cast
-  // CHECK: %[[cast1:.*]] = memref.cast
-  // CHECK: %[[cast2:.*]] = memref.cast
-  // CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
-  //
 
   %expanded = tensor.expand_shape %layer-176.bias [[0, 1]] : tensor<1000xf32> into tensor<1x1000xf32>
   %1573 = tensor.empty() : tensor<1x1000xf32>
@@ -2205,4 +1738,170 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   return %1590 : tensor<1x1000xf32>
 }
 
-
+// CHECK-LABEL: @resnet50v1(
+// CHECK-SAME: %[[arg:.*]]: memref<1x224x224x3xf32>) -> memref<1x1000xf32> {
+//
+// Constant definitions
+// CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+// CHECK-DAG: %[[false:.*]] = arith.constant false
+// CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+// CHECK-DAG: %[[c3_i64:.*]] = arith.constant 3 : i64
+// CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+// CHECK-DAG: %[[c6_i64:.*]] = arith.constant 6 : i64
+// CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
+// CHECK-DAG: %[[c14_i64:.*]] = arith.constant 14 : i64
+// CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
+// CHECK-DAG: %[[c56_i64:.*]] = arith.constant 56 : i64
+// CHECK-DAG: %[[c64_i64:.*]] = arith.constant 64 : i64
+// CHECK-DAG: %[[c112_i64:.*]] = arith.constant 112 : i64
+// CHECK-DAG: %[[c128_i64:.*]] = arith.constant 128 : i64
+// CHECK-DAG: %[[c256_i64:.*]] = arith.constant 256 : i64
+// CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
+// CHECK-DAG: %[[c1000_i64:.*]] = arith.constant 1000 : i64
+// CHECK-DAG: %[[c1024_i64:.*]] = arith.constant 1024 : i64
+// CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
+// CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[c3:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
+// CHECK-DAG: %[[c14:.*]] = arith.constant 14 : index
+// CHECK-DAG: %[[c28:.*]] = arith.constant 28 : index
+// CHECK-DAG: %[[c56:.*]] = arith.constant 56 : index
+// CHECK-DAG: %[[c112:.*]] = arith.constant 112 : index
+// CHECK-DAG: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[cst_0:.*]] = arith.constant 0xFF800000 : f32
+//
+// Check all matmul calls
+// CHECK: %[[matDis109:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c64_i64]], %[[c3_i64]], %[[c6_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c112]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis109]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: linalg.pooling_nhwc_max
+// CHECK: %[[matDis113:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis116:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis121:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis122:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c256_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis122]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis125:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c256_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis125]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis129:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis130:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis132:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis133:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis133]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis136:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis136]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis140:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis141:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis143:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis144:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis144]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis147:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis147]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis151:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis152:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis154:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: %[[matDis155:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis155]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+//
+// No more matmul dispatches or invokes should be present
+// CHECK-NOT: call @xsmm_matmul_
+//
+// CHECK: return
