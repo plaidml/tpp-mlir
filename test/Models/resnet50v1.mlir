@@ -1771,132 +1771,132 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // Check all matmul calls
 // CHECK: %[[matDis109:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c112_i64]], %[[c64_i64]], %[[c3_i64]], %[[c6_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c112]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis109]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis109]]
 // CHECK: linalg.pooling_nhwc_max
 // CHECK: %[[matDis113:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]]
 // CHECK: %[[matDis116:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]]
 // CHECK: %[[matDis121:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c64_i64]], %[[c256_i64]], %[[c256_i64]], %[[c64_i64]], %[[c64_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis121]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis116]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c56]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis113]]
 // CHECK: %[[matDis122:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c256_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis122]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis122]]
 // CHECK: %[[matDis125:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c256_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis125]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis125]]
 // CHECK: %[[matDis129:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]]
 // CHECK: %[[matDis130:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]]
 // CHECK: %[[matDis132:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c128_i64]], %[[c512_i64]], %[[c512_i64]], %[[c128_i64]], %[[c128_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis132]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis129]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c28]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis130]]
 // CHECK: %[[matDis133:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis133]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis133]]
 // CHECK: %[[matDis136:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis136]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis136]]
 // CHECK: %[[matDis140:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: %[[matDis141:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: %[[matDis143:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c256_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c256_i64]], %[[c256_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis143]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis140]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c14]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis141]]
 // CHECK: %[[matDis144:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis144]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis144]]
 // CHECK: %[[matDis147:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c1024_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis147]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis147]]
 // CHECK: %[[matDis151:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]]
 // CHECK: %[[matDis152:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]]
 // CHECK: %[[matDis154:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis154]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis151]]
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis152]]
 // CHECK: %[[matDis155:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis155]],{{.*}}) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+// CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[matDis155]]
 //
 // No more matmul dispatches or invokes should be present
 // CHECK-NOT: call @xsmm_matmul_
