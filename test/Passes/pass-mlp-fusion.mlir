@@ -8,20 +8,29 @@
   
 func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
-  // CHECK: tpp.identity ins(%{{.*}} : memref<32xf32, strided<[1], offset: ?>>) outs(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+  // CHECK: tpp.identity ins(%{{.*}} : memref<32xf32, strided<[1], offset: ?>>) 
+  // CHECK-SAME:  out(%{{.*}} : memref<32x32xf32>)
+>>>>>>> a9c7cdd9 (Enable better bufferization for tile and fuse)
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
   } -> tensor<128x512xf32>
-  // CHECK-NEXT: tpp.matmul ins(%{{.*}} : memref<32x256xf32, strided<[256, 1], offset: ?>>, %{{.*}} : memref<256x32xf32, strided<[512, 1], offset: ?>>) outs(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+  // CHECK: tpp.matmul ins(%{{.*}} : memref<32x256xf32, strided<[256, 1], offset: ?>>, %{{.*}} : memref<256x32xf32, strided<[512, 1], offset: ?>>) 
+  // CHECK-SAME: out(%{{.*}} : memref<32x32xf32>)
+>>>>>>> a9c7cdd9 (Enable better bufferization for tile and fuse)
   %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
       %16 = arith.mulf %arg9, %arg10 : f32
       %17 = arith.addf %arg11, %16 : f32
       linalg.yield %17 : f32
   } -> tensor<128x512xf32>
-  // CHECK: tpp.relu ins(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>) outs(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>)
+  // CHECK: tpp.relu ins(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>) 
+  // CHECK-SAME:     outs(%{{.*}} : memref<32x32xf32, strided<[512, 1], offset: ?>>)
   %c0 = arith.constant 0.0 : f32
+  // We don't map the relu anymore - as allOperandsHaveSameShapeAndStrides fails here.
+  // ins = memref<32x32xf32>)
+  // outs = memref<32x32xf32, strided<[512, 1], offset: ?>>
+  // see: 407
   %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<128x512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       %16 = arith.maxf %arg9, %c0 : f32
