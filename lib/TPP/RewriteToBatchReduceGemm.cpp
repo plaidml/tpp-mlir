@@ -180,8 +180,8 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
   SmallVector<Value> slicedOperands;
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
     FailureOr<Value> slicedOperand;
-    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
-    if (isVNNILoop && map.getNumResults() == 5) {
+    // In VNNI layout the second operand has size '4'.
+    if (isVNNILoop && operand->getOperandNumber() == 1) {
       slicedOperand = linalgx::utils::getSliceOperand(
           builder, operand, linalgOp, localIvs, valuesToUse, 4);
     } else {

@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -rewrite-to-brgemm | FileCheck %s
+// RUN: tpp-opt %s -rewrite-to-brgemm -split-input-file | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
@@ -32,4 +32,31 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
       linalg.yield %9 : f32
     } -> tensor<4x8x32x32xf32>
   return %1 :  tensor<4x8x32x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+
+// CHECK-LABEL: func.func @vnni_layout_brgemm
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<48x32x32xbf16>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<48x16x32x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<32x32xbf16>
+func.func @vnni_layout_brgemm(%arg0: tensor<48x32x32xbf16>, 
+                              %arg1: tensor<48x16x32x2xbf16>, %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : tensor<48x32x32xbf16>, tensor<48x16x32x2xbf16>) 
+    outs(%arg2 : tensor<32x32xbf16>) {
+      ^bb0(%in: bf16, %in_8: bf16, %out: bf16):
+        %11 = arith.mulf %in, %in_8 : bf16
+        %12 = arith.addf %out, %11 : bf16
+        linalg.yield %12 : bf16
+  } -> tensor<32x32xbf16>
+  // CHECK: vnni.brgemm ins(%[[ARG0]] : tensor<48x32x32xbf16>, %[[ARG1]] : tensor<48x16x32x2xbf16>) 
+  // CHECK-SAME:        out(%[[ARG2]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+  return %0 : tensor<32x32xbf16>
 }
