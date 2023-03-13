@@ -87,21 +87,6 @@ class MLIRBench {
   /// Tensor init type
   TensorInitType initType;
 
-  /// Create a random global based on the memref type
-  llvm::StringRef createGlobal(MemRefType);
-
-  /// Get a global memref by name
-  MemRefType getGlobalType(llvm::StringRef);
-
-  // Create a local dense tensor
-  Value createDenseTensor(TensorType);
-
-  // Create a constant dense attribute
-  DenseElementsAttr getDenseAttribute(ShapedType);
-
-  // Return a ConstantOp of a certain type with a certain initializer
-  template <class ValueT> arith::ConstantOp getConstant(Type, ValueT);
-
   /// Gets module's main block
   Block &getModuleBlock();
 
@@ -128,10 +113,6 @@ public:
   /// Create and initialize the kernel input arguments
   /// The values are cached locally in a kernel argument list, in order
   LogicalResult createKernelArgs();
-
-  /// Create all globals for the kernel method initializers
-  /// Populates the list with the names, in order
-  LogicalResult createGlobals(llvm::SmallVector<llvm::StringRef> &);
 
   /// Create main wrapper function, sets insertion point
   LogicalResult createMainWrapper();

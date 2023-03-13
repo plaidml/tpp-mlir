@@ -77,6 +77,7 @@ if (NOT TPP_INSIDE_IREE)
   add_subdirectory(tpp-opt)
   add_subdirectory(tpp-run)
   add_subdirectory(test)
+  add_subdirectory(utils)
   add_subdirectory(benchmarks)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
