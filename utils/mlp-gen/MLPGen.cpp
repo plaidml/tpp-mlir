@@ -46,7 +46,7 @@ void parseStringList(StringRef str, SmallVector<int64_t> &list) {
 }
 
 SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
-  SmallVector<int64_t, 5> shape;
+  SmallVector<int64_t> shape;
   assert(lhs.getRank() == rhs.getRank() && "Matmul types must have same rank");
   // M x K x N -> M x N
   assert(lhs.getDimSize(1) == rhs.getDimSize(0) &&
