@@ -16,6 +16,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "TPP/BuilderUtils.h"
+
 namespace mlir {
 class ModuleOp;
 class MemRefType;
@@ -55,6 +57,9 @@ class MLPGenerator {
   /// Random seed
   int seed;
 
+  /// Tensor init type
+  TensorInitType initType;
+
   // ============================ Code Generation Options
 
   /// Lower softmax at the last layer
@@ -66,7 +71,7 @@ class MLPGenerator {
   // ============================ Helpers
 
   /// Return current random seed, update next
-  unsigned getRand();
+  int getRand();
 
   /// Type of packing (NxC, KxC, NxK)
   enum PackingType { PACK_INPUT, PACK_WEIGHT, PACK_OUTPUT };

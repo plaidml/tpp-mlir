@@ -25,7 +25,6 @@
 #include <string>
 
 #include "MLPGen.h"
-#include "TPP/BuilderUtils.h"
 
 using namespace mlir;
 
@@ -106,7 +105,12 @@ MLPGenerator::MLPGenerator(unsigned miniBatch, StringRef layersStr,
   }
 
   // Initialize random seed, if needed
-  getRand();
+  if (seed) {
+    initType = TensorInitType::Normal;
+    srand(seed);
+  } else {
+    initType = TensorInitType::Constant;
+  }
 
   /// Initialize affine map expressions
   for (int i=0; i<6; i++)
@@ -133,9 +137,9 @@ Value MLPGenerator::createLayer(unsigned index, Value arg) {
 
   // Add matmul/bias/relu as it comes from tensorflow
   auto weight =
-      createDenseTensor(builder, TensorInitType::Normal, weightType, getRand());
+      createDenseTensor(builder, initType, weightType, getRand());
   auto bias =
-      createDenseTensor(builder, TensorInitType::Normal, outputType, getRand());
+      createDenseTensor(builder, initType, outputType, getRand());
   auto matmul = lowerMatmul({arg, weight, bias, /*output=*/nullptr});
   auto relu = lowerRelu(matmul);
 
@@ -156,7 +160,7 @@ Value MLPGenerator::createOutputLayer(Value arg, Value out) {
   // Add softmax
   auto weightType = getShape({input, output}, PACK_WEIGHT);
   auto weight =
-      createDenseTensor(builder, TensorInitType::Normal, weightType, getRand());
+      createDenseTensor(builder, initType, weightType, getRand());
 
   if (enableSoftmax) {
     // Return the softmax of the last layer
@@ -494,14 +498,13 @@ SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   return {};
 }
 
-unsigned MLPGenerator::getRand() {
-  // First init
+int MLPGenerator::getRand() {
+  // Not random
   if (!seed) {
-    seed = rand();
-    return seed;
+    return 0;
   }
-  // Following updates
-  unsigned temp = seed;
+  // Update and return previous
+  int temp = seed;
   seed = rand();
   return temp;
 }
