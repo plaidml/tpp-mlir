@@ -90,7 +90,7 @@ transform.sequence failures(propagate) {
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
       : (!pdl.operation) -> !pdl.operation
-    %4 = transform.structured.get_blocked_matmuls %3
+    %4 = transform.structured.get_blocked_convolutions %3
       : (!pdl.operation) -> (!transform.op<"linalg.generic">)
     %blocked_matmuls:2 = split_handles %4 in [2]
       : (!transform.op<"linalg.generic">) 
