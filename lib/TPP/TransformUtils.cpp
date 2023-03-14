@@ -208,13 +208,87 @@ bool isBlockedConvolution(Operation *op) {
   return tpp::utils::hasMulAddBody(linalgOp);
 }
 
-// TODO: Check indexing maps and iterator types. They should
-// match the one of a packed matmul.
+static llvm::SmallDenseSet<unsigned> getPreservedDims(AffineMap map) {
+  assert(map.isProjectedPermutation() &&
+         "expected map to have projected permutations");
+  llvm::SmallDenseSet<unsigned> preservedDims;
+  for (auto expr : map.getResults())
+    preservedDims.insert(expr.cast<AffineDimExpr>().getPosition());
+  return preservedDims;
+}
+
 bool isBlockedMatmul(Operation *op) {
-  if (!isa<linalg::LinalgOp>(op))
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp)
     return false;
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-  return tpp::utils::hasMulAddBody(linalgOp);
+
+  if (linalgOp.getNumDpsInputs() != 2 || linalgOp.getNumDpsInits() != 1)
+    return false;
+
+  if (!tpp::utils::hasMulAddBody(linalgOp))
+    return false;
+
+  // Check the input indexing map has the right form.
+  auto indexingMaps = linalgOp.getIndexingMapsArray();
+  if (indexingMaps.size() != 3)
+    return false;
+  if (llvm::any_of(indexingMaps, [](AffineMap map) {
+        return !map.isProjectedPermutation();
+      })) {
+    return false;
+  }
+  for (auto map : indexingMaps)
+    for (auto expr : map.getResults())
+      if (!expr.isa<AffineDimExpr>())
+        return false;
+
+  auto iteratorTypes = linalgOp.getIteratorTypesArray();
+
+  // Make sure all loops are characterized as one of:
+  // - I loop: present in C and A but not in B. I must be parallel.
+  // - J loop: present in C and B but not in A. J must be paralell.
+  // - K loop: present in A and B but not in C. K must be reduction.
+
+  llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(indexingMaps.back());
+  llvm::SmallDenseSet<unsigned> bDims = getPreservedDims(indexingMaps[1]);
+  llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(indexingMaps.front());
+  llvm::SmallDenseSet<unsigned> allLoopDims;
+  for (auto cExpr : indexingMaps.back().getResults()) {
+    unsigned cDim = cExpr.cast<AffineDimExpr>().getPosition();
+    // I loop
+    if (aDims.count(cDim) && !bDims.count(cDim)) {
+      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
+        return false;
+      allLoopDims.insert(cDim);
+      continue;
+    }
+    // J loop
+    if (bDims.count(cDim) && !aDims.count(cDim)) {
+      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
+        return false;
+      allLoopDims.insert(cDim);
+      continue;
+    }
+    return false;
+  }
+
+  for (auto aExpr : indexingMaps.front().getResults()) {
+    unsigned aDim = aExpr.cast<AffineDimExpr>().getPosition();
+    // I loop
+    if (cDims.count(aDim) && !bDims.count(aDim)) {
+      // Already seen.
+      continue;
+    }
+    // K loop
+    if (bDims.count(aDim) && !cDims.count(aDim)) {
+      if (iteratorTypes[aDim] != mlir::utils::IteratorType::reduction)
+        return false;
+      allLoopDims.insert(aDim);
+      continue;
+    }
+    return false;
+  }
+  return allLoopDims.size() == linalgOp.getNumLoops();
 }
 
 static std::optional<int64_t> getConstantRange(const Range &range) {
