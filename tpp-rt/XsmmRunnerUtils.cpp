@@ -465,9 +465,9 @@ extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
   } xsmm_matmul_invoke_t;
   xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *)params;
 
-  void *addr_tensorA = p->pA->alignedPtr + p->pA->offset;
-  void *addr_tensorB = p->pB->alignedPtr + p->pB->offset;
-  void *addr_tensorC = p->pC->alignedPtr + p->pC->offset;
+  void *addr_tensorA = p->pA->allocatedPtr;
+  void *addr_tensorB = p->pB->allocatedPtr;
+  void *addr_tensorC = p->pC->allocatedPtr;
 
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
