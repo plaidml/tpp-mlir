@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -tpp-mapping -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -tpp-mapping -cleanup -split-input-file | FileCheck %s
 
 // We don't expect to block as the blocking factor do not create full tiles.
 func.func @conv_to_matmul(%img: tensor<1x5x5x3xf32>, %filter: tensor<3x3x3x8xf32>, %out: tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32> {
@@ -8,15 +8,16 @@ func.func @conv_to_matmul(%img: tensor<1x5x5x3xf32>, %filter: tensor<3x3x3x8xf32
 
 // CHECK-LABEL: func.func @conv_to_matmul(
 // CHECK-NOT: linalg.conv_2d_nhwc_hwcf
+// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[c3:.+]] = arith.constant 3 : index
 // CHECK: scf.for
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       scf.for
-// CHECK:         tensor.extract_slice
-// CHECK:         tensor.extract_slice
-// CHECK:         tensor.extract_slice
-// CHECK:         linalg.matmul
-// CHECK:         tensor.insert_slice
+// CHECK:         tensor.extract_slice{{[^:]+}}: tensor<1x5x5x3xf32> to tensor<3x3xf32>
+// CHECK:         tensor.extract_slice{{[^:]+}}: tensor<3x3x3x8xf32> to tensor<3x8xf32>
+// CHECK:         tensor.extract_slice{{[^:]+}}: tensor<1x3x3x8xf32> to tensor<3x8xf32>
+// CHECK:         linalg.matmul{{.*}} -> tensor<3x8xf32>
+// CHECK:         tensor.insert_slice{{[^:]+}}: tensor<3x8xf32> into tensor<1x3x3x8xf32>
 // CHECK:       }
 
 // -----
@@ -34,21 +35,21 @@ func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x
 // Generalized pack of the first input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<1x113x113x64xf32> to tensor<32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32xf32> into tensor<1x2x113x113x32xf32>
 // Generalized pack of the second input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<3x3x64x256xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<8x2x3x3x32x32xf32>
 // Generalized pack of the output
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<1x111x111x256xf32> to tensor<32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32xf32> into tensor<1x8x111x111x32xf32>
 // Conv as matmul
 // CHECK: scf.for
 // CHECK:   linalg.matmul
@@ -66,21 +67,21 @@ func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1
 // Generalized pack of the first input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<14x512x28x28xf32> to tensor<32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32xf32> into tensor<14x16x28x28x32xf32>
 // Generalized pack of the second input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<1024x512x1x1xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<32x16x1x1x32x32xf32>
 // Generalized pack of the output
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<14x1024x28x28xf32> to tensor<32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32xf32> into tensor<14x32x28x28x32xf32>
 // Conv as matmul
 // CHECK: scf.for
 // CHECK:   linalg.matmul
@@ -100,15 +101,15 @@ func.func @generalize_pack_unpack(%arg0: tensor<12x2x56x56x32xf32>, %arg1: tenso
 // CHECK-NOT: tensor.pack
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<512x1024xbf16> to tensor<2xbf16>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<2xbf16> into tensor<256x1024x2xbf16>
 // CHECK-NOT: tensor.unpack
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<12x2x56x56x32xf32> to tensor<32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<1x1x1x1xf32> into tensor<12x56x56x64xf32>
 
 // -----
 
@@ -123,9 +124,9 @@ func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %ar
 // CHECK: scf.for
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       tensor.extract_slice
+// CHECK:       tensor.extract_slice{{[^:]+}}: tensor<32x4x4xbf16> to tensor<2xbf16>
 // CHECK:       linalg.transpose
-// CHECK:       tensor.insert_slice
+// CHECK:       tensor.insert_slice{{[^:]+}}: tensor<2xbf16> into tensor<32x2x4x2xbf16>
 // CHECK: vnni.brgemm
 
 // -----
@@ -144,22 +145,25 @@ func.func @pack_matmul(
 // Generalized pack of the first input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<128x128xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Generalized pack of the second input
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<128x128xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Generalized pack of the output
 // CHECK: scf.for
 // CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<128x128xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
-// CHECK:     tensor.insert_slice
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Packed matmul
 // CHECK: linalg.generic
+// CHECK-SAME: {{.*}}iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+// CHECK-SAME: ins({{.*}}: tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>)
+// CHECK-SAME: outs({{.*}}: tensor<4x4x32x32xf32>)
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
