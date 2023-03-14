@@ -372,20 +372,22 @@ extern "C" int iree_xsmm_brgemm_dispatch_f32(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_matmul_dispatch_f32(void *context, void *params,
-                                             void *reserved) {
+extern "C" int iree_xsmm_matmul_dispatch(void *context, void *params,
+                                         void *reserved) {
   typedef struct {
-    int64_t res;
+    int64_t gemm_addr;
+    int64_t dtype;
+    bool vnni;
     int64_t m;
     int64_t n;
     int64_t k;
     int64_t lda;
     int64_t ldb;
     int64_t ldc;
-  } xsmm_matmul_dispatch_f32_t;
-  xsmm_matmul_dispatch_f32_t *p = (xsmm_matmul_dispatch_f32_t *)params;
-  p->res = _mlir_ciface_xsmm_matmul_dispatch(
-      LIBXSMM_DATATYPE_F32, false, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
+  } xsmm_matmul_dispatch_t;
+  xsmm_matmul_dispatch_t *p = (xsmm_matmul_dispatch_t *)params;
+  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch(
+      (libxsmm_datatype) p->dtype, p->vnni, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -440,32 +442,42 @@ extern "C" int iree_xsmm_brgemm_invoke_f32(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_matmul_invoke_f32(void *context, void *params,
-                                           void *reserved) {
+extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
+                                       void *reserved) {
+  // Definition of this struct needs to match with the definition used in MemrefToLLVM pass.
+  // https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
   typedef struct {
-    int64_t addr;
-    float *pA;
-    int64_t offA;
-    float *pB;
-    int64_t offB;
-    float *pC;
-    int64_t offC;
-  } xsmm_matmul_invoke_f32_t;
-  xsmm_matmul_invoke_f32_t *p = (xsmm_matmul_invoke_f32_t *)params;
+    void* allocatedPtr;
+    void* alignedPtr;
+    int64_t offset;
+    int64_t sizes_and_strides[0];  // variable size: sizes[rank], strides[rank]
+  } input_tensor_t;
 
-  float *addr_tensorA = p->pA + p->offA;
-  float *addr_tensorB = p->pB + p->offB;
-  float *addr_tensorC = p->pC + p->offC;
+  typedef struct {
+    int64_t dtype;
+    int64_t gemm_addr;
+    int64_t rankA;
+    input_tensor_t *pA;
+    int64_t rankB;
+    input_tensor_t *pB;
+    int64_t rankC;
+    input_tensor_t *pC;
+  } xsmm_matmul_invoke_t;
+  xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *)params;
+
+  void *addr_tensorA = p->pA->alignedPtr + p->pA->offset;
+  void *addr_tensorB = p->pB->alignedPtr + p->pB->offset;
+  void *addr_tensorC = p->pC->alignedPtr + p->pC->offset;
 
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = (void *)addr_tensorB;
-  gemm_param.b.primary = (void *)addr_tensorA;
-  gemm_param.c.primary = (void *)addr_tensorC;
-  sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->addr);
-  sgemm.gemm(&gemm_param);
+  gemm_param.a.primary = (void *) addr_tensorB;
+  gemm_param.b.primary = (void *) addr_tensorA;
+  gemm_param.c.primary = (void *) addr_tensorC;
+  sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->gemm_addr);
 
+  sgemm.gemm(&gemm_param);
   return 0;
 }
 

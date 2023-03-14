@@ -71,14 +71,14 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_brgemm_dispatch_f32(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_matmul_dispatch_f32(void *context, void *params, void *reserved);
+iree_xsmm_matmul_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_unary_dispatch(void *context, void *params, void *reserved);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_brgemm_invoke_f32(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_matmul_invoke_f32(void *context, void *params, void *reserved);
+iree_xsmm_matmul_invoke(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_unary_invoke(void *context, void *params, void *reserved);
 
