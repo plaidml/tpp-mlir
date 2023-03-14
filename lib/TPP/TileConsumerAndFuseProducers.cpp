@@ -603,13 +603,11 @@ struct TileConsumerAndFuseProducers
     std::reverse(linalgOperations.begin(), linalgOperations.end());
     llvm::SmallDenseSet<Operation *> visitedConsumers;
     llvm::SmallDenseSet<Operation *> fusionRoots;
-    if (this->startFromLastFusableConsumer) {
-      for (linalg::LinalgOp linalgOp : linalgOperations) {
-        fusionRoots.insert(getLastFusableConsumer(linalgOp, visitedConsumers));
-      }
-    } else {
-      for (Operation *currentOp : linalgOperations)
-        fusionRoots.insert(currentOp);
+    for (linalg::LinalgOp linalgOp : linalgOperations) {
+      Operation *rootOp = linalgOp.getOperation();
+      if (this->startFromLastFusableConsumer)
+        rootOp = getLastFusableConsumer(linalgOp, visitedConsumers);
+      fusionRoots.insert(rootOp);
     }
 
     LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
