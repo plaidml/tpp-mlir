@@ -13,7 +13,7 @@
     }
   }},
   {
-  "mlp": {
+  "mlp-fp32-layer": {
     "ref": {
       "type": "C++",
       "benchmark": "bench_mlp",
@@ -21,8 +21,32 @@
     },
     "mlir": {
       "type": "MLIR",
-      "benchmark": "mlp.mlir",
+      "benchmark": "mlp-fp32-1layer-512.mlir",
       "flags": []
+    }
+  }},
+  {
+  "mlp-bf16-3x1024": {
+    "mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16-3layers-1024.mlir",
+      "flags": ["--disable-lsan"]
+    }
+  }},
+  {
+  "mlp-bf16-10x3584": {
+    "mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16-10layers-3584.mlir",
+      "flags": ["--disable-lsan"]
+    }
+  }},
+  {
+  "mlp-vnni-3x1024": {
+    "mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-vnni-3layers-1536.mlir",
+      "flags": ["--disable-lsan"]
     }
   }},
   {

@@ -177,7 +177,13 @@ if __name__ == '__main__':
                         help='Suppress warnings')
     parser.add_argument('-x', '--xsmm', action='count', default=1,
                         help='Turn on TPP optimizations (default)')
+    parser.add_argument('--disable-lsan', action='count', default=0,
+                        help='Disable LSAN')
     args = parser.parse_args()
+
+    # Some tensors may not be freed but we still want numbers
+    if args.disable_lsan:
+        os.putenv("ASAN_OPTIONS", f"detect_leaks=0")
 
     # Creates the logger object
     loglevel = args.verbose - (args.quiet > 0)
