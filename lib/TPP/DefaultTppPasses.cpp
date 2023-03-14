@@ -233,17 +233,26 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    pm.addPass(createTileConsumerAndFuseProducersPass());
     // Preprocess convolutions.
     pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
     pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
-    // Pack matmuls.
+    // Convert ops to packed layouts.
     pm.addPass(createPackMatmulPass({32, 32, 32}));
-
-    // Map ops to VNNI layout.
     pm.addPass(createPackVNNIPass());
+
+    // Postprocess packing.
+    // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
+    // mess up tensor producer-consumer chains used for analysis in the
+    // following passes.
+    pm.addPass(createPropagatePackUnPackPass());
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createConstantFoldPackPass());
+    pm.addPass(createCanonicalizerPass());
+
+    pm.addPass(createTileConsumerAndFuseProducersPass());
+    pm.addPass(createCleanupPass());
 
     // Generalize tensor.pack and tensor.unpack.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
