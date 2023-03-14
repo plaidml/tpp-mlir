@@ -98,8 +98,7 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     }
   }
   for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
-    maps.push_back(map.getMinorSubMap(2));
+    maps.push_back(linalgOp.getMatchingIndexingMap(operand).getMinorSubMap(2));
   }
 
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
