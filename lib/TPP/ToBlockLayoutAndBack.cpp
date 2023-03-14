@@ -485,7 +485,11 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
         /*doc=*/"", /*libraryCall=*/"");
 
   } else {
-    assert(matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() == 3);
+    // TODO: validate operands earlier
+    if (matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() != 3)
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "invalid second operand shape");
+
     dims = 5;
     bindDims(ctx, r1, r3, p3, p4, r2);
     mapA = AffineMap::get(dims, /*symbols=*/0, {r1, p3, r2}, ctx);
