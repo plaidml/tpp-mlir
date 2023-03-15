@@ -114,7 +114,7 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                   if (!areStaticValues(tilesSizes))
                     return;
                   for (int i = 0; i < packOp.getSourceType().getRank(); i++) {
-                    // Loop is not tiled
+                    // Loop is not tiled.
                     if (!tiledLoops.count(i)) {
                       delSourceIndexes.push_back(delDestIndexes[i]);
                       // Loop is tiled, the point loop is two hops away.
