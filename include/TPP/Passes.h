@@ -101,7 +101,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createTppMappingPass();
+std::unique_ptr<OperationPass<ModuleOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool loops = false);

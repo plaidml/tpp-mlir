@@ -202,7 +202,7 @@ private:
 // Apply collection of high-level passes that map operations to
 // TPP-compatible forms.
 struct TppMappingPass : public TppMappingBase<TppMappingPass>,
-                        UtilityPassBase<func::FuncOp> {
+                        UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -397,7 +397,7 @@ private:
     } else {
       // Lower IR through TPP operations.
       // Transform operations to be TPP compatible.
-      pm.addNestedPass<func::FuncOp>(createTppMappingPass());
+      pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
@@ -444,7 +444,7 @@ mlir::tpp::createPostprocessingPass() {
   return std::make_unique<PostprocessingPass>();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createTppMappingPass() {
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppMappingPass() {
   return std::make_unique<TppMappingPass>();
 }
 

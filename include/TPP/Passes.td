@@ -321,7 +321,7 @@ def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPostprocessingPass()";
 }
 
-def TppMapping : Pass<"tpp-mapping", "func::FuncOp"> {
+def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
   let summary = "Map operations to be TPP compatible";
   let description = [{
     Apply collection of TPP rewriting passes to map eligble operations
