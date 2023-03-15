@@ -16,7 +16,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -597,7 +596,7 @@ struct TileConsumerAndFuseProducers
   }
   void runOnOperation() override {
     func::FuncOp func = getOperation();
-    transform::TrivialPatternRewriter rewriter(&getContext());
+    IRRewriter rewriter(&getContext());
 
     // Set to keep track of fused ops.
     llvm::SmallDenseSet<Operation *> fusedOps;

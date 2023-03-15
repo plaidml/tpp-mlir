@@ -14,7 +14,6 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -33,7 +32,7 @@ struct GeneralizeTensorPackAndUnPack
   void runOnOperation() override {
     func::FuncOp func = getOperation();
 
-    transform::TrivialPatternRewriter rewriter(&getContext());
+    IRRewriter rewriter(&getContext());
     func->walk([&](tensor::UnPackOp unPackOp) {
       scf::SCFTilingOptions unpackTilingOptions;
       SmallVector<int64_t> tiles(unPackOp.getDestType().getRank(), 1);

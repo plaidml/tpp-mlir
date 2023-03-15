@@ -11,7 +11,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Threading.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -78,7 +77,7 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                   // Step1. De-linearize destination index.
                   // f(lin) = tmp[A][B][C]
                   SmallVector<int64_t> delDestIndexes =
-                      delinearize(strides, destLinearizedIdx);
+                      delinearize(destLinearizedIdx, strides);
                   assert(delDestIndexes.size() ==
                          static_cast<size_t>(packOp.getDestType().getRank()));
 
@@ -181,7 +180,7 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
 
   void runOnOperation() override {
     auto module = getOperation();
-    transform::TrivialPatternRewriter rewriter(&getContext());
+    IRRewriter rewriter(&getContext());
     module->walk(
         [&](tensor::PackOp packOp) { foldPackIntoSplatCst(rewriter, packOp); });
     module->walk([&](tensor::PackOp packOp) {
