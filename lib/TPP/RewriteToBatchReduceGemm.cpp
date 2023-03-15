@@ -116,10 +116,10 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
   expectedMaps = infer(
       {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
   auto secondOperand = linalgOp.getDpsInputOperands()[1];
-  assert(
-      secondOperand->get().getType().cast<ShapedType>().getShape()
-          [secondOperand->get().getType().cast<ShapedType>().getRank() - 1] ==
-      *blockingFactor);
+  auto secondOpShapedType = secondOperand->get().getType().cast<ShapedType>();
+  assert(secondOpShapedType.getShape()[secondOpShapedType.getRank() - 1] ==
+             *blockingFactor &&
+         "Blocking factor incorrect");
   if (compressedDimMaps != expectedMaps)
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
@@ -162,7 +162,7 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
 
 // single region block with add, mul and linalg::yield.
 static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
-  if (!tpp::utils::hasMatmulBody(linalgOp))
+  if (!tpp::utils::hasMulAddBody(linalgOp))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
   return success();

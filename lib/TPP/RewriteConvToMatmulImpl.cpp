@@ -209,7 +209,7 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
 // Check if the three innermost loop can be mapped to a matmul operation. Check
 // also the body and make sure it is a matmul-like.
 static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
-  if (!tpp::utils::hasMatmulBody(linalgOp))
+  if (!tpp::utils::hasMulAddBody(linalgOp))
     return false;
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();

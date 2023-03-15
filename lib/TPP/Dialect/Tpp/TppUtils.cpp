@@ -89,7 +89,7 @@ static bool isAddMul(Block &block) {
   return success;
 }
 
-bool hasMatmulBody(linalg::LinalgOp linalgOp) {
+bool hasMulAddBody(linalg::LinalgOp linalgOp) {
   if (linalgOp->getNumRegions() != 1)
     return false;
   Region &region = linalgOp->getRegion(0);
@@ -245,7 +245,7 @@ bool isTppMatmul(linalg::LinalgOp linalgOp) {
   if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
     return false;
   // operations and operands.
-  return hasMatmulBody(linalgOp);
+  return hasMulAddBody(linalgOp);
 }
 
 static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {

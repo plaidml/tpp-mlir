@@ -397,7 +397,7 @@ bool isVNNIPacked(linalg::GenericOp matmulOp) {
 
 bool isMatmulOp(linalg::GenericOp matmulOp) {
   // TODO check structural and access pattern.
-  return tpp::utils::hasMatmulBody(matmulOp);
+  return tpp::utils::hasMulAddBody(matmulOp);
 }
 
 //===----------------------------------------------------------------------===//
