@@ -1,21 +1,6 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// RUN: tpp-opt %s -transform-drop-schedule -bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
 // Make sure we map to linalg.matmul
 // RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule | FileCheck -check-prefix=LINALG %s
 
-// Validate default pipeline
 // RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \

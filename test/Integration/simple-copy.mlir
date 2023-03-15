@@ -1,24 +1,15 @@
-// Conversion to loop
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Conversion to XSMM
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Make sure we map to TPP
+// This should really be in the passes directory, not here
 // RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
-// Validate default pipeline
 // RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 

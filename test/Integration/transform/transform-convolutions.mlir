@@ -1,22 +1,10 @@
-// RUN: tpp-opt %s -transform-drop-schedule -bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
+// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -generalize-tensor-pack-unpack -bufferize -convert-linalg-to-loops -expand-strided-metadata | \
+// RUN: tpp-run -print \
+// RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
-//
-
-
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -generalize-tensor-pack-unpack -bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
 
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
-// Validate default pipeline
-// The transform block has to be dropped for compatibility reasons
 // See: #298
 // RUN: tpp-opt %s -transform-drop-schedule | \
 // RUN: tpp-run -print \
