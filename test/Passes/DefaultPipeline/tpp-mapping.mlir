@@ -181,3 +181,61 @@ func.func @fold_const_pack() ->  tensor<8x2x1x1x32x32xi64> {
 // CHECK-NOT: tensor.pack
 // CHECK: %[[CST:.+]] = arith.constant dense<1> : tensor<8x2x1x1x32x32xi64>
 // CHECK-NEXT: return %[[CST]] : tensor<8x2x1x1x32x32xi64>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2: tensor<128x256xf32>) -> tensor<128x256xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<4x16x32x32xf32>
+  %pack = tensor.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %0 : tensor<128x512xf32> -> tensor<4x16x32x32xf32>
+  %1 = tensor.empty() : tensor<8x16x32x32xf32>
+  %pack_0 = tensor.pack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %1 : tensor<512x256xf32> -> tensor<8x16x32x32xf32>
+  %2 = tensor.empty() : tensor<4x8x32x32xf32>
+  %pack_1 = tensor.pack %arg2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %2 : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%pack, %pack_0 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%pack_1 : tensor<4x8x32x32xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %5 = arith.mulf %in, %in_2 : f32
+      %6 = arith.addf %out, %5 : f32
+      linalg.yield %6 : f32
+  } -> tensor<4x8x32x32xf32>
+  %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg2 : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
+  %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%unpack : tensor<128x256xf32>) {
+    ^bb0(%out: f32):
+      %5 = arith.maxf %out, %cst : f32
+      linalg.yield %5 : f32
+  } -> tensor<128x256xf32>
+  return %4 : tensor<128x256xf32>
+}
+
+// CHECK-LABEL: func.func @propagate_pack_unpack(
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<128x512xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x16x32x32xf32>
+// Generalized pack of the second input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<512x256xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<8x16x32x32xf32>
+// Generalized pack of the output
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<128x256xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x8x32x32xf32>
+// Generic before unpack
+// CHECK: linalg.generic
+// Generalized unpack
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<4x8x32x32xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<32x32xf32> to tensor<1x1xf32>
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<1x1xf32> into tensor<128x256xf32>
