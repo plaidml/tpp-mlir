@@ -239,3 +239,33 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
 // CHECK:     linalg.transpose
 // CHECK:     tensor.extract_slice{{[^:]+}}: tensor<32x32xf32> to tensor<1x1xf32>
 // CHECK:     tensor.insert_slice{{[^:]+}}: tensor<1x1xf32> into tensor<128x256xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+func.func @conv_init_simplify(%arg0: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x64xf32>, %arg3: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<1x56x56x64xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+  %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg2 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%1 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg3 : tensor<1x56x56x64xf32>) outs(%0 : tensor<1x56x56x64xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<1x56x56x64xf32>
+  %4 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2, %3 : tensor<1x56x56x64xf32>, tensor<1x56x56x64xf32>) outs(%0 : tensor<1x56x56x64xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.addf %in, %in_0 : f32
+      linalg.yield %5 : f32
+  } -> tensor<1x56x56x64xf32>
+  return %4 : tensor<1x56x56x64xf32>
+}
+
+// CHECK-LABEL: func.func @conv_init_simplify(
+// CHECK-NOT: linalg.fill
+// CHECK-NOT: linalg.conv_2d_nhwc_hwcf
+// Conv as matmul
+// CHECK: scf.for
+// CHECK:   linalg.matmul
+// CHECK-NOT: linalg.generic

@@ -234,6 +234,8 @@ private:
     pm.clear();
 
     // Preprocess convolutions.
+    pm.addPass(createConvInitSimplifyPass());
+    pm.addPass(createCleanupPass());
     pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
     pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
