@@ -105,18 +105,19 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                   // After interchanging the outermost tiled loop we end up in
                   // the canonical form tmp[A][B][a][b]. Squash the point loops
                   // with the tiled ones.
-                  int64_t pointLoops = packOp.getInnerDimsPos().size();
-                  int64_t startTiledLoop =
-                      packOp.getDestType().getRank() - 2 * pointLoops;
+                  llvm::DenseSet<int64_t> tiledLoops(
+                      packOp.getInnerDimsPos().begin(),
+                      packOp.getInnerDimsPos().end());
                   SmallVector<int64_t> delSourceIndexes;
                   size_t tilePosIdx = 0;
                   SmallVector<int64_t> tilesSizes = packOp.getStaticTiles();
                   if (!areStaticValues(tilesSizes))
                     return;
-                  for (int i = 0;
-                       i < packOp.getDestType().getRank() - pointLoops; i++) {
-                    if (i < startTiledLoop) {
+                  for (int i = 0; i < packOp.getSourceType().getRank(); i++) {
+                    // Loop is not tiled.
+                    if (!tiledLoops.count(i)) {
                       delSourceIndexes.push_back(delDestIndexes[i]);
+                      // Loop is tiled, the point loop is two hops away.
                     } else {
                       delSourceIndexes.push_back(delDestIndexes[i] *
                                                      tilesSizes[tilePosIdx++] +
