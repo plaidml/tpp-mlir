@@ -1789,12 +1789,8 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK: %[[xsmmDis113:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c112_i64]], %[[c64_i64]], %[[c64_i64]], %[[c64_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis113]]
 // CHECK: linalg.pooling_nhwc_max
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis114:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c56_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
@@ -1802,73 +1798,55 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK: %[[xsmmDis116:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c56_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis114]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis115]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis116]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis117:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c64_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis117]]
@@ -1876,92 +1854,71 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK: %[[xsmmDis119:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis117]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis120:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c28_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis120]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis118]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis119]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis121:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c32_i64]], %[[c32_i64]], %[[c64_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis121]]
@@ -1969,131 +1926,105 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK: %[[xsmmDis123:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c14_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis121]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis124:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c14_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c32]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis124]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis122]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis123]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis125:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c64_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis125]]
@@ -2101,72 +2032,60 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK: %[[xsmmDis127:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK-NOT: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis125]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis128:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:       linalg.transpose
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:         linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
 // CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:     linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
 // CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis128]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis126]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
 // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis127]]
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c7]] step %[[c1]] {
-// CHECK:       linalg.transpose
+// CHECK: linalg.transpose
+// CHECK-NOT: linalg.transpose
 // CHECK: %[[xsmmDis129:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c1_i64]], %[[c1000_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1000_i64]], %[[c1000_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
 // CHECK: call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis129]]
 // CHECK: %[[xsmmDis130:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c1_i64]], %[[c1000_i64]], %[[c1000_i64]], %[[c1000_i64]], %[[c1000_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
