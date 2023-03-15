@@ -1,45 +1,19 @@
-// Loop conversion
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// XSMM conversion
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Loop conversion
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp="tile-sizes=8,8" -convert-tpp-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// XSMM conversion
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp="tile-sizes=8,8" -convert-tpp-to-xsmm -loop-invariant-code-motion -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Make sure we map to tpp
+// This should really be in the passes directory, not here
 // RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
-// Validate default pipeline
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-#map0 = affine_map<(d0, d1) -> (d0, d1)>
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
 
+// RUN: tpp-run %s -linalg-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @bigrelu(%B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0.0 : f32

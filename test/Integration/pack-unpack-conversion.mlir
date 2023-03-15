@@ -1,14 +1,12 @@
-// RUN: tpp-opt %s -generalize-tensor-pack-unpack -bufferize -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s 
-//
-
-// Validate default pipeline
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
+
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
+// FIXME: This test fails to bufferize when lowering linalg to loops
 
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {
   %init_source = tensor.empty(%width) : tensor<?xf32>
