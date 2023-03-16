@@ -1,16 +1,6 @@
 [
   {
   "canary": {
-    "copy_ref": {
-      "type": "C++",
-      "benchmark": "bench_simple_copy",
-      "flags": []
-    },
-    "copy_mlir": {
-      "type": "MLIR",
-      "benchmark": "simple_copy.mlir",
-      "flags": []
-    },
     "mlp_fp32_layer_ref": {
       "type": "C++",
       "benchmark": "bench_mlp",

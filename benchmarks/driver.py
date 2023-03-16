@@ -115,9 +115,6 @@ class CPPRun(BaseRun):
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
-        # Extra logs go on stderr
-        if self.stderr:
-            print(self.stderr, file=sys.stderr)
         return True
 
 class MLIRRun(BaseRun):
@@ -137,16 +134,14 @@ class MLIRRun(BaseRun):
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
-        # Extra logs go on stderr
-        if self.stderr:
-            print(self.stderr, file=sys.stderr)
         return True
 
 class Benchmark(object):
     """ A collection of runs """
 
-    def __init__(self, name, env, loglevel):
+    def __init__(self, name, args, env, loglevel):
         self.name = name
+        self.args = args
         self.env = env
         self.logger = Logger("driver.bench", loglevel)
         self.runs = list()
@@ -166,7 +161,7 @@ class Benchmark(object):
     def runAll(self):
         for run in self.runs:
             self.logger.debug(f"Running bench {run.name}")
-            if not run.run():
+            if not run.run() and not self.args.ignore_errors:
                 return False
 
         return True
@@ -181,9 +176,9 @@ class BenchmarkDriver(object):
         self.logger = Logger("driver.bench.driver", loglevel)
         self.env = Environment(args, loglevel)
         self.loglevel = loglevel
-        self.config = args.config
-        if not os.path.exists(self.config):
-            self.logger.error(f"JSON config '{self.config}' does not exist")
+        self.args = args
+        if not os.path.exists(self.args.config):
+            self.logger.error(f"JSON config '{self.args.config}' does not exist")
             raise SyntaxError("Cannot find JSON config")
         self.benchs = list()
 
@@ -191,8 +186,8 @@ class BenchmarkDriver(object):
         """ Scan directory for JSON file and create a list with all runs """
 
         # Find and read the JSON file
-        self.logger.info(f"Reading up '{self.config}'")
-        with open(self.config) as jsonFile:
+        self.logger.info(f"Reading up '{self.args.config}'")
+        with open(self.args.config) as jsonFile:
             jsonCfg = json.load(jsonFile)
 
         # Parse and add all runs
@@ -203,7 +198,7 @@ class BenchmarkDriver(object):
 
             name = list(cfg.keys())[0]
             runs = cfg[name]
-            benchs = Benchmark(name, self.env, self.loglevel)
+            benchs = Benchmark(name, self.args, self.env, self.loglevel)
             for key, run in runs.items():
                 if not benchs.addRun(key, run):
                     return False
@@ -222,7 +217,8 @@ class BenchmarkDriver(object):
         # Out/Err will be stored in the runs themselves, verify later
         for bench in self.benchs:
             if not bench.runAll():
-                return False
+                if not self.args.ignore_errors:
+                    return False
 
         return True
 
@@ -235,7 +231,8 @@ class BenchmarkDriver(object):
                 if not run.stdout:
                     self.logger.error(f"Benchmark {bench.name}, run {run.name} produced no output, can't verify results")
                     self.logger.error(f"Error: {run.stderr}")
-                    return False
+                    if not self.args.ignore_errors:
+                        return False
 
                 # Clean up output
                 stdout = re.sub("\n", "", run.stdout)
@@ -256,8 +253,8 @@ if __name__ == '__main__':
                         help='The verbosity of logging output')
     parser.add_argument('-q', '--quiet', action='count', default=0,
                         help='Suppress warnings')
-    parser.add_argument('-k', '--keep', action='count', default=0,
-                        help='Keep binaries after execution')
+    parser.add_argument('--ignore-errors', action='count', default=0,
+                        help='Ignore errors and only show the results that work')
     args = parser.parse_args()
 
     # Creates the logger object
