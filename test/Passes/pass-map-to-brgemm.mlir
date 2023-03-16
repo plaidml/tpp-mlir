@@ -69,7 +69,7 @@ func.func @vnni_layout_brgemm(%arg0: tensor<48x32x32xbf16>,
 //CHECK-LABEL: func.func @vnni_layout_brgemm2
 func.func @vnni_layout_brgemm2(%arg0: tensor<32x48x32x32xbf16>, 
                               %arg1: tensor<32x48x16x32x2xbf16>, %arg2: tensor<32x32x32xbf16>) -> tensor<32x32x32xbf16> {
-  // CHECK: vnni.brgemm ins(%{{.+}} : tensor<32x48x32x32xbf16>, %{{.+}} : tensor<32x48x16x32x2xbf16>) out(%{{.+}} : tensor<32x32x32xbf16>) -> tensor<32x32x32xbf16>
+  // CHECK: %{{.*}} = vnni.brgemm ins(%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>) out(%{{.+}} : tensor<32x32xbf16>) -> tensor<32x32xbf16>
    %0 = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} 
@@ -92,7 +92,7 @@ func.func @vnni_layout_brgemm2(%arg0: tensor<32x48x32x32xbf16>,
 // CHECK-LABEL: func.func @vnni_layout_brgemm3
 func.func @vnni_layout_brgemm3(%arg0: tensor<32x32x48x32x32xbf16>, 
                               %arg1: tensor<32x32x48x16x32x2xbf16>, %arg2: tensor<32x32x32x32xbf16>) -> tensor<32x32x32x32xbf16> {
-  // CHECK: vnni.brgemm ins(%{{.+}} : tensor<32x32x48x32x32xbf16>, %{{.+}} : tensor<32x32x48x16x32x2xbf16>) out(%{{.+}} : tensor<32x32x32x32xbf16>) -> tensor<32x32x32x32xbf16>
+  // CHECK: %{{.*}} = vnni.brgemm ins(%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>) out(%{{.+}} : tensor<32x32xbf16>) -> tensor<32x32xbf16>
   %0 = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} 
