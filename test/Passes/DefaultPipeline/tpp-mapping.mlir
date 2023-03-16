@@ -307,11 +307,12 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK:     tensor.extract_slice{{[^:]+}}: tensor<64x64xf32> to tensor<32x32xf32>
 // CHECK:     linalg.transpose
 // CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<2x2x32x32xf32>
-// Merged matmul and relu
-// CHECK: scf.forall
-// CHECK: linalg.generic{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
-// CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
-// CHECK:   arith.maxf
+// TODO: reenable once tile and fuse defaults are back
+// Fused matmul and relu
+// C_HECK: scf.forall
+// C_HECK: linalg.generic{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
+// C_HECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
+// C_HECK:   arith.mulf
+// C_HECK:   arith.addf
+// C_HECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
+// C_HECK:   arith.maxf
