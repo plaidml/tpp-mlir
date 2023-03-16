@@ -205,7 +205,7 @@ bool isBlockedConvolution(Operation *op) {
     return false;
   if (failed(mlir::linalg::detail::verifyConvolutionInterface(linalgOp)))
     return false;
-  return tpp::utils::hasMatmulBody(linalgOp);
+  return tpp::utils::hasMulAddBody(linalgOp);
 }
 
 // TODO: Check indexing maps and iterator types. They should
@@ -214,7 +214,7 @@ bool isBlockedMatmul(Operation *op) {
   if (!isa<linalg::LinalgOp>(op))
     return false;
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-  return tpp::utils::hasMatmulBody(linalgOp);
+  return tpp::utils::hasMulAddBody(linalgOp);
 }
 
 static std::optional<int64_t> getConstantRange(const Range &range) {

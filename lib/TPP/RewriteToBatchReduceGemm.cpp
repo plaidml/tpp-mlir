@@ -92,19 +92,13 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
     if (map.getNumResults() < 3)
       return failure();
     if (operand->getOperandNumber() == 1) {
-      if (operand->get().getType().cast<ShapedType>().getRank() == 5 &&
-          map.getNumResults() != 5)
-        return failure();
       maps.push_back(map.getMinorSubMap(4));
     } else {
       maps.push_back(map.getMinorSubMap(3));
     }
   }
   for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
-    if (map.getNumResults() < 2)
-      return failure();
-    maps.push_back(map.getMinorSubMap(2));
+    maps.push_back(linalgOp.getMatchingIndexingMap(operand).getMinorSubMap(2));
   }
 
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
@@ -121,6 +115,11 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
   // Expected access patterns of BRGEMM.
   expectedMaps = infer(
       {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
+  auto secondOperand = linalgOp.getDpsInputOperands()[1];
+  auto secondOpShapedType = secondOperand->get().getType().cast<ShapedType>();
+  assert(secondOpShapedType.getShape()[secondOpShapedType.getRank() - 1] ==
+             *blockingFactor &&
+         "Blocking factor incorrect");
   if (compressedDimMaps != expectedMaps)
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
@@ -161,9 +160,9 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
   return success();
 }
 
-// single region block with add, mul and linal::yield.
+// single region block with add, mul and linalg::yield.
 static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
-  if (!tpp::utils::hasMatmulBody(linalgOp))
+  if (!tpp::utils::hasMulAddBody(linalgOp))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
   return success();
@@ -180,8 +179,8 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
   SmallVector<Value> slicedOperands;
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
     FailureOr<Value> slicedOperand;
-    AffineMap map = linalgOp.getMatchingIndexingMap(operand);
-    if (isVNNILoop && map.getNumResults() == 5) {
+    // In VNNI layout the second operand has size '4'.
+    if (isVNNILoop && operand->getOperandNumber() == 1) {
       slicedOperand = linalgx::utils::getSliceOperand(
           builder, operand, linalgOp, localIvs, valuesToUse, 4);
     } else {
@@ -201,31 +200,6 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
     slicedOperands.push_back(*slicedOperand);
   }
   return slicedOperands;
-}
-
-// Returns true if linalg op is using its second operand in VNNI format.
-static bool isLinalgOpVNNI(linalg::LinalgOp linalgOp) {
-  if (linalgOp->getNumOperands() < 3)
-    return false;
-  auto firstOperand = linalgOp->getOperands()[1];
-  auto firstOperandType = firstOperand.getType();
-
-  // Linalg loop must have 7 dimensions.
-  if ((firstOperandType.cast<ShapedType>().getRank() == 5 &&
-       linalgOp.getNumLoops() != 7) ||
-      (firstOperandType.cast<ShapedType>().getRank() == 4 &&
-       linalgOp.getNumLoops() != 5))
-    return false;
-
-  auto blockingFactor = vnni::utils::getVNNIBlockingFactor(firstOperandType);
-  if (!blockingFactor)
-    // Unsupported blocking factor for type.
-    return false;
-  return (
-      vnni::utils::isBF16Type(firstOperandType) &&
-      firstOperandType.cast<ShapedType>()
-              .getShape()[firstOperandType.cast<ShapedType>().getRank() - 1] ==
-          *blockingFactor);
 }
 
 // Walk `ivs` and return the outermost loop.
@@ -346,9 +320,6 @@ rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
 
   if (failed(checkBody(linalgOp)))
     return rewriter.notifyMatchFailure(linalgOp, "expects a GEMM-like body");
-
-  if (!isLinalgOpVNNI(linalgOp))
-    return rewriter.notifyMatchFailure(linalgOp, "non-VNNI format");
 
   if (failed(checkVNNIStructure(linalgOp))) {
     return rewriter.notifyMatchFailure(

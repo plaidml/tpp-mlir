@@ -384,6 +384,11 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
+    // Convert generics to BRGEMM.
+    // The mapping is done after bufferization as the buffer semantics
+    // allow direct use of scf.parallel loops. This prevents different
+    // lowering outputs between input linalg on tensors and memrefs.
+    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
 
       // Lower operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());
