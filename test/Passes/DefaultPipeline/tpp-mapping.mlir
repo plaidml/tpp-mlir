@@ -269,3 +269,48 @@ func.func @conv_init_simplify(%arg0: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x6
 // CHECK: scf.for
 // CHECK:   linalg.matmul
 // CHECK-NOT: linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
+    %arg2: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0.0 : f32
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<64x64xf32>, tensor<64x64xf32>)
+    outs(%arg2 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %1 = linalg.generic {indexing_maps = [#map],
+                       iterator_types = ["parallel", "parallel"]}
+    outs(%0: tensor<64x64xf32>) {
+      ^bb0(%out: f32):
+        %2 = arith.maxf %out, %c0 : f32
+        linalg.yield %2 : f32
+    } -> tensor<64x64xf32>
+  return %1 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @tile_and_fuse(
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<64x64xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<2x2x32x32xf32>
+// Generalized pack of the second input
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<64x64xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<2x2x32x32xf32>
+// Generalized pack of the output
+// CHECK: scf.for
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice{{[^:]+}}: tensor<64x64xf32> to tensor<32x32xf32>
+// CHECK:     linalg.transpose
+// CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<2x2x32x32xf32>
+// TODO: the two linalg ops should be fussed when the default tiling sizes are chosen correctly
+//       then some scf loops should be present
+// CHECK-NOT: scf.for
+// CHECK-NOT: scf.parallel
+// CHECK: linalg.generic{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x2x32x32xf32>, tensor<2x2x32x32xf32>)
+// CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<2x2x32x32xf32>)
+// CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<2x2x32x32xf32>)
