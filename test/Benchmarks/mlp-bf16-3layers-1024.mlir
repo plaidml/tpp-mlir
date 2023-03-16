@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -element-wise-fusion -tile-consumer-and-fuse-producers="tile-sizes=1,1 max-depth=2" |
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,1 max-depth=2" |
 // RUN: tpp-run %s -n 10 \
 // RUN:  -e entry -entry-point-result=void
 
