@@ -26,6 +26,14 @@
     }
   }},
   {
+  "mlp-fp32-3x1024": {
+    "mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "flags": ["--disable-lsan"]
+    }
+  }},
+  {
   "mlp-bf16-3x1024": {
     "mlir": {
       "type": "MLIR",
