@@ -24,10 +24,16 @@
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
+
+// Extra command line options to control the default TPP utility passes.
+llvm::cl::opt<bool> packMatmul("def-pack-matmul",
+                               llvm::cl::desc("Default pipeline - pack matmul"),
+                               llvm::cl::init(true));
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -241,7 +247,8 @@ private:
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
     // Convert ops to packed layouts.
-    pm.addPass(createPackMatmulPass({32, 32, 32}));
+    if (packMatmul)
+      pm.addPass(createPackMatmulPass({32, 32, 32}));
     pm.addPass(createPackVNNIPass());
 
     // Postprocess packing.
