@@ -82,18 +82,26 @@ void Bufferize::runOnOperation() {
   buffOpts.bufferizeFunctionBoundaries = true;
   buffOpts.functionBoundaryTypeConversion =
       bufferization::LayoutMapOption::IdentityLayoutMap;
+  bool runOnlyAnalysis = this->testAnalysisOnly || this->printConflicts;
+  if (runOnlyAnalysis) {
+    buffOpts.printConflicts = this->printConflicts;
+    buffOpts.testAnalysisOnly = this->testAnalysisOnly;
+  }
   passManager.addPass(bufferization::createOneShotBufferizePass(buffOpts));
-  passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      bufferization::createFinalizingBufferizePass());
 
-  // Post-processing.
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCSEPass());
-  // There are redundant memcpy (with linalg.generic form) ops created, which
-  // can be deleted by canonicalizer. We have to run it again because the
-  // memrefs are unified in CSE pass, so we can truly remove redundant memcpy.
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  if (!runOnlyAnalysis) {
+    passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
+    passManager.addNestedPass<func::FuncOp>(
+        bufferization::createFinalizingBufferizePass());
+
+    // Post-processing.
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+    // There are redundant memcpy (with linalg.generic form) ops created, which
+    // can be deleted by canonicalizer. We have to run it again because the
+    // memrefs are unified in CSE pass, so we can truly remove redundant memcpy.
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  }
 
   if (failed(runPipeline(passManager, moduleOp)))
     return signalPassFailure();
