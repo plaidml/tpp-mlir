@@ -116,7 +116,8 @@ class BenchmarkController(object):
                                              '--entry-point-result=void',
                                              '--print=0',
                   ]
-        runCmd.extend(shlex.split(self.args.run_args))
+        if self.args.run_args:
+            runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
         if runResult.stderr:
             self.logger.error(f"Error executing tpp-run: {runResult.stderr}")
