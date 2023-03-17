@@ -683,18 +683,18 @@ struct TileConsumerAndFuseProducers
 
     auto &ctx = getContext();
     {
-      // Patterns for scf.for
+      // Patterns for scf.for.
       RewritePatternSet patterns(&ctx);
       patterns.add<ReplaceIterArgs>(&ctx);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
     {
-      // Patterns for scf.forall
+      // Patterns for scf.forall.
       RewritePatternSet patterns(&ctx);
       if (this->useForAll)
         patterns.add<ConvertToForAll>(&ctx);
-      // fold unit-extent dims for linalg on tensors.
+      // Fold unit-extent dims for linalg on tensors.
       linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
       tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
