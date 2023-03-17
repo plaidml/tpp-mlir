@@ -98,6 +98,8 @@ struct CombineTppOpPattern : public OpRewritePattern<tpp::ReluOp> {
                        reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
                        brgemmOp->getOpOperands()[1].get(),
                        addOp->getOpOperands()[1].get(),
+                       tpp::FusedOpTypeAttr::get(brgemmOp->getContext(),
+                                                 tpp::FusedOpType::RELU),
                        reluOp->getOpOperands()[1].get())
                    ->getResult(0);
     }

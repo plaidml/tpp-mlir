@@ -133,7 +133,10 @@ LogicalResult FusedBrgemmOp::verify() {
 
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
                           ValueRange inputs, Value output) {
-  FusedBrgemmOp::build(builder, state, inputs[0], inputs[1], inputs[2], output);
+  FusedBrgemmOp::build(
+      builder, state, inputs[0], inputs[1], inputs[2],
+      tpp::FusedOpTypeAttr::get(builder.getContext(), tpp::FusedOpType::NONE),
+      output);
 }
 //===----------------------------------------------------------------------===//
 // AdddOp

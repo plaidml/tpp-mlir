@@ -48,7 +48,7 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
 
 // Class for tpp binary operations with broadcast operands.
 class Tpp_BinaryBCastOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, []> {
+  Tpp_Op<mnemonic, !listconcat(traits, [])> {
 
   let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
 
@@ -411,8 +411,8 @@ def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
   let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
                        TppBRGEMMemrefInput:$batchMatrixB,
                        TppMemRef: $bias,
-		       Tpp_FusedOpType: $fusedOpType,
-		       TppMemRef:$matrixC);
+		                   Tpp_FusedOpType: $fusedOpType,
+		                   TppMemRef:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
@@ -459,15 +459,17 @@ def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
 
     ```mlir
 
-      tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, %2: memref<3x2x4x2xbf16>, %3: memref<4xbf16>)
-                      out(%3: memref<6x4xbf16>)
+      tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, 
+                                %2: memref<3x2x4x2xbf16>, 
+                                %3: memref<4xbf16>)
+                            out(%3: memref<6x4xbf16>)
     ```
   }];
 
   let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
                        TppBRGEMMVNNIMemrefInput:$batchMatrixB,
                        TppMemRef: $bias,
-		       TppMemRef:$matrixC);
+		                   TppMemRef:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`

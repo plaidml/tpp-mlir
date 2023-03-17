@@ -3,6 +3,7 @@ add_mlir_dialect_library(TPPTppDialect
     TppDialect.cpp
     TppOps.cpp
     TppUtils.cpp
+    TppAttr.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
@@ -10,6 +11,7 @@ add_mlir_dialect_library(TPPTppDialect
   DEPENDS
     # add_mlir_dialect macro force-prefixes with MLIR
     MLIRTppOpsIncGen
+    MLIRTppAttrDefIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR
