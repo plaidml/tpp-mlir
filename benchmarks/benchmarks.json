@@ -27,12 +27,12 @@
     "fp32_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-3layers-1024.mlir",
-      "flags": [ "--disable-lsan", "-run-args='-def-pack-matmul=0'" ]
+      "flags": [ "--disable-lsan" ]
     },
     "bf16_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
-      "flags": [ "--disable-lsan", "-run-args='-def-pack-matmul=0'" ]
+      "flags": [ "--disable-lsan" ]
     },
     "bf16_10x3584_mlir": {
       "type": "MLIR",
@@ -42,7 +42,7 @@
     "vnni_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-vnni-3layers-1536.mlir",
-      "flags": [ "--disable-lsan", "-run-args='-def-pack-matmul=0'" ]
+      "flags": [ "--disable-lsan" ]
     }
   }},
   {
