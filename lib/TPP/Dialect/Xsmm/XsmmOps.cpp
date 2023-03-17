@@ -17,11 +17,3 @@
 
 using namespace mlir;
 using namespace mlir::xsmm;
-
-LogicalResult QuarternaryOp::verify() { return success(); }
-
-LogicalResult TernaryOp::verify() { return success(); }
-
-LogicalResult BinaryOp::verify() { return success(); }
-
-LogicalResult UnaryOp::verify() { return success(); }
