@@ -1,15 +1,5 @@
 // RUN: tpp-opt %s -split-input-file -verify-diagnostics
 
-func.func @tpp_add_invalid(%arg0: memref<1x2xf32>,
-                           %arg1: memref<2x2xf32>) -> memref<2x1xf32> {
-
-  // expected-error @below {{'tpp.add' op requires all operands to have the same shape or strides}}
-  tpp.add ins(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) out(%arg1: memref<2x2xf32>)
-  return %arg1: memref<2x2xf32>
-}
-
-// -----
-
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
   // expected-error @below {{'tpp.add' op expects all operands to be shaped type}}
   tpp.add ins(%arg0: f32, %arg0: f32) out(%arg1: f32)
@@ -116,8 +106,16 @@ func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
 
 // -----
 
-func.func @tpp_add_wrong_strides(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
-  // expected-error @below {{'tpp.add' op requires all operands to have the same shape or strides}}
-  tpp.add ins(%arg0: memref<4x4xf32>, %arg0: memref<4x4xf32>) out(%arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>)
+func.func @tpp_add_check_broadcast_operand(%arg0: memref<2x3xf32>, %arg1: memref<3x3xf32>) {
+  // expected-error @below {{'tpp.add' op operands don't have broadcast-compatible shapes}}
+  tpp.add ins(%arg0: memref<2x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
   return
+}
+
+// -----
+
+func.func @tpp_add_check_broadcast_result(%arg0: memref<8x1xf32>, %arg1: memref<8x8xf32>) {
+  // expected-error @below {{'tpp.add' op result type not broadcast compatible with broadcasted operands's shapes}}
+  tpp.add ins(%arg1: memref<8x8xf32>, %arg1: memref<8x8xf32>) out(%arg0: memref<8x1xf32>)
+  return 
 }
