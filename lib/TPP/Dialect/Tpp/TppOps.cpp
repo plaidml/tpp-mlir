@@ -160,22 +160,6 @@ LogicalResult AddOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// AddBCastOp
-//===----------------------------------------------------------------------===//
-
-// Accept only shaped operands for AddOp. We currently do not support
-// broadcasting and TPP operations are memory to memory thus disallow scalar
-// operand for now.
-LogicalResult AddBCastOp::verify() {
-  Type lhsType = getLhs().getType();
-  Type rhsType = getRhs().getType();
-  Type outputType = getOut().getType();
-  if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
-      (!outputType.isa<ShapedType>()))
-    return emitOpError("expects all operands to be shaped type");
-  return success();
-}
-//===----------------------------------------------------------------------===//
 // ReluOp
 //===----------------------------------------------------------------------===//
 

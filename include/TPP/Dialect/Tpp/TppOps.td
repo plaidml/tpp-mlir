@@ -46,19 +46,6 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   }];
 }
 
-// Class for tpp binary operations with broadcast operands.
-class Tpp_BinaryBCastOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [])> {
-
-  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
-
-  let assemblyFormat = [{
-        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
-        `out` `(` $out `:` type($out) `)` attr-dict
-  }];
-}
-
-
 // Class for tpp.unary operations.
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [])> {
@@ -104,37 +91,6 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 
   let hasVerifier = 1;
 }
-
-//===----------------------------------------------------------------------===//
-// Add_BCastOp
-//===----------------------------------------------------------------------===//
-
-def Tpp_AddBCastOp : Tpp_BinaryBCastOp<"add_bcast"> {
-  let summary = "Element-wise addition with one of the operands marked as broadcastable.";
-  let description = [{
-    The `tpp.add_bcast` operation performs element-wise addition on two-dimensional
-    memrefs, with one of the operands marked as broadcastable, writing the result on
-    the output memref. No checks or assumption are made on the input/output arguments 
-    so the same memref can be passed both as input and output. 
-
-    Example:
-
-    ```mlir
-
-    // A = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>) 
-            out(%1: memref<2x2xf32>)
-
-    // C = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>)
-            out(%3 : memref<2x2xf32>)
-
-    ```
-  }];
-
-  let hasVerifier = 1;
-}
-
 
 //===----------------------------------------------------------------------===//
 // IdentityOp
