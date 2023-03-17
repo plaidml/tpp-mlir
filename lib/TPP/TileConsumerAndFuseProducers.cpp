@@ -681,20 +681,24 @@ struct TileConsumerAndFuseProducers
       }
     }
 
-    // Pattern to replace iter args of the outer most loop with region args of
-    // the inner most one.
-    RewritePatternSet patterns1(&getContext());
-    patterns1.add<ReplaceIterArgs>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns1));
+    auto &ctx = getContext();
+    {
+      // Patterns for scf.for
+      RewritePatternSet patterns(&ctx);
+      patterns.add<ReplaceIterArgs>(&ctx);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
 
-    RewritePatternSet patterns(&getContext());
-    if (this->useForAll)
-      patterns.add<ConvertToForAll>(&getContext());
-    // fold unit-extent dims for linalg on tensors.
-    linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
-    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
+    {
+      // Patterns for scf.forall
+      RewritePatternSet patterns(&ctx);
+      if (this->useForAll)
+        patterns.add<ConvertToForAll>(&ctx);
+      // fold unit-extent dims for linalg on tensors.
+      linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+      tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
   }
 };
 

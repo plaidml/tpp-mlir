@@ -1,4 +1,6 @@
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers -cse | FileCheck %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers -cse -bufferize | FileCheck %s -check-prefix=ALLOC
+// ALLOC-COUNT-1: memref.alloc
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
