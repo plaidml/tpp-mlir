@@ -13,8 +13,7 @@ include "TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "TppAttr.td"
-
-// TODO: implement ResultsBroadcastableShape ?
+include "mlir/IR/OpBase.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
     Type<And<[MemRefOf<allowedTypes>.predicate,
@@ -33,6 +32,10 @@ def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
+
+// Tpp operation trait - make sure the operand are broadcastable
+// following Numpy-style broadcast.
+def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 
 // Class for tpp binary operations.
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
@@ -62,7 +65,7 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_BinaryOp<"add"> {
+def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape]> {
   let summary = "Element-wise addition.";
   let description = [{
     The `tpp.add` operation performs element-wise addition on two-dimensional

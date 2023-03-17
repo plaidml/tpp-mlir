@@ -10,6 +10,8 @@
 #define TPP_DIALECT_TPP_TPPOPS_H
 
 #include "TPP/Dialect/Tpp/TppAttr.h"
+#include "TPP/Dialect/Tpp/TppTraits.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
