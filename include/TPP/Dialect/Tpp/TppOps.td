@@ -12,6 +12,7 @@
 include "TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "TppAttr.td"
 
 // TODO: implement ResultsBroadcastableShape ?
 
@@ -120,13 +121,9 @@ def Tpp_AddBCastOp : Tpp_BinaryBCastOp<"add_bcast"> {
 
     ```mlir
 
-    // A = A + A_BCast
-    tpp.add_bcast ins(%1 : memref<2x2xf32>, %1: memref<2xf32>)
-            out(%1 : memref<2x2xf32>)
-
     // A = A + B
     tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>) 
-            out(%2: memref<2x2xf32>)
+            out(%1: memref<2x2xf32>)
 
     // C = A + B
     tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2xf32>)
@@ -406,20 +403,22 @@ def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
 
     ```mlir
 
-      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>)
-                      out(%3: memref<6x4xf32>)
+      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>, %4: i64)
+                      out(%5: memref<6x4xf32>)
     ```
   }];
 
   let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
                        TppBRGEMMemrefInput:$batchMatrixB,
                        TppMemRef: $bias,
+		       Tpp_FusedOpType: $fusedOpType,
 		       TppMemRef:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `,`
-		$bias `:` type($bias)  `)`
+		$bias `:` type($bias)  `,`
+		$fusedOpType `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
