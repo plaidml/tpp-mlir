@@ -36,6 +36,7 @@ StringRef getMatchBroadcastRuleMessage(utils::MatchBroadcastRuleResult res) {
   llvm_unreachable("unhandled MatchBroadcastRuleResult case");
 }
 
+// TODO: use verifyCompatibleOperandBroadcast
 LogicalResult IdentityOp::verify() {
   utils::MatchBroadcastRuleResult res =
       utils::verifyTppIdentityBroadcastingRules(getInput().getType(),
@@ -161,12 +162,15 @@ static bool isCompatibleInferredReturnShape(ArrayRef<int64_t> inferred,
   };
   if (inferred.size() != existing.size())
     return false;
-  for (auto p : llvm::zip(inferred, existing))
+  for (auto p : llvm::zip_equal(inferred, existing))
     if (!isCompatible(std::get<0>(p), std::get<1>(p)))
       return false;
   return true;
 }
 
+// TODO: this should be part of an interface to verify tpp ops.
+// The interface will have methods to query the bcast (scalar, row or col) on
+// each operand.
 LogicalResult verifyCompatibleOperandBroadcast(Operation *op,
                                                TypeRange inputTypes,
                                                Type outputType) {
