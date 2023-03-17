@@ -69,17 +69,21 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
 
 /// Eternal functions imported in IREE must pass everything via void*.
 extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_brgemm_dispatch_f32(void *context, void *params, void *reserved);
+iree_xsmm_brgemm_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_matmul_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_unary_dispatch(void *context, void *params, void *reserved);
+extern "C" MLIR_RUNNERUTILS_EXPORT int
+iree_xsmm_binary_dispatch(void *context, void *params, void *reserved);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_brgemm_invoke_f32(void *context, void *params, void *reserved);
+iree_xsmm_brgemm_invoke(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_matmul_invoke(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_unary_invoke(void *context, void *params, void *reserved);
+extern "C" MLIR_RUNNERUTILS_EXPORT int
+iree_xsmm_binary_invoke(void *context, void *params, void *reserved);
 
 #endif // TPP_EXECUTIONENGINE_CRUNNERUTILS_H
