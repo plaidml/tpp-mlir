@@ -308,7 +308,7 @@ bool isBlockedMatmul(Operation *op) {
 
   // Make sure all loops are characterized as one of:
   // - I loop: present in C and A but not in B. I must be parallel.
-  // - J loop: present in C and B but not in A. J must be paralell.
+  // - J loop: present in C and B but not in A. J must be parallel.
   // - K loop: present in A and B but not in C. K must be reduction.
   llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(indexingMaps.back());
   llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(indexingMaps.front());
