@@ -1,14 +1,14 @@
-// RUN: tpp-opt %s -convert-check-to-loops -convert-linalg-to-tpp -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -convert-func-to-llvm -convert-math-to-llvm -reconcile-unrealized-casts |\
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
-//
-
-// Make sure we map to tpp
+// This should really be in the passes directory, not here
 // RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
-// Validate default pipeline
+// We don't need to print because we use the check dialect
 // RUN: tpp-run %s \
+// RUN:  -e entry -entry-point-result=void
+
+// RUN: tpp-run %s -tpp-to-loops -print \
+// RUN:  -e entry -entry-point-result=void
+
+// RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void
 
 #map = affine_map<(d0) -> (d0)>

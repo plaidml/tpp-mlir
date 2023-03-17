@@ -42,8 +42,8 @@ bool hasTppMark(linalg::LinalgOp linalgOp);
 // Returns true if the linalg operation is marked with 'target'.
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
-// Returns true if the linalg operation has a Matmul region.
-bool hasMatmulBody(linalg::LinalgOp linalgOp);
+// Returns true if the linalg operation has a MulAdd region.
+bool hasMulAddBody(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);

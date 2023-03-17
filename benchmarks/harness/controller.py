@@ -71,6 +71,8 @@ class BenchmarkController(object):
             self.unit = "gflops"
         if (not self.args.opt_args and 'opt-args' in fileArgs):
             self.args.opt_args = fileArgs['opt-args']
+        if (not self.args.run_args and 'run-args' in fileArgs):
+            self.args.run_args = fileArgs['run-args']
 
         # Make sure we get all we need
         self.logger.info("Validating arguments")
@@ -114,6 +116,8 @@ class BenchmarkController(object):
                                              '--entry-point-result=void',
                                              '--print=0',
                   ]
+        if self.args.run_args:
+            runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
         if runResult.stderr:
             self.logger.error(f"Error executing tpp-run: {runResult.stderr}")
@@ -171,13 +175,21 @@ if __name__ == '__main__':
                         help='Name of the entry point (checks RUN line)')
     parser.add_argument('-opt-args', type=str,
                         help='tpp-opt arguments (checks RUN line)')
+    parser.add_argument('-run-args', type=str,
+                        help='tpp-run arguments')
     parser.add_argument('-v', '--verbose', action='count', default=0,
                         help='The verbosity of logging output')
     parser.add_argument('-q', '--quiet', action='count', default=0,
                         help='Suppress warnings')
     parser.add_argument('-x', '--xsmm', action='count', default=1,
                         help='Turn on TPP optimizations (default)')
+    parser.add_argument('--disable-lsan', action='count', default=0,
+                        help='Disable LSAN')
     args = parser.parse_args()
+
+    # Some tensors may not be freed but we still want numbers
+    if args.disable_lsan:
+        os.putenv("ASAN_OPTIONS", f"detect_leaks=0")
 
     # Creates the logger object
     loglevel = args.verbose - (args.quiet > 0)

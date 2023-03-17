@@ -130,8 +130,8 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   let summary = "Convert matmul to block layout and back";
   let description = [{
-    Block Matmul as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb] If
-    the Matmul has a relu operation as its consumer block also the relu operation.
+    Block a linalg.matmul 
+    as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb].
   }];
   let options = [
     ListOption<"blockingFactors", "block-factors", "int64_t", 
@@ -178,8 +178,8 @@ def RewriteToBatchReduceGemm : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
     Rewrite a linalg.generic to a linalg.batch_reduce_matmul.
     Example: Given a Gemm in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
     [KB][CB][cb][kb] map it to a batch-reduce Gemm by splitting out the two
-    outermost parallel dimensions (as scf.for) and rewrite the body to a
-    linalg.batch_reduce_matmul. 
+    outermost parallel dimensions (as scf.for or scf.parallel at buffer level)
+    and rewrite the body to a linalg.batch_reduce_matmul. 
 
     The pass works on any linalg.generic and attempts to map the innermost
     loops to BRGemm.  It works both a memref and tensor level. When the element
@@ -253,13 +253,18 @@ def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
 
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
   let summary = "Propagate tensor.pack and tensor.unpack";
+  let description = [{
+    Attempt to push tensor.pack and tensor.unpack at the boundaries. Currently,
+    it propagates through linalg element-wise operations. Only one operand in the
+    generic must come from a tensor.pack/tensor.unpack.
+  }];
   let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
 }
 
 def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
   let summary = "Constant fold tensor.pack";
   let description = [{
-    Reduce pack overhead by folding tensor.pack into constants.
+    Reduce pack overhead by folding tensor.pack into constant tensors.
   }];
   let constructor = "mlir::tpp::createConstantFoldPackPass()";
 }
@@ -282,6 +287,14 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let constructor = "mlir::tpp::createBufferizePass()";
+  let options = [
+    Option<"testAnalysisOnly", "test-analysis-only", "bool",
+            /*default=*/"false",
+           "Only runs inplaceability analysis (for testing purposes only)">,
+    Option<"printConflicts", "print-conflicts", "bool",
+            /*default=*/"false",
+           "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
+  ];
 }
 
 def Cleanup : Pass<"cleanup", "func::FuncOp"> {
@@ -344,7 +357,6 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
   let summary = "Convert scf.forall to scf.parallel";
   let description = [{
     Rewrite an scf.forall to scf.parallel after bufferization.
-    Requires scf.forall to be a normalized loop.
   }];
   let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
 }

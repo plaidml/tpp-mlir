@@ -1,3 +1,6 @@
+// This should really be in the passes directory, not here
+// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck %s
+
 // RUN: tpp-run %s -tpp-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
@@ -10,8 +13,6 @@
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
-
-// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck %s
 
 func.func private @generate_1D_source(%init_source : memref<?xf32>){
   linalg.generic {

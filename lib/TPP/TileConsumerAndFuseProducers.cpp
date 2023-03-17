@@ -117,11 +117,7 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
 };
 
 static bool isMatmulLike(Operation *op) {
-  if (isa_and_nonnull<linalg::MatmulOp>(op))
-    return true;
-  if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
-    return linalgx::utils::isBlockedMatmul(maybeMatmul);
-  return false;
+  return linalgx::utils::isBlockedMatmul(op) || tpp::utils::isTppMatmul(op);
 }
 
 static bool isConvolutionLike(Operation *op) {
@@ -533,7 +529,20 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   return tileAndFuseResult;
 }
 
-static SmallVector<int64_t> getDefaultTileSizes() { return {32, 32}; }
+static SmallVector<int64_t> getDefaultTileSizes(linalg::LinalgOp linalgOp) {
+  // Blocked convolutions are tiled and fused along the three outermost parallel
+  // loops to expose a BRGEMM.
+  if (linalgx::utils::isBlockedConvolution(linalgOp))
+    return {1, 1, 1};
+  // Matmuls are tiled and fused along i and j with 32.
+  if (tpp::utils::isTppMatmul(linalgOp))
+    return {32, 32};
+  // Blocked matmuls are tiled and fused along the two outermost parallel loops
+  // to expose a BRGEMM.
+  if (linalgx::utils::isBlockedMatmul(linalgOp))
+    return {1, 1};
+  return {32, 32};
+}
 
 static Operation *
 getLastFusableConsumer(linalg::LinalgOp linalgOp,
@@ -603,11 +612,15 @@ struct TileConsumerAndFuseProducers
     std::reverse(linalgOperations.begin(), linalgOperations.end());
     llvm::SmallDenseSet<Operation *> visitedConsumers;
     llvm::SmallDenseSet<Operation *> fusionRoots;
+    DenseMap<Operation *, SmallVector<int64_t>> defaultTiles;
     for (linalg::LinalgOp linalgOp : linalgOperations) {
       Operation *rootOp = linalgOp.getOperation();
       if (this->startFromLastFusableConsumer)
         rootOp = getLastFusableConsumer(linalgOp, visitedConsumers);
       fusionRoots.insert(rootOp);
+      defaultTiles[rootOp] = (this->tileSizes.empty())
+                                 ? getDefaultTileSizes(linalgOp)
+                                 : llvm::to_vector(this->tileSizes);
     }
 
     LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
@@ -623,13 +636,11 @@ struct TileConsumerAndFuseProducers
     for (Operation *linalgOp : allLinalgOps) {
       if (fusionRoots.count(linalgOp)) {
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
-        if (this->tileSizes.empty())
-          this->tileSizes = getDefaultTileSizes();
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
-            fuseWithEltwise(
-                rewriter, cast<TilingInterface>(linalgOp),
-                getAsOpFoldResult(rewriter.getI64ArrayAttr(this->tileSizes)),
-                fusedOps, this->maxDepth);
+            fuseWithEltwise(rewriter, cast<TilingInterface>(linalgOp),
+                            getAsOpFoldResult(rewriter.getI64ArrayAttr(
+                                defaultTiles[linalgOp])),
+                            fusedOps, this->maxDepth);
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (succeeded(fuseAndTileResult)) {
           rewriter.replaceOp(

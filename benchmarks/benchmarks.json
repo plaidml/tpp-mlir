@@ -1,28 +1,38 @@
 [
   {
-  "simple_copy": {
-    "ref": {
+  "canary": {
+    "mlp_fp32_layer_ref": {
       "type": "C++",
-      "benchmark": "bench_simple_copy",
+      "benchmark": "bench_mlp",
       "flags": []
     },
-    "mlir": {
+    "mlp_fp32_layer_mlir": {
       "type": "MLIR",
-      "benchmark": "simple_copy.mlir",
+      "benchmark": "mlp-fp32-1layer-512.mlir",
       "flags": []
     }
   }},
   {
   "mlp": {
-    "ref": {
-      "type": "C++",
-      "benchmark": "bench_mlp",
-      "flags": []
-    },
-    "mlir": {
+    "fp32_3x1024_mlir": {
       "type": "MLIR",
-      "benchmark": "mlp.mlir",
-      "flags": []
+      "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "flags": ["--disable-lsan"]
+    },
+    "bf16_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16-3layers-1024.mlir",
+      "flags": ["--disable-lsan"]
+    },
+    "bf16_10x3584_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16-10layers-3584.mlir",
+      "flags": ["--disable-lsan"]
+    },
+    "vnni_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-vnni-3layers-1536.mlir",
+      "flags": ["--disable-lsan"]
     }
   }},
   {

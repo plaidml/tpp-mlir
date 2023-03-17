@@ -1,28 +1,12 @@
-// RUN: tpp-opt %s \
-// RUN: -linalg-generalize-named-ops -bufferize \
-// RUN: -convert-linalg-to-loops \
-// RUN: -convert-vector-to-scf -convert-scf-to-cf \
-// RUN: -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm \
-// RUN: -convert-func-to-llvm -reconcile-unrealized-casts | \
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Validate default pipeline
-// RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes="linalg-to-loops" | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: tpp-opt %s -linalg-generalize-named-ops -default-tpp-passes="tpp-to-loops" | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -tpp-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: tpp-opt %s -linalg-generalize-named-ops | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 

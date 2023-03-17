@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
     unit = "gflops";
 
   std::cout << std::fixed << std::setw(9) << std::setprecision(3) <<
-    mean << " +- " << stdev << " " << unit << std::endl;
+    mean << " +- " << std::setw(9) << stdev << " " << unit << std::endl;
 
   return returnValue;
 }

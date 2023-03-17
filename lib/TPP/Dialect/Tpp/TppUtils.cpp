@@ -89,7 +89,7 @@ static bool isAddMul(Block &block) {
   return success;
 }
 
-bool hasMatmulBody(linalg::LinalgOp linalgOp) {
+bool hasMulAddBody(linalg::LinalgOp linalgOp) {
   if (linalgOp->getNumRegions() != 1)
     return false;
   Region &region = linalgOp->getRegion(0);
@@ -225,10 +225,10 @@ static bool isZeroOp(Operation *defOp) {
 
 // Returns true if the linalg.generic maps to a tpp.gemm.
 bool isTppMatmul(linalg::LinalgOp linalgOp) {
-  if (!isa_and_nonnull<linalg::GenericOp>(linalgOp))
-    return false;
   if (isa_and_nonnull<linalg::MatmulOp>(linalgOp))
     return true;
+  if (!isa_and_nonnull<linalg::GenericOp>(linalgOp))
+    return false;
   // structural and access pattern.
   SmallVector<mlir::utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
@@ -245,7 +245,7 @@ bool isTppMatmul(linalg::LinalgOp linalgOp) {
   if (linalgOp.getIndexingMapsArray() != infer({{i, k}, {k, j}, {i, j}}))
     return false;
   // operations and operands.
-  return hasMatmulBody(linalgOp);
+  return hasMulAddBody(linalgOp);
 }
 
 static bool allIndexingsAreProjectedPermutation(linalg::GenericOp genericOp) {
