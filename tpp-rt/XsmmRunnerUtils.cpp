@@ -367,6 +367,17 @@ namespace {
     int64_t offset;
     int64_t sizes_and_strides[0];  // variable size: sizes[rank], strides[rank]
   } iree_input_tensor_t;
+
+  // Based on the code https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
+  // allocatedPtr and alignedPtr should be same. Also, the offset needs to be 0.
+  // We add these assumptions as asserts.
+  static inline void check_integrity_of_iree_input_tensor(
+    const iree_input_tensor_t *tensor) {
+      assert(tensor->allocatedPtr == tensor->alignedPtr &&
+        "allocatedPtr and alignedPtr are not same in iree_input_tensor to XsmmRunner");
+      assert(tensor->offset == 0 &&
+        "offset is non-zero in iree_input_tensor to XsmmRunner");
+    }
 }
 
 extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
@@ -461,6 +472,10 @@ extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
   } xsmm_brgemm_invoke_t;
   xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *)params;
 
+  check_integrity_of_iree_input_tensor(p->pA);
+  check_integrity_of_iree_input_tensor(p->pB);
+  check_integrity_of_iree_input_tensor(p->pC);
+
   void *addr_tensorA = p->pA->allocatedPtr;
   void *addr_tensorB = p->pB->allocatedPtr;
   void *addr_tensorC = p->pC->allocatedPtr;
@@ -493,6 +508,10 @@ extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
   } xsmm_matmul_invoke_t;
   xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *)params;
 
+  check_integrity_of_iree_input_tensor(p->pA);
+  check_integrity_of_iree_input_tensor(p->pB);
+  check_integrity_of_iree_input_tensor(p->pC);
+
   void *addr_tensorA = p->pA->allocatedPtr;
   void *addr_tensorB = p->pB->allocatedPtr;
   void *addr_tensorC = p->pC->allocatedPtr;
@@ -521,6 +540,9 @@ extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
   } xsmm_unary_invoke;
   xsmm_unary_invoke *p = (xsmm_unary_invoke *)params;
 
+  check_integrity_of_iree_input_tensor(p->pA);
+  check_integrity_of_iree_input_tensor(p->pB);
+
   void *addr_a = p->pA->allocatedPtr;
   void *addr_b = p->pB->allocatedPtr;
 
@@ -547,6 +569,10 @@ extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
     iree_input_tensor_t *pC;
   } xsmm_binary_invoke;
   xsmm_binary_invoke *p = (xsmm_binary_invoke *)params;
+
+  check_integrity_of_iree_input_tensor(p->pA);
+  check_integrity_of_iree_input_tensor(p->pB);
+  check_integrity_of_iree_input_tensor(p->pC);
 
   void *addr_a = p->pA->allocatedPtr;
   void *addr_b = p->pB->allocatedPtr;
