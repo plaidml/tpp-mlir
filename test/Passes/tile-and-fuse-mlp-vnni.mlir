@@ -8,7 +8,9 @@
 
 func.func @mlp(%arg0: tensor<8x48x32x32xbf16>, %arg1: tensor<48x48x16x32x2xbf16>, %arg2: tensor<1536xbf16>, %arg3: tensor<8x48x32x32xbf16>) -> tensor<8x48x32x32xbf16> {
   %cst = arith.constant 0.000000e+00 : bf16
-  // CHECK: scf.forall
+  // CHECK: %[[C48:.+]] = arith.constant 48 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) in (%[[C8]], %[[C48]])
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x48x32x32xbf16>, tensor<48x48x16x32x2xbf16>) outs(%arg3 : tensor<8x48x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %3 = arith.mulf %in, %in_0 : bf16
