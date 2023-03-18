@@ -77,9 +77,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformDropSchedulePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createPackMatmulPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNchwFchwPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createPackConv2DNhwcHwcfPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createPackMatmulPass(ArrayRef<int64_t> blockingFactors = {});
+std::unique_ptr<OperationPass<func::FuncOp>>
+createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors = {});
+std::unique_ptr<OperationPass<func::FuncOp>>
+createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteToBatchReduceGemmPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -99,7 +102,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createTppMappingPass();
+std::unique_ptr<OperationPass<ModuleOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool loops = false);
