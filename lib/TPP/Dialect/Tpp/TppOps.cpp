@@ -35,6 +35,7 @@ StringRef getMatchBroadcastRuleMessage(utils::MatchBroadcastRuleResult res) {
   llvm_unreachable("unhandled MatchBroadcastRuleResult case");
 }
 
+// TODO: use verifyCompatibleOperandBroadcast
 LogicalResult IdentityOp::verify() {
   utils::MatchBroadcastRuleResult res =
       utils::verifyTppIdentityBroadcastingRules(getInput().getType(),
@@ -114,6 +115,30 @@ void BrgemmOp::build(OpBuilder &builder, OperationState &state,
   BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
 }
 
+LogicalResult FusedBrgemmOp::verify() {
+  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
+  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
+  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
+  if (!verifyBRGemmShape(tensorA, tensorB, matrixC))
+    return emitOpError("fails to verify operands shapes");
+  // Check batch dimension.
+  if (tensorA.getShape()[0] != tensorB.getShape()[0])
+    return emitOpError("fails to verify operands dimensions mismatch");
+  // Check all others that must be 'matmul' like.
+  if (!verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
+                                tensorB.getShape().drop_front(),
+                                matrixC.getShape()))
+    return emitOpError("fails to verify operands dimensions mismatch");
+  return success();
+}
+
+void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
+                          ValueRange inputs, Value output) {
+  FusedBrgemmOp::build(
+      builder, state, inputs[0], inputs[1], inputs[2],
+      tpp::FusedOpTypeAttr::get(builder.getContext(), tpp::FusedOpType::NONE),
+      output);
+}
 //===----------------------------------------------------------------------===//
 // AdddOp
 //===----------------------------------------------------------------------===//
@@ -128,10 +153,6 @@ LogicalResult AddOp::verify() {
   if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
       (!outputType.isa<ShapedType>()))
     return emitOpError("expects all operands to be shaped type");
-  if (!utils::allOperandsHaveSameShapeAndStrides(
-          {lhsType, rhsType, outputType}))
-    return emitOpError(
-        "requires all operands to have the same shape or strides");
   return success();
 }
 
@@ -209,4 +230,22 @@ LogicalResult VNNIBrgemmOp::verify() {
 void VNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
                          ValueRange inputs, Value output) {
   VNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], output);
+}
+
+LogicalResult FusedVNNIBrgemmOp::verify() {
+  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
+  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
+  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
+  if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
+    return emitOpError("fails to verify operands shapes");
+  // Check batch dimension.
+  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[2])
+    return emitOpError("fails to verify operands dimensions mismatch");
+  return success();
+}
+
+void FusedVNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
+                              ValueRange inputs, Value output) {
+  FusedVNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], inputs[2],
+                           output);
 }

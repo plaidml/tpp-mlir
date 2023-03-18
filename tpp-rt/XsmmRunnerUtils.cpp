@@ -351,6 +351,119 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
+extern "C" void _mlir_ciface_xsmm_fused_brgemm_invoke(
+    const libxsmm_datatype dType, int64_t addr, UnrankedMemRefType<char> *A,
+    UnrankedMemRefType<char> *B, UnrankedMemRefType<char> *C,
+    UnrankedMemRefType<char> *D, int64_t numBatches) {
+  // std::cout << "numBatch: " << numBatches << "\n";
+  // std::cout << "\n A: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<char>(*A));
+  // std::cout << "\n B: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<char>(*B));
+  // std::cout << "\n C: \n";
+  // printMemRefMetaData(std::cout, DynamicMemRefType<char>(*C));
+  // std::cout << "\n";
+
+  DynamicMemRefType<char> tensorA = DynamicMemRefType<char>(*A);
+  DynamicMemRefType<char> tensorB = DynamicMemRefType<char>(*B);
+  DynamicMemRefType<char> tensorC = DynamicMemRefType<char>(*C);
+  DynamicMemRefType<char> tensorD = DynamicMemRefType<char>(*D);
+
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(addr);
+
+  unsigned long long numBatchesVar = numBatches;
+  if (dType == LIBXSMM_DATATYPE_F32) {
+    float *addr_tensorA = (float *)tensorA.data + tensorA.offset;
+    float *addr_tensorB = (float *)tensorB.data + tensorB.offset;
+    float *addr_tensorC = (float *)tensorC.data + tensorC.offset;
+    float *addr_tensorD = (float *)tensorD.data + tensorD.offset;
+    gemm_param.a.primary = (void *)addr_tensorB;
+    gemm_param.b.primary = (void *)addr_tensorA;
+    gemm_param.c.primary = (void *)addr_tensorC;
+    gemm_param.d.primary = (void *)addr_tensorD;
+  } else if (dType == LIBXSMM_DATATYPE_BF16) {
+    bf16 *addr_tensorA = (bf16 *)tensorA.data + tensorA.offset;
+    bf16 *addr_tensorB = (bf16 *)tensorB.data + tensorB.offset;
+    bf16 *addr_tensorC = (bf16 *)tensorC.data + tensorC.offset;
+    bf16 *addr_tensorD = (bf16 *)tensorD.data + tensorD.offset;
+    gemm_param.a.primary = (void *)addr_tensorB;
+    gemm_param.b.primary = (void *)addr_tensorA;
+    gemm_param.c.primary = (void *)addr_tensorC;
+    gemm_param.d.primary = (void *)addr_tensorD;
+  }
+  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
+    const libxsmm_datatype dtype, bool isVNNI, int64_t m, int64_t n, int64_t k,
+    int64_t lda, int64_t ldb, int64_t ldc) {
+  // std::cout << "lda: " << lda << "\n";
+  // std::cout << "lbd: " << ldb << "\n";
+  // std::cout << "ldc: " << ldc << "\n";
+  // std::cout << "m: " << m << "\n";
+  // std::cout << "n: " << n << "\n";
+  // std::cout << "k: " << k << "\n";
+
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+  // TODO: move stride computation to dispatch
+  // operation as in: https://github.com/plaidml/plaidml/pull/1983
+  auto typeSize = dtype == LIBXSMM_DATATYPE_F32 ? sizeof(float) : sizeof(bf16);
+  libxsmm_blasint stride_a = lda * m * typeSize;
+  libxsmm_blasint stride_b = ldb * k * typeSize;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags;
+  if (isVNNI) {
+    assert(dtype == LIBXSMM_DATATYPE_BF16);
+    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
+  } else {
+    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  }
+  libxsmm_bitfield l_prefetch_flags = 0;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = dtype;
+  l_shape.b_in_type = dtype;
+  l_shape.out_type = dtype;
+  l_shape.comp_type = dtype;
+
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
+  l_brconfig.br_stride_a_hint = stride_b;
+  l_brconfig.br_stride_b_hint = stride_a;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = dtype;
+
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//

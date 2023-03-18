@@ -20,6 +20,8 @@ enum class BinaryKind : uint64_t;
 class BinaryKindAttr;
 enum class TernaryKind : uint64_t;
 class TernaryKindAttr;
+enum class QuarternaryKind : uint64_t;
+class QuarternaryKindAttr;
 enum class UnaryKind : uint64_t;
 class UnaryKindAttr;
 enum class UnaryFlags : uint64_t;

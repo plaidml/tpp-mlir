@@ -29,6 +29,15 @@ def Xsmm_TernaryKind : I64EnumAttr<
   let cppNamespace = "mlir::xsmm";
 }
 
+def Xsmm_QuarternaryKind : I64EnumAttr<
+    "QuarternaryKind", "",
+    [
+      I64EnumAttrCase<"NONE", 0, "none">,
+      I64EnumAttrCase<"FUSED_BRGEMM", 1, "fused_brgemm">,
+    ]> {
+  let cppNamespace = "mlir::xsmm";
+}
+
 def Xsmm_BinaryKind : I64EnumAttr<
     "BinaryKind", "",
     [
@@ -62,7 +71,13 @@ def Xsmm_UnaryFlags : I64EnumAttr<
 def Xsmm_BinaryFlags : I64EnumAttr<
     "BinaryFlags", "",
     [
-      I64EnumAttrCase<"NONE", 0, "none">
+      I64EnumAttrCase<"NONE", 0, "none">,
+      I64EnumAttrCase<"BCAST_ROW_IN_0", 1, "bcast_row_in0">,
+      I64EnumAttrCase<"BCAST_ROW_IN_1", 2, "bcast_row_in1">,
+      I64EnumAttrCase<"BCAST_COL_IN_0", 4, "bcast_col_in0">,
+      I64EnumAttrCase<"BCAST_COL_IN_1", 8, "bcast_col_in1">,
+      I64EnumAttrCase<"BCAST_SCALAR_IN_0", 16, "bcast_scalar_in0">,
+      I64EnumAttrCase<"BCAST_SCALAR_IN_1", 32, "bcast_scalar_in1">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }

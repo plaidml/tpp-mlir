@@ -12,8 +12,8 @@
 include "TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
-// TODO: implement ResultsBroadcastableShape ?
+include "TppAttr.td"
+include "mlir/IR/OpBase.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
     Type<And<[MemRefOf<allowedTypes>.predicate,
@@ -33,6 +33,9 @@ def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
+// Tpp operation trait - make sure the operand are broadcastable
+// following Numpy-style broadcast.
+def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 
 // Class for tpp binary operations.
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
@@ -62,7 +65,7 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_BinaryOp<"add"> {
+def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape]> {
   let summary = "Element-wise addition.";
   let description = [{
     The `tpp.add` operation performs element-wise addition on two-dimensional
@@ -298,8 +301,8 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
 
 def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let summary = [{
-    Performs batch reduced matrix multiplication of two inputs with first
-    input in VNNI format}];
+    Performs batch reduced matrix multiplication of two inputs with second
+    input (weight) in VNNI format}];
 
   let description = [{
     The `tpp.vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
@@ -320,6 +323,117 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `)`
+      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() {
+      return getMatrixC().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixAType() {
+      return getBatchMatrixA().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixBType() {
+      return getBatchMatrixB().getType().cast<MemRefType>();
+    }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// FusedBrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
+  let summary = [{
+    Performs batch reduced matrix multiplication followed by bias addition and relu}];
+
+  let description = [{
+    The `tpp.fused_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+
+    Example:
+
+    ```mlir
+
+      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>, %4: i64)
+                      out(%5: memref<6x4xf32>)
+    ```
+  }];
+
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
+                       TppBRGEMMemrefInput:$batchMatrixB,
+                       TppMemRef: $bias,
+		                   Tpp_FusedOpType: $fusedOpType,
+		                   TppMemRef:$matrixC);
+
+  let assemblyFormat = [{
+      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
+                $batchMatrixB `:` type($batchMatrixB) `,`
+		$bias `:` type($bias)  `,`
+		$fusedOpType `)`
+      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    MemRefType getMatrixCType() {
+      return getMatrixC().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixAType() {
+      return getBatchMatrixA().getType().cast<MemRefType>();
+    }
+
+    MemRefType getBatchMatrixBType() {
+      return getBatchMatrixB().getType().cast<MemRefType>();
+    }
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+  ];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// FusedVNNIBrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
+  let summary = [{
+    Performs batch reduced matrix multiplication followed by bias addition and relu
+    with second operand in VNNI format}];
+
+  let description = [{
+    The `tpp.fused_vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+
+    Example:
+
+    ```mlir
+
+      tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, 
+                                %2: memref<3x2x4x2xbf16>, 
+                                %3: memref<4xbf16>)
+                            out(%3: memref<6x4xbf16>)
+    ```
+  }];
+
+  let arguments = (ins TppBRGEMMemrefInput:$batchMatrixA,
+                       TppBRGEMMVNNIMemrefInput:$batchMatrixB,
+                       TppMemRef: $bias,
+		                   TppMemRef:$matrixC);
+
+  let assemblyFormat = [{
+      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
+                $batchMatrixB `:` type($batchMatrixB) `,`
+		$bias `:` type($bias) `)`
       `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
