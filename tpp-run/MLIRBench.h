@@ -144,6 +144,7 @@ public:
   enum class PrintStage {
     None,
     Early, // After main generation, before optimization
+    Mid,   // After initial TPP-related optimizations
     Late,  // After optimizaiton, before LLVM dialect
     LLVM,  // Final MLIR, in LLVM dialect
     Invalid,
