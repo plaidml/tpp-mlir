@@ -1,4 +1,5 @@
-// RUN: tpp-opt %s -default-tpp-passes | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -expand-strided-metadata | \
+// RUN: FileCheck %s
 
 // RUN: tpp-run %s -n 10 \
 // RUN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
@@ -32,8 +33,26 @@
 #map_print = affine_map<(d0, d1) -> (d0, d1)>
 !tensor_print_t = tensor<1x8xf32>
 
+//
+// CHECK-LABEL: @first_conv2d_1x1_biasadd_relu(
+// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
+//
 func.func @first_conv2d_1x1_biasadd_relu(
         %input : !first_conv1x1_input_tensor_t) -> !first_conv1x1_output_tensor_t {
+    //
+    // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+    // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
+    // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+    // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+    // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+    // CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
+    // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
+    // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
+    // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
+    //
+
     %cst_0 = arith.constant 0.000000e+00 : f32
     %cst_9 = arith.constant dense<0.000000e+00> : !first_conv1x1_output_tensor_t
 
@@ -48,6 +67,15 @@ func.func @first_conv2d_1x1_biasadd_relu(
                 ins(%input, %filter : !first_conv1x1_input_tensor_t, !first_conv1x1_filter_tensor_t) 
                 outs(%1 : !first_conv1x1_output_tensor_t) -> !first_conv1x1_output_tensor_t
     
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.for
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
     // BiasAdd
     %3 = tensor.empty() : !first_conv1x1_output_tensor_t
     %4 = linalg.generic {
@@ -60,6 +88,14 @@ func.func @first_conv2d_1x1_biasadd_relu(
             linalg.yield %in : f32
     } -> !first_conv1x1_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
     %5 = tensor.empty() : !first_conv1x1_output_tensor_t
     %6 = linalg.generic {
             indexing_maps = [#map1, #map1, #map1], 
@@ -71,6 +107,15 @@ func.func @first_conv2d_1x1_biasadd_relu(
             %1591 = arith.addf %in, %in_34 : f32
             linalg.yield %1591 : f32
     } -> !first_conv1x1_output_tensor_t
+
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
 
     // ReLU
     %7 = tensor.empty() : !first_conv1x1_output_tensor_t
@@ -85,44 +130,39 @@ func.func @first_conv2d_1x1_biasadd_relu(
                 linalg.yield %1591 : f32
     } -> !first_conv1x1_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
+    //
+    // CHECK: return %[[alloc_12:.*]] : memref<1x7x7x512xf32>
+    //
     return %8 : !first_conv1x1_output_tensor_t
 }
 
 //
-// CHECK-LABEL: @first_conv2d_1x1_biasadd_relu(
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
-// CHECK-DAG: %[[c1_i64:.+]] = arith.constant 1 : i64
-// CHECK-DAG: %[[c7_i64:.+]] = arith.constant 7 : i64
-// CHECK-DAG: %[[c512_i64:.+]] = arith.constant 512 : i64
-// CHECK-DAG: %[[c4_i64:.+]] = arith.constant 4 : i64
-// CHECK-DAG: %[[false:.+]] = arith.constant false
-// CHECK-DAG: %[[c32_i64:.+]] = arith.constant 32 : i64
-// CHECK-DAG: %[[c5_i64:.+]] = arith.constant 5 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[c16:.+]] = arith.constant 16 : index
-// CHECK-DAG: %[[c64:.+]] = arith.constant 64 : index
-// CHECK-DAG: %[[c512:.+]] = arith.constant 512 : index
-// CHECK: %[[xsmmDis2:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis2]]
-// CHECK:       linalg.transpose
-// CHECK:       linalg.transpose
-// CHECK: %[[xsmmDis3:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis3]]
-// CHECK: %[[xsmmDis4:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis4]]
-// CHECK:       linalg.transpose
-// CHECK-NOT: call @xsmm_
-// CHECK: return
+// CHECK-LABEL: @conv2d_3x3_biasadd_relu(
+// CHECK-SAME: %[[arg:.*]]: memref<1x9x9x512xf32>) -> memref<1x7x7x512xf32> {
 //
-
 func.func @conv2d_3x3_biasadd_relu(
         %input : !conv3x3_input_tensor_t) -> !conv3x3_output_tensor_t {
+    //
+    // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+    // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
+    // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+    // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+    // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+    // CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
+    // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
+    // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
+    //
+
     %cst_0 = arith.constant 0.000000e+00 : f32
     %cst_9 = arith.constant dense<0.000000e+00> : !conv3x3_output_tensor_t
 
@@ -136,6 +176,15 @@ func.func @conv2d_3x3_biasadd_relu(
     %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
                 ins(%input, %filter : !conv3x3_input_tensor_t, !conv3x3_filter_tensor_t) 
                 outs(%1 : !conv3x3_output_tensor_t) -> !conv3x3_output_tensor_t
+
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.for
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
     
     // BiasAdd
     %3 = tensor.empty() : !conv3x3_output_tensor_t
@@ -149,6 +198,14 @@ func.func @conv2d_3x3_biasadd_relu(
             linalg.yield %in : f32
     } -> !conv3x3_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
     %5 = tensor.empty() : !conv3x3_output_tensor_t
     %6 = linalg.generic {
             indexing_maps = [#map1, #map1, #map1], 
@@ -160,6 +217,15 @@ func.func @conv2d_3x3_biasadd_relu(
             %1591 = arith.addf %in, %in_34 : f32
             linalg.yield %1591 : f32
     } -> !conv3x3_output_tensor_t
+
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
 
     // ReLU
     %7 = tensor.empty() : !conv3x3_output_tensor_t
@@ -174,45 +240,39 @@ func.func @conv2d_3x3_biasadd_relu(
                 linalg.yield %1591 : f32
     } -> !conv3x3_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
+    //
+    // CHECK: return %[[alloc:.*]] : memref<1x7x7x512xf32>
+    //
     return %8 : !conv3x3_output_tensor_t
 }
-//
-// CHECK-LABEL: @conv2d_3x3_biasadd_relu(
-// CHECK-SAME: %[[arg:.*]]: memref<1x9x9x512xf32>) -> memref<1x7x7x512xf32> {
-// CHECK-DAG: %[[c1_i64:.+]] = arith.constant 1 : i64
-// CHECK-DAG: %[[c7_i64:.+]] = arith.constant 7 : i64
-// CHECK-DAG: %[[c512_i64:.+]] = arith.constant 512 : i64
-// CHECK-DAG: %[[c4_i64:.+]] = arith.constant 4 : i64
-// CHECK-DAG: %[[false:.+]] = arith.constant false
-// CHECK-DAG: %[[c32_i64:.+]] = arith.constant 32 : i64
-// CHECK-DAG: %[[c5_i64:.+]] = arith.constant 5 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[c16:.+]] = arith.constant 16 : index
-// CHECK-DAG: %[[c3:.+]] = arith.constant 3 : index
-// CHECK-DAG: %[[c512:.+]] = arith.constant 512 : index
-// CHECK-DAG: %[[c9:.+]] = arith.constant 9 : index
-// CHECK: %[[xsmmDis2:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c512_i64]], %[[c512_i64]], %[[c512_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis2]]
-// CHECK:       linalg.transpose
-// CHECK:       linalg.transpose
-// CHECK: %[[xsmmDis3:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c16]] step %[[c1]] {
-// CHECK:           func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis3]]
-// CHECK: %[[xsmmDis4:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis4]]
-// CHECK:       linalg.transpose
-// CHECK-NOT: call @xsmm_
-// CHECK: return
-//
 
-
+//
+// CHECK-LABEL: @second_conv2d_1x1_biasadd_relu(
+// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x512xf32>) -> memref<1x7x7x2048xf32> {
+//
 func.func @second_conv2d_1x1_biasadd_relu(
         %input : !second_conv1x1_input_tensor_t) -> !second_conv1x1_output_tensor_t {
+    //
+    // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+    // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
+    // CHECK-DAG: %[[false:.*]] = arith.constant false
+    // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+    // CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+    // CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+    // CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
+    // CHECK-DAG: %[[c7_i64:.*]] = arith.constant 7 : i64
+    // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
+    // CHECK-DAG: %[[c2048_i64:.*]] = arith.constant 2048 : i64
+    //
 
     %cst_0 = arith.constant 0.000000e+00 : f32
     %cst_9 = arith.constant dense<0.000000e+00> : !second_conv1x1_output_tensor_t
@@ -227,6 +287,14 @@ func.func @second_conv2d_1x1_biasadd_relu(
     %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
                 ins(%input, %filter : !second_conv1x1_input_tensor_t, !second_conv1x1_filter_tensor_t) 
                 outs(%1 : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t
+
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c2048_i64]], %[[c512_i64]], %[[c512_i64]], %[[c2048_i64]], %[[c2048_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: %[[cast:.*]] = memref.cast
+    // CHECK: %[[cast1:.*]] = memref.cast
+    // CHECK: %[[cast2:.*]] = memref.cast
+    // CHECK: func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
     
     // BiasAdd
     %3 = tensor.empty() : !second_conv1x1_output_tensor_t
@@ -240,6 +308,14 @@ func.func @second_conv2d_1x1_biasadd_relu(
             linalg.yield %in : f32
     } -> !second_conv1x1_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
     %5 = tensor.empty() : !second_conv1x1_output_tensor_t
     %6 = linalg.generic {
             indexing_maps = [#map1, #map1, #map1], 
@@ -251,6 +327,15 @@ func.func @second_conv2d_1x1_biasadd_relu(
             %1591 = arith.addf %in, %in_34 : f32
             linalg.yield %1591 : f32
     } -> !second_conv1x1_output_tensor_t
+
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
 
     // ReLU
     %7 = tensor.empty() : !second_conv1x1_output_tensor_t
@@ -265,42 +350,24 @@ func.func @second_conv2d_1x1_biasadd_relu(
                 linalg.yield %1591 : f32
     } -> !second_conv1x1_output_tensor_t
     
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
+    //
+    // CHECK: return %[[alloc:.*]] : memref<1x7x7x2048xf32>
+    //
     return %8 : !second_conv1x1_output_tensor_t
 }
 
 //
-// CHECK-LABEL: @second_conv2d_1x1_biasadd_relu(
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x512xf32>) -> memref<1x7x7x2048xf32> {
-// CHECK-DAG: %[[c1_i64:.+]] = arith.constant 1 : i64
-// CHECK-DAG: %[[c7_i64:.+]] = arith.constant 7 : i64
-// CHECK-DAG: %[[c2048_i64:.+]] = arith.constant 2048 : i64
-// CHECK-DAG: %[[c4_i64:.+]] = arith.constant 4 : i64
-// CHECK-DAG: %[[false:.+]] = arith.constant false
-// CHECK-DAG: %[[c32_i64:.+]] = arith.constant 32 : i64
-// CHECK-DAG: %[[c5_i64:.+]] = arith.constant 5 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[c64:.+]] = arith.constant 64 : index
-// CHECK-DAG: %[[c16:.+]] = arith.constant 16 : index
-// CHECK-DAG: %[[c2048:.+]] = arith.constant 2048 : index
-// CHECK: %[[xsmmDis2:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c4_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis2]]
-// CHECK:       linalg.transpose
-// CHECK:       linalg.transpose
-// CHECK: %[[xsmmDis3:.+]] = call @xsmm_matmul_dispatch(%[[c1_i64]], %[[false]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]]) : (i64, i1, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.for %[[arg1:.+]] = %[[c0]] to %[[c64]] step %[[c1]] {
-// CHECK:       func.call @xsmm_matmul_invoke(%[[c1_i64]], %[[xsmmDis3]]
-// CHECK: %[[xsmmDis4:.+]] = call @xsmm_unary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c5_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_unary_invoke(%[[c1_i64]], %[[xsmmDis4]]
-// CHECK:       linalg.transpose
-// CHECK-NOT: call @xsmm_
-// CHECK: return
+// CHECK-LABEL: @padding_for_3x3
+// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x512xf32>) -> memref<1x9x9x512xf32> {
 //
-
 func.func @padding_for_3x3(%input : !first_conv1x1_output_tensor_t) -> !conv3x3_input_tensor_t {
     %cst_0 = arith.constant 0.000000e+00 : f32
     %0 = tensor.pad %input low[0, 1, 1, 0] high[0, 1, 1, 0] {
@@ -308,17 +375,18 @@ func.func @padding_for_3x3(%input : !first_conv1x1_output_tensor_t) -> !conv3x3_
             tensor.yield %cst_0 : f32
     } : !first_conv1x1_output_tensor_t to !conv3x3_input_tensor_t
 
+    //
+    // CHECK: %[[alloc:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x9x9x512xf32>
+    // CHECK: %[[reinterpret_cast:.*]] = memref.reinterpret_cast %alloc to offset: [5120], sizes: [1, 7, 7, 512], strides: [41472, 4608, 512, 1]
+    //
+
     return %0 : !conv3x3_input_tensor_t
 }
 
 //
-// CHECK-LABEL: @padding_for_3x3
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x512xf32>) -> memref<1x9x9x512xf32> {
-// CHECK: %[[alloc:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x9x9x512xf32>
-// CHECK: %[[subview:.*]] = memref.subview %[[alloc]]
-// CHECK: memref.copy %[[arg]], %[[subview]]
+// CHECK-LABEL: @skip_connection
+// CHECK-SAME: %[[arg0:.*]]: memref<1x7x7x2048xf32>, %[[arg1:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x2048xf32> {
 //
-
 func.func @skip_connection(%skip : !first_conv1x1_input_tensor_t, %input : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t {
     %0 = tensor.empty() : !second_conv1x1_output_tensor_t
     %1 = linalg.generic {
@@ -332,44 +400,36 @@ func.func @skip_connection(%skip : !first_conv1x1_input_tensor_t, %input : !seco
                 linalg.yield %sum : f32
     } -> !second_conv1x1_output_tensor_t
 
+    //
+    // CHECK: %[[ret:.*]] = {{.*}}call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+    // CHECK: scf.parallel
+    // CHECK:   %[[cast:.*]] = memref.cast
+    // CHECK:   %[[cast1:.*]] = memref.cast
+    // CHECK:   %[[cast2:.*]] = memref.cast
+    // CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[ret]], %[[cast]], %[[cast1]], %[[cast2]]) : (i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) -> ()
+    //
+
     return %1 : !second_conv1x1_output_tensor_t
-}
-
-//
-// CHECK-LABEL: @skip_connection
-// CHECK-SAME: %[[arg0:.*]]: memref<1x7x7x2048xf32>, %[[arg1:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x2048xf32> {
-// CHECK-DAG: %[[c1_i64:.+]] = arith.constant 1 : i64
-// CHECK-DAG: %[[c7_i64:.+]] = arith.constant 7 : i64
-// CHECK-DAG: %[[c2048_i64:.+]] = arith.constant 2048 : i64
-// CHECK-DAG: %[[c0_i64:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[c7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[c1:.+]] = arith.constant 1 : index
-// CHECK: %[[xsmmDis0:.+]] = call @xsmm_binary_dispatch(%[[c1_i64]], %[[c7_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c2048_i64]], %[[c1_i64]], %[[c0_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64) -> i64
-// CHECK: scf.parallel
-// CHECK:   func.call @xsmm_binary_invoke(%[[c1_i64]], %[[xsmmDis0]]
-// CHECK-NOT: call @xsmm_
-// CHECK: return
-//
-
-func.func @extract_results_for_printing(%input : !second_conv1x1_output_tensor_t) -> !tensor_print_t {
-    %ret = tensor.extract_slice %input[0, 0, 0, 0][1, 1, 1, 8][1, 1, 1, 1] : !second_conv1x1_output_tensor_t to !tensor_print_t
-
-    return %ret : !tensor_print_t
 }
 
 //
 // CHECK-LABEL: @extract_results_for_printing
 // CHECK-SAME: %[[arg0:.*]]: memref<1x7x7x2048xf32>) -> memref<1x8xf32> {
-// CHECK: %[[subview:.*]] = memref.subview %[[arg0]]
-// CHECK: %[[alloc:.*]] = memref.alloc() : memref<1x8xf32>
-// CHECK: memref.copy %[[subview]], %[[alloc]] : memref<1x8xf32, strided<[100352, 1]>> to memref<1x8xf32>
 //
+func.func @extract_results_for_printing(%input : !second_conv1x1_output_tensor_t) -> !tensor_print_t {
+    %ret = tensor.extract_slice %input[0, 0, 0, 0][1, 1, 1, 8][1, 1, 1, 1] : !second_conv1x1_output_tensor_t to !tensor_print_t
 
+    //
+    // CHECK: {{.*}} = memref.extract_strided_metadata %[[arg0]] : memref<1x7x7x2048xf32> -> memref<f32>, index,
+    // CHECK: %[[cast:.*]] = memref.reinterpret_cast %{{.*}} to offset: [0], sizes: [1, 8], strides: [100352, 1] : memref<f32> to memref<1x8xf32, strided<[100352, 1]>>
+    // CHECK: %[[alloc:.*]] = memref.alloc() : memref<1x8xf32>
+    // CHECK: memref.copy %[[cast]], %[[alloc]] : memref<1x8xf32, strided<[100352, 1]>> to memref<1x8xf32>
+    //
+
+    return %ret : !tensor_print_t
+}
 
 //
-// CHECK-DAG: func.func private @xsmm_binary_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @xsmm_binary_dispatch(i64, i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @xsmm_unary_invoke(i64, i64, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @xsmm_unary_dispatch(i64, i64, i64, i64, i64, i64, i64) -> i64 attributes {llvm.emit_c_interface}
 // CHECK-DAG: func.func private @xsmm_matmul_invoke(i64, i64, memref<*xf32>, memref<*xf32>, memref<*xf32>) attributes {llvm.emit_c_interface}

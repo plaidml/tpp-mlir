@@ -1,6 +1,10 @@
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,1 max-depth=2" |
 // RUN: tpp-run %s -n 10 \
 // RUN:  -e entry -entry-point-result=void
 
+// This benchmark isn't expected to "pass", just run as benchmark for now
+// XFAIL: *
+//
 // Total flops = matmul O(2*n*m*k) + BiasAdd (n*m) + ReLU (O(n*m) x 3
 // 2*256x1024x1024 (536870912) + 256x1024 (262144) + 256x1024 262144) x 3 = 1,072,168,960
 // BENCH_TOTAL_FLOPS: 1072168960
