@@ -115,7 +115,7 @@ llvm::cl::opt<std::string> initType(
 // Print MLIR before lowering
 llvm::cl::opt<std::string> printMLIR(
     "print-mlir",
-    llvm::cl::desc("Print MLIR to stdout (early, def-pipe, late, llvm)"),
+    llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
     llvm::cl::init(""));
 
 // Print LLVM IR before lowering
