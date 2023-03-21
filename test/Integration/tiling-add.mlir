@@ -17,7 +17,7 @@
 
 func.func @bigadd(%A: tensor<32x16xf32>,
                   %B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
-  // TPP: tpp.add ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
+  // TPP: tpp.add ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0, #map0],
                         iterator_types = ["parallel", "parallel"] }
     ins(%A : tensor<32x16xf32>) outs(%B: tensor<32x16xf32>) {

@@ -17,7 +17,7 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>) {
 
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [3, 3, 1, 3](broadcast scalar dataType f32)
   // CHECK: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[CST]], %[[ARG0]]) 
-  tpp.identity ins(%cst: f32) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%cst: f32) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -38,7 +38,7 @@ func.func @identity_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [3, 3, 3, 3](broadcast none dataType f32)
   // CHECK: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
-  tpp.identity ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.identity ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
   return
 }
 
@@ -60,7 +60,7 @@ func.func @identity_to_xsmm(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 
   // CHECK: xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast row dataType f32)
   // CHECK: xsmm.unary identity
-  tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
+  tpp.identity ins(%arg0: memref<5x1xf32>) outs(%arg1: memref<5x6xf32>)
   return
 }
 
@@ -82,7 +82,7 @@ func.func @identity_to_xsmm(%arg0: memref<1x5xf32>, %arg1: memref<5x5xf32>) {
 
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [5, 5, 5, 5](broadcast col dataType f32)
   // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
-  tpp.identity ins(%arg0: memref<1x5xf32>) out(%arg1: memref<5x5xf32>)
+  tpp.identity ins(%arg0: memref<1x5xf32>) outs(%arg1: memref<5x5xf32>)
   return
 }
 
@@ -95,7 +95,7 @@ func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
 
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast scalar dataType f32)
   // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
-  tpp.identity ins(%arg0: f32) out(%arg1: memref<5x6xf32>)
+  tpp.identity ins(%arg0: f32) outs(%arg1: memref<5x6xf32>)
   return
 }
 
@@ -106,6 +106,6 @@ func.func @identity_to_xsmm(%arg0: f32, %arg1: memref<5x6xf32>) {
 func.func @identity_to_xsmm(%arg0: memref<1x1xf32>, %arg1: memref<5x6xf32>) {
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [5, 6, 1, 6](broadcast scalar dataType f32)
   // CHECK-NEXT: xsmm.unary identity(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]]) 
-  tpp.identity ins(%arg0: memref<1x1xf32>) out(%arg1: memref<5x6xf32>)
+  tpp.identity ins(%arg0: memref<1x1xf32>) outs(%arg1: memref<5x6xf32>)
   return
 }

@@ -12,5 +12,5 @@ func.func @entry(%A: tensor<4x8xf32>,
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
-// CHECK: tpp.matmul ins(%[[ARG0]] : memref<4x8xf32>, %[[ARG1]] : memref<8x4xf32>) out(%[[ARG2]] : memref<4x4xf32>)
+// CHECK: tpp.matmul ins(%[[ARG0]] : memref<4x8xf32>, %[[ARG1]] : memref<8x4xf32>) outs(%[[ARG2]] : memref<4x4xf32>)
 // CHECK: return

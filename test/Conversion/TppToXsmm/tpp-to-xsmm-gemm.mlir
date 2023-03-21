@@ -5,7 +5,7 @@
 func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
   // CHECK: %[[DISPATCH:.*]] = xsmm.ternary.dispatch matmul [3, 3, 3, 3, 3, 3](dataType f32, isVNNI false)
   // CHECK-NEXT: xsmm.ternary matmul(dataType f32, %[[DISPATCH]], %[[ARG0]], %[[ARG1]], %[[ARG2]]) 
-  tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
+  tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
   return
 }
 
@@ -18,6 +18,6 @@ func.func @tpp_matmul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
   // CHECK-NOT: xsmm.ternary matmul
   tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
                  %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>)
-             out(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
+             outs(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
   return
 }

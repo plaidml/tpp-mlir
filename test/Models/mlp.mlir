@@ -25,7 +25,7 @@ func.func @entry(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: 
 // CHECK-SAME:  %[[ARG1:.+]]: memref<256x512xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<1x512xf32>,
 // CHECK-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
-// CHECK: tpp.identity ins(%[[ARG2]] : memref<1x512xf32>) out(%[[ARG3:.+]] : memref<128x512xf32>)
-// CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: tpp.relu ins(%[[ARG3]] : memref<128x512xf32>) out(%[[ARG3]] : memref<128x512xf32>)
+// CHECK: tpp.identity ins(%[[ARG2]] : memref<1x512xf32>) outs(%[[ARG3:.+]] : memref<128x512xf32>)
+// CHECK: tpp.matmul ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
+// CHECK: tpp.relu ins(%[[ARG3]] : memref<128x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: return

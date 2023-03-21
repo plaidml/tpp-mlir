@@ -10,9 +10,9 @@ func.func @tpp_ops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref
   // CHECK: tpp.identity
   // CHECK: tpp.add
   // CHECK: tpp.relu
-  tpp.identity ins(%arg2 : memref<1x1xf32>) out(%arg0 : memref<3x3xf32>)
-  tpp.add ins(%arg0 : memref<3x3xf32>, %arg1 : memref<3x3xf32>) out(%arg1 : memref<3x3xf32>)
-  tpp.relu ins(%arg0 : memref<3x3xf32>) out(%arg0 : memref<3x3xf32>)
+  tpp.identity ins(%arg2 : memref<1x1xf32>) outs(%arg0 : memref<3x3xf32>)
+  tpp.add ins(%arg0 : memref<3x3xf32>, %arg1 : memref<3x3xf32>) outs(%arg1 : memref<3x3xf32>)
+  tpp.relu ins(%arg0 : memref<3x3xf32>) outs(%arg0 : memref<3x3xf32>)
 
   return
 }
@@ -36,8 +36,8 @@ func.func @vnni_ops(%arg0: tensor<128x1024xbf16>,
                   %arg5: tensor<256x1024xbf16>) -> (tensor<128x2048xbf16>, tensor<256x1024xbf16>) {
   // CHECK: vnni.matmul
   // CHECK: vnni.brgemm
-  %0 = vnni.matmul ins(%arg0 : tensor<128x1024xbf16>, %arg1 : tensor<512x2048x2xbf16>) out(%arg2 : tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
-  %1 = vnni.brgemm ins(%arg3 : tensor<4x256x512xbf16>, %arg4 : tensor<4x256x1024x2xbf16>) out(%arg5 : tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %0 = vnni.matmul ins(%arg0 : tensor<128x1024xbf16>, %arg1 : tensor<512x2048x2xbf16>) outs(%arg2 : tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
+  %1 = vnni.brgemm ins(%arg3 : tensor<4x256x512xbf16>, %arg4 : tensor<4x256x1024x2xbf16>) outs(%arg5 : tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
 
   return %0, %1 : tensor<128x2048xbf16>, tensor<256x1024xbf16>
 }

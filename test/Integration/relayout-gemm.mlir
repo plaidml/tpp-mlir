@@ -33,7 +33,7 @@
 }
 
 
-func.func @matmulrelayout(%A: tensor<6x8xf32>,
+func.func @matmulrelayouts(%A: tensor<6x8xf32>,
   %B: tensor<8x16xf32>, %C: tensor<6x16xf32>) -> tensor<6x16xf32> attributes {llvm.emit_c_interface} {
   // MNmn += MKmk * NKkn
   // N = 16
@@ -123,7 +123,7 @@ func.func @entry() {
   ]> : tensor<8x16xf32>
 
   %C = arith.constant dense<0.0> : tensor<6x16xf32>
-  %0 = call @matmulrelayout(%da, %db, %C)
+  %0 = call @matmulrelayouts(%da, %db, %C)
       : (tensor<6x8xf32>, tensor<8x16xf32>, tensor<6x16xf32>) -> tensor<6x16xf32>
   %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<6x16xf32>, vector<6x16xf32>
   //
