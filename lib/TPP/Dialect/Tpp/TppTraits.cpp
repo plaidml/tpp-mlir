@@ -1,4 +1,5 @@
 #include "TPP/Dialect/Tpp/TppTraits.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Traits.h"
 
 using namespace mlir;
@@ -51,7 +52,7 @@ static LogicalResult verifyCompatibleOperandBroadcast(Operation *op,
   return success();
 }
 
-LogicalResult mlir::OpTrait::tpp::verifyTraitImpl(Operation *op) {
+LogicalResult mlir::OpTrait::tpp::verifyBroadcastableShapeImpl(Operation *op) {
   TypeRange operandTypes = op->getOperandTypes();
 
   // Get input operands all but last.
@@ -61,4 +62,25 @@ LogicalResult mlir::OpTrait::tpp::verifyTraitImpl(Operation *op) {
   }
   return verifyCompatibleOperandBroadcast(
       op, inputOperandTypes, operandTypes[operandTypes.size() - 1]);
+}
+
+// Verify all the operands have stride one in the fastest-varying dimension.
+LogicalResult mlir::OpTrait::tpp::verifyUnitStrideInnerLoopImpl(Operation *op) {
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  for (auto [idx, operand] : llvm::enumerate(op->getOperands())) {
+    auto operandType = operand.getType();
+    // Non-shaped type return success.
+    if (!isa<ShapedType>(operandType))
+      return success();
+    if (failed(getStridesAndOffset(operandType.cast<MemRefType>(), strides,
+                                   offset)))
+      return op->emitError() << "failed to compute strides for operand " << idx;
+    if (strides.back() != 1) {
+      return op->emitError() << "non-unit stride in the innermost varying "
+                                "dimension for operand "
+                             << idx;
+    }
+  }
+  return success();
 }

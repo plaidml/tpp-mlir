@@ -7,13 +7,22 @@ namespace mlir {
 namespace OpTrait {
 namespace tpp {
 
-LogicalResult verifyTraitImpl(Operation *op);
+LogicalResult verifyBroadcastableShapeImpl(Operation *op);
+LogicalResult verifyUnitStrideInnerLoopImpl(Operation *op);
 
 template <typename ConcreteType>
 struct BroadcastableShape
     : public OpTrait::TraitBase<ConcreteType, BroadcastableShape> {
   static LogicalResult verifyTrait(Operation *op) {
-    return verifyTraitImpl(op);
+    return verifyBroadcastableShapeImpl(op);
+  }
+};
+
+template <typename ConcreteType>
+struct UnitStrideInnerLoop
+    : public OpTrait::TraitBase<ConcreteType, UnitStrideInnerLoop> {
+  static LogicalResult verifyTrait(Operation *op) {
+    return verifyUnitStrideInnerLoopImpl(op);
   }
 };
 

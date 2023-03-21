@@ -119,3 +119,21 @@ func.func @tpp_add_check_broadcast_result(%arg0: memref<8x1xf32>, %arg1: memref<
   tpp.add ins(%arg1: memref<8x8xf32>, %arg1: memref<8x8xf32>) out(%arg0: memref<8x1xf32>)
   return 
 }
+
+// -----
+
+func.func @tpp_add_stride_inner_dim(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>, 
+                                    %arg1: memref<8x8xf32>) {
+  // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
+  tpp.add ins(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>, %arg1: memref<8x8xf32>) out(%arg1: memref<8x8xf32>)
+  return
+}
+
+// -----
+
+func.func @tpp_add_non_constant_stride(%arg0: memref<8x8xf32, strided<[?, ?], offset: 0>>,
+                                       %arg1: memref<8x8xf32>) {
+  // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
+  tpp.add ins(%arg0: memref<8x8xf32, strided<[?, ?], offset: 0>>, %arg1: memref<8x8xf32>) out(%arg1: memref<8x8xf32>)
+  return 
+}

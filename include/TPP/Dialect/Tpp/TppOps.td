@@ -37,6 +37,10 @@ def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 // following Numpy-style broadcast.
 def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 
+// Tpp operation trait - make sure the stride in the fastest-varying
+// dimension is one.
+def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
+
 // Class for tpp binary operations.
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [])> {
@@ -65,13 +69,14 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape]> {
+def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape, 
+                                     UnitStrideInnerLoop]> {
   let summary = "Element-wise addition.";
   let description = [{
     The `tpp.add` operation performs element-wise addition on two-dimensional
     memrefs, writing the result on the output memref. No checks or assumption are
     made on the input/output arguments so the same memref can be passed both as
-    input and output. 
+    input and output. It supports broadcast semantic based on Numpy rules. 
 
     Example:
 
