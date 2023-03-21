@@ -1,2 +1,1 @@
-add_subdirectory(matmul)
-add_subdirectory(mlp)
+add_subdirectory(ref)

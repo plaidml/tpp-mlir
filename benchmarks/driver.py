@@ -60,7 +60,10 @@ class Environment(object):
         helper = TPPHelper(loglevel)
         self.base_dir = os.path.realpath(os.path.dirname(__file__))
         self.root_dir = helper.findGitRoot(self.base_dir)
-        programs = helper.findTPPProgs(self.root_dir)
+        self.build_dir = args.build
+        if not self.build_dir:
+            self.build_dir = self.root_dir
+        programs = helper.findTPPProgs(self.build_dir)
         for _, path in programs.items():
             if os.path.exists(path):
                 self.bin_dir = os.path.realpath(os.path.dirname(path))
@@ -71,7 +74,7 @@ class Environment(object):
         assert(self.build_dir)
         self.bench_dir = os.path.join(self.root_dir, "benchmarks")
         self.harness = os.path.join(self.bench_dir, "harness", "controller.py")
-        self.test_dir = os.path.join(self.root_dir, "test", "Benchmarks")
+        self.test_dir = os.path.join(self.bench_dir, "mlir")
         # Pass arguments down to benchmarks, if known
         self.extra_args = list()
         if args.verbose > 0:
@@ -249,6 +252,8 @@ if __name__ == '__main__':
                         help='JSON file containing benchmark configuration')
 
     # Optional
+    parser.add_argument('--build', type=str, default="",
+                        help='Path to the build dir')
     parser.add_argument('-v', '--verbose', action='count', default=0,
                         help='The verbosity of logging output')
     parser.add_argument('-q', '--quiet', action='count', default=0,
