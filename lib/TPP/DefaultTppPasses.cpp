@@ -29,6 +29,11 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
+llvm::cl::opt<bool>
+    disableDefPipe("disable-def-pipe",
+                   llvm::cl::desc("Disable default pipeline execution"),
+                   llvm::cl::init(false));
+
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
@@ -350,15 +355,17 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
   }
 
   void runOnOperation() override {
-    auto module = getOperation();
+    if (!disableDefPipe) {
+      auto module = getOperation();
 
-    // Initialize the pipeline if needed.
-    // Otherwise, just run the cached one.
-    if (pm.empty())
-      constructPipeline();
+      // Initialize the pipeline if needed.
+      // Otherwise, just run the cached one.
+      if (pm.empty())
+        constructPipeline();
 
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
+      if (failed(runPipeline(pm, module)))
+        return signalPassFailure();
+    }
   }
 
 private:
@@ -384,11 +391,11 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
-    // Convert generics to BRGEMM.
-    // The mapping is done after bufferization as the buffer semantics
-    // allow direct use of scf.parallel loops. This prevents different
-    // lowering outputs between input linalg on tensors and memrefs.
-    pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
+      // Convert generics to BRGEMM.
+      // The mapping is done after bufferization as the buffer semantics
+      // allow direct use of scf.parallel loops. This prevents different
+      // lowering outputs between input linalg on tensors and memrefs.
+      pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
 
       // Lower operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());

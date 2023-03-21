@@ -113,23 +113,25 @@ llvm::cl::opt<std::string> initType(
     llvm::cl::init(""));
 
 // Print MLIR before lowering
-llvm::cl::opt<std::string>
-    printMLIR("print-mlir", llvm::cl::desc("Print MLIR to stdout (early, late, llvm)"),
-                llvm::cl::init(""));
+llvm::cl::opt<std::string> printMLIR(
+    "print-mlir",
+    llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
+    llvm::cl::init(""));
 
 // Print LLVM IR before lowering
 llvm::cl::opt<bool> printLLVM("print-llvm",
-                             llvm::cl::desc("print LLVM IR before lowering"),
-                             llvm::cl::init(false));
+                              llvm::cl::desc("print LLVM IR before lowering"),
+                              llvm::cl::init(false));
 
 // Parses MLIR print stage
 MLIRBench::PrintStage parsePrintStage(StringRef stage) {
   return StringSwitch<MLIRBench::PrintStage>(stage)
-    .Case("", MLIRBench::PrintStage::None)
-    .Case("early", MLIRBench::PrintStage::Early)
-    .Case("late", MLIRBench::PrintStage::Late)
-    .Case("llvm", MLIRBench::PrintStage::LLVM)
-    .Default(MLIRBench::PrintStage::Invalid);
+      .Case("", MLIRBench::PrintStage::None)
+      .Case("early", MLIRBench::PrintStage::Early)
+      .Case("mid", MLIRBench::PrintStage::Mid)
+      .Case("late", MLIRBench::PrintStage::Late)
+      .Case("llvm", MLIRBench::PrintStage::LLVM)
+      .Default(MLIRBench::PrintStage::Invalid);
 }
 
 // This function will be called by the pass manager after parsing,
