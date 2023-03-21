@@ -10,6 +10,16 @@
       "type": "MLIR",
       "benchmark": "mlp-fp32-1layer-512.mlir",
       "flags": []
+    },
+    "matmul_64x64x64_ref": {
+      "type": "C++",
+      "benchmark": "bench_matmul",
+      "flags": [ "--input=64x64x64" ]
+    },
+    "matmul_64x64x64_mlir": {
+      "type": "MLIR",
+      "benchmark": "matmul_64x64x64.mlir",
+      "flags": []
     }
   }},
   {
@@ -17,22 +27,22 @@
     "fp32_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-3layers-1024.mlir",
-      "flags": ["--disable-lsan"]
+      "flags": []
     },
     "bf16_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
-      "flags": ["--disable-lsan"]
+      "flags": []
     },
     "bf16_10x3584_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-10layers-3584.mlir",
-      "flags": ["--disable-lsan"]
+      "flags": [ "-run-args='-def-pack-matmul=0'" ]
     },
     "vnni_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-vnni-3layers-1536.mlir",
-      "flags": ["--disable-lsan"]
+      "flags": [ "--disable-lsan" ]
     }
   }},
   {
@@ -45,7 +55,7 @@
     "mlir_48x64x96": {
       "type": "MLIR",
       "benchmark": "matmul_48x64x96.mlir",
-      "flags": []
+      "flags": [ "-run-args='-def-pack-matmul=0'" ]
     },
     "ref_64x48x96": {
       "type": "C++",
@@ -55,7 +65,7 @@
     "mlir_64x48x96": {
       "type": "MLIR",
       "benchmark": "matmul_64x48x96.mlir",
-      "flags": []
+      "flags": [ "-run-args='-def-pack-matmul=0'" ]
     },
     "ref_64x64x64": {
       "type": "C++",
@@ -65,7 +75,7 @@
     "mlir_64x64x64": {
       "type": "MLIR",
       "benchmark": "matmul_64x64x64.mlir",
-      "flags": []
+      "flags": [ "-run-args='-def-pack-matmul=0'" ]
     }
   }}
 ]
