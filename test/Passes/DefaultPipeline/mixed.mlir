@@ -20,7 +20,7 @@ module @predict_function  {
     // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
     // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
-    tpp.identity ins(%arg2 : memref<512xf32>) out(%arg3 : memref<128x512xf32>)
+    tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
 
     // Matmul
     // CHECK: call @xsmm_matmul_dispatch

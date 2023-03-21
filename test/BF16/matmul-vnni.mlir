@@ -29,7 +29,7 @@ func.func @matmul_static(
 // CHECK: %[[extract0:.*]] = tensor.extract_slice %[[pack0]][%{{.*}}, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<8x16x32x32xbf16> to tensor<16x32x32xbf16>
 // CHECK: %[[extract1:.*]] = tensor.extract_slice %[[pack3]][%{{.*}}, 0, 0, 0, 0] [1, 16, 16, 32, 2] [1, 1, 1, 1, 1] : tensor<32x16x16x32x2xbf16> to tensor<16x16x32x2xbf16>
 // CHECK: %[[extract2:.*]] = tensor.extract_slice %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<8x32x32x32xbf16> to tensor<32x32xbf16>
-// CHECK:  %[[vnnimatmul:.*]] = vnni.brgemm ins(%[[extract0]] : tensor<16x32x32xbf16>, %[[extract1]] : tensor<16x16x32x2xbf16>) out(%[[extract2]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+// CHECK:  %[[vnnimatmul:.*]] = vnni.brgemm ins(%[[extract0]] : tensor<16x32x32xbf16>, %[[extract1]] : tensor<16x16x32x2xbf16>) outs(%[[extract2]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
 // CHECK: %[[insert:.*]] = tensor.insert_slice %[[vnnimatmul]]
 // CHECK: scf.yield
 // CHECK: }

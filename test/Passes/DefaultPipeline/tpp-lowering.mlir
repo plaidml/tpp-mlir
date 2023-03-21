@@ -2,9 +2,9 @@
 // RUN: tpp-opt %s -tpp-lowering="tpp-to-loops" -split-input-file | FileCheck %s -check-prefix=LOOPS
 
 func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: memref<5x5xf32>, %arg3: memref<5x5xf32>) {
-    tpp.brgemm ins(%arg0 : memref<3x5x4xf32>, %arg1 : memref<3x4x5xf32>) out(%arg2 : memref<5x5xf32>)
-    tpp.relu ins(%arg2 : memref<5x5xf32>) out(%arg2 : memref<5x5xf32>)
-    tpp.matmul ins(%arg2 : memref<5x5xf32>, %arg3 : memref<5x5xf32>) out(%arg2 : memref<5x5xf32>)
+    tpp.brgemm ins(%arg0 : memref<3x5x4xf32>, %arg1 : memref<3x4x5xf32>) outs(%arg2 : memref<5x5xf32>)
+    tpp.relu ins(%arg2 : memref<5x5xf32>) outs(%arg2 : memref<5x5xf32>)
+    tpp.matmul ins(%arg2 : memref<5x5xf32>, %arg3 : memref<5x5xf32>) outs(%arg2 : memref<5x5xf32>)
     return
   }
 

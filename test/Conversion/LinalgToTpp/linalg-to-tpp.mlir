@@ -6,7 +6,7 @@
 // CHECK-SAME: %[[arg2:.*]]: memref<5x5xf32>) {
 func.func @brgemm_lowering(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
                           %arg2: memref<5x5xf32>) {
-  // CHECK: tpp.brgemm ins(%[[arg0]] : memref<3x5x4xf32>, %[[arg1]] : memref<3x4x5xf32>) out(%[[arg2]] : memref<5x5xf32>)
+  // CHECK: tpp.brgemm ins(%[[arg0]] : memref<3x5x4xf32>, %[[arg1]] : memref<3x4x5xf32>) outs(%[[arg2]] : memref<5x5xf32>)
   linalg.batch_reduce_matmul ins(%arg0, %arg1: memref<3x5x4xf32>, memref<3x4x5xf32>)
                              outs(%arg2: memref<5x5xf32>)
   return
@@ -23,7 +23,7 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK-DAG: %[[sixtyfour:.*]] = arith.constant 64 : index
   // CHECK: scf.parallel ([[i:.*]]) = (%[[zero]]) to (%[[sixtyfour]]) step (%[[one]]) {
   // CHECK: %[[slice:.*]] = memref.subview
-  // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map{{.*}}>) out(%[[slice]] : memref<32x32xf32, #map{{.*}}>)
+  // CHECK: tpp.relu ins(%[[slice]] : memref<32x32xf32, #map{{.*}}>) outs(%[[slice]] : memref<32x32xf32, #map{{.*}}>)
   // CHECK: scf.yield
   %c0 = arith.constant 0.0 : f32
   linalg.generic {
@@ -45,7 +45,7 @@ func.func @relu(%arg3: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
 // CHECK-SAME: %[[arg2:.*]]: memref<8x8xf32>) {
 func.func @matmul_lowering(%arg0: memref<8x9xf32>,
                            %arg1: memref<9x8xf32>, %arg2: memref<8x8xf32>) {
-  // CHECK: tpp.matmul ins(%[[arg0]] : memref<8x9xf32>, %[[arg1]] : memref<9x8xf32>) out(%[[arg2]] : memref<8x8xf32>)
+  // CHECK: tpp.matmul ins(%[[arg0]] : memref<8x9xf32>, %[[arg1]] : memref<9x8xf32>) outs(%[[arg2]] : memref<8x8xf32>)
   linalg.matmul ins(%arg0, %arg1: memref<8x9xf32>, memref<9x8xf32>)
                 outs(%arg2: memref<8x8xf32>)
   return
@@ -79,7 +79,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 // CHECK: scf.parallel (%[[ARG1:.+]], %[[ARG2:.+]]) = (%[[C0]], %[[C0]]) to (%[[C12]], %[[C56]]) step (%[[C1]], %[[C1]]) {
 // CHECK: %[[SUB:.+]] = memref.subview %[[ALLOC]][%[[ARG1]], %[[ARG2]], 0, 0] 
 // CHECK-SAME:  [1, 1, 56, 64] [1, 1, 1, 1] : memref<12x56x56x64xf32> to memref<56x64xf32, #[[MAP]]>
-// CHECK: tpp.identity ins(%[[ARG0]] : memref<64xf32>) out(%[[SUB]] : memref<56x64xf32, #[[MAP]]>)
+// CHECK: tpp.identity ins(%[[ARG0]] : memref<64xf32>) outs(%[[SUB]] : memref<56x64xf32, #[[MAP]]>)
 // CHECK: scf.yield
 // CHECK: }
 
@@ -98,7 +98,7 @@ func.func @main() -> memref<8x32x32x32xf32> {
     scf.for %arg1 = %c0 to %c32 step %c1 {
       // CHECK: memref.subview
       %subview_0 = memref.subview %subview[0, %arg1, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<1x32x32x32xf32, strided<[32768, 1024, 32, 1], offset: ?>> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-      tpp.relu ins(%subview_0 : memref<32x32xf32, strided<[32, 1], offset: ?>>) out(%subview_0 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+      tpp.relu ins(%subview_0 : memref<32x32xf32, strided<[32, 1], offset: ?>>) outs(%subview_0 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
     }
   }
   return %alloc : memref<8x32x32x32xf32>
@@ -122,7 +122,7 @@ func.func @add_mapping(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 // CHECK: func.func @add_mapping(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<1xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<1xf32>)
-// CHECK: tpp.add ins(%[[ARG0]] : memref<1xf32>, %[[ARG1]] : memref<1xf32>) out(%[[ARG1]] : memref<1xf32>)
+// CHECK: tpp.add ins(%[[ARG0]] : memref<1xf32>, %[[ARG1]] : memref<1xf32>) outs(%[[ARG1]] : memref<1xf32>)
 
 // -----
 
@@ -187,7 +187,7 @@ func.func @add_mapping(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>)
 // CHECK: %[[ARG1_SUB:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:  [%[[I]], 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #[[MAP]]>
 // CHECK: tpp.add ins(%[[ARG0_SUB]] : memref<10x10xf32, #[[MAP]]>, 
-// CHECK-SAME:        %[[ARG1_SUB]] : memref<10x10xf32, #[[MAP]]>) out(%[[ARG1_SUB]] : memref<10x10xf32, #[[MAP]]>)
+// CHECK-SAME:        %[[ARG1_SUB]] : memref<10x10xf32, #[[MAP]]>) outs(%[[ARG1_SUB]] : memref<10x10xf32, #[[MAP]]>)
 
 // -----
 
@@ -212,7 +212,7 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
 // CHECK: %[[SUB_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:  [0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
 // CHECK: tpp.add ins(%[[SUB_ARG0]] : memref<10x10xf32>, %[[SUB_ARG1]] : memref<10x10xf32>) 
-// CHECK-SAME:    out(%[[SUB_ARG1]] : memref<10x10xf32>)
+// CHECK-SAME:    outs(%[[SUB_ARG1]] : memref<10x10xf32>)
 
 // -----
 
@@ -234,7 +234,7 @@ func.func @add_mapping(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>) {
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x4xf32>, 
 // CHECK-SAME:  %[[ARG1:.+]]: memref<4x4xf32>)
 // CHECK: tpp.add ins(%[[ARG0]] : memref<4x4xf32>, %[[ARG1]] : memref<4x4xf32>) 
-// CHECK-SAME:    out(%[[ARG1]] : memref<4x4xf32>)
+// CHECK-SAME:    outs(%[[ARG1]] : memref<4x4xf32>)
 
 // -----
 
@@ -259,7 +259,7 @@ func.func @add_mapping(%arg0: memref<1x10x1xf32>, %arg1: memref<1x10x1xf32>) {
 // CHECK: %[[SUB_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:  [0, 0, 0] [1, 10, 1] [1, 1, 1] : memref<1x10x1xf32> to memref<10xf32, strided<[1]>>
 // CHECK: tpp.add ins(%[[SUB_ARG0]] : memref<10xf32, strided<[1]>>, %[[SUB_ARG1]] : memref<10xf32, strided<[1]>>) 
-// CHECK-SAME:    out(%[[SUB_ARG1]] : memref<10xf32, strided<[1]>>)
+// CHECK-SAME:    outs(%[[SUB_ARG1]] : memref<10xf32, strided<[1]>>)
 
 // -----
 
@@ -295,7 +295,7 @@ func.func @add_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
 
 // CHECK: func.func @add_mapping(%[[ARG0:.+]]: memref<1x1xf32>, %[[ARG1:.+]]: memref<1x1xf32>)
 // CHECK: tpp.add ins(%[[ARG0]] : memref<1x1xf32>, %[[ARG1]] : memref<1x1xf32>) 
-// CHECK-SAME:    out(%[[ARG1]] : memref<1x1xf32>)
+// CHECK-SAME:    outs(%[[ARG1]] : memref<1x1xf32>)
 
 // -----
 
@@ -320,7 +320,7 @@ func.func @add_mapping(%arg0: memref<10x1x1xf32>, %arg1: memref<10x1x1xf32>) {
 // CHECK: %[[SUB_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:  [0, 0, 0] [10, 1, 1] [1, 1, 1] : memref<10x1x1xf32> to memref<10xf32, strided<[1]>>
 // CHECK: tpp.add ins(%[[SUB_ARG0]] : memref<10xf32, strided<[1]>>, %[[SUB_ARG1]] : memref<10xf32, strided<[1]>>) 
-// CHECK-SAME:    out(%[[SUB_ARG1]] : memref<10xf32, strided<[1]>>)
+// CHECK-SAME:    outs(%[[SUB_ARG1]] : memref<10xf32, strided<[1]>>)
 
 // -----
 
@@ -340,7 +340,7 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>) {
 
 // CHECK: func.func @relu_mapping(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>)
-// CHECK: tpp.relu ins(%[[ARG0]] : memref<10x10xf32>) out(%[[ARG0]] : memref<10x10xf32>)
+// CHECK: tpp.relu ins(%[[ARG0]] : memref<10x10xf32>) outs(%[[ARG0]] : memref<10x10xf32>)
 
 // -----
 
@@ -361,7 +361,7 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>) {
 // CHECK: func.func @relu_mapping(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<10x10xf32>)
-// CHECK: tpp.relu ins(%[[ARG1]] : memref<10x10xf32>) out(%[[ARG0]] : memref<10x10xf32>)
+// CHECK: tpp.relu ins(%[[ARG1]] : memref<10x10xf32>) outs(%[[ARG0]] : memref<10x10xf32>)
 
 // -----
 
@@ -410,7 +410,7 @@ func.func @relu_max_with_only_zeros(%arg0: memref<3xf32>, %arg1: memref<3xf32>) 
 // CHECK-SAME: %[[ARG0:.+]]: memref<3xf32>, %[[ARG1:.+]]: memref<3xf32>
 func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
   %c0 = arith.constant 0.0 : f32
-  // CHECK: tpp.relu ins(%[[ARG1]] : memref<3xf32>) out(%[[ARG1]] : memref<3xf32>)
+  // CHECK: tpp.relu ins(%[[ARG1]] : memref<3xf32>) outs(%[[ARG1]] : memref<3xf32>)
   linalg.generic {
     indexing_maps = [#map, #map],
     iterator_types = ["parallel"]}
@@ -470,7 +470,7 @@ func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) -> memref
 // CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>)
 func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) -> memref<3x3xf32> {
   // CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG1]] : memref<3x3xf32>)
-  // CHECK-SAME     out(%[[ARG2]] : memref<3x3xf32>)
+  // CHECK-SAME     outs(%[[ARG2]] : memref<3x3xf32>)
   linalg.generic {
     indexing_maps = [#map, #map, #map],
     iterator_types = ["parallel", "parallel"]}
@@ -549,7 +549,7 @@ func.func @add_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, stride
 func.func @relu_mapping_strided(%i: memref<4x4xf32>, %o: memref<4x4xf32, strided<[4, 1], offset: ?>>) {
   %cst = arith.constant 0.000000e+00 : f32 
   // CHECK: tpp.relu ins(%[[ARG0]]
-  // CHECK-SAME:  out(%[[ARG1]]
+  // CHECK-SAME:  outs(%[[ARG1]]
   linalg.generic {
     indexing_maps = [#map, #map], 
     iterator_types = ["parallel", "parallel"]} 
@@ -569,7 +569,7 @@ func.func @relu_mapping_strided(%i: memref<4x4xf32>, %o: memref<4x4xf32, strided
 // CHECK-LABEL: func.func @broadcast_row_identity
 // CHECK-SAME: %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<32xf32>
 func.func @broadcast_row_identity(%arg0: memref<8x32xf32>, %arg1: memref<32xf32>) {
-  // CHECK: tpp.identity ins(%[[ARG1]] : memref<32xf32>) out(%[[ARG0:.+]] : memref<8x32xf32>)
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<32xf32>) outs(%[[ARG0:.+]] : memref<8x32xf32>)
   linalg.generic {
     indexing_maps = [#map1, #map],
     iterator_types = ["parallel", "parallel"]}
@@ -588,7 +588,7 @@ func.func @broadcast_row_identity(%arg0: memref<8x32xf32>, %arg1: memref<32xf32>
 // CHECK-LABEL: func.func @broadcast_col_identity
 // CHECK-SAME:  %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<8x1xf32>
 func.func @broadcast_col_identity(%arg0: memref<8x32xf32>, %arg1: memref<8x1xf32>) {
-  // CHECK: tpp.identity ins(%[[ARG1]] : memref<8x1xf32>) out(%[[ARG0]] : memref<8x32xf32>)
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<8x1xf32>) outs(%[[ARG0]] : memref<8x32xf32>)
   linalg.generic {
     indexing_maps = [#map1, #map],
     iterator_types = ["parallel", "parallel"]}
@@ -643,7 +643,7 @@ func.func @transpose_no_output_identity(%arg0: memref<8x32xf32>, %arg1: memref<3
 // CHECK-LABEL: func.func @empty_map_identity
 // CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<8x32xf32>
 func.func @empty_map_identity(%arg0 : f32, %arg1: memref<8x32xf32>) {
-  // CHECK: tpp.identity ins(%[[ARG0]] : f32) out(%[[ARG1]] : memref<8x32xf32>)
+  // CHECK: tpp.identity ins(%[[ARG0]] : f32) outs(%[[ARG1]] : memref<8x32xf32>)
   linalg.generic {
     indexing_maps = [#map, #map1],
     iterator_types = ["parallel", "parallel"]}
@@ -680,7 +680,7 @@ func.func @non_zero_constant_identity(%arg0 : memref<8x32xf32>, %arg1: memref<8x
 // CHECK-LABEL: func.func @broadcast_row_identity
 // CHECK-SAME: %[[ARG0:.+]]: memref<8x32xf32>, %[[ARG1:.+]]: memref<1x32xf32>
 func.func @broadcast_row_identity(%arg0: memref<8x32xf32>, %arg1: memref<1x32xf32>) {
-  // CHECK: tpp.identity ins(%[[ARG1]] : memref<1x32xf32>) out(%[[ARG0]] : memref<8x32xf32>)
+  // CHECK: tpp.identity ins(%[[ARG1]] : memref<1x32xf32>) outs(%[[ARG0]] : memref<8x32xf32>)
   linalg.generic {
     indexing_maps = [#map1, #map],
     iterator_types = ["parallel", "parallel"]}

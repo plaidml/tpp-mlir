@@ -32,7 +32,7 @@ func.func @entry(){
   %init_source = tensor.empty() : tensor<64xf32>
   %input_tensor = call @generate_1D_source(%init_source) : (tensor<64xf32>) -> (tensor<64xf32>)
   %1 = tensor.empty() : tensor<12x56x56x64xf32>
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) out({{.*}} : {{.*}})
+  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %2 = linalg.generic {indexing_maps=[#map,#map1],
                        iterator_types = ["parallel", "parallel", "parallel", "parallel"],
                        library_call = "tpp.identity"}

@@ -38,7 +38,7 @@ def VNNI_MatmulOp : VNNI_Op<"matmul"> {
     blocked by size 2.
 
     ```mlir
-    vnni.matmul ins(%arg0: memref<6x4xbf16>, %arg1: memref<2x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
+    vnni.matmul ins(%arg0: memref<6x4xbf16>, %arg1: memref<2x6x2xbf16>) outs(%arg2: memref<6x6xbf16>)
     ```
   }];
 
@@ -47,7 +47,7 @@ def VNNI_MatmulOp : VNNI_Op<"matmul"> {
   
   let assemblyFormat = [{
     `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
-     `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
+     `outs` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
   }];
 
   let builders = [
@@ -66,7 +66,7 @@ def VNNI_BRGemmOp : VNNI_Op<"brgemm"> {
     blocked by size 2.
 
     ```mlir
-    vnni.brgemm ins(%arg0: memref<3x6x4xbf16>, %arg1: memref<3x2x6x2xbf16>) out(%arg2: memref<6x6xbf16>)
+    vnni.brgemm ins(%arg0: memref<3x6x4xbf16>, %arg1: memref<3x2x6x2xbf16>) outs(%arg2: memref<6x6xbf16>)
     ```
   }];
 
@@ -75,7 +75,7 @@ def VNNI_BRGemmOp : VNNI_Op<"brgemm"> {
   
   let assemblyFormat = [{
     `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
-    `out` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
+    `outs` `(` $matrixC `:` type($matrixC) `)` (`->` type($dest)^)? attr-dict
   }];
 
   let builders = [

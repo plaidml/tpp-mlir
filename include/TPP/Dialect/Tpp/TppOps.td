@@ -41,63 +41,19 @@ def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 // dimension is one.
 def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
 
-// Class for tpp binary operations.
-class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [])> {
+//===----------------------------------------------------------------------===//
+// Unary Operations
+//===----------------------------------------------------------------------===//
 
-  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
-
-  let assemblyFormat = [{
-        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
-        `out` `(` $out `:` type($out) `)` attr-dict
-  }];
-}
-
-// Class for tpp.unary operations.
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [])> {
   
   let arguments = (ins TppOperand:$input, TppOperand:$output);
   
   let assemblyFormat = [{
-    `ins` `(` $input `:` type($input) `)` `out` `(` $output `:` type($output) `)` 
+    `ins` `(` $input `:` type($input) `)` `outs` `(` $output `:` type($output) `)` 
     attr-dict
   }];
-}
-
-//===----------------------------------------------------------------------===//
-// AddOp
-//===----------------------------------------------------------------------===//
-
-def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape, 
-                                     UnitStrideInnerLoop]> {
-  let summary = "Element-wise addition.";
-  let description = [{
-    The `tpp.add` operation performs element-wise addition on two-dimensional
-    memrefs, writing the result on the output memref. No checks or assumption are
-    made on the input/output arguments so the same memref can be passed both as
-    input and output. It supports broadcast semantic based on Numpy rules. 
-
-    Example:
-
-    ```mlir
-
-    // A = A + A
-    tpp.add ins(%1 : memref<2x2xf32>, %1: memref<2x2xf32>)
-            out(%1 : memref<2x2xf32>)
-
-    // B = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>) 
-            out(%2: memref<2x2xf32>)
-
-    // C = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>)
-            out(%3 : memref<2x2xf32>)
-
-    ```
-  }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -119,9 +75,9 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
 
     ```mlir
 
-    tpp.identity ins(%1: memref<2x2xf32>) out(%2: memref<2x2xf32>)
+    tpp.identity ins(%1: memref<2x2xf32>) outs(%2: memref<2x2xf32>)
     
-    tpp.identity ins(%1: f32) out(%2: memref<2x2xf32>)
+    tpp.identity ins(%1: f32) outs(%2: memref<2x2xf32>)
 
     ```
   }];
@@ -144,15 +100,65 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
     ```mlir
 
     // out-of-place.
-    tpp.relu ins(%0: memref<2x2xf32>) out(%1: memref<2x2xf32>)
+    tpp.relu ins(%0: memref<2x2xf32>) outs(%1: memref<2x2xf32>)
 
     // in-place.
-    tpp.relu ins(%0: memref<2x2xf32>) out(%0: memref<2x2xf32>)
+    tpp.relu ins(%0: memref<2x2xf32>) outs(%0: memref<2x2xf32>)
 
     ```
   }];
 
   let hasVerifier = 1; 
+}
+
+//===----------------------------------------------------------------------===//
+// Binary Operations
+//===----------------------------------------------------------------------===//
+
+class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
+  Tpp_Op<mnemonic, !listconcat(traits, [])> {
+
+  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
+
+  let assemblyFormat = [{
+        `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
+        `outs` `(` $out `:` type($out) `)` attr-dict
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// AddOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape, 
+                                     UnitStrideInnerLoop]> {
+  let summary = "Element-wise addition.";
+  let description = [{
+    The `tpp.add` operation performs element-wise addition on two-dimensional
+    memrefs, writing the result on the output memref. No checks or assumption are
+    made on the input/output arguments so the same memref can be passed both as
+    input and output. It supports broadcast semantic based on Numpy rules. 
+
+    Example:
+
+    ```mlir
+
+    // A = A + A
+    tpp.add ins(%1 : memref<2x2xf32>, %1: memref<2x2xf32>)
+            outs(%1 : memref<2x2xf32>)
+
+    // B = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>) 
+            outs(%2: memref<2x2xf32>)
+
+    // C = A + B
+    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>)
+            outs(%3 : memref<2x2xf32>)
+
+    ```
+  }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -169,7 +175,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
     ```mlir
 
     tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
-               out(%3: memref<2x2xf32>)
+               outs(%3: memref<2x2xf32>)
 
     ```
   }];
@@ -179,7 +185,7 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -218,7 +224,7 @@ def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
     ```mlir
 
     tpp.vnni_matmul ins(%1: memref<4x4xf32>, %2: memref<2x2x2xf32>)
-    		       out(%3: memref<4x2xf32>)
+    		       outs(%3: memref<4x2xf32>)
 
     ```
   }];
@@ -228,7 +234,7 @@ def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -264,7 +270,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
     ```mlir
 
       tpp.brgemm ins(%1: memref<3x5x4xf32>, %2: memref<3x4x5xf32>)
-                 out(%3: memref<5x5xf32>)
+                 outs(%3: memref<5x5xf32>)
     ```
   }];
 
@@ -275,7 +281,7 @@ def Tpp_BrgemmOp : Tpp_Op<"brgemm"> {
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -317,7 +323,7 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
     ```mlir
 
       tpp.vnni_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x2x5x2xf32>)
-                      out(%3: memref<6x5xf32>)
+                      outs(%3: memref<6x5xf32>)
     ```
   }];
 
@@ -328,7 +334,7 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
   let assemblyFormat = [{
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -368,7 +374,7 @@ def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
     ```mlir
 
       tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>, %4: i64)
-                      out(%5: memref<6x4xf32>)
+                      outs(%5: memref<6x4xf32>)
     ```
   }];
 
@@ -383,7 +389,7 @@ def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
                 $batchMatrixB `:` type($batchMatrixB) `,`
 		$bias `:` type($bias)  `,`
 		$fusedOpType `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -426,7 +432,7 @@ def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
       tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, 
                                 %2: memref<3x2x4x2xbf16>, 
                                 %3: memref<4xbf16>)
-                            out(%3: memref<6x4xbf16>)
+                            outs(%3: memref<6x4xbf16>)
     ```
   }];
 
@@ -439,7 +445,7 @@ def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
       `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
                 $batchMatrixB `:` type($batchMatrixB) `,`
 		$bias `:` type($bias) `)`
-      `out` `(` $matrixC `:` type($matrixC) `)` attr-dict
+      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
   }];
 
   let extraClassDeclaration = [{

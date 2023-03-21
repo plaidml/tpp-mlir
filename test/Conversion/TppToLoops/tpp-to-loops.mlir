@@ -11,7 +11,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
   // CHECK:     memref.store %[[fill]], %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
   %cst = arith.constant 0.000000e+00 : f32
-  tpp.identity ins(%cst: f32) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%cst: f32) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -29,7 +29,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK:     %[[load:.*]] = memref.load %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:     %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
   // CHECK:     memref.store %[[max]], %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
-  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -47,7 +47,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK:     %[[load:.*]] = memref.load %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:     %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
   // CHECK:     memref.store %[[max]], %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
-  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
   return 
 }
 
@@ -66,14 +66,14 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK:     %[[load2:.*]] = memref.load %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
   // CHECK:     %[[add:.*]] = arith.addf %[[load1]], %[[load2]] : f32
   // CHECK:     memref.store %[[add]], %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
-  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
   return
 }
 
 // -----
 
 func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
-  tpp.identity ins(%arg1: memref<3xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%arg1: memref<3xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -93,7 +93,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
 // CHECK-LABEL: @identity_to_loops_scalar(
 // CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: f32)
 func.func @identity_to_loops_scalar(%arg0: f32, %arg1: f32) -> f32 {
-  tpp.identity ins(%arg0: f32) out(%arg1: f32)
+  tpp.identity ins(%arg0: f32) outs(%arg1: f32)
   // CHECK: arith.addf %[[ARG0]], %[[ARG0]] : f32
   %0 = arith.addf %arg1, %arg1 : f32
   return %0: f32
@@ -103,7 +103,7 @@ func.func @identity_to_loops_scalar(%arg0: f32, %arg1: f32) -> f32 {
 // -----
 
 func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) { 
-  tpp.identity ins(%arg1: memref<1x3xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%arg1: memref<1x3xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -121,7 +121,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
 // -----
 
 func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) { 
-  tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%arg1: memref<1x1xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
 
@@ -139,7 +139,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 // -----
 
 func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) { 
-  tpp.identity ins(%arg0: memref<5x1xf32>) out(%arg1: memref<5x6xf32>)
+  tpp.identity ins(%arg0: memref<5x1xf32>) outs(%arg1: memref<5x6xf32>)
   return
 }
 
@@ -158,7 +158,7 @@ func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 // -----
 
 func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) { 
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) outs(%arg2: memref<3x3xf32>)
   return
 }
 
@@ -185,7 +185,7 @@ func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %
 // -----
 
 func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
-  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg2: memref<3x3xf32>)
+  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
   return
 }
 

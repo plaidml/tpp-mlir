@@ -15,12 +15,12 @@ module {
       
       //CHECK:  {{.*}} = xsmm.quarternary.dispatch fused_brgemm [32, 32, 32, 32, 32, 32](dataType bf16, isVNNI true)
       //CHECK:  xsmm.quarternary fused_brgemm(dataType bf16, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) : (i64, memref<16x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, memref<16x16x32x2xbf16, strided<[1024, 64, 2, 1], offset: ?>>, memref<32xbf16, strided<[1], offset: ?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>, i64) -> ()
-      tpp.vnni_brgemm ins(%subview_0 : memref<16x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, %subview_1 : memref<16x16x32x2xbf16, strided<[1024, 64, 2, 1], offset: ?>>) out(%cast : memref<32x32xbf16, strided<[32, 1]>>)
+      tpp.vnni_brgemm ins(%subview_0 : memref<16x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, %subview_1 : memref<16x16x32x2xbf16, strided<[1024, 64, 2, 1], offset: ?>>) outs(%cast : memref<32x32xbf16, strided<[32, 1]>>)
       %subview_4 = memref.subview %expand_shape[%arg5, 0] [1, 32] [1, 1] : memref<16x32xbf16> to memref<32xbf16, strided<[1], offset: ?>>
       %alloc_5 = memref.alloc() {alignment = 64 : i64} : memref<32x32xbf16>
-      tpp.add ins(%alloc_3 : memref<32x32xbf16>, %subview_4 : memref<32xbf16, strided<[1], offset: ?>>) out(%alloc_5 : memref<32x32xbf16>)
+      tpp.add ins(%alloc_3 : memref<32x32xbf16>, %subview_4 : memref<32xbf16, strided<[1], offset: ?>>) outs(%alloc_5 : memref<32x32xbf16>)
       %subview_6 = memref.subview %alloc[%arg4, %arg5, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
-      tpp.relu ins(%alloc_5 : memref<32x32xbf16>) out(%subview_6 : memref<32x32xbf16, strided<[32, 1], offset: ?>>)
+      tpp.relu ins(%alloc_5 : memref<32x32xbf16>) outs(%subview_6 : memref<32x32xbf16, strided<[32, 1], offset: ?>>)
       memref.dealloc %alloc_3 : memref<32x32xbf16>
       memref.dealloc %alloc_5 : memref<32x32xbf16>
     }

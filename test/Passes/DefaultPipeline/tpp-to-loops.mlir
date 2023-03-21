@@ -8,7 +8,7 @@ func.func @tpp_add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
   // CHECK:     arith.addf
-  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) out(%arg1: memref<3x3xf32>)
+  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
 
   return
 }
@@ -24,7 +24,7 @@ func.func @tpp_identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   // CHECK:   scf.for
   // CHECK:     memref.load
   // CHECK:     memref.store
-  tpp.identity ins(%arg1: memref<1x1xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.identity ins(%arg1: memref<1x1xf32>) outs(%arg0: memref<3x3xf32>)
 
   return
 }
@@ -38,7 +38,7 @@ func.func @tpp_relu(%arg0: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
   // CHECK:     arith.maxf
-  tpp.relu ins(%arg0: memref<3x3xf32>) out(%arg0: memref<3x3xf32>)
+  tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
 
   return
 }
@@ -57,7 +57,7 @@ func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2:
   // CHECK:       scf.for
   // CHECK:         arith.mulf
   // CHECK:         arith.addf
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) out(%arg2: memref<3x3xf32>)
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) outs(%arg2: memref<3x3xf32>)
 
   return
 }
@@ -76,7 +76,7 @@ func.func @tpp_matmul(%A: memref<4x8xf32>,
   // CHECK:     scf.for
   // CHECK:       arith.mulf
   // CHECK:       arith.addf
-  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) out(%C : memref<4x4xf32>)
+  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) outs(%C : memref<4x4xf32>)
 
   return
 }

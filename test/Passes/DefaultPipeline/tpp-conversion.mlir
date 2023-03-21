@@ -57,8 +57,8 @@ func.func @vnni_dialect(%arg0: memref<4x256x512xbf16>,
                   %arg2: memref<256x1024xbf16>,
                   %arg3: memref<512x2048x2xbf16>,
                   %arg4: memref<256x2048xbf16>) {
-  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>)
-  vnni.matmul ins(%arg2: memref<256x1024xbf16>, %arg3: memref<512x2048x2xbf16>) out(%arg4: memref<256x2048xbf16>)
+  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) outs(%arg2 : memref<256x1024xbf16>)
+  vnni.matmul ins(%arg2: memref<256x1024xbf16>, %arg3: memref<512x2048x2xbf16>) outs(%arg4: memref<256x2048xbf16>)
 
   return
 }

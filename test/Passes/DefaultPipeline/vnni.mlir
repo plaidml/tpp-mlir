@@ -12,7 +12,7 @@ func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  %vnni_result = vnni.matmul ins(%arg0: tensor<128x1024xbf16>, %arg1: tensor<512x2048x2xbf16>) out(%arg2: tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
+  %vnni_result = vnni.matmul ins(%arg0: tensor<128x1024xbf16>, %arg1: tensor<512x2048x2xbf16>) outs(%arg2: tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
 
   return %vnni_result : tensor<128x2048xbf16>
 }
@@ -31,7 +31,7 @@ func.func @matmul_memref(%arg0: memref<128x1024xbf16>,
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  vnni.matmul ins(%arg0: memref<128x1024xbf16>, %arg1: memref<512x2048x2xbf16>) out(%arg2: memref<128x2048xbf16>)
+  vnni.matmul ins(%arg0: memref<128x1024xbf16>, %arg1: memref<512x2048x2xbf16>) outs(%arg2: memref<128x2048xbf16>)
 
   return %arg2 : memref<128x2048xbf16>
 }
@@ -53,7 +53,7 @@ func.func @matmul_memref_result(%arg0: memref<128x1024xbf16>,
   // CHECK-NOT: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK-NOT: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   // CHECK: vnni.matmul
-  %vnni_result = vnni.matmul ins(%arg0: memref<128x1024xbf16>, %arg1: memref<512x2048x2xbf16>) out(%arg2: memref<128x2048xbf16>) -> memref<128x2048xbf16>
+  %vnni_result = vnni.matmul ins(%arg0: memref<128x1024xbf16>, %arg1: memref<512x2048x2xbf16>) outs(%arg2: memref<128x2048xbf16>) -> memref<128x2048xbf16>
 
   return %vnni_result : memref<128x2048xbf16>
 }
@@ -74,7 +74,7 @@ func.func @brgemm_static_tensor(%arg0: tensor<4x256x512xbf16>, %arg1: tensor<4x5
   // CHECK: %[[cast1:.*]] = memref.cast %[[alloc]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  %2 = vnni.brgemm ins(%arg0 : tensor<4x256x512xbf16>, %1 : tensor<4x256x1024x2xbf16>) out(%arg2 : tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %2 = vnni.brgemm ins(%arg0 : tensor<4x256x512xbf16>, %1 : tensor<4x256x1024x2xbf16>) outs(%arg2 : tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
 
   return %2 : tensor<256x1024xbf16>
 }
@@ -91,7 +91,7 @@ func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x2
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>)
+  vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) outs(%arg2 : memref<256x1024xbf16>)
 
   return %arg2 : memref<256x1024xbf16>
 }
@@ -111,7 +111,7 @@ func.func @brgemm_static_memref_result(%arg0: memref<4x256x512xbf16>, %arg1: mem
   // CHECK-NOT: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK-NOT: call @xsmm_brgemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   // CHECK: vnni.brgemm
-  %2 = vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) out(%arg2 : memref<256x1024xbf16>) -> memref<256x1024xbf16>
+  %2 = vnni.brgemm ins(%arg0 : memref<4x256x512xbf16>, %arg1 : memref<4x256x1024x2xbf16>) outs(%arg2 : memref<256x1024xbf16>) -> memref<256x1024xbf16>
 
   return %2 : memref<256x1024xbf16>
 }
