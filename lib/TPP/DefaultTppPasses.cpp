@@ -24,10 +24,16 @@
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
+
+// Extra command line options to control the default TPP utility passes.
+llvm::cl::opt<bool> packMatmul("def-pack-matmul",
+                               llvm::cl::desc("Default pipeline - pack matmul"),
+                               llvm::cl::init(true));
 
 llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
@@ -207,7 +213,7 @@ private:
 // Apply collection of high-level passes that map operations to
 // TPP-compatible forms.
 struct TppMappingPass : public TppMappingBase<TppMappingPass>,
-                        UtilityPassBase<func::FuncOp> {
+                        UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -238,12 +244,35 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    pm.addPass(createTileConsumerAndFuseProducersPass());
     // Preprocess convolutions.
+    pm.addPass(createConvInitSimplifyPass());
+    pm.addPass(createCleanupPass());
+    pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
+    pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
+
+    // Convert ops to packed layouts.
+    if (packMatmul)
+      pm.addPass(createPackMatmulPass({32, 32, 32}));
+    pm.addPass(createPackVNNIPass());
+
+    // Postprocess packing.
+    // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
+    // mess up tensor producer-consumer chains used for analysis in the
+    // following passes.
+    pm.addPass(createPropagatePackUnPackPass());
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createConstantFoldPackPass());
+    pm.addPass(createCanonicalizerPass());
+
+    pm.addPass(createTileConsumerAndFuseProducersPass());
+    pm.addPass(createCleanupPass());
 
     // Generalize tensor.pack and tensor.unpack.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
+
+    // Final clenaup after all the mapping.
+    pm.addPass(createCleanupPass());
   }
 };
 
@@ -387,7 +416,7 @@ private:
     } else {
       // Lower IR through TPP operations.
       // Transform operations to be TPP compatible.
-      pm.addNestedPass<func::FuncOp>(createTppMappingPass());
+      pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
@@ -434,7 +463,7 @@ mlir::tpp::createPostprocessingPass() {
   return std::make_unique<PostprocessingPass>();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createTppMappingPass() {
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppMappingPass() {
   return std::make_unique<TppMappingPass>();
 }
 

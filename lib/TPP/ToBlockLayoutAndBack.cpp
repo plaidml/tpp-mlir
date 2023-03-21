@@ -485,7 +485,11 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
         /*doc=*/"", /*libraryCall=*/"");
 
   } else {
-    assert(matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() == 3);
+    // TODO: validate operands earlier
+    if (matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() != 3)
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "invalid second operand shape");
+
     dims = 5;
     bindDims(ctx, r1, r3, p3, p4, r2);
     mapA = AffineMap::get(dims, /*symbols=*/0, {r1, p3, r2}, ctx);
@@ -788,18 +792,19 @@ void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackMatmulPass() {
-  return std::make_unique<PackMatmul>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createPackMatmulPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackMatmul>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNchwFchwPass() {
-  return std::make_unique<PackConv2DNchwFchw>();
+mlir::tpp::createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackConv2DNchwFchw>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNhwcHwcfPass() {
-  return std::make_unique<PackConv2DNhwcHwcf>();
+mlir::tpp::createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors) {
+  return std::make_unique<PackConv2DNhwcHwcf>(blockingFactors);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {

@@ -236,7 +236,6 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let summary = "Collection of default TPP passes";
-  let constructor = "mlir::tpp::createDefaultTppPass()";
   let description = [{
     A collection of passes that lower everything TPP-related
     to standard low-level dialects.
@@ -249,6 +248,7 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "bool", /*default=*/"0",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
   ];
+  let constructor = "mlir::tpp::createDefaultTppPass()";
 }
 
 def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
@@ -331,7 +331,7 @@ def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPostprocessingPass()";
 }
 
-def TppMapping : Pass<"tpp-mapping", "func::FuncOp"> {
+def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
   let summary = "Map operations to be TPP compatible";
   let description = [{
     Apply collection of TPP rewriting passes to map eligble operations
@@ -354,12 +354,12 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
     Lower all TPP operations into combination of operations from
     standard and local dialects.
   }];
-  let constructor = "mlir::tpp::createTppLoweringPass()";
   let options= [
     Option<"tppToLoops", "tpp-to-loops",
            "bool", /*default=*/"0",
            "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
   ];
+  let constructor = "mlir::tpp::createTppLoweringPass()";
 }
 
 def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
