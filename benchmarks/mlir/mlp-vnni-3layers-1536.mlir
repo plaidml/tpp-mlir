@@ -2,9 +2,6 @@
 // RUN: tpp-run %s -n 10 \
 // RUN:  -e entry -entry-point-result=void
 
-// This benchmark isn't expected to "pass", just run as benchmark for now
-// XFAIL: *
-//
 // Total flops = matmul O(2*n*m*k) + BiasAdd (n*m) + ReLU (O(n*m) x 3
 // 2*256x1536x1536 (1207959552) + 256x1536 (393216) + 256x1536 (393216) x 3 = 3,626,237,952
 // BENCH_TOTAL_FLOPS: 3626237952
