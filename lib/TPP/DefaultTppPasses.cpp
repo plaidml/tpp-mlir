@@ -35,6 +35,10 @@ llvm::cl::opt<bool> packMatmul("def-pack-matmul",
                                llvm::cl::desc("Default pipeline - pack matmul"),
                                llvm::cl::init(true));
 
+llvm::cl::opt<bool> defPipePack("def-pack",
+                                llvm::cl::desc("Default pipeline - packing"),
+                                llvm::cl::init(true));
+
 llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
                    llvm::cl::desc("Disable default pipeline execution"),
@@ -247,14 +251,16 @@ private:
     // Preprocess convolutions.
     pm.addPass(createConvInitSimplifyPass());
     pm.addPass(createCleanupPass());
-    pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
-    pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
-    pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
+    if (defPipePack) {
+      pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
+      pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
+      pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
-    // Convert ops to packed layouts.
-    if (packMatmul)
-      pm.addPass(createPackMatmulPass({32, 32, 32}));
-    pm.addPass(createPackVNNIPass());
+      // Convert ops to packed layouts.
+      if (packMatmul)
+        pm.addPass(createPackMatmulPass({32, 32, 32}));
+      pm.addPass(createPackVNNIPass());
+    }
 
     // Postprocess packing.
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
