@@ -227,8 +227,7 @@ DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
   }
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
-  mlir::tpp::populateConvertLinalgToTppPatterns(patterns,
-                                                /*useParallelLoops=*/true);
+  mlir::tpp::populateConvertLinalgToTppPatterns(patterns);
 
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
     return emitDefaultDefiniteFailure(target);

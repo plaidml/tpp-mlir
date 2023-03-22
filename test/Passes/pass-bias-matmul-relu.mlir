@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -propagate-pack-and-unpack -canonicalize -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs" -canonicalize  -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp="use-parallel-loops=true" -rewrite-to-brgemm -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -propagate-pack-and-unpack -canonicalize -tile-consumer-and-fuse-producers -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs" -canonicalize  -drop-equivalent-buffer-results -finalizing-bufferize -canonicalize -convert-linalg-to-tpp -rewrite-to-brgemm -convert-linalg-to-tpp | FileCheck %s
 
 !A_tensor_t = tensor<256x512xf32>
 !B_tensor_t = tensor<512x1024xf32>
@@ -35,30 +35,11 @@ func.func @matmul_static(
   return %res : !C_tensor_t
 }
 
-
-// CHECK: #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 32 + d1 + s0)>
-// CHECK: func.func @matmul_static(
-// CHECK-SAME:  %[[ARG0:[a-zA-Z0-9]+]]: memref<256x512xf32, strided<[?, ?], offset: ?>>,
-// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<512x1024xf32, strided<[?, ?], offset: ?>>,
-// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: memref<256x1024xf32, strided<[?, ?], offset: ?>>,
-// CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: memref<1024xf32, strided<[?], offset: ?>>) {
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK: tpp.identity ins(%[[ARG3]] : memref<1024xf32, strided<[?], offset: ?>>) outs(%[[ARG2]] : memref<256x1024xf32, strided<[?, ?], offset: ?>>)
-// Pack allocations.
-// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x16x32x32xf32
-// CHECK: %[[ALLOC1:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32x16x32x32xf32>
-// CHECK: %[[ALLOC2:.+]] = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xf32>
-// CHECK: scf.parallel (%[[I:.+]], %[[J:.+]]) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]])
-// CHECK:     %[[SUBV:.+]] = memref.subview %[[ALLOC]][%[[I]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-// CHECK:     %[[SUBV1:.+]] = memref.subview %[[ALLOC1]][%[[J]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<32x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-// CHECK:     %[[SUBV2:.+]] = memref.subview %[[ALLOC2]][%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-// CHECK: tpp.brgemm ins(%[[SUBV]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUBV1]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[SUBV2]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-// CHECK: }
-// CHECK: scf.parallel (%[[L:.+]], %[[E:.+]]) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]]) {
-// CHECK:   %[[SUBV3:.+]] = memref.subview %[[ALLOC2]][%[[L]], %[[E]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, #[[MAP0]]>
-// CHECK:   tpp.relu ins(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>) outs(%[[SUBV3]] : memref<32x32xf32, #[[MAP0]]>)
-// CHECK:   scf.yield
-// CHECK: }
+// CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) in (8, 32)
+// CHECK: %[[SUB:.+]] = memref.subview %{{.+}}[%[[I]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK: %[[SUB2:.+]] = memref.subview %{{.+}}[%[[J]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<32x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>
+// CHECK: %[[SUB3:.+]] = memref.subview %{{.+}}[%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK: tpp.brgemm ins(%[[SUB]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUB2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) 
+// CHECK-SAME:       outs(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+// CHECK: tpp.relu ins(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>) 
+// CHECK-SAME:     outs(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
