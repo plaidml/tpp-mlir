@@ -55,12 +55,12 @@ struct CombineTppOpPattern : public OpRewritePattern<tpp::ReluOp> {
           isa<memref::DeallocOp>(user)) {
         continue;
       }
-      // assert(user.isa<tpp::AddBCastOp>());
+      assert(isa<tpp::AddOp>(user));
       addOp = user;
       break;
     }
 
-    if (addOp == NULL) {
+    if (addOp == NULL || !isa<tpp::AddOp>(addOp)) {
       return failure();
     }
     auto brgemmResultBuffer = addOp->getOperands()[0].getDefiningOp();
