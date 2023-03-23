@@ -379,13 +379,9 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
+  auto res = mlir::OpTrait::tpp::verifyBroadcastableShapeImpl(linalgOp);
   if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()) &&
-      (verifyTppIdentityBroadcastingRules(linalgOp.getOperand(1).getType(),
-                                          linalgOp.getOperand(0).getType()) !=
-           MatchBroadcastRuleResult::Success &&
-       verifyTppIdentityBroadcastingRules(linalgOp.getOperand(0).getType(),
-                                          linalgOp.getOperand(1).getType()) !=
-           MatchBroadcastRuleResult::Success))
+      failed(res))
     return false;
   return hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
 }
