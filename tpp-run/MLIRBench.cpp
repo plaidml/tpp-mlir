@@ -369,14 +369,8 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   if (print == PrintStage::Mid)
     passManager.addPass(createPrintIRPass());
 
-  // Bufferization, if needed
-  passManager.addNestedPass<func::FuncOp>(createTensorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(vector::createVectorBufferizePass());
-  passManager.addNestedPass<func::FuncOp>(createLinalgBufferizePass());
-
   // Partial Lowering
   passManager.addPass(memref::createExpandStridedMetadataPass());
-  passManager.addPass(createLowerAffinePass());
   passManager.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoopsPass());
   passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
@@ -384,6 +378,7 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createConvertVectorToSCFPass());
   passManager.addPass(createConvertSCFToCFPass());
+  passManager.addPass(createLowerAffinePass());
 
   // Print IR of optimized kernel and main
   if (print == PrintStage::Late)

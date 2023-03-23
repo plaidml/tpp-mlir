@@ -16,23 +16,9 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let description = [{
     Convert linalg.generic (or named) operations to tpp operations. Linalg generic
     operations are converted using simple pattern matching (i.e., see `isTppAdd`).
-    Before mapping to tpp the conversion makes sure to resize all the tensors to 2d
-    by tiling all but the two innermost dimensions. This pass runs at buffer level
-    as we want to preserve parallel semantics when tiling. We do an additional
-    round of tiling to select the best tpp for matmul - SIMD dimension multiple of
-    16 - 64 the optimal, the other parallel dimension with a tile factor of 32
-    while we do not tile the reduction dimension. We bail out if we cannot generate
-    full tiles.  The user can pass tile sizes using 'tile-sizes' options.
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"enableTiling", "enable-tiling", "bool", "false",
-           "Try to select optimal tile sizes before mapping to tpp.">,
-    Option<"useParallelLoops", "use-parallel-loops", "bool", "true",
-           "Use parallel loops when mapping to TPPs.">,
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">
-  ];
+  let dependentDialects = ["linalg::LinalgDialect"]; 
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {

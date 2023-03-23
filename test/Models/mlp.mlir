@@ -1,6 +1,6 @@
 // RUN: tpp-opt %s \
 // RUN: -bufferize \ 
-// RUN: -convert-linalg-to-tpp="use-parallel-loops=false" \
+// RUN: -convert-linalg-to-tpp \
 // RUN: -convert-linalg-to-tpp | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (0, d1)>

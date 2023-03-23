@@ -14,6 +14,7 @@
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 func.func private @generate_1D_memref(%arg0: index, %buff: memref<?xf32>) -> memref<?xf32> {
@@ -49,9 +50,9 @@ func.func @entry() {
   scf.for %arg3 = %c0 to %c12 step %c1 {
     scf.for %arg4 = %c0 to %c2 step %c1 {
       scf.for %arg5 = %c0 to %c56 step %c1 {
-        %subview = memref.subview %alloc_0[%arg3, %arg4, %arg5, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : memref<12x2x56x56x32xf32> to memref<1x1x1x56x32xf32, strided<[200704, 100352, 1792, 32, 1], offset: ?>>
+        %subview = memref.subview %alloc_0[%arg3, %arg4, %arg5, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : memref<12x2x56x56x32xf32> to memref<56x32xf32, strided<[32, 1], offset: ?>>
         // TPP: tpp.relu ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
-        linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%subview : memref<1x1x1x56x32xf32, strided<[200704, 100352, 1792, 32, 1], offset: ?>>) {
+        linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%subview : memref<56x32xf32, strided<[32, 1], offset: ?>>) {
           ^bb0(%out: f32):
             %0 = arith.maxf %out, %cf : f32
             linalg.yield %0 : f32
@@ -66,7 +67,6 @@ func.func @entry() {
         linalg.yield %in : f32
   }
 
-  // TPP: tpp.relu ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%alloc_1 : memref<12x2x56x56x32xf32>) {
       ^bb0(%out: f32):
         %0 = arith.maxf %out, %cf : f32
