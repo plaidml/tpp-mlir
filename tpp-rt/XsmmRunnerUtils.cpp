@@ -115,7 +115,22 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   l_shape.comp_type = dtype;
 
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
-  assert(sgemm && "failed to generate matmul func");
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate matmul func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    fprintf(stderr, "M: %d\n", l_shape.m);
+    fprintf(stderr, "N: %d\n", l_shape.n);
+    fprintf(stderr, "K: %d\n", l_shape.k);
+    fprintf(stderr, "lda: %d\n", l_shape.lda);
+    fprintf(stderr, "ldb: %d\n", l_shape.ldb);
+    fprintf(stderr, "ldc: %d\n", l_shape.ldc);
+    fprintf(stderr, "a_in_type: %d\n", l_shape.a_in_type);
+    fprintf(stderr, "b_in_type: %d\n", l_shape.b_in_type);
+    fprintf(stderr, "comp_type: %d\n", l_shape.comp_type);
+    fprintf(stderr, "out_type: %d\n", l_shape.out_type);
+    exit(-1);
+  }
+
   return reinterpret_cast<int64_t>(sgemm);
 }
 
@@ -148,7 +163,19 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
       static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
       static_cast<libxsmm_bitfield>(unary_flags));
-  assert(kernel && "failed to generate unary func");
+  if (!kernel) {
+    fprintf(stderr, "failed to generate unary func\n");
+    fprintf(stderr, "type: %ld\n", type);
+    fprintf(stderr, "bcast_type: %ld\n", bcast_type);
+    fprintf(stderr, "M: %d\n", unary_shape.m);
+    fprintf(stderr, "N: %d\n", unary_shape.n);
+    fprintf(stderr, "in0_type: %d\n", unary_shape.in0_type);
+    fprintf(stderr, "comp_type: %d\n", unary_shape.comp_type);
+    fprintf(stderr, "out_type: %d\n", unary_shape.out_type);
+    fprintf(stderr, "ldi: %d\n", unary_shape.ldi);
+    fprintf(stderr, "ldo: %d\n", unary_shape.ldo);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(kernel);
 }
@@ -372,13 +399,17 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
     fprintf(stderr, "M: %d\n", l_shape.m);
     fprintf(stderr, "N: %d\n", l_shape.n);
     fprintf(stderr, "K: %d\n", l_shape.k);
+    fprintf(stderr, "lda: %d\n", l_shape.lda);
+    fprintf(stderr, "ldb: %d\n", l_shape.ldb);
+    fprintf(stderr, "ldc: %d\n", l_shape.ldc);
     fprintf(stderr, "a_in_type: %d\n", l_shape.a_in_type);
     fprintf(stderr, "b_in_type: %d\n", l_shape.b_in_type);
     fprintf(stderr, "comp_type: %d\n", l_shape.comp_type);
     fprintf(stderr, "out_type: %d\n", l_shape.out_type);
     fprintf(stderr, "br_type: %d\n", l_brconfig.br_type);
-    fprintf(stderr, "stride_a: %d\n", stride_a);
-    fprintf(stderr, "stride_b: %d\n", stride_b);
+    fprintf(stderr, "br_stride_a_hint: %d\n", l_brconfig.br_stride_a_hint);
+    fprintf(stderr, "br_stride_b_hint: %d\n", l_brconfig.br_stride_b_hint);
+    fprintf(stderr, "br_unroll_hint: %d\n", l_brconfig.br_unroll_hint);
     exit(-1);
   }
 
@@ -495,7 +526,25 @@ extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
 
   auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
       l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
-  assert(sgemm && "failed to generate brgemm func");
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate fused brgemm func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    fprintf(stderr, "M: %d\n", l_shape.m);
+    fprintf(stderr, "N: %d\n", l_shape.n);
+    fprintf(stderr, "K: %d\n", l_shape.k);
+    fprintf(stderr, "lda: %d\n", l_shape.lda);
+    fprintf(stderr, "ldb: %d\n", l_shape.ldb);
+    fprintf(stderr, "ldc: %d\n", l_shape.ldc);
+    fprintf(stderr, "a_in_type: %d\n", l_shape.a_in_type);
+    fprintf(stderr, "b_in_type: %d\n", l_shape.b_in_type);
+    fprintf(stderr, "comp_type: %d\n", l_shape.comp_type);
+    fprintf(stderr, "out_type: %d\n", l_shape.out_type);
+    fprintf(stderr, "br_type: %d\n", l_brconfig.br_type);
+    fprintf(stderr, "stride_a_hint: %d\n", l_brconfig.br_stride_a_hint);
+    fprintf(stderr, "stride_b_hint: %d\n", l_brconfig.br_stride_b_hint);
+    fprintf(stderr, "br_unroll_hint: %d\n", l_brconfig.br_unroll_hint);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(sgemm);
 }
