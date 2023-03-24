@@ -11,11 +11,14 @@
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 
-func.func @entry(%arg0: tensor<8x32x32x32xbf16>, %arg2: tensor<1024xbf16>, %arg3: tensor<8x32x32x32xbf16>, %arg5: tensor<1024xbf16>, %arg6: tensor<8x32x32x32xbf16>, %arg8: tensor<1024xbf16>, %arg9: tensor<8x32x32x32xbf16> ) -> tensor<8x32x32x32xbf16> {
+func.func @entry(%arg0: tensor<8x32x32x32xbf16>, %arg3: tensor<8x32x32x32xbf16>, %arg6: tensor<8x32x32x32xbf16>, %arg9: tensor<8x32x32x32xbf16> ) -> tensor<8x32x32x32xbf16> {
   %cst = arith.constant 0.000000e+00 : bf16
-  %arg1 = arith.constant dense<0.1> : tensor<32x32x32x32xbf16>
-  %arg4 = arith.constant dense<0.2> : tensor<32x32x32x32xbf16>
-  %arg7 = arith.constant dense<0.3> : tensor<32x32x32x32xbf16>
+  %arg1 = arith.constant dense<0.01> : tensor<32x32x32x32xbf16>
+  %arg4 = arith.constant dense<0.02> : tensor<32x32x32x32xbf16>
+  %arg7 = arith.constant dense<0.03> : tensor<32x32x32x32xbf16>
+  %arg2 = arith.constant dense<0.4> : tensor<1024xbf16>
+  %arg5 = arith.constant dense<0.5> : tensor<1024xbf16>
+  %arg8 = arith.constant dense<0.6> : tensor<1024xbf16>
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x32x32x32xbf16>, tensor<32x32x32x32xbf16>) outs(%arg3 : tensor<8x32x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %mul = arith.mulf %in, %in_0 : bf16
