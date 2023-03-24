@@ -32,7 +32,7 @@
     "bf16_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
-      "flags": [ "-run-args='-def-pack=0'" ]
+      "flags": []
     },
     "bf16_3x1024_unpacked_mlir": {
       "type": "MLIR",
