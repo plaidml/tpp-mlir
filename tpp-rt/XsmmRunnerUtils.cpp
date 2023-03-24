@@ -163,25 +163,17 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
   libxsmm_meltw_binary_shape binary_shape;
 
   // Row major to col major swap m with n.
-  // Retarget bf16 to f32 due to missing hardware support.
-  binary_shape.m =
-      static_cast<libxsmm_blasint>(dtype == LIBXSMM_DATATYPE_BF16 ? n / 2 : n);
-  binary_shape.n =
-      static_cast<libxsmm_blasint>(dtype == LIBXSMM_DATATYPE_BF16 ? m / 2 : m);
-  binary_shape.in0_type =
-      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
-  binary_shape.in1_type =
-      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
+  binary_shape.m = static_cast<libxsmm_blasint>(n);
+  binary_shape.n = static_cast<libxsmm_blasint>(m);
+  binary_shape.in0_type = dtype;
+  binary_shape.in1_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
   binary_shape.comp_type =
       dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
-  binary_shape.out_type =
-      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
-  binary_shape.ldi = static_cast<libxsmm_blasint>(
-      dtype == LIBXSMM_DATATYPE_BF16 ? ldiLhs / 2 : ldiLhs);
-  binary_shape.ldi2 = static_cast<libxsmm_blasint>(
-      dtype == LIBXSMM_DATATYPE_BF16 ? ldiRhs / 2 : ldiRhs);
-  binary_shape.ldo = static_cast<libxsmm_blasint>(
-      dtype == LIBXSMM_DATATYPE_BF16 ? ldo / 2 : ldo);
+  binary_shape.out_type = dtype;
+  binary_shape.ldi = static_cast<libxsmm_blasint>(ldiLhs);
+  binary_shape.ldi2 = static_cast<libxsmm_blasint>(ldiRhs);
+  binary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
   libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary_v2(
       static_cast<libxsmm_meltw_binary_type>(type), binary_shape,
@@ -387,6 +379,7 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
     fprintf(stderr, "br_type: %d\n", l_brconfig.br_type);
     fprintf(stderr, "stride_a: %d\n", stride_a);
     fprintf(stderr, "stride_b: %d\n", stride_b);
+    exit(-1);
   }
 
   return reinterpret_cast<int64_t>(sgemm);

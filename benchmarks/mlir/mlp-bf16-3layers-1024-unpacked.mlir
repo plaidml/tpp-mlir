@@ -12,12 +12,12 @@
 
 func.func @entry(%arg0: tensor<256x512xbf16>, %arg3: tensor<256x512xbf16>, %arg6: tensor<256x512xbf16>, %arg9: tensor<256x512xbf16> ) -> tensor<256x512xbf16> {
   %cst = arith.constant 0.000000e+00 : bf16
-  %arg1 = arith.constant dense<0.1> : tensor<512x512xbf16>
-  %arg4 = arith.constant dense<0.2> : tensor<512x512xbf16>
-  %arg7 = arith.constant dense<0.3> : tensor<512x512xbf16>
-  %arg2 = arith.constant dense<1.1> : tensor<256x512xbf16>
-  %arg5 = arith.constant dense<1.2> : tensor<256x512xbf16>
-  %arg8 = arith.constant dense<1.3> : tensor<256x512xbf16>
+  %arg1 = arith.constant dense<0.01> : tensor<512x512xbf16>
+  %arg4 = arith.constant dense<0.02> : tensor<512x512xbf16>
+  %arg7 = arith.constant dense<0.03> : tensor<512x512xbf16>
+  %arg2 = arith.constant dense<0.4> : tensor<256x512xbf16>
+  %arg5 = arith.constant dense<0.5> : tensor<256x512xbf16>
+  %arg8 = arith.constant dense<0.6> : tensor<256x512xbf16>
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<256x512xbf16>, tensor<512x512xbf16>) outs(%arg3 : tensor<256x512xbf16>) -> tensor<256x512xbf16>
   %2 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel"]}
   ins(%0, %arg2 : tensor<256x512xbf16>, tensor<256x512xbf16>) outs(%arg3 : tensor<256x512xbf16>) {
