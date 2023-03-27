@@ -2,16 +2,16 @@
 
 The `xsmm` dialect sits between the `tpp` dialect and function calls, and represents the lowering of TPP instructions to `libxsmm` calls (dispatch and invoke).
 
-At this level, all of the transformations are related to library lowering optimizations, such as commoning up dispatches, pre-allocating tmeporary buffers, keeping the PRNG state, etc.
+At this level, all of the transformations are related to library lowering optimizations, such as commoning up dispatches, pre-allocating temporary buffers, keeping the PRNG state, etc.
 
 The lowering of `xsmm` to function calls at the end should leave the IR with just low level dialects like `scf`, `func` and can be directly lowered to `llvm` dialect.
 
 ## Optimizations
 
-There are basically three main optimizaiton we want to do at this level:
+There are basically three main optimization we want to do at this level:
 
 1. Hoist all dispatches to the beginning of the function, common them up and reuse the function pointers for the identical invoke calls. This avoids calling the JITter multiple times, most of them returning an existing pointer.
-2. Setting up buffers, either outside of the parallel loops (being careful about multi-threading) or inside the last parallel outer loop (reusing some arena pre-allocation), and pass the poiters (base+offset) to the inner loop invokes.
+2. Setting up buffers, either outside of the parallel loops (being careful about multi-threading) or inside the last parallel outer loop (reusing some arena pre-allocation), and pass the pointers (base+offset) to the inner loop invokes.
 3. Initializing the PRNG first thing in the function and propagate the state through all invokes (as arguments), so that we explicitly keep track of this and make the lowering to function a trivial process.
 
 # Basic Rules
@@ -41,7 +41,7 @@ The `invoke` family takes that function pointer, and _invokes_ it with the appro
 
 All `invoke` operations have a name (here _"brgemm"_), a data type, the function pointer from the `dispatch`, the input and output data pointers, and optional execution flags (here _"c2_i64"_).
 
-The _"pointers"_ are cast to `i64` to be passed throgh MLIR, and are cast back to function pointer inside the XSMM runtime.
+The _"pointers"_ are cast to `i64` to be passed through MLIR, and are cast back to function pointer inside the XSMM runtime.
 
 ## Unary
 
