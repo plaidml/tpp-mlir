@@ -8,17 +8,17 @@ Those operations can be lowered to individual `xsmm` operations (which themselve
 
 The TPP dialect supports `tensor` types, converted directly from `linalg`, `tensor` and `tcp` operations, and have their own tiling and bufferization rules at `tensor` level.
 
-After bufferization, the dialect also supports `memref` types, where further grouping, transforms and annotation happen, in preparaiton for optimal `xsmm` lowering.
+After bufferization, the dialect also supports `memref` types, where further grouping, transforms and annotation happen, in preparation for optimal `xsmm` lowering.
 
 ## Optimizations
 
 Due to cache locality, instruction set availability and number of registers, there are various costs and benefits of picking particular combinations, which aren't immediately clear to the programmer.
 
-Our compiler needs to select the most appropriate combination that can be lowered to existing and optiomal `libxsmm` calls with the right blockng and tiling factors.
+Our compiler needs to select the most appropriate combination that can be lowered to existing and optional `libxsmm` calls with the right blocking and tiling factors.
 
-TPP operations can carry attributes, their operands can be chained and grouped, forming trees and graphs, which can be mathed in different ways.
+TPP operations can carry attributes, their operands can be chained and grouped, forming trees and graphs, which can be matched in different ways.
 
-Once lowered to `xsmm` dialect, the operations are selected and any further lowering won't change the TPP semantics, only add `xsmm` boilerplate and infrastruture to execute the chosen strategies.
+Once lowered to `xsmm` dialect, the operations are selected and any further lowering won't change the TPP semantics, only add `xsmm` boilerplate and infrastructure to execute the chosen strategies.
 
 # Basic Rules
 
@@ -52,7 +52,7 @@ For transforms (`broadcast`, `reduce`, `transpose`, `pack`, etc), there is one `
 The sizes must be the same for element-wise / arith, but will often be different for transforms (except `copy` and `transpose`).
 
 There is no implicit transform semantics.
-When lowering a broadcast (ex. a `linalg.generic` with lower dimension argument and apporpriate affine map), we map to `tpp.broadcast` + the operation.
+When lowering a broadcast (ex. a `linalg.generic` with lower dimension argument and appropriate affine map), we map to `tpp.broadcast` + the operation.
 
 ### Binary
 
@@ -169,7 +169,7 @@ Type must have the same rank, 2, dims flipped.
 ```mlir
   tpp.transpose ins(%0) outs(%1) : memref<MxNxTy> -> memref<NxMxTy> // TRANSFORM_NORM_TO_NORMT
 ```
-Shiould be fused with the user(s).
+Should be fused with the user(s).
 GEMM ops have transposed versions, we should use this op to annotate operands.
 
 ## BF16 Pack / Unpack
@@ -178,7 +178,7 @@ Ignore-for now.
 
 ## Tensor pack
 The tensor operation `tensor.pack` does a "block transpose" (n,m <-> m,n) copies.
-We lower this to a series of `tpp.copy` into temporaty tiles if needed.
+We lower this to a series of `tpp.copy` into temporary tiles if needed.
 But the idea is that all constant tensors would have been packed by the compiler already and all input packs would be combined at the beginning.
 
 ## Tensor Unpack
