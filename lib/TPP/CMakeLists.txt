@@ -1,4 +1,5 @@
 add_subdirectory(Dialect)
+add_subdirectory(IR)
 
 get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 
@@ -36,6 +37,9 @@ add_mlir_library(MLIRTPP
     ConvertPerfToLoops.cpp
     ConvertPerfToFunc.cpp
 
+  # Test Passes
+    TestMatchers.cpp
+
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
 
@@ -44,6 +48,7 @@ add_mlir_library(MLIRTPP
     TPPLinalgXTransformOps
 
     LINK_LIBS PUBLIC
+    TPPIR
     TPPTppDialect
     TPPXsmmDialect
     TPPVNNIDialect
