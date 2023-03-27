@@ -17,7 +17,6 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -35,7 +34,7 @@ DiagnosedSilenceableFailure
 transform::PackOpExt::applyToOne(linalg::LinalgOp target,
                                  ApplyToEachResultList &results,
                                  transform::TransformState &state) {
-  TrivialPatternRewriter rewriter(target->getContext());
+  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   SmallVector<OpFoldResult> blockingFactors =
       getAsOpFoldResult(rewriter.getI64ArrayAttr(getBlockingFactors()));
@@ -81,7 +80,7 @@ transform::CollapseOp::applyToOne(linalg::LinalgOp target,
                                   transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  TrivialPatternRewriter rewriter(target->getContext());
+  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
       rewriter, cast<linalg::GenericOp>(target), getReassociationIndices());
@@ -112,7 +111,7 @@ transform::RewriteToBrgemmOp::applyToOne(linalg::LinalgOp target,
                                          transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
-  TrivialPatternRewriter rewriter(target->getContext());
+  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops = mlir::linalgx::rewriteToBRGemmOp(
       rewriter, cast<linalg::GenericOp>(target));
@@ -129,7 +128,7 @@ transform::RewriteConvToMatmulOp::applyToOne(linalg::LinalgOp target,
                                              transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  TrivialPatternRewriter rewriter(target->getContext());
+  IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::rewriteConvToMatmul(
       rewriter, cast<linalg::GenericOp>(target));
@@ -252,7 +251,7 @@ transform::CollapseTo2dOp::apply(transform::TransformResults &results,
       diag.attachNote(op->getLoc()) << "when applied to this op";
       return DiagnosedSilenceableFailure::definiteFailure();
     }
-    TrivialPatternRewriter rewriter(currentTarget->getContext());
+    IRRewriter rewriter(currentTarget->getContext());
     rewriter.setInsertionPoint(currentTarget);
     FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
         rewriter, currentTarget, getReassociationIndices(currentTarget));
@@ -331,7 +330,7 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
                            : linalg::LinalgTilingLoopType::Loops;
     linalgTilingOptions.setLoopType(loopsTypes)
         .setTileSizeComputationFunction(getTileSizes);
-    TrivialPatternRewriter rewriter(currentTarget->getContext());
+    IRRewriter rewriter(currentTarget->getContext());
     FailureOr<linalg::TiledLinalgOp> tiledOp =
         linalg::tileLinalgOp(rewriter, currentTarget, linalgTilingOptions);
     if (failed(tiledOp))
