@@ -237,7 +237,6 @@ Generic out-of-place syntax:
   tpp.sub ins(%0, %1) outs(%2) : (memref<NxMxTy>, memref<NxMxTy>, memref<NxMxTy>) -> memref<NxMxTy> // SUB
   tpp.mul ins(%0, %1) outs(%2) : (memref<NxMxTy>, memref<NxMxTy>, memref<NxMxTy>) -> memref<NxMxTy> // MUL
   tpp.div ins(%0, %1) outs(%2) : (memref<NxMxTy>, memref<NxMxTy>, memref<NxMxTy>) -> memref<NxMxTy> // DIV
-  tpp.muladd ins(%0, %1) outs(%2) : (memref<NxMxTy>, memref<NxMxTy>, memref<NxMxTy>) -> memref<NxMxTy> // MULADD
 ```
 
 Depending on the arguments, the operation can also be in-place.
@@ -254,7 +253,6 @@ Depending on the arguments, the operation can also be in-place.
 Matrix-multiply between two memrefs.
 Always out-of-place.
 Operands of the compatible type (M, N, K), broadcast by operator
-If operand's producer is `tpp.broadcast`, add appropriate `BCAST_*` flag to op.
 If operand's producer is `tpp.transpose` and/or `tpp.vnni_pack`, change op to appropriate `MATMUL_X_TRANS_VNNI` variant.
 
 ```mlir
