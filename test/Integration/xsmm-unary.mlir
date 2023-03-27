@@ -9,7 +9,6 @@ func.func @entry(%arg0: memref<3x3xf32>) {
   return
 }
 
- // CHECK: ( 1, 1, 1 )
- // CHECK: ( 1, 1, 1 )
- // CHECK: ( 1, 1, 1 )
- 
+// CHECK: ( 1, 1, 1 )
+// CHECK: ( 1, 1, 1 )
+// CHECK: ( 1, 1, 1 )
