@@ -239,7 +239,7 @@ class BenchmarkDriver(object):
 
                 # Clean up output
                 stdout = re.sub("\n", "", run.stdout)
-                print(f"{run.name:20}: {stdout}")
+                print(f"{run.name:28}: {stdout}")
             print("")
 
         return True
