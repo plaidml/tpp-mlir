@@ -82,7 +82,7 @@ class Environment(object):
                 self.extra_args.append("-v")
         # Set environment variables for dynamic loading (Linux and Mac)
         os.putenv("LD_LIBRARY_PATH", f"{self.lib_dir}:{os.getenv('LD_LIBRARY_PATH')}")
-        os.putenv("DYLDLIBRARY_PATH", f"{self.lib_dir}:{os.getenv('DYLDLIBRARY_PATH')}")
+        os.putenv("DYLD_LIBRARY_PATH", f"{self.lib_dir}:{os.getenv('DYLD_LIBRARY_PATH')}")
 
 class BaseRun(object):
     """ Base class for all runs """
