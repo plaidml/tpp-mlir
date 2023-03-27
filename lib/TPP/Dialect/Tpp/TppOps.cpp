@@ -115,30 +115,13 @@ void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
 // AdddOp
 //===----------------------------------------------------------------------===//
 
-// Accept only shaped operands for AddOp. We currently do not support
-// broadcasting and TPP operations are memory to memory thus disallow scalar
-// operand for now.
-LogicalResult AddOp::verify() {
-  Type lhsType = getLhs().getType();
-  Type rhsType = getRhs().getType();
-  Type outputType = getOut().getType();
-  if ((!lhsType.isa<ShapedType>()) || (!rhsType.isa<ShapedType>()) ||
-      (!outputType.isa<ShapedType>()))
-    return emitOpError("expects all operands to be shaped type");
-  return success();
-}
+LogicalResult AddOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult ReluOp::verify() {
-  Type inputType = getInput().getType();
-  Type outputType = getOutput().getType();
-  if ((!inputType.isa<ShapedType>()) || (!outputType.isa<ShapedType>()))
-    return emitOpError("expects both operands to be shaped type");
-  return success();
-}
+LogicalResult ReluOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // VNNIMatmulOp

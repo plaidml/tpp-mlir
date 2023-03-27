@@ -1,6 +1,6 @@
 // RUN: tpp-opt %s -convert-tpp-to-loops -split-input-file | FileCheck %s
 
-// CHECK: func.func @identity_to_loops(
+// CHECK-LABEL: func.func @identity_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>) {
 func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -17,7 +17,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>) {
 
 // -----
 
-// CHECK: func.func @relu_to_loops(
+// CHECK-LABEL: func.func @relu_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>) {
 func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -35,7 +35,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
 
 // -----
 
-// CHECK: func.func @relu_to_loops(
+// CHECK-LABEL: func.func @relu_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>)
 func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -53,7 +53,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 
 // -----
 
-// CHECK: func.func @add_to_loops(
+// CHECK-LABEL: func.func @add_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>) {
 func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
@@ -77,7 +77,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
   return
 }
 
-// CHECK: func.func @identity_to_loops(
+// CHECK-LABEL: func.func @identity_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<3xf32>) {
 // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -90,24 +90,12 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
 
 // -----
 
-// CHECK-LABEL: @identity_to_loops_scalar(
-// CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: f32)
-func.func @identity_to_loops_scalar(%arg0: f32, %arg1: f32) -> f32 {
-  tpp.identity ins(%arg0: f32) outs(%arg1: f32)
-  // CHECK: arith.addf %[[ARG0]], %[[ARG0]] : f32
-  %0 = arith.addf %arg1, %arg1 : f32
-  return %0: f32
-}
-
-
-// -----
-
 func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) { 
   tpp.identity ins(%arg1: memref<1x3xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
 
-// CHECK: func.func @identity_to_loops(
+// CHECK-LABEL: func.func @identity_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<1x3xf32>) {
 // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -125,7 +113,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   return
 }
 
-// CHECK: func.func @identity_to_loops(
+// CHECK-LABEL: func.func @identity_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<1x1xf32>) {
 // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
@@ -143,7 +131,7 @@ func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
   return
 }
 
-// CHECK: func.func @identity_to_loops(
+// CHECK-LABEL: func.func @identity_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<5x1xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<5x6xf32>) {
 // CHECK-DAG: %[[five:.*]] = arith.constant 5 : index
@@ -162,7 +150,7 @@ func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %
   return
 }
 
-// CHECK: func.func @brgemm_to_loops(
+// CHECK-LABEL: func.func @brgemm_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>) {
@@ -189,7 +177,7 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: m
   return
 }
 
-// CHECK: func.func @add_to_loops(
+// CHECK-LABEL: func.func @add_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>) {
 // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
 // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
@@ -200,3 +188,152 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: m
 // CHECK:     %[[load2:.*]] = memref.load %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
 // CHECK:     %[[add:.*]] = arith.addf %[[load1]], %[[load2]] : f32
 // CHECK:     memref.store %[[add]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: memref<1x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: memref<1x3xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME:  %[[ARG0:.+]]: memref<1x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG0]][%[[C0]], %[[J]]] : memref<1x3xf32>
+// CHECK:     %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[LOAD]], %[[LOAD1]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: memref<3x1xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: memref<3x1xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x1xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG0]][%[[I]], %[[C0]]] : memref<3x1xf32>
+// CHECK:     %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[LOAD]], %[[LOAD1]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: f32, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: f32, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME:  %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[ARG0]], %[[LOAD]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: memref<1x1xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: memref<1x1xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME: %[[ARG0:.+]]: memref<1x1xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG0]][%[[C0]], %[[C0]]] : memref<1x1xf32>
+// CHECK:     %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[LOAD]], %[[LOAD1]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: memref<1xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: memref<1xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME: %[[ARG0:.+]]: memref<1xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG0]][%[[C0]]] : memref<1xf32>
+// CHECK:     %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[LOAD]], %[[LOAD1]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @add_to_loops(%arg0: memref<3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.add ins(%arg0: memref<3xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_to_loops
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3xf32>, %[[ARG1:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
+// CHECK:     %[[LOAD:.+]] = memref.load %[[ARG0]][%[[J]]] : memref<3xf32>
+// CHECK:     %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[I]], %[[J]]] : memref<3x3xf32>
+// CHECK:     %[[ADD:.+]] = arith.addf %[[LOAD]], %[[LOAD1]] : f32
+// CHECK:     memref.store %[[ADD]], %[[ARG2]][%[[I]], %[[J]]] : memref<3x3xf32>
+
+// -----
+
+func.func @relu_to_loops(%arg0: f32, %arg1: memref<4x5xf32>) {
+  tpp.relu ins(%arg0 : f32) outs(%arg1 : memref<4x5xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @relu_to_loops
+// CHECK-SAME:  %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<4x5xf32>
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[C4]] step %[[C1]]
+// CHECK:     scf.for %[[J:.+]] = %[[C0]] to %[[C5]] step %[[C1]]
+// CHECK:       %[[MAX:.+]] = arith.maxf %[[ARG0]], %[[CST]] : f32
+// CHECK:       memref.store %[[MAX]], %[[ARG1]][%[[I]], %[[J]]] : memref<4x5xf32>
+
+// -----
+
+func.func @relu_to_loops(%arg0: f32, %arg1: memref<1x1xf32>) {
+  tpp.relu ins(%arg0: f32) outs(%arg1 : memref<1x1xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @relu_to_loops
+// CHECK-SAME:  %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<1x1xf32>
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C1]] step %[[C1]]
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C1]] step %[[C1]]
+// CHECK:     %[[MAX:.+]] = arith.maxf %[[ARG0]], %[[CST]] : f32
+// CHECK:     memref.store %[[MAX]], %[[ARG1]][%[[I]], %[[J]]] : memref<1x1xf32>
