@@ -15,6 +15,16 @@
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
+// Helper function prototypes.
+static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
+                            FILE *outfile = stderr);
+static void printXsmmStruct(const libxsmm_meltw_unary_shape &unaryShape,
+                            FILE *outfile = stderr);
+static void printXsmmStruct(const libxsmm_meltw_binary_shape &binaryShape,
+                            FILE *outfile = stderr);
+static void printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmShape,
+                            FILE *outfile = stderr);
+
 extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
                                                 int64_t funcAddr,
                                                 UnrankedMemRefType<char> *A,
@@ -115,6 +125,13 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   l_shape.comp_type = dtype;
 
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate matmul func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    printXsmmStruct(l_shape);
+    exit(-1);
+  }
+
   return reinterpret_cast<int64_t>(sgemm);
 }
 
@@ -147,6 +164,13 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
       static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
       static_cast<libxsmm_bitfield>(unary_flags));
+  if (!kernel) {
+    fprintf(stderr, "failed to generate unary func\n");
+    fprintf(stderr, "type: %ld\n", type);
+    fprintf(stderr, "bcast_type: %ld\n", bcast_type);
+    printXsmmStruct(unary_shape);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(kernel);
 }
@@ -165,7 +189,9 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
   binary_shape.n = static_cast<libxsmm_blasint>(m);
   binary_shape.in0_type = dtype;
   binary_shape.in1_type = dtype;
-  binary_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  binary_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
   binary_shape.out_type = dtype;
   binary_shape.ldi = static_cast<libxsmm_blasint>(ldiLhs);
   binary_shape.ldi2 = static_cast<libxsmm_blasint>(ldiRhs);
@@ -174,6 +200,13 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
   libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary_v2(
       static_cast<libxsmm_meltw_binary_type>(type), binary_shape,
       static_cast<libxsmm_bitfield>(binary_flags));
+  if (!kernel) {
+    fprintf(stderr, "failed to generate binary func\n");
+    fprintf(stderr, "type: %ld\n", type);
+    fprintf(stderr, "bcast_type: %ld\n", bcast_type);
+    printXsmmStruct(binary_shape);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(kernel);
 }
@@ -347,6 +380,13 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
 
   auto sgemm = libxsmm_dispatch_brgemm_v2(l_shape, l_flags, l_prefetch_flags,
                                           l_brconfig);
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate brgemm func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    printXsmmStruct(l_shape);
+    printXsmmStruct(l_brconfig);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(sgemm);
 }
@@ -461,6 +501,13 @@ extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
 
   auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
       l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate fused brgemm func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    printXsmmStruct(l_shape);
+    printXsmmStruct(l_brconfig);
+    exit(-1);
+  }
 
   return reinterpret_cast<int64_t>(sgemm);
 }
@@ -469,32 +516,35 @@ extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
 //----------------------------------------------------------------------------//
 
 namespace {
-  // Definition of this struct needs to match with the definition used in MemrefToLLVM pass.
-  // https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
-  //
-  // This definition is used by LLVM to convert Memref into C struct in order to pass to our
-  // iree_*_invoke functions.
-  typedef struct {
-    void* allocatedPtr;
-    void* alignedPtr;
-    int64_t offset;
-    int64_t sizes_and_strides[0];  // variable size: sizes[rank], strides[rank]
-  } iree_input_tensor_t;
+// Definition of this struct needs to match with the definition used in
+// MemrefToLLVM pass.
+// https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
+//
+// This definition is used by LLVM to convert Memref into C struct in order to
+// pass to our iree_*_invoke functions.
+typedef struct {
+  void *allocatedPtr;
+  void *alignedPtr;
+  int64_t offset;
+  int64_t sizes_and_strides[0]; // variable size: sizes[rank], strides[rank]
+} iree_input_tensor_t;
 
-  // Based on the code https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
-  // allocatedPtr and alignedPtr should be same. Also, the offset needs to be 0.
-  // We add these assumptions as asserts.
-  static inline void check_integrity_of_iree_input_tensor(
-    const iree_input_tensor_t *tensor) {
-      assert(tensor->allocatedPtr == tensor->alignedPtr &&
-        "allocatedPtr and alignedPtr are not same in iree_input_tensor to XsmmRunner");
-      assert(tensor->offset == 0 &&
-        "offset is non-zero in iree_input_tensor to XsmmRunner");
-    }
+// Based on the code
+// https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
+// allocatedPtr and alignedPtr should be same. Also, the offset needs to be 0.
+// We add these assumptions as asserts.
+static inline void
+check_integrity_of_iree_input_tensor(const iree_input_tensor_t *tensor) {
+  assert(tensor->allocatedPtr == tensor->alignedPtr &&
+         "allocatedPtr and alignedPtr are not same in iree_input_tensor to "
+         "XsmmRunner");
+  assert(tensor->offset == 0 &&
+         "offset is non-zero in iree_input_tensor to XsmmRunner");
 }
+} // namespace
 
 extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
-                                             void *reserved) {
+                                         void *reserved) {
   typedef struct {
     int64_t address;
     int64_t dtype;
@@ -507,8 +557,9 @@ extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
     int64_t ldc;
   } xsmm_brgemm_dispatch_t;
   xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *)params;
-  p->address = _mlir_ciface_xsmm_brgemm_dispatch(
-      (libxsmm_datatype) p->dtype, p->vnni, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
+  p->address = _mlir_ciface_xsmm_brgemm_dispatch((libxsmm_datatype)p->dtype,
+                                                 p->vnni, p->m, p->n, p->k,
+                                                 p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -526,8 +577,9 @@ extern "C" int iree_xsmm_matmul_dispatch(void *context, void *params,
     int64_t ldc;
   } xsmm_matmul_dispatch_t;
   xsmm_matmul_dispatch_t *p = (xsmm_matmul_dispatch_t *)params;
-  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch(
-      (libxsmm_datatype) p->dtype, p->vnni, p->m, p->n, p->k, p->lda, p->ldb, p->ldc);
+  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch((libxsmm_datatype)p->dtype,
+                                                   p->vnni, p->m, p->n, p->k,
+                                                   p->lda, p->ldb, p->ldc);
   return 0;
 }
 
@@ -544,13 +596,14 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
     int64_t bcast_type;
   } xsmm_unary_dispatch;
   xsmm_unary_dispatch *p = (xsmm_unary_dispatch *)params;
-  p->address = _mlir_ciface_xsmm_unary_dispatch(
-      (libxsmm_datatype) p->dtype, p->m, p->n, p->ldi, p->ldo, p->type, p->bcast_type);
+  p->address =
+      _mlir_ciface_xsmm_unary_dispatch((libxsmm_datatype)p->dtype, p->m, p->n,
+                                       p->ldi, p->ldo, p->type, p->bcast_type);
   return 0;
 }
 
 extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
-                                        void *reserved) {
+                                         void *reserved) {
   typedef struct {
     int64_t address;
     int64_t dtype;
@@ -564,14 +617,15 @@ extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
   } xsmm_binary_dispatch;
   xsmm_binary_dispatch *p = (xsmm_binary_dispatch *)params;
   p->address = _mlir_ciface_xsmm_binary_dispatch(
-      (libxsmm_datatype) p->dtype, p->m, p->n, p->ldiLhs, p->ldiRhs, p->ldo, p->type, p->bcast_type);
+      (libxsmm_datatype)p->dtype, p->m, p->n, p->ldiLhs, p->ldiRhs, p->ldo,
+      p->type, p->bcast_type);
   return 0;
 }
 
 // TODO: struct slicing. BRGEMM struct is the same as the GEMM one plus the
 // batch parameter.
 extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
-                                           void *reserved) {
+                                       void *reserved) {
   typedef struct {
     int64_t dtype;
     int64_t address;
@@ -632,9 +686,9 @@ extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = (void *) addr_tensorB;
-  gemm_param.b.primary = (void *) addr_tensorA;
-  gemm_param.c.primary = (void *) addr_tensorC;
+  gemm_param.a.primary = (void *)addr_tensorB;
+  gemm_param.b.primary = (void *)addr_tensorA;
+  gemm_param.c.primary = (void *)addr_tensorC;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->gemm_addr);
 
   sgemm.gemm(&gemm_param);
@@ -670,7 +724,7 @@ extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
 }
 
 extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
-                                      void *reserved) {
+                                       void *reserved) {
   typedef struct {
     int64_t dtype;
     int64_t address;
@@ -695,9 +749,56 @@ extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
       reinterpret_cast<libxsmm_meltwfunction_binary>(p->address);
   libxsmm_meltw_binary_param param;
   param.in0.primary = (void *)addr_a;
-  param.in1.primary = (void*)addr_b;
+  param.in1.primary = (void *)addr_b;
   param.out.primary = (void *)addr_c;
   kernel(&param);
 
   return 0;
+}
+
+static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
+                            FILE *outfile) {
+  fprintf(outfile, "M: %d\n", gemmShape.m);
+  fprintf(outfile, "N: %d\n", gemmShape.n);
+  fprintf(outfile, "K: %d\n", gemmShape.k);
+  fprintf(outfile, "lda: %d\n", gemmShape.lda);
+  fprintf(outfile, "ldb: %d\n", gemmShape.ldb);
+  fprintf(outfile, "ldc: %d\n", gemmShape.ldc);
+  fprintf(outfile, "a_in_type: %d\n", gemmShape.a_in_type);
+  fprintf(outfile, "b_in_type: %d\n", gemmShape.b_in_type);
+  fprintf(outfile, "comp_type: %d\n", gemmShape.comp_type);
+  fprintf(outfile, "out_type: %d\n", gemmShape.out_type);
+}
+
+static void printXsmmStruct(const libxsmm_meltw_unary_shape &unaryShape,
+                            FILE *outfile) {
+  fprintf(outfile, "M: %d\n", unaryShape.m);
+  fprintf(outfile, "N: %d\n", unaryShape.n);
+  fprintf(outfile, "in0_type: %d\n", unaryShape.in0_type);
+  fprintf(outfile, "comp_type: %d\n", unaryShape.comp_type);
+  fprintf(outfile, "out_type: %d\n", unaryShape.out_type);
+  fprintf(outfile, "ldi: %d\n", unaryShape.ldi);
+  fprintf(outfile, "ldo: %d\n", unaryShape.ldo);
+}
+
+static void printXsmmStruct(const libxsmm_meltw_binary_shape &binaryShape,
+                            FILE *outfile) {
+  fprintf(outfile, "M: %d\n", binaryShape.m);
+  fprintf(outfile, "N: %d\n", binaryShape.n);
+  fprintf(outfile, "in0_type: %d\n", binaryShape.in0_type);
+  fprintf(outfile, "in1_type: %d\n", binaryShape.in1_type);
+  fprintf(outfile, "comp_type: %d\n", binaryShape.comp_type);
+  fprintf(outfile, "out_type: %d\n", binaryShape.out_type);
+  fprintf(outfile, "ldi: %d\n", binaryShape.ldi);
+  fprintf(outfile, "ldi2: %d\n", binaryShape.ldi2);
+  fprintf(outfile, "ldo: %d\n", binaryShape.ldo);
+}
+
+static void
+printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmConfig,
+                FILE *outfile) {
+  fprintf(outfile, "br_type: %d\n", brgemmConfig.br_type);
+  fprintf(outfile, "br_stride_a_hint: %d\n", brgemmConfig.br_stride_a_hint);
+  fprintf(outfile, "br_stride_b_hint: %d\n", brgemmConfig.br_stride_b_hint);
+  fprintf(outfile, "br_unroll_hint: %d\n", brgemmConfig.br_unroll_hint);
 }
