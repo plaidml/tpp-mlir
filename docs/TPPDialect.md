@@ -288,8 +288,7 @@ Matmul:
 ## Fused BRGEMM
 Batched reduce matrix-multiply between two memrefs.
 Operands of the compatible type (Batch, M, N, K), broadcast by operator
-If operand's producer is `tpp.broadcast`, add appropriate `BCAST_*` flag to op.
-If operand's producer is `tpp.transpose` and/or `tpp.vnni_pack`, change op to appropriate `BRGEMM_X_TRANS_VNNI` variant.
+Same type checks, VNNI remarks, etc.
 
 Operation semantics:
 ```
