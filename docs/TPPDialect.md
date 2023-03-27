@@ -61,12 +61,7 @@ On `tensors`, binary ops have two arguments and one return value.
 On `memrefs`, binary operations have both `ins` and `outs`, with always two `ins` and one `outs` arguments.
 On most binary ops, the `outs` can alias `ins` (ex. `a=a+b`), and `ins` can alias themselves (ex. `a=a+a`).
 
-The exception is `matmul`, where the output cannot alias the inputs.
-A binary `matmul` is equivalent to `C = A x B`, with `C` as a new `memref` allocation.
-
 Element wise operations must have the same types, with broadcast done as a separate op, per operand.
-
-GEMM operations must have compatible types (MxNxK, VNNI, etc.).
 
 ### Ternary
 
@@ -76,6 +71,7 @@ On `memrefs`, ternary operations have both `ins` and `outs`, with always three `
 The `outs` can alias with any type-compatible `ins` argument (accumulation matrix).
 
 A ternary `matmul` is equivalent to `C = A x B + C`, with `C` as an input and a potential output.
+If `C` is empty, then it must come from a `tensor.empty + tensor.fill(0)` or `memref.alloc(a) + tpp.zero`.
 
 GEMM operations must have compatible types (M,N,K) with the third input (C matrix) the same shape as the output.
 
@@ -99,7 +95,7 @@ We're still investigating what representation to use or if the existing sparse `
 
 We may create additional types, as needed.
 For example:
- * `vnni18`, `vnni8` for VNNI shapes of `bf16` and `bf8`. Those are _packed_ floats, ex. `{ bf16, bf16 }`.
+ * `vnni2`, `vnni4` for VNNI shapes of `bf16` and `bf8`. Those are _packed_ floats, ex. `{ bf16, bf16 }`.
  * Sparse offset representations of dense `memref`, as `{ ptr, memref<*xi1> }` (base ptr + mask).
 
 ## Aliasing
