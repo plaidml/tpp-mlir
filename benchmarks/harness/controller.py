@@ -187,9 +187,16 @@ if __name__ == '__main__':
                         help='Disable LSAN')
     args = parser.parse_args()
 
+    # List of ASAN_OPTIONS
+    asan_options = [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+
     # Some tensors may not be freed but we still want numbers
     if args.disable_lsan:
-        os.putenv("ASAN_OPTIONS", f"detect_leaks=0")
+        asan_options.append("detect_leaks=0")
+
+    # Apply ASAN_OPTIONS to environment
+    if asan_options:
+        os.environ["ASAN_OPTIONS"] = ":".join(asan_options)
 
     # Creates the logger object
     loglevel = args.verbose - (args.quiet > 0)
