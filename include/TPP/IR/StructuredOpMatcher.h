@@ -45,6 +45,7 @@ struct Operand {
 
 struct IsProjectedPermutation {
   IsProjectedPermutation() = default;
+  
   bool operator()(AffineMap map) const {
     return map.isProjectedPermutation(/*allowZeroInResults=*/true);
   }
@@ -52,6 +53,7 @@ struct IsProjectedPermutation {
 
 struct IsIdentity {
   IsIdentity() = default;
+  
   bool operator()(AffineMap map) const { return map.isIdentity(); }
 };
 
