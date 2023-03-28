@@ -55,8 +55,17 @@ struct Operand {
   const size_t idx;
 };
 
-struct IsProjectedPermutation {};
-struct IsIdentity {};
+struct IsProjectedPermutation {
+  IsProjectedPermutation() = default;
+  bool operator()(AffineMap map) const {
+    return map.isProjectedPermutation(/*allowZeroInResults=*/true);
+  }
+};
+
+struct IsIdentity {
+  IsIdentity() = default;
+  bool operator()(AffineMap map) const { return map.isIdentity(); }
+};
 
 struct HasStaticShape {};
 
@@ -150,16 +159,14 @@ public:
       verifyInterface(std::function<LogicalResult(Operation *op)>);
 
   // Predicate on OpOperands.
-  StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
-  StructuredOpMatcher &input(AllOperands tag, IsIdentity);
   StructuredOpMatcher &input(AllOperands tag, HasStaticShape);
+  StructuredOpMatcher &input(AllOperands tag, std::function<bool(AffineMap)>);
   StructuredOpMatcher &input(Operand operand,
                              std::function<bool(AffineMap map)>);
 
   // Predicates on OpOperands.
-  StructuredOpMatcher &output(AllOperands tag, IsProjectedPermutation);
-  StructuredOpMatcher &output(AllOperands tag, IsIdentity);
   StructuredOpMatcher &output(AllOperands tag, HasStaticShape);
+  StructuredOpMatcher &output(AllOperands tag, std::function<bool(AffineMap)>);
   StructuredOpMatcher &output(Operand operand,
                               std::function<bool(AffineMap map)>);
 

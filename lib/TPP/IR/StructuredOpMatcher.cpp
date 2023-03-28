@@ -98,32 +98,6 @@ structured_match::StructuredOpMatcher::verifyInterface(
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::input(AllOperands tag, IsIdentity) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
-        return false;
-    }
-    return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::input(AllOperands tag,
-                                             IsProjectedPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation(
-              /*allowZeroInResults=*/true))
-        return false;
-    }
-    return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::input(AllOperands tag, HasStaticShape) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
@@ -150,39 +124,28 @@ structured_match::StructuredOpMatcher::input(
   return *this;
 }
 
+structured_match::StructuredOpMatcher &
+structured_match::StructuredOpMatcher::input(
+    AllOperands tag, std::function<bool(AffineMap map)> fun) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+      AffineMap tiedIndexingMap = linalgOp.getMatchingIndexingMap(operand);
+      if (!fun(tiedIndexingMap))
+        return false;
+    }
+    return true;
+  });
+  return *this;
+}
+
 //===---------------------------------------------------------------------===//
 // Output predicates.
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::output(AllOperands tag, IsIdentity) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
-        return false;
-    }
-    return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::output(AllOperands tag,
-                                              IsProjectedPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
-        return false;
-    }
-    return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::output(AllOperands tag, HasStaticShape) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       auto operandType = operand->get().getType();
       if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
         if (!shapedType.hasStaticShape())
@@ -202,6 +165,20 @@ structured_match::StructuredOpMatcher::output(
     AffineMap tiedIndexingMap =
         linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(idxOperand));
     return fun(tiedIndexingMap);
+  });
+  return *this;
+}
+
+structured_match::StructuredOpMatcher &
+structured_match::StructuredOpMatcher::output(
+    AllOperands tag, std::function<bool(AffineMap map)> fun) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+      AffineMap tiedIndexingMap = linalgOp.getMatchingIndexingMap(operand);
+      if (!fun(tiedIndexingMap))
+        return false;
+    }
+    return true;
   });
   return *this;
 }
