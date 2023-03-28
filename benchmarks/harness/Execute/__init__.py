@@ -29,13 +29,13 @@ class Execute(object):
 
         # Call the program, capturing stdout/stderr
         result = subprocess.run(program,
-                                input=bytes(input, encoding='utf-8'),
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                                input=input if input else None,
+                                capture_output=True,
+                                encoding="utf-8")
 
         # Collect stdout, stderr as UTF-8 strings
-        result.stdout = result.stdout.decode('utf-8')
-        result.stderr = result.stderr.decode('utf-8')
+        result.stdout = str(result.stdout)
+        result.stderr = str(result.stderr)
 
         # Return
         return result
