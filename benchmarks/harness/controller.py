@@ -100,7 +100,7 @@ class BenchmarkController(object):
 
             # Run tpp-opt and capture the output IR
             optResult = executor.run(optCmd)
-            if optResult.stderr:
+            if 0 != optResult.returncode:
                 self.logger.error(f"Error executing tpp-opt: {optResult.stderr}")
                 return False
             irContents = optResult.stdout
@@ -119,7 +119,7 @@ class BenchmarkController(object):
         if self.args.run_args:
             runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
-        if runResult.stderr:
+        if 0 != runResult.returncode:
             self.logger.error(f"Error executing tpp-run: {runResult.stderr}")
             return False
         self.output = runResult.stdout
@@ -220,4 +220,3 @@ if __name__ == '__main__':
         print(f'{(controller.mean):9.3f} +- {(controller.stdev):9.3f} {controller.unit}')
     else:
         print(f'{(controller.mean):3.9f} +- {(controller.stdev):3.9f} {controller.unit}')
-
