@@ -44,8 +44,6 @@ struct HeapToStackAllocation : public OpRewritePattern<memref::AllocOp> {
           alloc, "Buffer exceeds maximum convertion size");
 
     // Find matching deallocation operation.
-    // If the lifetime of the given allocation extends beyond the current scope,
-    // the buffer cannot be converted to stack.
     Operation *deallocOp = nullptr;
     for (Operation *user : alloc->getUsers()) {
       if (isa<memref::DeallocOp>(user)) {
@@ -55,7 +53,13 @@ struct HeapToStackAllocation : public OpRewritePattern<memref::AllocOp> {
     }
     if (!deallocOp)
       return rewriter.notifyMatchFailure(
-          alloc, "Expected deallocator to be present within the same scope");
+          alloc, "Expected to find matching deallocator");
+
+    // If the lifetime of the given allocation extends beyond the current scope,
+    // the buffer cannot be converted to stack.
+    if (alloc->getParentRegion() != deallocOp->getParentRegion())
+      return rewriter.notifyMatchFailure(
+          alloc, "Expected deallocator to be in the same scope");
 
     // Remove the deallocator as stack lifetime is managed automatically.
     rewriter.eraseOp(deallocOp);
