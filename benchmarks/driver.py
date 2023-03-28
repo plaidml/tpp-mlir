@@ -23,17 +23,20 @@
              "ref": {
                  "type": "C++",
                  "benchmark": "matmul",
-                 "flags": [ "--input=64x64x64", "-v" ]
+                 "flags": [ "--input=64x64x64", "-v" ],
+                 "extensions": [ "avx2" ]
              },
              "xsmm": {
                  "type": "C++",
                  "benchmark": "matmul",
-                 "flags": [ "--input=64x64x64", "-v", "-xsmm" ]
+                 "flags": [ "--input=64x64x64", "-v", "-xsmm" ],
+                 "extensions": []
              },
              "mlir": {
                  "type": "MLIR",
-                 "benchmark": "matmul_64x64x64.mlir",
-                 "flags": [ "-v" ]
+                 "benchmark": "matmul_64x64x64_vnni.mlir",
+                 "flags": [ "-v" ],
+                 "extensions": [ "avx512.*" ]
              },
          },
          "128x256x512":  {
@@ -47,12 +50,38 @@ import sys
 import re
 import argparse
 import json
+import shlex
 
 sys.path.append('harness')
 
 from Logger import Logger
 from Execute import Execute
 from TPPHelper import TPPHelper
+
+class ExtensionFlags(object):
+    def __init__(self, loglevel):
+        self.logger = Logger("driver.flags", loglevel)
+        runner = Execute(loglevel)
+        command = ["grep", "-m1", "flags", "/proc/cpuinfo"]
+        res = runner.run(command)
+        self.flags = list()
+        if res.stderr:
+            self.logger.error(f"Error on lscpu: {res.stderr}")
+            return
+        if not res.stdout:
+            self.logger.warning(f"No output from lscpu")
+            return
+        self.flags = shlex.split(res.stdout)
+        self.logger.debug(f"CPU flags: {self.flags}")
+
+    def hasFlag(self, flag):
+        if not self.flags:
+            return False
+        for ext in self.flags:
+            if re.fullmatch(flag, ext):
+                return True
+        return False
+
 
 class Environment(object):
     def __init__(self, args, loglevel):
@@ -189,6 +218,7 @@ class BenchmarkDriver(object):
             self.logger.error(f"JSON config '{self.args.config}' does not exist")
             raise SyntaxError("Cannot find JSON config")
         self.benchs = list()
+        self.exts = ExtensionFlags(loglevel)
 
     def scanBenchmarks(self):
         """ Scan directory for JSON file and create a list with all runs """
@@ -208,7 +238,23 @@ class BenchmarkDriver(object):
             runs = cfg[name]
             benchs = Benchmark(name, self.args, self.env, self.loglevel)
             for key, run in runs.items():
+                # Make sure we support this benchmark in this machine
+                supported = False
+                if not run["extensions"]:
+                    # Empty means any machine supports it
+                    supported = True
+                else:
+                    # List of possible supported (ex. avx512 OR sve2)
+                    for ext in run["extensions"]:
+                        if self.exts.hasFlag(ext):
+                            self.logger.debug(f"{key} extension {ext} supported")
+                            supported = True
+                            break
+                if not supported:
+                    self.logger.warning(f"Skipping {key} as extension {ext} not supported")
+                    continue
                 if not benchs.addRun(key, run):
+                    self.logger.error(f"Error adding benchmark run {key} in {name}")
                     return False
 
             # Append to the benchmarks
