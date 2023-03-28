@@ -197,39 +197,42 @@ structured_match::StructuredOpMatcher::dim(std::function<bool(size_t)> fun) {
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(AllDims tag,
-                                           utils::IteratorType kind) {
+structured_match::StructuredOpMatcher::dim(
+    RangeDims range, SmallVector<utils::IteratorType> kinds) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    size_t upperBound = range.getUpperBound();
+    size_t lowerBound = range.getLowerBound();
+    if (upperBound == std::numeric_limits<size_t>::max())
+      upperBound = kinds.size();
+    size_t sizeRange = upperBound - lowerBound;
+    if (kinds.size() != sizeRange)
+      return false;
+
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
-    for (auto iteratorType : iteratorTypes)
-      if (iteratorType != kind)
+    // Reverse iterators to have the innermost one at index 0.
+    std::reverse(iteratorTypes.begin(), iteratorTypes.end());
+    for (auto [idx, rangeIdx] :
+         llvm::enumerate(llvm::seq<size_t>(lowerBound, upperBound))) {
+      if (iteratorTypes[rangeIdx] != kinds[idx])
         return false;
+    }
     return true;
   });
   return *this;
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(
-    AllDims tag, SmallVector<utils::IteratorType> kinds) {
+structured_match::StructuredOpMatcher::dim(RangeDims range,
+                                           utils::IteratorType kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
-    return iteratorTypes == kinds;
-  });
-  return *this;
-}
+    size_t upperBound = range.getUpperBound();
+    size_t lowerBound = range.getLowerBound();
+    if (upperBound == std::numeric_limits<size_t>::max())
+      upperBound = iteratorTypes.size();
 
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(
-    RangeDims range, SmallVector<utils::IteratorType> kinds) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    if (kinds.size() != range.getSize())
-      return false;
-    auto iteratorTypes = linalgOp.getIteratorTypesArray();
-    // Reverse iterators to have the innermost one at index 0.
-    std::reverse(iteratorTypes.begin(), iteratorTypes.end());
-    for (auto [idx, rangeIdx] : llvm::enumerate(range.getRange())) {
-      if (iteratorTypes[rangeIdx] != kinds[idx])
+    for (auto rangeIdx = lowerBound; rangeIdx < upperBound; rangeIdx++) {
+      if (iteratorTypes[rangeIdx] != kind)
         return false;
     }
     return true;

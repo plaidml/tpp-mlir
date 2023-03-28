@@ -21,24 +21,27 @@ namespace structured_match {
 struct AllDims {};
 struct RangeDims {
   RangeDims() = delete;
+  explicit RangeDims(AllDims)
+      : lowerBound(0), upperBound(std::numeric_limits<size_t>::max()) {}
   explicit RangeDims(size_t lowerBound, size_t upperBound)
       : lowerBound(lowerBound), upperBound(upperBound) {
     assert(upperBound >= lowerBound);
-  };
-  size_t getSize() const { return upperBound - lowerBound; };
-  SmallVector<size_t> getRange() const {
-    return llvm::to_vector(llvm::seq<size_t>(lowerBound, upperBound));
   }
+  size_t getLowerBound() const { return lowerBound; };
+  size_t getUpperBound() const { return upperBound; };
+
+private:
   const size_t lowerBound;
   const size_t upperBound;
 };
+
 struct AllDimsBut {
   AllDimsBut() = delete;
   explicit AllDimsBut(std::initializer_list<size_t> range) {
     llvm::append_range(exceptions, range);
   }
   explicit AllDimsBut(RangeDims range) {
-    for (auto i = range.lowerBound; i < range.upperBound; i++)
+    for (auto i = range.getLowerBound(); i < range.getUpperBound(); i++)
       exceptions.push_back(i);
   }
   ArrayRef<size_t> getExceptions() const { return exceptions; }
@@ -172,12 +175,10 @@ public:
 
   // Predicates on Iterators.
   StructuredOpMatcher &dim(std::function<bool(size_t)>);
-  StructuredOpMatcher &dim(AllDims, mlir::utils::IteratorType kind);
   StructuredOpMatcher &dim(RangeDims range,
                            SmallVector<mlir::utils::IteratorType> kinds);
+  StructuredOpMatcher &dim(RangeDims range, mlir::utils::IteratorType kind);
   StructuredOpMatcher &dim(AllDimsBut, mlir::utils::IteratorType kind);
-  StructuredOpMatcher &dim(AllDims,
-                           SmallVector<mlir::utils::IteratorType> kinds);
 
   // Predicates on region.
   template <typename OpTy>

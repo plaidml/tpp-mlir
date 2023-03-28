@@ -91,7 +91,7 @@ void testTppAdd(FunctionOpInterface funcOp) {
       .output(AllOperands(), HasStaticShape())
       .output(AllOperands(), IsIdentity())
       .dim(LessThanOrEqualTo(2))
-      .dim(AllDims(), utils::IteratorType::parallel)
+      .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
       .hasRegionWithSingleOp<arith::AddFOp>(&operands);
   // clang-format on
 
@@ -141,7 +141,7 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .hasBufferSemantics()
       .outputs(NumEqualsTo(1))
       .inputs(_OR(NumEqualsTo(1), NumEqualsTo(0)))
-      .dim(AllDims(), utils::IteratorType::parallel)
+      .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
       .output(AllOperands(), HasStaticShape())
       .input(AllOperands(), HasStaticShape())
       .output(AllOperands(), IsIdentity())
