@@ -208,6 +208,7 @@ private:
     // Postprocess buffers.
     pm.addPass(bufferization::createBufferHoistingPass());
     pm.addPass(bufferization::createBufferDeallocationPass());
+    pm.addPass(createHeapToStackPass());
 
     // Run general cleanup to normalize IR.
     pm.addPass(createCleanupPass());
