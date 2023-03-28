@@ -99,13 +99,12 @@ structured_match::StructuredOpMatcher::verifyInterface(
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::input(AllOperands tag, HasStaticShape) {
+structured_match::StructuredOpMatcher::input(
+    AllOperands tag, std::function<bool(OpOperand *operand)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      auto operandType = operand->get().getType();
-      if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
-        if (!shapedType.hasStaticShape())
-          return false;
+      if (!fun(operand))
+        return false;
     }
     return true;
   });
@@ -144,13 +143,12 @@ structured_match::StructuredOpMatcher::input(
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::output(AllOperands tag, HasStaticShape) {
+structured_match::StructuredOpMatcher::output(
+    AllOperands tag, std::function<bool(OpOperand *operand)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      auto operandType = operand->get().getType();
-      if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
-        if (!shapedType.hasStaticShape())
-          return false;
+      if (!fun(operand))
+        return false;
     }
     return true;
   });

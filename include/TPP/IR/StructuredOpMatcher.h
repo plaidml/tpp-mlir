@@ -57,7 +57,17 @@ struct IsIdentity {
   bool operator()(AffineMap map) const { return map.isIdentity(); }
 };
 
-struct HasStaticShape {};
+struct HasStaticShape {
+  HasStaticShape() = default;
+
+  bool operator()(OpOperand *operand) const {
+    auto operandType = operand->get().getType();
+    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
+      if (!shapedType.hasStaticShape())
+        return false;
+    return true;
+  }
+};
 
 struct NumEqualsTo {
   NumEqualsTo() = delete;
@@ -149,13 +159,14 @@ public:
       verifyInterface(std::function<LogicalResult(Operation *op)>);
 
   // Predicate on OpOperands.
-  StructuredOpMatcher &input(AllOperands tag, HasStaticShape);
+  StructuredOpMatcher &input(AllOperands tag, std::function<bool(OpOperand *)>);
   StructuredOpMatcher &input(AllOperands tag, std::function<bool(AffineMap)>);
   StructuredOpMatcher &input(Operand operand,
                              std::function<bool(AffineMap map)>);
 
   // Predicates on OpOperands.
-  StructuredOpMatcher &output(AllOperands tag, HasStaticShape);
+  StructuredOpMatcher &output(AllOperands tag,
+                              std::function<bool(OpOperand *)>);
   StructuredOpMatcher &output(AllOperands tag, std::function<bool(AffineMap)>);
   StructuredOpMatcher &output(Operand operand,
                               std::function<bool(AffineMap map)>);
