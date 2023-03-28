@@ -34,10 +34,10 @@ void testMatmul(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcher =
     StructuredOpMatcher::make<linalg::MatmulOp>()
-      .hasTensorSemantics()
-      .numDpsInputs(NumEqualsTo(2))
+      .operation(HasTensorSemantics())
+      .operation(NumDpsInputs(EqualsTo(2)))
       .input(AllOperands(), HasStaticShape())
-      .numDpsInits(NumEqualsTo(1))
+      .operation(NumDpsInits(EqualsTo(1)))
       .output(AllOperands(), HasStaticShape());
   // clang-format on
 
@@ -53,12 +53,12 @@ void testVnniBrgemm(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcher = 
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .hasTensorSemantics()
-      .numDpsInputs(NumEqualsTo(2))
+      .operation(HasTensorSemantics())
+      .operation(NumDpsInputs(EqualsTo(2)))
       .input(AllOperands(), HasStaticShape())
-      .numDpsInits(NumEqualsTo(1))
+      .operation(NumDpsInits(EqualsTo(1)))
       .output(AllOperands(), HasStaticShape())
-      .dim(GreaterThanOrEqualTo(5))
+      .operation(NumOfLoops(GreaterThanOrEqualTo(5)))
       .dim(RangeDims(/*lowerBound=*/0, /*upperBound=*/5), 
                      {utils::IteratorType::reduction,
                       utils::IteratorType::parallel,
@@ -80,14 +80,14 @@ void testTppAdd(FunctionOpInterface funcOp) {
   SmallVector<Value> operands;
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .hasBufferSemantics()
-      .numDpsInputs(NumEqualsTo(2))
+      .operation(HasBufferSemantics())
+      .operation(NumDpsInputs(EqualsTo(2)))
       .input(AllOperands(), HasStaticShape())
-      .input(AllOperands(), IsIdentity())
-      .numDpsInits(NumEqualsTo(1))
+      .input(AllOperands(), HasMap(Identity()))
+      .operation(NumDpsInits(EqualsTo(1)))
       .output(AllOperands(), HasStaticShape())
-      .output(AllOperands(), IsIdentity())
-      .dim(LessThanOrEqualTo(2))
+      .output(AllOperands(), HasMap(Identity()))
+      .operation(NumOfLoops(LessThanOrEqualTo(2)))
       .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
       .hasRegionWithSingleOp<arith::AddFOp>(&operands);
   // clang-format on
@@ -104,7 +104,7 @@ void testPredicates(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .numDpsInputs(_OR(NumEqualsTo(2), NumEqualsTo(1)));
+      .operation(NumDpsInputs(_OR(EqualsTo(2), EqualsTo(1))));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -119,7 +119,8 @@ void testInterfaces(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .verifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop);
+      .operation(
+        VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -135,16 +136,16 @@ void testTppIdentity(FunctionOpInterface funcOp) {
   SmallVector<Value> operands;
   auto matcher = 
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .hasBufferSemantics()
-      .numDpsInits(NumEqualsTo(1))
-      .numDpsInputs(_OR(NumEqualsTo(1), NumEqualsTo(0)))
+      .operation(HasBufferSemantics())
+      .operation(NumDpsInits(EqualsTo(1)))
+      .operation(NumDpsInputs(_OR(EqualsTo(1), EqualsTo(0))))
       .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
       .output(AllOperands(), HasStaticShape())
       .input(AllOperands(), HasStaticShape())
-      .output(AllOperands(), IsIdentity())
-      .input(AllOperands(), IsProjectedPermutation())
-      .verifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop)
-      .verifyInterface(OpTrait::tpp::checkBroadcastableShape)
+      .output(AllOperands(), HasMap(Identity()))
+      .input(AllOperands(), HasMap(ProjectedPermutation()))
+      .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop))
+      .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape))
       .hasRegionWithSingleOp<linalg::YieldOp>(&operands);
   // clang-format on
 

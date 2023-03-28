@@ -43,24 +43,57 @@ struct Operand {
   const size_t idx;
 };
 
-struct IsProjectedPermutation {
-  IsProjectedPermutation() = default;
-  
+struct NumOfLoops {
+  NumOfLoops() = delete;
+  NumOfLoops(std::function<bool(size_t)> fun) : fun(fun){};
+
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
+      auto numberOfLoops = linalgOp.getNumLoops();
+      return fun(numberOfLoops);
+    }
+    return false;
+  }
+  std::function<bool(size_t)> fun;
+};
+
+// Callable object to check if the `operand` of `op` has a map that satisfies
+// `fun`.
+struct HasMap {
+  HasMap() = delete;
+  HasMap(std::function<bool(AffineMap)> fun) : fun(fun){};
+
+  bool operator()(OpOperand *operand, Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
+      auto map = linalgOp.getMatchingIndexingMap(operand);
+      return fun(map);
+    }
+    return false;
+  }
+  std::function<bool(AffineMap map)> fun;
+};
+
+// Callble object to verify if `map` is a projected permutation map.
+struct ProjectedPermutation {
+  ProjectedPermutation() = default;
+
   bool operator()(AffineMap map) const {
     return map.isProjectedPermutation(/*allowZeroInResults=*/true);
   }
 };
 
-struct IsIdentity {
-  IsIdentity() = default;
-  
+// Callable object to verify if `map` is an identity map.
+struct Identity {
+  Identity() = default;
+
   bool operator()(AffineMap map) const { return map.isIdentity(); }
 };
 
+// Callable object to verify if `operand` has static shape.
 struct HasStaticShape {
   HasStaticShape() = default;
 
-  bool operator()(OpOperand *operand) const {
+  bool operator()(OpOperand *operand, Operation *op) const {
     auto operandType = operand->get().getType();
     if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
       if (!shapedType.hasStaticShape())
@@ -69,12 +102,12 @@ struct HasStaticShape {
   }
 };
 
-struct NumEqualsTo {
-  NumEqualsTo() = delete;
-  explicit NumEqualsTo(size_t value) : value(value){};
+struct EqualsTo {
+  EqualsTo() = delete;
+  explicit EqualsTo(size_t value) : value(value){};
   const size_t value;
 
-  bool operator()(size_t value) { return value == this->value; }
+  auto operator()(size_t value) -> bool { return value == this->value; }
 };
 
 struct LessThanOrEqualTo {
@@ -82,7 +115,7 @@ struct LessThanOrEqualTo {
   explicit LessThanOrEqualTo(size_t value) : value(value){};
   const size_t value;
 
-  bool operator()(size_t value) { return value <= this->value; }
+  bool operator()(size_t value) const { return value <= this->value; }
 };
 
 struct GreaterThanOrEqualTo {
@@ -101,35 +134,81 @@ struct HasAffineMapEqualsTo {
   bool operator()(AffineMap map) const { return map == this->map; }
 };
 
-// OR or AND between predicates (functors).
-struct BinaryPredicate {
-public:
-  enum BinaryPredicateKind { _OR, _AND };
+// Callable object to check if `op` has tensor semantics.
+struct HasTensorSemantics {
+  HasTensorSemantics() = default;
 
-private:
-  const BinaryPredicateKind binaryPredicateKind;
-
-public:
-  std::function<bool(size_t)> predicateOnLhs;
-  std::function<bool(size_t)> predicateOnRhs;
-
-public:
-  BinaryPredicateKind getKind() const { return binaryPredicateKind; }
-  BinaryPredicate() = delete;
-  BinaryPredicate(BinaryPredicateKind binaryPredicateKind,
-                  std::function<bool(size_t)> lhs,
-                  std::function<bool(size_t)> rhs)
-      : binaryPredicateKind(binaryPredicateKind),
-        predicateOnLhs(std::move(lhs)), predicateOnRhs(std::move(rhs)) {}
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return linalgOp.hasTensorSemantics();
+    return false;
+  }
 };
 
-struct _OR : public BinaryPredicate {
-  _OR(std::function<bool(size_t)> lhs, std::function<bool(size_t)> rhs)
-      : BinaryPredicate(BinaryPredicateKind::_OR, lhs, rhs) {}
+// Callable object to check if `op` buffer semantics.
+struct HasBufferSemantics {
+  HasBufferSemantics() = default;
 
-  static bool classof(const BinaryPredicate *binaryPredicate) {
-    return binaryPredicate->getKind() == BinaryPredicateKind::_OR;
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return linalgOp.hasBufferSemantics();
+    return false;
   }
+};
+
+// Callable object to validate number of init operands for `op`.
+struct NumDpsInits {
+  NumDpsInits() = delete;
+  explicit NumDpsInits(std::function<bool(size_t)> fun) : fun(fun){};
+
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return fun(linalgOp.getNumDpsInits());
+    return false;
+  }
+
+  std::function<bool(size_t)> fun;
+};
+
+// Callable object to validate number of input operands for `op`.
+struct NumDpsInputs {
+  NumDpsInputs() = delete;
+  explicit NumDpsInputs(std::function<bool(size_t)> fun) : fun(fun){};
+
+  bool operator()(Operation *op) {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return fun(linalgOp.getNumDpsInputs());
+    return false;
+  }
+
+  std::function<bool(size_t)> fun;
+};
+
+// Logical OR between two predicates.
+struct _OR {
+  _OR() = delete;
+  _OR(std::function<bool(size_t)> lhs, std::function<bool(size_t)> rhs)
+      : lhs(lhs), rhs(rhs) {}
+
+  bool operator()(size_t num) { return (lhs(num) || rhs(num)); }
+
+  std::function<bool(size_t)> lhs;
+  std::function<bool(size_t)> rhs;
+};
+
+// Callable object to check if `op` adheres to a given interface.
+struct VerifyInterface {
+  VerifyInterface() = delete;
+  explicit VerifyInterface(std::function<LogicalResult(Operation *op)> fun)
+      : fun(fun){};
+
+  bool operator()(Operation *op) {
+    if (succeeded(fun(op)))
+      return true;
+    return false;
+  }
+
+  std::function<LogicalResult(Operation *op)> fun;
 };
 
 class StructuredOpMatcher {
@@ -150,29 +229,21 @@ public:
   bool match(Operation *op);
 
   // Predicates on operation.
-  StructuredOpMatcher &hasBufferSemantics();
-  StructuredOpMatcher &hasTensorSemantics();
-  StructuredOpMatcher &numDpsInputs(std::function<bool(size_t)>);
-  StructuredOpMatcher &numDpsInits(std::function<bool(size_t)>);
-  StructuredOpMatcher &numDpsInputs(BinaryPredicate);
-  StructuredOpMatcher &
-      verifyInterface(std::function<LogicalResult(Operation *op)>);
+  StructuredOpMatcher &operation(std::function<bool(Operation *)>);
 
   // Predicate on OpOperands.
-  StructuredOpMatcher &input(AllOperands tag, std::function<bool(OpOperand *)>);
-  StructuredOpMatcher &input(AllOperands tag, std::function<bool(AffineMap)>);
-  StructuredOpMatcher &input(Operand operand,
-                             std::function<bool(AffineMap map)>);
+  StructuredOpMatcher &input(AllOperands tag,
+                             std::function<bool(OpOperand *, Operation *)>);
+  StructuredOpMatcher &input(Operand tag,
+                             std::function<bool(OpOperand *, Operation *)>);
 
   // Predicates on OpOperands.
   StructuredOpMatcher &output(AllOperands tag,
-                              std::function<bool(OpOperand *)>);
-  StructuredOpMatcher &output(AllOperands tag, std::function<bool(AffineMap)>);
-  StructuredOpMatcher &output(Operand operand,
-                              std::function<bool(AffineMap map)>);
+                              std::function<bool(OpOperand *, Operation *)>);
+  StructuredOpMatcher &output(Operand tag,
+                              std::function<bool(OpOperand *, Operation *)>);
 
   // Predicates on Iterators.
-  StructuredOpMatcher &dim(std::function<bool(size_t)>);
   StructuredOpMatcher &dim(RangeDims range,
                            SmallVector<mlir::utils::IteratorType> kinds);
   StructuredOpMatcher &dim(RangeDims range, mlir::utils::IteratorType kind);

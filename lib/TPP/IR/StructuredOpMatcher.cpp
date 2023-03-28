@@ -35,75 +35,24 @@ bool structured_match::StructuredOpMatcher::match(Operation *op) {
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::numDpsInits(
-    std::function<bool(size_t)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    size_t numDpsInits = static_cast<size_t>(linalgOp.getNumDpsInits());
-    return fun(numDpsInits);
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::numDpsInputs(
-    std::function<bool(size_t)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    size_t numDpsInputs = static_cast<size_t>(linalgOp.getNumDpsInputs());
-    return fun(numDpsInputs);
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::numDpsInputs(
-    structured_match::BinaryPredicate binaryPredicate) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    if (isa<_OR>(&binaryPredicate)) {
-      return (binaryPredicate.predicateOnLhs(linalgOp.getNumDpsInputs()) ||
-              binaryPredicate.predicateOnRhs(linalgOp.getNumDpsInputs()));
-    }
-    return false;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::hasBufferSemantics() {
-  predicates.push_back([](linalg::LinalgOp linalgOp) -> bool {
-    return linalgOp.hasBufferSemantics();
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::hasTensorSemantics() {
-  predicates.push_back([](linalg::LinalgOp linalgOp) -> bool {
-    return linalgOp.hasTensorSemantics();
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::verifyInterface(
-    std::function<LogicalResult(Operation *op)> fun) {
-  predicates.push_back([&](linalg::LinalgOp linalgOp) -> bool {
-    if (failed(fun(linalgOp)))
-      return false;
-    return true;
-  });
+structured_match::StructuredOpMatcher::operation(
+    std::function<bool(Operation *op)> fun) {
+  predicates.push_back(
+      [=](linalg::LinalgOp linalgOp) -> bool { return fun(linalgOp); });
   return *this;
 }
 
 //===---------------------------------------------------------------------===//
-// Input predicates.
+// Operand predicates - input.
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::input(
-    AllOperands tag, std::function<bool(OpOperand *operand)> fun) {
+    AllOperands tag,
+    std::function<bool(OpOperand *operand, Operation *op)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!fun(operand))
+      if (!fun(operand, linalgOp.getOperation()))
         return false;
     }
     return true;
@@ -113,41 +62,28 @@ structured_match::StructuredOpMatcher::input(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::input(
-    Operand operand, std::function<bool(AffineMap map)> fun) {
+    Operand operand,
+    std::function<bool(OpOperand *operand, Operation *op)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     size_t idxOperand = operand.idx;
     assert(idxOperand < static_cast<size_t>(linalgOp.getNumDpsInputs()));
-    AffineMap tiedIndexingMap = linalgOp.getMatchingIndexingMap(
-        linalgOp.getDpsInputOperand(idxOperand));
-    return fun(tiedIndexingMap);
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::input(
-    AllOperands tag, std::function<bool(AffineMap map)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      AffineMap tiedIndexingMap = linalgOp.getMatchingIndexingMap(operand);
-      if (!fun(tiedIndexingMap))
-        return false;
-    }
-    return true;
+    return fun(linalgOp.getDpsInputOperand(idxOperand),
+               linalgOp.getOperation());
   });
   return *this;
 }
 
 //===---------------------------------------------------------------------===//
-// Output predicates.
+// Operand predicates - output.
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::output(
-    AllOperands tag, std::function<bool(OpOperand *operand)> fun) {
+    AllOperands tag,
+    std::function<bool(OpOperand *operand, Operation *operation)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!fun(operand))
+      if (!fun(operand, linalgOp.getOperation()))
         return false;
     }
     return true;
@@ -157,27 +93,12 @@ structured_match::StructuredOpMatcher::output(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::output(
-    Operand operand, std::function<bool(AffineMap map)> fun) {
+    Operand operand,
+    std::function<bool(OpOperand *operand, Operation *operation)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     size_t idxOperand = operand.idx;
     assert(idxOperand < static_cast<size_t>(linalgOp.getNumDpsInits()));
-    AffineMap tiedIndexingMap =
-        linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(idxOperand));
-    return fun(tiedIndexingMap);
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::output(
-    AllOperands tag, std::function<bool(AffineMap map)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      AffineMap tiedIndexingMap = linalgOp.getMatchingIndexingMap(operand);
-      if (!fun(tiedIndexingMap))
-        return false;
-    }
-    return true;
+    return fun(linalgOp.getDpsInitOperand(idxOperand), linalgOp.getOperation());
   });
   return *this;
 }
@@ -185,15 +106,6 @@ structured_match::StructuredOpMatcher::output(
 //===---------------------------------------------------------------------===//
 // Dim predicates.
 //===---------------------------------------------------------------------===//
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(std::function<bool(size_t)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    size_t numberOfIterator = linalgOp.getIteratorTypesArray().size();
-    return fun(numberOfIterator);
-  });
-  return *this;
-}
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::dim(
