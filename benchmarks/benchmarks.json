@@ -55,7 +55,7 @@
     "vnni_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-vnni-3layers-1536.mlir",
-      "flags": [],
+      "flags": [ "--disable-lsan" ],
       "extensions": [ "avx512_vnni" ]
     }
   }},
