@@ -81,8 +81,10 @@ class Environment(object):
             for v in range(args.verbose - args.quiet):
                 self.extra_args.append("-v")
         # Set environment variables for dynamic loading (Linux and Mac)
-        os.putenv("LD_LIBRARY_PATH", f"{self.lib_dir}:{os.getenv('LD_LIBRARY_PATH')}")
-        os.putenv("DYLD_LIBRARY_PATH", f"{self.lib_dir}:{os.getenv('DYLD_LIBRARY_PATH')}")
+        for path in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+            environ = [os.getenv(path)] if os.getenv(path) else []
+            environ.insert(0, self.lib_dir)  # prepend
+            os.environ[path] = ":".join(environ)
 
 class BaseRun(object):
     """ Base class for all runs """
