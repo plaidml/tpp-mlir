@@ -35,9 +35,9 @@ void testMatmul(FunctionOpInterface funcOp) {
   auto matcher =
     StructuredOpMatcher::make<linalg::MatmulOp>()
       .hasTensorSemantics()
-      .inputs(NumEqualsTo(2))
+      .numDpsInputs(NumEqualsTo(2))
       .input(AllOperands(), HasStaticShape())
-      .outputs(NumEqualsTo(1))
+      .numDpsInits(NumEqualsTo(1))
       .output(AllOperands(), HasStaticShape());
   // clang-format on
 
@@ -54,9 +54,9 @@ void testVnniBrgemm(FunctionOpInterface funcOp) {
   auto matcher = 
     StructuredOpMatcher::make<linalg::GenericOp>()
       .hasTensorSemantics()
-      .inputs(NumEqualsTo(2))
+      .numDpsInputs(NumEqualsTo(2))
       .input(AllOperands(), HasStaticShape())
-      .outputs(NumEqualsTo(1))
+      .numDpsInits(NumEqualsTo(1))
       .output(AllOperands(), HasStaticShape())
       .dim(GreaterThanOrEqualTo(5))
       .dim(RangeDims(/*lowerBound=*/0, /*upperBound=*/5), 
@@ -81,10 +81,10 @@ void testTppAdd(FunctionOpInterface funcOp) {
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
       .hasBufferSemantics()
-      .inputs(NumEqualsTo(2))
+      .numDpsInputs(NumEqualsTo(2))
       .input(AllOperands(), HasStaticShape())
       .input(AllOperands(), IsIdentity())
-      .outputs(NumEqualsTo(1))
+      .numDpsInits(NumEqualsTo(1))
       .output(AllOperands(), HasStaticShape())
       .output(AllOperands(), IsIdentity())
       .dim(LessThanOrEqualTo(2))
@@ -104,7 +104,7 @@ void testPredicates(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
-      .inputs(_OR(NumEqualsTo(2), NumEqualsTo(1)));
+      .numDpsInputs(_OR(NumEqualsTo(2), NumEqualsTo(1)));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -136,8 +136,8 @@ void testTppIdentity(FunctionOpInterface funcOp) {
   auto matcher = 
     StructuredOpMatcher::make<linalg::GenericOp>()
       .hasBufferSemantics()
-      .outputs(NumEqualsTo(1))
-      .inputs(_OR(NumEqualsTo(1), NumEqualsTo(0)))
+      .numDpsInits(NumEqualsTo(1))
+      .numDpsInputs(_OR(NumEqualsTo(1), NumEqualsTo(0)))
       .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
       .output(AllOperands(), HasStaticShape())
       .input(AllOperands(), HasStaticShape())

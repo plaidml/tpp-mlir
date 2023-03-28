@@ -140,9 +140,9 @@ public:
   // Predicates on operation.
   StructuredOpMatcher &hasBufferSemantics();
   StructuredOpMatcher &hasTensorSemantics();
-  StructuredOpMatcher &inputs(std::function<bool(size_t)>);
-  StructuredOpMatcher &outputs(std::function<bool(size_t)>);
-  StructuredOpMatcher &inputs(BinaryPredicate);
+  StructuredOpMatcher &numDpsInputs(std::function<bool(size_t)>);
+  StructuredOpMatcher &numDpsInits(std::function<bool(size_t)>);
+  StructuredOpMatcher &numDpsInputs(BinaryPredicate);
   StructuredOpMatcher &
       verifyInterface(std::function<LogicalResult(Operation *op)>);
 

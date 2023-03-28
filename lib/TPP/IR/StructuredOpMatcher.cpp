@@ -35,7 +35,7 @@ bool structured_match::StructuredOpMatcher::match(Operation *op) {
 //===---------------------------------------------------------------------===//
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::outputs(
+structured_match::StructuredOpMatcher::numDpsInits(
     std::function<bool(size_t)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     size_t numDpsInits = static_cast<size_t>(linalgOp.getNumDpsInits());
@@ -45,7 +45,8 @@ structured_match::StructuredOpMatcher::outputs(
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::inputs(std::function<bool(size_t)> fun) {
+structured_match::StructuredOpMatcher::numDpsInputs(
+    std::function<bool(size_t)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     size_t numDpsInputs = static_cast<size_t>(linalgOp.getNumDpsInputs());
     return fun(numDpsInputs);
@@ -54,7 +55,7 @@ structured_match::StructuredOpMatcher::inputs(std::function<bool(size_t)> fun) {
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::inputs(
+structured_match::StructuredOpMatcher::numDpsInputs(
     structured_match::BinaryPredicate binaryPredicate) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     if (isa<_OR>(&binaryPredicate)) {
