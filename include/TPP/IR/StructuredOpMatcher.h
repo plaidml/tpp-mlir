@@ -35,21 +35,6 @@ private:
   const size_t upperBound;
 };
 
-struct AllDimsBut {
-  AllDimsBut() = delete;
-  explicit AllDimsBut(std::initializer_list<size_t> range) {
-    llvm::append_range(exceptions, range);
-  }
-  explicit AllDimsBut(RangeDims range) {
-    for (auto i = range.getLowerBound(); i < range.getUpperBound(); i++)
-      exceptions.push_back(i);
-  }
-  ArrayRef<size_t> getExceptions() const { return exceptions; }
-
-private:
-  SmallVector<size_t> exceptions;
-};
-
 struct AllOperands {};
 struct Operand {
   Operand() = delete;
@@ -178,7 +163,6 @@ public:
   StructuredOpMatcher &dim(RangeDims range,
                            SmallVector<mlir::utils::IteratorType> kinds);
   StructuredOpMatcher &dim(RangeDims range, mlir::utils::IteratorType kind);
-  StructuredOpMatcher &dim(AllDimsBut, mlir::utils::IteratorType kind);
 
   // Predicates on region.
   template <typename OpTy>

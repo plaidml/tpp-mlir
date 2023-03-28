@@ -64,10 +64,7 @@ void testVnniBrgemm(FunctionOpInterface funcOp) {
                       utils::IteratorType::parallel,
                       utils::IteratorType::parallel,
                       utils::IteratorType::reduction,
-                      utils::IteratorType::reduction})
-      .dim(AllDimsBut(
-           RangeDims(/*lowerBound=*/0, /*upperBound=*/5)),
-                      utils::IteratorType::parallel);
+                      utils::IteratorType::reduction});
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {

@@ -240,26 +240,6 @@ structured_match::StructuredOpMatcher::dim(RangeDims range,
   return *this;
 }
 
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(AllDimsBut allDimsBut,
-                                           utils::IteratorType kind) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    llvm::DenseSet<size_t> exceptions(allDimsBut.getExceptions().begin(),
-                                      allDimsBut.getExceptions().end());
-    auto iteratorTypes = linalgOp.getIteratorTypesArray();
-    // Reverse iterators to have the innermost one at index 0.
-    std::reverse(iteratorTypes.begin(), iteratorTypes.end());
-    for (auto [idx, iteratorType] : llvm::enumerate(iteratorTypes)) {
-      if (exceptions.contains(idx))
-        continue;
-      if (iteratorType != kind)
-        return false;
-    }
-    return true;
-  });
-  return *this;
-}
-
 //===---------------------------------------------------------------------===//
 // Region predicates.
 //===---------------------------------------------------------------------===//
