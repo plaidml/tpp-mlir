@@ -47,7 +47,10 @@ class BenchmarkController(object):
         # If we're in a git repo, find the base dir, otherwise, this is the base dir
         self.baseDir = self.helper.findGitRoot(os.path.dirname(__file__))
         self.logger.debug(f"Base dir: {self.baseDir}")
-        self.programs = self.helper.findTPPProgs(self.baseDir)
+        self.build_dir = args.build
+        if not self.build_dir:
+            self.build_dir = self.baseDir
+        self.programs = self.helper.findTPPProgs(self.build_dir)
         self.output = ''
         self.mean = 0.0
         self.stdev = 0.0
@@ -185,6 +188,8 @@ if __name__ == '__main__':
                         help='Turn on TPP optimizations (default)')
     parser.add_argument('--disable-lsan', action='count', default=0,
                         help='Disable LSAN')
+    parser.add_argument('--build', type=str, default="",
+                        help='Path to the build dir')
     args = parser.parse_args()
 
     # List of ASAN_OPTIONS

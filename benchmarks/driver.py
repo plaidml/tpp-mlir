@@ -71,7 +71,7 @@ class Environment(object):
                 self.build_dir = os.path.realpath(parent)
                 self.lib_dir = os.path.join(self.build_dir, "lib")
                 break
-        assert(self.build_dir)
+        assert(self.build_dir != self.root_dir)
         self.bench_dir = os.path.join(self.root_dir, "benchmarks")
         self.harness = os.path.join(self.bench_dir, "harness", "controller.py")
         self.test_dir = os.path.join(self.bench_dir, "mlir")
@@ -89,9 +89,10 @@ class Environment(object):
 class BaseRun(object):
     """ Base class for all runs """
 
-    def __init__(self, name, env, json, loglevel):
+    def __init__(self, name, args, env, json, loglevel):
         self.name = name
         self.env = env
+        self.args = args
         self.benchmark = json["benchmark"]
         self.flags = json["flags"]
         self.runner = Execute(loglevel)
@@ -105,9 +106,9 @@ class BaseRun(object):
 class CPPRun(BaseRun):
     """ C++ runs """
 
-    def __init__(self, name, env, json, loglevel):
+    def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.cpprun", loglevel)
-        BaseRun.__init__(self, name, env, json, loglevel)
+        BaseRun.__init__(self, name, args, env, json, loglevel)
         assert(json["type"] == "C++")
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
@@ -123,14 +124,16 @@ class CPPRun(BaseRun):
         return True
 
 class MLIRRun(BaseRun):
-    def __init__(self, name, env, json, loglevel):
+    def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.mlirrun", loglevel)
-        BaseRun.__init__(self, name, env, json, loglevel)
+        BaseRun.__init__(self, name, args, env, json, loglevel)
         assert(json["type"] == "MLIR")
         self.benchmark = os.path.join(env.test_dir, self.benchmark)
 
     def run(self):
         command = [self.env.harness]
+        if self.args.build:
+            command.extend(["--build", self.args.build])
         if self.flags:
             command.extend(self.flags)
         if self.env.extra_args:
@@ -155,9 +158,9 @@ class Benchmark(object):
         runType = json["type"]
         self.logger.debug(f"Adding {runType} run {name} for {self.name}")
         if runType == "C++":
-            self.runs.append(CPPRun(name, self.env, json, loglevel))
+            self.runs.append(CPPRun(name, self.args, self.env, json, loglevel))
         elif runType == "MLIR":
-            self.runs.append(MLIRRun(name, self.env, json, loglevel))
+            self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False
