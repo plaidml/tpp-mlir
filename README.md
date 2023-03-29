@@ -20,7 +20,15 @@ If you have a checkout with the previous name, please follow [these instructions
 ```sh
 # Clone
 git clone https://github.com/llvm/llvm-project.git
-# Please check-out the llvm version in: build_tools/llvm_version.txt
+
+# checking out a tpp-mlir compatible version of llvm-project
+wget https://raw.githubusercontent.com/plaidml/tpp-mlir/main/build_tools/llvm_version.txt
+pushd llvm_project
+git checkout `cat ../llvm_version.txt`
+popd
+rm llvm_version.txt
+
+# create build dir
 mkdir llvm-project/build
 pushd llvm-project/build
 
