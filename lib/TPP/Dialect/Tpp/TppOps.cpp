@@ -21,29 +21,7 @@ using namespace mlir::tpp;
 // IdentityOp
 //===----------------------------------------------------------------------===//
 
-StringRef getMatchBroadcastRuleMessage(utils::MatchBroadcastRuleResult res) {
-  switch (res) {
-  case utils::MatchBroadcastRuleResult::OutputNotShapedType:
-    return "expect shaped shaped type for output";
-  case utils::MatchBroadcastRuleResult::WrongOutputRank:
-    return "wrong rank on output";
-  case utils::MatchBroadcastRuleResult::FailedToVerifyRules:
-    return "fails to verify broadcasting rules";
-  case utils::MatchBroadcastRuleResult::Success:
-    return "";
-  }
-  llvm_unreachable("unhandled MatchBroadcastRuleResult case");
-}
-
-// TODO: use verifyCompatibleOperandBroadcast
-LogicalResult IdentityOp::verify() {
-  utils::MatchBroadcastRuleResult res =
-      utils::verifyTppIdentityBroadcastingRules(getInput().getType(),
-                                                getOutput().getType());
-  if (res != utils::MatchBroadcastRuleResult::Success)
-    return emitOpError(getMatchBroadcastRuleMessage(res));
-  return success();
-}
+LogicalResult IdentityOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // MatmulOp

@@ -28,59 +28,33 @@ using namespace mlir;
 
 namespace {
 
-// Given an operand 'operand' check if it is a scalar
-// or a static shape type with rank <= 2.
-static LogicalResult checkOperandForTpp(Value operand) {
-  Type operandType = operand.getType();
-  if (!operandType.isa<ShapedType>())
-    return success();
-  if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>()) {
-    if (!shapedType.hasStaticShape())
-      return failure();
-    unsigned rank = shapedType.getRank();
-    if (rank == 0 || rank > 2)
-      return failure();
-  }
-  return success();
-}
-
 // Convert a linalg.generic to a tpp operation.
 struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
-                               ArrayRef<Value> operands, IRMapping &mapping,
                                PatternRewriter &rewriter) const {
-    tpp::utils::OperandInfo operandInfo;
-    if (tpp::utils::isTppIdentity(linalgOp)) {
+    SmallVector<Value> operands;
+    if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
       assert(operands.size() == 2 && "Expect two operands");
-      // FIXME: We are not converting 1d to xsmm. See #375.
-      Type outputType = operands[1].getType();
-      if (outputType.cast<ShapedType>().getRank() != 2)
-        return failure();
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
     }
-    if (tpp::utils::isTppRelu(linalgOp, operandInfo)) {
-      assert(operandInfo.inputs.size() == 1);
-      assert(operandInfo.outputs.size() == 1);
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(
-          linalgOp, mapping.lookup(operandInfo.inputs[0]),
-          mapping.lookup(operandInfo.outputs[0]));
+    if (tpp::utils::isTppRelu(linalgOp, &operands)) {
+      assert(operands.size() == 2 && "Expect two operands");
+      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
+                                               operands[1]);
       return success();
     }
-    if (tpp::utils::isTppAdd(linalgOp)) {
-      // Allow either:
-      // 1. A = A + B
-      // 2. C = A + B
-      Value output =
-          (linalgOp.getNumOperands() == 3) ? operands[2] : operands[1];
+    if (tpp::utils::isTppAdd(linalgOp, &operands)) {
+      assert(operands.size() == 3 && "Expect three operands");
       rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
-                                              operands[1], output);
+                                              operands[1], operands[2]);
       return success();
     }
-    if (tpp::utils::isTppMatmul(linalgOp)) {
+    if (tpp::utils::isTppMatmul(linalgOp, &operands)) {
+      assert(operands.size() == 3 && "Expect three operands");
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(linalgOp, operands[0],
                                                  operands[1], operands[2]);
       return success();
@@ -96,19 +70,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (!tpp::utils::hasStaticShape(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");
-
-    SmallVector<Value> newOperands;
-    IRMapping mapping;
-    for (Value operand : linalgOp->getOperands()) {
-      if (failed(checkOperandForTpp(operand)))
-        return rewriter.notifyMatchFailure(
-            linalgOp, "Expect scalar or rank 2 memref when mapping to tpp");
-      // This is not required anymore as we don't reshape anymore.
-      // Will be clean-up when we introduce the matchers.
-      newOperands.push_back(operand);
-      mapping.map(operand, operand);
-    }
-    return rewriteToTppOp(linalgOp, newOperands, mapping, rewriter);
+    return rewriteToTppOp(linalgOp, rewriter);
   }
 };
 

@@ -34,7 +34,7 @@ func.func @tpp_add_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
 
 func.func @tpp_identity_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) -> memref<1x2xf32> {
 
-  // expected-error @below {{'tpp.identity' op fails to verify broadcasting rules}}
+  // expected-error @below {{op result type not broadcast compatible with broadcasted operands's shapes}}
   tpp.identity ins(%arg1: memref<2x2xf32>) outs(%arg0: memref<1x2xf32>)
   return %arg0: memref<1x2xf32>
 }
@@ -51,7 +51,7 @@ func.func @myfunc(%arg0: memref<?x?xf32>, %arg1: memref<2x2xf32>) -> memref<2x2x
 
 func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) -> memref<3x3xf32> {
 
-  // expected-error @below {{'tpp.identity' op fails to verify broadcasting rules}}
+  // expected-error @below {{op result type not broadcast compatible with broadcasted operands's shapes}}
   tpp.identity ins(%arg1: memref<2x3xf32>) outs(%arg0: memref<3x3xf32>)
   return %arg0: memref<3x3xf32>
 }

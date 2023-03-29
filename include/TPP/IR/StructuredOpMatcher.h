@@ -126,9 +126,9 @@ struct GreaterThanOrEqualTo {
   bool operator()(size_t value) const { return value >= this->value; };
 };
 
-struct HasAffineMapEqualsTo {
-  HasAffineMapEqualsTo() = delete;
-  explicit HasAffineMapEqualsTo(AffineMap map) : map(map){};
+struct MapEqualsTo {
+  MapEqualsTo() = delete;
+  explicit MapEqualsTo(AffineMap map) : map(map){};
   AffineMap map;
 
   bool operator()(AffineMap map) const { return map == this->map; }
