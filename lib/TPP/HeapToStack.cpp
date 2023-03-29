@@ -65,8 +65,8 @@ struct HeapToStackAllocation : public OpRewritePattern<memref::AllocOp> {
     rewriter.eraseOp(deallocOp);
 
     // Replace the original buffer with an equivalent stack allocation.
-    rewriter.replaceOpWithNewOp<memref::AllocaOp>(alloc,
-                                                  alloc.getMemref().getType());
+    rewriter.replaceOpWithNewOp<memref::AllocaOp>(
+        alloc, alloc.getMemref().getType(), alloc.getAlignmentAttr());
 
     return success();
   }
