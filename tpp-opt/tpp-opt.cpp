@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   mlir::check::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::vnni::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::tpp::registerTestStructuralMatchers();
 
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that

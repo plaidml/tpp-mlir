@@ -32,27 +32,41 @@ static bool isCompatibleInferredReturnShape(ArrayRef<int64_t> inferred,
 
 static LogicalResult verifyCompatibleOperandBroadcast(Operation *op,
                                                       TypeRange inputTypes,
-                                                      Type outputType) {
-  assert(!inputTypes.empty());
+                                                      Type outputType,
+                                                      bool emitDiagnostic) {
+  // No input nothing to verify.
+  if (inputTypes.empty())
+    return success();
+
   SmallVector<int64_t> resultShape;
   (void)OpTrait::util::getBroadcastedShape(getShape(inputTypes.front()), {},
                                            resultShape);
   for (auto other : llvm::make_early_inc_range(inputTypes)) {
     SmallVector<int64_t> temp = resultShape;
-    if (!OpTrait::util::getBroadcastedShape(temp, getShape(other), resultShape))
-      return op->emitOpError("operands don't have broadcast-compatible shapes");
+    if (!OpTrait::util::getBroadcastedShape(temp, getShape(other),
+                                            resultShape)) {
+      if (emitDiagnostic)
+        return op->emitOpError(
+            "operands don't have broadcast-compatible shapes");
+      return failure();
+    }
   }
 
   ArrayRef<int64_t> actualSuffix =
       getShape(outputType).take_back(resultShape.size());
   if (!isCompatibleInferredReturnShape(resultShape, actualSuffix)) {
-    return op->emitOpError() << "result type not broadcast compatible with "
-                                "broadcasted operands's shapes";
+    if (emitDiagnostic) {
+      return op->emitOpError() << "result type not broadcast compatible with "
+                                  "broadcasted operands's shapes";
+    }
+    return failure();
   }
   return success();
 }
 
-LogicalResult mlir::OpTrait::tpp::verifyBroadcastableShapeImpl(Operation *op) {
+LogicalResult
+mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
+                                             bool emitDiagnostic) {
   TypeRange operandTypes = op->getOperandTypes();
 
   // Get input operands all but last.
@@ -60,12 +74,15 @@ LogicalResult mlir::OpTrait::tpp::verifyBroadcastableShapeImpl(Operation *op) {
   for (size_t idx = 0, end = operandTypes.size() - 1; idx < end; idx++) {
     inputOperandTypes.push_back(operandTypes[idx]);
   }
-  return verifyCompatibleOperandBroadcast(
-      op, inputOperandTypes, operandTypes[operandTypes.size() - 1]);
+  return verifyCompatibleOperandBroadcast(op, inputOperandTypes,
+                                          operandTypes[operandTypes.size() - 1],
+                                          emitDiagnostic);
 }
 
 // Verify all the operands have stride one in the fastest-varying dimension.
-LogicalResult mlir::OpTrait::tpp::verifyUnitStrideInnerLoopImpl(Operation *op) {
+LogicalResult
+mlir::OpTrait::tpp::verifyUnitStrideInnerLoop(Operation *op,
+                                              bool emitDiagnostic) {
   SmallVector<int64_t> strides;
   int64_t offset;
   for (auto [idx, operand] : llvm::enumerate(op->getOperands())) {
@@ -74,13 +91,35 @@ LogicalResult mlir::OpTrait::tpp::verifyUnitStrideInnerLoopImpl(Operation *op) {
     if (!isa<ShapedType>(operandType))
       return success();
     if (failed(getStridesAndOffset(operandType.cast<MemRefType>(), strides,
-                                   offset)))
-      return op->emitError() << "failed to compute strides for operand " << idx;
+                                   offset))) {
+      if (emitDiagnostic)
+        return op->emitError()
+               << "failed to compute strides for operand " << idx;
+      return failure();
+    }
+
+    // For 0-rank memref `getStridesAndOffset` does not fail and return 0
+    // strides.
+    if (strides.empty())
+      return failure();
+
+    assert(!strides.empty());
     if (strides.back() != 1) {
-      return op->emitError() << "non-unit stride in the innermost varying "
-                                "dimension for operand "
-                             << idx;
+      if (emitDiagnostic) {
+        return op->emitError() << "non-unit stride in the innermost varying "
+                                  "dimension for operand "
+                               << idx;
+      }
+      return failure();
     }
   }
   return success();
+}
+
+LogicalResult mlir::OpTrait::tpp::checkBroadcastableShape(Operation *op) {
+  return verifyBroadcastableShape(op, /*emitDiagnostic=*/false);
+}
+
+LogicalResult mlir::OpTrait::tpp::checkUnitStrideInnerLoop(Operation *op) {
+  return verifyUnitStrideInnerLoop(op, /*emitDiagnostic=*/false);
 }
