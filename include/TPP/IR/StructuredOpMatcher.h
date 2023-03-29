@@ -211,6 +211,23 @@ struct VerifyInterface {
   std::function<LogicalResult(Operation *op)> fun;
 };
 
+// Work-around for template specialization.
+struct WithSingleOpImpl {
+  WithSingleOpImpl() = default;
+
+  bool withSingleOpImpl(StringRef, Operation *, SmallVectorImpl<Value> *);
+};
+
+// Callable object to check the `op` region for a single scalar operation OpTy.
+template <typename OpTy> struct WithSingleOp {
+  WithSingleOp() = default;
+
+  bool operator()(Operation *op, SmallVectorImpl<Value> *captures) {
+    return WithSingleOpImpl().withSingleOpImpl(OpTy::getOperationName(), op,
+                                               captures);
+  }
+};
+
 class StructuredOpMatcher {
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
 
@@ -249,23 +266,16 @@ public:
   StructuredOpMatcher &dim(RangeDims range, mlir::utils::IteratorType kind);
 
   // Predicates on region.
-  template <typename OpTy>
+  // TODO: To be consistent the region API should look like:
+  // std::function<bool(Region* region, Operation *operation)>
+  // How to pass the captures to the functors?
   StructuredOpMatcher &
-  hasRegionWithSingleOp(SmallVectorImpl<Value> *capturedOperands) {
-    return hasRegionWithSingleOpImpl(OpTy::getOperationName(),
-                                     capturedOperands);
-  }
-  StructuredOpMatcher &
-  hasRegion(std::function<bool(Operation *op,
-                               SmallVectorImpl<Value> *capturedOperands)>,
-            SmallVectorImpl<Value> *capturedOperands);
+  region(std::function<bool(Operation *op,
+                            SmallVectorImpl<Value> *capturedOperands)>,
+         SmallVectorImpl<Value> *capturedOperands);
 
 private:
   llvm::SmallVector<PredicateFn> predicates;
-
-  StructuredOpMatcher &
-  hasRegionWithSingleOpImpl(StringRef operationName,
-                            SmallVectorImpl<Value> *capturedOperands);
 };
 
 } // namespace structured_match

@@ -116,10 +116,10 @@ structured_match::StructuredOpMatcher::dim(
     if (upperBound == std::numeric_limits<size_t>::max())
       upperBound = kinds.size();
     size_t sizeRange = upperBound - lowerBound;
-    if (kinds.size() != sizeRange)
-      return false;
 
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
+    if (iteratorTypes.size() != sizeRange)
+      return false;
     // Reverse iterators to have the innermost one at index 0.
     std::reverse(iteratorTypes.begin(), iteratorTypes.end());
     for (auto [idx, rangeIdx] :
@@ -155,66 +155,65 @@ structured_match::StructuredOpMatcher::dim(RangeDims range,
 // Region predicates.
 //===---------------------------------------------------------------------===//
 
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::hasRegionWithSingleOpImpl(
-    StringRef operationName, SmallVectorImpl<Value> *capturedOperands) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) {
-    Region &region = linalgOp->getRegion(0);
+bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
+    StringRef operationName, Operation *op,
+    SmallVectorImpl<Value> *capturedOperands) {
+  if (!isa<linalg::LinalgOp>(op))
+    return false;
+  auto linalgOp = cast<linalg::LinalgOp>(op);
+  Region &region = linalgOp->getRegion(0);
 
-    if (!region.hasOneBlock())
-      return false;
-    unsigned numberOfOpsInRegion =
-        (operationName.compare(linalg::YieldOp::getOperationName()) == 0) ? 1
-                                                                          : 2;
-    if (std::distance(region.front().begin(), region.front().end()) !=
-        numberOfOpsInRegion)
-      return false;
-    if (linalgOp.getNumDpsInits() != 1)
-      return false;
+  if (!region.hasOneBlock())
+    return false;
+  unsigned numberOfOpsInRegion =
+      (operationName.compare(linalg::YieldOp::getOperationName()) == 0) ? 1 : 2;
+  if (std::distance(region.front().begin(), region.front().end()) !=
+      numberOfOpsInRegion)
+    return false;
+  if (linalgOp.getNumDpsInits() != 1)
+    return false;
 
-    // Require only a single yield operand defined by innerOp.
-    Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
-      return false;
-    // Only linalg.yield, exit true.
-    if (numberOfOpsInRegion == 1) {
-      if (capturedOperands) {
-        auto arg0 = dyn_cast<BlockArgument>(yieldOp->getOperand(0));
-        if (!arg0 || arg0.getParentBlock() != linalgOp.getBlock())
-          return false;
-        capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg0)->get());
-        capturedOperands->push_back(linalgOp.getDpsInitOperand(0)->get());
-      }
-      return true;
-    }
-
-    // Check on the only inner operation.
-    Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-    if (innerOp->getName().getStringRef() != operationName)
-      return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-      return false;
-    // The operand of the innerOp must comes from the region
-    // args of the generic.
-    auto arg0 = dyn_cast<BlockArgument>(innerOp->getOperand(0));
-    auto arg1 = dyn_cast<BlockArgument>(innerOp->getOperand(1));
-    if (!arg0 || !arg1)
-      return false;
-    if (arg0.getParentBlock() != linalgOp.getBlock() ||
-        arg1.getParentBlock() != linalgOp.getBlock())
-      return false;
+  // Require only a single yield operand defined by innerOp.
+  Operation *yieldOp = linalgOp.getBlock()->getTerminator();
+  if (yieldOp->getNumOperands() != 1)
+    return false;
+  // Only linalg.yield, exit true.
+  if (numberOfOpsInRegion == 1) {
     if (capturedOperands) {
+      auto arg0 = dyn_cast<BlockArgument>(yieldOp->getOperand(0));
+      if (!arg0 || arg0.getParentBlock() != linalgOp.getBlock())
+        return false;
       capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg0)->get());
-      capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg1)->get());
       capturedOperands->push_back(linalgOp.getDpsInitOperand(0)->get());
     }
     return true;
-  });
-  return *this;
+  }
+
+  // Check on the only inner operation.
+  Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
+  if (innerOp->getName().getStringRef() != operationName)
+    return false;
+  if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+    return false;
+  // The operand of the innerOp must comes from the region
+  // args of the generic.
+  auto arg0 = dyn_cast<BlockArgument>(innerOp->getOperand(0));
+  auto arg1 = dyn_cast<BlockArgument>(innerOp->getOperand(1));
+  if (!arg0 || !arg1)
+    return false;
+  if (arg0.getParentBlock() != linalgOp.getBlock() ||
+      arg1.getParentBlock() != linalgOp.getBlock())
+    return false;
+  if (capturedOperands) {
+    capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg0)->get());
+    capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg1)->get());
+    capturedOperands->push_back(linalgOp.getDpsInitOperand(0)->get());
+  }
+  return true;
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::hasRegion(
+structured_match::StructuredOpMatcher::region(
     std::function<bool(Operation *op, SmallVectorImpl<Value> *capturedOperands)>
         fun,
     SmallVectorImpl<Value> *capturedOperands) {

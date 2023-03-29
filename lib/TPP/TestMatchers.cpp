@@ -89,7 +89,7 @@ void testTppAdd(FunctionOpInterface funcOp) {
       .output(AllOperands(), HasMap(Identity()))
       .operation(NumOfLoops(LessThanOrEqualTo(2)))
       .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
-      .hasRegionWithSingleOp<arith::AddFOp>(&operands);
+      .region(WithSingleOp<arith::AddFOp>(), &operands);
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -146,7 +146,7 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .input(AllOperands(), HasMap(ProjectedPermutation()))
       .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop))
       .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape))
-      .hasRegionWithSingleOp<linalg::YieldOp>(&operands);
+      .region(WithSingleOp<linalg::YieldOp>(), &operands);
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
