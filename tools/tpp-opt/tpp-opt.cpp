@@ -23,6 +23,7 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
@@ -44,6 +45,7 @@ int main(int argc, char **argv) {
   mlir::check::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::vnni::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::tpp::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::tpp::registerTestStructuralMatchers();
 
   // Add the following to include *all* MLIR Core dialects, or selectively

@@ -6,6 +6,7 @@ add_mlir_dialect_library(TPPTppDialect
     TppAttr.cpp
     TppTraits.cpp
     TppInterface.cpp
+    BufferizableOpInterfaceImpl.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
