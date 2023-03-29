@@ -357,4 +357,17 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
   let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
 }
 
+def HeapToStack : Pass<"heap-to-stack", "func::FuncOp"> {
+  let summary = "Convert buffers from heap to stack";
+  let description = [{
+    Convert buffers from heap-based to stack-based allocations.
+  }];
+  let options = [
+    Option<"maxAllocSizeInBytes", "max-alloc-size-in-bytes", "unsigned",
+           /*default=*/"4096",
+           "Maximal size in bytes to promote allocations to stack.">
+  ];
+  let constructor = "mlir::tpp::createHeapToStackPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
