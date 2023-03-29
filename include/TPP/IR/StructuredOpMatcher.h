@@ -18,29 +18,35 @@ class Operation;
 namespace tpp {
 namespace structured_match {
 
-struct AllDims {};
-struct RangeDims {
-  RangeDims() = delete;
-  explicit RangeDims(AllDims)
-      : lowerBound(0), upperBound(std::numeric_limits<size_t>::max()) {}
-  explicit RangeDims(size_t lowerBound, size_t upperBound)
-      : lowerBound(lowerBound), upperBound(upperBound) {
-    assert(upperBound >= lowerBound);
-  }
+struct MatchSelector {
+  MatchSelector() = delete;
   size_t getLowerBound() const { return lowerBound; };
   size_t getUpperBound() const { return upperBound; };
+
+protected:
+  explicit MatchSelector(size_t lowerBound, size_t upperBound)
+      : lowerBound(lowerBound), upperBound(upperBound) {
+    assert(upperBound > lowerBound);
+  }
 
 private:
   const size_t lowerBound;
   const size_t upperBound;
 };
 
-struct AllOperands {};
-struct Operand {
-  Operand() = delete;
-  Operand(size_t idx) : idx(idx){};
+struct MatchAll : public MatchSelector {
+  MatchAll() : MatchSelector(0, std::numeric_limits<size_t>::max()) {}
+};
 
-  const size_t idx;
+struct MatchOne : public MatchSelector {
+  MatchOne() = delete;
+  MatchOne(size_t idx) : MatchSelector(idx, idx + 1) {}
+};
+
+struct MatchRange : public MatchSelector {
+  MatchRange() = delete;
+  MatchRange(size_t lowerBound, size_t upperBound)
+      : MatchSelector(lowerBound, upperBound) {}
 };
 
 // Callable object to check if the number of loops in `op` satisfies `fun`.
@@ -179,6 +185,20 @@ struct NumDpsInputs {
   std::function<bool(size_t)> fun;
 };
 
+// Callable object to validate number of regions for `op`.
+struct NumRegions {
+  NumRegions() = delete;
+  explicit NumRegions(std::function<bool(size_t)> fun) : fun(fun){};
+
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return fun(linalgOp->getNumRegions());
+    return false;
+  }
+
+  std::function<bool(size_t)> fun;
+};
+
 // Logical OR between two predicates.
 struct _OR {
   _OR() = delete;
@@ -210,17 +230,22 @@ struct VerifyInterface {
 struct WithSingleOpImpl {
   WithSingleOpImpl() = default;
 
-  bool withSingleOpImpl(StringRef, Operation *, SmallVectorImpl<Value> *);
+  bool withSingleOpImpl(StringRef, Region *, Operation *,
+                        SmallVectorImpl<Value> *);
 };
 
 // Callable object to check the `op` region for a single scalar operation OpTy.
 template <typename OpTy> struct WithSingleOp {
-  WithSingleOp() = default;
+  WithSingleOp() = delete;
+  WithSingleOp(SmallVectorImpl<Value> *captures) : captures(captures){};
 
-  bool operator()(Operation *op, SmallVectorImpl<Value> *captures) {
-    return WithSingleOpImpl().withSingleOpImpl(OpTy::getOperationName(), op,
-                                               captures);
+  bool operator()(Region *region, Operation *op) {
+    return WithSingleOpImpl().withSingleOpImpl(OpTy::getOperationName(), region,
+                                               op, captures);
   }
+
+private:
+  SmallVectorImpl<Value> *captures;
 };
 
 class StructuredOpMatcher {
@@ -244,30 +269,21 @@ public:
   StructuredOpMatcher &operation(std::function<bool(Operation *)>);
 
   // Predicate on OpOperands.
-  StructuredOpMatcher &input(AllOperands tag,
-                             std::function<bool(OpOperand *, Operation *)>);
-  StructuredOpMatcher &input(Operand tag,
+  StructuredOpMatcher &input(MatchSelector range,
                              std::function<bool(OpOperand *, Operation *)>);
 
   // Predicates on OpOperands.
-  StructuredOpMatcher &output(AllOperands tag,
-                              std::function<bool(OpOperand *, Operation *)>);
-  StructuredOpMatcher &output(Operand tag,
+  StructuredOpMatcher &output(MatchSelector range,
                               std::function<bool(OpOperand *, Operation *)>);
 
   // Predicates on Iterators.
-  StructuredOpMatcher &dim(RangeDims range,
+  StructuredOpMatcher &dim(MatchSelector range,
                            SmallVector<mlir::utils::IteratorType> kinds);
-  StructuredOpMatcher &dim(RangeDims range, mlir::utils::IteratorType kind);
+  StructuredOpMatcher &dim(MatchSelector range, mlir::utils::IteratorType kind);
 
   // Predicates on region.
-  // TODO: To be consistent the region API should look like:
-  // std::function<bool(Region* region, Operation *operation)>
-  // How to pass the captures to the functors?
-  StructuredOpMatcher &
-  region(std::function<bool(Operation *op,
-                            SmallVectorImpl<Value> *capturedOperands)>,
-         SmallVectorImpl<Value> *capturedOperands);
+  StructuredOpMatcher &region(MatchSelector range,
+                              std::function<bool(Region *, Operation *op)>);
 
 private:
   llvm::SmallVector<PredicateFn> predicates;

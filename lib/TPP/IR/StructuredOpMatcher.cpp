@@ -48,27 +48,21 @@ structured_match::StructuredOpMatcher::operation(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::input(
-    AllOperands tag,
+    MatchSelector range,
     std::function<bool(OpOperand *operand, Operation *op)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!fun(operand, linalgOp.getOperation()))
+    auto operands = linalgOp.getDpsInputOperands();
+    size_t upperBound = range.getUpperBound();
+    size_t lowerBound = range.getLowerBound();
+    if (upperBound == std::numeric_limits<size_t>::max())
+      upperBound = operands.size();
+
+    for (auto idx :
+         llvm::to_vector(llvm::seq<size_t>(lowerBound, upperBound))) {
+      if (!fun(operands[idx], linalgOp.getOperation()))
         return false;
     }
     return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::input(
-    Operand operand,
-    std::function<bool(OpOperand *operand, Operation *op)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    size_t idxOperand = operand.idx;
-    assert(idxOperand < static_cast<size_t>(linalgOp.getNumDpsInputs()));
-    return fun(linalgOp.getDpsInputOperand(idxOperand),
-               linalgOp.getOperation());
   });
   return *this;
 }
@@ -79,26 +73,21 @@ structured_match::StructuredOpMatcher::input(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::output(
-    AllOperands tag,
+    MatchSelector range,
     std::function<bool(OpOperand *operand, Operation *operation)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!fun(operand, linalgOp.getOperation()))
+    auto operands = linalgOp.getDpsInitOperands();
+    size_t upperBound = range.getUpperBound();
+    size_t lowerBound = range.getLowerBound();
+    if (upperBound == std::numeric_limits<size_t>::max())
+      upperBound = operands.size();
+
+    for (auto idx :
+         llvm::to_vector(llvm::seq<size_t>(lowerBound, upperBound))) {
+      if (!fun(operands[idx], linalgOp.getOperation()))
         return false;
     }
     return true;
-  });
-  return *this;
-}
-
-structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::output(
-    Operand operand,
-    std::function<bool(OpOperand *operand, Operation *operation)> fun) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    size_t idxOperand = operand.idx;
-    assert(idxOperand < static_cast<size_t>(linalgOp.getNumDpsInits()));
-    return fun(linalgOp.getDpsInitOperand(idxOperand), linalgOp.getOperation());
   });
   return *this;
 }
@@ -109,7 +98,7 @@ structured_match::StructuredOpMatcher::output(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::dim(
-    RangeDims range, SmallVector<utils::IteratorType> kinds) {
+    MatchSelector range, SmallVector<utils::IteratorType> kinds) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     size_t upperBound = range.getUpperBound();
     size_t lowerBound = range.getLowerBound();
@@ -134,7 +123,7 @@ structured_match::StructuredOpMatcher::dim(
 }
 
 structured_match::StructuredOpMatcher &
-structured_match::StructuredOpMatcher::dim(RangeDims range,
+structured_match::StructuredOpMatcher::dim(MatchSelector range,
                                            utils::IteratorType kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
@@ -157,18 +146,17 @@ structured_match::StructuredOpMatcher::dim(RangeDims range,
 //===---------------------------------------------------------------------===//
 
 bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
-    StringRef operationName, Operation *op,
+    StringRef operationName, Region *region, Operation *op,
     SmallVectorImpl<Value> *capturedOperands) {
   if (!isa<linalg::LinalgOp>(op))
     return false;
   auto linalgOp = cast<linalg::LinalgOp>(op);
-  Region &region = linalgOp->getRegion(0);
 
-  if (!region.hasOneBlock())
+  if (!region->hasOneBlock())
     return false;
   unsigned numberOfOpsInRegion =
       (operationName.compare(linalg::YieldOp::getOperationName()) == 0) ? 1 : 2;
-  if (std::distance(region.front().begin(), region.front().end()) !=
+  if (std::distance(region->front().begin(), region->front().end()) !=
       numberOfOpsInRegion)
     return false;
   if (linalgOp.getNumDpsInits() != 1)
@@ -215,11 +203,22 @@ bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
 
 structured_match::StructuredOpMatcher &
 structured_match::StructuredOpMatcher::region(
-    std::function<bool(Operation *op, SmallVectorImpl<Value> *capturedOperands)>
-        fun,
-    SmallVectorImpl<Value> *capturedOperands) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) {
-    return fun(linalgOp, capturedOperands);
+    MatchSelector range,
+    std::function<bool(Region *region, Operation *op)> fun) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    auto regions = linalgOp->getRegions();
+    assert(regions.size() != 0);
+    size_t upperBound = range.getUpperBound();
+    size_t lowerBound = range.getLowerBound();
+    if (upperBound == std::numeric_limits<size_t>::max())
+      upperBound = regions.size();
+
+    for (auto idx :
+         llvm::to_vector(llvm::seq<size_t>(lowerBound, upperBound))) {
+      if (!fun(&regions[idx], linalgOp.getOperation()))
+        return false;
+    }
+    return true;
   });
   return *this;
 }
