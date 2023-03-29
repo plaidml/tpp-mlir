@@ -55,12 +55,6 @@ struct HeapToStackAllocation : public OpRewritePattern<memref::AllocOp> {
       return rewriter.notifyMatchFailure(
           alloc, "Expected to find matching deallocator");
 
-    // If the lifetime of the given allocation extends beyond the current scope,
-    // the buffer cannot be converted to stack.
-    if (alloc->getParentRegion() != deallocOp->getParentRegion())
-      return rewriter.notifyMatchFailure(
-          alloc, "Expected deallocator to be in the same scope");
-
     // Remove the deallocator as stack lifetime is managed automatically.
     rewriter.eraseOp(deallocOp);
 
