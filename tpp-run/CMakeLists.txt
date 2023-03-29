@@ -37,11 +37,13 @@ message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
 message(STATUS "MLIR libraries at: ${LLVM_LIBRARY_DIR}")
 # Add TPP/MLIR library path so we don't need --shared-libs on every call
 target_link_options(tpp-run PRIVATE
-  -ltpp_c_runner_utils
+  -Wl,--no-as-needed
   -L${CMAKE_BINARY_DIR}/lib
+  -ltpp_c_runner_utils
+  -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
-  -L${LLVM_LIBRARY_DIR}
+  -Wl,--as-needed
 )
 
 install(TARGETS tpp-run)
