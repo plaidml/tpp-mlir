@@ -107,7 +107,7 @@ struct EqualsTo {
   explicit EqualsTo(size_t value) : value(value){};
   const size_t value;
 
-  auto operator()(size_t value) -> bool { return value == this->value; }
+  bool operator()(size_t value) const { return value == this->value; }
 };
 
 struct LessThanOrEqualTo {
