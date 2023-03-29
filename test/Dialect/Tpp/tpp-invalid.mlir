@@ -231,10 +231,25 @@ func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) {
 func.func @non_unit_stride_mamtul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
     %arg1: memref<9x6xf32, strided<[?, ?], offset: ?>>,
     %arg2: memref<12x6xf32, strided<[?, ?], offset: ?>>) {
-
   // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
   tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
                  %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>)
              outs(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
   return
+}
+
+// -----
+
+func.func @tpp_identity_invalid(%arg0: tensor<3x3xf32>) -> tensor<2x3xf32> {
+  // expected-error @below {{op result type not broadcast compatible with broadcasted operands's shapes}}
+  %0 = tpp.identity (%arg0: tensor<3x3xf32>) -> tensor<2x3xf32>
+  return %0: tensor<2x3xf32>
+}
+
+// -----
+
+func.func @tpp_add_check_broadcast_operand(%arg0: tensor<2x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // expected-error @below {{operands don't have broadcast-compatible shapes}}
+  %0 = tpp.add (%arg0: tensor<2x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
 }

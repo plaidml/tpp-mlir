@@ -73,20 +73,31 @@ static bool hasTensorSemantics(Operation *op) {
   return hasTensorResult || hasTensorOperand;
 }
 
-// TODO: this is not correct now. We need to check the result.
 LogicalResult
 mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
                                              bool emitDiagnostic) {
   TypeRange operandTypes = op->getOperandTypes();
 
-  // Get input operands all but last.
+  // In tpp at memref the last operand is the output buffer, while in tpp on
+  // tensor we need to check the single result.
   SmallVector<Type> inputOperandTypes;
-  for (size_t idx = 0, end = operandTypes.size() - 1; idx < end; idx++) {
-    inputOperandTypes.push_back(operandTypes[idx]);
+  if (hasTensorSemantics(op))
+    inputOperandTypes = operandTypes;
+  else {
+    for (size_t idx = 0, end = operandTypes.size() - 1; idx < end; idx++) {
+      inputOperandTypes.push_back(operandTypes[idx]);
+    }
   }
+  Type resultOrOutType;
+  if (hasTensorSemantics(op)) {
+    assert(op->getNumResults() == 1);
+    resultOrOutType = op->getResultTypes()[0];
+  } else {
+    resultOrOutType = operandTypes[operandTypes.size() - 1];
+  }
+
   return verifyCompatibleOperandBroadcast(op, inputOperandTypes,
-                                          operandTypes[operandTypes.size() - 1],
-                                          emitDiagnostic);
+                                          resultOrOutType, emitDiagnostic);
 }
 
 // Verify all the operands have stride one in the fastest-varying dimension.
