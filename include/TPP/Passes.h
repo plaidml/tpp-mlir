@@ -111,6 +111,8 @@ createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHeapToStackPass(unsigned maxAllocSizeInBytes = 4096);
 
+void registerTestStructuralMatchers();
+
 } // namespace tpp
 } // namespace mlir
 
