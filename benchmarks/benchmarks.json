@@ -37,7 +37,7 @@
     "bf16_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
-      "flags": [],
+      "flags": [ "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_3x1024_unpacked_mlir": {
@@ -55,7 +55,8 @@
     "vnni_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-vnni-3layers-1536.mlir",
-      "flags": [ "--disable-lsan" ],
+      "flags": [ "--disable-lsan",
+                 "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx512_vnni" ]
     }
   }},

@@ -31,13 +31,19 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 // Extra command line options to control the default TPP utility passes.
-llvm::cl::opt<bool> packMatmul("def-pack-matmul",
-                               llvm::cl::desc("Default pipeline - pack matmul"),
-                               llvm::cl::init(true));
+llvm::cl::opt<bool>
+    defPackMatmul("def-pack-matmul",
+                  llvm::cl::desc("Default pipeline - pack matmul"),
+                  llvm::cl::init(true));
 
 llvm::cl::opt<bool> defPipePack("def-pack",
                                 llvm::cl::desc("Default pipeline - packing"),
                                 llvm::cl::init(true));
+
+llvm::cl::opt<bool>
+    defHeapToStack("def-heap-to-stack",
+                   llvm::cl::desc("Default pipeline - heap to stack allocs"),
+                   llvm::cl::init(false));
 
 llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
@@ -208,7 +214,8 @@ private:
     // Postprocess buffers.
     pm.addPass(bufferization::createBufferHoistingPass());
     pm.addPass(bufferization::createBufferDeallocationPass());
-    pm.addPass(createHeapToStackPass());
+    if (defHeapToStack)
+      pm.addPass(createHeapToStackPass());
 
     // Run general cleanup to normalize IR.
     pm.addPass(createCleanupPass());
@@ -258,7 +265,7 @@ private:
       pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
       // Convert ops to packed layouts.
-      if (packMatmul)
+      if (defPackMatmul)
         pm.addPass(createPackMatmulPass({32, 32, 32}));
       pm.addPass(createPackVNNIPass());
     }
