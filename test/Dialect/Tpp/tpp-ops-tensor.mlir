@@ -17,3 +17,17 @@ func.func @tpp_dialect(%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>,
   %4 = tpp.relu (%3 : tensor<5x5xf32>) -> tensor<5x5xf32>
   return %4 : tensor<5x5xf32>
 }
+
+// CHECK-LABEL: func.func @tpp_identity_tensor_bcast
+func.func @tpp_identity_tensor_bcast(%arg0: tensor<32xf32>) -> tensor<32x32xf32> {
+  // CHECK: tpp.identity
+  %0 = tpp.identity (%arg0: tensor<32xf32>) -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
+
+// CHECK-LABEL: func.func @tpp_relu_tensor_scalar_bcast
+func.func @tpp_relu_tensor_scalar_bcast(%arg0: f32) -> tensor<32x32xf32> {
+  // CHECK: tpp.relu
+  %0 = tpp.relu (%arg0: f32) -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
