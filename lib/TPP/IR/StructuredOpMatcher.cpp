@@ -164,7 +164,8 @@ structured_match::StructuredOpMatcher::hasRegionWithSingleOpImpl(
     if (!region.hasOneBlock())
       return false;
     unsigned numberOfOpsInRegion =
-        (operationName.compare("linalg.yield") == 0) ? 1 : 2;
+        (operationName.compare(linalg::YieldOp::getOperationName()) == 0) ? 1
+                                                                          : 2;
     if (std::distance(region.front().begin(), region.front().end()) !=
         numberOfOpsInRegion)
       return false;
