@@ -122,7 +122,9 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
 
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
   if (!sgemm) {
@@ -156,7 +158,14 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   unary_shape.m = static_cast<libxsmm_blasint>(n);
   unary_shape.n = static_cast<libxsmm_blasint>(m);
   unary_shape.in0_type = dtype;
-  unary_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  // Copy and Zero should remain in BF16 to avoid useless up/down casts
+  auto op_type = static_cast<libxsmm_meltw_unary_type>(type);
+  auto force_fp32 =
+      (dtype == LIBXSMM_DATATYPE_BF16 &&
+       op_type != libxsmm_meltw_unary_type::LIBXSMM_MELTW_TYPE_UNARY_XOR &&
+       op_type != libxsmm_meltw_unary_type::LIBXSMM_MELTW_TYPE_UNARY_IDENTITY);
+  unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
   unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
@@ -372,7 +381,9 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
   l_brconfig.br_stride_a_hint = stride_b;
   l_brconfig.br_stride_b_hint = stride_a;
@@ -478,7 +489,9 @@ extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
 
   libxsmm_gemm_batch_reduce_config l_brconfig;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
