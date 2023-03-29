@@ -23,7 +23,7 @@ git clone https://github.com/llvm/llvm-project.git
 
 # checking out a tpp-mlir compatible version of llvm-project
 wget https://raw.githubusercontent.com/plaidml/tpp-mlir/main/build_tools/llvm_version.txt
-pushd llvm_project
+pushd llvm-project
 git checkout `cat ../llvm_version.txt`
 popd
 rm llvm_version.txt
