@@ -445,6 +445,64 @@ struct ConvertTppFusedVNNIBrgemmOp
   }
 };
 
+// ======================================== Unary/Binary Ops Lowering
+
+template <class OpKind, class OpFlags, class KindAttr, class FlagsAttr,
+          class DispatchOp, class Op>
+static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
+                                    Type elmTy, OpKind kind, OpFlags flags,
+                                    ArrayRef<int64_t> dims) {
+  auto* ctx = op->getContext();
+  auto loc = op->getLoc();
+
+  KindAttr attr = KindAttr::get(ctx, kind);
+  DenseI64ArrayAttr dimsAttr = DenseI64ArrayAttr::get(
+      rewriter.getContext(), dims);
+  FlagsAttr bCastAttr = FlagsAttr::get(ctx, flags);
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  xsmm::DataTypeAttr dtype;
+  if (elmTy.isBF16()) {
+    dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::BF16);
+  } else {
+    assert(elmTy.isF32() &&
+           "Element type neither bf16 nor f32");
+    dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::F32);
+  }
+
+  Value dispatched = rewriter.create<DispatchOp>(
+      loc, integer64, attr, dimsAttr, bCastAttr, dtype);
+
+  SmallVector<Value, 6> invokeOperands;
+  invokeOperands.push_back(dispatched);
+  invokeOperands.append(op->getOperands().begin(),
+                        op->getOperands().end());
+
+  rewriter.replaceOpWithNewOp<Op>(op, dtype, attr,
+                                             invokeOperands);
+  return success();
+}
+
+static LogicalResult lowerUnaryTPPtoXSMM(Operation *op,
+                                         PatternRewriter &rewriter, Type elmTy,
+                                         xsmm::UnaryKind kind,
+                                         xsmm::UnaryFlags flags,
+                                         ArrayRef<int64_t> dims) {
+  return lowerTPPtoXSMM<xsmm::UnaryKind, xsmm::UnaryFlags, xsmm::UnaryKindAttr,
+                        xsmm::UnaryFlagsAttr, xsmm::UnaryDispatchOp,
+                        xsmm::UnaryOp>(op, rewriter, elmTy, kind, flags, dims);
+}
+
+static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
+                                         PatternRewriter &rewriter, Type elmTy,
+                                         xsmm::BinaryKind kind,
+                                         xsmm::BinaryFlags flags,
+                                         ArrayRef<int64_t> dims) {
+  return lowerTPPtoXSMM<xsmm::BinaryKind, xsmm::BinaryFlags,
+                        xsmm::BinaryKindAttr, xsmm::BinaryFlagsAttr,
+                        xsmm::BinaryDispatchOp, xsmm::BinaryOp>(
+      op, rewriter, elmTy, kind, flags, dims);
+}
+
 struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   using OpRewritePattern<tpp::IdentityOp>::OpRewritePattern;
 
@@ -501,7 +559,6 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
 
   LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = identityOp.getLoc();
     // no conversion if identity is a scalar operation.
     Type outputType = identityOp.getOutput().getType();
     MemRefType outputMemRefType = outputType.dyn_cast<MemRefType>();
@@ -523,36 +580,10 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
     std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
         getLdiAndBCast(identityOp, ldo);
     int64_t ldi = ldiAndBCast.first;
-    xsmm::UnaryFlags bCast = ldiAndBCast.second;
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    xsmm::UnaryKindAttr attr = xsmm::UnaryKindAttr::get(
-        identityOp.getContext(), xsmm::UnaryKind::IDENTITY);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
-    xsmm::UnaryFlagsAttr bCastAttr =
-        xsmm::UnaryFlagsAttr::get(identityOp.getContext(), bCast);
-    xsmm::DataTypeAttr dtype;
-    if (outputMemRefType.getElementType().isBF16()) {
-      dtype = xsmm::DataTypeAttr::get(identityOp.getContext(),
-                                      xsmm::DataType::BF16);
-    } else {
-      assert(outputMemRefType.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype =
-          xsmm::DataTypeAttr::get(identityOp.getContext(), xsmm::DataType::F32);
-    }
 
-    Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr, dtype);
-
-    SmallVector<Value, 6> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(identityOp->getOperands().begin(),
-                          identityOp->getOperands().end());
-
-    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(identityOp, dtype, attr,
-                                               invokeOperands);
-    return success();
+    return lowerUnaryTPPtoXSMM(
+        identityOp, rewriter, outputMemRefType.getElementType(),
+        xsmm::UnaryKind::IDENTITY, ldiAndBCast.second, {m, n, ldi, ldo});
   }
 };
 
@@ -561,7 +592,6 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = reluOp.getLoc();
     Type outputType = reluOp.getInput().getType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
 
@@ -579,35 +609,9 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
     int64_t ldo = *leadDim;
     int64_t ldi = *leadDim;
 
-    xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
-    xsmm::UnaryKindAttr attr =
-        xsmm::UnaryKindAttr::get(reluOp.getContext(), xsmm::UnaryKind::RELU);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldi, ldo});
-    xsmm::UnaryFlagsAttr bCastAttr =
-        xsmm::UnaryFlagsAttr::get(reluOp.getContext(), bCast);
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    xsmm::DataTypeAttr dtype;
-    if (outputMemRef.getElementType().isBF16()) {
-      dtype =
-          xsmm::DataTypeAttr::get(reluOp.getContext(), xsmm::DataType::BF16);
-    } else {
-      assert(outputMemRef.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype = xsmm::DataTypeAttr::get(reluOp.getContext(), xsmm::DataType::F32);
-    }
-
-    Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr, dtype);
-
-    SmallVector<Value, 6> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(reluOp->getOperands().begin(),
-                          reluOp->getOperands().end());
-
-    rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(reluOp, dtype, attr,
-                                               invokeOperands);
-    return success();
+    return lowerUnaryTPPtoXSMM(reluOp, rewriter, outputMemRef.getElementType(),
+                          xsmm::UnaryKind::RELU, xsmm::UnaryFlags::NONE,
+                          {m, n, ldi, ldo});
   }
 };
 
@@ -685,7 +689,6 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = addOp.getLoc();
     Type outputType = addOp.getOut().getType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
     auto outputMemRef = outputType.cast<MemRefType>();
@@ -723,32 +726,9 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
     xsmm::BinaryFlags bCast =
         (bCastOnLhs != xsmm::BinaryFlags::NONE) ? bCastOnLhs : bCastOnRhs;
 
-    xsmm::BinaryKindAttr attr =
-        xsmm::BinaryKindAttr::get(addOp.getContext(), xsmm::BinaryKind::ADD);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, ldiLhs, ldiRhs, ldo});
-    xsmm::BinaryFlagsAttr bCastAttr =
-        xsmm::BinaryFlagsAttr::get(addOp.getContext(), bCast);
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    xsmm::DataTypeAttr dtype;
-    if (outputMemRef.getElementType().isBF16()) {
-      dtype = xsmm::DataTypeAttr::get(addOp.getContext(), xsmm::DataType::BF16);
-    } else {
-      assert(outputMemRef.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype = xsmm::DataTypeAttr::get(addOp.getContext(), xsmm::DataType::F32);
-    }
-
-    Value dispatched = rewriter.create<xsmm::BinaryDispatchOp>(
-        loc, integer64, attr, dims, bCastAttr, dtype);
-
-    SmallVector<Value, 6> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(addOp->getOperands().begin(),
-                          addOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(addOp, dtype, attr,
-                                                invokeOperands);
-    return success();
+    return lowerBinaryTPPtoXSMM(addOp, rewriter, outputMemRef.getElementType(),
+                          xsmm::BinaryKind::ADD, bCast,
+                          {m, n, ldiLhs, ldiRhs, ldo});
   }
 };
 
