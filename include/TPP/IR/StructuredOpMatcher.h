@@ -103,22 +103,15 @@ struct HasStaticShape {
   }
 };
 
-struct EqualsTo {
+template <typename T> struct EqualsTo {
   EqualsTo() = delete;
-  explicit EqualsTo(size_t value) : payload(value){};
-  explicit EqualsTo(AffineMap map) : payload(map){};
-  union Payload {
-    const size_t value;
-    const AffineMap map;
+  explicit EqualsTo(T value) : value(value){};
 
-    Payload() = delete;
-    explicit Payload(size_t value) : value(value) {}
-    explicit Payload(AffineMap map) : map(map) {}
-  } payload;
+  const T value;
 
-  bool operator()(size_t value) const { return value == this->payload.value; }
-  bool operator()(AffineMap map) const { return map == this->payload.map; }
+  bool operator()(T value) const { return value == this->value; }
 };
+template <typename T> EqualsTo(T) -> EqualsTo<T>;
 
 struct LessThanOrEqualTo {
   LessThanOrEqualTo() = delete;
