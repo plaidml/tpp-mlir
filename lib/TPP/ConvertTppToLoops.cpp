@@ -24,8 +24,33 @@ namespace {
 
 static bool isScalarVal(Value val) { return !val.getType().isa<ShapedType>(); }
 
-static SmallVector<Value> getLocalIvs(Value in, Value out, ValueRange ivs,
-                                      Value zero) {
+static inline Value getZero(RewriterBase &rewriter, Location loc) {
+  return rewriter.create<arith::ConstantIndexOp>(loc, 0);
+}
+
+static inline Value getOne(RewriterBase &rewriter, Location loc) {
+  return rewriter.create<arith::ConstantIndexOp>(loc, 1);
+}
+
+static inline SmallVector<Value> getShapeAsValues(RewriterBase &rewriter,
+                                                  Location loc,
+                                                  ArrayRef<int64_t> shape) {
+  SmallVector<Value> shapeAsValues;
+  for (int64_t shapeDim : shape) {
+    assert(shapeDim != ShapedType::kDynamic);
+    shapeAsValues.push_back(
+        rewriter.create<arith::ConstantIndexOp>(loc, shapeDim));
+  }
+  return shapeAsValues;
+}
+
+// Return the touched ivs by `in` based on `out` and `ivs`. The iteration
+// domain in tpp is defined by the output tensor. Assuming static shape we
+// can get the induction varibales used by `in` looking at the shape of `in`
+// and `out`. Exmaple:
+// out = [4, 3] in = [3] iv =  [i, j]. Will return j.
+static SmallVector<Value> getInputOperandIvs(Value in, Value out,
+                                             ValueRange ivs, Value zero) {
   assert(in.getType().isa<ShapedType>());
   assert(out.getType().isa<ShapedType>());
   auto shapedIn = in.getType().dyn_cast<ShapedType>();
@@ -73,18 +98,15 @@ static inline Value getOne(RewriterBase &rewriter, Location loc) {
 }
 
 template <typename OpTy>
-static void convertTppToLoops(RewriterBase &rewriter, Location loc, Value lhs,
-                              Value rhs, Value out) {
+static void convertBinaryTppToLoops(RewriterBase &rewriter, Location loc,
+                                    Value lhs, Value rhs, Value out) {
   assert(out.getType().isa<ShapedType>());
   auto shape = out.getType().cast<ShapedType>().getShape();
   int64_t rank = shape.size();
-  SmallVector<Value> ubs;
-  for (int64_t shapeDim : shape)
-    ubs.push_back(rewriter.create<arith::ConstantIndexOp>(loc, shapeDim));
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value zero = getZero(rewriter, loc);
+  SmallVector<Value> ubs = getShapeAsValues(rewriter, loc, shape);
   SmallVector<Value> lbs(rank, zero);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  SmallVector<Value> steps(rank, one);
+  SmallVector<Value> steps(rank, getOne(rewriter, loc));
   (void)scf::buildLoopNest(
       rewriter, loc, lbs, ubs, steps,
       [&](OpBuilder &b, Location loc, ValueRange localIvs) {
@@ -92,12 +114,12 @@ static void convertTppToLoops(RewriterBase &rewriter, Location loc, Value lhs,
             isScalarVal(lhs)
                 ? lhs
                 : b.create<memref::LoadOp>(
-                      loc, lhs, getLocalIvs(lhs, out, localIvs, zero));
+                      loc, lhs, getInputOperandIvs(lhs, out, localIvs, zero));
         Value scalarRhs =
             isScalarVal(rhs)
                 ? rhs
                 : b.create<memref::LoadOp>(
-                      loc, rhs, getLocalIvs(rhs, out, localIvs, zero));
+                      loc, rhs, getInputOperandIvs(rhs, out, localIvs, zero));
         Value opLhsAndRhs = b.create<OpTy>(loc, scalarLhs, scalarRhs);
         b.create<memref::StoreOp>(loc, opLhsAndRhs, out, localIvs);
       });
@@ -141,7 +163,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
               isScalarVal(in)
                   ? in
                   : b.create<memref::LoadOp>(
-                        loc, in, getLocalIvs(in, out, localIvs, zero));
+                        loc, in, getInputOperandIvs(in, out, localIvs, zero));
           b.create<memref::StoreOp>(loc, scalarIn, out, localIvs);
         });
     rewriter.eraseOp(identityOp);
@@ -184,10 +206,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
     SmallVector<Value> ubs = {i, j, k};
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs = {zero, zero, zero};
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps = {one, one, one};
+    SmallVector<Value> lbs(/*rank=*/3, getZero(rewriter, loc));
+    SmallVector<Value> steps(/*rank=*/3, getOne(rewriter, loc));
 
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
@@ -227,10 +247,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     Value k = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[2]);
     Value b = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[0]);
     SmallVector<Value> ubs = {b, i, j, k};
-    Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs = {zero, zero, zero, zero};
-    Value one = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps = {one, one, one, one};
+    SmallVector<Value> lbs(/*rank=*/4, getZero(rewriter, loc));
+    SmallVector<Value> steps(/*rank=*/4, getOne(rewriter, loc));
 
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
