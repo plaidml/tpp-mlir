@@ -379,7 +379,7 @@ bool isTppAdd(linalg::GenericOp linalgOp) {
     return false;
   if (!isBinaryOp(linalgOp))
     return false;
-  auto res = mlir::OpTrait::tpp::verifyBroadcastableShapeImpl(linalgOp);
+  auto res = mlir::OpTrait::tpp::checkBroadcastableShape(linalgOp);
   if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()) &&
       failed(res))
     return false;

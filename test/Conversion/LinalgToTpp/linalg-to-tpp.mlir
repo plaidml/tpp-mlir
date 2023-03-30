@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -split-input-file -convert-linalg-to-tpp --verify-diagnostics  | FileCheck %s 
+// RUN: tpp-opt %s -split-input-file -convert-linalg-to-tpp | FileCheck %s 
 
 // CHECK-LABEL: func.func @brgemm_lowering(
 // CHECK-SAME: %[[arg0:.*]]: memref<3x5x4xf32>,
@@ -68,7 +68,7 @@ func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
-// expected-error @below {{'linalg.generic' op result type not broadcast compatible with broadcasted operands's shapes}}
+ // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map1],
     iterator_types = ["parallel", "parallel"]} 
@@ -324,7 +324,7 @@ func.func @matmul_mapping() -> memref<28x32xf32> {
 // Stride 2 in the fast varying dimension, fail to match.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @add_non_unit_stride(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32, strided<[4, 2], offset: ?>>) {
-  // expected-error @below {{non-unit stride in the innermost varying dimension for operand 2}}
+  // CHECK-NOT: tpp.add
   linalg.generic {indexing_maps = [#map, #map, #map], 
                   iterator_types = ["parallel", "parallel"]}
     ins(%arg0, %arg0: memref<4x4xf32>, memref<4x4xf32>) 
