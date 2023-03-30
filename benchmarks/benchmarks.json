@@ -46,6 +46,13 @@
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx2" ]
+    },
+    "bf16_dp4_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16_dp4-3layers-1024.mlir",
+      "flags": [ "--disable-lsan",
+                 "-run-args='-def-heap-to-stack=1'" ],
+      "extensions": [ "svebf16" ]
     }
   }},
   {
@@ -80,6 +87,13 @@
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx512.*" ]
+    },
+    "bf16_dp4_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16_dp4-3layers-1024.mlir",
+      "flags": [ "--disable-lsan",
+                 "-run-args='-def-heap-to-stack=1'" ],
+      "extensions": [ "svebf16" ]
     }
   }},
   {
