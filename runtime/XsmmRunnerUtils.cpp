@@ -531,13 +531,14 @@ typedef struct {
 
 // Based on the code
 // https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
-// allocatedPtr and alignedPtr should be same. Also, the offset needs to be 0.
-// We add these assumptions as asserts.
+// the offset needs to be 0. We add this assumption as assert.
+// We will remove it if we find a violation of this assumption.
+//
+// We do not enforce the constraint that allocatedPtr and alignedPtr are same.
+// Because allocatedPtr could be deadbeef in certain cases such as
+// mlir/lib/Conversion/MemRefToLLVM/MemRefToLLVM.cpp#L739
 static inline void
 check_integrity_of_iree_input_tensor(const iree_input_tensor_t *tensor) {
-  assert(tensor->allocatedPtr == tensor->alignedPtr &&
-         "allocatedPtr and alignedPtr are not same in iree_input_tensor to "
-         "XsmmRunner");
   assert(tensor->offset == 0 &&
          "offset is non-zero in iree_input_tensor to XsmmRunner");
 }
@@ -556,8 +557,8 @@ extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
     int64_t ldb;
     int64_t ldc;
   } xsmm_brgemm_dispatch_t;
-  xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *)params;
-  p->address = _mlir_ciface_xsmm_brgemm_dispatch((libxsmm_datatype)p->dtype,
+  xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *) params;
+  p->address = _mlir_ciface_xsmm_brgemm_dispatch((libxsmm_datatype) p->dtype,
                                                  p->vnni, p->m, p->n, p->k,
                                                  p->lda, p->ldb, p->ldc);
   return 0;
@@ -576,8 +577,8 @@ extern "C" int iree_xsmm_matmul_dispatch(void *context, void *params,
     int64_t ldb;
     int64_t ldc;
   } xsmm_matmul_dispatch_t;
-  xsmm_matmul_dispatch_t *p = (xsmm_matmul_dispatch_t *)params;
-  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch((libxsmm_datatype)p->dtype,
+  xsmm_matmul_dispatch_t *p = (xsmm_matmul_dispatch_t *) params;
+  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch((libxsmm_datatype) p->dtype,
                                                    p->vnni, p->m, p->n, p->k,
                                                    p->lda, p->ldb, p->ldc);
   return 0;
@@ -595,9 +596,9 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
     int64_t type;
     int64_t bcast_type;
   } xsmm_unary_dispatch;
-  xsmm_unary_dispatch *p = (xsmm_unary_dispatch *)params;
+  xsmm_unary_dispatch *p = (xsmm_unary_dispatch *) params;
   p->address =
-      _mlir_ciface_xsmm_unary_dispatch((libxsmm_datatype)p->dtype, p->m, p->n,
+      _mlir_ciface_xsmm_unary_dispatch((libxsmm_datatype) p->dtype, p->m, p->n,
                                        p->ldi, p->ldo, p->type, p->bcast_type);
   return 0;
 }
@@ -615,9 +616,9 @@ extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
     int64_t type;
     int64_t bcast_type;
   } xsmm_binary_dispatch;
-  xsmm_binary_dispatch *p = (xsmm_binary_dispatch *)params;
+  xsmm_binary_dispatch *p = (xsmm_binary_dispatch *) params;
   p->address = _mlir_ciface_xsmm_binary_dispatch(
-      (libxsmm_datatype)p->dtype, p->m, p->n, p->ldiLhs, p->ldiRhs, p->ldo,
+      (libxsmm_datatype) p->dtype, p->m, p->n, p->ldiLhs, p->ldiRhs, p->ldo,
       p->type, p->bcast_type);
   return 0;
 }
@@ -637,25 +638,25 @@ extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
     iree_input_tensor_t *pC;
     int64_t numBatches;
   } xsmm_brgemm_invoke_t;
-  xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *)params;
+  xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *) params;
 
   check_integrity_of_iree_input_tensor(p->pA);
   check_integrity_of_iree_input_tensor(p->pB);
   check_integrity_of_iree_input_tensor(p->pC);
 
-  void *addr_tensorA = p->pA->allocatedPtr;
-  void *addr_tensorB = p->pB->allocatedPtr;
-  void *addr_tensorC = p->pC->allocatedPtr;
+  void *addr_tensorA = p->pA->alignedPtr;
+  void *addr_tensorB = p->pB->alignedPtr;
+  void *addr_tensorC = p->pC->alignedPtr;
 
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->address);
   unsigned long long numBatchesVar = p->numBatches;
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = (void *)addr_tensorB;
-  gemm_param.b.primary = (void *)addr_tensorA;
-  gemm_param.c.primary = (void *)addr_tensorC;
-  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  gemm_param.a.primary = (void *) addr_tensorB;
+  gemm_param.b.primary = (void *) addr_tensorA;
+  gemm_param.c.primary = (void *) addr_tensorC;
+  gemm_param.op.tertiary = (void *) &numBatchesVar;
   sgemm.gemm(&gemm_param);
 
   return 0;
@@ -673,22 +674,22 @@ extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
     int64_t rankC;
     iree_input_tensor_t *pC;
   } xsmm_matmul_invoke_t;
-  xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *)params;
+  xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *) params;
 
   check_integrity_of_iree_input_tensor(p->pA);
   check_integrity_of_iree_input_tensor(p->pB);
   check_integrity_of_iree_input_tensor(p->pC);
 
-  void *addr_tensorA = p->pA->allocatedPtr;
-  void *addr_tensorB = p->pB->allocatedPtr;
-  void *addr_tensorC = p->pC->allocatedPtr;
+  void *addr_tensorA = p->pA->alignedPtr;
+  void *addr_tensorB = p->pB->alignedPtr;
+  void *addr_tensorC = p->pC->alignedPtr;
 
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = (void *)addr_tensorB;
-  gemm_param.b.primary = (void *)addr_tensorA;
-  gemm_param.c.primary = (void *)addr_tensorC;
+  gemm_param.a.primary = (void *) addr_tensorB;
+  gemm_param.b.primary = (void *) addr_tensorA;
+  gemm_param.c.primary = (void *) addr_tensorC;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(p->gemm_addr);
 
   sgemm.gemm(&gemm_param);
@@ -705,19 +706,19 @@ extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
     int64_t rankB;
     iree_input_tensor_t *pB;
   } xsmm_unary_invoke;
-  xsmm_unary_invoke *p = (xsmm_unary_invoke *)params;
+  xsmm_unary_invoke *p = (xsmm_unary_invoke *) params;
 
   check_integrity_of_iree_input_tensor(p->pA);
   check_integrity_of_iree_input_tensor(p->pB);
 
-  void *addr_a = p->pA->allocatedPtr;
-  void *addr_b = p->pB->allocatedPtr;
+  void *addr_a = p->pA->alignedPtr;
+  void *addr_b = p->pB->alignedPtr;
 
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(p->address);
   libxsmm_meltw_unary_param param;
-  param.in.primary = (void *)addr_a;
-  param.out.primary = (void *)addr_b;
+  param.in.primary = (void *) addr_a;
+  param.out.primary = (void *) addr_b;
   kernel(&param);
 
   return 0;
@@ -735,22 +736,22 @@ extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
     int64_t rankC;
     iree_input_tensor_t *pC;
   } xsmm_binary_invoke;
-  xsmm_binary_invoke *p = (xsmm_binary_invoke *)params;
+  xsmm_binary_invoke *p = (xsmm_binary_invoke *) params;
 
   check_integrity_of_iree_input_tensor(p->pA);
   check_integrity_of_iree_input_tensor(p->pB);
   check_integrity_of_iree_input_tensor(p->pC);
 
-  void *addr_a = p->pA->allocatedPtr;
-  void *addr_b = p->pB->allocatedPtr;
-  void *addr_c = p->pC->allocatedPtr;
+  void *addr_a = p->pA->alignedPtr;
+  void *addr_b = p->pB->alignedPtr;
+  void *addr_c = p->pC->alignedPtr;
 
   libxsmm_meltwfunction_binary kernel =
       reinterpret_cast<libxsmm_meltwfunction_binary>(p->address);
   libxsmm_meltw_binary_param param;
-  param.in0.primary = (void *)addr_a;
-  param.in1.primary = (void *)addr_b;
-  param.out.primary = (void *)addr_c;
+  param.in0.primary = (void *) addr_a;
+  param.in1.primary = (void *) addr_b;
+  param.out.primary = (void *) addr_c;
   kernel(&param);
 
   return 0;
