@@ -69,8 +69,7 @@ message (STATUS ${XSMM_INCLUDE_DIRS})
 
 add_subdirectory(include)
 add_subdirectory(lib)
-# Atm, IREE needs the tpp-rt library to call into libxsmm.
-add_subdirectory(tpp-rt)
+add_subdirectory(runtime)
 
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
