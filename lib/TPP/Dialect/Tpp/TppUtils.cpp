@@ -297,51 +297,49 @@ bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
 }
 
+static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
+  if (!isa<linalg::GenericOp>(op))
+    return false;
+  auto linalgOp = cast<linalg::GenericOp>(op);
+  Region &region = linalgOp->getRegion(0);
+  if (!region.hasOneBlock())
+    return false;
+  if (linalgOp.getNumDpsInits() != 1)
+    return false;
+  Operation *yieldOp = linalgOp.getBlock()->getTerminator();
+  if (yieldOp->getNumOperands() != 1)
+    return false;
+  Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
+  if (!isa<arith::MaxFOp>(innerOp))
+    return false;
+  if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+    return false;
+  auto maxfOp = cast<arith::MaxFOp>(innerOp);
+  Value maxfLhs = maxfOp.getLhs();
+  Value maxfRhs = maxfOp.getRhs();
+
+  // If lhs is a zero get rhs as input for the relu if it is a block argument,
+  // return false otherwise.
+  auto getOperand = [&](Value lhs, Value rhs) -> bool {
+    if (tpp::utils::isZeroTensor(lhs)) {
+      auto blockArg = dyn_cast<BlockArgument>(rhs);
+      if (!blockArg || blockArg.getParentBlock() != linalgOp.getBlock())
+        return false;
+      OpOperand *operand =
+          linalgOp.getMatchingOpOperand(cast<BlockArgument>(rhs));
+      if (captured) {
+        captured->push_back(operand->get());
+        captured->push_back(linalgOp.getDpsInitOperand(0)->get());
+      }
+      return true;
+    }
+    return false;
+  };
+  return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
+}
+
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
-  // Callback to check relu-body.
-  auto hasReluBody = [=](Operation *op,
-                         SmallVectorImpl<Value> *captured) -> bool {
-    if (!isa<linalg::GenericOp>(op))
-      return false;
-    auto linalgOp = cast<linalg::GenericOp>(op);
-    Region &region = linalgOp->getRegion(0);
-    if (!region.hasOneBlock())
-      return false;
-    if (linalgOp.getNumDpsInits() != 1)
-      return false;
-    Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
-      return false;
-    Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-    if (!isa<arith::MaxFOp>(innerOp))
-      return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-      return false;
-    auto maxfOp = cast<arith::MaxFOp>(innerOp);
-    Value maxfLhs = maxfOp.getLhs();
-    Value maxfRhs = maxfOp.getRhs();
-
-    // If lhs is a zero get rhs as input for the relu if it is a block argument,
-    // return false otherwise.
-    auto getOperand = [&](Value lhs, Value rhs) -> bool {
-      if (tpp::utils::isZeroTensor(lhs)) {
-        auto blockArg = dyn_cast<BlockArgument>(rhs);
-        if (!blockArg || blockArg.getParentBlock() != linalgOp.getBlock())
-          return false;
-        OpOperand *operand =
-            linalgOp.getMatchingOpOperand(cast<BlockArgument>(rhs));
-        if (captured) {
-          captured->push_back(operand->get());
-          captured->push_back(linalgOp.getDpsInitOperand(0)->get());
-        }
-        return true;
-      }
-      return false;
-    };
-    return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
-  };
-
   using namespace tpp::structured_match;
   auto reluMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
       hasReluBody, operands);
