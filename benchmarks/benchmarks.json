@@ -45,7 +45,7 @@
       "benchmark": "gemm-vnni-3layers-1024.mlir",
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
-      "extensions": [ "avx512.*" ]
+      "extensions": [ "avx2" ]
     }
   }},
   {

@@ -8,8 +8,6 @@
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
-#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map4 = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 
 func.func @entry(%arg0: tensor<8x32x32x32xf32>, %arg3: tensor<8x32x32x32xf32>, %arg6: tensor<8x32x32x32xf32>, %arg9: tensor<8x32x32x32xf32> ) -> tensor<8x32x32x32xf32> {
   %arg1 = arith.constant dense<0.01> : tensor<32x32x32x32xf32>

@@ -9,8 +9,6 @@
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
-#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map4 = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 
 func.func @entry(%arg0: tensor<8x32x32x32xbf16>, %arg3: tensor<8x32x32x32xbf16>, %arg6: tensor<8x32x32x32xbf16>, %arg9: tensor<8x32x32x32xbf16> ) -> tensor<8x32x32x32xbf16> {
   %arg1 = arith.constant dense<0.01> : tensor<32x32x16x32x2xbf16>
