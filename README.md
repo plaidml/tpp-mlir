@@ -13,7 +13,10 @@ If you have a checkout with the previous name, please follow [these instructions
 
 ## Build Status
 
-[![TPP-MLIR build status](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg?branch=main)](https://buildkite.com/intel/tpp-mlir)
+| Build | Status |
+| ----- | ------ |
+| Tests | [![TPP-mlir](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg?branch=main)](https://buildkite.com/intel/tpp-mlir) |
+| Benchmarks | [![TPP-benchmark](https://badge.buildkite.com/087a1980507200f059ce3661f6ddb33c227db858d115691bf9.svg?branch=main)](https://buildkite.com/intel/tpp-benchmark) |
 
 ## How to setup the environment
 
