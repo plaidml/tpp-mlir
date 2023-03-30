@@ -116,8 +116,6 @@ mlir::OpTrait::tpp::verifyUnitStrideInnerLoop(Operation *op,
   return success();
 }
 
-// Verify the output tensor to be
-
 LogicalResult mlir::OpTrait::tpp::checkBroadcastableShape(Operation *op) {
   return verifyBroadcastableShape(op, /*emitDiagnostic=*/false);
 }
