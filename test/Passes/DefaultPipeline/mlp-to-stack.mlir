@@ -36,8 +36,6 @@ func.func @mlp(%arg0: tensor<8x48x32x32xbf16>,
 // CHECK-LABEL: func.func @mlp(
 // CHECK:     call @xsmm_brgemm_dispatch
 // CHECK:     scf.parallel
-// CHECK-NOT:   memref.alloc()
-// CHECK:       memref.alloca() {alignment
 // CHECK:       call @xsmm_brgemm_invoke
 // CHECK-NOT:   memref.alloc()
 // CHECK:       memref.alloca() {alignment

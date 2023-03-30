@@ -32,6 +32,10 @@ using namespace mlir;
 
 namespace {
 
+// Replace the iter operand of the outermost loop with the region iter argument
+// of the innermost loop in the region of the innermost loop. This fix-up
+// destination passing style in tile-consumer-and-fuse-producers:
+// https://github.com/llvm/llvm-project/issues/61386
 struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
@@ -40,8 +44,8 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
     assert(outerFor.getNumIterOperands() == innerFor.getNumIterOperands() &&
            "expect same number of iter args");
     Block *block = &(*innerFor.getRegion().begin());
-    for (auto it :
-         llvm::zip(outerFor.getIterOperands(), innerFor.getRegionIterArgs())) {
+    for (auto it : llvm::zip_equal(outerFor.getIterOperands(),
+                                   innerFor.getRegionIterArgs())) {
       Value source = std::get<0>(it);
       Value target = std::get<1>(it);
       rewriter.replaceUsesWithIf(source, target, [&](OpOperand &use) {
