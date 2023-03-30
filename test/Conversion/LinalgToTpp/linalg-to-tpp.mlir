@@ -83,7 +83,7 @@ func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
 
 // -----
 
-// The output is not an identity we should not map this.
+// The output is not an identity map. We should not map this.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 func.func @add_mapping(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>) {
