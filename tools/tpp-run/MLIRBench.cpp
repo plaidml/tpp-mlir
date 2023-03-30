@@ -385,12 +385,12 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createPrintIRPass());
 
   // Lower to LLVM
+  passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createConvertSCFToCFPass());
   passManager.addPass(createConvertOpenMPToLLVMPass());
-  passManager.addPass(createConvertVectorToLLVMPass());
-  passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
+  passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
