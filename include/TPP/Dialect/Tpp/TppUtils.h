@@ -26,11 +26,6 @@ class YieldOp;
 namespace tpp {
 namespace utils {
 
-struct OperandInfo {
-  SmallVector<Value> inputs;
-  SmallVector<Value> outputs;
-};
-
 // Returns true if all the operands of the linalg operation have static
 // dimensions.
 bool hasStaticShape(linalg::LinalgOp linalgOp);
@@ -43,22 +38,27 @@ bool hasTppMark(linalg::LinalgOp linalgOp);
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
 // Returns true if the linalg operation has a MulAdd region.
-bool hasMulAddBody(linalg::LinalgOp linalgOp);
+bool hasMulAddBody(linalg::LinalgOp linalgOp,
+                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Returns true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
 
 // Returns true if the linalg operation can convert to a tpp.matmul.
-bool isTppMatmul(linalg::LinalgOp linalgOp);
+bool isTppMatmul(linalg::LinalgOp linalgOp,
+                 SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Returns true if the linalg operation can convert to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp);
+bool isTppAdd(linalg::GenericOp linalgOp,
+              SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Returns true if the linalg.generic can convert to a tpp.identity.
-bool isTppIdentity(linalg::GenericOp linalgOp);
+bool isTppIdentity(linalg::GenericOp linalgOp,
+                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Returns true if the linalg.generic can convert to a tpp.relu.
-bool isTppRelu(linalg::GenericOp linalgOp, OperandInfo &info);
+bool isTppRelu(linalg::GenericOp linalgOp,
+               SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Returns true if: 1) the region has a single block. 2) The block has a single
 // operation `OP`. 3) The operation result types are int or float.
@@ -85,25 +85,6 @@ bool isValConstZero(Value val);
 
 // Returns true if the op defining `val` represents a zero filled tensor.
 bool isZeroTensor(Value val);
-
-// Returns true if `types` have the same shape and strides. For example: A:
-// memref<56x32xf32, strided<[32, 1], offset: ?>> B: memref<56x32xf32>
-// allOperandsHaveSameShape(A, B) return true. C: memref<1x32xf32>
-// allOperandsHaveSameShape(A, C) return false.
-bool allOperandsHaveSameShapeAndStrides(TypeRange types);
-
-// Check if tpp.identity satisfies broadcasting rules.
-// see: https://numpy.org/doc/stable/reference/ufuncs.html#broadcasting
-// TODO: Make this function general enough for other tpp ops when we support
-// broadcasting.
-enum class MatchBroadcastRuleResult {
-  Success = 0,
-  OutputNotShapedType,
-  WrongOutputRank,
-  FailedToVerifyRules,
-};
-MatchBroadcastRuleResult verifyTppIdentityBroadcastingRules(Type input,
-                                                            Type output);
 
 } // namespace utils
 } // namespace tpp

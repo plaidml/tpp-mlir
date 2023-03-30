@@ -83,9 +83,11 @@ func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
 
 // -----
 
+// The output is not an identity map. We should not map this.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 func.func @add_mapping(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>) {
+  // CHECK-NOT: tpp.add
   linalg.generic {
     indexing_maps = [#map, #map1], 
     iterator_types = ["parallel", "parallel"]} 
@@ -96,12 +98,6 @@ func.func @add_mapping(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>) {
   }
   return
 }
-
-// CHECK: func.func @add_mapping(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<4x4xf32>, 
-// CHECK-SAME:  %[[ARG1:.+]]: memref<4x4xf32>)
-// CHECK: tpp.add ins(%[[ARG0]] : memref<4x4xf32>, %[[ARG1]] : memref<4x4xf32>) 
-// CHECK-SAME:    outs(%[[ARG1]] : memref<4x4xf32>)
 
 // -----
 

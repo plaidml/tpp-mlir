@@ -43,6 +43,7 @@ struct Operand {
   const size_t idx;
 };
 
+// Callable object to check if the number of loops in `op` satisfies `fun`.
 struct NumOfLoops {
   NumOfLoops() = delete;
   NumOfLoops(std::function<bool(size_t)> fun) : fun(fun){};
@@ -102,13 +103,15 @@ struct HasStaticShape {
   }
 };
 
-struct EqualsTo {
+template <typename T> struct EqualsTo {
   EqualsTo() = delete;
-  explicit EqualsTo(size_t value) : value(value){};
-  const size_t value;
+  explicit EqualsTo(T value) : value(value){};
 
-  bool operator()(size_t value) const { return value == this->value; }
+  const T value;
+
+  bool operator()(T value) const { return value == this->value; }
 };
+template <typename T> EqualsTo(T) -> EqualsTo<T>;
 
 struct LessThanOrEqualTo {
   LessThanOrEqualTo() = delete;
@@ -123,15 +126,7 @@ struct GreaterThanOrEqualTo {
   explicit GreaterThanOrEqualTo(size_t value) : value(value){};
   const size_t value;
 
-  bool operator()(size_t value) const { return value >= this->value; };
-};
-
-struct HasAffineMapEqualsTo {
-  HasAffineMapEqualsTo() = delete;
-  explicit HasAffineMapEqualsTo(AffineMap map) : map(map){};
-  AffineMap map;
-
-  bool operator()(AffineMap map) const { return map == this->map; }
+  bool operator()(size_t value) const { return value >= this->value; }
 };
 
 // Callable object to check if `op` has tensor semantics.

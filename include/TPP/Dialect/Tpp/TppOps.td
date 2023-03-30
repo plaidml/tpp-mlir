@@ -33,8 +33,10 @@ def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
-// Tpp operation trait - make sure the operand are broadcastable
-// following Numpy-style broadcast.
+// Tpp operation trait - make sure the operand are broadcastable.
+// Two dimensions are compatible when:
+// 1. they are equal, or
+// 2. one of them is 1.
 def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 
 // Tpp operation trait - make sure the stride in the fastest-varying
@@ -46,7 +48,8 @@ def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
 //===----------------------------------------------------------------------===//
 
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
+                                        UnitStrideInnerLoop])> {
   
   let arguments = (ins TppOperand:$input, TppOperand:$output);
   
@@ -64,13 +67,8 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
   let summary = "Copies input to output.";
   let description = [{
     The `tpp.identity` copies input memref to output memref. It supports
-    broadcast comparing the memref shape element-wise. Starting with the trailing
-    dimensions and working from right to left. Two dimensions are broadcast
-    compatible if:
-    - They are equal
-    - One if them is 1 For more details, see: 
-    https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
-
+    Numpy-style broadcast. 
+   
     Example:
 
     ```mlir
@@ -81,8 +79,6 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
 
     ```
   }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -93,7 +89,7 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
   let summary = "Applies a Rectified Linear Unit function in place.";
   let description = [{
     The `tpp.relu` applies a Rectified Linear Unit function in place 
-    or out-of-place.
+    or out-of-place. It supports Numpy-style broadcast.
 
     Example:
 
@@ -104,6 +100,9 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 
     // in-place.
     tpp.relu ins(%0: memref<2x2xf32>) outs(%0: memref<2x2xf32>)
+
+    // bcast
+    tpp.relu ins(%0: memref<4xf32>) outs(%1: memref<2x4xf32>)
 
     ```
   }];
@@ -116,7 +115,8 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 //===----------------------------------------------------------------------===//
 
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape, 
+                                        UnitStrideInnerLoop])> {
 
   let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
 
@@ -130,8 +130,7 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape, 
-                                     UnitStrideInnerLoop]> {
+def Tpp_AddOp : Tpp_BinaryOp<"add"> {
   let summary = "Element-wise addition.";
   let description = [{
     The `tpp.add` operation performs element-wise addition on two-dimensional
@@ -144,16 +143,20 @@ def Tpp_AddOp : Tpp_BinaryOp<"add", [BroadcastableShape,
     ```mlir
 
     // A = A + A
-    tpp.add ins(%1 : memref<2x2xf32>, %1: memref<2x2xf32>)
-            outs(%1 : memref<2x2xf32>)
+    tpp.add ins(%1: memref<2x2xf32>, %1: memref<2x2xf32>)
+            outs(%1: memref<2x2xf32>)
 
     // B = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>) 
+    tpp.add ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) 
             outs(%2: memref<2x2xf32>)
 
     // C = A + B
-    tpp.add ins(%1 : memref<2x2xf32>, %2: memref<2x2xf32>)
-            outs(%3 : memref<2x2xf32>)
+    tpp.add ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
+            outs(%3: memref<2x2xf32>)
+
+    // bcast
+    tpp.add ins(%1: memref<1x3xf32>, %2: memref<3xf32>)
+            outs(%3: memref<3x3xf32>) 
 
     ```
   }];
