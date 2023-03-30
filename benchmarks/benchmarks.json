@@ -27,6 +27,28 @@
     }
   }},
   {
+  "gemm": {
+    "fp32_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-fp32-3layers-1024.mlir",
+      "flags": [],
+      "extensions": [ "avx2" ]
+    },
+    "bf16_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16-3layers-1024.mlir",
+      "flags": [ "-run-args='-def-heap-to-stack=1'" ],
+      "extensions": [ "avx2" ]
+    },
+    "vnni_3x1024_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-vnni-3layers-1024.mlir",
+      "flags": [ "--disable-lsan",
+                 "-run-args='-def-heap-to-stack=1'" ],
+      "extensions": [ "avx512.*" ]
+    }
+  }},
+  {
   "mlp": {
     "fp32_3x1024_mlir": {
       "type": "MLIR",
@@ -52,12 +74,12 @@
       "flags": [ "-run-args='-def-pack=0'" ],
       "extensions": [ "avx512.*" ]
     },
-    "vnni_3x1024_mlir": {
+    "vnni_3x1536_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-vnni-3layers-1536.mlir",
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
-      "extensions": [ "avx512_vnni" ]
+      "extensions": [ "avx512.*" ]
     }
   }},
   {
