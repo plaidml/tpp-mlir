@@ -15,6 +15,34 @@ If you have a checkout with the previous name, please follow [these instructions
 
 [![TPP-MLIR build status](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg?branch=main)](https://buildkite.com/intel/tpp-mlir)
 
+## How to setup the environment
+
+In order to build LLVM and TPP-MLIR, several software development tools such as git, cmake, compilers, etc. are needed. As each operating system has its own package 
+manager and package names, we opted for providing instructions for the user-level package manager ```conda```. This environment has been successfully tested on top of a Fedora Server
+minimal installation with less than 400 system-wide packages being installed.
+
+Initial Setup (for x86_64 machines):
+```sh
+export TPPMLIR_WORKSPACE_DIR=/foo
+cd ${TPPMLIR_WORKSPACE_DIR}
+
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
+eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
+conda activate
+
+conda install cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools gcc_linux-64 gxx_linux-64 binutils
+python -m pip install coloredlogs
+```
+
+Reloading the environment  after conda deactivate/logout/reboot:
+```sh
+export TPPMLIR_WORKSPACE_DIR=/foo
+cd ${TPPMLIR_WORKSPACE_DIR}
+eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
+conda activate
+```
+
 ## How to build LLVM
 
 ```sh
