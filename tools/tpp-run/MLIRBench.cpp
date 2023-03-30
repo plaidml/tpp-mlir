@@ -377,7 +377,6 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addPass(createConvertSCFToOpenMPPass());
   passManager.addPass(createConvertVectorToSCFPass());
-  passManager.addPass(createConvertSCFToCFPass());
   passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createLowerAffinePass());
 
@@ -386,10 +385,11 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createPrintIRPass());
 
   // Lower to LLVM
+  passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
+  passManager.addPass(createConvertSCFToCFPass());
   passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
-  passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
