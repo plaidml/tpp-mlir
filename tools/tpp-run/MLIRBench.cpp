@@ -375,9 +375,10 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(arith::createArithExpandOpsPass());
+  passManager.addPass(createConvertSCFToOpenMPPass());
   passManager.addPass(createConvertVectorToSCFPass());
   passManager.addPass(createConvertSCFToCFPass());
+  passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createLowerAffinePass());
 
   // Print IR of optimized kernel and main
@@ -385,6 +386,7 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createPrintIRPass());
 
   // Lower to LLVM
+  passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
