@@ -57,18 +57,15 @@ static SmallVector<Value> getInputOperandIvs(Value in, Value out,
   auto shapedOut = out.getType().dyn_cast<ShapedType>();
   assert(shapedOut.getRank() >= shapedIn.getRank());
 
-  // Handle rank 1 input.
   auto shapeIn = shapedIn.getShape();
-  if (shapedIn.getRank() == 1) {
-    if (shapeIn[0] == 1)
-      return {zero};
-    return {ivs[shapedOut.getRank() - 1]};
-  }
-
-  // Handle rank 2 input.
-  assert(shapedIn.getRank() == shapedOut.getRank());
   SmallVector<Value> newIvs;
   for (auto [idx, shapeOnDim] : llvm::enumerate(shapeIn)) {
+    // Handle rank 1 input.
+    if (shapedIn.getRank() == 1) {
+      if (shapeIn[0] == 1)
+        return {zero};
+      return {ivs[shapedOut.getRank() - 1]};
+    }
     if (shapeOnDim == 1)
       newIvs.push_back(zero);
     else
@@ -98,7 +95,7 @@ static inline Value getOne(RewriterBase &rewriter, Location loc) {
 }
 
 template <typename OpTy>
-static void convertBinaryTppToLoops(RewriterBase &rewriter, Location loc,
+static void convertBinaryToLoops(RewriterBase &rewriter, Location loc,
                                     Value lhs, Value rhs, Value out) {
   assert(out.getType().isa<ShapedType>());
   auto shape = out.getType().cast<ShapedType>().getShape();
