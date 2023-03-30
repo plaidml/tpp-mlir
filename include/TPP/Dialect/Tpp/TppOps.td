@@ -33,9 +33,10 @@ def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
 
-// Tpp operation trait - make sure the operand are broadcastable
-// following Numpy-style broadcast.
-//  https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
+// Tpp operation trait - make sure the operand are broadcastable.
+// Two dimensions are compatible when:
+// 1. they are equal, or
+// 2. one of them is 1.
 def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 
 // Tpp operation trait - make sure the stride in the fastest-varying
