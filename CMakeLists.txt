@@ -73,14 +73,12 @@ add_subdirectory(runtime)
 
 # IREE doesn't need any of these
 if (NOT TPP_INSIDE_IREE)
-  add_subdirectory(tpp-opt)
-  add_subdirectory(tpp-run)
+  add_subdirectory(tools)
   add_subdirectory(test)
-  add_subdirectory(utils)
   add_subdirectory(benchmarks)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
-  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v
+  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
                     DEPENDS bench_mlp bench_matmul tpp-opt tpp-run
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run C++ and MLIR Benchmarks)
