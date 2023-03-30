@@ -92,11 +92,9 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LATE:   memref.cast
 // LATE:   memref.cast
 // LATE:   call @xsmm_matmul_invoke
-// LATE:   cf.cond_br %{{.*}}, [[BODY:.*]], [[LATCH:.*]]
-// LATE:   [[BODY]]:
+// LATE:   scf.for
 // LATE:     memref.load
 // LATE:     arith.addf
-// LATE:   [[LATCH]]:
 // LATE-DAG: @xsmm_matmul_invoke
 // LATE-DAG: @xsmm_matmul_dispatch
 // LATE-LABEL: @entry
@@ -128,24 +126,18 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LOOPS-DAG:  memref.global "private" constant @__constant_8x4xf32 : memref<8x4xf32> = dense<1.000000e+00> {alignment = 64 : i64}
 // LOOPS-LABEL: @_entry
 // LOOPS:   memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
-// LOOPS:   cf.cond_br %{{.*}}, [[BODY:.*]], [[LATCH:.*]]
-// LOOPS: [[BODY]]:
-// LOOPS:   memref.load
-// LOOPS:   memref.load
-// LOOPS:   memref.load
-// LOOPS:   arith.mulf
-// LOOPS:   arith.addf
-// LOOPS:   memref.store
-// LOOPS:   arith.addi
-// LOOPS: [[LATCH]]:
-// LOOPS:   cf.cond_br %{{.*}}, [[BODY1:.*]], [[LATCH1:.*]]
-// LOOPS: [[BODY1]]:
-// LOOPS:   memref.load
-// LOOPS:   memref.load
-// LOOPS:   arith.addf
-// LOOPS:   memref.store
-// LOOPS:   arith.addi
-// LOOPS: [[LATCH1]]:
+// LOOPS:   scf.for
+// LOOPS:     memref.load
+// LOOPS:     memref.load
+// LOOPS:     memref.load
+// LOOPS:     arith.mulf
+// LOOPS:     arith.addf
+// LOOPS:     memref.store
+// LOOPS:   scf.for
+// LOOPS:     memref.load
+// LOOPS:     memref.load
+// LOOPS:     arith.addf
+// LOOPS:     memref.store
 // LOOPS-LABEL: @entry
 // LOOPS:   call @_entry({{.*}}) : (memref<4x8xf32>, memref<4x4xf32>, memref<f32>) -> ()
 
