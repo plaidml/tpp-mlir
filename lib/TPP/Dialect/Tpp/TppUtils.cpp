@@ -280,9 +280,9 @@ bool isTppMatmul(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
           .dim(RangeDims(AllDims()), {mlir::utils::IteratorType::reduction,
                                       mlir::utils::IteratorType::parallel,
                                       mlir::utils::IteratorType::parallel})
-          .input(Operand(0), HasMap(MapEqualsTo(mapList[0])))
-          .input(Operand(1), HasMap(MapEqualsTo(mapList[1])))
-          .output(Operand(0), HasMap(MapEqualsTo(mapList[2])))
+          .input(Operand(0), HasMap(EqualsTo(mapList[0])))
+          .input(Operand(1), HasMap(EqualsTo(mapList[1])))
+          .output(Operand(0), HasMap(EqualsTo(mapList[2])))
           .region(hasMulAddBody, operands);
   // TODO: we don't check buffer semantics. We never did and this tpp method
   // leaks in other files. Will come back with a fix.
