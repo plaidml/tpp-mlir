@@ -27,11 +27,18 @@ def TppVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
 def TppBRGEMMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
 def TppBRGEMMVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [4]>;
 
-// Tpp operands is a scalar float or a static memref with rank 1 or 2.
-def TppOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
+// Tpp operands:
+// input operand: is a scalar float or a static memref with rank 1 or 2.
+// output operand: static memref with rank 1 or 2.
+def TppInputOperand : AnyTypeOf<[TppMemRef, AnyFloat]>;
+def TppOutputOperand : AnyTypeOf<[TppMemRef]>;
 
 // Tpp operands for VNNI layout.
 def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
+
+//===----------------------------------------------------------------------===//
+// Tpp Traits
+//===----------------------------------------------------------------------===//
 
 // Tpp operation trait - make sure the operand are broadcastable.
 // Two dimensions are compatible when:
@@ -51,10 +58,11 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
                                         UnitStrideInnerLoop])> {
   
-  let arguments = (ins TppOperand:$input, TppOperand:$output);
+  let arguments = (ins TppInputOperand:$input, TppOutputOperand:$output);
   
   let assemblyFormat = [{
-    `ins` `(` $input `:` type($input) `)` `outs` `(` $output `:` type($output) `)` 
+    `ins` `(` $input `:` type($input) `)` 
+    `outs` `(` $output `:` type($output) `)` 
     attr-dict
   }];
 }
@@ -106,8 +114,6 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 
     ```
   }];
-
-  let hasVerifier = 1; 
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,7 +124,8 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape, 
                                         UnitStrideInnerLoop])> {
 
-  let arguments = (ins TppOperand:$lhs, TppOperand:$rhs, TppOperand:$out);
+  let arguments = (ins TppInputOperand:$lhs, TppInputOperand:$rhs, 
+                       TppOutputOperand:$out);
 
   let assemblyFormat = [{
         `ins` `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)`
@@ -160,8 +167,6 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 
     ```
   }];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,8 +188,8 @@ def Tpp_MatmulOp : Tpp_Op<"matmul"> {
     ```
   }];
 
-  let arguments = (ins TppOperand:$matrixA, TppOperand:$matrixB,
-                       TppOperand:$matrixC);
+  let arguments = (ins TppInputOperand:$matrixA, TppInputOperand:$matrixB,
+                       TppOutputOperand:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
@@ -232,8 +237,8 @@ def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
     ```
   }];
 
-  let arguments = (ins TppOperand:$matrixA, TppVNNIOperand:$matrixB,
-                       TppOperand:$matrixC);
+  let arguments = (ins TppInputOperand:$matrixA, TppVNNIOperand:$matrixB,
+                       TppOutputOperand:$matrixC);
 
   let assemblyFormat = [{
       `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
@@ -367,16 +372,20 @@ def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
 
 def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
   let summary = [{
-    Performs batch reduced matrix multiplication followed by bias addition and relu}];
+    Performs batch reduced matrix multiplication followed by bias 
+    addition and relu
+  }];
 
   let description = [{
-    The `tpp.fused_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
+    The `tpp.fused_brgemm` is an implementation of the Batch GEMM operation 
+    in oneAPI.
 
     Example:
 
     ```mlir
 
-      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, %3: memref<4xf32>, %4: i64)
+      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, 
+                           %3: memref<4xf32>, %4: i64)
                       outs(%5: memref<6x4xf32>)
     ```
   }];

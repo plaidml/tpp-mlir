@@ -88,17 +88,6 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
 // CHECK:     %[[tostore:.*]] = memref.load %[[ARG1]][%[[j]]] : memref<3xf32>
 // CHECK:     memref.store %[[tostore]], %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
 
-// -----
-
-// CHECK-LABEL: @identity_to_loops_scalar(
-// CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: f32)
-func.func @identity_to_loops_scalar(%arg0: f32, %arg1: f32) -> f32 {
-  tpp.identity ins(%arg0: f32) outs(%arg1: f32)
-  // CHECK: arith.addf %[[ARG0]], %[[ARG0]] : f32
-  %0 = arith.addf %arg1, %arg1 : f32
-  return %0: f32
-}
-
 
 // -----
 
