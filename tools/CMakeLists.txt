@@ -1,0 +1,3 @@
+add_subdirectory(mlp-gen)
+add_subdirectory(tpp-opt)
+add_subdirectory(tpp-run)
