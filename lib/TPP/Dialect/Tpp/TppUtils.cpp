@@ -289,14 +289,6 @@ bool isTppMatmul(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
   return matmulMatcher.match(linalgOp);
 }
 
-// Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
-  using namespace tpp::structured_match;
-  auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
-      WithSingleOp<arith::AddFOp>(), operands);
-  return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
-}
-
 static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   if (!isa<linalg::GenericOp>(op))
     return false;
@@ -338,52 +330,13 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
 }
 
-MatchBroadcastRuleResult verifyTppIdentityBroadcastingRules(Type inputType,
-                                                            Type outputType) {
-  // input scalar, just return.
-  if (!inputType.isa<ShapedType>())
-    return MatchBroadcastRuleResult::Success;
-
-  // if the input is not a scalar the output rank should be >= of the input
-  // rank.
-  auto shapedInputType = inputType.cast<ShapedType>();
-  unsigned rankInput = shapedInputType.getRank();
-  if (!outputType.isa<ShapedType>())
-    return MatchBroadcastRuleResult::OutputNotShapedType;
-  auto shapedOutputType = outputType.cast<ShapedType>();
-  unsigned rankOutput = shapedOutputType.getRank();
-  if (rankOutput < rankInput)
-    return MatchBroadcastRuleResult::WrongOutputRank;
-
-  // check if the shape are broadcast compatible.
-  ArrayRef<int64_t> shapeInput = shapedInputType.getShape();
-  ArrayRef<int64_t> shapeOutput = shapedOutputType.getShape();
-
-  for (int64_t i = rankInput - 1, j = rankOutput - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    int64_t inputDim = shapeInput[i];
-    int64_t outputDim = shapeOutput[j];
-
-    if (inputDim == outputDim)
-      continue;
-    if (inputDim == 1 && outputDim > 1)
-      continue;
-    return MatchBroadcastRuleResult::FailedToVerifyRules;
-  }
-  return MatchBroadcastRuleResult::Success;
-}
-
 // Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp) {
-  if (!hasMappingToTppConditions(linalgOp))
-    return false;
-  if (!isBinaryOp(linalgOp))
-    return false;
+bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+  using namespace tpp::structured_match;
+  auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      WithSingleOp<arith::AddFOp>(), operands);
   auto res = mlir::OpTrait::tpp::checkBroadcastableShape(linalgOp);
-  if (!allOperandsHaveSameShapeAndStrides(linalgOp->getOperands().getTypes()) &&
-      failed(res))
-    return false;
-  return hasOnlyOp<arith::AddFOp>(linalgOp.getRegion());
+  return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp) && !failed(res);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.relu.
