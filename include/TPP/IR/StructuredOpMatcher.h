@@ -18,6 +18,7 @@ class Operation;
 namespace tpp {
 namespace structured_match {
 
+// Base class for the matcher predicates selection tag.
 struct MatchSelector {
   MatchSelector() = delete;
   size_t getLowerBound() const { return lowerBound; };
@@ -34,15 +35,20 @@ private:
   const size_t upperBound;
 };
 
+// Selector which specifies that predicate should apply on all values.
 struct MatchAll : public MatchSelector {
   MatchAll() : MatchSelector(0, std::numeric_limits<size_t>::max()) {}
 };
 
+// Selector which specifies that predicate should apply only on one value at
+// the position `idx`.
 struct MatchOne : public MatchSelector {
   MatchOne() = delete;
   MatchOne(size_t idx) : MatchSelector(idx, idx + 1) {}
 };
 
+// Selector which specifies that predicate should apply only on range of values
+// at positions from `lowerBound` up to - but not including - `upperBound`.
 struct MatchRange : public MatchSelector {
   MatchRange() = delete;
   MatchRange(size_t lowerBound, size_t upperBound)
@@ -109,6 +115,7 @@ struct HasStaticShape {
   }
 };
 
+// Callable object to check if the input is equal to specified `value`.
 template <typename T> struct EqualsTo {
   EqualsTo() = delete;
   explicit EqualsTo(T value) : value(value){};
@@ -119,6 +126,8 @@ template <typename T> struct EqualsTo {
 };
 template <typename T> EqualsTo(T) -> EqualsTo<T>;
 
+// Callable object to check if the input is less than or equal to specified
+// `value`.
 struct LessThanOrEqualTo {
   LessThanOrEqualTo() = delete;
   explicit LessThanOrEqualTo(size_t value) : value(value){};
@@ -127,6 +136,8 @@ struct LessThanOrEqualTo {
   bool operator()(size_t value) const { return value <= this->value; }
 };
 
+// Callable object to check if the input is greater than or equal to specified
+// `value`.
 struct GreaterThanOrEqualTo {
   GreaterThanOrEqualTo() = delete;
   explicit GreaterThanOrEqualTo(size_t value) : value(value){};
@@ -263,6 +274,7 @@ public:
         [](linalg::LinalgOp op) { return isa<OpTy>(op.getOperation()); });
   }
 
+  // Match given `op` using stored predicates.
   bool match(Operation *op);
 
   // Predicates on operation.
