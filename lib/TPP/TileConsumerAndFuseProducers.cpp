@@ -32,6 +32,42 @@ using namespace mlir;
 
 namespace {
 
+// Replace the iter operand of the outermost loop with the region iter argument
+// of the innermost loop in the region of the innermost loop. This fix-up
+// destination passing style in tile-consumer-and-fuse-producers:
+// https://github.com/llvm/llvm-project/issues/61386
+struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+  void replaceIterArgs(PatternRewriter &rewriter, scf::ForOp outerFor,
+                       scf::ForOp innerFor) const {
+    assert(outerFor.getNumIterOperands() == innerFor.getNumIterOperands() &&
+           "expect same number of iter args");
+    Block *block = &(*innerFor.getRegion().begin());
+    for (auto it : llvm::zip_equal(outerFor.getIterOperands(),
+                                   innerFor.getRegionIterArgs())) {
+      Value source = std::get<0>(it);
+      Value target = std::get<1>(it);
+      rewriter.replaceUsesWithIf(source, target, [&](OpOperand &use) {
+        return use.getOwner()->getBlock() == block;
+      });
+    }
+  }
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                PatternRewriter &rewriter) const override {
+    auto metadata = forOp->getAttrOfType<StringAttr>("fusion");
+    if (!metadata || metadata.getValue() != "root")
+      return failure();
+    if (forOp.getNumRegionIterArgs() != 1)
+      return failure();
+    SmallVector<scf::ForOp> nestedLoops;
+    getPerfectlyNestedLoops(nestedLoops, forOp);
+    replaceIterArgs(rewriter, forOp, nestedLoops[nestedLoops.size() - 1]);
+    return success();
+  }
+};
+
 // Convert scf.for to scf.forall after fusion.
 struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
@@ -649,14 +685,24 @@ struct TileConsumerAndFuseProducers
       }
     }
 
-    RewritePatternSet patterns(&getContext());
-    if (this->useForAll)
-      patterns.add<ConvertToForAll>(&getContext());
-    // fold unit-extent dims for linalg on tensors.
-    linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
-    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
+    auto &ctx = getContext();
+    {
+      // Patterns for scf.for.
+      RewritePatternSet patterns(&ctx);
+      patterns.add<ReplaceIterArgs>(&ctx);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
+
+    {
+      // Patterns for scf.forall.
+      RewritePatternSet patterns(&ctx);
+      if (this->useForAll)
+        patterns.add<ConvertToForAll>(&ctx);
+      // Fold unit-extent dims for linalg on tensors.
+      linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+      tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
   }
 };
 
