@@ -28,6 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 
 #include "TPP/BuilderUtils.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
@@ -36,6 +37,11 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
+
+llvm::cl::opt<bool>
+    defParallel("def-parallel",
+                llvm::cl::desc("Default pipeline - enable parallel execution"),
+                llvm::cl::init(false));
 
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
@@ -375,9 +381,10 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(arith::createArithExpandOpsPass());
+  if (defParallel)
+    passManager.addPass(createConvertSCFToOpenMPPass());
   passManager.addPass(createConvertVectorToSCFPass());
-  passManager.addPass(createConvertSCFToCFPass());
+  passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createLowerAffinePass());
 
   // Print IR of optimized kernel and main
@@ -386,9 +393,12 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
 
   // Lower to LLVM
   passManager.addPass(createConvertVectorToLLVMPass());
-  passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
+  passManager.addPass(createConvertSCFToCFPass());
+  if (defParallel)
+    passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
+  passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
