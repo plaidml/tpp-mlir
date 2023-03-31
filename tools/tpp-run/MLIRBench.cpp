@@ -28,6 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 
 #include "TPP/BuilderUtils.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
@@ -36,6 +37,11 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
+
+llvm::cl::opt<bool>
+    defParallel("def-parallel",
+                llvm::cl::desc("Default pipeline - enable parallel execution"),
+                llvm::cl::init(false));
 
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
@@ -375,7 +381,8 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(tpp::createConvertPerfToFuncPass());
   passManager.addPass(createConvertTensorToLinalgPass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addPass(createConvertSCFToOpenMPPass());
+  if (defParallel)
+    passManager.addPass(createConvertSCFToOpenMPPass());
   passManager.addPass(createConvertVectorToSCFPass());
   passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createLowerAffinePass());
@@ -388,7 +395,8 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(createConvertVectorToLLVMPass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createConvertSCFToCFPass());
-  passManager.addPass(createConvertOpenMPToLLVMPass());
+  if (defParallel)
+    passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
