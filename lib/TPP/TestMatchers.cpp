@@ -36,9 +36,9 @@ void testMatmul(FunctionOpInterface funcOp) {
     StructuredOpMatcher::make<linalg::MatmulOp>()
       .operation(HasTensorSemantics())
       .operation(NumDpsInputs(EqualsTo(2)))
-      .input(AllOperands(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape())
       .operation(NumDpsInits(EqualsTo(1)))
-      .output(AllOperands(), HasStaticShape());
+      .output(MatchAll(), HasStaticShape());
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -55,11 +55,11 @@ void testVnniBrgemm(FunctionOpInterface funcOp) {
     StructuredOpMatcher::make<linalg::GenericOp>()
       .operation(HasTensorSemantics())
       .operation(NumDpsInputs(EqualsTo(2)))
-      .input(AllOperands(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape())
       .operation(NumDpsInits(EqualsTo(1)))
-      .output(AllOperands(), HasStaticShape())
+      .output(MatchAll(), HasStaticShape())
       .operation(NumOfLoops(GreaterThanOrEqualTo(5)))
-      .dim(RangeDims(/*lowerBound=*/0, /*upperBound=*/5), 
+      .dim(MatchRange(/*lowerBound=*/0, /*upperBound=*/5),
                      {utils::IteratorType::reduction,
                       utils::IteratorType::parallel,
                       utils::IteratorType::parallel,
@@ -82,14 +82,15 @@ void testTppAdd(FunctionOpInterface funcOp) {
     StructuredOpMatcher::make<linalg::GenericOp>()
       .operation(HasBufferSemantics())
       .operation(NumDpsInputs(EqualsTo(2)))
-      .input(AllOperands(), HasStaticShape())
-      .input(AllOperands(), HasMap(Identity()))
+      .operation(NumRegions(EqualsTo(1)))
+      .input(MatchAll(), HasStaticShape())
+      .input(MatchAll(), HasMap(Identity()))
       .operation(NumDpsInits(EqualsTo(1)))
-      .output(AllOperands(), HasStaticShape())
-      .output(AllOperands(), HasMap(Identity()))
+      .output(MatchAll(), HasStaticShape())
+      .output(MatchAll(), HasMap(Identity()))
       .operation(NumOfLoops(LessThanOrEqualTo(2)))
-      .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
-      .region(WithSingleOp<arith::AddFOp>(), &operands);
+      .dim(MatchAll(), utils::IteratorType::parallel)
+      .region(MatchOne(0), WithSingleOp<arith::AddFOp>(&operands));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -139,14 +140,15 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .operation(HasBufferSemantics())
       .operation(NumDpsInits(EqualsTo(1)))
       .operation(NumDpsInputs(_OR(EqualsTo(1), EqualsTo(0))))
-      .dim(RangeDims(AllDims()), utils::IteratorType::parallel)
-      .output(AllOperands(), HasStaticShape())
-      .input(AllOperands(), HasStaticShape())
-      .output(AllOperands(), HasMap(Identity()))
-      .input(AllOperands(), HasMap(ProjectedPermutation()))
+      .operation(NumRegions(EqualsTo(1)))
+      .dim(MatchAll(), utils::IteratorType::parallel)
+      .output(MatchAll(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape())
+      .output(MatchAll(), HasMap(Identity()))
+      .input(MatchAll(), HasMap(ProjectedPermutation()))
       .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop))
       .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape))
-      .region(WithSingleOp<linalg::YieldOp>(), &operands);
+      .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&operands));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
