@@ -88,14 +88,8 @@ mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
       inputOperandTypes.push_back(operandTypes[idx]);
     }
   }
-  Type resultOrOutType;
-  if (hasTensorSemantics(op)) {
-    assert(op->getNumResults() == 1);
-    resultOrOutType = op->getResultTypes()[0];
-  } else {
-    resultOrOutType = operandTypes[operandTypes.size() - 1];
-  }
-
+  Type resultOrOutType =
+      hasTensorSemantics(op) ? op.getResultType() : op.getOutputType();
   return verifyCompatibleOperandBroadcast(op, inputOperandTypes,
                                           resultOrOutType, emitDiagnostic);
 }

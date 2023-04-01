@@ -92,6 +92,8 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
       assert(getResults().size() == 1 && "Expect single result");
       return getResults()[0];
     }
+    Type getOutputType() { return getOutput().getType(); }
+    Type getResultType() { return getResult().getType(); }
   }];
 
   let builders = [
@@ -116,7 +118,11 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
 
     tpp.identity ins(%1: memref<2x2xf32>) outs(%2: memref<2x2xf32>)
     
+    // bcast
     tpp.identity ins(%1: f32) outs(%2: memref<2x2xf32>)
+
+    // tensor
+    %0 = tpp.identity (%1: tensor<3x3xf32>) -> tensor<3x3xf32>
 
     ```
   }];
@@ -145,6 +151,9 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
     // bcast
     tpp.relu ins(%0: memref<4xf32>) outs(%1: memref<2x4xf32>)
 
+    // tensor
+    %0 = tpp.relu (%0: tensor<4xf32>) -> tensor<4xf32>
+
     ```
   }];
 }
@@ -159,17 +168,26 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
                                         UnitStrideInnerLoop])> {
 
   let arguments = (ins TppInputOperand:$lhs, TppInputOperand:$rhs, 
-                       Variadic<TppOutputOperand>:$outs);
+                       Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
   let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
-    Value getOut() {
+    // Get the output buffer.
+    Value getOutput() {
       assert(getResults().empty() && "Expect buffer semantics");
-      assert(getOuts().size() == 1 && "Expect single output");
-      return getOuts()[0]; 
+      assert(getOutputs().size() == 1 && "Expect single output");
+      return getOutputs()[0]; 
     }
+    // Get the result tensor.
+    Value getResult() {
+      assert(!getResults().empty() && "Expect tensor semantics");
+      assert(getResults().size() == 1 && "Expect single result");
+      return getResults()[0];
+    }
+    Value getOutputType() { return getOutput().getType(); }
+    Value getResultType() { return getResult().getType(); }
   }];
 
   let builders = [
