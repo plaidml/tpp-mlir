@@ -116,12 +116,13 @@ def Tpp_IdentityOp : Tpp_UnaryOp<"identity"> {
 
     ```mlir
 
+    // out-of-place - memref abstraction.
     tpp.identity ins(%1: memref<2x2xf32>) outs(%2: memref<2x2xf32>)
     
-    // bcast
+    // bcast - memref abstraction.
     tpp.identity ins(%1: f32) outs(%2: memref<2x2xf32>)
 
-    // tensor
+    // tensor abstraction.
     %0 = tpp.identity (%1: tensor<3x3xf32>) -> tensor<3x3xf32>
 
     ```
@@ -142,16 +143,16 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 
     ```mlir
 
-    // out-of-place.
+    // out-of-place - memref abstraction.
     tpp.relu ins(%0: memref<2x2xf32>) outs(%1: memref<2x2xf32>)
 
-    // in-place.
+    // in-place - memref abstraction.
     tpp.relu ins(%0: memref<2x2xf32>) outs(%0: memref<2x2xf32>)
 
-    // bcast
+    // bcast - memref abstraction.
     tpp.relu ins(%0: memref<4xf32>) outs(%1: memref<2x4xf32>)
 
-    // tensor
+    // tensor abstraction.
     %0 = tpp.relu (%0: tensor<4xf32>) -> tensor<4xf32>
 
     ```
@@ -214,23 +215,23 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 
     ```mlir
 
-    // A = A + A - memref abstraction
+    // A = A + A - memref abstraction.
     tpp.add ins(%1: memref<2x2xf32>, %1: memref<2x2xf32>)
             outs(%1: memref<2x2xf32>)
 
-    // B = A + B - memref abstraction
+    // B = A + B - memref abstraction.
     tpp.add ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) 
             outs(%2: memref<2x2xf32>)
 
-    // C = A + B - memref abstraction
+    // C = A + B - memref abstraction.
     tpp.add ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
             outs(%3: memref<2x2xf32>)
 
-    // bcast
+    // bcast.
     tpp.add ins(%1: memref<1x3xf32>, %2: memref<3xf32>)
             outs(%3: memref<3x3xf32>) 
 
-    // tensor abstraction
+    // tensor abstraction.
     tpp.add (%1: tensor<3x3xf32>, %2: tensor<3x3xf32>) -> tensor<3x3xf32>
 
     ```
