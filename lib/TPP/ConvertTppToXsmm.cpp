@@ -96,9 +96,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
-    MemRefType memrefC = matmulOp.getMatrixCType();
-    MemRefType memrefA = matmulOp.getMatrixAType();
-    MemRefType memrefB = matmulOp.getMatrixBType();
+    auto memrefC = matmulOp.getMemrefCType();
+    auto memrefA = matmulOp.getMemrefAType();
+    auto memrefB = matmulOp.getMemrefBType();
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[1];
@@ -207,9 +207,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
 
-    MemRefType memrefC = brgemmOp.getMatrixCType();
-    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
-    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
+    auto memrefC = brgemmOp.getMemrefCType();
+    auto memrefA = brgemmOp.getMemrefAType();
+    auto memrefB = brgemmOp.getMemrefBType();
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[2];

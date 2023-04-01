@@ -18,13 +18,177 @@ using namespace mlir;
 using namespace mlir::tpp;
 
 //===----------------------------------------------------------------------===//
+// Utils
+//===----------------------------------------------------------------------===//
+
+static void printCommaSeparatedList(OpAsmPrinter &printer, ValueRange values) {
+  printer << '(';
+  for (auto [idx, value] : llvm::enumerate(values)) {
+    printer << value << " : " << value.getType();
+    if (idx != values.size() - 1)
+      printer << ", ";
+  }
+  printer << ')';
+}
+
+static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand> operands;
+  SmallVector<Type> operandsTypes;
+
+  bool isMemRef = false;
+  if (succeeded(parser.parseOptionalKeyword("ins")))
+    isMemRef = true;
+
+  // Parse operands.
+  SmallVector<llvm::SMLoc> locsOperands;
+  auto parseOperand = [&]() -> ParseResult {
+    locsOperands.push_back(parser.getCurrentLocation());
+    if (parser.parseOperand(operands.emplace_back()) ||
+        parser.parseColonType(operandsTypes.emplace_back()))
+      return failure();
+    return success();
+  };
+
+  if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren,
+                                     parseOperand)) {
+    return failure();
+  }
+
+  if (isMemRef) {
+    if (parser.parseKeyword("outs") || parser.parseLParen() ||
+        parser.parseOperand(operands.emplace_back()) ||
+        parser.parseColonType(operandsTypes.emplace_back()) ||
+        parser.parseRParen())
+      return failure();
+  } else {
+    // Parse result types.
+    SmallVector<Type> resultTypes;
+    llvm::SMLoc resultTypeLoc = parser.getCurrentLocation();
+    if (parser.parseArrowTypeList(resultTypes) ||
+        parser.addTypesToList(resultTypes, result.types))
+      return failure();
+
+    if (resultTypes.size() != 1) {
+      return parser.emitError(resultTypeLoc,
+                              "expect single result at tensor abstraction");
+    }
+  }
+
+  // Validate operands.
+  for (auto [idx, operand] : llvm::enumerate(operands)) {
+    if (parser.resolveOperand(operand, operandsTypes[idx], result.operands))
+      return failure();
+    if (isMemRef && operandsTypes[idx].isa<RankedTensorType>())
+      return parser.emitError(locsOperands[idx], "expect memref type");
+
+    if (!isMemRef && operandsTypes[idx].isa<MemRefType>())
+      return parser.emitError(locsOperands[idx], "expect tensor type");
+  }
+
+  NamedAttrList attrs;
+  if (parser.parseOptionalAttrDictWithKeyword(attrs))
+    return failure();
+  result.addAttributes(attrs);
+  return success();
+}
+
+void printTppOp(OpAsmPrinter &printer, ValueRange operands, Optional<Value> out,
+                TypeRange results, Operation *op) {
+  printer << ' ';
+  if (results.empty()) {
+    printer << "ins";
+    printCommaSeparatedList(printer, operands);
+    printer << ' ';
+    printer << "outs";
+    printCommaSeparatedList(printer, {*out});
+  } else {
+    printCommaSeparatedList(printer, operands);
+    printer << " -> (" << results << ")";
+  }
+  printer.printOptionalAttrDict((op)->getAttrs());
+}
+
+// Ternay op are += thus we need to pass `C` also at the tensor level.
+void printTernaryTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
+                       TypeRange results, Operation *op) {
+  printer << ' ';
+  if (results.empty()) {
+    printer << "ins";
+    printCommaSeparatedList(printer, operands);
+    printer << ' ';
+    printer << "outs";
+    printCommaSeparatedList(printer, {out});
+  } else {
+    SmallVector<Value> tensorOperands = llvm::to_vector(operands);
+    tensorOperands.emplace_back(out);
+    printCommaSeparatedList(printer, ValueRange{tensorOperands});
+    printer << " -> (" << results << ")";
+  }
+  printer.printOptionalAttrDict((op)->getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// IdentityOp
+//===----------------------------------------------------------------------===//
+
+void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
+                       Value output) {
+  return IdentityOp::build(builder, result, /*TypeRange=*/{}, input, output);
+}
+
+void IdentityOp::print(OpAsmPrinter &printer) {
+  printTppOp(printer, ValueRange{getInput()}, getOutput(), getResultTypes(),
+             *this);
+}
+
+ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+//===----------------------------------------------------------------------===//
+// ReluOp
+//===----------------------------------------------------------------------===//
+
+void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
+                   Value output) {
+  return ReluOp::build(builder, result, /*TypeRange=*/{}, input, output);
+}
+
+void ReluOp::print(OpAsmPrinter &printer) {
+  printTppOp(printer, ValueRange{getInput()}, getOutput(), getResultTypes(),
+             *this);
+}
+
+ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+//===----------------------------------------------------------------------===//
+// AdddOp
+//===----------------------------------------------------------------------===//
+
+void AddOp::build(OpBuilder &builder, OperationState &result, Value lhs,
+                  Value rhs, Value out) {
+  return AddOp::build(builder, result, /*TypeRange=*/{}, lhs, rhs, out);
+}
+
+void AddOp::print(OpAsmPrinter &printer) {
+  printTppOp(printer, ValueRange{getLhs(), getRhs()}, getOut(),
+             getResultTypes(), *this);
+}
+
+ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+//===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
 
-static bool verifyMatmulShape(MemRefType memrefA, MemRefType memrefB,
-                              MemRefType memrefC) {
-  return !(memrefB.getRank() != 2 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 2);
+static bool verifyMatmulShape(ShapedType shapedA, ShapedType shapedB,
+                              ShapedType shapedC) {
+  return !(shapedB.getRank() != 2 || shapedC.getRank() != 2 ||
+           shapedA.getRank() != 2);
 }
 
 static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
@@ -39,53 +203,77 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
 
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
-  MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
-  MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
-  MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
-  if (!verifyMatmulShape(memrefA, memrefB, memrefC))
+  auto shapedA = getAType();
+  auto shapedB = getBType();
+  auto shapedC = getCType();
+  if (!verifyMatmulShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
-  if (!verifyMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
-                                memrefC.getShape()))
+  if (!verifyMatmulOperandsDims(shapedA.getShape(), shapedB.getShape(),
+                                shapedC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
 
 void MatmulOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  MatmulOp::build(builder, state, inputs[0], inputs[1], output);
+  MatmulOp::build(builder, state, /*TypeRange=*/{}, inputs[0], inputs[1],
+                  output);
+}
+
+ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+void MatmulOp::print(OpAsmPrinter &printer) {
+  printTernaryTppOp(printer, ValueRange{getShapedA(), getShapedB()},
+                    getShapedC(), getResultTypes(), *this);
 }
 
 //===----------------------------------------------------------------------===//
 // BrgemmOp
 //===----------------------------------------------------------------------===//
 
-static bool verifyBRGemmShape(MemRefType memrefA, MemRefType memrefB,
-                              MemRefType memrefC) {
-  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 3);
+static bool verifyBRGemmShape(ShapedType shapedA, ShapedType shapedB,
+                              ShapedType shapedC) {
+  return !(shapedB.getRank() != 3 || shapedC.getRank() != 2 ||
+           shapedA.getRank() != 3);
 }
 
 LogicalResult BrgemmOp::verify() {
-  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
-  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
-  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
-  if (!verifyBRGemmShape(tensorA, tensorB, matrixC))
+  auto shapedA = getShapedA().getType().cast<ShapedType>();
+  auto shapedB = getShapedB().getType().cast<ShapedType>();
+  auto shapedC = getShapedC().getType().cast<ShapedType>();
+  if (!verifyBRGemmShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.
-  if (tensorA.getShape()[0] != tensorB.getShape()[0])
+  if (shapedA.getShape()[0] != shapedB.getShape()[0])
     return emitOpError("fails to verify operands dimensions mismatch");
   // Check all others that must be 'matmul' like.
-  if (!verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
-                                tensorB.getShape().drop_front(),
-                                matrixC.getShape()))
+  if (!verifyMatmulOperandsDims(shapedA.getShape().drop_front(),
+                                shapedB.getShape().drop_front(),
+                                shapedC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  BrgemmOp::build(builder, state, inputs[0], inputs[1], output);
+  BrgemmOp::build(builder, state, /*TypeRange=*/{}, inputs[0], inputs[1],
+                  output);
 }
+
+ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+void BrgemmOp::print(OpAsmPrinter &printer) {
+  printTernaryTppOp(printer, ValueRange{getShapedA(), getShapedB()},
+                    getShapedC(), getResultTypes(), *this);
+}
+
+//===----------------------------------------------------------------------===//
+// FusedBrgemmOp
+//===----------------------------------------------------------------------===//
 
 LogicalResult FusedBrgemmOp::verify() {
   MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
@@ -175,6 +363,10 @@ void VNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
                          ValueRange inputs, Value output) {
   VNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], output);
 }
+
+//===----------------------------------------------------------------------===//
+// FusedVNNIBrgemmOp
+//===----------------------------------------------------------------------===//
 
 LogicalResult FusedVNNIBrgemmOp::verify() {
   MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();

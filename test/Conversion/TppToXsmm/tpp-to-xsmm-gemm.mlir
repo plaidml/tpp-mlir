@@ -8,16 +8,3 @@ func.func @matmul_to_xsmm(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2:
   tpp.matmul ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg2: memref<3x3xf32>)
   return
 }
-
-// -----
-
-// Strides are non-constant expect to fail.
-func.func @tpp_matmul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
-                      %arg1: memref<9x6xf32, strided<[?, ?], offset: ?>>,
-                      %arg2: memref<12x6xf32, strided<[?, ?], offset: ?>>) {
-  // CHECK-NOT: xsmm.ternary matmul
-  tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
-                 %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>)
-             outs(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
-  return
-}

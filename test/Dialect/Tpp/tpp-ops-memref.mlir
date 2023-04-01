@@ -1,10 +1,10 @@
 // RUN: tpp-opt %s | tpp-opt | FileCheck %s
 
-// CHECK-LABEL: @myfunc
-func.func @myfunc(%arg0: memref<2x2xf32>,
-                  %arg1: memref<2x2xf32>,
-                  %arg2: memref<2x2xf32>, %arg3: f32, %arg4: f32,
-                  %arg5: memref<2xf32>, %arg6: memref<2xf32>) -> memref<2x2xf32> {
+// CHECK-LABEL: @tpp_dialect
+func.func @tpp_dialect(%arg0: memref<2x2xf32>,
+                       %arg1: memref<2x2xf32>,
+                       %arg2: memref<2x2xf32>, %arg3: f32, %arg4: f32,
+                       %arg5: memref<2xf32>, %arg6: memref<2xf32>) -> memref<2x2xf32> {
   // CHECK: tpp.add
   tpp.add ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg2: memref<2x2xf32>)
 

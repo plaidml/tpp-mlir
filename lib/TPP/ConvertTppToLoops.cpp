@@ -202,9 +202,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
-    ArrayRef<int64_t> shapeC = matmulOp.getMatrixCType().getShape();
-    ArrayRef<int64_t> shapeB = matmulOp.getMatrixBType().getShape();
-    ArrayRef<int64_t> shapeA = matmulOp.getMatrixAType().getShape();
+    ArrayRef<int64_t> shapeC = matmulOp.getMemrefCType().getShape();
+    ArrayRef<int64_t> shapeB = matmulOp.getMemrefBType().getShape();
+    ArrayRef<int64_t> shapeA = matmulOp.getMemrefAType().getShape();
     if (shapeB.size() == 3)
       return rewriter.notifyMatchFailure(matmulOp, "Packed BF16 loops unsupported");
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
@@ -223,15 +223,15 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
           Value localI = localIvs[0];
           Value localJ = localIvs[1];
           Value localK = localIvs[2];
-          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getMatrixA(),
+          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getShapedA(),
                                                    ValueRange{localI, localK});
-          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getMatrixB(),
+          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getShapedB(),
                                                    ValueRange{localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getMatrixC(),
+          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getShapedC(),
                                                    ValueRange{localI, localJ});
           Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
           Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
-          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.getMatrixC(),
+          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.getShapedC(),
                                     ValueRange{localI, localJ});
         });
 
@@ -247,8 +247,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
-    ArrayRef<int64_t> shapeC = brgemmOp.getMatrixCType().getShape();
-    ArrayRef<int64_t> shapeA = brgemmOp.getBatchMatrixAType().getShape();
+    ArrayRef<int64_t> shapeC = brgemmOp.getMemrefCType().getShape();
+    ArrayRef<int64_t> shapeA = brgemmOp.getMemrefAType().getShape();
     Value i = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[2]);
@@ -267,17 +267,15 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
           Value localI = localIvs[1];
           Value localJ = localIvs[2];
           Value localK = localIvs[3];
-          Value scalarA =
-              b.create<memref::LoadOp>(loc, brgemmOp.getBatchMatrixA(),
-                                       ValueRange{localB, localI, localK});
-          Value scalarB =
-              b.create<memref::LoadOp>(loc, brgemmOp.getBatchMatrixB(),
-                                       ValueRange{localB, localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getMatrixC(),
+          Value scalarA = b.create<memref::LoadOp>(
+              loc, brgemmOp.getShapedA(), ValueRange{localB, localI, localK});
+          Value scalarB = b.create<memref::LoadOp>(
+              loc, brgemmOp.getShapedB(), ValueRange{localB, localK, localJ});
+          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getShapedC(),
                                                    ValueRange{localI, localJ});
           Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
           Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
-          b.create<memref::StoreOp>(loc, scalarAdd, brgemmOp.getMatrixC(),
+          b.create<memref::StoreOp>(loc, scalarAdd, brgemmOp.getShapedC(),
                                     ValueRange{localI, localJ});
         });
     rewriter.eraseOp(brgemmOp);

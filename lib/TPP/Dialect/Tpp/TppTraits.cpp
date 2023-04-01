@@ -64,6 +64,16 @@ static LogicalResult verifyCompatibleOperandBroadcast(Operation *op,
   return success();
 }
 
+static bool hasTensorSemantics(Operation *op) {
+
+  auto isaTensor = [](Type t) -> bool { return t.isa<RankedTensorType>(); };
+
+  bool hasTensorResult = any_of(op->getResultTypes(), isaTensor);
+  bool hasTensorOperand = any_of(op->getOperandTypes(), isaTensor);
+  return hasTensorResult || hasTensorOperand;
+}
+
+// TODO: this is not correct now. We need to check the result.
 LogicalResult
 mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
                                              bool emitDiagnostic) {
@@ -83,13 +93,16 @@ mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
 LogicalResult
 mlir::OpTrait::tpp::verifyUnitStrideInnerLoop(Operation *op,
                                               bool emitDiagnostic) {
+  if (hasTensorSemantics(op))
+    return success();
+
   SmallVector<int64_t> strides;
   int64_t offset;
   for (auto [idx, operand] : llvm::enumerate(op->getOperands())) {
     auto operandType = operand.getType();
     // Non-shaped type return success.
     if (!isa<ShapedType>(operandType))
-      return success();
+      continue;
     if (failed(getStridesAndOffset(operandType.cast<MemRefType>(), strides,
                                    offset))) {
       if (emitDiagnostic)
