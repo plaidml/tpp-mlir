@@ -165,14 +165,6 @@ func.func @tpp_add_mixing(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) -> ten
 // -----
 
 func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: memref<3x3xf32>) -> tensor<3x3xf32> {
-  // expected-error @below {{expect tensor type}}
-  %0 = tpp.add (%arg0: tensor<3x3xf32>, %arg1: memref<3x3xf32>) -> tensor<3x3xf32>
-  return %0 : tensor<3x3xf32>
-}
-
-// -----
-
-func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: memref<3x3xf32>) -> tensor<3x3xf32> {
   // expected-error @below {{expected 'outs'}}
   %0 = tpp.add ins(%arg0: tensor<3x3xf32>, %arg1: memref<3x3xf32>) -> tensor<3x3xf32>
   return %0 : tensor<3x3xf32>

@@ -74,13 +74,13 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
     }
   }
 
-  // Validate operands.
+  // Validate operands. Scan each operand one-by-one to emit
+  // better diagnostic.
   for (auto [idx, operand] : llvm::enumerate(operands)) {
     if (parser.resolveOperand(operand, operandsTypes[idx], result.operands))
       return failure();
     if (isMemRef && operandsTypes[idx].isa<RankedTensorType>())
       return parser.emitError(locsOperands[idx], "expect memref type");
-
     if (!isMemRef && operandsTypes[idx].isa<MemRefType>())
       return parser.emitError(locsOperands[idx], "expect tensor type");
   }

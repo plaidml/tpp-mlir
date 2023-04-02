@@ -211,7 +211,7 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
     result at tensor abstraction). At memref, no checks or assumption are made on
     the input/output arguments so the same memref can be passed both as input and
     output. At tensor level the operation produces a new tensor. In both cases, the
-    op supports broadcast semantic based on Numpy rules. 
+    op supports broadcast semantic see `BroadcastableShape` rules. 
 
     Example:
 
