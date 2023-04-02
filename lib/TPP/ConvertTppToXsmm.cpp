@@ -689,7 +689,7 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = addOp.getOut().getType();
+    Type outputType = addOp.getOutputType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
     auto outputMemRef = outputType.cast<MemRefType>();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&

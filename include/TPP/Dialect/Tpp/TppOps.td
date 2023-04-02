@@ -94,6 +94,7 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
     }
     Type getOutputType() { return getOutput().getType(); }
     Type getResultType() { return getResult().getType(); }
+    bool hasTensorSemantics() { return getResults().size() == 1; }
   }];
 
   let builders = [
@@ -187,8 +188,9 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
       assert(getResults().size() == 1 && "Expect single result");
       return getResults()[0];
     }
-    Value getOutputType() { return getOutput().getType(); }
-    Value getResultType() { return getResult().getType(); }
+    Type getOutputType() { return getOutput().getType(); }
+    Type getResultType() { return getResult().getType(); }
+    bool hasTensorSemantics() { return getResults().size() == 1; }
   }];
 
   let builders = [

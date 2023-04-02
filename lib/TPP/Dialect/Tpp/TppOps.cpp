@@ -92,25 +92,11 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-void printTppOp(OpAsmPrinter &printer, ValueRange operands, Optional<Value> out,
-                TypeRange results, Operation *op) {
-  printer << ' ';
-  if (results.empty()) {
-    printer << "ins";
-    printCommaSeparatedList(printer, operands);
-    printer << ' ';
-    printer << "outs";
-    printCommaSeparatedList(printer, {*out});
-  } else {
-    printCommaSeparatedList(printer, operands);
-    printer << " -> (" << results << ")";
-  }
-  printer.printOptionalAttrDict((op)->getAttrs());
-}
-
-// Ternay op are += thus we need to pass `C` also at the tensor level.
-void printTernaryTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
-                       TypeRange results, Operation *op) {
+// Print a tpp op. Note that `out` can be null. It is null for unary and binary
+// at tensor abstraction. Ternary operations have `out` also at tensor
+// abstraction.
+void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
+                TypeRange results, Operation *op, bool isTernary = false) {
   printer << ' ';
   if (results.empty()) {
     printer << "ins";
@@ -120,8 +106,10 @@ void printTernaryTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
     printCommaSeparatedList(printer, {out});
   } else {
     SmallVector<Value> tensorOperands = llvm::to_vector(operands);
-    tensorOperands.emplace_back(out);
-    printCommaSeparatedList(printer, ValueRange{tensorOperands});
+    // Ternay op are += thus we need to pass `C` also at the tensor level.
+    if (isTernary)
+      tensorOperands.emplace_back(out);
+    printCommaSeparatedList(printer, tensorOperands);
     printer << " -> (" << results << ")";
   }
   printer.printOptionalAttrDict((op)->getAttrs());
@@ -137,8 +125,8 @@ void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
 }
 
 void IdentityOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, ValueRange{getInput()}, getOutput(), getResultTypes(),
-             *this);
+  Value output = hasTensorSemantics() ? Value() : getOutput();
+  printTppOp(printer, ValueRange{getInput()}, output, getResultTypes(), *this);
 }
 
 ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -155,8 +143,8 @@ void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
 }
 
 void ReluOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, ValueRange{getInput()}, getOutput(), getResultTypes(),
-             *this);
+  Value output = hasTensorSemantics() ? Value() : getOutput();
+  printTppOp(printer, ValueRange{getInput()}, output, getResultTypes(), *this);
 }
 
 ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -173,8 +161,9 @@ void AddOp::build(OpBuilder &builder, OperationState &result, Value lhs,
 }
 
 void AddOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, ValueRange{getLhs(), getRhs()}, getOut(),
-             getResultTypes(), *this);
+  Value output = hasTensorSemantics() ? Value() : getOutput();
+  printTppOp(printer, ValueRange{getLhs(), getRhs()}, output, getResultTypes(),
+             *this);
 }
 
 ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -225,8 +214,8 @@ ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void MatmulOp::print(OpAsmPrinter &printer) {
-  printTernaryTppOp(printer, ValueRange{getShapedA(), getShapedB()},
-                    getShapedC(), getResultTypes(), *this);
+  printTppOp(printer, ValueRange{getShapedA(), getShapedB()}, getShapedC(),
+             getResultTypes(), *this, /*isTernary=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -267,8 +256,8 @@ ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void BrgemmOp::print(OpAsmPrinter &printer) {
-  printTernaryTppOp(printer, ValueRange{getShapedA(), getShapedB()},
-                    getShapedC(), getResultTypes(), *this);
+  printTppOp(printer, ValueRange{getShapedA(), getShapedB()}, getShapedC(),
+             getResultTypes(), *this, /*isTernary=*/true);
 }
 
 //===----------------------------------------------------------------------===//
