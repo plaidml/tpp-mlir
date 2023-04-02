@@ -94,8 +94,8 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
 
 // Print a tpp op. Note that `out` can be null. It is null for unary and binary
 // at tensor abstraction. Ternary operations have `out` also at tensor
-// abstraction.
-void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
+// abstraction, that is the init value (ternary ops are +=).
+static void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
                 TypeRange results, Operation *op, bool isTernary = false) {
   printer << ' ';
   if (results.empty()) {
