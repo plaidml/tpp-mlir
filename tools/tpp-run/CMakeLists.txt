@@ -43,7 +43,7 @@ target_link_options(tpp-run PRIVATE
   -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
-  -fopenmp
+  -lomp
   -Wl,--as-needed
 )
 
