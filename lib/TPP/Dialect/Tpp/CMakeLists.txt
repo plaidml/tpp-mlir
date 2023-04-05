@@ -14,6 +14,7 @@ add_mlir_dialect_library(TPPTppDialect
     MLIRTppOpsIncGen
     MLIRTppAttrDefIncGen
     TPPIR
+    MLIRTppInterfacesIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR

@@ -9,10 +9,11 @@
 #ifndef TPP_TPP_OPS
 #define TPP_TPP_OPS
 
-include "TppDialect.td"
+include "TPP/Dialect/Tpp/TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "TppAttr.td"
+include "TPP/Dialect/Tpp/TppAttr.td"
+include "TPP/Dialect/Tpp/TppInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
@@ -71,31 +72,14 @@ def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
                                         SameOperandsElementType,
-                                        UnitStrideInnerLoop])> {
+                                        UnitStrideInnerLoop,
+                                        TppOpInterface])> {
   
   let arguments = (ins TppInputOperand:$input, 
                        Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
-  let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    // Get the output buffer. 
-    Value getOutput() {
-      assert(getResults().empty() && "Expect buffer semantics");
-      assert(getOutputs().size() == 1 && "Expect single output");
-      return getOutputs()[0];
-    }
-    // Get the result tensor.
-    Value getResult() {
-      assert(!getResults().empty() && "Expect tensor semantics");
-      assert(getResults().size() == 1 && "Expect single result");
-      return getResults()[0];
-    }
-    Type getOutputType() { return getOutput().getType(); }
-    Type getResultType() { return getResult().getType(); }
-    bool hasTensorSemantics() { return getResults().size() == 1; }
-  }];
+  let hasCustomAssemblyFormat = 1; 
 
   let builders = [
     // Memref builder.
@@ -167,31 +151,14 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
                                         SameOperandsElementType, 
-                                        UnitStrideInnerLoop])> {
+                                        UnitStrideInnerLoop,
+                                        TppOpInterface])> {
 
   let arguments = (ins TppInputOperand:$lhs, TppInputOperand:$rhs, 
                        Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
   let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    // Get the output buffer.
-    Value getOutput() {
-      assert(getResults().empty() && "Expect buffer semantics");
-      assert(getOutputs().size() == 1 && "Expect single output");
-      return getOutputs()[0]; 
-    }
-    // Get the result tensor.
-    Value getResult() {
-      assert(!getResults().empty() && "Expect tensor semantics");
-      assert(getResults().size() == 1 && "Expect single result");
-      return getResults()[0];
-    }
-    Type getOutputType() { return getOutput().getType(); }
-    Type getResultType() { return getResult().getType(); }
-    bool hasTensorSemantics() { return getResults().size() == 1; }
-  }];
 
   let builders = [
     // Memref builder.
