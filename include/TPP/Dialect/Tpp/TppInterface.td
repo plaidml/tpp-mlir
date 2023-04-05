@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_IR_LINALGINTERFACES
-#define TPP_IR_LINALGINTERFACES
+#ifndef TPP_DIALECT_LINALGINTERFACES
+#define TPP_DIALECT_LINALGINTERFACES
 
 include "mlir/IR/OpBase.td"
 include "TPP/Dialect/Tpp/TppDialect.td"
@@ -72,4 +72,4 @@ def TppOpInterface : OpInterface<"TppOp"> {
   ];
 }
 
-#endif // TPP_IR_LINALGINTERFACES
+#endif // TPP_DIALECT_LINALGINTERFACES

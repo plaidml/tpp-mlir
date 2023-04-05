@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_DIALECT_TPP_IR_TPPINTERFACES_H_
-#define MLIR_DIALECT_TPP_IR_TPPINTERFACES_H_
+#ifndef MLIR_DIALECT_TPP_TPPINTERFACES_H_
+#define MLIR_DIALECT_TPP_TPPINTERFACES_H_
 
 #include "mlir/IR/OpDefinition.h"
 
 #include "TPP/Dialect/Tpp/TppInterfaces.h.inc"
 
-#endif // MLIR_DIALECT_TPP_IR_LINALGINTERFACES_H_
+#endif // MLIR_DIALECT_TPP_TPPINTERFACES_H_

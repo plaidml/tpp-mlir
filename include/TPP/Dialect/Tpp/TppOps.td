@@ -13,7 +13,7 @@ include "TPP/Dialect/Tpp/TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "TPP/Dialect/Tpp/TppAttr.td"
-include "TPP/Dialect/Tpp/TppInterfaces.td"
+include "TPP/Dialect/Tpp/TppInterface.td"
 include "mlir/IR/OpBase.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
