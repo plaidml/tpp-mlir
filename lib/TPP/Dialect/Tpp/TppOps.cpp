@@ -55,6 +55,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   }
 
   if (isMemRef) {
+    locsOperands.push_back(parser.getCurrentLocation());
     if (parser.parseKeyword("outs") || parser.parseLParen() ||
         parser.parseOperand(operands.emplace_back()) ||
         parser.parseColonType(operandsTypes.emplace_back()) ||

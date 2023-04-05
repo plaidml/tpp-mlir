@@ -245,3 +245,11 @@ func.func @tpp_add_check_broadcast_operand(%arg0: tensor<2x3xf32>, %arg1: tensor
   %0 = tpp.add (%arg0: tensor<2x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32>
   return %0 : tensor<3x3xf32>
 }
+
+// -----
+
+func.func @tpp_matmul(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) {
+  // expected-error @below {{expect memref type}}
+  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) outs(%arg2: tensor<2x2xf32>)
+  return
+}
