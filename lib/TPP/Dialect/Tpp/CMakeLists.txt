@@ -13,10 +13,12 @@ add_mlir_dialect_library(TPPTppDialect
     # add_mlir_dialect macro force-prefixes with MLIR
     MLIRTppOpsIncGen
     MLIRTppAttrDefIncGen
+    TPPIR
 
   LINK_LIBS PUBLIC
     MLIRIR
     MLIRInferTypeOpInterface
+    TPPIR
 )
 
 target_include_directories(TPPTppDialect

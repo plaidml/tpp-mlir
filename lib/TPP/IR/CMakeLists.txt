@@ -3,4 +3,7 @@ add_mlir_library(TPPIR
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
+
+  DEPENDS
+    MLIRLinalgDialect
 )
