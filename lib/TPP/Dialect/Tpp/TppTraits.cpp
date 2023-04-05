@@ -95,6 +95,8 @@ mlir::OpTrait::tpp::verifyBroadcastableShape(Operation *op,
                                           resultOrOutType, emitDiagnostic);
 }
 
+// TODO: refactor these interfaces to use the tpp op interface. Note
+// that we use the `check*` on linalg operations.
 // Verify all the operands have stride one in the fastest-varying dimension.
 LogicalResult
 mlir::OpTrait::tpp::verifyUnitStrideInnerLoop(Operation *op,

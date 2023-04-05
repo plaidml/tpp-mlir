@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_DIALECT_LINALGINTERFACES
-#define TPP_DIALECT_LINALGINTERFACES
+#ifndef TPP_DIALECT_TPPINTERFACES
+#define TPP_DIALECT_TPPINTERFACES
 
 include "mlir/IR/OpBase.td"
-include "TPP/Dialect/Tpp/TppDialect.td"
 
 def TppOpInterface : OpInterface<"TppOp"> {
   let cppNamespace = "::mlir::tpp";
@@ -72,4 +71,4 @@ def TppOpInterface : OpInterface<"TppOp"> {
   ];
 }
 
-#endif // TPP_DIALECT_LINALGINTERFACES
+#endif // TPP_DIALECT_TPPINTERFACES
