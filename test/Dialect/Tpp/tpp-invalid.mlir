@@ -253,3 +253,11 @@ func.func @tpp_matmul(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: ten
   tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) outs(%arg2: tensor<2x2xf32>)
   return
 }
+
+// -----
+
+func.func @tpp_add_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
+  // expected-error @below {{expects two operands as input}}
+  tpp.add ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
+  return
+}

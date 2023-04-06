@@ -96,9 +96,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
-    auto memrefC = matmulOp.getMemrefCType();
-    auto memrefA = matmulOp.getMemrefAType();
-    auto memrefB = matmulOp.getMemrefBType();
+    auto memrefC = matmulOp.getOutputType();
+    auto memrefA = matmulOp.getMemRefInputType(0);
+    auto memrefB = matmulOp.getMemRefInputType(1);
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[1];
@@ -112,7 +112,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    auto ldcDim = getLeadingDim(memrefC);
+    // TODO: update the tpp interface and remove the cast.
+    // `matmulOp.getOutputType` should return a memref.
+    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
@@ -207,9 +209,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
 
-    auto memrefC = brgemmOp.getMemrefCType();
-    auto memrefA = brgemmOp.getMemrefAType();
-    auto memrefB = brgemmOp.getMemrefBType();
+    auto memrefC = brgemmOp.getOutputType();
+    auto memrefA = brgemmOp.getMemRefInputType(0);
+    auto memrefB = brgemmOp.getMemRefInputType(1);
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[2];
@@ -224,7 +226,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    auto ldcDim = getLeadingDim(memrefC);
+    // TODO: update the tpp interface and remove the cast.
+    // `matmulOp.getOutputType` should return a memref.
+    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;

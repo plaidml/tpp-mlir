@@ -13,6 +13,7 @@
 #ifndef MLIR_DIALECT_TPP_TPPINTERFACE_H_
 #define MLIR_DIALECT_TPP_TPPINTERFACE_H_
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 
 #include "TPP/Dialect/Tpp/TppInterface.h.inc"

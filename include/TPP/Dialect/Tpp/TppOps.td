@@ -215,42 +215,21 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 //===----------------------------------------------------------------------===//
 
 class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [UnitStrideInnerLoop, 
-                                        SameOperandsElementType])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments, 
+                                        SameOperandsElementType,
+                                        UnitStrideInnerLoop,
+                                        TppOpInterface])> {
 
-  let arguments = (ins TppBrgemmOperand:$shapedA, TppBrgemmOperand:$shapedB, 
-                   TppBrgemmOperand:$shapedC);
+  let arguments = (ins Variadic<TppBrgemmOperand>:$inputs,
+                       Variadic<TppBrgemmOperand>:$outputs); 
   let results = (outs Variadic<TppBrgemmOperand>:$results);
 
   let hasCustomAssemblyFormat = 1;
 
   let builders = [
+    // Memref builder.
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
-  ];
-
-  code commonExtraClassDeclaration = [{
-    MemRefType getMemrefCType() {
-      assert(getShapedC().getType().isa<MemRefType>());
-      return getShapedC().getType().cast<MemRefType>();
-    }
-    MemRefType getMemrefAType() {
-      assert(getShapedA().getType().isa<MemRefType>());
-      return getShapedA().getType().cast<MemRefType>();
-    }
-    MemRefType getMemrefBType() {
-      assert(getShapedB().getType().isa<MemRefType>());
-      return getShapedB().getType().cast<MemRefType>();
-    }
-    ShapedType getCType() {
-      return getShapedC().getType().cast<ShapedType>();
-    }
-    ShapedType getAType() {
-      return getShapedA().getType().cast<ShapedType>();
-    }
-    ShapedType getBType() {
-      return getShapedB().getType().cast<ShapedType>();
-    }
-  }];
+  ]; 
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,18 +245,17 @@ def Tpp_MatmulOp : Tpp_TernaryOp<"matmul"> {
 
     ```mlir
 
-    // Memref abstraction
+    // Memref abstraction.
     tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
                outs(%3: memref<2x2xf32>)
 
-    // Tensor abstraction
+    // Tensor abstraction.
     %0 = tpp.matmul (%1: tensor<2x2xf32>, %2: tensor<2x2xf32>, 
                      %3: tensor<2x2xf32>) -> tensor<2x2xf32>
 
     ```
   }];
 
-  let extraClassDeclaration = commonExtraClassDeclaration;
   let hasVerifier = 1;
 }
 
@@ -294,17 +272,16 @@ def Tpp_BrgemmOp : Tpp_TernaryOp<"brgemm"> {
 
     ```mlir
 
-      // Memref abstraction
+      // Memref abstraction.
       tpp.brgemm ins(%1: memref<3x5x4xf32>, %2: memref<3x4x5xf32>)
                  outs(%3: memref<5x5xf32>)
 
-      // Tensor abstraction
+      // Tensor abstraction.
       %0 = tpp.brgemm (%1: tensor<3x5x4xf32>, %2: tensor<3x4x5xf32> 
                        %3: tensor<5x5xf32>) -> tensor<5x5xf32>
     ```
   }];
  
-  let extraClassDeclaration = commonExtraClassDeclaration; 
   let hasVerifier = 1;
 }
 

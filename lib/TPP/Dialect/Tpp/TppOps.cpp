@@ -103,8 +103,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
 }
 
 // Print a tpp op. Note that `out` can be null. It is null for unary and binary
-// at tensor abstraction. Ternary operations have `out` also at tensor
-// abstraction, that is the init value (ternary ops are +=).
+// at tensor abstraction.
 static void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
                 TypeRange results, Operation *op, bool isTernary = false) {
   printer << ' ';
@@ -115,11 +114,7 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
     printer << "outs";
     printCommaSeparatedList(printer, {out});
   } else {
-    SmallVector<Value> tensorOperands = llvm::to_vector(operands);
-    // Ternay op are += thus we need to pass `C` also at the tensor level.
-    if (isTernary)
-      tensorOperands.emplace_back(out);
-    printCommaSeparatedList(printer, tensorOperands);
+    printCommaSeparatedList(printer, operands);
     printer << " -> (" << results << ")";
   }
 }
@@ -207,9 +202,9 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
 
 // Check that op to be 2d matmul in row-major.
 LogicalResult MatmulOp::verify() {
-  auto shapedA = getAType();
-  auto shapedB = getBType();
-  auto shapedC = getCType();
+  auto shapedA = getInputs()[0].getType().cast<ShapedType>();
+  auto shapedB = getInputs()[1].getType().cast<ShapedType>();
+  auto shapedC = (hasTensorSemantics()) ? getResultType() : getOutputType();
   if (!verifyMatmulShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
   if (!verifyMatmulOperandsDims(shapedA.getShape(), shapedB.getShape(),
@@ -220,8 +215,7 @@ LogicalResult MatmulOp::verify() {
 
 void MatmulOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  MatmulOp::build(builder, state, /*TypeRange=*/{}, inputs[0], inputs[1],
-                  output);
+  MatmulOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
 }
 
 ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -229,8 +223,9 @@ ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void MatmulOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, ValueRange{getShapedA(), getShapedB()}, getShapedC(),
-             getResultTypes(), *this, /*isTernary=*/true);
+  Value output = (hasTensorSemantics()) ? Value() : getOutput();
+  printTppOp(printer, getInputs(), output, getResultTypes(), *this,
+             /*isTernary=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -244,9 +239,9 @@ static bool verifyBRGemmShape(ShapedType shapedA, ShapedType shapedB,
 }
 
 LogicalResult BrgemmOp::verify() {
-  auto shapedA = getShapedA().getType().cast<ShapedType>();
-  auto shapedB = getShapedB().getType().cast<ShapedType>();
-  auto shapedC = getShapedC().getType().cast<ShapedType>();
+  auto shapedA = getInputs()[0].getType().cast<ShapedType>();
+  auto shapedB = getInputs()[1].getType().cast<ShapedType>();
+  auto shapedC = (hasTensorSemantics()) ? getResultType() : getOutputType();
   if (!verifyBRGemmShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.
@@ -262,8 +257,7 @@ LogicalResult BrgemmOp::verify() {
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  BrgemmOp::build(builder, state, /*TypeRange=*/{}, inputs[0], inputs[1],
-                  output);
+  BrgemmOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
 }
 
 ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -271,8 +265,9 @@ ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void BrgemmOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, ValueRange{getShapedA(), getShapedB()}, getShapedC(),
-             getResultTypes(), *this, /*isTernary=*/true);
+  Value output = (hasTensorSemantics()) ? Value() : getOutput();
+  printTppOp(printer, getInputs(), output, getResultTypes(), *this,
+             /*isTernary=*/true);
 }
 
 //===----------------------------------------------------------------------===//

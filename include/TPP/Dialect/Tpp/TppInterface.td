@@ -44,28 +44,46 @@ def TppOpInterface : OpInterface<"TppOp"> {
       /*desc=*/[{
         Return the result type at tensor abstraction.
       }],
-      /*retTy=*/"Type",
+      /*retTy=*/"RankedTensorType",
       /*methodName*/"getResultType",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert($_op.getResults().size() == 1);
         assert($_op.hasTensorSemantics());
-        return $_op.getResult(0).getType();
+        return $_op.getResult(0).getType().template cast<RankedTensorType>();
       }]
     >, 
     InterfaceMethod<
       /*desc=*/[{
         Return the output type at buffer abstraction.
       }],
-      /*retTy=*/"Type",
+      /*retTy=*/"ShapedType",
       /*methodName*/"getOutputType",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
+        llvm::errs() << $_op.getOutputs().size() << "\n";
         assert($_op.getOutputs().size() == 1);
+        // TODO: this method should be at buffer level only
+        // Need to first update the ternary to be:
+        // tpp.matmul (A B C) (D)
+        return $_op.getOutputs()[0].getType().template cast<ShapedType>();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the input type as memref type.
+      }],
+      /*retTy=*/"MemRefType",
+      /*methodName*/"getMemRefInputType",
+      /*args=*/(ins "unsigned":$idx),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        assert(idx < opInputs.size());
         assert(!$_op.hasTensorSemantics());
-        return $_op.getOutputs()[0].getType();
+        return opInputs[idx].getType().template cast<MemRefType>();
       }]
     >
   ];
