@@ -96,9 +96,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
-    MemRefType memrefC = matmulOp.getMatrixCType();
-    MemRefType memrefA = matmulOp.getMatrixAType();
-    MemRefType memrefB = matmulOp.getMatrixBType();
+    auto memrefC = matmulOp.getOutputType();
+    auto memrefA = matmulOp.getMemRefInputType(0);
+    auto memrefB = matmulOp.getMemRefInputType(1);
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[1];
@@ -112,7 +112,9 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    auto ldcDim = getLeadingDim(memrefC);
+    // TODO: update the tpp interface and remove the cast.
+    // `matmulOp.getOutputType` should return a memref.
+    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
@@ -207,9 +209,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = brgemmOp.getLoc();
 
-    MemRefType memrefC = brgemmOp.getMatrixCType();
-    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
-    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
+    auto memrefC = brgemmOp.getOutputType();
+    auto memrefA = brgemmOp.getMemRefInputType(0);
+    auto memrefB = brgemmOp.getMemRefInputType(1);
     int64_t m = memrefC.getShape()[0];
     int64_t n = memrefC.getShape()[1];
     int64_t k = memrefA.getShape()[2];
@@ -224,7 +226,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    auto ldcDim = getLeadingDim(memrefC);
+    // TODO: update the tpp interface and remove the cast.
+    // `matmulOp.getOutputType` should return a memref.
+    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
@@ -509,7 +513,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   // Return ldi and bCast.
   std::pair<int64_t, xsmm::UnaryFlags>
   getLdiAndBCast(tpp::IdentityOp identityOp, int64_t ldo) const {
-    Type inputType = identityOp.getInput().getType();
+    Type inputType = identityOp.getInputs()[0].getType();
 
     // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
     // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
@@ -592,7 +596,7 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = reluOp.getInput().getType();
+    Type outputType = reluOp.getInputs()[0].getType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
 
     MemRefType outputMemRef = outputType.cast<MemRefType>();
@@ -689,7 +693,7 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = addOp.getOut().getType();
+    Type outputType = addOp.getOutputType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
     auto outputMemRef = outputType.cast<MemRefType>();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
@@ -699,8 +703,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
     int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
                                               : outputMemRef.getShape()[0];
 
-    auto lhsMemRef = addOp.getLhs().getType().cast<MemRefType>();
-    auto rhsMemRef = addOp.getRhs().getType().cast<MemRefType>();
+    auto lhsMemRef = addOp.getInputs()[0].getType().cast<MemRefType>();
+    auto rhsMemRef = addOp.getInputs()[1].getType().cast<MemRefType>();
 
     auto ldiLhsDim = getLeadingDim(lhsMemRef);
     if (failed(ldiLhsDim))
