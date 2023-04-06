@@ -104,15 +104,15 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
 
 // Print a tpp op. Note that `out` can be null. It is null for unary and binary
 // at tensor abstraction.
-static void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
-                TypeRange results, Operation *op, bool isTernary = false) {
+static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
+                       ValueRange outs, TypeRange results, Operation *op) {
   printer << ' ';
   if (results.empty()) {
     printer << "ins";
     printCommaSeparatedList(printer, operands);
     printer << ' ';
     printer << "outs";
-    printCommaSeparatedList(printer, {out});
+    printCommaSeparatedList(printer, outs);
   } else {
     printCommaSeparatedList(printer, operands);
     printer << " -> (" << results << ")";
@@ -129,8 +129,7 @@ void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
 }
 
 void IdentityOp::print(OpAsmPrinter &printer) {
-  Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
 ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -147,8 +146,7 @@ void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
 }
 
 void ReluOp::print(OpAsmPrinter &printer) {
-  Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
 ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -166,18 +164,11 @@ void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,
 }
 
 void AddOp::print(OpAsmPrinter &printer) {
-  Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
 ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
-}
-
-LogicalResult AddOp::verify() {
-  if (getInputs().size() != 2)
-    emitOpError("expects two operands as input");
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -223,9 +214,7 @@ ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void MatmulOp::print(OpAsmPrinter &printer) {
-  Value output = (hasTensorSemantics()) ? Value() : getOutput();
-  printTppOp(printer, getInputs(), output, getResultTypes(), *this,
-             /*isTernary=*/true);
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -265,9 +254,7 @@ ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void BrgemmOp::print(OpAsmPrinter &printer) {
-  Value output = (hasTensorSemantics()) ? Value() : getOutput();
-  printTppOp(printer, getInputs(), output, getResultTypes(), *this,
-             /*isTernary=*/true);
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
 //===----------------------------------------------------------------------===//

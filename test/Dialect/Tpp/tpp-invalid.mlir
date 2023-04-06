@@ -257,7 +257,47 @@ func.func @tpp_matmul(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: ten
 // -----
 
 func.func @tpp_add_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
-  // expected-error @below {{expects two operands as input}}
+  // expected-error @below {{expect 2 input operands, but got: 3}}
   tpp.add ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
   return
+}
+
+// -----
+
+func.func @tpp_relu_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
+  // expected-error @below {{expect 1 input operands, but got: 3}}
+  tpp.relu ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
+  return
+}
+
+// -----
+
+func.func @tpp_matmul_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
+  // expected-error @below {{expect 2 input operands, but got: 3}}
+  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
+  return
+}
+
+// -----
+
+func.func @tpp_add_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
+  // expected-error @below {{expect 2 input operands, but got: 3}}
+  %0 = tpp.add (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
+  return %0: tensor<2x2xf32>
+}
+
+// -----
+
+func.func @tpp_relu_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
+  // expected-error @below {{expect 1 input operands, but got: 3}}
+  %0 = tpp.relu (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
+  return %0: tensor<2x2xf32>
+}
+
+// -----
+
+func.func @tpp_matmul_invalid_number_of_operands(%arg0: tensor<2x2xf32>) {
+  // expected-error @below {{expect 3 input operands, but got: 2}}
+  %0 = tpp.matmul (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
+  return %0: tensor<2x2xf32>
 }

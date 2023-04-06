@@ -84,7 +84,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 
   bool isScalarOp(IdentityOp identityOp) const {
-    return (isScalar(identityOp.getInputs()) &&
+    return (isScalar(identityOp.getInputs()[0]) &&
             isScalar(identityOp.getOutput()));
   }
 
@@ -115,7 +115,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value input = identityOp.getInputs();
+          Value input = identityOp.getInputs()[0];
           // input is scalar.
           if (isScalar(input))
             b.create<memref::StoreOp>(loc, input, identityOp.getOutput(),
@@ -128,8 +128,10 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
           }
           // input is a 2d-memref.
           else {
-            ArrayRef<int64_t> shapeInput =
-                identityOp.getInputs().getType().cast<MemRefType>().getShape();
+            ArrayRef<int64_t> shapeInput = identityOp.getInputs()[0]
+                                               .getType()
+                                               .cast<MemRefType>()
+                                               .getShape();
             SmallVector<Value, 2> inputIvs = localIvs;
             // broadcasting dimension with size 1.
             for (size_t idx = 0; idx < shapeInput.size(); idx++)
@@ -184,7 +186,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, reluOp.getInputs(), localIvs);
+              b.create<memref::LoadOp>(loc, reluOp.getInputs()[0], localIvs);
           Value scalarRelu =
               b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
           b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(),

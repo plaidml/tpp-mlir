@@ -65,17 +65,24 @@ def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
 // dimension is one.
 def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
 
+// Tpp operation trait - verify tpp operand segment size.
+def UnaryOp : NativeOpTrait<"tpp::UnaryOp">;
+def BinaryOp : NativeOpTrait<"tpp::BinaryOp">;
+def TernaryOp : NativeOpTrait<"tpp::TernaryOp">;
+
 //===----------------------------------------------------------------------===//
 // Unary Operations
 //===----------------------------------------------------------------------===//
 
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
+  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
+                                        BroadcastableShape,
                                         SameOperandsElementType,
+                                        UnaryOp,
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
   
-  let arguments = (ins TppInputOperand:$inputs, 
+  let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
@@ -150,6 +157,7 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
+                                        BinaryOp,
                                         BroadcastableShape,
                                         SameOperandsElementType, 
                                         UnitStrideInnerLoop,
@@ -165,8 +173,6 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
     // Memref builder.
     OpBuilder<(ins "ValueRange":$inputs, "Value":$out)>
   ];
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -216,6 +222,7 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 
 class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments, 
+                                        TernaryOp,
                                         SameOperandsElementType,
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {

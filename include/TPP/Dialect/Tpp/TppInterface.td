@@ -63,7 +63,6 @@ def TppOpInterface : OpInterface<"TppOp"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        llvm::errs() << $_op.getOutputs().size() << "\n";
         assert($_op.getOutputs().size() == 1);
         // TODO: this method should be at buffer level only
         // Need to first update the ternary to be:
