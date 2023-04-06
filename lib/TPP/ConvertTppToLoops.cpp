@@ -27,7 +27,7 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
   bool isScalarOp(AddOp addOp) const {
-    return !addOp.getLhs().getType().isa<ShapedType>();
+    return !addOp.getInputs()[0].getType().isa<ShapedType>();
   }
 
   LogicalResult matchAndRewrite(AddOp addOp,
@@ -35,18 +35,19 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     Location loc = addOp.getLoc();
     // handle scalar case.
     if (isScalarOp(addOp)) {
-      Value scalarAdd =
-          rewriter.create<arith::AddFOp>(loc, addOp.getLhs(), addOp.getRhs());
+      Value scalarAdd = rewriter.create<arith::AddFOp>(
+          loc, addOp.getInputs()[0], addOp.getInputs()[1]);
       rewriter.replaceAllUsesWith(addOp.getOutput(), scalarAdd);
       rewriter.eraseOp(addOp);
       return success();
     }
     // handle memref case.
     SmallVector<Value> ubs;
-    size_t rank = addOp.getLhs().getType().cast<MemRefType>().getRank();
+    size_t rank = addOp.getInputs()[0].getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, addOp.getLhs().getType().cast<MemRefType>().getShape()[idx]);
+          loc,
+          addOp.getInputs()[0].getType().cast<MemRefType>().getShape()[idx]);
       ubs.push_back(dim);
     }
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -57,9 +58,9 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, addOp.getLhs(), localIvs);
+              b.create<memref::LoadOp>(loc, addOp.getInputs()[0], localIvs);
           Value scalarRhs =
-              b.create<memref::LoadOp>(loc, addOp.getRhs(), localIvs);
+              b.create<memref::LoadOp>(loc, addOp.getInputs()[1], localIvs);
           Value addLhsAndRhs =
               b.create<arith::AddFOp>(loc, scalarLhs, scalarRhs);
           b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(),
@@ -83,7 +84,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   }
 
   bool isScalarOp(IdentityOp identityOp) const {
-    return (isScalar(identityOp.getInput()) &&
+    return (isScalar(identityOp.getInputs()) &&
             isScalar(identityOp.getOutput()));
   }
 
@@ -93,7 +94,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     // Handle scalar.
     if (isScalarOp(identityOp)) {
       rewriter.replaceAllUsesWith(identityOp.getOutput(),
-                                  identityOp.getInput());
+                                  identityOp.getInputs());
       rewriter.eraseOp(identityOp);
       return success();
     }
@@ -114,7 +115,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     (void)scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value input = identityOp.getInput();
+          Value input = identityOp.getInputs();
           // input is scalar.
           if (isScalar(input))
             b.create<memref::StoreOp>(loc, input, identityOp.getOutput(),
@@ -128,7 +129,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
           // input is a 2d-memref.
           else {
             ArrayRef<int64_t> shapeInput =
-                identityOp.getInput().getType().cast<MemRefType>().getShape();
+                identityOp.getInputs().getType().cast<MemRefType>().getShape();
             SmallVector<Value, 2> inputIvs = localIvs;
             // broadcasting dimension with size 1.
             for (size_t idx = 0; idx < shapeInput.size(); idx++)
@@ -183,7 +184,7 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarLhs =
-              b.create<memref::LoadOp>(loc, reluOp.getInput(), localIvs);
+              b.create<memref::LoadOp>(loc, reluOp.getInputs(), localIvs);
           Value scalarRelu =
               b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
           b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(),

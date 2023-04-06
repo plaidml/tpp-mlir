@@ -509,7 +509,7 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   // Return ldi and bCast.
   std::pair<int64_t, xsmm::UnaryFlags>
   getLdiAndBCast(tpp::IdentityOp identityOp, int64_t ldo) const {
-    Type inputType = identityOp.getInput().getType();
+    Type inputType = identityOp.getInputs().getType();
 
     // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
     // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
@@ -592,7 +592,7 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = reluOp.getInput().getType();
+    Type outputType = reluOp.getInputs().getType();
     assert(outputType.isa<MemRefType>() && "expect a memref type");
 
     MemRefType outputMemRef = outputType.cast<MemRefType>();
@@ -699,8 +699,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
     int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
                                               : outputMemRef.getShape()[0];
 
-    auto lhsMemRef = addOp.getLhs().getType().cast<MemRefType>();
-    auto rhsMemRef = addOp.getRhs().getType().cast<MemRefType>();
+    auto lhsMemRef = addOp.getInputs()[0].getType().cast<MemRefType>();
+    auto rhsMemRef = addOp.getInputs()[1].getType().cast<MemRefType>();
 
     auto ldiLhsDim = getLeadingDim(lhsMemRef);
     if (failed(ldiLhsDim))

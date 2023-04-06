@@ -75,7 +75,7 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
   
-  let arguments = (ins TppInputOperand:$input, 
+  let arguments = (ins TppInputOperand:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
@@ -149,12 +149,13 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 //===----------------------------------------------------------------------===//
 
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
+  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
+                                        BroadcastableShape,
                                         SameOperandsElementType, 
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
 
-  let arguments = (ins TppInputOperand:$lhs, TppInputOperand:$rhs, 
+  let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
   let results = (outs Variadic<TppTensor>:$results);
 
@@ -162,8 +163,10 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
 
   let builders = [
     // Memref builder.
-    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$out)>
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$out)>
   ];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

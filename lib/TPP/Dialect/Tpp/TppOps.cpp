@@ -53,6 +53,8 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
                                      parseOperand)) {
     return failure();
   }
+  int numberOfInputs = operands.size();
+  int numberOfOutputs = 0;
 
   if (isMemRef) {
     locsOperands.push_back(parser.getCurrentLocation());
@@ -61,6 +63,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
         parser.parseColonType(operandsTypes.emplace_back()) ||
         parser.parseRParen())
       return failure();
+    numberOfOutputs = operands.size() - numberOfInputs;
   } else {
     // Parse result types.
     SmallVector<Type> resultTypes;
@@ -87,8 +90,14 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   }
 
   NamedAttrList attrs;
-  if (parser.parseOptionalAttrDictWithKeyword(attrs))
+  if (parser.parseOptionalAttrDict(attrs))
     return failure();
+  // Check if we parsed `operand_segment_sizes` already, otherwise add it.
+  if (!attrs.get("operand_segment_sizes")) {
+    auto operandSegmentSize = parser.getBuilder().getDenseI32ArrayAttr(
+        {numberOfInputs, numberOfOutputs});
+    result.addAttribute("operand_segment_sizes", operandSegmentSize);
+  }
   result.addAttributes(attrs);
   return success();
 }
@@ -113,7 +122,6 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands, Value out,
     printCommaSeparatedList(printer, tensorOperands);
     printer << " -> (" << results << ")";
   }
-  printer.printOptionalAttrDict((op)->getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -127,7 +135,7 @@ void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
 
 void IdentityOp::print(OpAsmPrinter &printer) {
   Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, ValueRange{getInput()}, output, getResultTypes(), *this);
+  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
 }
 
 ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -145,7 +153,7 @@ void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
 
 void ReluOp::print(OpAsmPrinter &printer) {
   Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, ValueRange{getInput()}, output, getResultTypes(), *this);
+  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
 }
 
 ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -156,19 +164,25 @@ ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
 // AdddOp
 //===----------------------------------------------------------------------===//
 
-void AddOp::build(OpBuilder &builder, OperationState &result, Value lhs,
-                  Value rhs, Value out) {
-  return AddOp::build(builder, result, /*TypeRange=*/{}, lhs, rhs, out);
+void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,
+                  Value out) {
+  return AddOp::build(builder, result, /*TypeRange=*/{}, inputs,
+                      ValueRange{out});
 }
 
 void AddOp::print(OpAsmPrinter &printer) {
   Value output = hasTensorSemantics() ? Value() : getOutput();
-  printTppOp(printer, ValueRange{getLhs(), getRhs()}, output, getResultTypes(),
-             *this);
+  printTppOp(printer, getInputs(), output, getResultTypes(), *this);
 }
 
 ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
+}
+
+LogicalResult AddOp::verify() {
+  if (getInputs().size() != 2)
+    emitOpError("expects two operands as input");
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

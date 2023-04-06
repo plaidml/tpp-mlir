@@ -49,8 +49,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     }
     if (tpp::utils::isTppAdd(linalgOp, &operands)) {
       assert(operands.size() == 3 && "Expect three operands");
-      rewriter.replaceOpWithNewOp<tpp::AddOp>(linalgOp, operands[0],
-                                              operands[1], operands[2]);
+      rewriter.replaceOpWithNewOp<tpp::AddOp>(
+          linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
       return success();
     }
     if (tpp::utils::isTppMatmul(linalgOp, &operands)) {
