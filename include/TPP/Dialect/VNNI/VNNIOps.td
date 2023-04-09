@@ -43,7 +43,7 @@ def VNNI_MatmulOp : VNNI_Op<"matmul"> {
   }];
 
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
-  let results = (outs Variadic<VNNIOperand>:$dest);
+  let results = (outs Optional<VNNIOperand>:$dest);
   
   let assemblyFormat = [{
     `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
@@ -71,7 +71,7 @@ def VNNI_BRGemmOp : VNNI_Op<"brgemm"> {
   }];
 
   let arguments = (ins VNNIOperand:$matrixA, VNNIOperand:$matrixB, VNNIOperand:$matrixC);
-  let results = (outs Variadic<VNNIOperand>:$dest);
+  let results = (outs Optional<VNNIOperand>:$dest);
   
   let assemblyFormat = [{
     `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)` 
