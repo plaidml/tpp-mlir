@@ -15,7 +15,7 @@
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @bigrelu(%B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
+func.func @bigrelu(%B: tensor<32x16xf32>) -> tensor<32x16xf32>  {
   %c0 = arith.constant 0.0 : f32
   // TPP: tpp.relu ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0],

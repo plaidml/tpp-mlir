@@ -9,7 +9,6 @@
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -270,9 +269,6 @@ static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
                                           Operation *op,
                                           PatternRewriter &rewriter) {
   auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
-  funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                  UnitAttr::get(rewriter.getContext()));
-
   return success();
 }
 

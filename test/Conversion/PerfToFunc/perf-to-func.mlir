@@ -1,6 +1,6 @@
 // RUN: tpp-opt %s -convert-perf-to-loops -convert-perf-to-func -split-input-file -canonicalize | FileCheck %s
 
-// CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} 
 // CHECK-LABEL: @func_start_timer
 func.func @func_start_timer() {
   // CHECK: call @perf_start_timer()
@@ -10,8 +10,8 @@ func.func @func_start_timer() {
 
 // -----
 
-// CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_stop_timer({{.*}}) -> {{.*}} attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} 
+// CHECK-DAG: func.func private @perf_stop_timer({{.*}}) -> {{.*}} 
 // CHECK-LABEL: @func_stop_timer
 func.func @func_stop_timer() {
   // CHECK: %[[timer:.*]] = call @perf_start_timer()
@@ -126,8 +126,8 @@ func.func @func_sink_variants(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
 // CHECK-DAG: func.func private @perf_stdev({{.*}}: memref<*xf64>, {{.*}}: f64) -> f64
 // CHECK-DAG: func.func private @perf_mean({{.*}}: memref<*xf64>) -> f64
 // CHECK-DAG: func.func private @perf_sink_tensor_f32({{.*}}: tensor<*xf32>) attributes {passthrough = ["optnone", "noinline"]}
-// CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
-// CHECK-DAG: func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
+// CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 
+// CHECK-DAG: func.func private @perf_start_timer() -> i64 
 // CHECK-LABEL: @perf_example
 func.func @perf_example(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {

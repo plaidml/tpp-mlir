@@ -155,13 +155,6 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    if (!useMeta) {
-      // Insert a function attribute that will trigger the emission of the
-      // corresponding `_mlir_ciface_xxx` interface so that external libraries
-      // see a normalized ABI.
-      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                      UnitAttr::get(op->getContext()));
-    }
     funcOp.setPrivate();
   }
 
@@ -322,13 +315,6 @@ static func::CallOp buildDispatchCall(Location loc,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    if (!useMeta) {
-      // Insert a function attribute that will trigger the emission of the
-      // corresponding `_mlir_ciface_xxx` interface so that external libraries
-      // see a normalized ABI.
-      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                      UnitAttr::get(rewriter.getContext()));
-    }
     funcOp.setPrivate();
   }
 

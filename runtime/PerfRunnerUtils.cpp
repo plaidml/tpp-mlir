@@ -20,13 +20,13 @@
 //===----------------------------------------------------------------------===//
 
 // Return the current timestamp.
-int64_t _mlir_ciface_perf_start_timer() {
+int64_t perf_start_timer() {
   auto timestamp = std::chrono::high_resolution_clock::now();
   return timestamp.time_since_epoch().count();
 }
 
 // Compute time delta between the starting time and now.
-double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
+double perf_stop_timer(int64_t startTimestamp) {
   auto stop = std::chrono::high_resolution_clock::now();
   std::chrono::high_resolution_clock::time_point start{
       std::chrono::high_resolution_clock::duration{startTimestamp}};

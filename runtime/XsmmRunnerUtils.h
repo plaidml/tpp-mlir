@@ -21,57 +21,57 @@
 
 // TODO: here we want to have dispatch/invoke only for unary/binary and ternary.
 // matmul, brgemm are way too specific.
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_gemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_gemm_dispatch(
-    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
-    int64_t, const libxsmm_gemm_flags);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+xsmm_gemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
+                   int64_t, int64_t, const libxsmm_gemm_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_unary_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_unary_dispatch(
     const libxsmm_meltw_unary_type, const libxsmm_datatype, int64_t, int64_t,
     int64_t, int64_t, const libxsmm_meltw_unary_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_binary_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_binary_dispatch(
     const libxsmm_meltw_binary_type, const libxsmm_datatype, int64_t, int64_t,
     int64_t, int64_t, int64_t, const libxsmm_meltw_binary_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_brgemm_dispatch(
-    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
-    int64_t, const libxsmm_gemm_flags);
-
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_fused_brgemm_dispatch(const libxsmm_datatype, bool isVNNI,
-                                        int64_t, int64_t, int64_t, int64_t,
-                                        int64_t, int64_t);
+xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
+                     int64_t, int64_t, const libxsmm_gemm_flags);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_gemm_invoke(const libxsmm_datatype dType, int64_t addr, int64_t rankA,
+                 void *memrefDescA, int64_t rankB, void *memrefDescB,
+                 int64_t rankC, void *memrefDescC);
 
 //TODO: Remove this function as all unary ops are expected to work in place.
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype, int64_t,
-                               UnrankedMemRefType<char> *,
-                               UnrankedMemRefType<char> *);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_binary_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
+xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr, int64_t inputRank,
+                  void *inputMemrefDesc, int64_t outputRank,
+                  void *outputMemrefDesc);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype, int64_t,
-                                      UnrankedMemRefType<char> *);
+xsmm_binary_invoke(const libxsmm_datatype dType, int64_t addr, int64_t lhsRank,
+                   void *lhsMemrefDesc, int64_t rhsRank, void *rhsMemrefDesc,
+                   int64_t outRank, void *outMemrefDesc);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_scalar_invoke(const libxsmm_datatype, int64_t, float,
-                                      UnrankedMemRefType<char> *);
+xsmm_unary_invoke_inline(const libxsmm_datatype, int64_t, int64_t, void *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_unary_scalar_invoke(const libxsmm_datatype dType, int64_t addr,
+                         float input, int64_t rankOutput,
+                         void *outputMemrefDesc);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_fused_brgemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_brgemm_invoke(const libxsmm_datatype dType, int64_t addr, int64_t rankA,
+                   void *memrefDescA, int64_t rankB, void *memrefDescB,
+                   int64_t rankC, void *memrefDescC, int64_t numBatches);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_fused_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
+                         int64_t rankA, void *memrefDescA, int64_t rankB,
+                         void *memrefDescB, int64_t rankC, void *memrefDescC,
+                         int64_t rankD, void *memrefDescD, int64_t numBatches);
 
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.

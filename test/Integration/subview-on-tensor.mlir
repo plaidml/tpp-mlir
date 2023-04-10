@@ -13,7 +13,7 @@
 module {
 
   func.func @fillSubview(%A: tensor<2x2x3x3xf32>,
-      %cst: f32, %slice: index) -> tensor<2x2x3x3xf32> attributes {llvm.emit_c_interface} {
+      %cst: f32, %slice: index) -> tensor<2x2x3x3xf32>  {
     %O = tensor.extract_slice %A[%slice, %slice, 0, 0][1, 1, 3, 3][1, 1, 1, 1] :
       tensor<2x2x3x3xf32> to tensor<3x3xf32>
     %OO = linalg.fill ins(%cst: f32) outs(%O: tensor<3x3xf32>) -> tensor<3x3xf32>

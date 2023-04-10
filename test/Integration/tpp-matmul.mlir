@@ -17,8 +17,9 @@
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-func.func @matmultpp(%A: tensor<4x8xf32>,
-          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
+// TPP-LABEL: gemm_tpp
+func.func @gemm_tpp(%A: tensor<4x8xf32>,
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
   // TPP: tpp.gemm ins({{.*}} : {{.*}}, {{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
                          iterator_types = ["parallel", "parallel", "reduction"]}
@@ -55,7 +56,7 @@ func.func @entry() {
 
   // Call kernel.
   %C = arith.constant dense<0.0> : tensor<4x4xf32>
-  %0 = call @matmultpp(%da, %db, %C)
+  %0 = call @gemm_tpp(%da, %db, %C)
        : (tensor<4x8xf32>, tensor<8x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 
   //
