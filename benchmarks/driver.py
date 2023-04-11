@@ -138,7 +138,6 @@ class CPPRun(BaseRun):
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.cpprun", loglevel)
         BaseRun.__init__(self, name, args, env, json, loglevel)
-        assert(json["type"] == "C++")
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
     def run(self):
@@ -152,11 +151,28 @@ class CPPRun(BaseRun):
         self.stderr = res.stderr
         return True
 
+class XSMMDNNRun(CPPRun):
+    """ XSMM-DNN runs """
+    def __init__(self, name, args, env, json, loglevel):
+        self.logger = Logger("driver.xsmm-dnn", loglevel)
+        CPPRun.__init__(self, name, args, env, json, loglevel)
+
+    def run(self):
+        if not CPPRun.run(self):
+            return False
+        match = re.search(r"GFLOPS  = (.+)", self.stdout)
+        if not match:
+            self.logger.error("Cannot match to XSMM-DNN output")
+            return False
+
+        self.stdout = match.group(1) + " +- 0.00 gflops"
+        return True
+
 class MLIRRun(BaseRun):
+    """ MLIR runs """
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.mlirrun", loglevel)
         BaseRun.__init__(self, name, args, env, json, loglevel)
-        assert(json["type"] == "MLIR")
         self.benchmark = os.path.join(env.test_dir, self.benchmark)
 
     def run(self):
@@ -190,6 +206,8 @@ class Benchmark(object):
             self.runs.append(CPPRun(name, self.args, self.env, json, loglevel))
         elif runType == "MLIR":
             self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
+        elif runType == "XSMM-DNN":
+            self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False
@@ -326,6 +344,11 @@ if __name__ == '__main__':
         print('\n\n')
         parser.print_help()
         sys.exit(1)
+
+    # Always disable leak santizier
+    asan_options = [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+    asan_options.append("detect_leaks=0")
+    os.environ["ASAN_OPTIONS"] = ":".join(asan_options)
 
     # Runs all benchmarks
     if (not driver.run()):
