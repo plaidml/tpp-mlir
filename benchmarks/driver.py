@@ -171,7 +171,7 @@ class XSMMDNNRun(CPPRun):
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
         if not match:
-            self.logger.error("Cannot match to XSMM-DNN output")
+            self.logger.error(f"Cannot match to XSMM-DNN output: {self.stdout}")
             return False
 
         self.stdout = match.group(1) + " +- 0.00 gflops"

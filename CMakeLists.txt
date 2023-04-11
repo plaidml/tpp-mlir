@@ -81,7 +81,7 @@ if (NOT TPP_INSIDE_IREE)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
   add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-                    DEPENDS bench_mlp bench_matmul tpp-opt tpp-run
+                    DEPENDS bench_mlp bench_matmul tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run C++ and MLIR Benchmarks)
 endif()
