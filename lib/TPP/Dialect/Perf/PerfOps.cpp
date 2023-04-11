@@ -46,12 +46,12 @@ LogicalResult StopTimerOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void BenchOp::build(OpBuilder &builder, OperationState &result, Value numIters,
-                    Value deltas, ValueRange args) {
+                    Value deltas, ValueRange iterArgs) {
   result.addOperands({numIters, deltas});
-  result.addOperands(args);
+  result.addOperands(iterArgs);
 
   // Results have to match the input arguments
-  for (Value v : args)
+  for (Value v : iterArgs)
     result.addTypes(v.getType());
 
   Region *bodyRegion = result.addRegion();
@@ -61,7 +61,7 @@ void BenchOp::build(OpBuilder &builder, OperationState &result, Value numIters,
   // Create the default terminator if the arguments are not provided.
   // Otherwise, leave this to the caller because we don't know which values to
   // return from the body.
-  if (args.empty()) {
+  if (iterArgs.empty()) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(&bodyBlock);
     builder.create<perf::YieldOp>(result.location);

@@ -40,8 +40,8 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     auto loop = rewriter.create<scf::ForOp>(loc, zero, numIters, one,
-                                            benchOp.getArgs());
-    if (benchOp.getArgs().empty()) {
+                                            benchOp.getIterArgs());
+    if (benchOp.getIterArgs().empty()) {
       // Erase the default loop yield, it will be inserted later.
       rewriter.eraseOp(loop.getRegion().front().getTerminator());
     }
@@ -71,10 +71,10 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
 
     // Replace uses of bench args within the benchmark body with their
     // equivalent loop-carried variables.
-    assert((benchOp.getArgs().size() == loop.getRegionIterArgs().size()) &&
+    assert((benchOp.getIterArgs().size() == loop.getRegionIterArgs().size()) &&
            "expect equal number of loop-carried variables");
     for (auto [benchArg, loopArg] :
-         llvm::zip_equal(benchOp.getArgs(), loop.getRegionIterArgs()))
+         llvm::zip_equal(benchOp.getIterArgs(), loop.getRegionIterArgs()))
       replaceAllUsesInRegionWith(benchArg, loopArg, loop.getRegion());
 
     // Pass perf.yield values through the scf.yield.

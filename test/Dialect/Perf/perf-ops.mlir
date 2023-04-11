@@ -115,7 +115,7 @@ func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
   %bench_res = arith.constant 0 : i32
 
   // CHECK: %[[out:.*]] = perf.bench
-  %out = perf.bench (%n, %deltas : memref<?xf64>) args(%bench_res : i32) {
+  %out = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%bench_res : i32) {
     // CHECK: %[[c:.*]] = arith.addi
     %c = arith.addi %a, %b : i32
     // CHECK: perf.yield %[[c]]
@@ -138,7 +138,7 @@ func.func @perf_example(%A: tensor<4x8xf32>,
   %output = arith.constant 0 : i64
 
   // CHECK: %[[res:.*]] = perf.bench
-  %res = perf.bench (%n, %deltas : memref<?xf64>) args(%output : i64) {
+  %res = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%output : i64) {
     // CHECK: %[[mulres:.*]] = linalg.matmul
     // CHECK: perf.sink(%[[mulres]])
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
