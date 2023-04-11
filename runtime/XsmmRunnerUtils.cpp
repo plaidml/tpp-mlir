@@ -14,6 +14,7 @@
 
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
+#include "libxsmm_typedefs.h"
 
 // Helper function prototypes.
 static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
@@ -24,6 +25,38 @@ static void printXsmmStruct(const libxsmm_meltw_binary_shape &binaryShape,
                             FILE *outfile = stderr);
 static void printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmShape,
                             FILE *outfile = stderr);
+
+static bool isTransformUnary(const libxsmm_meltw_unary_type dtype) {
+  switch (dtype) {
+    // Zero
+    case LIBXSMM_MELTW_TYPE_UNARY_XOR:
+    // Copy
+    case LIBXSMM_MELTW_TYPE_UNARY_IDENTITY:
+    // Transpose
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT:
+    // VNNI2
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI2_TO_VNNI2T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2_PAD:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD2:
+    // VNNI4
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI4T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4_PAD:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_NORM:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI2:
+      return true;
+    default:
+      return false;
+  }
+}
 
 extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
                                                 int64_t funcAddr,
@@ -162,9 +195,7 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   // Copy and Zero should remain in BF16 to avoid useless up/down casts
   auto op_type = static_cast<libxsmm_meltw_unary_type>(type);
   auto force_fp32 =
-      (dtype == LIBXSMM_DATATYPE_BF16 &&
-       op_type != libxsmm_meltw_unary_type::LIBXSMM_MELTW_TYPE_UNARY_XOR &&
-       op_type != libxsmm_meltw_unary_type::LIBXSMM_MELTW_TYPE_UNARY_IDENTITY);
+      (dtype == LIBXSMM_DATATYPE_BF16 && isTransformUnary(op_type));
   unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
   unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
