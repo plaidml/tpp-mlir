@@ -102,7 +102,7 @@ func.func @perf_example(%A: tensor<4x8xf32>,
   // CHECK:   memref.store %[[delta]], %[[deltas]][%[[i]]]
   // CHECK:   scf.yield %[[sum]]
   // CHECK: }
-  %res = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%output : i64) {
+  %res = perf.bench (%n: i64, %deltas : memref<?xf64>) iter_args(%output : i64) {
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
                        outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
     perf.sink(%D) : tensor<4x4xf32>
@@ -144,7 +144,7 @@ func.func @perf_example_multi_arg(%A: tensor<4x8xf32>,
   // CHECK:   memref.store %[[delta]], %[[deltas]][%[[i]]]
   // CHECK:   scf.yield %[[sum]], %[[mulres]]
   // CHECK: }
-  %res, %res1 = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%output, %output1 : i64, tensor<4x4xf32>) {
+  %res, %res1 = perf.bench (%n: i64, %deltas : memref<?xf64>) iter_args(%output, %output1 : i64, tensor<4x4xf32>) {
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
                        outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
     %sum = arith.addi %output, %k : i64

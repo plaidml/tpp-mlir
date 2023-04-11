@@ -123,7 +123,7 @@ def Perf_BenchOp : Perf_Op<"bench",
 
     ```mlir
     %deltas = memref.alloc(%size) : memref<?xf64>
-    perf.bench (%n, %deltas : memref<?xf64>) {
+    perf.bench (%n, %deltas : i64, memref<?xf64>) {
       ... // body - ops under measurement
     }
     ```
@@ -143,7 +143,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     An example of a benchmark with an output result:
 
     ```mlir
-    %sum = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%val : i32) {
+    %sum = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%val : i32) {
       %sum_next = arith.addi %val, %cst : i32
       perf.yield %sum_next : i32
     } -> i32
@@ -154,7 +154,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     a benchmarking loop.
     For example, the following input:
     ```mlir
-    %res, ... = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%x, ... : ...) {
+    %res, ... = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%x, ... : ...) {
       ... // body - ops under measurement
 
       // Yield current iteration values to the next iteration iter_args (%x, ...)
@@ -188,12 +188,7 @@ def Perf_BenchOp : Perf_Op<"bench",
   let results = (outs Variadic<AnyType>:$bodyResults);
   let regions = (region SizedRegion<1>:$region);
 
-  let assemblyFormat = [{
-    `(` $numIters `,` $deltas `:` type($deltas) `)`
-    (`iter_args` `(` $iterArgs^ `:` type($iterArgs) `)`)?
-    $region attr-dict
-    (`->` type($bodyResults)^)?
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -230,8 +225,7 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
   let arguments = (ins Variadic<AnyType>:$operands);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
-  let assemblyFormat =
-    [{  attr-dict ($operands^ `:` type($operands))? }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -247,13 +241,16 @@ def Perf_MeanOp : Perf_Op<"mean", []> {
     Example:
 
     ```mlir
+    %n = arith.constant 10 : i64
+    %size = arith.index_cast %n : i64 to index
+    %deltas = memref.alloc(%size) : memref<?xf64>
 
-    %deltas = perf.bench (%n) {
+    perf.bench (%n, %deltas: i64, memref<?xf64>) {
       ... // benchmarked code
-    } -> memref<?xf64>
+    }
 
     %mean = perf.mean(%deltas : memref<?xf64>) : f64
-
+    memref.dealloc %deltas : memref<?xf64>
     ```
   }];
 
@@ -285,14 +282,17 @@ def Perf_StdevOp : Perf_Op<"stdev", []> {
     Example:
 
     ```mlir
+    %n = arith.constant 10 : i64
+    %size = arith.index_cast %n : i64 to index
+    %deltas = memref.alloc(%size) : memref<?xf64>
 
-    %deltas = perf.bench (%n) {
+    perf.bench (%n, %deltas: i64, memref<?xf64>) {
       ... // benchmarked code
-    } -> memref<?xf64>
+    }
 
     %mean = perf.mean(%deltas : memref<?xf64>) : f64
     %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
-
+    memref.dealloc %deltas : memref<?xf64>
     ```
   }];
 
@@ -326,10 +326,10 @@ def Perf_SinkOp : Perf_Op<"sink", [ConditionallySpeculatable]> {
 
     ```mlir
 
-    %deltas = perf.bench (%n) {
+    perf.bench (%n, %deltas: i64, memref<?xf64>) {
       %a = arith.addi %b, %c : i64
       perf.sink(%a) : i64 // make sure that 'addi' is not optimized away
-    } -> memref<?xf64>
+    }
 
     ```
   }];
