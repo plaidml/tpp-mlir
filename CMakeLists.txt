@@ -65,7 +65,9 @@ include(sanitizers)
 
 # libxsmm
 include(xsmm)
-message (STATUS ${XSMM_INCLUDE_DIRS})
+message (STATUS "LIBXSMM Include dir: ${XSMM_INCLUDE_DIRS}")
+include(xsmm-dnn)
+message (STATUS "LIBXSMM-DNN Include dir: ${XSMM_DNN_INCLUDE_DIRS}")
 
 add_subdirectory(include)
 add_subdirectory(lib)
