@@ -14,6 +14,7 @@
 
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
+#include "libxsmm_typedefs.h"
 
 // Helper function prototypes.
 static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
@@ -24,6 +25,38 @@ static void printXsmmStruct(const libxsmm_meltw_binary_shape &binaryShape,
                             FILE *outfile = stderr);
 static void printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmShape,
                             FILE *outfile = stderr);
+
+static bool isTransformUnary(const libxsmm_meltw_unary_type dtype) {
+  switch (dtype) {
+    // Zero
+    case LIBXSMM_MELTW_TYPE_UNARY_XOR:
+    // Copy
+    case LIBXSMM_MELTW_TYPE_UNARY_IDENTITY:
+    // Transpose
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT:
+    // VNNI2
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI2_TO_VNNI2T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2_PAD:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD2:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD2:
+    // VNNI4
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI4T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4T:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4_PAD:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD4:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_NORM:
+    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI2:
+      return true;
+    default:
+      return false;
+  }
+}
 
 extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
                                                 int64_t funcAddr,
@@ -122,7 +155,9 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
 
   auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
   if (!sgemm) {
@@ -156,7 +191,12 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   unary_shape.m = static_cast<libxsmm_blasint>(n);
   unary_shape.n = static_cast<libxsmm_blasint>(m);
   unary_shape.in0_type = dtype;
-  unary_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  // Copy and Zero should remain in BF16 to avoid useless up/down casts
+  auto op_type = static_cast<libxsmm_meltw_unary_type>(type);
+  auto force_fp32 =
+      (dtype == LIBXSMM_DATATYPE_BF16 && isTransformUnary(op_type));
+  unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
   unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
@@ -372,7 +412,9 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
   l_brconfig.br_stride_a_hint = stride_b;
   l_brconfig.br_stride_b_hint = stride_a;
@@ -478,7 +520,9 @@ extern "C" int64_t _mlir_ciface_xsmm_fused_brgemm_dispatch(
   l_shape.a_in_type = dtype;
   l_shape.b_in_type = dtype;
   l_shape.out_type = dtype;
-  l_shape.comp_type = dtype;
+  // Retarget computation type from bf16 to f32 due to missing hardware support.
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
 
   libxsmm_gemm_batch_reduce_config l_brconfig;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
