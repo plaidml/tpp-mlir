@@ -51,6 +51,7 @@ import re
 import argparse
 import json
 import shlex
+import shutil
 
 sys.path.append('harness')
 
@@ -114,6 +115,11 @@ class Environment(object):
             environ = [os.getenv(path)] if os.getenv(path) else []
             environ.insert(0, self.lib_dir)  # prepend
             os.environ[path] = ":".join(environ)
+        # Check if taskset is available
+        # (every CPU we care about has at least 4 cores)
+        taskset = shutil.which("taskset")
+        if taskset:
+            self.cpu_pinning = [ taskset, "-c", "3" ]
 
 class BaseRun(object):
     """ Base class for all runs """
@@ -141,7 +147,10 @@ class CPPRun(BaseRun):
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
     def run(self):
-        command = [self.benchmark]
+        command = list()
+        if self.env.cpu_pinning:
+            command.extend(self.env.cpu_pinning)
+        command.append(self.benchmark)
         if self.flags:
             command.extend(self.flags)
         if self.env.extra_args:
@@ -176,7 +185,10 @@ class MLIRRun(BaseRun):
         self.benchmark = os.path.join(env.test_dir, self.benchmark)
 
     def run(self):
-        command = [self.env.harness]
+        command = list()
+        if self.env.cpu_pinning:
+            command.extend(self.env.cpu_pinning)
+        command.append(self.env.harness)
         if self.args.build:
             command.extend(["--build", self.args.build])
         if self.flags:
