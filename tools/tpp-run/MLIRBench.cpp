@@ -113,7 +113,7 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
   auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
     // We only change float types
     auto elmTy = shape.getElementType();
-    if (!elmTy.isBF16() && !elmTy.isF32())
+    if (!TensorInit::isTypeSupported(elmTy))
       return attr;
     // We only change dense attributes that are splat
     auto value = dyn_cast<DenseElementsAttr>(attr);
