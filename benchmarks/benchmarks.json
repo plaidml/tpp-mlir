@@ -1,22 +1,10 @@
 [
   {
   "canary": {
-    "mlp_fp32_layer_ref": {
-      "type": "C++",
-      "benchmark": "bench_mlp",
-      "flags": [],
-      "extensions": []
-    },
     "mlp_fp32_layer_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-1layer-512.mlir",
       "flags": [],
-      "extensions": []
-    },
-    "matmul_64x64x64_ref": {
-      "type": "C++",
-      "benchmark": "bench_matmul",
-      "flags": [ "--input=64x64x64" ],
       "extensions": []
     },
     "matmul_64x64x64_mlir": {
@@ -98,34 +86,16 @@
   }},
   {
   "matmul": {
-    "ref_48x64x96": {
-      "type": "C++",
-      "benchmark": "bench_matmul",
-      "flags": [ "--input=48x64x96" ],
-      "extensions": []
-    },
     "mlir_48x64x96": {
       "type": "MLIR",
       "benchmark": "matmul_48x64x96.mlir",
       "flags": [ "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
     },
-    "ref_64x48x96": {
-      "type": "C++",
-      "benchmark": "bench_matmul",
-      "flags": [ "--input=64x48x96" ],
-      "extensions": []
-    },
     "mlir_64x48x96": {
       "type": "MLIR",
       "benchmark": "matmul_64x48x96.mlir",
       "flags": [ "-run-args='-def-pack-matmul=0'" ],
-      "extensions": []
-    },
-    "ref_64x64x64": {
-      "type": "C++",
-      "benchmark": "bench_matmul",
-      "flags": [ "--input=64x64x64" ],
       "extensions": []
     },
     "mlir_64x64x64": {
@@ -137,29 +107,29 @@
   }},
   {
   "libxsmm-dnn": {
-    "matmul_64x64x64_fp32_dnn": {
+    "matmul_32x32x32_fp32_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
-      "flags": [ "100", "256", "0", "F", "64", "64", "64", "0", "64", "64", "64" ],
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "0", "1024", "1024" ],
       "extensions": []
     },
     "mlp_fp32_layer_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
-      "flags": [ "100", "256", "3", "F", "64", "64", "64", "0", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "3", "F", "32", "32", "32", "0", "1024", "1024", "1024" ],
       "extensions": []
     },
     "matmul_64x64x64_bf16_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
-      "flags": [ "100", "256", "0", "F", "64", "64", "64", "1", "64", "64", "64" ],
-      "extensions": [ "avx512.*" ]
+      "flags": [ "100", "256", "0", "F", "64", "64", "64", "1", "1024", "1024" ],
+      "extensions": [ "avx2" ]
     },
     "mlp_bf16_layer_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "flags": [ "100", "256", "3", "F", "64", "64", "64", "1", "1024", "1024", "1024" ],
-      "extensions": [ "avx512.*" ]
+      "extensions": [ "avx2" ]
     }
   }}
 ]
