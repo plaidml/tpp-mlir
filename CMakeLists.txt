@@ -65,7 +65,9 @@ include(sanitizers)
 
 # libxsmm
 include(xsmm)
-message (STATUS ${XSMM_INCLUDE_DIRS})
+message (STATUS "LIBXSMM Include dir: ${XSMM_INCLUDE_DIRS}")
+include(xsmm-dnn)
+message (STATUS "LIBXSMM-DNN Include dir: ${XSMM_DNN_INCLUDE_DIRS}")
 
 add_subdirectory(include)
 add_subdirectory(lib)
@@ -79,7 +81,7 @@ if (NOT TPP_INSIDE_IREE)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
   add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-                    DEPENDS bench_mlp bench_matmul tpp-opt tpp-run
+                    DEPENDS bench_mlp bench_matmul tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run C++ and MLIR Benchmarks)
 endif()
