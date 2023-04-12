@@ -30,6 +30,8 @@ enum class BinaryFlags : uint64_t;
 class BinaryFlagsAttr;
 enum class DataType : uint64_t;
 class DataTypeAttr;
+enum class GemmFlags : uint64_t;
+class GemmFlagsAttr;
 } // namespace xsmm
 } // namespace mlir
 

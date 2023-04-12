@@ -230,7 +230,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
                                                    ValueRange{localI, localK});
           Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[1],
                                                    ValueRange{localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getOutput(),
+          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[2],
                                                    ValueRange{localI, localJ});
           Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
           Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
@@ -274,7 +274,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
               loc, brgemmOp.getInputs()[0], ValueRange{localB, localI, localK});
           Value scalarB = b.create<memref::LoadOp>(
               loc, brgemmOp.getInputs()[1], ValueRange{localB, localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getOutput(),
+          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getInputs()[2],
                                                    ValueRange{localI, localJ});
           Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
           Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);

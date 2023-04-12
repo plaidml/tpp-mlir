@@ -39,7 +39,7 @@ func.func @matmul_static(
 // CHECK: %[[SUB:.+]] = memref.subview %{{.+}}[%[[I]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
 // CHECK: %[[SUB2:.+]] = memref.subview %{{.+}}[%[[J]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<32x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>
 // CHECK: %[[SUB3:.+]] = memref.subview %{{.+}}[%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-// CHECK: tpp.brgemm ins(%[[SUB]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUB2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) 
+// CHECK: tpp.brgemm ins(%[[SUB]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUB2]] : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>) 
 // CHECK-SAME:       outs(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)
 // CHECK: tpp.relu ins(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>) 
 // CHECK-SAME:     outs(%[[SUB3]] : memref<32x32xf32, strided<[32, 1], offset: ?>>)

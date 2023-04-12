@@ -144,7 +144,8 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) outs(%arg2: memref<3x3xf32>)
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
+             outs(%arg2: memref<3x3xf32>)
 
   return
 }
@@ -180,7 +181,8 @@ func.func @matmul(%A: memref<4x8xf32>,
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
-  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>) outs(%C : memref<4x4xf32>)
+  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C : memref<4x4xf32>) 
+             outs(%C : memref<4x4xf32>)
 
   return
 }
@@ -224,7 +226,10 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>) outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+    tpp.brgemm ins(%subview : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
+                   %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
+                   %subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>) 
+               outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
     scf.yield
   }
 
@@ -257,7 +262,10 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   scf.for %arg1 = %c0 to %c7 step %c1 {
     %subview = memref.subview %arg0[0, %arg1, 0, 0] [1, 1, 7, 2048] [1, 1, 1, 1] : memref<1x7x7x2048xf32> to memref<7x2048xf32, strided<[2048, 1], offset: ?>>
     %subview_0 = memref.subview %alloc[0, %arg1, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : memref<1x7x7x512xf32> to memref<7x512xf32, strided<[512, 1], offset: ?>>
-    tpp.matmul ins(%subview : memref<7x2048xf32, strided<[2048, 1], offset: ?>>, %0 : memref<2048x512xf32>) outs(%subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
+    tpp.matmul ins(%subview : memref<7x2048xf32, strided<[2048, 1], offset: ?>>, 
+                   %0 : memref<2048x512xf32>,
+                   %subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>) 
+               outs(%subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
   }
 
   // CHECK: return {{.*}} : memref<1x7x7x512xf32>
@@ -293,7 +301,8 @@ module @predict_function  {
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
     // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
-    tpp.matmul ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>) outs(%arg3 : memref<128x512xf32>)
+    tpp.matmul ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>) 
+               outs(%arg3 : memref<128x512xf32>)
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch

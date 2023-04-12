@@ -146,6 +146,7 @@ LogicalResult mlir::OpTrait::tpp::checkUnitStrideInnerLoop(Operation *op) {
   return verifyUnitStrideInnerLoop(op, /*emitDiagnostic=*/false);
 }
 
+// TODO: verify operand segement size on output.
 LogicalResult mlir::OpTrait::tpp::verifyArity(Operation *op, unsigned numInput,
                                               unsigned numOutput) {
   assert(op->template hasTrait<OpTrait::AttrSizedOperandSegments>());
@@ -158,31 +159,6 @@ LogicalResult mlir::OpTrait::tpp::verifyArity(Operation *op, unsigned numInput,
   if (sizeAttr[0] != static_cast<int>(numInput)) {
     return op->emitError() << "expect " << numInput
                            << " input operands, but got: " << sizeAttr[0];
-  }
-  return success();
-}
-
-// TODO: remove me after memref update to ternary.
-LogicalResult mlir::OpTrait::tpp::verifyArityTernary(Operation *op) {
-  assert(op->template hasTrait<OpTrait::AttrSizedOperandSegments>());
-  auto attrName =
-      OpTrait::AttrSizedOperandSegments<void>::getOperandSegmentSizeAttr();
-  ArrayRef<int> sizeAttr =
-      op->template getAttrOfType<DenseI32ArrayAttr>(attrName).asArrayRef();
-  if (sizeAttr.empty() || sizeAttr.size() != 2)
-    return op->emitError("invalid operand segment size");
-
-  auto tppOp = cast<mlir::tpp::TppOp>(op);
-  if (tppOp.hasTensorSemantics()) {
-    if (sizeAttr[0] != static_cast<int>(3)) {
-      return op->emitError()
-             << "expect 3 input operands, but got: " << sizeAttr[0];
-    }
-    return success();
-  }
-  if (sizeAttr[0] != static_cast<int>(2)) {
-    return op->emitError() << "expect 2 input operands, but got: "
-                           << sizeAttr[0];
   }
   return success();
 }

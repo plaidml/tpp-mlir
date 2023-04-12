@@ -11,7 +11,7 @@ include "mlir/IR/EnumAttr.td"
 include "TPP/Dialect/Xsmm/XsmmDialect.td"
 
 def Xsmm_DataType: I64EnumAttr<
-    "DataType", "",
+    "DataType", "see: libxsmm_datatype",
     [
       I64EnumAttrCase<"F32",  1, "f32">,
       I64EnumAttrCase<"BF16", 2, "bf16">
@@ -20,11 +20,9 @@ def Xsmm_DataType: I64EnumAttr<
 }
 
 def Xsmm_TernaryKind : I64EnumAttr<
-    "TernaryKind", "",
+    "TernaryKind", "see: libxsmm_meltw_ternary_type",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
-      I64EnumAttrCase<"MATMUL", 2, "matmul">,
-      I64EnumAttrCase<"BRGEMM", 3, "brgemm">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }
@@ -39,7 +37,7 @@ def Xsmm_QuarternaryKind : I64EnumAttr<
 }
 
 def Xsmm_BinaryKind : I64EnumAttr<
-    "BinaryKind", "",
+    "BinaryKind", "see: libxsmm_meltw_binary_type",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"ADD", 1, "add">
@@ -48,7 +46,7 @@ def Xsmm_BinaryKind : I64EnumAttr<
 }
 
 def Xsmm_UnaryKind : I64EnumAttr<
-    "UnaryKind", "",
+    "UnaryKind", "see: libxsmm_meltw_unary_type",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"IDENTITY", 1, "identity">,
@@ -58,7 +56,7 @@ def Xsmm_UnaryKind : I64EnumAttr<
 }
 
 def Xsmm_UnaryFlags : I64EnumAttr<
-    "UnaryFlags", "",
+    "UnaryFlags", "see: libxsmm_meltw_unary_flags",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"BCAST_ROW", 2, "row">,
@@ -69,7 +67,7 @@ def Xsmm_UnaryFlags : I64EnumAttr<
 }
 
 def Xsmm_BinaryFlags : I64EnumAttr<
-    "BinaryFlags", "",
+    "BinaryFlags", "see: libxsmm_meltw_binary_flags",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"BCAST_ROW_IN_0", 1, "bcast_row_in0">,
@@ -78,6 +76,18 @@ def Xsmm_BinaryFlags : I64EnumAttr<
       I64EnumAttrCase<"BCAST_COL_IN_1", 8, "bcast_col_in1">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_0", 16, "bcast_scalar_in0">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_1", 32, "bcast_scalar_in1">
+    ]> {
+  let cppNamespace = "mlir::xsmm";
+}
+
+def Xsmm_GemmFlags : I64EnumAttr<
+    "GemmFlags", "see: libxsmm_gemm_flags",
+    [
+      I64EnumAttrCase<"NONE", 0, "none">,
+      I64EnumAttrCase<"BETA_0", 4, "beta_0">,
+      I64EnumAttrCase<"VNNI_A", 2048, "vnni_a">,
+      I64EnumAttrCase<"VNNI_B", 4096, "vnni_b">,
+      I64EnumAttrCase<"VNNI_C", 8192, "vnni_c">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }

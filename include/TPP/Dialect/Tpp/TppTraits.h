@@ -15,8 +15,6 @@ LogicalResult verifyUnitStrideInnerLoop(Operation *op,
 LogicalResult checkBroadcastableShape(Operation *op);
 LogicalResult checkUnitStrideInnerLoop(Operation *op);
 LogicalResult verifyArity(Operation *op, unsigned numInput, unsigned numOutput);
-// TODO: remove me after memref update to ternary.
-LogicalResult verifyArityTernary(Operation *op);
 
 template <typename ConcreteType>
 struct BroadcastableShape
@@ -51,7 +49,7 @@ struct BinaryOp : public OpTrait::TraitBase<ConcreteType, BinaryOp> {
 template <typename ConcreteType>
 struct TernaryOp : public OpTrait::TraitBase<ConcreteType, TernaryOp> {
   static LogicalResult verifyTrait(Operation *op) {
-    return verifyArityTernary(op);
+    return verifyArity(op, 3, 1);
   }
 };
 

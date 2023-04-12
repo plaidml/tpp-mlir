@@ -9,8 +9,8 @@
 #ifndef TPP_XSMM_OPS
 #define TPP_XSMM_OPS
 
-include "XsmmDialect.td"
-include "XsmmAttr.td"
+include "TPP/Dialect/Xsmm/XsmmDialect.td"
+include "TPP/Dialect/Xsmm/XsmmAttr.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, F32, BF16, I64]>;
@@ -97,7 +97,8 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
   let summary = "binary operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
-    difference is the number of operands for the computation is restricted to two.
+    difference is the number of operands for the computation is restricted to 
+    two.
   }];
 
   let arguments = (ins Xsmm_DataType:$dataType, Xsmm_BinaryKind:$callee, 
@@ -141,6 +142,34 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 }
 
 //===----------------------------------------------------------------------===//
+// MatmulOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_MatmulOp : Xsmm_Op<"matmul"> {
+  let summary = "matmul call operation.";
+  let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
+  
+  let assemblyFormat = [{
+    `(` `dataType` $dataType `,` $inputs `)`
+    attr-dict `:` functional-type($inputs, results)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// BrgemmOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
+  let summary = "brgemm call operation.";
+  let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
+
+  let assemblyFormat = [{
+    `(` `dataType` $dataType `,` $inputs `)`
+    attr-dict `:` functional-type($inputs, results)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // QuarternaryDispatchOp
 //===----------------------------------------------------------------------===//
 
@@ -168,6 +197,7 @@ def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch",[Pure]> {
 // TernaryDispatchOp
 //===----------------------------------------------------------------------===//
 
+// TODO: drop isVNNI
 def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
   let summary = "dispatch ternary operation.";
   let description = [{
@@ -175,7 +205,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
     dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
     dataType is passed to set the datatype in libxsmm call.
     Additional I64 operands are passed based on the operation to
-    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
+    dispatch. For example, leading dimensions or sizes. Returns
     the pointer to call as I64.
   }];
 
@@ -224,6 +254,36 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
   let assemblyFormat = [{
     $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// MatmulDispatchOp
+//===----------------------------------------------------------------------===//
+
+// TODO: all the `flags` should be a list.
+class Xsmm_MatmulAndBrgemmDispatchOp<string mnemonic, list<Trait> traits = []> :
+  Xsmm_Op<mnemonic, !listconcat(traits, [Pure])> {
+    let arguments = (ins DenseI64ArrayAttr:$inputs, 
+                       Xsmm_GemmFlags:$flags, 
+                       Xsmm_DataType:$dataType);
+  let results = (outs I64:$results);
+
+  let assemblyFormat = [{
+    $inputs `(` `flags` `=` $flags `,` 
+                `data_type` `=` $dataType `)` attr-dict
+  }];
+}
+
+def Xsmm_MatmulDispatchOp : Xsmm_MatmulAndBrgemmDispatchOp<"matmul.dispatch"> {
+  let summary = "dispatch for matmul operation."; 
+}
+
+//===----------------------------------------------------------------------===//
+// BrgemmDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_BrgemmDispatchOp : Xsmm_MatmulAndBrgemmDispatchOp<"brgemm.dispatch"> {
+  let summary = "dispatch for brgemm operation."; 
 }
 
 #endif // TPP_XSMM_OPS
