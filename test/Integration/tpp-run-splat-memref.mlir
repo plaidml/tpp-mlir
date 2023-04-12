@@ -6,6 +6,7 @@
 // RUN: FileCheck %s --check-prefix=RANDOM-SPLAT
 
 memref.global "private" constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00> {alignment = 128 : i64}
+memref.global "private" constant @__constant_2x16xf64 : memref<2x16xf64> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_4x16xf32 : memref<4x16xf32> = dense<2.0> {alignment = 128 : i64}
 memref.global "private" constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.0> {alignment = 128 : i64}
 memref.global "private" constant @__constant_non_splat : memref<2x2xf32> = dense<[[0.0, 1.0],[2.0, 3.0]]> {alignment = 128 : i64}
@@ -18,6 +19,7 @@ func.func @entry(%input: memref<4x2xf32>) {
 }
 // SPLAT: @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // SPLAT: constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00>
+// SPLAT: constant @__constant_2x16xf64 : memref<2x16xf64> = dense<1.000000e+00>
 // SPLAT: constant @__constant_4x16xf32 : memref<4x16xf32> = dense<2.000000e+00>
 // SPLAT: constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.000000e+00>
 // SPLAT: constant @__constant_non_splat : memref<2x2xf32> = dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
@@ -26,6 +28,7 @@ func.func @entry(%input: memref<4x2xf32>) {
 
 // RANDOM-NOT: @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // RANDOM: constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00>
+// RANDOM: constant @__constant_2x16xf64 : memref<2x16xf64> = dense<1.000000e+00>
 // RANDOM: constant @__constant_4x16xf32 : memref<4x16xf32> = dense<2.000000e+00>
 // RANDOM: constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.000000e+00>
 // RANDOM: constant @__constant_non_splat : memref<2x2xf32> = dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>
@@ -34,6 +37,7 @@ func.func @entry(%input: memref<4x2xf32>) {
 
 // RANDOM-SPLAT-NOT: @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // RANDOM-SPLAT-NOT: constant @__constant_2x16xf32 : memref<2x16xf32> = dense<1.000000e+00>
+// RANDOM-SPLAT-NOT: constant @__constant_2x16xf64 : memref<2x16xf64> = dense<1.000000e+00>
 // RANDOM-SPLAT-NOT: constant @__constant_4x16xf32 : memref<4x16xf32> = dense<2.000000e+00>
 // RANDOM-SPLAT: constant @__constant_4x8xf32 : memref<4x8xf32> = dense<0.000000e+00>
 // RANDOM-SPLAT: constant @__constant_non_splat : memref<2x2xf32> = dense<{{.*}}0.000000e+00, 1.000000e+00], [2.000000e+00, 3.000000e+00{{.*}}>

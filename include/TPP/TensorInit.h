@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Types.h"
 
 #include <algorithm>
 #include <random>
@@ -19,17 +20,33 @@
 /// Assumes float (32) as base type.
 /// TODO: Add a template parameter if/when we support double.
 struct TensorInit {
-  /// Data type (TODO: Support 64/8-bit data types)
-  enum DataType {
-    FP32, BF16
-  };
+  /// Data type (TODO: Support 8-bit data types)
+  enum DataType { FP32, FP64, BF16 };
+
+  static bool isTypeSupported(const mlir::Type &type) {
+    return type.isF32() || type.isF64() || type.isBF16();
+  }
 
 protected:
+  /// FP32 conversion (by reference)
+  static void toFP32(llvm::APFloat &value) {
+    bool ignored;
+    value.convert(llvm::APFloat::IEEEsingle(),
+                  llvm::APFloat::rmNearestTiesToEven, &ignored);
+  }
+
+  /// FP64 conversion (by reference)
+  static void toFP64(llvm::APFloat &value) {
+    bool ignored;
+    value.convert(llvm::APFloat::IEEEdouble(),
+                  llvm::APFloat::rmNearestTiesToEven, &ignored);
+  }
+
   /// BF16 conversion (by reference)
-  static void toBF16(llvm::APFloat& value) {
+  static void toBF16(llvm::APFloat &value) {
     bool ignored;
     value.convert(llvm::APFloat::BFloat(), llvm::APFloat::rmNearestTiesToEven,
-                       &ignored);
+                  &ignored);
   }
 
   /// Data type
@@ -47,6 +64,9 @@ protected:
 
   /// Insert element at the end of the buffer
   void push(float value);
+
+  /// Convert value to the tensor's data type (by reference)
+  void convertType(llvm::APFloat &value);
 
   /// Actual implementation that fills the buffer
   /// To be implemented by derived classes.
@@ -97,9 +117,7 @@ struct RandomTensorInit : TensorInit {
       : TensorInit(type), generator(seed), distribution(0.0, 1.0) {}
 
   /// Next random uniform number
-  float next() {
-    return distribution(generator);
-  }
+  float next() { return distribution(generator); }
 
   /// Return a dense<uniform(0.0, 1.0)> throughout the shape
   void fillData() override;
