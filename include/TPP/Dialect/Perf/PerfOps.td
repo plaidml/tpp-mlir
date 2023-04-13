@@ -98,8 +98,8 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
-     RangedTypesMatchWith<"result types match types of args",
-                          "args",
+     RangedTypesMatchWith<"result types match types of iter_args",
+                          "iterArgs",
                           "bodyResults",
                           "$_self">,
      RangedTypesMatchWith<"result types match types of yield",
@@ -143,7 +143,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     An example of a benchmark with an output result:
 
     ```mlir
-    %sum = perf.bench (%n, %deltas : memref<?xf64>) args(%val : i32) {
+    %sum = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%val : i32) {
       %sum_next = arith.addi %val, %cst : i32
       perf.yield %sum_next : i32
     } -> i32
@@ -154,10 +154,10 @@ def Perf_BenchOp : Perf_Op<"bench",
     a benchmarking loop.
     For example, the following input:
     ```mlir
-    %res, ... = perf.bench (%n, %deltas : memref<?xf64>) args(%x, ... : ...) {
+    %res, ... = perf.bench (%n, %deltas : memref<?xf64>) iter_args(%x, ... : ...) {
       ... // body - ops under measurement
 
-      // Yield current iteration values to the next iteration args (%x, ...)
+      // Yield current iteration values to the next iteration iter_args (%x, ...)
       // or to the bench op results (%res, ...) if it is the final iteration.
       perf.yield %x, ...
     } -> type(%res), ...
@@ -175,7 +175,7 @@ def Perf_BenchOp : Perf_Op<"bench",
       // Store measured time delta.
       store %delta, %deltas[%iv]
 
-      // Yield current iteration values to the next iteration args (%x, ...)
+      // Yield current iteration values to the next iteration iter_args (%x, ...)
       // or to the loop results (%res, ...) if it is the final iteration.
       yield %x, ...
     }
@@ -184,13 +184,13 @@ def Perf_BenchOp : Perf_Op<"bench",
 
   let arguments = (ins I64:$numIters,
                        RankedOrUnrankedMemRefOf<[F64]>:$deltas,
-                       Variadic<AnyType>:$args);
+                       Variadic<AnyType>:$iterArgs);
   let results = (outs Variadic<AnyType>:$bodyResults);
   let regions = (region SizedRegion<1>:$region);
 
   let assemblyFormat = [{
     `(` $numIters `,` $deltas `:` type($deltas) `)`
-    (`args` `(` $args^ `:` type($args) `)`)?
+    (`iter_args` `(` $iterArgs^ `:` type($iterArgs) `)`)?
     $region attr-dict
     (`->` type($bodyResults)^)?
   }];
@@ -198,7 +198,7 @@ def Perf_BenchOp : Perf_Op<"bench",
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins "Value":$numIters, "Value":$deltas,
-      CArg<"ValueRange", "std::nullopt">:$args)>
+      CArg<"ValueRange", "std::nullopt">:$iterArgs)>
   ];
 
   let extraClassDeclaration = [{
