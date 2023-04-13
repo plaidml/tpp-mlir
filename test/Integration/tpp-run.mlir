@@ -11,6 +11,7 @@
 // Benchmark options
 // RUN: tpp-run %s -e entry -entry-point-result=void -print 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
 // RUN: tpp-run %s -e entry -entry-point-result=void -n 10  2>&1 | FileCheck %s --check-prefix=BENCH_STATS
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 10 -timer-median 2>&1 | FileCheck %s --check-prefix=BENCH_STATS
 
 // CPU options can't be tested as even the LLVM IR is identical
 // Splat and init options in tpp-run-splat-* tests

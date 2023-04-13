@@ -248,7 +248,7 @@ Value MLIRBench::createTimerLoop(unsigned n) {
   return acc;
 }
 
-Value MLIRBench::getTimerStats(Value acc) {
+Value MLIRBench::getTimerStats(Value acc, bool computeMedian) {
   auto callMean =
       builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
   auto mean = callMean.getMean();

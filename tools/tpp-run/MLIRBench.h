@@ -128,8 +128,9 @@ public:
   /// Returns the memref containing measured time deltas
   Value createTimerLoop(unsigned);
 
-  /// Get the timer average/deviation
-  Value getTimerStats(Value);
+  /// Get the timer mean/deviation - optionally compute median
+  /// instead of the mean
+  Value getTimerStats(Value acc, bool computeMedian = false);
 
   /// Prints a float value (used for mean/dev)
   void printVector(Value);

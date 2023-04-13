@@ -23,6 +23,15 @@ func.func @perf_mean(%arg0: memref<?xf64>) -> f64 {
 
 // -----
 
+// CHECK-LABEL: @perf_median
+func.func @perf_median(%arg0: memref<?xf64>) -> f64 {
+  // CHECK: perf.median
+  %median = perf.median(%arg0 : memref<?xf64>) : f64
+  return %median : f64
+}
+
+// -----
+
 // CHECK-LABEL: @perf_stdev
 func.func @perf_stdev(%arg0: memref<?xf64>, %mean: f64) -> f64 {
   // CHECK: perf.stdev

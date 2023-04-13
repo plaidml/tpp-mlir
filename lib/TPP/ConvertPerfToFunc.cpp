@@ -360,6 +360,19 @@ struct ConvertMeanOp : public OpRewritePattern<perf::MeanOp> {
   }
 };
 
+struct ConvertMedianOp : public OpRewritePattern<perf::MedianOp> {
+  using OpRewritePattern<perf::MedianOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(perf::MedianOp medianOp,
+                                PatternRewriter &rewriter) const override {
+    auto res = buildPerfFuncCall(
+        medianOp.getLoc(), medianOp.getLibraryCallName(), medianOp, rewriter);
+    if (succeeded(res))
+      rewriter.eraseOp(medianOp);
+    return res;
+  }
+};
+
 struct ConvertStdevOp : public OpRewritePattern<perf::StdevOp> {
   using OpRewritePattern<perf::StdevOp>::OpRewritePattern;
 
@@ -393,7 +406,8 @@ struct ConvertSinkOp : public OpRewritePattern<perf::SinkOp> {
 
 void populatePerfToFuncPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertStartTimerOp, ConvertStopTimerOp, ConvertMeanOp,
-               ConvertStdevOp, ConvertSinkOp>(patterns.getContext());
+               ConvertMedianOp, ConvertStdevOp, ConvertSinkOp>(
+      patterns.getContext());
 }
 
 struct ConvertPerfToFunc : public ConvertPerfToFuncBase<ConvertPerfToFunc> {

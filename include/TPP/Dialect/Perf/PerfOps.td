@@ -273,6 +273,44 @@ def Perf_MeanOp : Perf_Op<"mean", []> {
 }
 
 //===----------------------------------------------------------------------===//
+// MedianOp
+//===----------------------------------------------------------------------===//
+
+def Perf_MedianOp : Perf_Op<"median", []> {
+  let summary = "Compute median value.";
+  let description = [{
+    The `perf.median` operation computes median value of the provided
+    time deltas.
+
+    Example:
+
+    ```mlir
+
+    %deltas = perf.bench (%n) {
+      ... // benchmarked code
+    } -> memref<?xf64>
+
+    %mean = perf.median(%deltas : memref<?xf64>) : f64
+
+    ```
+  }];
+
+  let arguments = (ins RankedOrUnrankedMemRefOf<[F64]>:$input);
+  let results = (outs F64:$result);
+
+  let assemblyFormat = [{
+    `(` $input `:` type($input) `)` attr-dict
+    `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    static std::string getLibraryCallName() {
+      return "perf_median";
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // StdevOp
 //===----------------------------------------------------------------------===//
 

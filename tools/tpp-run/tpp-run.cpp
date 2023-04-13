@@ -113,15 +113,21 @@ llvm::cl::opt<std::string> initType(
     llvm::cl::init(""));
 
 // Print MLIR before lowering
-llvm::cl::opt<std::string> printMLIR(
-    "print-mlir",
-    llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
-    llvm::cl::init(""));
+llvm::cl::opt<std::string>
+    printMLIR("print-mlir",
+              llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
+              llvm::cl::init(""));
 
 // Print LLVM IR before lowering
 llvm::cl::opt<bool> printLLVM("print-llvm",
                               llvm::cl::desc("print LLVM IR before lowering"),
                               llvm::cl::init(false));
+
+// Compute median of the measured results instead of mean
+llvm::cl::opt<bool>
+    timerMedian("timer-median",
+                llvm::cl::desc("Compute median timer value instead of mean"),
+                llvm::cl::init(false));
 
 // Parses MLIR print stage
 MLIRBench::PrintStage parsePrintStage(StringRef stage) {
@@ -185,7 +191,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     auto acc = bench.createTimerLoop(benchNumLoops);
     if (!acc)
       return bench.emitError("Cannot create timer loop");
-    auto stats = bench.getTimerStats(acc);
+    auto stats = bench.getTimerStats(acc, timerMedian);
     if (!stats)
       return bench.emitError("Cannot get timer stats");
     bench.printVector(stats);

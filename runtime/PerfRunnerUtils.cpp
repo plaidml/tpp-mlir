@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 
@@ -32,4 +33,23 @@ double _mlir_ciface_perf_stop_timer(int64_t startTimestamp) {
       std::chrono::high_resolution_clock::duration{startTimestamp}};
   return std::chrono::duration_cast<std::chrono::duration<double>>(stop - start)
       .count();
+}
+
+double _mlir_ciface_perf_median(UnrankedMemRefType<double> *buf) {
+  DynamicMemRefType<double> deltas(*buf);
+
+  // First, sort the measurements.
+  std::vector<double> data(deltas.begin(), deltas.end());
+  std::sort(data.begin(), data.end());
+
+  // Calculate median value.
+  int64_t n = data.size();
+  double median = 0.0f;
+  if (n % 2 == 0) {
+    median = (data[n / 2 - 1] + data[n / 2]) / 2.0;
+  } else {
+    median = data[n / 2];
+  }
+
+  return median;
 }
