@@ -46,6 +46,11 @@ llvm::cl::opt<bool>
                    llvm::cl::init(false));
 
 llvm::cl::opt<bool>
+    defPerfTagCalls("def-perf-tag-calls",
+                    llvm::cl::desc("Default pipeline - perf tag func calls"),
+                    llvm::cl::init(true));
+
+llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
                    llvm::cl::desc("Disable default pipeline execution"),
                    llvm::cl::init(false));
@@ -159,6 +164,8 @@ private:
     pm.clear();
 
     pm.addNestedPass<func::FuncOp>(createConvertCheckToLoopsPass());
+    if (defPerfTagCalls)
+      pm.addNestedPass<func::FuncOp>(createPerfTagCallsPass());
     pm.addNestedPass<func::FuncOp>(createConvertPerfToLoopsPass());
 
     // Note that LICM should be performed before any function calls are
