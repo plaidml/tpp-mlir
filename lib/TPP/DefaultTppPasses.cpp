@@ -208,9 +208,6 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Postprocess loops.
-    pm.addPass(createParallelLoopFusionPass());
-
     // Postprocess buffers.
     pm.addPass(bufferization::createBufferHoistingPass());
     pm.addPass(bufferization::createBufferDeallocationPass());
