@@ -240,8 +240,14 @@ Value MLIRBench::createTimerLoop(unsigned n) {
   auto loop = builder.create<perf::BenchOp>(unkLoc, count, acc);
   builder.setInsertionPointToStart(loop.getBody());
 
-  // Call the kernel, ignore output
-  callKernel();
+  // Call the kernel
+  auto call = callKernel();
+
+  // Mark the kernel call as the only operation which performance should be
+  // measured. This ensures that any additional ops created by other passes,
+  // such as bufferization's allocations and copies, do not influence time
+  // measurements.
+  perf::BenchOp::tagOp(call);
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
