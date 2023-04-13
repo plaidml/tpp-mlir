@@ -2,7 +2,8 @@
 #
 # Runs CMake on the source / build directories
 
-SCRIPT_DIR=$(realpath $(dirname $0))
+# Include common utils
+source $(realpath $(dirname $0))/common.sh
 
 die_syntax() {
   echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR] [-t (Release|Debug|RelWithDebInfo)] [-c (clang|gcc)] [-g (gcc toolchain)] [-l (ld|lld|gold|mold)] [-S] [-n N]"
@@ -54,9 +55,13 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
       ;;
     c)
       if [ "${OPTARG}" == "clang" ]; then
+        check_program clang
+        check_program clang++
         CC=clang
         CXX=clang++
       elif [ "${OPTARG}" == "gcc" ]; then
+        check_program gcc
+        check_program g++
         CC=gcc
         CXX=g++
       else
@@ -78,15 +83,19 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
       ;;
     l)
       if [ "${OPTARG}" == "ld" ]; then
+        check_program ld
         LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "lld" ]; then
+        check_program lld
         LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "gold" ]; then
+        check_program gold
         LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "mold" ]; then
+        check_program mold
         LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       else
-        echo "Compiler "${OPTARG}" not recognized"
+        echo "Linker "${OPTARG}" not recognized"
         die_syntax
       fi
       ;;
@@ -96,7 +105,7 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
     n)
       PROCS=$(nproc)
       if [ "${OPTARG}" -gt "0" ] && [ "${OPTARG}" -lt "${PROCS}" ]; then
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DCMAKE_JOB_POOLS=link=${OPTARG}"
+        LINKER_OPTIONS="${LINKER_OPTIONS} -DCMAKE_JOB_POOL_LINK=link -DCMAKE_JOB_POOLS=link=${OPTARG}"
       else
         echo "Invalid value for number of linker jobs '${OPTARG}'"
         die_syntax
@@ -114,18 +123,29 @@ if [ ! "${BLD_DIR}" ] || [ ! "${SRC_DIR}" ] || [ ! "${MLIR_DIR}" ]; then
   die_syntax
 fi
 
+if [ ! "${BUILD_OPTIONS}" ]; then
+  BUILD_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
+fi
+
 if [ ! "${CC}" ] || [ ! "${CXX}" ]; then
+  check_program clang
+  check_program clang++
   CC=clang
   CXX=clang++
 fi
 
 # Check deps
-$SCRIPT_DIR/deps.sh
+check_program cmake
+check_program ninja
+check_program pip
+pip install --upgrade --user lit
+check_program lit
+pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
 
 TPP_LIT=$(which lit)
 
 # CMake
-cmake -Wno-dev -G Ninja \
+echo_run cmake -Wno-dev -G Ninja \
     -B${BLD_DIR} -S${SRC_DIR} \
     -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} \
     -DCMAKE_INSTALL_PREFIX=${INST_DIR} \

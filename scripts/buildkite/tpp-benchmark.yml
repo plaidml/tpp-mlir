@@ -1,0 +1,24 @@
+env:
+  # Required environment to call this script
+  #  - TPPROOT
+  #  - BUILD_DIR
+  #  - SRUN
+  LLVMROOT: "${TPPROOT}/llvm"
+  NPROCS_LIMIT_LINK: "8"
+  #LIBXSMM_VERBOSE: 4
+  #LIBXSMMFETCH: 1
+
+steps:
+  - label: "LLVM"
+    command: "${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/check_llvm.sh"
+  - wait
+
+  - label: "TPP-MLIR-bench"
+    command: "${SRUN} --partition=clx --time=0:30:00 -- \
+              'KIND=Release COMPILER=clang LINKER=lld CHECK=1 BENCH=1 \
+              $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
+    env:
+      LOGRPTSUM: "mlir"
+      #LOGRPTFMT: "svg"
+      #LOGRPTBND: "-"
+      LOGRPTQRY: ""
