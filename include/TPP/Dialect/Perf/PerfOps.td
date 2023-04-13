@@ -180,6 +180,36 @@ def Perf_BenchOp : Perf_Op<"bench",
       yield %x, ...
     }
     ```
+
+    If there are any operation present within the `perf.bench` region with
+    the tag `perf_bench_tag`, the timers get inserted before the first and
+    after the last tagged operation. All other ops present in the region e.g.,
+    value initialization, ops inserted by other passes etc., are ignored
+    whenever possible. However, untagged ops are not moved, even when they
+    are located between two tagged ops, to avoid influencing operation ordering
+    and/or data dependencies.
+    An example of the tag usage:
+    ```mlir
+    perf.bench (%n, %deltas : memref<?xf64>) {
+      op1
+      op2 attr = {perf_bench_tag}
+      op3
+      op4 attr = {perf_bench_tag}
+      op5
+    }
+    ```
+    is materialized as:
+    ```mlir
+    loop %iv from 0 to %n step 1 {
+      op1
+      start_timer
+      op2 attr = {perf_bench_tag}
+      op3
+      op4 attr = {perf_bench_tag}
+      %delta = stop_timer
+      op5
+    }
+    ```
   }];
 
   let arguments = (ins I64:$numIters,
@@ -203,6 +233,13 @@ def Perf_BenchOp : Perf_Op<"bench",
 
   let extraClassDeclaration = [{
     YieldOp getYieldOp();
+
+    static void tagOp(Operation* op) {
+      op->setAttr(getTagAttrStrName(),
+                  UnitAttr::get(op->getContext()));
+    }
+
+    static StringRef getTagAttrStrName() { return "perf_bench_tag"; }
   }];
 
   let hasVerifier = 1;

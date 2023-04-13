@@ -49,25 +49,42 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     // Move perf.bench region inside the loop.
     rewriter.mergeBlocks(&benchOp.getRegion().front(), loop.getBody());
 
+    // Gather tagged operations to be benchmarked.
+    SmallVector<Operation *> taggedOps;
+    const auto tagName = perf::BenchOp::getTagAttrStrName();
+    for (auto &op : loop.getRegion().getOps()) {
+      if (op.getAttr(tagName)) {
+        taggedOps.push_back(&op);
+      }
+    }
+
     // Wrap the benchmark kernel in timer calls.
     OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(loop.getBody());
+
+    if (!taggedOps.empty())
+      rewriter.setInsertionPoint(taggedOps.front());
+    else
+      rewriter.setInsertionPointToStart(loop.getBody());
     auto timer = rewriter.create<perf::StartTimerOp>(
         loc, TimerType::get(rewriter.getContext()));
-    rewriter.setInsertionPointToEnd(loop.getBody());
+
+    if (!taggedOps.empty())
+      rewriter.setInsertionPointAfter(taggedOps.back());
+    else
+      rewriter.setInsertionPointToEnd(loop.getBody());
     auto delta = rewriter.create<perf::StopTimerOp>(loc, rewriter.getF64Type(),
                                                     timer.getTimer());
-
-    // Move all perf.sink ops after the timer to prevent influencing
-    // measurements.
-    for (auto &op : loop.getRegion().getOps()) {
-      if (isa<perf::SinkOp>(op))
-        op.moveAfter(delta.getOperation());
-    }
 
     // Store measured time delta on each iteration.
     rewriter.create<memref::StoreOp>(loc, delta.getDelta(), benchOp.getDeltas(),
                                      loop.getInductionVar());
+
+    // Move all perf.sink ops to end of the loop to prevent influencing
+    // measurements.
+    for (auto &op : loop.getRegion().getOps()) {
+      if (isa<perf::SinkOp>(op))
+        op.moveBefore(loop.getBody(), loop.getBody()->end());
+    }
 
     // Replace uses of bench args within the benchmark body with their
     // equivalent loop-carried variables.
