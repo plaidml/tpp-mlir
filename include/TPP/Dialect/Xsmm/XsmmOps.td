@@ -261,9 +261,18 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
 //===----------------------------------------------------------------------===//
 
 // TODO: all the `flags` should be a list.
-class Xsmm_MatmulAndBrgemmDispatchOp<string mnemonic, list<Trait> traits = []> :
+class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
   Xsmm_Op<mnemonic, !listconcat(traits, [Pure])> {
-    let arguments = (ins DenseI64ArrayAttr:$inputs, 
+  let description = [{
+    Base class for 'matmul.dispatch' and 'brgemm.dispatch'. The operation has
+    the following arguments: 1) inputs carry information on leading dimensions and
+    sizes; for example,  in 'matmul.dispatch' the inputs are m, n, k, lda, ldb and
+    ldc. Inputs is a dense attribute of I64 elements. 2) flags carry information on
+    the different flags that can be used for matmul and brgemm (i.e., VNNI_B). For
+    more details, see: `Xsmm_GemmFlags`.
+  }];
+
+  let arguments = (ins DenseI64ArrayAttr:$inputs, 
                        Xsmm_GemmFlags:$flags, 
                        Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
@@ -274,7 +283,7 @@ class Xsmm_MatmulAndBrgemmDispatchOp<string mnemonic, list<Trait> traits = []> :
   }];
 }
 
-def Xsmm_MatmulDispatchOp : Xsmm_MatmulAndBrgemmDispatchOp<"matmul.dispatch"> {
+def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
   let summary = "dispatch for matmul operation."; 
 }
 
@@ -282,7 +291,7 @@ def Xsmm_MatmulDispatchOp : Xsmm_MatmulAndBrgemmDispatchOp<"matmul.dispatch"> {
 // BrgemmDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BrgemmDispatchOp : Xsmm_MatmulAndBrgemmDispatchOp<"brgemm.dispatch"> {
+def Xsmm_BrgemmDispatchOp : Xsmm_MatmulLikeOp<"brgemm.dispatch"> {
   let summary = "dispatch for brgemm operation."; 
 }
 
