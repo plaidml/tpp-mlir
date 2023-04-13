@@ -20,6 +20,7 @@ add_mlir_library(MLIRTPP
     ConvertForAllToParallelOp.cpp
     CombineTpp.cpp
     HeapToStack.cpp
+    PerfTagCalls.cpp
 
   # Utils
     TensorInit.cpp

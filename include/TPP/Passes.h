@@ -110,6 +110,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHeapToStackPass(unsigned maxAllocSizeInBytes = 4096);
+std::unique_ptr<OperationPass<func::FuncOp>> createPerfTagCallsPass();
 
 void registerTestStructuralMatchers();
 

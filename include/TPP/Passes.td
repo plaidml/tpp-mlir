@@ -370,4 +370,13 @@ def HeapToStack : Pass<"heap-to-stack", "func::FuncOp"> {
   let constructor = "mlir::tpp::createHeapToStackPass()";
 }
 
+def PerfTagCalls : Pass<"perf-tag-calls", "func::FuncOp"> {
+  let summary = "Perf tag all function calls within perf.bench.";
+  let description = [{
+    Mark all function calls found within perf.bench region
+    with the perf.bench measurement tag.
+  }];
+  let constructor = "mlir::tpp::createPerfTagCallsPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
