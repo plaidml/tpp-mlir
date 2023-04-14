@@ -1,3 +1,9 @@
+// RUN: tpp-run %s -n 10 \
+// RUN:  -e entry -entry-point-result=void
+
+// Total flops = matmul O(2*n*m*k) + BiasAdd (n*m) + ReLU (O(n*m) x 3
+// 2*256x1024x1024 (536870912) + 256x1024 (262144) + 256x1024 262144) x 3 = 1,072,168,960
+// BENCH_TOTAL_FLOPS: 1072168960
 
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
