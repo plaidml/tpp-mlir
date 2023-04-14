@@ -22,7 +22,7 @@
       "flags": [],
       "extensions": [ "avx2" ]
     },
-    "fp32_3x1024_mlir": {
+    "unpacked_fp32_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-unpacked-fp32-3layers-1024.mlir",
       "flags": [],
