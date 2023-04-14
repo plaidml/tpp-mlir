@@ -10,7 +10,7 @@
 #define TPP_XSMM_OPS
 
 include "TPP/Dialect/Xsmm/XsmmDialect.td"
-include "TPP/Dialect/Xsmm/XsmmAttr.td"
+include "TPP/Dialect/Xsmm/XsmmEnum.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, F32, BF16, I64]>;

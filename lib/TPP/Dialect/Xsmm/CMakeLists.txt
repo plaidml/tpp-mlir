@@ -1,6 +1,6 @@
 add_mlir_dialect_library(TPPXsmmDialect
   # Ops and dialects
-    XsmmAttr.cpp
+    XsmmEnum.cpp
     XsmmDialect.cpp
     XsmmOps.cpp
 

@@ -1,4 +1,4 @@
-//===- XsmmAttr.cpp - Xsmm dialect attr -------------------------*- C++ -*-===//
+//===- XsmmEnum.cpp - Xsmm dialect enum -------------------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Xsmm/XsmmAttr.h"
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace mlir::xsmm;
 
-#include "TPP/Dialect/Xsmm/XsmmAttr.cpp.inc"
+#include "TPP/Dialect/Xsmm/XsmmEnum.cpp.inc"
