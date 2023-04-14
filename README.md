@@ -70,7 +70,7 @@ export PATH=$CUSTOM_LLVM_ROOT/bin:$PATH
 
 # Build
 cmake -G Ninja ../llvm \
-   -DLLVM_ENABLE_PROJECTS="mlir;clang;openmp" \
+   -DLLVM_ENABLE_PROJECTS="mlir" \
    -DLLVM_BUILD_EXAMPLES=ON \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_TARGETS_TO_BUILD="X86;NVPTX;AMDGPU" \
