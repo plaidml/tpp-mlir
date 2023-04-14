@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -152,7 +151,7 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
 };
 
 static bool isMatmulLike(Operation *op) {
-  return linalgx::utils::isBlockedMatmul(op) || tpp::utils::isTppMatmul(op);
+  return linalgx::utils::isBlockedMatmul(op) || linalgx::utils::isMatmulOp(op);
 }
 
 static bool isConvolutionLike(Operation *op) {
@@ -570,7 +569,7 @@ static SmallVector<int64_t> getDefaultTileSizes(linalg::LinalgOp linalgOp) {
   if (linalgx::utils::isBlockedConvolution(linalgOp))
     return {1, 1, 1};
   // Matmuls are tiled and fused along i and j with 32.
-  if (tpp::utils::isTppMatmul(linalgOp))
+  if (linalgx::utils::isMatmulOp(linalgOp))
     return {32, 32};
   // Blocked matmuls are tiled and fused along the two outermost parallel loops
   // to expose a BRGEMM.

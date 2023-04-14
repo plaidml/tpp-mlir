@@ -56,10 +56,10 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
 FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
                                                     linalg::LinalgOp linalgOp,
                                                     unsigned upTo);
-// Return true if the convolution is blocked.
+// Return true if `op` is a blocked convolution.
 bool isBlockedConvolution(Operation *op);
 
-// Return true if the matmul is blocked.
+// Return true if `op` is a blocked matmul.
 bool isBlockedMatmul(Operation *op);
 
 // Validate a tile configuration for a linalgOp when we can statically do that.
@@ -69,6 +69,14 @@ bool isBlockedMatmul(Operation *op);
 bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
                              ArrayRef<size_t> dims = {});
+
+// Return true if `op` is a linalg.matmul
+bool isMatmulOp(Operation *op,
+                SmallVectorImpl<Value> *capturedOperands = nullptr);
+
+// Returns true if the linalg operation has a MulAdd region.
+bool hasMulAddBody(linalg::LinalgOp linalgOp,
+                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 } // namespace utils
 } // namespace linalgx

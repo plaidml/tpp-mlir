@@ -162,7 +162,7 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
 
 // single region block with add, mul and linalg::yield.
 static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
-  if (!tpp::utils::hasMulAddBody(linalgOp))
+  if (!linalgx::utils::hasMulAddBody(linalgOp))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
   return success();
