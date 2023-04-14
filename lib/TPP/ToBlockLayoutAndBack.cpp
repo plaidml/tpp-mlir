@@ -619,7 +619,7 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasTensorSemantics())
       return failure();
-    if (!tpp::utils::isMarkedWithTpp(linalgOp, "tpp.matmul"))
+    if (!linalgx::utils::isMatmulOp(linalgOp))
       return failure();
     SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
     SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
