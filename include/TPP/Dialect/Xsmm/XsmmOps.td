@@ -260,7 +260,6 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
 // MatmulDispatchOp
 //===----------------------------------------------------------------------===//
 
-// TODO: all the `flags` should be a list.
 class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
   Xsmm_Op<mnemonic, !listconcat(traits, [Pure])> {
   let description = [{
@@ -276,11 +275,7 @@ class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
                        TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
                        Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
-
-  let assemblyFormat = [{
-    $inputs `(` `flags` `=` $flags `,` 
-                `data_type` `=` $dataType `)` attr-dict
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
