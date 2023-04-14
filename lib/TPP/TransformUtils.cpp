@@ -8,7 +8,7 @@
 
 #include <utility>
 
-#include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -21,6 +21,95 @@ namespace mlir {
 namespace linalgx {
 
 namespace utils {
+
+// taken from LinalgInterfaces.cpp
+// Returns true if the use-def chain from `v` to `from` consists of 0 or more
+// unary single-operand operations.
+// TODO: relax to multi-operands with constants, which are technically unary ops
+// as needed (e.g. add5).
+static bool isChainOfUnaryOpsFrom(Value v, Value from) {
+  while (true) {
+    if (v == from)
+      return true;
+    Operation *op = v.getDefiningOp();
+    if (!op || op->getNumOperands() != 1)
+      return false;
+    v = op->getOperand(0);
+  };
+}
+
+// taken from LinalgInterfaces.cpp
+// Returns the unique instance of OpType in `block` if it is indeed unique.
+// Returns null if none or more than 1 instances exist.
+template <typename OpType> static OpType getSingleOpOfType(Block &block) {
+  OpType res = nullptr;
+  block.walk([&](OpType op) {
+    if (res) {
+      res = nullptr;
+      return WalkResult::interrupt();
+    }
+    res = op;
+    return WalkResult::advance();
+  });
+  return res;
+}
+
+// Taken from: LinalgInterfaces.cpp
+// Detect whether res is any permutation of `u5(u1(c) + u2(u3(a) * u4(b)))`
+// on the field (AddOpType, MulOpType), where u1, u2, u3, u4 and u5 represent
+// unary operations that may change the type.
+template <typename AddOpType, typename MulOpType>
+static bool isAddMul(linalg::LinalgOp linalgOp,
+                     SmallVectorImpl<Value> *capturedOperands) {
+  Block &block = linalgOp->getRegion(0).front();
+  if (block.getNumArguments() != 3)
+    return false;
+  Operation *yieldOp = block.getTerminator();
+  if (yieldOp->getNumOperands() != 1)
+    return false;
+
+  AddOpType addOp = getSingleOpOfType<AddOpType>(block);
+  MulOpType mulOp = getSingleOpOfType<MulOpType>(block);
+  if (!addOp || !mulOp)
+    return false;
+
+  BlockArgument argA = block.getArgument(0), argB = block.getArgument(1);
+  Value a = mulOp->getOperand(0), b = mulOp->getOperand(1);
+  Value mul = mulOp->getResult(0);
+  BlockArgument argC = block.getArgument(2);
+  Value c1 = addOp->getOperand(0), c2 = addOp->getOperand(1);
+  Value add = addOp->getResult(0);
+  Value res = yieldOp->getOperand(0);
+  // Result traces back to add.
+  auto un = isChainOfUnaryOpsFrom;
+  bool success = un(res, add);
+  // One of the operands of add traces back to argC, the other to the mul.
+  success |= (un(c1, argC) && un(c2, mul)) || ((un(c1, mul)) && un(c2, argC));
+  // One of the operands of mul traces back to argA, the other to argB.
+  success |= (un(a, argA) && un(b, argB)) || ((un(a, argB)) && un(b, argA));
+  if (capturedOperands) {
+    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argA)->get());
+    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argB)->get());
+    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argC)->get());
+  }
+  return success;
+}
+
+bool hasMulAddBody(linalg::LinalgOp linalgOp,
+                   SmallVectorImpl<Value> *capturedOperands) {
+  if (linalgOp->getNumRegions() != 1)
+    return false;
+  Region &region = linalgOp->getRegion(0);
+  if (!region.hasOneBlock())
+    return false;
+  if (std::distance(region.front().begin(), region.front().end()) != 3)
+    return false;
+  bool isFloat =
+      isAddMul<arith::AddFOp, arith::MulFOp>(linalgOp, capturedOperands);
+  bool isInt =
+      isAddMul<arith::AddIOp, arith::MulIOp>(linalgOp, capturedOperands);
+  return (isFloat || isInt);
+}
 
 // Given localIvs being outermost dimensions of the current linalg operation,
 // return the dimensions used by a given operand looking at its access map. As
@@ -206,7 +295,7 @@ bool isBlockedConvolution(Operation *op) {
     return false;
   if (failed(mlir::linalg::detail::verifyConvolutionInterface(linalgOp)))
     return false;
-  return tpp::utils::hasMulAddBody(linalgOp);
+  return hasMulAddBody(linalgOp, /*captures=*/nullptr);
 }
 
 static llvm::SmallDenseSet<unsigned> getPreservedDims(AffineMap map) {
@@ -285,7 +374,7 @@ bool isBlockedMatmul(Operation *op) {
   if (linalgOp.getNumDpsInputs() != 2 || linalgOp.getNumDpsInits() != 1)
     return false;
 
-  if (!tpp::utils::hasMulAddBody(linalgOp))
+  if (!hasMulAddBody(linalgOp, /*captures=*/nullptr))
     return false;
 
   // Check the input indexing map has the right form.
@@ -425,6 +514,52 @@ bool validateFullTilesOnDims(TilingInterface tileOp,
       return false;
   }
   return true;
+}
+
+namespace {
+// Helper matcher functor for matmul detection.
+struct WithMulAddBody {
+  WithMulAddBody() = delete;
+  WithMulAddBody(SmallVectorImpl<Value> *captures) : captures(captures){};
+
+  bool operator()(Region *region, Operation *op) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp)
+      return false;
+
+    return hasMulAddBody(linalgOp, captures);
+  }
+
+private:
+  SmallVectorImpl<Value> *captures;
+};
+} // namespace
+
+bool isMatmulOp(Operation *op, SmallVectorImpl<Value> *operands) {
+  if (isa_and_nonnull<linalg::MatmulOp>(op))
+    return true;
+  if (!isa_and_nonnull<linalg::GenericOp>(op))
+    return false;
+  auto linalgOp = cast<linalg::GenericOp>(op);
+  using namespace tpp::structured_match;
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr i, j, k;
+  bindDims(linalgOp.getContext(), i, j, k);
+  auto mapList = infer({{i, k}, {k, j}, {i, j}});
+  auto matmulMatcher =
+      StructuredOpMatcher::make<linalg::GenericOp>()
+          .operation(NumDpsInits(EqualsTo(1)))
+          .operation(NumDpsInputs(EqualsTo(2)))
+          .operation(NumRegions(EqualsTo(1)))
+          .dim(MatchAll(), {mlir::utils::IteratorType::reduction,
+                            mlir::utils::IteratorType::parallel,
+                            mlir::utils::IteratorType::parallel})
+          .input(MatchOne(0), HasMap(EqualsTo(mapList[0])))
+          .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
+          .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
+          .region(MatchOne(0), WithMulAddBody(operands));
+  return matmulMatcher.match(linalgOp);
 }
 
 } // namespace utils
