@@ -9,11 +9,7 @@
 #ifndef XSMM_TPP_DIALECT_H
 #define XSMM_TPP_DIALECT_H
 
-#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "mlir/IR/Dialect.h"
-
-#define GET_ATTRDEF_CLASSES
-#include "TPP/Dialect/Xsmm/XsmmAttr.h.inc"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOpsDialect.h.inc"

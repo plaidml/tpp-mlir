@@ -9,6 +9,7 @@
 #ifndef TPP_DIALECT_XSMM_XSMMOPS_H
 #define TPP_DIALECT_XSMM_XSMMOPS_H
 
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

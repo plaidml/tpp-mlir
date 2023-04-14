@@ -91,6 +91,3 @@ def Xsmm_GemmFlags : I64EnumAttr<
     ]> {
   let cppNamespace = "mlir::xsmm";
 }
-
-def ArrayOfGemmFlags : ArrayOfAttr<Xsmm_Dialect, "ArrayOfGemmFlags",
-  "array of gemm flags", "GemmFlagsAttr">;

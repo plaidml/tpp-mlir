@@ -9,10 +9,6 @@
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/DialectImplementation.h"
-#include "llvm/ADT/TypeSwitch.h"
-
 using namespace mlir;
 using namespace mlir::xsmm;
 
@@ -25,13 +21,6 @@ void XsmmDialect::initialize() {
 #define GET_OP_LIST
 #include "TPP/Dialect/Xsmm/XsmmOps.cpp.inc"
       >();
-  addAttributes<
-#define GET_ATTRDEF_LIST
-#include "TPP/Dialect/Xsmm/XsmmAttr.cpp.inc"
-      >();
 }
 
 #include "TPP/Dialect/Xsmm/XsmmOpsDialect.cpp.inc"
-
-#define GET_ATTRDEF_CLASSES
-#include "TPP/Dialect/Xsmm/XsmmAttr.cpp.inc"

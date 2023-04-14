@@ -370,9 +370,12 @@ static LogicalResult dispatchBrgemmOrGemm(RewriterBase &rewriter,
   }
 
   // Dispatch the flags.
-  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, dispatchOp.getFlagsAttr()));
-  dispatchOperandTypes.push_back(integer64);
+  for (auto flag : dispatchOp.getFlagsAttr()) {
+    auto intAttr = flag.template dyn_cast<IntegerAttr>();
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, intAttr));
+    dispatchOperandTypes.push_back(integer64);
+  }
 
   func::CallOp call =
       buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,

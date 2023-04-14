@@ -122,7 +122,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmAttr =
+    xsmm::GemmFlagsAttr gemmFlag =
         xsmm::GemmFlagsAttr::get(matmulOp.getContext(), xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype;
     if (memrefC.getElementType().isBF16()) {
@@ -136,7 +136,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
     }
 
     Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
-        loc, integer64, dims, gemmAttr, dtype);
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -185,12 +185,13 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmAttr = xsmm::GemmFlagsAttr::get(
+    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
         matmulOp.getContext(), xsmm::GemmFlags::VNNI_B);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
+
     Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
-        loc, integer64, dims, gemmAttr, dtype);
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -236,7 +237,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmAttr =
+    xsmm::GemmFlagsAttr gemmFlag =
         xsmm::GemmFlagsAttr::get(brgemmOp.getContext(), xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
@@ -251,7 +252,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     }
 
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-        loc, integer64, dims, gemmAttr, dtype);
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
     SmallVector<Value, 6> invokeOperands;
@@ -304,13 +306,14 @@ struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmAttr = xsmm::GemmFlagsAttr::get(
+    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
         brgemmOp.getContext(), xsmm::GemmFlags::VNNI_B);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
 
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-        loc, integer64, dims, gemmAttr, dtype);
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
     SmallVector<Value, 6> invokeOperands;

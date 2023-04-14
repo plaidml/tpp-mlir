@@ -273,7 +273,7 @@ class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
   }];
 
   let arguments = (ins DenseI64ArrayAttr:$inputs, 
-                       Xsmm_GemmFlags:$flags, 
+                       TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
                        Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
