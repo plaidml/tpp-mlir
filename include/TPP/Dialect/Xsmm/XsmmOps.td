@@ -271,15 +271,19 @@ class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
     more details, see: `Xsmm_GemmFlags`.
   }];
 
-  let arguments = (ins DenseI64ArrayAttr:$inputs, 
-                       TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
-                       Xsmm_DataType:$dataType);
+  let arguments = (ins 
+    ConfinedAttr<DenseI64ArrayAttr,
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs, 
+    TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
+    Xsmm_DataType:$dataType);
+  
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
 }
 
 def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
   let summary = "dispatch for matmul operation."; 
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -288,6 +292,7 @@ def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
 
 def Xsmm_BrgemmDispatchOp : Xsmm_MatmulLikeOp<"brgemm.dispatch"> {
   let summary = "dispatch for brgemm operation."; 
+  let hasVerifier = 1;
 }
 
 #endif // TPP_XSMM_OPS

@@ -62,8 +62,8 @@ static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   DataType dataType;
   if (parseEnum(dataType, parser))
     return failure();
-  result.addAttribute(
-      "dataType", builder.getI64IntegerAttr(static_cast<int64_t>(dataType)));
+  result.addAttribute("dataType",
+                      DataTypeAttr::get(builder.getContext(), dataType));
   result.addTypes(builder.getIntegerType(64));
 
   // Parse the optional attribute list
@@ -102,4 +102,46 @@ void MatmulDispatchOp::print(OpAsmPrinter &printer) {
 
 void BrgemmDispatchOp::print(OpAsmPrinter &printer) {
   printerImpl<BrgemmDispatchOp>(printer, *this);
+}
+
+static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
+                                     Operation *op) {
+  SmallVector<int64_t> flagsAsInt;
+  for (auto flag : flags) {
+    flagsAsInt.push_back(flag.cast<IntegerAttr>().getInt());
+  }
+  // check uniqueness
+  std::sort(flagsAsInt.begin(), flagsAsInt.end());
+  auto *it = std::unique(flagsAsInt.begin(), flagsAsInt.end());
+  if (it != flagsAsInt.end())
+    return op->emitOpError() << "expected flags to be unique";
+  // none flag conflicts with all the others
+  if (llvm::is_contained(flagsAsInt, static_cast<int64_t>(GemmFlags::NONE)) &&
+      flagsAsInt.size() != 1)
+    return op->emitOpError() << "'none' flags conflicts with others";
+  // VNNI flags must be specified only for bf16 type
+  if (dataType != DataType::BF16 && llvm::any_of(flagsAsInt, [](int64_t flag) {
+        return (flag == static_cast<int64_t>(GemmFlags::VNNI_B) ||
+                flag == static_cast<int64_t>(GemmFlags::VNNI_A) ||
+                flag == static_cast<int64_t>(GemmFlags::VNNI_C));
+      })) {
+    return op->emitOpError() << "VNNI flags but type is not bf16";
+  }
+  return success();
+}
+
+template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
+  // `inputs` are leading dimensions and sizes, expect 6 inputs only
+  size_t numInputs = op.getInputs().size();
+  if (numInputs != 6)
+    return op.emitOpError() << "expect 6 args but got: " << numInputs;
+  return verifyGemmFlags(op.getFlags(), op.getDataType(), op);
+}
+
+LogicalResult MatmulDispatchOp::verify() {
+  return verifyGemmLikeOp<MatmulDispatchOp>(*this);
+}
+
+LogicalResult BrgemmDispatchOp::verify() {
+  return verifyGemmLikeOp<BrgemmDispatchOp>(*this);
 }

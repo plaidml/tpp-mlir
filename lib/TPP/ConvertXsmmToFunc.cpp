@@ -369,13 +369,24 @@ static LogicalResult dispatchBrgemmOrGemm(RewriterBase &rewriter,
     dispatchOperandTypes.push_back(integer64);
   }
 
-  // Dispatch the flags.
+  // Dispatch the flags. Pass to the library the already ored-flag to
+  // avoid changing the interface every time we add a new flag. Flags
+  // are assumed to be verified before (i.e., op verifier).
+  int64_t oredFlag = 0;
   for (auto flag : dispatchOp.getFlagsAttr()) {
-    auto intAttr = flag.template dyn_cast<IntegerAttr>();
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, intAttr));
-    dispatchOperandTypes.push_back(integer64);
+    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
+    // LIBXSMM is col-major, swap A and B flags.
+    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
+      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
+      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
+    }
+    oredFlag |= intAttr;
   }
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
+  dispatchOperandTypes.push_back(integer64);
 
   func::CallOp call =
       buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
