@@ -135,7 +135,7 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAG_NONE;
-  if (flags == LIBXSMM_GEMM_FLAG_VNNI_B) {
+  if (flags & LIBXSMM_GEMM_FLAG_VNNI_B) {
     assert(dtype == LIBXSMM_DATATYPE_BF16);
     l_flags = l_flags | LIBXSMM_GEMM_FLAG_VNNI_A;
   } else {
@@ -393,7 +393,7 @@ extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch(
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAG_NONE;
-  if (flags == LIBXSMM_GEMM_FLAG_VNNI_B) {
+  if (flags & LIBXSMM_GEMM_FLAG_VNNI_B) {
     assert(dtype == LIBXSMM_DATATYPE_BF16);
     // We swap A and B since LIBXSMM is col-major.
     // We need to update the flag.
