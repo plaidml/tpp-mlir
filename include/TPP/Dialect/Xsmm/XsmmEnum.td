@@ -59,9 +59,9 @@ def Xsmm_UnaryFlags : I64EnumAttr<
     "UnaryFlags", "see: libxsmm_meltw_unary_flags",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
-      I64EnumAttrCase<"BCAST_ROW", 2, "row">,
-      I64EnumAttrCase<"BCAST_COL", 4, "col">,
-      I64EnumAttrCase<"BCAST_SCALAR", 8, "scalar">
+      I64EnumAttrCase<"BCAST_ROW", 2, "bcast_row">,
+      I64EnumAttrCase<"BCAST_COL", 4, "bcast_col">,
+      I64EnumAttrCase<"BCAST_SCALAR", 8, "bcast_scalar">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }
@@ -76,6 +76,14 @@ def Xsmm_BinaryFlags : I64EnumAttr<
       I64EnumAttrCase<"BCAST_COL_IN_1", 8, "bcast_col_in1">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_0", 16, "bcast_scalar_in0">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_1", 32, "bcast_scalar_in1">
+    ]> {
+  let cppNamespace = "mlir::xsmm";
+}
+
+def Xsmm_TernaryFlags : I64EnumAttr<
+    "TernaryFlags", "see: libxsmm_meltw_ternary_flags",
+    [
+      I64EnumAttrCase<"NONE", 0, "none">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: dispatch_unary
 func.func @dispatch_unary() -> i64 {
-  %0 = xsmm.unary.dispatch identity [5, 6, 5, 6](broadcast row dataType f32)
+  %0 = xsmm.unary.dispatch identity [5, 6, 5, 6] flags = (bcast_row) data_type = f32
   return %0: i64
 }
 
@@ -10,7 +10,7 @@ func.func @dispatch_unary() -> i64 {
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
-// CHECK: call @xsmm_unary_dispatch(%[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C1]], %[[C2]])
+// CHECK: call @xsmm_unary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C2]])
 
 // -----
 

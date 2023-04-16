@@ -30,6 +30,7 @@ static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
   return success();
 }
 
+template <typename FLAGS>
 static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   // Parse the input
@@ -46,8 +47,8 @@ static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   // Parse flags
   SmallVector<Attribute, 4> flags;
   auto parseFlags = [&]() -> ParseResult {
-    GemmFlags flag;
-    if (parseEnum(flag, parser))
+    FLAGS flag;
+    if (parseEnum<FLAGS>(flag, parser))
       return failure();
     flags.push_back(builder.getI64IntegerAttr(static_cast<int64_t>(flag)));
     return success();
@@ -72,22 +73,54 @@ static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
 
 ParseResult MatmulDispatchOp::parse(OpAsmParser &parser,
                                     OperationState &result) {
-  return parserImpl(parser, result);
+  return parserImpl<GemmFlags>(parser, result);
 }
 
 ParseResult BrgemmDispatchOp::parse(OpAsmParser &parser,
                                     OperationState &result) {
-  return parserImpl(parser, result);
+  return parserImpl<GemmFlags>(parser, result);
 }
 
-template <typename OpTy>
+ParseResult UnaryDispatchOp::parse(OpAsmParser &parser,
+                                   OperationState &result) {
+  // Parse the type of unary
+  UnaryKind kind;
+  if (parseEnum(kind, parser))
+    return failure();
+  result.addAttribute(
+      "kind", UnaryKindAttr::get(parser.getBuilder().getContext(), kind));
+  return parserImpl<UnaryFlags>(parser, result);
+}
+
+ParseResult BinaryDispatchOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
+  // Parse the type of binary
+  BinaryKind kind;
+  if (parseEnum(kind, parser))
+    return failure();
+  result.addAttribute(
+      "kind", BinaryKindAttr::get(parser.getBuilder().getContext(), kind));
+  return parserImpl<BinaryFlags>(parser, result);
+}
+
+ParseResult TernaryDispatchOp::parse(OpAsmParser &parser,
+                                     OperationState &result) {
+  // Parse the type of ternary
+  TernaryKind kind;
+  if (parseEnum(kind, parser))
+    return failure();
+  result.addAttribute(
+      "kind", TernaryKindAttr::get(parser.getBuilder().getContext(), kind));
+  return parserImpl<TernaryFlags>(parser, result);
+}
+
+template <typename OpTy, typename AttrTy>
 static void printerImpl(OpAsmPrinter &printer, OpTy op) {
   printer << " [" << op.getInputs() << ']';
   printer << " "
           << " flags = (";
-  llvm::interleaveComma(op.getFlags(), printer, [&](auto &attr) {
-    auto flag = *symbolizeGemmFlags(attr.template cast<IntegerAttr>().getInt());
-    printer << xsmm::stringifyGemmFlags(flag);
+  llvm::interleaveComma(op.getFlags(), printer, [&](auto &flag) {
+    printer << stringifyEnum(flag.template cast<AttrTy>().getValue());
   });
   printer << ") data_type = ";
   auto dataType = op.getDataType();
@@ -97,11 +130,26 @@ static void printerImpl(OpAsmPrinter &printer, OpTy op) {
 }
 
 void MatmulDispatchOp::print(OpAsmPrinter &printer) {
-  printerImpl<MatmulDispatchOp>(printer, *this);
+  printerImpl<MatmulDispatchOp, GemmFlagsAttr>(printer, *this);
 }
 
 void BrgemmDispatchOp::print(OpAsmPrinter &printer) {
-  printerImpl<BrgemmDispatchOp>(printer, *this);
+  printerImpl<BrgemmDispatchOp, GemmFlagsAttr>(printer, *this);
+}
+
+void UnaryDispatchOp::print(OpAsmPrinter &printer) {
+  printer << " " << getKind();
+  printerImpl<UnaryDispatchOp, UnaryFlagsAttr>(printer, *this);
+}
+
+void BinaryDispatchOp::print(OpAsmPrinter &printer) {
+  printer << " " << getKind();
+  printerImpl<BinaryDispatchOp, BinaryFlagsAttr>(printer, *this);
+}
+
+void TernaryDispatchOp::print(OpAsmPrinter &printer) {
+  printer << " " << getKind();
+  printerImpl<TernaryDispatchOp, TernaryFlagsAttr>(printer, *this);
 }
 
 static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,

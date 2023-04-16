@@ -210,13 +210,11 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
     Xsmm_TernaryKind:$kind,
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    TypedArrayAttrBase<Xsmm_TernaryFlags, "ternary flags">:$flags,
     Xsmm_DataType:$dataType);
   
   let results = (outs I64:$results);
-
-  let assemblyFormat = [{
-    $kind $inputs `(` `dataType` $dataType `)` attr-dict
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let hasVerifier = 1;
 }
@@ -235,13 +233,11 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
     Xsmm_BinaryKind:$kind,
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
-    Xsmm_BinaryFlags:$flags, Xsmm_DataType:$dataType);
+    TypedArrayAttrBase<Xsmm_BinaryFlags, "binary flags">:$flags,
+    Xsmm_DataType:$dataType);
   
   let results = (outs I64:$results);
-
-  let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let hasVerifier = 1;
 }
@@ -260,14 +256,12 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
     Xsmm_UnaryKind:$kind, 
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
-    Xsmm_UnaryFlags:$flags, Xsmm_DataType:$dataType);
+    TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$flags, 
+    Xsmm_DataType:$dataType);
   
   let results = (outs I64:$results);
-
-  let assemblyFormat = [{
-    $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
-  }];
-
+  let hasCustomAssemblyFormat = 1;
+  
   let hasVerifier = 1;
 }
 

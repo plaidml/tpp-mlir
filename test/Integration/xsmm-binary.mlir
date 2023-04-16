@@ -6,7 +6,7 @@ memref.global "private" constant @__constant_bias : memref<3x3xf32> = dense<1.0>
 
 func.func @entry(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   %0 = memref.get_global @__constant_bias : memref<3x3xf32>
-  %1 = xsmm.binary.dispatch add [3, 3, 3, 3, 3](broadcast none dataType f32)
+  %1 = xsmm.binary.dispatch add [3, 3, 3, 3, 3] flags = (none) data_type = f32
   xsmm.binary add(dataType f32, %1, %arg0, %0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return

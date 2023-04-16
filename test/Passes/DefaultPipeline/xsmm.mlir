@@ -8,7 +8,7 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
-  %0 = xsmm.binary.dispatch add [3, 3, 3, 3, 3](broadcast none dataType f32)
+  %0 = xsmm.binary.dispatch add [3, 3, 3, 3, 3] flags = (none) data_type = f32
   xsmm.binary add(dataType f32, %0, %arg0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
@@ -28,7 +28,7 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
     %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
     %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
-    %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10](broadcast none dataType f32)
+    %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
     xsmm.binary add(dataType f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32>, memref<10x10xf32>) -> ()
 
   return
@@ -51,7 +51,7 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
   scf.parallel (%arg2) = (%c0) to (%c10) step (%c1) {
     %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
-    %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10](broadcast none dataType f32)
+    %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
     xsmm.binary add(dataType f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
     scf.yield
   }
@@ -69,7 +69,7 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast1]]
-  %0 = xsmm.unary.dispatch identity [3, 3, 1, 3](broadcast scalar dataType f32)
+  %0 = xsmm.unary.dispatch identity [3, 3, 1, 3] flags = (bcast_scalar) data_type = f32
   xsmm.unary identity(dataType f32, %0, %arg1, %arg0) : (i64, memref<1x1xf32>, memref<3x3xf32>) -> ()
 
   return
@@ -93,7 +93,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
   %alloc = memref.alloc() {alignment = 128 : i64} : memref<12x56x56x64xf32>
   scf.parallel (%arg1, %arg2) = (%c0, %c0) to (%c12, %c56) step (%c1, %c1) {
     %subview = memref.subview %alloc[%arg1, %arg2, 0, 0] [1, 1, 56, 64] [1, 1, 1, 1] : memref<12x56x56x64xf32> to memref<56x64xf32, #map>
-    %0 = xsmm.unary.dispatch identity [56, 64, 64, 64](broadcast col dataType f32)
+    %0 = xsmm.unary.dispatch identity [56, 64, 64, 64] flags = (bcast_col) data_type = f32
     xsmm.unary identity(dataType f32, %0, %arg0, %subview) : (i64, memref<64xf32>, memref<56x64xf32, #map>) -> ()
     scf.yield
   }
@@ -109,7 +109,7 @@ func.func @relu(%arg0: memref<3x3xf32>) {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
-  %0 = xsmm.unary.dispatch relu [3, 3, 3, 3](broadcast none dataType f32)
+  %0 = xsmm.unary.dispatch relu [3, 3, 3, 3] flags = (none) data_type = f32
   xsmm.unary relu(dataType f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
@@ -131,7 +131,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   %c1 = arith.constant 1 : index
   scf.parallel (%arg1) = (%c0) to (%c64) step (%c1) {
     %subview = memref.subview %arg0[%arg1, 0, 0] [1, 32, 32] [1, 1, 1] : memref<64x32x32xf32> to memref<32x32xf32, #map>
-    %0 = xsmm.unary.dispatch relu [32, 32, 32, 32](broadcast none dataType f32)
+    %0 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
     xsmm.unary relu(dataType f32, %0, %subview, %subview) : (i64, memref<32x32xf32, #map>, memref<32x32xf32, #map>) -> ()
     scf.yield
   }
@@ -306,7 +306,7 @@ module @predict_function {
     // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
     // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
-    %0 = xsmm.unary.dispatch identity [128, 512, 512, 512](broadcast col dataType f32)
+    %0 = xsmm.unary.dispatch identity [128, 512, 512, 512] flags = (bcast_col) data_type = f32
     xsmm.unary identity(dataType f32, %0, %arg2, %arg3) : (i64, memref<512xf32>, memref<128x512xf32>) -> ()
 
     // Matmul
@@ -320,7 +320,7 @@ module @predict_function {
     // Relu
     // CHECK: call @xsmm_unary_dispatch
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
-    %2 = xsmm.unary.dispatch relu [128, 512, 512, 512](broadcast none dataType f32)
+    %2 = xsmm.unary.dispatch relu [128, 512, 512, 512] flags = (none) data_type = f32
     xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
     return
