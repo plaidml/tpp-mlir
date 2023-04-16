@@ -197,24 +197,21 @@ def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch",[Pure]> {
 // TernaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-// TODO: drop isVNNI
 def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
   let summary = "dispatch ternary operation.";
   let description = [{
     The 'kind' carries information about the name of the LIBXSMM function to
-    dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
-    dataType is passed to set the datatype in libxsmm call.
-    Additional I64 operands are passed based on the operation to
-    dispatch. For example, leading dimensions or sizes. Returns
-    the pointer to call as I64.
+    dispatch.  'dataType' is passed to set the datatype in libxsmm call.
+    Additional I64 operands are passed based on the operation to dispatch. For
+    example, leading dimensions or sizes. Returns the pointer to call as I64.
   }];
 
   let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_DataType:$dataType, BoolAttr:$isVNNI);
+                       Xsmm_DataType:$dataType);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `dataType` $dataType `,` `isVNNI` $isVNNI `)` attr-dict
+    $kind $inputs `(` `dataType` $dataType `)` attr-dict
   }];
 }
 
