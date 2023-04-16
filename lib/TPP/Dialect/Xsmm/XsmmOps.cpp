@@ -131,11 +131,21 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
   return success();
 }
 
-template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
-  // `inputs` are leading dimensions and sizes, expect 6 inputs only
+template <typename OpTy>
+static LogicalResult verifyInputs(OpTy op, size_t expected) {
+  // `inputs` are leading dimensions and sizes
   size_t numInputs = op.getInputs().size();
-  if (numInputs != 6)
-    return op.emitOpError() << "expect 6 args but got: " << numInputs;
+  if (numInputs != expected) {
+    return op.emitOpError()
+           << "expect " << expected << " args but got: " << numInputs;
+  }
+  return success();
+}
+
+template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
+  // 'inputs' = [m, n, k, lda, ldb, ldc]
+  if (failed(verifyInputs(op, /*expected=*/6)))
+    return failure();
   return verifyGemmFlags(op.getFlags(), op.getDataType(), op);
 }
 
@@ -145,4 +155,25 @@ LogicalResult MatmulDispatchOp::verify() {
 
 LogicalResult BrgemmDispatchOp::verify() {
   return verifyGemmLikeOp<BrgemmDispatchOp>(*this);
+}
+
+LogicalResult UnaryDispatchOp::verify() {
+  // 'inputs' = [m, n, lda, ldo]
+  if (failed(verifyInputs(*this, /*expected=*/4)))
+    return failure();
+  return success();
+}
+
+LogicalResult BinaryDispatchOp::verify() {
+  // 'inputs' = [m, n, lda, ldb, ldo]
+  if (failed(verifyInputs(*this, /*expected=*/5)))
+    return failure();
+  return success();
+}
+
+LogicalResult TernaryDispatchOp::verify() {
+  // 'inputs' = [m, n, k, lda, ldb, ldc]
+  if (failed(verifyInputs(*this, /*expected=*/6)))
+    return failure();
+  return success();
 }

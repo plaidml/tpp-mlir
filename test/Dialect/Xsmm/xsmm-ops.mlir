@@ -13,10 +13,10 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
     : (memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.binary.dispatch
-  %0 = xsmm.binary.dispatch add [3, 2, 1] (broadcast none dataType f32)
+  %0 = xsmm.binary.dispatch add [3, 2, 1, 3, 2] (broadcast none dataType f32)
 
   // CHECK: xsmm.unary.dispatch
-  %1 = xsmm.unary.dispatch identity [3, 2, 1] (broadcast row dataType f32)
+  %1 = xsmm.unary.dispatch identity [3, 2, 1, 3] (broadcast row dataType f32)
 
   // CHECK: xsmm.matmul
   xsmm.matmul (dataType f32, %arg0, %arg1, %arg2) 

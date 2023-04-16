@@ -206,13 +206,19 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
     example, leading dimensions or sizes. Returns the pointer to call as I64.
   }];
 
-  let arguments = (ins Xsmm_TernaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_DataType:$dataType);
+  let arguments = (ins 
+    Xsmm_TernaryKind:$kind,
+    ConfinedAttr<DenseI64ArrayAttr,
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    Xsmm_DataType:$dataType);
+  
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
     $kind $inputs `(` `dataType` $dataType `)` attr-dict
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -225,13 +231,19 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
     See 'ternary.dispatch'.
   }];
 
-  let arguments = (ins Xsmm_BinaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_BinaryFlags:$flags, Xsmm_DataType:$dataType);
+  let arguments = (ins 
+    Xsmm_BinaryKind:$kind,
+    ConfinedAttr<DenseI64ArrayAttr,
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    Xsmm_BinaryFlags:$flags, Xsmm_DataType:$dataType);
+  
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
     $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -244,13 +256,19 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
     See 'ternary.dispatch'.
   }];
 
-  let arguments = (ins Xsmm_UnaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_UnaryFlags:$flags, Xsmm_DataType:$dataType);
+  let arguments = (ins 
+    Xsmm_UnaryKind:$kind, 
+    ConfinedAttr<DenseI64ArrayAttr,
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    Xsmm_UnaryFlags:$flags, Xsmm_DataType:$dataType);
+  
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
     $kind $inputs `(` `broadcast` $flags `dataType` $dataType `)` attr-dict
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
