@@ -82,26 +82,19 @@ struct CombineTppOpPattern : public OpRewritePattern<tpp::ReluOp> {
     if (brgemmOp == NULL) {
       return failure();
     }
-    Value result;
     // Replace brgemm-addbcast-relu ops into one large tpp op
     if (isVNNILayout(brgemmOp)) {
-      result = rewriter
-                   .create<tpp::FusedVNNIBrgemmOp>(
-                       reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
-                       brgemmOp->getOpOperands()[1].get(),
-                       addOp->getOpOperands()[1].get(),
-                       reluOp->getOpOperands()[1].get())
-                   ->getResult(0);
+      rewriter.create<tpp::FusedVNNIBrgemmOp>(
+          reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
+          brgemmOp->getOpOperands()[1].get(), addOp->getOpOperands()[1].get(),
+          reluOp->getOpOperands()[1].get());
     } else {
-      result = rewriter
-                   .create<tpp::FusedBrgemmOp>(
-                       reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
-                       brgemmOp->getOpOperands()[1].get(),
-                       addOp->getOpOperands()[1].get(),
-                       tpp::FusedOpTypeAttr::get(brgemmOp->getContext(),
-                                                 tpp::FusedOpType::RELU),
-                       reluOp->getOpOperands()[1].get())
-                   ->getResult(0);
+      rewriter.create<tpp::FusedBrgemmOp>(
+          reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
+          brgemmOp->getOpOperands()[1].get(), addOp->getOpOperands()[1].get(),
+          tpp::FusedOpTypeAttr::get(brgemmOp->getContext(),
+                                    tpp::FusedOpType::RELU),
+          reluOp->getOpOperands()[1].get());
     }
     rewriter.eraseOp(reluOp);
     rewriter.eraseOp(addOp);

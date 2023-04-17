@@ -80,8 +80,8 @@ void Bufferize::runOnOperation() {
   bufferization::OneShotBufferizationOptions buffOpts;
   buffOpts.allowReturnAllocs = true;
   buffOpts.bufferizeFunctionBoundaries = true;
-  buffOpts.functionBoundaryTypeConversion =
-      bufferization::LayoutMapOption::IdentityLayoutMap;
+  buffOpts.setFunctionBoundaryTypeConversion(
+      bufferization::LayoutMapOption::IdentityLayoutMap);
   bool runOnlyAnalysis = this->testAnalysisOnly || this->printConflicts;
   if (runOnlyAnalysis) {
     buffOpts.printConflicts = this->printConflicts;
