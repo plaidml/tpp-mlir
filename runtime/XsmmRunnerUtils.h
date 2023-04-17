@@ -25,9 +25,9 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_matmul_invoke(
     const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
     UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_matmul_dispatch(const libxsmm_datatype, bool isVNNI, int64_t,
-                                  int64_t, int64_t, int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_matmul_dispatch(
+    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, const libxsmm_gemm_flags);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype, int64_t, int64_t,
@@ -37,9 +37,9 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_binary_dispatch(const libxsmm_datatype, int64_t, int64_t,
                                   int64_t, int64_t, int64_t, int64_t, int64_t);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype, bool isVNNI, int64_t,
-                                  int64_t, int64_t, int64_t, int64_t, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_brgemm_dispatch(
+    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, const libxsmm_gemm_flags);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 _mlir_ciface_xsmm_fused_brgemm_dispatch(const libxsmm_datatype, bool isVNNI,

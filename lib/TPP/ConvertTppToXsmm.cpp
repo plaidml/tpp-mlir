@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
-#include "TPP/Dialect/Xsmm/XsmmAttr.h"
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
@@ -122,8 +122,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
-        matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
+    xsmm::GemmFlagsAttr gemmFlag =
+        xsmm::GemmFlagsAttr::get(matmulOp.getContext(), xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype;
     if (memrefC.getElementType().isBF16()) {
       dtype =
@@ -135,16 +135,17 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
           xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
     }
 
-    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(matmulOp.getContext(), false));
+    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(matmulOp->getOperands().begin(),
                           matmulOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, dtype, attr,
-                                                 invokeOperands);
+    // Drop the aliasing output operand.
+    invokeOperands.pop_back();
+    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
+                                                invokeOperands);
     return success();
   }
 };
@@ -184,20 +185,20 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
-        matmulOp.getContext(), xsmm::TernaryKind::MATMUL);
+    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
+        matmulOp.getContext(), xsmm::GemmFlags::VNNI_B);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
-    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(matmulOp.getContext(), true));
+
+    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(matmulOp->getOperands().begin(),
                           matmulOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(matmulOp, dtype, attr,
-                                                 invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
+                                                invokeOperands);
     return success();
   }
 };
@@ -236,8 +237,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
-        brgemmOp.getContext(), xsmm::TernaryKind::BRGEMM);
+    xsmm::GemmFlagsAttr gemmFlag =
+        xsmm::GemmFlagsAttr::get(brgemmOp.getContext(), xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
     if (memrefC.getElementType().isBF16()) {
@@ -250,18 +251,20 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
           xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
     }
 
-    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(brgemmOp.getContext(), false));
+    Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(brgemmOp->getOperands().begin(),
                           brgemmOp->getOperands().end());
+    // Drop the aliasing output operand.
+    invokeOperands.pop_back();
     invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(brgemmOp, dtype, attr,
-                                                 invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(brgemmOp, dtype,
+                                                invokeOperands);
     return success();
   }
 };
@@ -303,14 +306,14 @@ struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::TernaryKindAttr attr = xsmm::TernaryKindAttr::get(
-        brgemmOp.getContext(), xsmm::TernaryKind::BRGEMM);
+    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
+        brgemmOp.getContext(), xsmm::GemmFlags::VNNI_B);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
 
-    Value dispatched = rewriter.create<xsmm::TernaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(brgemmOp.getContext(), true));
+    Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
+        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
     SmallVector<Value, 6> invokeOperands;
@@ -318,8 +321,8 @@ struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
     invokeOperands.append(brgemmOp->getOperands().begin(),
                           brgemmOp->getOperands().end());
     invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::TernaryOp>(brgemmOp, dtype, attr,
-                                                 invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(brgemmOp, dtype,
+                                                invokeOperands);
     return success();
   }
 };

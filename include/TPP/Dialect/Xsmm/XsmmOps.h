@@ -9,6 +9,7 @@
 #ifndef TPP_DIALECT_XSMM_XSMMOPS_H
 #define TPP_DIALECT_XSMM_XSMMOPS_H
 
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
@@ -30,6 +31,8 @@ enum class BinaryFlags : uint64_t;
 class BinaryFlagsAttr;
 enum class DataType : uint64_t;
 class DataTypeAttr;
+enum class GemmFlags : uint64_t;
+class GemmFlagsAttr;
 } // namespace xsmm
 } // namespace mlir
 

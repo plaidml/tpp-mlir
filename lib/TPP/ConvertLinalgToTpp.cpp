@@ -56,7 +56,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (tpp::utils::isTppMatmul(linalgOp, &operands)) {
       assert(operands.size() == 3 && "Expect three operands");
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
-          linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
+          linalgOp, ValueRange{operands[0], operands[1], operands[2]},
+          operands[2]);
       return success();
     }
     return rewriter.notifyMatchFailure(
@@ -88,6 +89,7 @@ struct ConvertBrgemmToTpp
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
+    inputs.push_back(brMatmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
     return success();
@@ -107,6 +109,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
+    inputs.push_back(matmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
     return success();

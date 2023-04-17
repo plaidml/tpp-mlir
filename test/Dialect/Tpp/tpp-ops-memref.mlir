@@ -24,7 +24,7 @@ func.func @tpp_dialect(%arg0: memref<2x2xf32>,
   tpp.add ins(%arg5: memref<2xf32>, %arg5: memref<2xf32>) outs(%arg6: memref<2xf32>)
 
   // CHECK: tpp.matmul
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>)
+  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>)
              outs(%arg2: memref<2x2xf32>)
 
   return %arg2: memref<2x2xf32>
@@ -48,7 +48,7 @@ func.func @identity_bcast_col(%arg0: memref<5xf32>, %arg1: memref<6x5xf32>) {
 func.func @test_brgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
                       %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
   // CHECK: tpp.brgemm
-  tpp.brgemm ins(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>)
+  tpp.brgemm ins(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>, %arg2: memref<5x5xf32>)
              outs(%arg2: memref<5x5xf32>)
   return %arg2: memref<5x5xf32>
 }
@@ -93,6 +93,7 @@ func.func @add_bcast_col_operand_one(%arg0: memref<6x1xf32>, %arg1: memref<6x5xf
 // CHECK-LABEL: test_matmul
 func.func @test_matmul(%arg0: memref<2x2xf32>) {
   // CHECK: tpp.matmul
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
+  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
+             outs(%arg0: memref<2x2xf32>)
   return
 }

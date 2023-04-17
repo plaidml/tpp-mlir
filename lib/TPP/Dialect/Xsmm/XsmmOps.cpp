@@ -7,8 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
-#include "TPP/Dialect/Xsmm/XsmmAttr.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 

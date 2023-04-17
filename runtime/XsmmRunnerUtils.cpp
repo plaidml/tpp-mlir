@@ -119,8 +119,8 @@ extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
 }
 
 extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
-    const libxsmm_datatype dtype, const bool isVNNI, int64_t m, int64_t n,
-    int64_t k, int64_t lda, int64_t ldb, int64_t ldc) {
+    const libxsmm_datatype dtype, int64_t m, int64_t n, int64_t k, int64_t lda,
+    int64_t ldb, int64_t ldc, const libxsmm_gemm_flags flags) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "ldb: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -134,12 +134,12 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
   libxsmm_blasint k_int = k;
 
   libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags;
-  if (isVNNI) {
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAG_NONE;
+  if (flags & LIBXSMM_GEMM_FLAG_VNNI_B) {
     assert(dtype == LIBXSMM_DATATYPE_BF16);
-    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
+    l_flags = l_flags | LIBXSMM_GEMM_FLAG_VNNI_A;
   } else {
-    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+    l_flags = l_flags | flags;
   }
   libxsmm_bitfield l_prefetch_flags = 0;
 
@@ -369,10 +369,9 @@ extern "C" void _mlir_ciface_xsmm_brgemm_invoke(const libxsmm_datatype dType,
   sgemm.gemm(&gemm_param);
 }
 
-extern "C" int64_t
-_mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
-                                  int64_t m, int64_t n, int64_t k, int64_t lda,
-                                  int64_t ldb, int64_t ldc) {
+extern "C" int64_t _mlir_ciface_xsmm_brgemm_dispatch(
+    const libxsmm_datatype dtype, int64_t m, int64_t n, int64_t k, int64_t lda,
+    int64_t ldb, int64_t ldc, const libxsmm_gemm_flags flags) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "lbd: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -393,12 +392,14 @@ _mlir_ciface_xsmm_brgemm_dispatch(const libxsmm_datatype dtype, bool isVNNI,
   libxsmm_blasint stride_b = ldb * k * typeSize;
 
   libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags;
-  if (isVNNI) {
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAG_NONE;
+  if (flags & LIBXSMM_GEMM_FLAG_VNNI_B) {
     assert(dtype == LIBXSMM_DATATYPE_BF16);
-    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
+    // We swap A and B since LIBXSMM is col-major.
+    // We need to update the flag.
+    l_flags = l_flags | LIBXSMM_GEMM_FLAG_VNNI_A;
   } else {
-    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+    l_flags = l_flags | flags;
   }
   libxsmm_bitfield l_prefetch_flags = 0;
   libxsmm_gemm_batch_reduce_config l_brconfig;
@@ -593,18 +594,18 @@ extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
   typedef struct {
     int64_t address;
     int64_t dtype;
-    bool vnni;
     int64_t m;
     int64_t n;
     int64_t k;
     int64_t lda;
     int64_t ldb;
     int64_t ldc;
+    const libxsmm_gemm_flags flags;
   } xsmm_brgemm_dispatch_t;
   xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *) params;
-  p->address = _mlir_ciface_xsmm_brgemm_dispatch((libxsmm_datatype) p->dtype,
-                                                 p->vnni, p->m, p->n, p->k,
-                                                 p->lda, p->ldb, p->ldc);
+  p->address =
+      _mlir_ciface_xsmm_brgemm_dispatch((libxsmm_datatype)p->dtype, p->m, p->n,
+                                        p->k, p->lda, p->ldb, p->ldc, p->flags);
   return 0;
 }
 
@@ -613,18 +614,18 @@ extern "C" int iree_xsmm_matmul_dispatch(void *context, void *params,
   typedef struct {
     int64_t gemm_addr;
     int64_t dtype;
-    bool vnni;
     int64_t m;
     int64_t n;
     int64_t k;
     int64_t lda;
     int64_t ldb;
     int64_t ldc;
+    const libxsmm_gemm_flags flags;
   } xsmm_matmul_dispatch_t;
   xsmm_matmul_dispatch_t *p = (xsmm_matmul_dispatch_t *) params;
-  p->gemm_addr = _mlir_ciface_xsmm_matmul_dispatch((libxsmm_datatype) p->dtype,
-                                                   p->vnni, p->m, p->n, p->k,
-                                                   p->lda, p->ldb, p->ldc);
+  p->gemm_addr =
+      _mlir_ciface_xsmm_matmul_dispatch((libxsmm_datatype)p->dtype, p->m, p->n,
+                                        p->k, p->lda, p->ldb, p->ldc, p->flags);
   return 0;
 }
 

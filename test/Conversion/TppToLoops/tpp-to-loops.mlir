@@ -147,7 +147,8 @@ func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 // -----
 
 func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) { 
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>) outs(%arg2: memref<3x3xf32>)
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
+             outs(%arg2: memref<3x3xf32>)
   return
 }
 

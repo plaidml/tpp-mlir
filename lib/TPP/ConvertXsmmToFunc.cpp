@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Xsmm/XsmmAttr.h"
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
@@ -15,6 +15,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 using namespace mlir;
 using namespace mlir::xsmm;
 
@@ -76,15 +77,21 @@ static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
   res.reserve(operands.size() + 1);
   IntegerType integer64 = IntegerType::get(b.getContext(), 64);
   res.push_back(b.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
-  for (Value op : operands) {
-    auto memrefType = op.getType().dyn_cast<MemRefType>();
+  llvm::DenseMap<Value, Value> operandToCastedOperand;
+  for (Value operand : operands) {
+    auto memrefType = operand.getType().dyn_cast<MemRefType>();
     if (!memrefType)
-      res.push_back(op);
+      res.push_back(operand);
     else {
-      MemRefType rankedMemref = op.getType().dyn_cast<MemRefType>();
+      MemRefType rankedMemref = operand.getType().dyn_cast<MemRefType>();
       UnrankedMemRefType unrankedMemref = UnrankedMemRefType::get(
           rankedMemref.getElementType(), rankedMemref.getMemorySpace());
-      Value cast = b.create<memref::CastOp>(loc, unrankedMemref, op);
+      if (operandToCastedOperand.count(operand)) {
+        res.push_back(operandToCastedOperand[operand]);
+        continue;
+      }
+      Value cast = b.create<memref::CastOp>(loc, unrankedMemref, operand);
+      operandToCastedOperand[operand] = cast;
       res.push_back(cast);
     }
   }
@@ -174,13 +181,54 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
-    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
-                                         (int64_t)ternaryOp.getDataType());
     std::string funcName =
         "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
-                                  useMeta, rewriter, dataTypeAttr))) {
+                                  useMeta, rewriter,
+                                  ternaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(ternaryOp);
+      return success();
+    }
+    return failure();
+  }
+
+private:
+  bool useMeta = false;
+};
+
+struct ConvertMatmulXsmmOp : public OpRewritePattern<MatmulOp> {
+  ConvertMatmulXsmmOp(MLIRContext *context, bool useMeta,
+                      PatternBenefit benefit = 1)
+      : OpRewritePattern<MatmulOp>(context, benefit), useMeta(useMeta) {}
+
+  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    std::string funcName = "xsmm_matmul_invoke";
+    if (succeeded(buildInvokeCall(matmulOp.getLoc(), funcName, matmulOp,
+                                  useMeta, rewriter,
+                                  matmulOp.getDataTypeAttr()))) {
+      rewriter.eraseOp(matmulOp);
+      return success();
+    }
+    return failure();
+  }
+
+private:
+  bool useMeta = false;
+};
+
+struct ConvertBrgemmXsmmOp : public OpRewritePattern<BrgemmOp> {
+  ConvertBrgemmXsmmOp(MLIRContext *context, bool useMeta,
+                      PatternBenefit benefit = 1)
+      : OpRewritePattern<BrgemmOp>(context, benefit), useMeta(useMeta) {}
+
+  LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    std::string funcName = "xsmm_brgemm_invoke";
+    if (succeeded(buildInvokeCall(brgemmOp.getLoc(), funcName, brgemmOp,
+                                  useMeta, rewriter,
+                                  brgemmOp.getDataTypeAttr()))) {
+      rewriter.eraseOp(brgemmOp);
       return success();
     }
     return failure();
@@ -197,13 +245,11 @@ struct ConvertQuarternaryXsmmOp : public OpRewritePattern<QuarternaryOp> {
 
   LogicalResult matchAndRewrite(QuarternaryOp quarternaryOp,
                                 PatternRewriter &rewriter) const override {
-    auto type = (uint64_t)quarternaryOp.getDataType();
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
     std::string funcName =
         "xsmm_" + stringifyEnum(quarternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(quarternaryOp.getLoc(), funcName,
                                   quarternaryOp, useMeta, rewriter,
-                                  typeAttr))) {
+                                  quarternaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(quarternaryOp);
       return success();
     }
@@ -225,13 +271,11 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     // in MLIR (thus we need to change the function name from
     // "unary" to "unary_scalar"). We also don't want to convert
     // the scalar to a memref by using an alloc/alloca.
-    auto dataTypeAttr =
-        IntegerAttr::get(rewriter.getI64Type(), (int64_t)unaryOp.getDataType());
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
     if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
-                                  rewriter, dataTypeAttr))) {
+                                  rewriter, unaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
@@ -249,11 +293,10 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
-    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
-                                         (int64_t)binaryOp.getDataType());
     std::string funcName = "xsmm_binary_invoke";
     if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
-                                  useMeta, rewriter, dataTypeAttr))) {
+                                  useMeta, rewriter,
+                                  binaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }
@@ -264,11 +307,12 @@ private:
   bool useMeta = false;
 };
 
+// TODO: move rewriter as first arg.
 static func::CallOp buildDispatchCall(Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
                                       ModuleOp module, FlatSymbolRefAttr fnName,
-                                      bool useMeta, PatternRewriter &rewriter) {
+                                      bool useMeta, RewriterBase &rewriter) {
   auto libFnType = rewriter.getFunctionType(
       dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
 
@@ -294,9 +338,87 @@ static func::CallOp buildDispatchCall(Location loc,
       dispatchOperands);
   return call;
 }
-struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
-  ConvertTernaryDispatch(MLIRContext *context, bool useMeta,
-                         PatternBenefit benefit = 1)
+
+// TODO: We can derive all the dispatch from the same base class and use
+// this method. Left for future work as require changes on the td.
+template <typename OpTy>
+static LogicalResult dispatchBrgemmOrGemm(RewriterBase &rewriter,
+                                          OpTy dispatchOp, std::string funcName,
+                                          bool useMeta) {
+  Location loc = dispatchOp.getLoc();
+  FlatSymbolRefAttr fnName =
+      SymbolRefAttr::get(rewriter.getContext(), funcName);
+
+  ModuleOp module = dispatchOp->template getParentOfType<ModuleOp>();
+  SmallVector<Value, 10> dispatchOperands;
+  SmallVector<Type, 10> dispatchOperandTypes;
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+  // Dispatch the data type.
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, dispatchOp.getDataTypeAttr()));
+  dispatchOperandTypes.push_back(integer64);
+
+  // Dispatch the inputs.
+  ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
+  size_t arrayAttrSize = integers.size();
+  for (size_t idx = 0; idx < arrayAttrSize; idx++) {
+    IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, attr));
+    dispatchOperandTypes.push_back(integer64);
+  }
+
+  // Dispatch the flags.
+  for (auto flag : dispatchOp.getFlagsAttr()) {
+    auto intAttr = flag.template dyn_cast<IntegerAttr>();
+    dispatchOperands.push_back(
+        rewriter.create<arith::ConstantOp>(loc, integer64, intAttr));
+    dispatchOperandTypes.push_back(integer64);
+  }
+
+  func::CallOp call =
+      buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
+                        fnName, useMeta, rewriter);
+  rewriter.replaceOp(dispatchOp, call.getResult(0));
+  return success();
+}
+
+struct ConvertMatmulDispatchOp : public OpRewritePattern<MatmulDispatchOp> {
+  ConvertMatmulDispatchOp(MLIRContext *context, bool useMeta,
+                          PatternBenefit benefit = 1)
+      : OpRewritePattern<MatmulDispatchOp>(context, benefit), useMeta(useMeta) {
+  }
+
+  LogicalResult matchAndRewrite(MatmulDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return dispatchBrgemmOrGemm<MatmulDispatchOp>(
+        rewriter, dispatchOp, "xsmm_matmul_dispatch", useMeta);
+  }
+
+private:
+  bool useMeta = false;
+};
+
+struct ConvertBrgemmDispatchOp : public OpRewritePattern<BrgemmDispatchOp> {
+  ConvertBrgemmDispatchOp(MLIRContext *context, bool useMeta,
+                          PatternBenefit benefit = 1)
+      : OpRewritePattern<BrgemmDispatchOp>(context, benefit), useMeta(useMeta) {
+  }
+
+  LogicalResult matchAndRewrite(BrgemmDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return dispatchBrgemmOrGemm<BrgemmDispatchOp>(
+        rewriter, dispatchOp, "xsmm_brgemm_dispatch", useMeta);
+  }
+
+private:
+  bool useMeta = false;
+};
+
+struct ConvertTernaryDispatchOp : public OpRewritePattern<TernaryDispatchOp> {
+  ConvertTernaryDispatchOp(MLIRContext *context, bool useMeta,
+                           PatternBenefit benefit = 1)
       : OpRewritePattern<TernaryDispatchOp>(context, benefit),
         useMeta(useMeta) {}
 
@@ -312,10 +434,8 @@ struct ConvertTernaryDispatch : public OpRewritePattern<TernaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
-                                         (int64_t)(dispatchOp.getDataType()));
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getDataTypeAttr()));
     dispatchOperandTypes.push_back(integer64);
 
     BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
@@ -343,10 +463,10 @@ private:
   bool useMeta = false;
 };
 
-struct ConvertQuarternaryDispatch
+struct ConvertQuarternaryDispatchOp
     : public OpRewritePattern<QuarternaryDispatchOp> {
-  ConvertQuarternaryDispatch(MLIRContext *context, bool useMeta,
-                             PatternBenefit benefit = 1)
+  ConvertQuarternaryDispatchOp(MLIRContext *context, bool useMeta,
+                               PatternBenefit benefit = 1)
       : OpRewritePattern<QuarternaryDispatchOp>(context, benefit),
         useMeta(useMeta) {}
 
@@ -354,7 +474,6 @@ struct ConvertQuarternaryDispatch
                                 PatternRewriter &rewriter) const override {
     Location loc = dispatchOp.getLoc();
     std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    auto type = (uint64_t)(dispatchOp.getDataType());
     kindAsString = "xsmm_" + kindAsString + "_dispatch";
     FlatSymbolRefAttr fnName =
         SymbolRefAttr::get(rewriter.getContext(), kindAsString);
@@ -363,9 +482,8 @@ struct ConvertQuarternaryDispatch
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    IntegerAttr typeAttr = IntegerAttr::get(rewriter.getI64Type(), type);
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, typeAttr));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getDataTypeAttr()));
     dispatchOperandTypes.push_back(integer64);
 
     BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
@@ -393,9 +511,9 @@ private:
   bool useMeta = false;
 };
 
-struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
-  ConvertBinaryDispatch(MLIRContext *context, bool useMeta,
-                        PatternBenefit benefit = 1)
+struct ConvertBinaryDispatchOp : public OpRewritePattern<BinaryDispatchOp> {
+  ConvertBinaryDispatchOp(MLIRContext *context, bool useMeta,
+                          PatternBenefit benefit = 1)
       : OpRewritePattern<BinaryDispatchOp>(context, benefit), useMeta(useMeta) {
   }
 
@@ -410,11 +528,8 @@ struct ConvertBinaryDispatch : public OpRewritePattern<BinaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-
-    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
-                                         (int64_t)(dispatchOp.getDataType()));
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getDataTypeAttr()));
     dispatchOperandTypes.push_back(integer64);
 
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
@@ -447,9 +562,9 @@ private:
   bool useMeta = false;
 };
 
-struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
-  ConvertUnaryDispatch(MLIRContext *context, bool useMeta,
-                       PatternBenefit benefit = 1)
+struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
+  ConvertUnaryDispatchOp(MLIRContext *context, bool useMeta,
+                         PatternBenefit benefit = 1)
       : OpRewritePattern<UnaryDispatchOp>(context, benefit), useMeta(useMeta) {}
 
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
@@ -464,11 +579,8 @@ struct ConvertUnaryDispatch : public OpRewritePattern<UnaryDispatchOp> {
     SmallVector<Value, 10> dispatchOperands;
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-
-    auto dataTypeAttr = IntegerAttr::get(rewriter.getI64Type(),
-                                         (int64_t)dispatchOp.getDataType());
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, dispatchOp.getDataTypeAttr()));
     dispatchOperandTypes.push_back(integer64);
 
     ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
@@ -518,11 +630,13 @@ struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
 
 void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                            bool useExtractMetaData) {
-  patterns.add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp,
-               ConvertBinaryXsmmOp, ConvertUnaryXsmmOp>(patterns.getContext(),
-                                                        useExtractMetaData);
-  patterns.add<ConvertQuarternaryDispatch, ConvertTernaryDispatch,
-               ConvertBinaryDispatch, ConvertUnaryDispatch>(
+  patterns
+      .add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp, ConvertBinaryXsmmOp,
+           ConvertUnaryXsmmOp, ConvertMatmulXsmmOp, ConvertBrgemmXsmmOp>(
+          patterns.getContext(), useExtractMetaData);
+  patterns.add<ConvertQuarternaryDispatchOp, ConvertTernaryDispatchOp,
+               ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,
+               ConvertMatmulDispatchOp, ConvertBrgemmDispatchOp>(
       patterns.getContext(), useExtractMetaData);
 }
 

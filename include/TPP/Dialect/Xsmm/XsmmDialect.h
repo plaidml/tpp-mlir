@@ -9,9 +9,9 @@
 #ifndef XSMM_TPP_DIALECT_H
 #define XSMM_TPP_DIALECT_H
 
-// clang-format off
 #include "mlir/IR/Dialect.h"
+
+#define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOpsDialect.h.inc"
-// clang-format on
 
 #endif // XSMM_TPP_DIALECT_H
