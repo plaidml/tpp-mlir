@@ -126,7 +126,7 @@ static void printerImpl(OpAsmPrinter &printer, OpTy op) {
   auto dataType = op.getDataType();
   printer << xsmm::stringifyDataType(dataType);
   printer.printOptionalAttrDict(
-      op->getAttrs(), /*elidedAttrs=*/{"dataType", "flags", "inputs"});
+      op->getAttrs(), /*elidedAttrs=*/{"dataType", "flags", "inputs", "kind"});
 }
 
 void MatmulDispatchOp::print(OpAsmPrinter &printer) {
