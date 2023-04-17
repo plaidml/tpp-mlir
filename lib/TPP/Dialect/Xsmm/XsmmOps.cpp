@@ -25,7 +25,7 @@ static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
     return failure();
   auto flagAttr = symbolizeEnum<EnumClass>(flag);
   if (!flagAttr)
-    return parser.emitError(loc, "invalid enum") << flag;
+    return parser.emitError(loc, "invalid enum ") << flag;
   value = *flagAttr;
   return success();
 }
@@ -33,7 +33,11 @@ static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
 static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   // Parse the input
-  result.addAttribute("inputs", DenseI64ArrayAttr::parse(parser, Type{}));
+  DenseI64ArrayAttr kindAttr;
+  if (parser.parseCustomAttributeWithFallback(kindAttr, Type{}, "inputs",
+                                              result.attributes)) {
+    return failure();
+  }
 
   if (parser.parseKeyword("flags") || parser.parseEqual() ||
       parser.parseLParen())
@@ -61,7 +65,9 @@ static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   result.addAttribute(
       "dataType", builder.getI64IntegerAttr(static_cast<int64_t>(dataType)));
   result.addTypes(builder.getIntegerType(64));
-  return success();
+
+  // Parse the optional attribute list
+  return parser.parseOptionalAttrDict(result.attributes);
 }
 
 ParseResult MatmulDispatchOp::parse(OpAsmParser &parser,
@@ -86,6 +92,8 @@ static void printerImpl(OpAsmPrinter &printer, OpTy op) {
   printer << ") data_type = ";
   auto dataType = op.getDataType();
   printer << xsmm::stringifyDataType(dataType);
+  printer.printOptionalAttrDict(
+      op->getAttrs(), /*elidedAttrs=*/{"dataType", "flags", "inputs"});
 }
 
 void MatmulDispatchOp::print(OpAsmPrinter &printer) {
