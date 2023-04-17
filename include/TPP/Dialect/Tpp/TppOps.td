@@ -152,6 +152,29 @@ def Tpp_ReluOp : Tpp_UnaryOp<"relu"> {
 }
 
 //===----------------------------------------------------------------------===//
+// ZeroOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_ZeroOp : Tpp_UnaryOp<"zero"> {
+  let summary = "Zero a tensor or memref.";
+  let description = [{
+    Zero initialize a tensor or memref value.
+    
+    Example:
+    
+    ```mlir
+    
+    // out-of-place - memref abstraction.
+    tpp.zero ins(%0: memref<2x2xf32>) outs(%1: memref<2x2xf32>)
+
+    // tensor abstraction.
+    %0 = tpp.zero (%0: tensor<4xf32>) -> tensor<4xf32>
+    
+    ```
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Binary Operations
 //===----------------------------------------------------------------------===//
 

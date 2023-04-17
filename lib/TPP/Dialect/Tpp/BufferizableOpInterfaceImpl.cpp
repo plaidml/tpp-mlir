@@ -9,6 +9,8 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 
@@ -126,11 +128,53 @@ struct IdentityBufferizationInterface
   }
 };
 
+struct ZeroBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<ZeroBufferizationInterface,
+                                                    tpp::ZeroOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return bufferizesToMemoryReadUnaryImpl(op, opOperand, state);
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return bufferizesToMemoryWriteUnaryImpl(op, opOperand, state);
+  }
+
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return getAliasingOpResultsUnaryImpl(op, opOperand, state);
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    return bufferizeUnaryOp<tpp::ZeroOp>(op, rewriter, options);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Binary
 //===----------------------------------------------------------------------===//
 
-static bool isConstantVal(Value val) { return matchPattern(val, m_Constant()); }
+static bool isConstantVal(Value val) {
+  if (auto toTensorOp = val.getDefiningOp<bufferization::ToTensorOp>()) {
+    Value memrefVal = toTensorOp.getMemref();
+    if (auto getGlobalOp = memrefVal.getDefiningOp<memref::GetGlobalOp>()) {
+      auto *symbolTableOp =
+          getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
+      if (!symbolTableOp)
+        return false;
+      auto globalOp =
+          dyn_cast_or_null<memref::GlobalOp>(SymbolTable::lookupSymbolIn(
+              symbolTableOp, getGlobalOp.getNameAttr()));
+      if (!globalOp)
+        return false;
+      if (globalOp.getConstantInitValue())
+        return true;
+    }
+  }
+  return matchPattern(val, m_Constant());
+}
 
 // Helper function to bufferize a binary op.
 template <typename OpTy>
@@ -191,13 +235,17 @@ static bool bufferizesToMemoryWriteBinaryImpl(Operation *op,
   // If the rhs can bufferize in place with the result return true.
   if (opOperand.getOperandNumber() == 1 &&
       opOperand.get().getType() == op->getResult(0).getType() &&
-      !isConstantVal(opOperand.get()))
+      !isConstantVal(opOperand.get())) {
     return true;
+  }
+
   // If the lhs can bufferize in place with the result return true. Note that
   // if both can bufferize with the result we select the rhs first.
   if (opOperand.getOperandNumber() == 0) {
-    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType())
+    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType() &&
+        !isConstantVal(op->getOpOperand(1).get())) {
       return false;
+    }
     if (opOperand.get().getType() == op->getResult(0).getType())
       return true;
   }
@@ -254,6 +302,12 @@ struct AddBufferizationInterface
 // Ternary
 //===----------------------------------------------------------------------===//
 
+static bool isZeroFilled(Value val) {
+  if (val.getDefiningOp<tpp::ZeroOp>())
+    return true;
+  return false;
+}
+
 // Helper function to bufferize ternary operations.
 template <typename OpTy>
 static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
@@ -278,10 +332,14 @@ static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
 }
 
 // Helper function to bufferize ternay operations.
-// All operands bufferize to memory reads.
 static bool bufferizesToMemoryReadTernaryImpl(Operation *op,
                                               OpOperand &opOperand,
                                               const AnalysisState &state) {
+  // If the rhs input operand is zeroFilled, the access is not read/write
+  // but only write. This allows to avoid allocation for GEMM and BRGEMM
+  // if C is zero intialized.
+  if (opOperand.getOperandNumber() == 2 && isZeroFilled(opOperand.get()))
+    return false;
   return true;
 }
 
@@ -361,9 +419,10 @@ namespace mlir {
 namespace tpp {
 void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, tpp::TppDialect *dialect) {
-    AddOp::attachInterface<tpp::AddBufferizationInterface>(*ctx);
     IdentityOp::attachInterface<tpp::IdentityBufferizationInterface>(*ctx);
     ReluOp::attachInterface<tpp::ReluBufferizationInterface>(*ctx);
+    ZeroOp::attachInterface<tpp::ZeroBufferizationInterface>(*ctx);
+    AddOp::attachInterface<tpp::AddBufferizationInterface>(*ctx);
     MatmulOp::attachInterface<tpp::MatmulBufferizationInterface>(*ctx);
     BrgemmOp::attachInterface<tpp::BrgemmBufferizationInterface>(*ctx);
   });

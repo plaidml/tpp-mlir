@@ -154,6 +154,23 @@ ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
+// ZeroOp
+//===----------------------------------------------------------------------===//
+
+void ZeroOp::build(OpBuilder &builder, OperationState &result, Value input,
+                   Value output) {
+  return ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
+}
+
+void ZeroOp::print(OpAsmPrinter &printer) {
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
+}
+
+ParseResult ZeroOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+//===----------------------------------------------------------------------===//
 // AdddOp
 //===----------------------------------------------------------------------===//
 
