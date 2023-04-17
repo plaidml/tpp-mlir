@@ -195,7 +195,8 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
 LogicalResult MatmulOp::verify() {
   auto shapedA = getInputs()[0].getType().cast<ShapedType>();
   auto shapedB = getInputs()[1].getType().cast<ShapedType>();
-  auto shapedC = (hasTensorSemantics()) ? getResultType() : getOutputType();
+  auto shapedC = (hasTensorSemantics()) ? getResultType().cast<ShapedType>()
+                                        : getOutputType().cast<ShapedType>();
   if (!verifyMatmulShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
   if (!verifyMatmulOperandsDims(shapedA.getShape(), shapedB.getShape(),
@@ -230,7 +231,8 @@ static bool verifyBRGemmShape(ShapedType shapedA, ShapedType shapedB,
 LogicalResult BrgemmOp::verify() {
   auto shapedA = getInputs()[0].getType().cast<ShapedType>();
   auto shapedB = getInputs()[1].getType().cast<ShapedType>();
-  auto shapedC = (hasTensorSemantics()) ? getResultType() : getOutputType();
+  auto shapedC = (hasTensorSemantics()) ? getResultType().cast<ShapedType>()
+                                        : getOutputType().cast<ShapedType>();
   if (!verifyBRGemmShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
   // Check batch dimension.

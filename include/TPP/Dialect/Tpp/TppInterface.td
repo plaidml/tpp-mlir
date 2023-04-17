@@ -58,16 +58,14 @@ def TppOpInterface : OpInterface<"TppOp"> {
       /*desc=*/[{
         Return the output type at buffer abstraction.
       }],
-      /*retTy=*/"ShapedType",
+      /*retTy=*/"MemRefType",
       /*methodName*/"getOutputType",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert($_op.getOutputs().size() == 1);
-        // TODO: this method should be at buffer level only
-        // Need to first update the ternary to be:
-        // tpp.matmul (A B C) (D)
-        return $_op.getOutputs()[0].getType().template cast<ShapedType>();
+        assert(!$_op.hasTensorSemantics());
+        return $_op.getOutputs()[0].getType().template cast<MemRefType>();
       }]
     >,
     InterfaceMethod<

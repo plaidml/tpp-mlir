@@ -112,9 +112,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    // TODO: update the tpp interface and remove the cast.
-    // `matmulOp.getOutputType` should return a memref.
-    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
+    auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
@@ -227,9 +225,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
     int64_t ldb = *ldbDim;
 
-    // TODO: update the tpp interface and remove the cast.
-    // `matmulOp.getOutputType` should return a memref.
-    auto ldcDim = getLeadingDim(memrefC.cast<MemRefType>());
+    auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
     int64_t ldc = *ldcDim;
@@ -696,9 +692,7 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = addOp.getOutputType();
-    assert(outputType.isa<MemRefType>() && "expect a memref type");
-    auto outputMemRef = outputType.cast<MemRefType>();
+    auto outputMemRef = addOp.getOutputType();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
            "expect memref with rank 1 or 2");
 
