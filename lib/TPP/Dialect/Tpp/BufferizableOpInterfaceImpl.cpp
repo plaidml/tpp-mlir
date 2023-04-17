@@ -33,9 +33,9 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
   if (failed(buffer))
     return failure();
   // Out-of-place bufferization.
-  if (unaryOp.getInputs()[0].getType() != op->getResult(0).getType()) {
+  if (unaryOp.getInputs()[0].getType() != unaryOp.getResultType()) {
     FailureOr<Value> alloc =
-        allocateTensorForShapedValue(rewriter, loc, op->getResult(0),
+        allocateTensorForShapedValue(rewriter, loc, unaryOp.getResult(0),
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
@@ -144,12 +144,12 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   if (failed(rhsBuffer))
     return failure();
   // Out-of-place bufferization.
-  auto outType = binaryOp->getResult(0).getType();
+  auto outType = binaryOp.getResultType();
   auto lhsType = binaryOp.getInputs()[0].getType();
   auto rhsType = binaryOp.getInputs()[1].getType();
   if ((outType != lhsType) && (outType != rhsType)) {
     FailureOr<Value> alloc =
-        allocateTensorForShapedValue(rewriter, loc, binaryOp->getResult(0),
+        allocateTensorForShapedValue(rewriter, loc, binaryOp.getResult(0),
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
