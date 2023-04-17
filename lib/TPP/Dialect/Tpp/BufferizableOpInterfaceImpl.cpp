@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 
 using namespace mlir;
@@ -129,6 +130,8 @@ struct IdentityBufferizationInterface
 // Binary
 //===----------------------------------------------------------------------===//
 
+static bool isConstantVal(Value val) { return matchPattern(val, m_Constant()); }
+
 // Helper function to bufferize a binary op.
 template <typename OpTy>
 static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
@@ -146,7 +149,8 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   // Out-of-place bufferization.
   auto outType = binaryOp.getResultType();
   auto lhsType = binaryOp.getInputs()[0].getType();
-  auto rhsType = binaryOp.getInputs()[1].getType();
+  auto rhsVal = binaryOp.getInputs()[1];
+  auto rhsType = rhsVal.getType();
   if ((outType != lhsType) && (outType != rhsType)) {
     FailureOr<Value> alloc =
         allocateTensorForShapedValue(rewriter, loc, binaryOp.getResult(0),
@@ -161,8 +165,8 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
     replaceOpWithBufferizedValues(rewriter, op, *allocBuffer);
     return success();
   }
-  // In-place bufferization on rhs.
-  if (outType == rhsType) {
+  // In-place bufferization on rhs. If the rhs is not a constant like.
+  if (outType == rhsType && !isConstantVal(rhsVal)) {
     rewriter.create<OpTy>(loc, ValueRange{*lhsBuffer, *rhsBuffer}, *rhsBuffer);
     replaceOpWithBufferizedValues(rewriter, op, *rhsBuffer);
     return success();
@@ -186,7 +190,8 @@ static bool bufferizesToMemoryWriteBinaryImpl(Operation *op,
                                               const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return true.
   if (opOperand.getOperandNumber() == 1 &&
-      opOperand.get().getType() == op->getResult(0).getType())
+      opOperand.get().getType() == op->getResult(0).getType() &&
+      !isConstantVal(opOperand.get()))
     return true;
   // If the lhs can bufferize in place with the result return true. Note that
   // if both can bufferize with the result we select the rhs first.
@@ -204,7 +209,8 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return the rhs.
   if (opOperand.getOperandNumber() == 1 &&
-      opOperand.get().getType() == op->getResult(0).getType())
+      opOperand.get().getType() == op->getResult(0).getType() &&
+      !isConstantVal(opOperand.get()))
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
   // If the lhs can bufferize in place with the result return the lhs. Note

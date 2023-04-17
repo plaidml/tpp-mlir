@@ -287,3 +287,57 @@ func.func @simple_linalg(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tens
     } -> tensor<3x3xf32>
   return %0 : tensor<3x3xf32>
 }
+
+// -----
+
+// Here you need the alloc. tpp.add second operand reads from 'the old value' of %arg1.
+// This bufferization is optimal.
+func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+                                      %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
+  %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
+  %0 = tpp.matmul (%arg0: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>, 
+                   %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %1 = tpp.add (%0: tensor<256x1024xbf16>, %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %2 = tpp.relu (%1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  return %2 : tensor<256x1024xbf16>
+}
+
+// CHECK-LABEL: test_mlp_bf16_3_layer_1024
+// CHECK-SAME:  %[[ARG0:.+]]: memref<256x1024xbf16>, %[[ARG1:.+]]: memref<256x1024xbf16>
+// CHECK: %[[CST:.+]] = memref.get_global @__constant_1024x1024xbf16 : memref<1024x1024xbf16>
+// CHECK-NEXT: %[[ALLOC:.+]] = memref.alloc
+// CHECK-NEXT: memref.copy %[[ARG1]], %[[ALLOC]] : memref<256x1024xbf16> to memref<256x1024xbf16>
+// CHECK-NEXT: tpp.matmul ins(%[[ARG0]] : memref<256x1024xbf16>, %[[CST]] : memref<1024x1024xbf16>, %[[ALLOC]] : memref<256x1024xbf16>) outs(%[[ALLOC]] : memref<256x1024xbf16>)
+// CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<256x1024xbf16>, %[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK-NEXT: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK-NEXT: memref.dealloc %[[ALLOC]] : memref<256x1024xbf16>
+
+// -----
+
+// CHECK-LABEL: test_mlp_bf16_3_layer_1024
+func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+                                      %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
+  // CHECK-NOT: memref.alloc
+  %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
+  %cst1 = arith.constant dense<0.02> : tensor<256x1024xbf16>
+  %0 = tpp.matmul (%arg0: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>, 
+                   %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %1 = tpp.add (%cst1: tensor<256x1024xbf16>, %0: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %2 = tpp.relu (%1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  return %2 : tensor<256x1024xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: test_mlp_bf16_3_layer_1024
+func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+                                      %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
+  // CHECK-NOT: memref.alloc
+  %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
+  %cst1 = arith.constant dense<0.02> : tensor<256x1024xbf16>
+  %0 = tpp.matmul (%arg0: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>, 
+                   %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %1 = tpp.add (%0: tensor<256x1024xbf16>, %cst1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %2 = tpp.relu (%1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  return %2 : tensor<256x1024xbf16>
+}
