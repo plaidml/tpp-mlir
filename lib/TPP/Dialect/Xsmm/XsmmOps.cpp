@@ -117,8 +117,9 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
     return op->emitOpError() << "expected flags to be unique";
   // none flag conflicts with all the others
   if (llvm::is_contained(flagsAsInt, static_cast<int64_t>(GemmFlags::NONE)) &&
-      flagsAsInt.size() != 1)
+      flagsAsInt.size() != 1) {
     return op->emitOpError() << "'none' flags conflicts with others";
+  }
   // VNNI flags must be specified only for bf16 type
   if (dataType != DataType::BF16 && llvm::any_of(flagsAsInt, [](int64_t flag) {
         return (flag == static_cast<int64_t>(GemmFlags::VNNI_B) ||
