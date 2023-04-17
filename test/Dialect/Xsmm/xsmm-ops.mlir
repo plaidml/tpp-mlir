@@ -23,7 +23,10 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
     : (memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.matmul.dispatch
-  xsmm.matmul.dispatch [3, 2, 1] (flags = [0, 4096], data_type = f32)
+  xsmm.matmul.dispatch [3, 2, 1] flags = (none, vnni_b) data_type = f32
+
+  // CHECK: xsmm.matmul.dispatch {{.*}} {myAttr = "myattr"}
+  xsmm.matmul.dispatch [3, 2, 1] flags = (none, vnni_b) data_type = f32 {myAttr = "myattr"}
 
   return %arg2: memref<2x2xf32>
 }

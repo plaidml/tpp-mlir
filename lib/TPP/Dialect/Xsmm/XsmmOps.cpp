@@ -16,3 +16,90 @@
 
 using namespace mlir;
 using namespace mlir::xsmm;
+
+template <typename EnumClass>
+static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
+  StringRef flag;
+  auto loc = parser.getCurrentLocation();
+  if (parser.parseKeyword(&flag))
+    return failure();
+  auto flagAttr = symbolizeEnum<EnumClass>(flag);
+  if (!flagAttr)
+    return parser.emitError(loc, "invalid enum ") << flag;
+  value = *flagAttr;
+  return success();
+}
+
+static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  // Parse the input
+  DenseI64ArrayAttr kindAttr;
+  if (parser.parseCustomAttributeWithFallback(kindAttr, Type{}, "inputs",
+                                              result.attributes)) {
+    return failure();
+  }
+
+  if (parser.parseKeyword("flags") || parser.parseEqual() ||
+      parser.parseLParen())
+    return failure();
+
+  // Parse flags
+  SmallVector<Attribute, 4> flags;
+  auto parseFlags = [&]() -> ParseResult {
+    GemmFlags flag;
+    if (parseEnum(flag, parser))
+      return failure();
+    flags.push_back(builder.getI64IntegerAttr(static_cast<int64_t>(flag)));
+    return success();
+  };
+  if (parser.parseCommaSeparatedList(parseFlags) || parser.parseRParen())
+    return failure();
+  result.addAttribute("flags", builder.getArrayAttr(flags));
+
+  // Parse dataType
+  if (parser.parseKeyword("data_type") || parser.parseEqual())
+    return failure();
+  DataType dataType;
+  if (parseEnum(dataType, parser))
+    return failure();
+  result.addAttribute(
+      "dataType", builder.getI64IntegerAttr(static_cast<int64_t>(dataType)));
+  result.addTypes(builder.getIntegerType(64));
+
+  // Parse the optional attribute list
+  return parser.parseOptionalAttrDict(result.attributes);
+}
+
+ParseResult MatmulDispatchOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
+  return parserImpl(parser, result);
+}
+
+ParseResult BrgemmDispatchOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
+  return parserImpl(parser, result);
+}
+
+template <typename OpTy>
+static void printerImpl(OpAsmPrinter &printer, OpTy op) {
+  printer << " [" << op.getInputs() << ']';
+  printer << " "
+          << " flags = (";
+  llvm::interleaveComma(op.getFlags(), printer, [&](auto &attr) {
+    auto flag = *symbolizeGemmFlags(attr.template cast<IntegerAttr>().getInt());
+    printer << xsmm::stringifyGemmFlags(flag);
+  });
+  printer << ") data_type = ";
+  auto dataType = op.getDataType();
+  printer << xsmm::stringifyDataType(dataType);
+  printer.printOptionalAttrDict(
+      op->getAttrs(), /*elidedAttrs=*/{"dataType", "flags", "inputs"});
+}
+
+void MatmulDispatchOp::print(OpAsmPrinter &printer) {
+  printerImpl<MatmulDispatchOp>(printer, *this);
+}
+
+void BrgemmDispatchOp::print(OpAsmPrinter &printer) {
+  printerImpl<BrgemmDispatchOp>(printer, *this);
+}
