@@ -49,6 +49,7 @@ func.func @tpp_tensor_add_bufferize_outs_of_place(%arg0: tensor<1xf32>, %arg1: t
 // CHECK-LABEL: func.func @tpp_tensor_add_loop
 // CHECK-SAME: %[[ARG0:.+]]: memref<32x32xf32>, %[[ARG1:.+]]: memref<32x32xf32>
 func.func @tpp_tensor_add_loop(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %c0 = arith.constant 0 : index
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -92,6 +93,7 @@ func.func @tpp_tensor_relu_must_allocate(%arg0: tensor<32xf32>) -> tensor<32x32x
 // CHECK-LABEL: func.func @relu_tensor_loop
 // CHECK-SAME:  (%[[ARG0:.+]]: memref<32x32xf32>)
 func.func @relu_tensor_loop(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %c0 = arith.constant 0 : index
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -150,6 +152,7 @@ func.func @tpp_tensor_matmul(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<32x32xf32>, %[[ARG3:.+]]: memref<32x32xf32>
 func.func @tpp_mixed(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                      %arg2: tensor<32x32xf32>, %arg3: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %0 = tpp.matmul (%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                           %arg2: tensor<32x32xf32>) -> tensor<32x32xf32>
   // CHECK: tpp.matmul ins(%[[ARG0]] : memref<32x64xf32>, %[[ARG1]] : memref<64x32xf32>, %[[ARG2]] : memref<32x32xf32>) 
@@ -197,6 +200,7 @@ func.func @tpp_add_with_insert_slice(%arg0: tensor<1536xbf16>,
   return %0 : tensor<8x48x32x32xbf16>
 }
 
+// CHECK-NOT: memref.alloc
 // CHECK: %[[EXPAND:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<1536xbf16> into memref<48x32xbf16>
 // CHECK: scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (8, 48)
 // CHECK-NEXT: %[[SUB:.+]] = memref.subview %expand_shape[%[[ARG3]], 0] [1, 32] [1, 1] 
@@ -235,6 +239,7 @@ func.func @sequence_of_adds_on_lhs(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32
 }
 
 // CHECK-LABEL: sequence_of_adds_on_lhs
+// CHECK-NOT: memref.alloc
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>
 // CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG1]] : memref<3x3xf32>) 
 // CHECK-SAME:    outs(%[[ARG1]] : memref<3x3xf32>)
