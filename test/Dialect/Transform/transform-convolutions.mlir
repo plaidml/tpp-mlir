@@ -132,7 +132,7 @@ transform.sequence failures(propagate) {
     // Original layout: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
     // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    // Collapse       : [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
+    // Collapse       : [N][K'][P * Q][k] = [N][C'][H * W][c] * [K'][C'][c][k]
     %2 = transform.structured.collapse %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
     %3 = transform.structured.collapse %2 [[0], [1], [2, 3], [4], [5], [6]]
     //
