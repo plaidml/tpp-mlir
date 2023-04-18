@@ -374,9 +374,9 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
   return %8 : tensor<256x1024xbf16>
 }
 
-// CHECK-NOT: memref.alloc
 // CHECK-LABEL: test_mlp_bf16_3_layer_1024(
 // CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xbf16>, %[[ARG1:.+]]: memref<256x1024xbf16>)
+// CHECK-NOT: memref.alloc
 // CHECK: %[[GB:.+]] = memref.get_global @__constant_1024x1024xbf16 : memref<1024x1024xbf16>
 // CHECK: %[[GB1:.+]] = memref.get_global @__constant_256x1024xbf16 : memref<256x1024xbf16>
 // CHECK: tpp.zero ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)

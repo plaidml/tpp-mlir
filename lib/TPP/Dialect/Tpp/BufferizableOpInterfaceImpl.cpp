@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -157,23 +158,24 @@ struct ZeroBufferizationInterface
 //===----------------------------------------------------------------------===//
 
 static bool isConstantVal(Value val) {
-  if (auto toTensorOp = val.getDefiningOp<bufferization::ToTensorOp>()) {
-    Value memrefVal = toTensorOp.getMemref();
-    if (auto getGlobalOp = memrefVal.getDefiningOp<memref::GetGlobalOp>()) {
-      auto *symbolTableOp =
-          getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
-      if (!symbolTableOp)
-        return false;
-      auto globalOp =
-          dyn_cast_or_null<memref::GlobalOp>(SymbolTable::lookupSymbolIn(
-              symbolTableOp, getGlobalOp.getNameAttr()));
-      if (!globalOp)
-        return false;
-      if (globalOp.getConstantInitValue())
-        return true;
-    }
+  auto toTensorOp = val.getDefiningOp<bufferization::ToTensorOp>();
+  if (!toTensorOp)
+    return matchPattern(val, m_Constant());
+
+  Value memrefVal = toTensorOp.getMemref();
+  if (auto getGlobalOp = memrefVal.getDefiningOp<memref::GetGlobalOp>()) {
+    auto *symbolTableOp =
+        getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
+    if (!symbolTableOp)
+      return false;
+    auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
+        SymbolTable::lookupSymbolIn(symbolTableOp, getGlobalOp.getNameAttr()));
+    if (!globalOp)
+      return false;
+    if (globalOp.getConstantInitValue())
+      return true;
   }
-  return matchPattern(val, m_Constant());
+  return false;
 }
 
 // Helper function to bufferize a binary op.
@@ -302,12 +304,6 @@ struct AddBufferizationInterface
 // Ternary
 //===----------------------------------------------------------------------===//
 
-static bool isZeroFilled(Value val) {
-  if (val.getDefiningOp<tpp::ZeroOp>())
-    return true;
-  return false;
-}
-
 // Helper function to bufferize ternary operations.
 template <typename OpTy>
 static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
@@ -335,10 +331,11 @@ static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
 static bool bufferizesToMemoryReadTernaryImpl(Operation *op,
                                               OpOperand &opOperand,
                                               const AnalysisState &state) {
-  // If the rhs input operand is zeroFilled, the access is not read/write
-  // but only write. This allows to avoid allocation for GEMM and BRGEMM
-  // if C is zero intialized.
-  if (opOperand.getOperandNumber() == 2 && isZeroFilled(opOperand.get()))
+  // If the third accumulation operand is zeroFilled, the access is not
+  // read/write but only write. This allows to avoid allocation for GEMM and
+  // BRGEMM if C is zero intialized.
+  if (opOperand.getOperandNumber() == 2 &&
+      tpp::utils::isZeroTensor(opOperand.get()))
     return false;
   return true;
 }
