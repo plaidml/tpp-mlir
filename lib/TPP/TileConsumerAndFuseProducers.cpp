@@ -62,6 +62,8 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
       return failure();
     SmallVector<scf::ForOp> nestedLoops;
     getPerfectlyNestedLoops(nestedLoops, forOp);
+    if (nestedLoops.size() == 0)
+      return failure();
     replaceIterArgs(rewriter, forOp, nestedLoops[nestedLoops.size() - 1]);
     return success();
   }
@@ -80,6 +82,8 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
       return failure();
     SmallVector<scf::ForOp> nestedLoops;
     getPerfectlyNestedLoops(nestedLoops, forOp);
+    if (nestedLoops.size() == 0)
+      return failure();
 
     SmallVector<Value> loopArgs;
     SmallVector<OpFoldResult> lbs, ubs, steps;
