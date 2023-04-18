@@ -165,9 +165,10 @@ extern "C" int64_t _mlir_ciface_xsmm_matmul_dispatch(
 }
 
 extern "C" int64_t
-_mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
+_mlir_ciface_xsmm_unary_dispatch(const libxsmm_meltw_unary_type op_type,
+                                 const libxsmm_datatype dtype, int64_t m,
                                  int64_t n, int64_t ldi, int64_t ldo,
-                                 int64_t type, int64_t bcast_type) {
+                                 const libxsmm_meltw_unary_flags unary_flags) {
 
   // std::cout << "ldi: " << ldi << "\n";
   // std::cout << "ldo: " << ldo << "\n";
@@ -176,18 +177,13 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   // std::cout << "type: " << type << "\n";
   // std::cout << "bcast_type: " << bcast_type << "\n";
 
-  libxsmm_meltw_unary_flags unary_flags =
-      static_cast<libxsmm_meltw_unary_flags>(bcast_type);
-
   libxsmm_meltw_unary_shape unary_shape;
-
   // Row major to col major swap m with n.
   unary_shape.m = static_cast<libxsmm_blasint>(n);
   unary_shape.n = static_cast<libxsmm_blasint>(m);
   unary_shape.in0_type = dtype;
   // Retarget computation type from bf16 to f32 due to missing hardware support.
   // Copy and Zero should remain in BF16 to avoid useless up/down casts
-  auto op_type = static_cast<libxsmm_meltw_unary_type>(type);
   auto force_fp32 =
       (dtype == LIBXSMM_DATATYPE_BF16 && isTransformUnary(op_type));
   unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
@@ -195,13 +191,12 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
-  libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
-      static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
-      static_cast<libxsmm_bitfield>(unary_flags));
+  libxsmm_meltwfunction_unary kernel =
+      libxsmm_dispatch_meltw_unary_v2(op_type, unary_shape, unary_flags);
   if (!kernel) {
     fprintf(stderr, "failed to generate unary func\n");
-    fprintf(stderr, "type: %ld\n", type);
-    fprintf(stderr, "bcast_type: %ld\n", bcast_type);
+    fprintf(stderr, "op_type: %u\n", op_type);
+    fprintf(stderr, "flags: %u\n", unary_flags);
     printXsmmStruct(unary_shape);
     exit(-1);
   }
@@ -210,14 +205,11 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_datatype dtype, int64_t m,
 }
 
 extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
-    const libxsmm_datatype dtype, int64_t m, int64_t n, int64_t ldiLhs,
-    int64_t ldiRhs, int64_t ldo, int64_t type, int64_t bcast_type) {
-
-  libxsmm_meltw_binary_flags binary_flags =
-      static_cast<libxsmm_meltw_binary_flags>(bcast_type);
+    const libxsmm_meltw_binary_type op_type, const libxsmm_datatype dtype,
+    int64_t m, int64_t n, int64_t ldiLhs, int64_t ldiRhs, int64_t ldo,
+    const libxsmm_meltw_binary_flags flags) {
 
   libxsmm_meltw_binary_shape binary_shape;
-
   // Row major to col major swap m with n.
   binary_shape.m = static_cast<libxsmm_blasint>(n);
   binary_shape.n = static_cast<libxsmm_blasint>(m);
@@ -231,13 +223,12 @@ extern "C" int64_t _mlir_ciface_xsmm_binary_dispatch(
   binary_shape.ldi2 = static_cast<libxsmm_blasint>(ldiRhs);
   binary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
-  libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary_v2(
-      static_cast<libxsmm_meltw_binary_type>(type), binary_shape,
-      static_cast<libxsmm_bitfield>(binary_flags));
+  libxsmm_meltwfunction_binary kernel =
+      libxsmm_dispatch_meltw_binary_v2(op_type, binary_shape, flags);
   if (!kernel) {
     fprintf(stderr, "failed to generate binary func\n");
-    fprintf(stderr, "type: %ld\n", type);
-    fprintf(stderr, "bcast_type: %ld\n", bcast_type);
+    fprintf(stderr, "op_type: %u\n", op_type);
+    fprintf(stderr, "flags: %u\n", flags);
     printXsmmStruct(binary_shape);
     exit(-1);
   }
@@ -625,12 +616,12 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
     int64_t ldi;
     int64_t ldo;
     int64_t type;
-    int64_t bcast_type;
+    int64_t flags;
   } xsmm_unary_dispatch;
   xsmm_unary_dispatch *p = (xsmm_unary_dispatch *) params;
-  p->address =
-      _mlir_ciface_xsmm_unary_dispatch((libxsmm_datatype) p->dtype, p->m, p->n,
-                                       p->ldi, p->ldo, p->type, p->bcast_type);
+  p->address = _mlir_ciface_xsmm_unary_dispatch(
+      (libxsmm_meltw_unary_type)p->type, (libxsmm_datatype)p->dtype, p->m, p->n,
+      p->ldi, p->ldo, (libxsmm_meltw_unary_flags)p->flags);
   return 0;
 }
 
@@ -645,12 +636,12 @@ extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
     int64_t ldiRhs;
     int64_t ldo;
     int64_t type;
-    int64_t bcast_type;
+    int64_t flags;
   } xsmm_binary_dispatch;
   xsmm_binary_dispatch *p = (xsmm_binary_dispatch *) params;
   p->address = _mlir_ciface_xsmm_binary_dispatch(
-      (libxsmm_datatype) p->dtype, p->m, p->n, p->ldiLhs, p->ldiRhs, p->ldo,
-      p->type, p->bcast_type);
+      (libxsmm_meltw_binary_type)p->type, (libxsmm_datatype)p->dtype, p->m,
+      p->n, p->ldiLhs, p->ldiRhs, p->ldo, (libxsmm_meltw_binary_flags)p->flags);
   return 0;
 }
 

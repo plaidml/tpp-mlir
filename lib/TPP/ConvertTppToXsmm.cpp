@@ -458,10 +458,10 @@ static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
   auto* ctx = op->getContext();
   auto loc = op->getLoc();
 
-  KindAttr attr = KindAttr::get(ctx, kind);
+  KindAttr kindAttr = KindAttr::get(ctx, kind);
   DenseI64ArrayAttr dimsAttr = DenseI64ArrayAttr::get(
       rewriter.getContext(), dims);
-  FlagsAttr bCastAttr = FlagsAttr::get(ctx, flags);
+  auto flagsAttr = FlagsAttr::get(ctx, flags);
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   xsmm::DataTypeAttr dtype;
   if (elmTy.isBF16()) {
@@ -472,16 +472,16 @@ static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
     dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::F32);
   }
 
-  Value dispatched = rewriter.create<DispatchOp>(
-      loc, integer64, attr, dimsAttr, bCastAttr, dtype);
+  Value dispatched =
+      rewriter.create<DispatchOp>(loc, integer64, kindAttr, dimsAttr,
+                                  rewriter.getArrayAttr(flagsAttr), dtype);
 
   SmallVector<Value, 6> invokeOperands;
   invokeOperands.push_back(dispatched);
   invokeOperands.append(op->getOperands().begin(),
                         op->getOperands().end());
 
-  rewriter.replaceOpWithNewOp<Op>(op, dtype, attr,
-                                             invokeOperands);
+  rewriter.replaceOpWithNewOp<Op>(op, dtype, kindAttr, invokeOperands);
   return success();
 }
 

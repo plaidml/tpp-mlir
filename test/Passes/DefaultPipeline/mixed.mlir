@@ -37,7 +37,7 @@ module @predict_function  {
     // Relu
     // CHECK: call @xsmm_unary_dispatch
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
-    %2 = xsmm.unary.dispatch relu [128, 512, 512, 512](broadcast none dataType f32)
+    %2 = xsmm.unary.dispatch relu [128, 512, 512, 512] flags = (none) data_type = f32
     xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
     return

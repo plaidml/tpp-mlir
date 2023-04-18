@@ -339,12 +339,36 @@ static func::CallOp buildDispatchCall(Location loc,
   return call;
 }
 
-// TODO: We can derive all the dispatch from the same base class and use
-// this method. Left for future work as require changes on the td.
+template <typename OpTy,
+          typename = std::enable_if_t<
+              std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
+              std::is_same<OpTy, xsmm::BinaryDispatchOp>::value ||
+              std::is_same<OpTy, xsmm::TernaryDispatchOp>::value>>
+void addKindOperand(RewriterBase &rewriter, OpTy dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  Location loc = dispatchOp.getLoc();
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, dispatchOp.getKindAttr()));
+  dispatchOperandTypes.push_back(integer64);
+}
+
+void addKindOperand(RewriterBase &rewriter, MatmulDispatchOp dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  /* do nothing */
+}
+
+void addKindOperand(RewriterBase &rewriter, BrgemmDispatchOp dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  /* do nothing */
+}
+
 template <typename OpTy>
-static LogicalResult dispatchBrgemmOrGemm(RewriterBase &rewriter,
-                                          OpTy dispatchOp, std::string funcName,
-                                          bool useMeta) {
+static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
+                                     std::string funcName, bool useMeta) {
   Location loc = dispatchOp.getLoc();
   FlatSymbolRefAttr fnName =
       SymbolRefAttr::get(rewriter.getContext(), funcName);
@@ -353,6 +377,15 @@ static LogicalResult dispatchBrgemmOrGemm(RewriterBase &rewriter,
   SmallVector<Value, 10> dispatchOperands;
   SmallVector<Type, 10> dispatchOperandTypes;
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+  // If `OpTy` is unary, binary or ternary we need to dispatch and extra
+  // integer for the kind of operation to invoke.
+  if (std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
+      std::is_same<OpTy, xsmm::BinaryDispatchOp>::value ||
+      std::is_same<OpTy, xsmm::TernaryDispatchOp>::value) {
+    addKindOperand(rewriter, dispatchOp, dispatchOperands,
+                   dispatchOperandTypes);
+  }
 
   // Dispatch the data type.
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
@@ -403,8 +436,8 @@ struct ConvertMatmulDispatchOp : public OpRewritePattern<MatmulDispatchOp> {
 
   LogicalResult matchAndRewrite(MatmulDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    return dispatchBrgemmOrGemm<MatmulDispatchOp>(
-        rewriter, dispatchOp, "xsmm_matmul_dispatch", useMeta);
+    return buildDispatchOp<MatmulDispatchOp>(rewriter, dispatchOp,
+                                             "xsmm_matmul_dispatch", useMeta);
   }
 
 private:
@@ -419,8 +452,8 @@ struct ConvertBrgemmDispatchOp : public OpRewritePattern<BrgemmDispatchOp> {
 
   LogicalResult matchAndRewrite(BrgemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    return dispatchBrgemmOrGemm<BrgemmDispatchOp>(
-        rewriter, dispatchOp, "xsmm_brgemm_dispatch", useMeta);
+    return buildDispatchOp<BrgemmDispatchOp>(rewriter, dispatchOp,
+                                             "xsmm_brgemm_dispatch", useMeta);
   }
 
 private:
@@ -435,33 +468,8 @@ struct ConvertTernaryDispatchOp : public OpRewritePattern<TernaryDispatchOp> {
 
   LogicalResult matchAndRewrite(TernaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = dispatchOp.getLoc();
-    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch";
-    FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
-
-    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-    SmallVector<Value, 10> dispatchOperands;
-    SmallVector<Type, 10> dispatchOperandTypes;
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getDataTypeAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
-    size_t arrayAttrSize = integers.size();
-    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
-      dispatchOperands.push_back(
-          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
-      dispatchOperandTypes.push_back(integer64);
-    }
-    func::CallOp call =
-        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                          fnName, useMeta, rewriter);
-    rewriter.replaceOp(dispatchOp, call.getResult(0));
-    return success();
+    return buildDispatchOp<TernaryDispatchOp>(rewriter, dispatchOp,
+                                              "xsmm_ternary_dispatch", useMeta);
   }
 
 private:
@@ -524,43 +532,8 @@ struct ConvertBinaryDispatchOp : public OpRewritePattern<BinaryDispatchOp> {
 
   LogicalResult matchAndRewrite(BinaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = dispatchOp.getLoc();
-    std::string kindAsString = "xsmm_binary_dispatch";
-    FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
-
-    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-    SmallVector<Value, 10> dispatchOperands;
-    SmallVector<Type, 10> dispatchOperandTypes;
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getDataTypeAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
-    size_t arrayAttrSize = integers.size();
-    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
-      dispatchOperands.push_back(
-          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
-      dispatchOperandTypes.push_back(integer64);
-    }
-
-    // kind of operation to invoke.
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getKindAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    // kind of broadcast
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getFlagsAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    func::CallOp call =
-        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                          fnName, useMeta, rewriter);
-    rewriter.replaceOp(dispatchOp, call.getResult(0));
-    return success();
+    return buildDispatchOp<BinaryDispatchOp>(rewriter, dispatchOp,
+                                             "xsmm_binary_dispatch", useMeta);
   }
 
 private:
@@ -574,43 +547,8 @@ struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
 
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = dispatchOp.getLoc();
-    std::string kindAsString = "xsmm_unary_dispatch";
-
-    FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
-
-    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-    SmallVector<Value, 10> dispatchOperands;
-    SmallVector<Type, 10> dispatchOperandTypes;
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getDataTypeAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
-    size_t arrayAttrSize = integers.size();
-    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
-      dispatchOperands.push_back(
-          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
-      dispatchOperandTypes.push_back(integer64);
-    }
-
-    // kind of operation to invoke.
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getKindAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    // kind of broadcast
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getFlagsAttr()));
-    dispatchOperandTypes.push_back(integer64);
-
-    func::CallOp call =
-        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                          fnName, useMeta, rewriter);
-    rewriter.replaceOp(dispatchOp, call.getResult(0));
+    return buildDispatchOp<UnaryDispatchOp>(rewriter, dispatchOp,
+                                            "xsmm_unary_dispatch", useMeta);
     return success();
   }
 
