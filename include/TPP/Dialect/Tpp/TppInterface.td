@@ -82,6 +82,45 @@ def TppOpInterface : OpInterface<"TppOp"> {
         assert(!$_op.hasTensorSemantics());
         return opInputs[idx].getType().template cast<MemRefType>();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if the op is unary.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"isUnary",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        return opInputs.size() == 1;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if the op is binary.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"isBinary",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        return opInputs.size() == 2;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if the op is ternary.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"isTernary",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        return opInputs.size() == 3;
+      }]
     >
   ];
 }
