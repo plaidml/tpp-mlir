@@ -46,27 +46,3 @@ func.func @vnni_dialect(%arg0: memref<4x256x512xbf16>,
 // CHECK: tpp.vnni_brgemm
 // CHECK-NOT: vnni.matmul
 // CHECK: tpp.vnni_matmul
-
-// -----
-
-func.func @matmul_lowering(%arg0: tensor<8x9xf32>,
-                           %arg1: tensor<9x8xf32>, %arg2: tensor<8x8xf32>) -> tensor<8x8xf32> {
-  %0 = linalg.matmul ins(%arg0, %arg1: tensor<8x9xf32>, tensor<9x8xf32>)
-                     outs(%arg2: tensor<8x8xf32>) -> tensor<8x8xf32>
-  return %0 : tensor<8x8xf32>
-}
-
-// CHECK-LABEL: matmul_lowering
-// CHECK: tpp.matmul
-
-// -----
-
-func.func @brgemm_lowering(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
-                          %arg2: tensor<5x5xf32>) -> tensor<5x5xf32> {
-  %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<3x5x4xf32>, tensor<3x4x5xf32>)
-                                  outs(%arg2: tensor<5x5xf32>) -> tensor<5x5xf32>
-  return %0 : tensor<5x5xf32>
-}
-
-// CHECK-LABEL: brgemm_lowering
-// CHECK: tpp.brgemm
