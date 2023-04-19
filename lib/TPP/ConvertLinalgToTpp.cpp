@@ -148,6 +148,10 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
       return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
 
     auto outputs = fillOp.getOutputs();
+    if (outputs[0].getType().cast<ShapedType>().getRank() > 2)
+      return rewriter.notifyMatchFailure(fillOp,
+                                         "Expect output rank at most 2");
+
     rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, outputs[0], outputs[0]);
     return success();
   }

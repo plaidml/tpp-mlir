@@ -584,6 +584,24 @@ func.func @zero_fill_const(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
 
 // -----
 
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @zero_fill_const_3d
+func.func @zero_fill_const_3d(%arg0: memref<2x8x32xf32>) -> memref<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    outs(%arg0: memref<2x8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    }
+  return %arg0 : memref<2x8x32xf32>
+}
+
+// -----
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 memref.global "private" constant @__constant_zero : memref<8x32xf32> = dense<0.000000e+00>
@@ -650,4 +668,15 @@ func.func @linalg_fill_arg(%arg0: memref<8x32xf32>, %cst : f32) -> memref<8x32xf
   // CHECK: linalg.fill
   linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
   return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_3d
+func.func @linalg_fill_3d(%arg0: memref<2x8x32xf32>) -> memref<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  %cst = arith.constant 0.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<2x8x32xf32>)
+  return %arg0 : memref<2x8x32xf32>
 }
