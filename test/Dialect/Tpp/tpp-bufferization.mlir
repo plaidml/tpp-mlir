@@ -397,3 +397,28 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
 // CHECK-SAME:  outs(%[[ARG1]] : memref<256x1024xbf16>)
 // CHECK: tpp.add ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
 // CHECK: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+
+// -----
+
+// CHECK-LABEL: brgemm_in_loops 
+func.func @brgemm_in_loops(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK-NOT: memref.alloc
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %0 = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg2) -> (tensor<4x8x32x32xf32>) {
+    %1 = scf.for %arg5 = %c0 to %c8 step %c1 iter_args(%arg6 = %arg4) -> (tensor<4x8x32x32xf32>) {
+      %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<4x16x32x32xf32> to tensor<16x32x32xf32>
+      %extracted_slice_0 = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<8x16x32x32xf32> to tensor<16x32x32xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg6[%arg3, %arg5, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<32x32xf32>
+      %2 = tpp.brgemm (%extracted_slice : tensor<16x32x32xf32>, %extracted_slice_0 : tensor<16x32x32xf32>, %extracted_slice_1 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+      %inserted_slice = tensor.insert_slice %2 into %arg6[%arg3, %arg5, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x8x32x32xf32>
+      scf.yield %inserted_slice : tensor<4x8x32x32xf32>
+    }
+    scf.yield %1 : tensor<4x8x32x32xf32>
+  }
+  return %0 : tensor<4x8x32x32xf32>
+}
+
+// CHECK: tpp.brgemm ins(%{{.+}} : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %{{.+}} : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %{{.+}} : memref<32x32xf32, strided<[32, 1], offset: ?>>) outs(%{{.+}} : memref<32x32xf32, strided<[32, 1], offset: ?>>)
