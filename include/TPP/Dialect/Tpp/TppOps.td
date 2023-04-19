@@ -164,8 +164,8 @@ def Tpp_ZeroOp : Tpp_UnaryOp<"zero"> {
     
     ```mlir
     
-    // out-of-place - memref abstraction.
-    tpp.zero ins(%0: memref<2x2xf32>) outs(%1: memref<2x2xf32>)
+    // in-place - memref abstraction.
+    tpp.zero ins(%0: memref<2x2xf32>) outs(%0: memref<2x2xf32>)
 
     // tensor abstraction.
     %0 = tpp.zero (%0: tensor<4xf32>) -> tensor<4xf32>
