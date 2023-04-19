@@ -788,7 +788,8 @@ struct PropagatePackUnPack
 } // end namespace
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
-  linalg::populateDataLayoutPropagationPatterns(patterns);
+  linalg::populateDataLayoutPropagationPatterns(
+      patterns, [](Operation *op) { return true; });
   patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
 
