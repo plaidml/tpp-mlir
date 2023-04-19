@@ -541,14 +541,3 @@ func.func @broadcast_col_identity(%arg0: memref<8x32xf32>, %arg1: memref<8xf32>)
     }
   return
 }
-
-// -----
-
-// CHECK-LABEL: func.func @matmul_on_tensor(
-func.func @matmul_on_tensor(%arg0: tensor<8x9xf32>,
-                            %arg1: tensor<9x8xf32>, %arg2: tensor<8x8xf32>) -> tensor<8x8xf32> {
-  // CHECK-NOT: tpp.matmul
-  %0 = linalg.matmul ins(%arg0, %arg1: tensor<8x9xf32>, tensor<9x8xf32>)
-                outs(%arg2: tensor<8x8xf32>) -> tensor<8x8xf32>
-  return %0 : tensor<8x8xf32>
-}
