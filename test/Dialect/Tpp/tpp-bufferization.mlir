@@ -49,6 +49,7 @@ func.func @tpp_tensor_add_bufferize_outs_of_place(%arg0: tensor<1xf32>, %arg1: t
 // CHECK-LABEL: func.func @tpp_tensor_add_loop
 // CHECK-SAME: %[[ARG0:.+]]: memref<32x32xf32>, %[[ARG1:.+]]: memref<32x32xf32>
 func.func @tpp_tensor_add_loop(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %c0 = arith.constant 0 : index
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -92,6 +93,7 @@ func.func @tpp_tensor_relu_must_allocate(%arg0: tensor<32xf32>) -> tensor<32x32x
 // CHECK-LABEL: func.func @relu_tensor_loop
 // CHECK-SAME:  (%[[ARG0:.+]]: memref<32x32xf32>)
 func.func @relu_tensor_loop(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %c0 = arith.constant 0 : index
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -150,6 +152,7 @@ func.func @tpp_tensor_matmul(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<32x32xf32>, %[[ARG3:.+]]: memref<32x32xf32>
 func.func @tpp_mixed(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                      %arg2: tensor<32x32xf32>, %arg3: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK-NOT: memref.alloc
   %0 = tpp.matmul (%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                           %arg2: tensor<32x32xf32>) -> tensor<32x32xf32>
   // CHECK: tpp.matmul ins(%[[ARG0]] : memref<32x64xf32>, %[[ARG1]] : memref<64x32xf32>, %[[ARG2]] : memref<32x32xf32>) 
@@ -197,6 +200,7 @@ func.func @tpp_add_with_insert_slice(%arg0: tensor<1536xbf16>,
   return %0 : tensor<8x48x32x32xbf16>
 }
 
+// CHECK-NOT: memref.alloc
 // CHECK: %[[EXPAND:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<1536xbf16> into memref<48x32xbf16>
 // CHECK: scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (8, 48)
 // CHECK-NEXT: %[[SUB:.+]] = memref.subview %expand_shape[%[[ARG3]], 0] [1, 32] [1, 1] 
@@ -235,6 +239,7 @@ func.func @sequence_of_adds_on_lhs(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32
 }
 
 // CHECK-LABEL: sequence_of_adds_on_lhs
+// CHECK-NOT: memref.alloc
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>
 // CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG1]] : memref<3x3xf32>) 
 // CHECK-SAME:    outs(%[[ARG1]] : memref<3x3xf32>)
@@ -314,8 +319,8 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
 
 // -----
 
-// CHECK-LABEL: test_mlp_bf16_3_layer_1024
-func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+// CHECK-LABEL: test_mlp_bf16_1_layer_1024
+func.func @test_mlp_bf16_1_layer_1024(%arg0: tensor<256x1024xbf16>, 
                                       %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
   // CHECK-NOT: memref.alloc
   %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
@@ -329,8 +334,8 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
 
 // -----
 
-// CHECK-LABEL: test_mlp_bf16_3_layer_1024
-func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+// CHECK-LABEL: test_mlp_bf16_1_layer_1024
+func.func @test_mlp_bf16_1_layer_1024(%arg0: tensor<256x1024xbf16>, 
                                       %arg1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
   // CHECK-NOT: memref.alloc
   %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
@@ -341,3 +346,79 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
   %2 = tpp.relu (%1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
   return %2 : tensor<256x1024xbf16>
 }
+
+// -----
+
+// CHECK: test_zero
+// CHECK-SAME: %[[ARG0:.+]]: memref<5x5xf32>
+func.func @test_zero(%arg0: tensor<5x5xf32>) -> tensor<5x5xf32> {
+  // CHECK: ins(%[[ARG0]] : memref<5x5xf32>) outs(%[[ARG0]] : memref<5x5xf32>)
+  %0 = tpp.zero (%arg0: tensor<5x5xf32>) -> tensor<5x5xf32>
+  return %0 : tensor<5x5xf32>
+}
+
+// -----
+
+func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>, 
+                                      %out: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
+  %cst = arith.constant dense<0.01> : tensor<1024x1024xbf16>
+  %cst1 = arith.constant dense<0.02> : tensor<256x1024xbf16>
+  %zero = tpp.zero (%out: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %0 = tpp.matmul (%arg0: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>, 
+                   %zero: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %1 = tpp.add (%0: tensor<256x1024xbf16>, %cst1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %2 = tpp.relu (%1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %3 = tpp.matmul (%2: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>, 
+                   %zero: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %4 = tpp.add (%3: tensor<256x1024xbf16>, %cst1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %5 = tpp.relu (%4: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %6 = tpp.matmul (%5: tensor<256x1024xbf16>, %cst: tensor<1024x1024xbf16>,
+                   %zero: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %7 = tpp.add (%6: tensor<256x1024xbf16>, %cst1: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  %8 = tpp.relu (%7: tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
+  return %8 : tensor<256x1024xbf16>
+}
+
+// CHECK-LABEL: test_mlp_bf16_3_layer_1024(
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xbf16>, %[[ARG1:.+]]: memref<256x1024xbf16>)
+// CHECK-NOT: memref.alloc
+// CHECK: %[[GB:.+]] = memref.get_global @__constant_1024x1024xbf16 : memref<1024x1024xbf16>
+// CHECK: %[[GB1:.+]] = memref.get_global @__constant_256x1024xbf16 : memref<256x1024xbf16>
+// CHECK: tpp.zero ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.matmul ins(%[[ARG0]] : memref<256x1024xbf16>, %[[GB]] : memref<1024x1024xbf16>, %[[ARG1]] : memref<256x1024xbf16>) 
+// CHECK-SAME:  outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.add ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.matmul ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB]] : memref<1024x1024xbf16>, %[[ARG1]] : memref<256x1024xbf16>) 
+// CHECK-SAME:  outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.add ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.matmul ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB]] : memref<1024x1024xbf16>, %[[ARG1]] : memref<256x1024xbf16>) 
+// CHECK-SAME:  outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.add ins(%[[ARG1]] : memref<256x1024xbf16>, %[[GB1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+// CHECK: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
+
+// -----
+
+// CHECK-LABEL: brgemm_in_loops 
+func.func @brgemm_in_loops(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK-NOT: memref.alloc
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %0 = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg2) -> (tensor<4x8x32x32xf32>) {
+    %1 = scf.for %arg5 = %c0 to %c8 step %c1 iter_args(%arg6 = %arg4) -> (tensor<4x8x32x32xf32>) {
+      %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<4x16x32x32xf32> to tensor<16x32x32xf32>
+      %extracted_slice_0 = tensor.extract_slice %arg1[%arg5, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : tensor<8x16x32x32xf32> to tensor<16x32x32xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg6[%arg3, %arg5, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<32x32xf32>
+      %2 = tpp.brgemm (%extracted_slice : tensor<16x32x32xf32>, %extracted_slice_0 : tensor<16x32x32xf32>, %extracted_slice_1 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+      %inserted_slice = tensor.insert_slice %2 into %arg6[%arg3, %arg5, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x8x32x32xf32>
+      scf.yield %inserted_slice : tensor<4x8x32x32xf32>
+    }
+    scf.yield %1 : tensor<4x8x32x32xf32>
+  }
+  return %0 : tensor<4x8x32x32xf32>
+}
+
+// CHECK: tpp.brgemm ins(%{{.+}} : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %{{.+}} : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %{{.+}} : memref<32x32xf32, strided<[32, 1], offset: ?>>) outs(%{{.+}} : memref<32x32xf32, strided<[32, 1], offset: ?>>)

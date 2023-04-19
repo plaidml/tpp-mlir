@@ -14,8 +14,11 @@ func.func @tpp_dialect(%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>,
   %3 = tpp.brgemm (%arg3: tensor<8x5x5xf32>, %arg3: tensor<8x5x5xf32>, 
                    %2: tensor<5x5xf32>) -> tensor<5x5xf32>
   // CHECK: tpp.relu
-  %4 = tpp.relu (%3 : tensor<5x5xf32>) -> tensor<5x5xf32>
-  return %4 : tensor<5x5xf32>
+  %4 = tpp.relu (%3: tensor<5x5xf32>) -> tensor<5x5xf32>
+  
+  // CHECK: tpp.zero
+  %5 = tpp.zero (%4: tensor<5x5xf32>) -> tensor<5x5xf32> 
+  return %5 : tensor<5x5xf32>
 }
 
 // CHECK-LABEL: func.func @tpp_identity_tensor_bcast

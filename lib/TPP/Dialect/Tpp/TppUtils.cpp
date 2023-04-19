@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/TransformUtils.h"
@@ -107,11 +108,13 @@ static bool isZeroOp(Operation *defOp) {
   if (!defOp)
     return false;
 
+  if (isa_and_nonnull<tpp::ZeroOp>(defOp))
+    return true;
+
   return TypeSwitch<Operation *, bool>(defOp)
       .Case<arith::ConstantOp>([&](auto op) {
         // Dense attributes don't match APFloat.isZero()
         auto attr = op.getValue();
-        attr.dump();
         return isZeroAttr(attr);
       })
       .Case<linalg::FillOp, linalg::CopyOp>([&](auto op) {
