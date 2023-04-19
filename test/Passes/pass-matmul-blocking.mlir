@@ -120,5 +120,3 @@ func.func @block_linalg_matmul(
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 // CHECK: return %[[OUT]] : tensor<128x128xf32>
 // CHECK: }
-
-

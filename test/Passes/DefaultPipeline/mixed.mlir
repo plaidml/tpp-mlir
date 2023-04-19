@@ -135,3 +135,51 @@ func.func @tensor_forall(%arg0: tensor<32x32xbf16>) -> tensor<8x112x32x32xbf16> 
   }
   return %1 : tensor<8x112x32x32xbf16>
 }
+
+// -----
+
+!A_tensor_t = tensor<256x512xf32>
+!B_tensor_t = tensor<512x1024xf32>
+!C_tensor_t = tensor<256x1024xf32>
+!Bias_tensor_t = tensor<1024xf32>
+
+#map0 = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+func.func @matmul_static(
+    %A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {
+  // Expanding bias beforehand may be easier to fuse and completely fold away than post-hoc addBias to matmul.
+  %expanded_bias = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]}
+      ins(%Bias : !Bias_tensor_t) outs(%C : !C_tensor_t) {
+        ^bb0(%arg9: f32, %arg10: f32):
+      linalg.yield %arg9 : f32
+    } -> !C_tensor_t
+
+  %matmul = linalg.matmul ins(%A, %B : !A_tensor_t, !B_tensor_t)
+                     outs(%expanded_bias : !C_tensor_t) -> !C_tensor_t
+
+  %c0 = arith.constant 0.0 : f32
+  // ReLU has no "ins" operands.
+  %res = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]}
+      outs(%matmul : !C_tensor_t) {
+    ^bb0(%arg9: f32):
+      %16 = arith.maxf %arg9, %c0 : f32
+      linalg.yield %16 : f32
+    } -> !C_tensor_t
+
+  return %res : !C_tensor_t
+}
+
+// CHECK-LABEL: func.func @matmul_static
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK: call @xsmm_unary_invoke
+// CHECK: scf.parallel (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C8]], %[[C32]]) step (%[[C1]], %[[C1]])
+// CHECK: call @xsmm_brgemm_invoke
+// CHECK-NEXT: call @xsmm_unary_invoke
+// CHECK-NEXT: scf.yield
