@@ -133,6 +133,26 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
   }
 };
 
+// Convert a linalg.matmul to a tpp.matmul.
+struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
+  using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tpp::utils::hasStaticShape(fillOp))
+      return rewriter.notifyMatchFailure(
+          fillOp, "Expect static shape when mapping to tpp");
+
+    auto inputs = fillOp.getInputs();
+    if (!tpp::utils::isZeroTensor(inputs[0]))
+      return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
+
+    auto outputs = fillOp.getOutputs();
+    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, outputs[0], outputs[0]);
+    return success();
+  }
+};
+
 struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   ConvertLinalgToTpp() = default;
   void runOnOperation() override {
@@ -152,7 +172,8 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
-               ConvertMatmulToTpp>(patterns.getContext());
+               ConvertMatmulToTpp,
+               ConvertFillToTpp>(patterns.getContext());
   // clang-format on
 }
 

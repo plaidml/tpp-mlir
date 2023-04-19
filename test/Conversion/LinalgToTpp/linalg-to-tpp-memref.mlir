@@ -620,3 +620,34 @@ func.func @buffer_fill_const(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
     }
   return %arg0 : memref<8x32xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_zero
+func.func @linalg_fill_zero(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK: tpp.zero
+  %cst = arith.constant 0.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_non_zero
+func.func @linalg_fill_non_zero(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  %cst = arith.constant 1.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_arg
+func.func @linalg_fill_arg(%arg0: memref<8x32xf32>, %cst : f32) -> memref<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
