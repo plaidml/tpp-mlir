@@ -53,6 +53,22 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 
 // -----
 
+// CHECK: func.func @zero_to_loops(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>) {
+func.func @zero_to_loops(%arg0: memref<3x3xf32>) {
+  // CHECK-DAG: %[[ub:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[zero:.*]] = arith.constant 0.000000e+00 : f32
+  // CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ub]] step %[[step]] {
+  // CHECK:     memref.store %[[zero]], %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
+  tpp.zero ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
+  return
+}
+
+// -----
+
 // CHECK: func.func @add_to_loops(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>) {

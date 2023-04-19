@@ -46,6 +46,19 @@ func.func @tpp_relu(%arg0: memref<3x3xf32>) {
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
+// CHECK: func.func @tpp_zero(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+func.func @tpp_zero(%arg0: memref<3x3xf32>) {
+  // CHECK: scf.for
+  // CHECK:   scf.for
+  // CHECK:     memref.store
+  tpp.zero ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
+  return
+}
+
+// -----
+
+// CHECK-NOT: func.func private @xsmm_
 // CHECK: func.func @tpp_brgemm(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
