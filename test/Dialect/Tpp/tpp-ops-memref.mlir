@@ -27,6 +27,9 @@ func.func @tpp_dialect(%arg0: memref<2x2xf32>,
   tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>)
              outs(%arg2: memref<2x2xf32>)
 
+  // CHECK: tpp.zero
+  tpp.zero ins(%arg1: memref<2x2xf32>) outs(%arg1: memref<2x2xf32>)
+
   return %arg2: memref<2x2xf32>
 }
 

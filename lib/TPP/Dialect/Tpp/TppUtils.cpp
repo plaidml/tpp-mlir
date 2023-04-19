@@ -262,6 +262,21 @@ bool isTppIdentity(linalg::GenericOp linalgOp,
   return isTppUnaryOp(linalgOp) && identityMatcher.match(linalgOp);
 }
 
+// Return true if the linalg.generic can be mapped to a tpp.zero.
+bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+  using namespace tpp::structured_match;
+  auto zeroMatcher =
+      StructuredOpMatcher::make<linalg::GenericOp>()
+          .operation(NumRegions(EqualsTo(1)))
+          .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(operands));
+
+  if (!isTppUnaryOp(linalgOp) || !zeroMatcher.match(linalgOp))
+    return false;
+
+  Operation *yieldOp = linalgOp.getBlock()->getTerminator();
+  return isZeroTensor(yieldOp->getOperand(0));
+}
+
 } // namespace utils
 } // namespace tpp
 } // namespace mlir
