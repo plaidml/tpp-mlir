@@ -66,8 +66,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(linalgOp, "Expect buffer semantics");
     if (!tpp::utils::hasStaticShape(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");

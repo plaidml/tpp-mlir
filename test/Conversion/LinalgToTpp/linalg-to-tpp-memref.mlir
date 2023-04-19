@@ -65,7 +65,7 @@ func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
 
 // -----
 
-// We don't support broadcast for tpp.add. All operands must have the same type.
+// Output affine map is not an identity.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
@@ -101,7 +101,7 @@ func.func @add_mapping(%arg0: memref<4x4xf32>, %arg1: memref<4x4xf32>) {
 
 // -----
 
-// All dimension get collapsed to a rank zero memref and we do not convert rank 0 memref to tpp.
+// tpp have 2d rank.
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 func.func @add_mapping(%arg0: memref<1x1x1xf32>, %arg1: memref<1x1x1xf32>) {
   // CHECK-NOT: tpp.add
@@ -307,7 +307,10 @@ func.func @matmul_mapping() -> memref<28x32xf32> {
   %alloc_1 = memref.alloc() : memref<28x32xf32>
   
   // CHECK-NOT: tpp.matmul
-  linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%alloc, %alloc_0 : memref<28x55xf32>, memref<55x32xf32>) outs(%alloc_1 : memref<28x32xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["parallel", "parallel", "reduction"]} 
+    ins(%alloc, %alloc_0 : memref<28x55xf32>, memref<55x32xf32>) outs(%alloc_1 : memref<28x32xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %0 = arith.mulf %in, %in_2 : f32
       %1 = arith.addf %out, %0 : f32
@@ -455,7 +458,7 @@ func.func @transpose_no_output_identity(%arg0: memref<8x32xf32>, %arg1: memref<3
 
 // CHECK-LABEL: func.func @empty_map_identity
 // CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<8x32xf32>
-func.func @empty_map_identity(%arg0 : f32, %arg1: memref<8x32xf32>) {
+func.func @empty_map_identity(%arg0: f32, %arg1: memref<8x32xf32>) {
   // CHECK: tpp.identity ins(%[[ARG0]] : f32) outs(%[[ARG1]] : memref<8x32xf32>)
   linalg.generic {
     indexing_maps = [#map, #map1],

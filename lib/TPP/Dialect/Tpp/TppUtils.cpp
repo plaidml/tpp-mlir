@@ -139,7 +139,6 @@ static bool isTppOp(linalg::GenericOp linalgOp) {
   using namespace tpp::structured_match;
   auto tppMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
-          .operation(HasBufferSemantics())
           .output(MatchAll(), HasStaticShape())
           .input(MatchAll(), HasStaticShape())
           .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
@@ -175,9 +174,8 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
 }
 
 // Returns true if the linalg.generic maps to a tpp.gemm.
+// TODO: we may want to remove now.
 bool isTppMatmul(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
-  if (linalgOp.hasTensorSemantics())
-    return false;
   return linalgx::utils::isMatmulOp(linalgOp, operands);
 }
 
