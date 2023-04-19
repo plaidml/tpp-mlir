@@ -207,6 +207,12 @@ LogicalResult MatmulOp::verify() {
 
 void MatmulOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return MatmulOp::build(builder, state, TypeRange{rankedOutput}, inputs,
+                           ValueRange{output});
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
   MatmulOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
 }
 
@@ -248,6 +254,12 @@ LogicalResult BrgemmOp::verify() {
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return BrgemmOp::build(builder, state, TypeRange{rankedOutput}, inputs,
+                           ValueRange{output});
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
   BrgemmOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
 }
 

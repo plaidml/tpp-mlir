@@ -1,27 +1,5 @@
 // RUN: tpp-opt %s -tpp-conversion -split-input-file | FileCheck %s
 
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
-
-// Rewriting to brgemm is done after bufferization which is why it is not part of 'tpp-mapping'.
-// See the default pipeline in 'DefaultTppPasses' for more details.
-func.func @generic_to_brgemm(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
-    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
-      %8 = arith.mulf %arg3, %arg4 : f32
-      %9 = arith.addf %arg5, %8 : f32
-      linalg.yield %9 : f32
-    } -> tensor<4x8x32x32xf32>
-  return %1 :  tensor<4x8x32x32xf32>
-}
-
-// CHECK-LABEL: func.func @generic_to_brgemm(
-// CHECK-NOT: linalg.generic
-// CHECK: linalg.batch_reduce_matmul
-
-// -----
-
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @linalg_dialect(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,

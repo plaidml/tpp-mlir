@@ -82,9 +82,6 @@ struct ConvertBrgemmToTpp
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!brMatmulOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(
-          brMatmulOp, "Expect buffer semantics when mapping to tpp");
     if (!tpp::utils::hasStaticShape(brMatmulOp))
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
@@ -102,9 +99,6 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(
-          matmulOp, "Expect buffer semantics when mapping to tpp");
     if (!tpp::utils::hasStaticShape(matmulOp))
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");

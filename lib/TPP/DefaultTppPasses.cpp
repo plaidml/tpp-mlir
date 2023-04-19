@@ -315,12 +315,15 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    pm.addPass(createConvertForAllToParallelOpPass());
     // Convert generics to BRGEMM.
     // The mapping is done after bufferization as the buffer semantics
     // allow direct use of scf.parallel loops. This prevents different
     // lowering outputs between input linalg on tensors and memrefs.
     pm.addPass(createRewriteToBatchReduceGemmPass());
+    // Convert forAll to parallel loops should run after bufferization
+    // as scf.parallel does not handle tensor. Fix it upstream or keep the
+    // pass after `createBufferizePass`.
+    pm.addPass(createConvertForAllToParallelOpPass());
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
@@ -431,12 +434,6 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
-      // Convert generics to BRGEMM.
-      // The mapping is done after bufferization as the buffer semantics
-      // allow direct use of scf.parallel loops. This prevents different
-      // lowering outputs between input linalg on tensors and memrefs.
-      pm.addNestedPass<func::FuncOp>(createRewriteToBatchReduceGemmPass());
-
       // Lower operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());

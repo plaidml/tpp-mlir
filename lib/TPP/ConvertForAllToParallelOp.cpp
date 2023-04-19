@@ -24,6 +24,7 @@ struct ConvertForAllToParallelOpImpl : public OpRewritePattern<scf::ForallOp> {
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
+    // Bail-out if we are not at memref.
     if (forallOp->getNumResults() != 0)
       return failure();
     Location loc = forallOp.getLoc();
