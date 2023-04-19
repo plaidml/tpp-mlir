@@ -22,8 +22,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-static bool isScalarVal(Value val) { return !val.getType().isa<ShapedType>(); }
-
 // Return the touched ivs by `in` based on `out` and `ivs`. The iteration
 // domain in tpp is defined by the output tensor. Assuming static shape we
 // can get the induction varibales used by `in` looking at the shape of `in`
@@ -88,15 +86,17 @@ static void convertTppToLoops(RewriterBase &rewriter, Location loc,
       rewriter, loc, lbs, ubs, steps,
       [&](OpBuilder &b, Location loc, ValueRange localIvs) {
         Value scalarLhs =
-            isScalarVal(lhs)
-                ? lhs
-                : b.create<memref::LoadOp>(
-                      loc, lhs, getInputOperandIvs(lhs, out, localIvs, zero));
+            lhs.getType().isa<ShapedType>()
+
+                ? b.create<memref::LoadOp>(
+                      loc, lhs, getInputOperandIvs(lhs, out, localIvs, zero))
+                : lhs;
         Value scalarRhs =
-            isScalarVal(rhs)
-                ? rhs
-                : b.create<memref::LoadOp>(
-                      loc, rhs, getInputOperandIvs(rhs, out, localIvs, zero));
+            rhs.getType().isa<ShapedType>()
+
+                ? b.create<memref::LoadOp>(
+                      loc, rhs, getInputOperandIvs(rhs, out, localIvs, zero))
+                : rhs;
         Value opLhsAndRhs = b.create<OpTy>(loc, scalarLhs, scalarRhs);
         b.create<memref::StoreOp>(loc, opLhsAndRhs, out, localIvs);
       });
@@ -137,10 +137,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
         rewriter, loc, lbs, ubs, steps,
         [&](OpBuilder &b, Location loc, ValueRange localIvs) {
           Value scalarIn =
-              isScalarVal(in)
-                  ? in
-                  : b.create<memref::LoadOp>(
-                        loc, in, getInputOperandIvs(in, out, localIvs, zero));
+              in.getType().isa<ShapedType>()
+
+                  ? b.create<memref::LoadOp>(
+                        loc, in, getInputOperandIvs(in, out, localIvs, zero))
+                  : in;
           b.create<memref::StoreOp>(loc, scalarIn, out, localIvs);
         });
     rewriter.eraseOp(identityOp);
