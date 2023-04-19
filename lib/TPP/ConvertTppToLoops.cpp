@@ -24,26 +24,6 @@ namespace {
 
 static bool isScalarVal(Value val) { return !val.getType().isa<ShapedType>(); }
 
-static inline Value getZero(RewriterBase &rewriter, Location loc) {
-  return rewriter.create<arith::ConstantIndexOp>(loc, 0);
-}
-
-static inline Value getOne(RewriterBase &rewriter, Location loc) {
-  return rewriter.create<arith::ConstantIndexOp>(loc, 1);
-}
-
-static inline SmallVector<Value> getShapeAsValues(RewriterBase &rewriter,
-                                                  Location loc,
-                                                  ArrayRef<int64_t> shape) {
-  SmallVector<Value> shapeAsValues;
-  for (int64_t shapeDim : shape) {
-    assert(shapeDim != ShapedType::kDynamic);
-    shapeAsValues.push_back(
-        rewriter.create<arith::ConstantIndexOp>(loc, shapeDim));
-  }
-  return shapeAsValues;
-}
-
 // Return the touched ivs by `in` based on `out` and `ivs`. The iteration
 // domain in tpp is defined by the output tensor. Assuming static shape we
 // can get the induction varibales used by `in` looking at the shape of `in`
@@ -95,7 +75,7 @@ static inline Value getOne(RewriterBase &rewriter, Location loc) {
 }
 
 template <typename OpTy>
-static void convertBinaryToLoops(RewriterBase &rewriter, Location loc,
+static void convertTppToLoops(RewriterBase &rewriter, Location loc,
                                     Value lhs, Value rhs, Value out) {
   assert(out.getType().isa<ShapedType>());
   auto shape = out.getType().cast<ShapedType>().getShape();
