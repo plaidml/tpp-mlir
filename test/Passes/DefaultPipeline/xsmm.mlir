@@ -103,6 +103,20 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 
 // -----
 
+// CHECK: func.func @zero(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+func.func @zero(%arg0: memref<3x3xf32>) {
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
+  %0 = xsmm.unary.dispatch zero [3, 3, 3, 3] flags = (none) data_type = f32
+  xsmm.unary zero(dataType f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
+
+  return
+}
+
+// -----
+
 // CHECK: func.func @relu(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
 func.func @relu(%arg0: memref<3x3xf32>) {

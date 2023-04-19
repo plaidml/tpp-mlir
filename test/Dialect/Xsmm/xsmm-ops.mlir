@@ -41,5 +41,10 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
   // CHECK: xsmm.matmul.dispatch {{.*}} {myAttr = "myattr"}
   %10 = xsmm.matmul.dispatch [3, 2, 1, 3, 2, 1] flags = (none) data_type = f32 {myAttr = "myattr"}
 
+  // CHECK: xsmm.unary.dispatch zero
+  %11 = xsmm.unary.dispatch zero [2, 2, 2, 2] flags = (none) data_type = f32
+  // CHECK: xsmm.unary zero
+  xsmm.unary zero(dataType f32, %11, %arg0, %arg0) : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
+
   return
 }
