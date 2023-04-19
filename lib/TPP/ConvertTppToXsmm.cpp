@@ -455,20 +455,19 @@ template <class OpKind, class OpFlags, class KindAttr, class FlagsAttr,
 static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
                                     Type elmTy, OpKind kind, OpFlags flags,
                                     ArrayRef<int64_t> dims) {
-  auto* ctx = op->getContext();
+  auto *ctx = op->getContext();
   auto loc = op->getLoc();
 
   KindAttr kindAttr = KindAttr::get(ctx, kind);
-  DenseI64ArrayAttr dimsAttr = DenseI64ArrayAttr::get(
-      rewriter.getContext(), dims);
+  DenseI64ArrayAttr dimsAttr =
+      DenseI64ArrayAttr::get(rewriter.getContext(), dims);
   auto flagsAttr = FlagsAttr::get(ctx, flags);
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   xsmm::DataTypeAttr dtype;
   if (elmTy.isBF16()) {
     dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::BF16);
   } else {
-    assert(elmTy.isF32() &&
-           "Element type neither bf16 nor f32");
+    assert(elmTy.isF32() && "Element type neither bf16 nor f32");
     dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::F32);
   }
 
@@ -478,8 +477,7 @@ static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
 
   SmallVector<Value, 6> invokeOperands;
   invokeOperands.push_back(dispatched);
-  invokeOperands.append(op->getOperands().begin(),
-                        op->getOperands().end());
+  invokeOperands.append(op->getOperands().begin(), op->getOperands().end());
 
   rewriter.replaceOpWithNewOp<Op>(op, dtype, kindAttr, invokeOperands);
   return success();
@@ -496,10 +494,10 @@ static LogicalResult lowerUnaryTPPtoXSMM(Operation *op,
 }
 
 static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
-                                         PatternRewriter &rewriter, Type elmTy,
-                                         xsmm::BinaryKind kind,
-                                         xsmm::BinaryFlags flags,
-                                         ArrayRef<int64_t> dims) {
+                                          PatternRewriter &rewriter, Type elmTy,
+                                          xsmm::BinaryKind kind,
+                                          xsmm::BinaryFlags flags,
+                                          ArrayRef<int64_t> dims) {
   return lowerTPPtoXSMM<xsmm::BinaryKind, xsmm::BinaryFlags,
                         xsmm::BinaryKindAttr, xsmm::BinaryFlagsAttr,
                         xsmm::BinaryDispatchOp, xsmm::BinaryOp>(
@@ -613,8 +611,36 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
     int64_t ldi = *leadDim;
 
     return lowerUnaryTPPtoXSMM(reluOp, rewriter, outputMemRef.getElementType(),
-                          xsmm::UnaryKind::RELU, xsmm::UnaryFlags::NONE,
-                          {m, n, ldi, ldo});
+                               xsmm::UnaryKind::RELU, xsmm::UnaryFlags::NONE,
+                               {m, n, ldi, ldo});
+  }
+};
+
+struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
+  using OpRewritePattern<tpp::ZeroOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tpp::ZeroOp zeroOp,
+                                PatternRewriter &rewriter) const override {
+    Type outputType = zeroOp.getInputs()[0].getType();
+    assert(outputType.isa<MemRefType>() && "expect a memref type");
+
+    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
+           "expect memref with rank 1 or 2");
+
+    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
+    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
+                                              : outputMemRef.getShape()[0];
+
+    auto leadDim = getLeadingDim(outputMemRef);
+    if (failed(leadDim))
+      return rewriter.notifyMatchFailure(zeroOp, "Cannot compute ldo/ldi");
+    int64_t ldo = *leadDim;
+    int64_t ldi = *leadDim;
+
+    return lowerUnaryTPPtoXSMM(zeroOp, rewriter, outputMemRef.getElementType(),
+                               xsmm::UnaryKind::ZERO, xsmm::UnaryFlags::NONE,
+                               {m, n, ldi, ldo});
   }
 };
 
@@ -728,8 +754,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
         (bCastOnLhs != xsmm::BinaryFlags::NONE) ? bCastOnLhs : bCastOnRhs;
 
     return lowerBinaryTPPtoXSMM(addOp, rewriter, outputMemRef.getElementType(),
-                          xsmm::BinaryKind::ADD, bCast,
-                          {m, n, ldiLhs, ldiRhs, ldo});
+                                xsmm::BinaryKind::ADD, bCast,
+                                {m, n, ldiLhs, ldiRhs, ldo});
   }
 };
 
@@ -745,10 +771,11 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 } // namespace
 
 void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppAddOp,
-               ConvertTppMatmulOp, ConvertTppVNNIMatmulOp, ConvertTppBrgemmOp,
-               ConvertTppVNNIBrgemmOp, ConvertTppFusedVNNIBrgemmOp,
-               ConvertTppFusedBrgemmOp>(patterns.getContext());
+  patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
+               ConvertTppAddOp, ConvertTppMatmulOp, ConvertTppVNNIMatmulOp,
+               ConvertTppBrgemmOp, ConvertTppVNNIBrgemmOp,
+               ConvertTppFusedVNNIBrgemmOp, ConvertTppFusedBrgemmOp>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
