@@ -37,21 +37,14 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                PatternRewriter &rewriter) const {
     SmallVector<Value> operands;
     if (tpp::utils::isTppZero(linalgOp, &operands)) {
-      assert((operands.size() > 0 && operands.size() <= 2) &&
-             "tpp.zero expects one or two operands");
-
-      // Only take the output, the other operand might be a constant.
-      rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp,
-                                               operands[operands.size() - 1],
-                                               operands[operands.size() - 1]);
+      assert(operands.size() == 1 && "tpp.zero expects one operand");
+      rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp, operands[0],
+                                               operands[0]);
       return success();
     }
 
     if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
-      if (operands.size() != 2)
-        return rewriter.notifyMatchFailure(linalgOp,
-                                           "tpp.identity expects two operands");
-
+      assert(operands.size() == 2 && "tpp.identity expects one operand");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();

@@ -247,7 +247,7 @@ struct WithSingleOpImpl {
 
 // Callable object to check the `op` region for a single scalar operation OpTy.
 template <typename OpTy> struct WithSingleOp {
-  WithSingleOp() = delete;
+  WithSingleOp() : WithSingleOp(nullptr){};
   WithSingleOp(SmallVectorImpl<Value> *captures) : captures(captures){};
 
   bool operator()(Region *region, Operation *op) {

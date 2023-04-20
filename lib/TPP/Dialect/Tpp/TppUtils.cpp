@@ -255,32 +255,43 @@ bool isTppRelu(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
 bool isTppIdentity(linalg::GenericOp linalgOp,
                    SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
+  SmallVector<Value, 2> linalgOperands;
   auto identityMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumRegions(EqualsTo(1)))
-          .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(operands));
-  return isTppUnaryOp(linalgOp) && identityMatcher.match(linalgOp);
+          .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
+
+  if (!isTppUnaryOp(linalgOp) || !identityMatcher.match(linalgOp))
+    return false;
+
+  if (linalgOperands.size() != 2)
+    return false;
+
+  *operands = linalgOperands;
+  return true;
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.zero.
 bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  SmallVector<Value, 2> linalgOperands;
-  auto zeroMatcher =
-      StructuredOpMatcher::make<linalg::GenericOp>()
-          .operation(NumRegions(EqualsTo(1)))
-          .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
+  auto zeroMatcher = StructuredOpMatcher::make<linalg::GenericOp>()
+                         .operation(NumRegions(EqualsTo(1)))
+                         .region(MatchOne(0), WithSingleOp<linalg::YieldOp>());
 
   if (!isTppUnaryOp(linalgOp) || !zeroMatcher.match(linalgOp))
     return false;
 
   Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-  if (isZeroTensor(yieldOp->getOperand(0))) {
-    *operands = linalgOperands;
-    return true;
-  }
+  if (!isZeroTensor(yieldOp->getOperand(0)))
+    return false;
 
-  return false;
+  // Only take the output as tpp.zero is an in-place operation.
+  auto output = linalgOp.getOutputs()[0];
+  if (!output.getType().isa<ShapedType>())
+    return false;
+
+  operands->push_back(output);
+  return true;
 }
 
 } // namespace utils
