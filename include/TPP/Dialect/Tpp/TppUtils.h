@@ -40,10 +40,6 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 // Returns true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
 
-// Returns true if the linalg operation can convert to a tpp.matmul.
-bool isTppMatmul(linalg::LinalgOp linalgOp,
-                 SmallVectorImpl<Value> *capturedOperands = nullptr);
-
 // Returns true if the linalg operation can convert to a tpp.add.
 bool isTppAdd(linalg::GenericOp linalgOp,
               SmallVectorImpl<Value> *capturedOperands = nullptr);
