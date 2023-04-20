@@ -182,8 +182,23 @@ ParseResult ZeroOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
 }
 
+LogicalResult ZeroOp::verify() {
+  // At tensor abstraction computation result is always placed in a new tensor
+  // so skip validation.
+  if (hasTensorSemantics())
+    return success();
+
+  auto input = getInputs()[0];
+  auto output = getOutputs()[0];
+
+  if (input != output)
+    return emitOpError("fails to verify in-place computation");
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
-// AdddOp
+// AddOp
 //===----------------------------------------------------------------------===//
 
 void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,

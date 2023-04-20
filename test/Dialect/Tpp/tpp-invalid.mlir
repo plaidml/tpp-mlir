@@ -24,6 +24,14 @@ func.func @tpp_relu_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
 
 // -----
 
+func.func @tpp_zero_invalid(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) -> memref<2x2xf32> {
+  // expected-error @below {{op fails to verify in-place computation}}
+  tpp.zero ins(%arg0: memref<2x2xf32>) outs(%arg1: memref<2x2xf32>)
+  return %arg0 : memref<2x2xf32>
+}
+
+// -----
+
 func.func @tpp_add_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
   // expected-error @below {{operand #0 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<f32>'}}
   tpp.add ins(%arg0: memref<f32>, %arg1: memref<f32>) outs(%arg1: memref<f32>)
