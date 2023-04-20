@@ -37,8 +37,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
                                PatternRewriter &rewriter) const {
     SmallVector<Value> operands;
     if (tpp::utils::isTppZero(linalgOp, &operands)) {
-      assert((operands.size() != 0 && operands.size() <= 2) &&
-             "zero expects one or two operands");
+      assert((operands.size() > 0 && operands.size() <= 2) &&
+             "tpp.zero expects one or two operands");
 
       // Only take the output, the other operand might be a constant.
       rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp,
@@ -47,38 +47,32 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    // Clear operands as the previous checks might have captured some operations
-    // that are no longer relevant for the next check.
-    operands.clear();
     if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
       if (operands.size() != 2)
         return rewriter.notifyMatchFailure(linalgOp,
-                                           "identity expects two operands");
+                                           "tpp.identity expects two operands");
 
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
     }
 
-    operands.clear();
     if (tpp::utils::isTppRelu(linalgOp, &operands)) {
-      assert(operands.size() == 2 && "relu expects two operands");
+      assert(operands.size() == 2 && "tpp.relu expects two operands");
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
                                                operands[1]);
       return success();
     }
 
-    operands.clear();
     if (tpp::utils::isTppAdd(linalgOp, &operands)) {
-      assert(operands.size() == 3 && "add expects three operands");
+      assert(operands.size() == 3 && "tpp.add expects three operands");
       rewriter.replaceOpWithNewOp<tpp::AddOp>(
           linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
       return success();
     }
 
-    operands.clear();
     if (linalgx::utils::isMatmulOp(linalgOp, &operands)) {
-      assert(operands.size() == 3 && "matmul expects three operands");
+      assert(operands.size() == 3 && "tpp.matmul expects three operands");
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
           linalgOp, ValueRange{operands[0], operands[1], operands[2]},
           operands[2]);
@@ -86,7 +80,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     }
 
     return rewriter.notifyMatchFailure(
-        linalgOp, "failed to match a known library_call attribute");
+        linalgOp, "failed to match to a known tpp operation");
   }
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
@@ -133,7 +127,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
   }
 };
 
-// Convert a linalg.matmul to a tpp.matmul.
+// Convert a linalg.fill to a tpp.zero.
 struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
   using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
 

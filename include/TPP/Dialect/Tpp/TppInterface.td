@@ -108,19 +108,6 @@ def TppOpInterface : OpInterface<"TppOp"> {
         auto opInputs = ValueRange{$_op.getInputs()};
         return opInputs.size() == 2;
       }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return true if the op is ternary.
-      }],
-      /*retTy=*/"bool",
-      /*methodName*/"isTernary",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        auto opInputs = ValueRange{$_op.getInputs()};
-        return opInputs.size() == 3;
-      }]
     >
   ];
 }
