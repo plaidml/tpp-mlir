@@ -109,7 +109,7 @@ structured_match::StructuredOpMatcher::dim(
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
     if (iteratorTypes.size() != sizeRange)
       return false;
-    
+
     // Reverse iterators to have the innermost one at index 0.
     std::reverse(iteratorTypes.begin(), iteratorTypes.end());
     for (auto [idx, rangeIdx] :
@@ -170,9 +170,9 @@ bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
   if (numberOfOpsInRegion == 1) {
     if (capturedOperands) {
       auto arg0 = dyn_cast<BlockArgument>(yieldOp->getOperand(0));
-      if (!arg0 || arg0.getParentBlock() != linalgOp.getBlock())
-        return false;
-      capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg0)->get());
+      // linalg.yield operand might be coming from a different region.
+      if (arg0 && arg0.getParentBlock() == linalgOp.getBlock())
+        capturedOperands->push_back(linalgOp.getMatchingOpOperand(arg0)->get());
       capturedOperands->push_back(linalgOp.getDpsInitOperand(0)->get());
     }
     return true;

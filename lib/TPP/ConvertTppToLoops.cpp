@@ -32,6 +32,8 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
 
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
+    assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
+
     Location loc = addOp.getLoc();
     // handle scalar case.
     if (isScalarOp(addOp)) {
@@ -71,6 +73,30 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   }
 };
 
+void buildUnaryLoop(
+    PatternRewriter &rewriter, TppOp tppOp,
+    function_ref<void(OpBuilder &, Location, ValueRange)> bodyBuilder) {
+  assert(tppOp.isUnary() && "Expect tpp unary op");
+
+  Location loc = tppOp.getLoc();
+
+  SmallVector<Value> ubs;
+  size_t rank = tppOp.getOutput().getType().cast<MemRefType>().getRank();
+  ArrayRef<int64_t> shapeOutput =
+      tppOp.getOutput().getType().cast<MemRefType>().getShape();
+  for (size_t idx = 0; idx < rank; idx++) {
+    Value dim = rewriter.create<arith::ConstantIndexOp>(loc, shapeOutput[idx]);
+    ubs.push_back(dim);
+  }
+
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  SmallVector<Value> lbs(rank, zero);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<Value> steps(rank, one);
+
+  (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+}
+
 // Converts tpp.identity to SCF loops.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
@@ -90,7 +116,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = identityOp.getLoc();
+    assert(identityOp.hasBufferSemantics() &&
+           "tpp.identity expects a memref type");
+
     // Handle scalar.
     if (isScalarOp(identityOp)) {
       rewriter.replaceAllUsesWith(identityOp.getOutput(),
@@ -98,50 +126,36 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
       rewriter.eraseOp(identityOp);
       return success();
     }
+
     // Handle memref.
-    SmallVector<Value> ubs;
-    size_t rank = identityOp.getOutput().getType().cast<MemRefType>().getRank();
-    ArrayRef<int64_t> shapeOutput =
-        identityOp.getOutput().getType().cast<MemRefType>().getShape();
-    for (size_t idx = 0; idx < rank; idx++) {
-      Value dim =
-          rewriter.create<arith::ConstantIndexOp>(loc, shapeOutput[idx]);
-      ubs.push_back(dim);
-    }
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs(rank, zero);
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps(rank, one);
-    (void)scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value input = identityOp.getInputs()[0];
-          // input is scalar.
-          if (isScalar(input))
-            b.create<memref::StoreOp>(loc, input, identityOp.getOutput(),
-                                      localIvs);
-          // input is a 1d-memref.
-          else if (is1DMemRef(input)) {
-            Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs[1]);
-            b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
-                                      localIvs);
-          }
-          // input is a 2d-memref.
-          else {
-            ArrayRef<int64_t> shapeInput = identityOp.getInputs()[0]
-                                               .getType()
-                                               .cast<MemRefType>()
-                                               .getShape();
-            SmallVector<Value, 2> inputIvs = localIvs;
-            // broadcasting dimension with size 1.
-            for (size_t idx = 0; idx < shapeInput.size(); idx++)
-              if (shapeInput[idx] == 1)
-                inputIvs[idx] = zero;
-            Value scalarVal = b.create<memref::LoadOp>(loc, input, inputIvs);
-            b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
-                                      localIvs);
-          }
-        });
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      Value input = identityOp.getInputs()[0];
+      // input is scalar.
+      if (isScalar(input))
+        b.create<memref::StoreOp>(loc, input, identityOp.getOutput(), localIvs);
+      // input is a 1d-memref.
+      else if (is1DMemRef(input)) {
+        Value scalarVal = b.create<memref::LoadOp>(loc, input, localIvs[1]);
+        b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
+                                  localIvs);
+      }
+      // input is a 2d-memref.
+      else {
+        ArrayRef<int64_t> shapeInput =
+            identityOp.getInputs()[0].getType().cast<MemRefType>().getShape();
+        SmallVector<Value, 2> inputIvs = localIvs;
+        // broadcasting dimension with size 1.
+        Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        for (size_t idx = 0; idx < shapeInput.size(); idx++)
+          if (shapeInput[idx] == 1)
+            inputIvs[idx] = zero;
+        Value scalarVal = b.create<memref::LoadOp>(loc, input, inputIvs);
+        b.create<memref::StoreOp>(loc, scalarVal, identityOp.getOutput(),
+                                  localIvs);
+      }
+    };
+    buildUnaryLoop(rewriter, identityOp, bodyBuilder);
+
     rewriter.eraseOp(identityOp);
     return success();
   }
@@ -157,6 +171,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
+    assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
+
     Location loc = reluOp.getLoc();
     // handle scalar case.
     if (isScalarOp(reluOp)) {
@@ -164,36 +180,53 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
       rewriter.eraseOp(reluOp);
       return success();
     }
-    // handle memref case.
-    SmallVector<Value> ubs;
-    size_t rank = reluOp.getOutput().getType().cast<MemRefType>().getRank();
-    for (size_t idx = 0; idx < rank; idx++) {
-      Value dim = rewriter.create<arith::ConstantIndexOp>(
-          loc, reluOp.getOutput().getType().cast<MemRefType>().getShape()[idx]);
-      ubs.push_back(dim);
-    }
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs(rank, zero);
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps(rank, one);
 
+    // handle memref case.
     Type elementType =
         reluOp.getOutput().getType().cast<MemRefType>().getElementType();
     Value zeroConstant = rewriter.create<arith::ConstantOp>(
         loc, elementType, rewriter.getFloatAttr(elementType, 0));
 
-    (void)scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value scalarLhs =
-              b.create<memref::LoadOp>(loc, reluOp.getInputs()[0], localIvs);
-          Value scalarRelu =
-              b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
-          b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(),
-                                    localIvs);
-        });
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      Value scalarLhs =
+          b.create<memref::LoadOp>(loc, reluOp.getInputs()[0], localIvs);
+      Value scalarRelu = b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
+      b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(), localIvs);
+    };
+    buildUnaryLoop(rewriter, reluOp, bodyBuilder);
 
     rewriter.eraseOp(reluOp);
+    return success();
+  }
+};
+
+// Convert tpp.zero to SCF loops.
+struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
+  using OpRewritePattern<ZeroOp>::OpRewritePattern;
+
+  bool isScalarOp(ZeroOp zeroOp) const {
+    return !zeroOp.getOutput().getType().isa<ShapedType>();
+  }
+
+  LogicalResult matchAndRewrite(ZeroOp zeroOp,
+                                PatternRewriter &rewriter) const override {
+    assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
+
+    Location loc = zeroOp.getLoc();
+
+    Type elementType =
+        zeroOp.getOutput().getType().cast<MemRefType>().getElementType();
+    Value zeroConstant = rewriter.create<arith::ConstantOp>(
+        loc, elementType, rewriter.getFloatAttr(elementType, 0));
+
+    // handle memref case.
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      b.create<memref::StoreOp>(loc, zeroConstant, zeroOp.getOutput(),
+                                localIvs);
+    };
+    buildUnaryLoop(rewriter, zeroOp, bodyBuilder);
+
+    rewriter.eraseOp(zeroOp);
     return success();
   }
 };
@@ -204,12 +237,16 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
+
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC = matmulOp.getOutputType().getShape();
     ArrayRef<int64_t> shapeB = matmulOp.getMemRefInputType(1).getShape();
     ArrayRef<int64_t> shapeA = matmulOp.getMemRefInputType(0).getShape();
-    if (shapeB.size() == 3)
-      return rewriter.notifyMatchFailure(matmulOp, "Packed BF16 loops unsupported");
+    if (shapeB.size() == 3) {
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "Packed BF16 loops unsupported");
+    }
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
@@ -249,6 +286,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
 
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.hasBufferSemantics() && "tpp.brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
     ArrayRef<int64_t> shapeC = brgemmOp.getOutputType().getShape();
     ArrayRef<int64_t> shapeA = brgemmOp.getMemRefInputType(0).getShape();
@@ -292,7 +331,8 @@ void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
                ConvertTppIdentityOp,
                ConvertTppMatmulOp,
                ConvertTppBrgemmOp,
-               ConvertTppReluOp>(patterns.getContext());
+               ConvertTppReluOp,
+               ConvertTppZeroOp>(patterns.getContext());
   // clang-format on
 }
 

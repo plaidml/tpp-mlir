@@ -171,7 +171,13 @@ ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ZeroOp::build(OpBuilder &builder, OperationState &result, Value input,
                    Value output) {
-  return ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return ZeroOp::build(builder, result, TypeRange{rankedOutput}, input,
+                         output);
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
+  ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
 }
 
 void ZeroOp::print(OpAsmPrinter &printer) {
@@ -182,8 +188,23 @@ ParseResult ZeroOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
 }
 
+LogicalResult ZeroOp::verify() {
+  // At tensor abstraction computation result is always placed in a new tensor
+  // so skip validation.
+  if (hasTensorSemantics())
+    return success();
+
+  auto input = getInputs()[0];
+  auto output = getOutputs()[0];
+
+  if (input != output)
+    return emitOpError("fails to verify in-place computation");
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
-// AdddOp
+// AddOp
 //===----------------------------------------------------------------------===//
 
 void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,

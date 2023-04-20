@@ -149,3 +149,137 @@ func.func @broadcast_col_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<8x1xf32
 // CHECK-LABEL: broadcast_col_identity
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x32xf32>, %[[ARG1]]: tensor<8x1xf32>
 // CHECK: %{{.+}} = tpp.identity (%[[ARG1]] : tensor<8x1xf32>) -> (tensor<8x32xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @zero_fill_arg
+func.func @zero_fill_arg(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%zero: f32) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @zero_fill_const
+func.func @zero_fill_const(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @zero_fill_const_3d
+func.func @zero_fill_const_3d(%arg0: tensor<2x8x32xf32>) -> tensor<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    outs(%arg0: tensor<2x8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    } -> tensor<2x8x32xf32>
+  return %0 : tensor<2x8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @zero_fill_buffer
+func.func @zero_fill_buffer(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.zero
+  %zero = arith.constant dense<0.000000e+00> : tensor<8x32xf32>
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%zero: tensor<8x32xf32>) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @buffer_fill_const
+func.func @buffer_fill_const(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK-NOT: tpp.identity
+  %zero = arith.constant 1.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_zero
+func.func @linalg_fill_zero(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.zero
+  %cst = arith.constant 0.0 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_non_zero
+func.func @linalg_fill_non_zero(%arg0: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: %0 = linalg.fill
+  %cst = arith.constant 1.0 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_arg
+func.func @linalg_fill_arg(%arg0: tensor<8x32xf32>, %cst : f32) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: %0 = linalg.fill
+  %0 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_3d
+func.func @linalg_fill_3d(%arg0: tensor<2x8x32xf32>) -> tensor<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: %0 = linalg.fill
+  %cst = arith.constant 0.0 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<2x8x32xf32>) -> tensor<2x8x32xf32>
+  return %0 : tensor<2x8x32xf32>
+}

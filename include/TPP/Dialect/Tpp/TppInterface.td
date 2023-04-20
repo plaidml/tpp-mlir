@@ -28,6 +28,18 @@ def TppOpInterface : OpInterface<"TppOp"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Return true if the op has buffer semantics.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"hasBufferSemantics",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return !$_op.hasTensorSemantics();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Return the output at buffer abstraction.
       }],
       /*retTy=*/"Value",
@@ -81,6 +93,32 @@ def TppOpInterface : OpInterface<"TppOp"> {
         assert(idx < opInputs.size());
         assert(!$_op.hasTensorSemantics());
         return opInputs[idx].getType().template cast<MemRefType>();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if the op is unary.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"isUnary",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        return opInputs.size() == 1;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if the op is binary.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"isBinary",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto opInputs = ValueRange{$_op.getInputs()};
+        return opInputs.size() == 2;
       }]
     >
   ];

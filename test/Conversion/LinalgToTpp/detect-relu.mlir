@@ -37,6 +37,24 @@ func.func @reluSwapped(%arg0: memref<1x512xf32>, %arg1: memref<1x512xf32>) {
 // -----
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @reluOnlyOuts(%arg0: memref<1x512xf32>) {
+  %c0 = arith.constant 0.0 : f32
+  linalg.generic {indexing_maps = [#map0], iterator_types = ["parallel", "parallel"]}
+  outs(%arg0 : memref<1x512xf32>) {
+    ^bb0(%out: f32):
+      %2 = arith.maxf %c0, %out : f32
+      linalg.yield %2 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @reluOnlyOuts
+// CHECK: tpp.relu
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @reluNonZero(%arg0: memref<1x512xf32>, %arg1: memref<1x512xf32>) {

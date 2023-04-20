@@ -260,8 +260,8 @@ func.func @relu_max_with_no_zero2(%arg0: memref<3xf32>, %arg1: memref<3xf32>) ->
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 // Expect not to match as the input/output are not use in the computation.
-func.func @add_mapping(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) -> memref<3x3xf32> {
-  %c0 = arith.constant 0.0 : f32
+// CHECK-LABEL: func.func @add_mapping_no_match
+func.func @add_mapping_no_match(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %c0 : f32) -> memref<3x3xf32> {
   %c1 = arith.constant 1.0 : f32
   // CHECK-NOT: tpp.add
   linalg.generic {
@@ -543,4 +543,140 @@ func.func @broadcast_col_identity(%arg0: memref<8x32xf32>, %arg1: memref<8xf32>)
         linalg.yield %in : f32
     }
   return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @zero_fill_arg
+func.func @zero_fill_arg(%arg0: memref<8x32xf32>) {
+  // CHECK: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%zero: f32) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @zero_fill_const
+func.func @zero_fill_const(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    }
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @zero_fill_const_3d
+func.func @zero_fill_const_3d(%arg0: memref<2x8x32xf32>) -> memref<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  %zero = arith.constant 0.0 : f32
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    outs(%arg0: memref<2x8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    }
+  return %arg0 : memref<2x8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+memref.global "private" constant @__constant_zero : memref<8x32xf32> = dense<0.000000e+00>
+
+// CHECK-LABEL: func.func @zero_fill_buffer
+func.func @zero_fill_buffer(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK: tpp.zero
+  %zero = memref.get_global @__constant_zero : memref<8x32xf32>
+  linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%zero: memref<8x32xf32>) outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @buffer_fill_const
+func.func @buffer_fill_const(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK-NOT: tpp.identity
+  %zero = arith.constant 1.0 : f32
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg0: memref<8x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %zero : f32
+    }
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_zero
+func.func @linalg_fill_zero(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK: tpp.zero
+  %cst = arith.constant 0.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_non_zero
+func.func @linalg_fill_non_zero(%arg0: memref<8x32xf32>) -> memref<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  %cst = arith.constant 1.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_arg
+func.func @linalg_fill_arg(%arg0: memref<8x32xf32>, %cst : f32) -> memref<8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<8x32xf32>)
+  return %arg0 : memref<8x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @linalg_fill_3d
+func.func @linalg_fill_3d(%arg0: memref<2x8x32xf32>) -> memref<2x8x32xf32> {
+  // CHECK-NOT: tpp.zero
+  // CHECK: linalg.fill
+  %cst = arith.constant 0.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<2x8x32xf32>)
+  return %arg0 : memref<2x8x32xf32>
 }

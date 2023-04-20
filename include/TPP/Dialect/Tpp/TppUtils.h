@@ -48,6 +48,10 @@ bool isTppAdd(linalg::GenericOp linalgOp,
 bool isTppIdentity(linalg::GenericOp linalgOp,
                    SmallVectorImpl<Value> *capturedOperands = nullptr);
 
+// Returns true if the linalg.generic can convert to a tpp.zero.
+bool isTppZero(linalg::GenericOp linalgOp,
+               SmallVectorImpl<Value> *capturedOperands = nullptr);
+
 // Returns true if the linalg.generic can convert to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp,
                SmallVectorImpl<Value> *capturedOperands = nullptr);
