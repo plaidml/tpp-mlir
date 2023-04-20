@@ -44,7 +44,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     }
 
     if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
-      assert(operands.size() == 2 && "tpp.identity expects one operand");
+      assert(operands.size() == 2 && "tpp.identity expects two operands");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1]);
       return success();
