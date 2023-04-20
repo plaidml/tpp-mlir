@@ -171,7 +171,13 @@ ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ZeroOp::build(OpBuilder &builder, OperationState &result, Value input,
                    Value output) {
-  return ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return ZeroOp::build(builder, result, TypeRange{rankedOutput}, input,
+                         output);
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
+  ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
 }
 
 void ZeroOp::print(OpAsmPrinter &printer) {
