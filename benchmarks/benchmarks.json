@@ -4,12 +4,14 @@
     "mlp_fp32_layer_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-1layer-512.mlir",
+      "environment": {},
       "flags": [],
       "extensions": []
     },
     "matmul_64x64x64_mlir": {
       "type": "MLIR",
       "benchmark": "matmul_64x64x64.mlir",
+      "environment": {},
       "flags": [],
       "extensions": []
     }
@@ -19,24 +21,28 @@
     "fp32_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-fp32-3layers-1024.mlir",
+      "environment": {},
       "flags": [],
       "extensions": [ "avx2" ]
     },
     "fp32_3x512_unpacked.mlir": {
       "type": "MLIR",
       "benchmark": "gemm-fp32-3layers-1024-unpacked.mlir",
+      "environment": {},
       "flags": [],
       "extensions": [ "avx2" ]
     },
     "bf16_flat_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-bf16-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx2" ]
     },
     "bf16_dp2_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx2" ]
@@ -44,6 +50,7 @@
     "bf16_dp4_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-bf16_dp4-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "svebf16" ]
@@ -54,30 +61,35 @@
     "fp32_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "environment": {},
       "flags": [],
       "extensions": [ "avx2" ]
     },
     "bf16_flat_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_flat_3x1024_unpacked_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024-unpacked.mlir",
+      "environment": {},
       "flags": [],
       "extensions": [ "avx512.*" ]
     },
     "bf16_flat_10x3584_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-10layers-3584.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-pack=0'" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_dp2_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "avx512.*" ]
@@ -85,6 +97,7 @@
     "bf16_dp4_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16_dp4-3layers-1024.mlir",
+      "environment": {},
       "flags": [ "--disable-lsan",
                  "-run-args='-def-heap-to-stack=1'" ],
       "extensions": [ "svebf16" ]
@@ -95,20 +108,68 @@
     "mlir_48x64x96": {
       "type": "MLIR",
       "benchmark": "matmul_48x64x96.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
     },
     "mlir_64x48x96": {
       "type": "MLIR",
       "benchmark": "matmul_64x48x96.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
     },
     "mlir_64x64x64": {
       "type": "MLIR",
       "benchmark": "matmul_64x64x64.mlir",
+      "environment": {},
       "flags": [ "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
+    }
+  }},
+  {
+  "openmp": {
+    "gemm_fp32_3x1024_omp_0_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "0" },
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
+    },
+    "mlp_fp32_3x1024_omp_0_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "0" },
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
+    },
+    "gemm_fp32_3x1024_omp_8_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
+    },
+    "mlp_fp32_3x1024_omp_8_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
+    },
+    "gemm_fp32_3x1024_omp_16_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
+    },
+    "mlp_fp32_3x1024_omp_16_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-fp32-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-run-args='-def-parallel'" ],
+      "extensions": [ "avx2" ]
     }
   }},
   {
@@ -116,24 +177,28 @@
     "matmul_32x32x32_fp32_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
+      "environment": {},
       "flags": [ "100", "256", "0", "F", "32", "32", "32", "0", "1024", "1024" ],
       "extensions": []
     },
     "mlp_fp32_layer_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
+      "environment": {},
       "flags": [ "100", "256", "3", "F", "32", "32", "32", "0", "1024", "1024", "1024" ],
       "extensions": []
     },
     "matmul_64x64x64_bf16_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
+      "environment": {},
       "flags": [ "100", "256", "0", "F", "64", "64", "64", "1", "1024", "1024" ],
       "extensions": [ "avx2" ]
     },
     "mlp_bf16_layer_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
+      "environment": {},
       "flags": [ "100", "256", "3", "F", "64", "64", "64", "1", "1024", "1024", "1024" ],
       "extensions": [ "avx2" ]
     }
