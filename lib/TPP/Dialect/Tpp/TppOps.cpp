@@ -125,7 +125,13 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
 
 void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
                        Value output) {
-  return IdentityOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return IdentityOp::build(builder, result, TypeRange{rankedOutput}, input,
+                             output);
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
+  IdentityOp::build(builder, result, /*TypeRange=*/{}, input, output);
 }
 
 void IdentityOp::print(OpAsmPrinter &printer) {
@@ -142,7 +148,13 @@ ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
                    Value output) {
-  return ReluOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return ReluOp::build(builder, result, TypeRange{rankedOutput}, input,
+                         output);
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
+  ReluOp::build(builder, result, /*TypeRange=*/{}, input, output);
 }
 
 void ReluOp::print(OpAsmPrinter &printer) {
@@ -175,9 +187,14 @@ ParseResult ZeroOp::parse(OpAsmParser &parser, OperationState &result) {
 //===----------------------------------------------------------------------===//
 
 void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,
-                  Value out) {
-  return AddOp::build(builder, result, /*TypeRange=*/{}, inputs,
-                      ValueRange{out});
+                  Value output) {
+  if (auto rankedOutput =
+          output.getType().dyn_cast_or_null<RankedTensorType>()) {
+    return AddOp::build(builder, result, TypeRange{rankedOutput}, inputs,
+                        ValueRange{output});
+  }
+  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
+  AddOp::build(builder, result, /*TypeRange=*/{}, inputs, ValueRange{output});
 }
 
 void AddOp::print(OpAsmPrinter &printer) {

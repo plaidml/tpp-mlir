@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
+#include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -53,7 +54,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
       return success();
     }
-    if (tpp::utils::isTppMatmul(linalgOp, &operands)) {
+    if (linalgx::utils::isMatmulOp(linalgOp, &operands)) {
       assert(operands.size() == 3 && "Expect three operands");
       rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
           linalgOp, ValueRange{operands[0], operands[1], operands[2]},
@@ -66,8 +67,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(linalgOp, "Expect buffer semantics");
     if (!tpp::utils::hasStaticShape(linalgOp))
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");

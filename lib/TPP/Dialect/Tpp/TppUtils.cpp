@@ -10,7 +10,6 @@
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
-#include "TPP/TransformUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -139,7 +138,6 @@ static bool isTppOp(linalg::GenericOp linalgOp) {
   using namespace tpp::structured_match;
   auto tppMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
-          .operation(HasBufferSemantics())
           .output(MatchAll(), HasStaticShape())
           .input(MatchAll(), HasStaticShape())
           .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
@@ -172,13 +170,6 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
           .input(MatchAll(), HasMap(ProjectedPermutation()))
           .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape));
   return isTppOp(linalgOp) && unaryMatcher.match(linalgOp);
-}
-
-// Returns true if the linalg.generic maps to a tpp.gemm.
-bool isTppMatmul(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
-  if (linalgOp.hasTensorSemantics())
-    return false;
-  return linalgx::utils::isMatmulOp(linalgOp, operands);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.add.
