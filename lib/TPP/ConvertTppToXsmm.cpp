@@ -94,6 +94,8 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
 
   LogicalResult matchAndRewrite(tpp::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
+
     Location loc = matmulOp.getLoc();
 
     auto memrefC = matmulOp.getOutputType();
@@ -153,6 +155,9 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
 
   LogicalResult matchAndRewrite(tpp::VNNIMatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    assert(matmulOp.getMatrixC().getType().isa<MemRefType>() &&
+           "tpp.vnni_matmul expects a memref type");
+
     Location loc = matmulOp.getLoc();
 
     MemRefType memrefC = matmulOp.getMatrixCType();
@@ -206,6 +211,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.hasBufferSemantics() && "tpp.brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
 
     auto memrefC = brgemmOp.getOutputType();
@@ -270,6 +277,9 @@ struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::VNNIBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
+           "tpp.vnni_brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
 
     MemRefType memrefC = brgemmOp.getMatrixCType();
@@ -328,6 +338,9 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::FusedBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
+           "tpp.fused_brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
 
     MemRefType memrefC = brgemmOp.getMatrixCType();
@@ -395,6 +408,9 @@ struct ConvertTppFusedVNNIBrgemmOp
 
   LogicalResult matchAndRewrite(tpp::FusedVNNIBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
+           "tpp.fused_vnni_brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
 
     MemRefType memrefC = brgemmOp.getMatrixCType();
@@ -560,10 +576,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
 
   LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    // no conversion if identity is a scalar operation.
-    Type outputType = identityOp.getOutput().getType();
-    MemRefType outputMemRefType = outputType.dyn_cast<MemRefType>();
-    if (!outputMemRefType || outputMemRefType.getRank() != 2)
+    assert(identityOp.hasBufferSemantics() &&
+           "tpp.identity expects a memref type");
+
+    MemRefType outputMemRefType = identityOp.getOutputType();
+    if (outputMemRefType.getRank() != 2)
       return rewriter.notifyMatchFailure(identityOp, "not a 2-D memref type");
 
     int64_t outputOffset;
@@ -593,10 +610,9 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = reluOp.getInputs()[0].getType();
-    assert(outputType.isa<MemRefType>() && "expect a memref type");
+    assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
 
-    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    MemRefType outputMemRef = reluOp.getOutputType();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
            "expect memref with rank 1 or 2");
 
@@ -621,10 +637,9 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
 
   LogicalResult matchAndRewrite(tpp::ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
-    Type outputType = zeroOp.getInputs()[0].getType();
-    assert(outputType.isa<MemRefType>() && "expect a memref type");
+    assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
 
-    MemRefType outputMemRef = outputType.cast<MemRefType>();
+    MemRefType outputMemRef = zeroOp.getOutputType();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
            "expect memref with rank 1 or 2");
 
@@ -718,6 +733,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
+    assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
+
     auto outputMemRef = addOp.getOutputType();
     assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
            "expect memref with rank 1 or 2");

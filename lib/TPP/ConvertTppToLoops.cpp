@@ -32,6 +32,8 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
 
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
+    assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
+
     Location loc = addOp.getLoc();
     // handle scalar case.
     if (isScalarOp(addOp)) {
@@ -114,6 +116,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
+    assert(identityOp.hasBufferSemantics() &&
+           "tpp.identity expects a memref type");
+
     // Handle scalar.
     if (isScalarOp(identityOp)) {
       rewriter.replaceAllUsesWith(identityOp.getOutput(),
@@ -166,6 +171,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
+    assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
+
     Location loc = reluOp.getLoc();
     // handle scalar case.
     if (isScalarOp(reluOp)) {
@@ -203,19 +210,14 @@ struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
 
   LogicalResult matchAndRewrite(ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
+    assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
+
     Location loc = zeroOp.getLoc();
 
     Type elementType =
         zeroOp.getOutput().getType().cast<MemRefType>().getElementType();
     Value zeroConstant = rewriter.create<arith::ConstantOp>(
         loc, elementType, rewriter.getFloatAttr(elementType, 0));
-
-    // handle scalar case.
-    if (isScalarOp(zeroOp)) {
-      rewriter.replaceAllUsesWith(zeroOp.getOutput(), zeroConstant);
-      rewriter.eraseOp(zeroOp);
-      return success();
-    }
 
     // handle memref case.
     auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
@@ -235,13 +237,16 @@ struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
 
   LogicalResult matchAndRewrite(MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
+
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC = matmulOp.getOutputType().getShape();
     ArrayRef<int64_t> shapeB = matmulOp.getMemRefInputType(1).getShape();
     ArrayRef<int64_t> shapeA = matmulOp.getMemRefInputType(0).getShape();
-    if (shapeB.size() == 3)
+    if (shapeB.size() == 3) {
       return rewriter.notifyMatchFailure(matmulOp,
                                          "Packed BF16 loops unsupported");
+    }
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
@@ -281,6 +286,8 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
 
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
+    assert(brgemmOp.hasBufferSemantics() && "tpp.brgemm expects a memref type");
+
     Location loc = brgemmOp.getLoc();
     ArrayRef<int64_t> shapeC = brgemmOp.getOutputType().getShape();
     ArrayRef<int64_t> shapeA = brgemmOp.getMemRefInputType(0).getShape();

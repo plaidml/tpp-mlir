@@ -28,6 +28,18 @@ def TppOpInterface : OpInterface<"TppOp"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Return true if the op has buffer semantics.
+      }],
+      /*retTy=*/"bool",
+      /*methodName*/"hasBufferSemantics",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return !$_op.hasTensorSemantics();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Return the output at buffer abstraction.
       }],
       /*retTy=*/"Value",

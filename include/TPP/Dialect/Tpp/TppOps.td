@@ -77,7 +77,6 @@ def TernaryOp : NativeOpTrait<"tpp::TernaryOp">;
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
                                         BroadcastableShape,
-                                        SameOperandsElementType,
                                         UnaryOp,
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
@@ -184,7 +183,6 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
                                         BinaryOp,
                                         BroadcastableShape,
-                                        SameOperandsElementType, 
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
 
@@ -248,7 +246,6 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
   Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments, 
                                         TernaryOp,
-                                        SameOperandsElementType,
                                         UnitStrideInnerLoop,
                                         TppOpInterface])> {
 
