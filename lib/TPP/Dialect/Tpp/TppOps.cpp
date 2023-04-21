@@ -130,7 +130,8 @@ static void tppOpBuilder(OpBuilder &builder, OperationState &state,
     state.addTypes(outputs.getTypes());
     state.addAttribute(
         "operand_segment_sizes",
-        builder.getDenseI32ArrayAttr({static_cast<int>(inputs.size()), 0}));
+        builder.getDenseI32ArrayAttr(
+            {static_cast<int>(inputs.size()), /*numOutputs=*/0}));
   } else {
     state.addOperands(outputs);
     state.addAttribute(
