@@ -1,9 +1,8 @@
 // RUN: tpp-run %s -def-parallel=0 -e entry -entry-point-result=void -print-mlir=late -print 2>&1 | \
 // RUN: FileCheck %s --check-prefix=SERIAL
 
-// TODO: reenable when OpenMP is readibly available everywhere
-// R_UN: tpp-run %s -def-parallel=1 -e entry -entry-point-result=void -print-mlir=late -print 2>&1 | \
-// R_UN: FileCheck %s --check-prefix=PARALLEL
+// RUN: tpp-run %s -def-parallel=1 -e entry -entry-point-result=void -print-mlir=late -print 2>&1 | \
+// RUN: FileCheck %s --check-prefix=PARALLEL
 
 func.func @entry(%arg0: memref<8x8xf32>) -> memref<8x8xf32> {
   %c0 = arith.constant 0 : index
