@@ -121,19 +121,32 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
                                 /*elidedAttrs=*/{"operand_segment_sizes"});
 }
 
+static void tppOpBuilder(OpBuilder &builder, OperationState &state,
+                         ValueRange inputs, ValueRange outputs) {
+  assert(outputs.size() >= 1);
+  state.addOperands(inputs);
+  if (auto rankedOutput =
+          outputs[0].getType().dyn_cast_or_null<RankedTensorType>()) {
+    state.addTypes(outputs.getTypes());
+    state.addAttribute(
+        "operand_segment_sizes",
+        builder.getDenseI32ArrayAttr({static_cast<int>(inputs.size()), 0}));
+  } else {
+    state.addOperands(outputs);
+    state.addAttribute(
+        "operand_segment_sizes",
+        builder.getDenseI32ArrayAttr({static_cast<int>(inputs.size()),
+                                      static_cast<int>(outputs.size())}));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // IdentityOp
 //===----------------------------------------------------------------------===//
 
-void IdentityOp::build(OpBuilder &builder, OperationState &result, Value input,
+void IdentityOp::build(OpBuilder &builder, OperationState &state, Value input,
                        Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return IdentityOp::build(builder, result, TypeRange{rankedOutput}, input,
-                             output);
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  IdentityOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  tppOpBuilder(builder, state, input, output);
 }
 
 void IdentityOp::print(OpAsmPrinter &printer) {
@@ -148,15 +161,9 @@ ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
 // ReluOp
 //===----------------------------------------------------------------------===//
 
-void ReluOp::build(OpBuilder &builder, OperationState &result, Value input,
+void ReluOp::build(OpBuilder &builder, OperationState &state, Value input,
                    Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return ReluOp::build(builder, result, TypeRange{rankedOutput}, input,
-                         output);
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  ReluOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  tppOpBuilder(builder, state, input, output);
 }
 
 void ReluOp::print(OpAsmPrinter &printer) {
@@ -171,15 +178,9 @@ ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
 // ZeroOp
 //===----------------------------------------------------------------------===//
 
-void ZeroOp::build(OpBuilder &builder, OperationState &result, Value input,
+void ZeroOp::build(OpBuilder &builder, OperationState &state, Value input,
                    Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return ZeroOp::build(builder, result, TypeRange{rankedOutput}, input,
-                         output);
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  ZeroOp::build(builder, result, /*TypeRange=*/{}, input, output);
+  tppOpBuilder(builder, state, input, output);
 }
 
 void ZeroOp::print(OpAsmPrinter &printer) {
@@ -209,15 +210,9 @@ LogicalResult ZeroOp::verify() {
 // AddOp
 //===----------------------------------------------------------------------===//
 
-void AddOp::build(OpBuilder &builder, OperationState &result, ValueRange inputs,
+void AddOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
                   Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return AddOp::build(builder, result, TypeRange{rankedOutput}, inputs,
-                        ValueRange{output});
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  AddOp::build(builder, result, /*TypeRange=*/{}, inputs, ValueRange{output});
+  tppOpBuilder(builder, state, inputs, output);
 }
 
 void AddOp::print(OpAsmPrinter &printer) {
@@ -264,13 +259,7 @@ LogicalResult MatmulOp::verify() {
 
 void MatmulOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return MatmulOp::build(builder, state, TypeRange{rankedOutput}, inputs,
-                           ValueRange{output});
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  MatmulOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
+  tppOpBuilder(builder, state, inputs, output);
 }
 
 ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -311,13 +300,7 @@ LogicalResult BrgemmOp::verify() {
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  if (auto rankedOutput =
-          output.getType().dyn_cast_or_null<RankedTensorType>()) {
-    return BrgemmOp::build(builder, state, TypeRange{rankedOutput}, inputs,
-                           ValueRange{output});
-  }
-  assert(output.getType().isa<MemRefType>() && "expect memref semantics");
-  BrgemmOp::build(builder, state, /*TypeRange=*/{}, inputs, ValueRange{output});
+  tppOpBuilder(builder, state, inputs, output);
 }
 
 ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
