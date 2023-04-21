@@ -146,10 +146,8 @@ LogicalResult mlir::OpTrait::tpp::checkUnitStrideInnerLoop(Operation *op) {
   return verifyUnitStrideInnerLoop(op, /*emitDiagnostic=*/false);
 }
 
-// TODO: verify operand segement size on output.
-LogicalResult mlir::OpTrait::tpp::verifyArity(Operation *op, unsigned numInput,
-                                              unsigned numOutput) {
-  assert(op->template hasTrait<OpTrait::AttrSizedOperandSegments>());
+static LogicalResult verifyArityImpl(Operation *op, unsigned numInput,
+                                     unsigned numOutput) {
   auto attrName =
       OpTrait::AttrSizedOperandSegments<void>::getOperandSegmentSizeAttr();
   ArrayRef<int> sizeAttr =
@@ -160,5 +158,19 @@ LogicalResult mlir::OpTrait::tpp::verifyArity(Operation *op, unsigned numInput,
     return op->emitError() << "expect " << numInput
                            << " input operands, but got: " << sizeAttr[0];
   }
+  if (sizeAttr[1] != static_cast<int>(numOutput)) {
+    return op->emitError() << "expect " << numOutput
+                           << " output operands, but got: " << sizeAttr[1];
+  }
   return success();
+}
+
+LogicalResult mlir::OpTrait::tpp::verifyArity(Operation *op,
+                                              unsigned numInput) {
+  assert(op->template hasTrait<OpTrait::AttrSizedOperandSegments>());
+  assert(isa<mlir::tpp::TppOp>(op) && "expect a tpp operation");
+  auto tppOp = cast<mlir::tpp::TppOp>(op);
+  if (tppOp.hasTensorSemantics())
+    return verifyArityImpl(tppOp, numInput, /*numberOfOutput=*/0);
+  return verifyArityImpl(tppOp, numInput, /*numberOfOutput=*/1);
 }

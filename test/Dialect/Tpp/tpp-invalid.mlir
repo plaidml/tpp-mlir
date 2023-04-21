@@ -310,8 +310,24 @@ func.func @tpp_relu_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor
 
 // -----
 
-func.func @tpp_matmul_invalid_number_of_operands(%arg0: tensor<2x2xf32>) {
+func.func @tpp_matmul_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
   // expected-error @below {{expect 3 input operands, but got: 2}}
   %0 = tpp.matmul (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
   return %0: tensor<2x2xf32>
+}
+
+// -----
+
+func.func @tpp_segement_size(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
+  // expected-error @below {{expect 0 output operands, but got: 1}}
+  %0 = tpp.zero(%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {operand_segment_sizes = array<i32: 1, 1>}
+  return %0 : tensor<2x2xf32>
+}
+
+// -----
+
+func.func @unary_invalid_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
+  // expected-error @below {{expect 1 input operands, but got: 2}}
+  %0 = tpp.zero(%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
+  return %0 : tensor<2x2xf32>
 }
