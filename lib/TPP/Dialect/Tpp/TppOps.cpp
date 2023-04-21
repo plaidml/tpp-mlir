@@ -141,6 +141,22 @@ static void tppOpBuilder(OpBuilder &builder, OperationState &state,
   }
 }
 
+static void getEffectsImpl(
+    TppOp tppOp,
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (tppOp.hasTensorSemantics())
+    return;
+  for (auto operand : tppOp.getInputs()) {
+    if (!operand.getType().isa<MemRefType>())
+      continue;
+    effects.emplace_back(MemoryEffects::Read::get(), operand,
+                         SideEffects::DefaultResource::get());
+  }
+  effects.emplace_back(MemoryEffects::Write::get(), tppOp.getOutput(),
+                       SideEffects::DefaultResource::get());
+}
+
 //===----------------------------------------------------------------------===//
 // IdentityOp
 //===----------------------------------------------------------------------===//
@@ -158,6 +174,12 @@ ParseResult IdentityOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
 }
 
+void IdentityOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
+}
+
 //===----------------------------------------------------------------------===//
 // ReluOp
 //===----------------------------------------------------------------------===//
@@ -173,6 +195,12 @@ void ReluOp::print(OpAsmPrinter &printer) {
 
 ParseResult ReluOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
+}
+
+void ReluOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
 }
 
 //===----------------------------------------------------------------------===//
@@ -207,6 +235,12 @@ LogicalResult ZeroOp::verify() {
   return success();
 }
 
+void ZeroOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
+}
+
 //===----------------------------------------------------------------------===//
 // AddOp
 //===----------------------------------------------------------------------===//
@@ -222,6 +256,12 @@ void AddOp::print(OpAsmPrinter &printer) {
 
 ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
+}
+
+void AddOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
 }
 
 //===----------------------------------------------------------------------===//
@@ -271,6 +311,12 @@ void MatmulOp::print(OpAsmPrinter &printer) {
   printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
+void MatmulOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
+}
+
 //===----------------------------------------------------------------------===//
 // BrgemmOp
 //===----------------------------------------------------------------------===//
@@ -310,6 +356,12 @@ ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void BrgemmOp::print(OpAsmPrinter &printer) {
   printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
+}
+
+void BrgemmOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
 }
 
 //===----------------------------------------------------------------------===//
