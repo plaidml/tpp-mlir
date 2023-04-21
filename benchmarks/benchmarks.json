@@ -129,17 +129,17 @@
   }},
   {
   "openmp": {
-    "gemm_fp32_3x1024_omp_0_mlir": {
+    "gemm_fp32_3x1024_omp_4_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-fp32-3layers-1024.mlir",
-      "environment": { "OMP_NUM_THREADS": "0" },
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-run-args='-def-parallel'" ],
       "extensions": [ "avx2" ]
     },
-    "mlp_fp32_3x1024_omp_0_mlir": {
+    "mlp_fp32_3x1024_omp_4_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-fp32-3layers-1024.mlir",
-      "environment": { "OMP_NUM_THREADS": "0" },
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-run-args='-def-parallel'" ],
       "extensions": [ "avx2" ]
     },

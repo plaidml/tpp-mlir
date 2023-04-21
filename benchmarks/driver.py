@@ -120,9 +120,18 @@ class Environment(object):
             os.environ[path] = ":".join(environ)
         # Check if taskset is available
         # (every CPU we care about has at least 4 cores)
+        self.cpu_pinning = None
         taskset = shutil.which("taskset")
         if taskset:
             self.cpu_pinning = [ taskset, "-c", "3" ]
+
+    def pin_task(self, command):
+        """ Adds taskset if not forced through other means """
+        if not self.cpu_pinning:
+            return
+        if "KMP_AFFINITY" in os.environ:
+            return
+        command.extend(self.cpu_pinning)
 
 class BaseRun(object):
     """ Base class for all runs """
@@ -147,7 +156,7 @@ class BaseRun(object):
             if key in os.environ:
                 old_value = os.environ[key]
             self.original_env[key] = old_value
-            self.logger.info(f"export {key}={value}")
+            self.logger.debug(f"export {key}={value}")
             os.environ[key] = value
 
     def run(self):
@@ -157,7 +166,7 @@ class BaseRun(object):
     def teardown(self):
         # Revert the environment to previous state
         for key, value in self.original_env.items():
-            self.logger.info(f"revert {key}={value}")
+            self.logger.debug(f"revert {key}={value}")
             os.environ[key] = value
 
 class CPPRun(BaseRun):
@@ -171,8 +180,7 @@ class CPPRun(BaseRun):
     def run(self):
         self.setup()
         command = list()
-        if self.env.cpu_pinning:
-            command.extend(self.env.cpu_pinning)
+        self.env.pin_task(command)
         command.append(self.benchmark)
         if self.flags:
             command.extend(self.flags)
@@ -191,18 +199,15 @@ class XSMMDNNRun(CPPRun):
         CPPRun.__init__(self, name, args, env, json, loglevel)
 
     def run(self):
-        self.setup()
+        # Doesn't need setup/teardown, as it uses CPPRun.run()
         if not CPPRun.run(self):
-            self.teardown()
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
         if not match:
             self.logger.error(f"Cannot match to XSMM-DNN output: {self.stdout}")
-            self.teardown()
             return False
 
         self.stdout = match.group(1) + " +- 0.00 gflops"
-        self.teardown()
         return True
 
 class MLIRRun(BaseRun):
@@ -215,8 +220,7 @@ class MLIRRun(BaseRun):
     def run(self):
         self.setup()
         command = list()
-        if self.env.cpu_pinning:
-            command.extend(self.env.cpu_pinning)
+        self.env.pin_task(command)
         command.append(self.env.harness)
         if self.args.build:
             command.extend(["--build", self.args.build])
