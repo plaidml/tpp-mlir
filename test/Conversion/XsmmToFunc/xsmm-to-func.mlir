@@ -30,7 +30,7 @@ func.func @dispatch_brgemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (none) data_type = f32
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (none) data_type = f32
   return %0 : i64
 }
 
@@ -47,7 +47,7 @@ func.func @dispatch_gemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b) data_type = bf16
   return %0 : i64
 }
 
@@ -65,7 +65,7 @@ func.func @dispatch_gemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b, vnni_c) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b, vnni_c) data_type = bf16
   return %0 : i64
 }
 
@@ -83,7 +83,7 @@ func.func @dispatch_gemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a) data_type = bf16
   return %0 : i64
 }
 
@@ -101,7 +101,7 @@ func.func @dispatch_gemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_b) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_b) data_type = bf16
   return %0 : i64
 }
 

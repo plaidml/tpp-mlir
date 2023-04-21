@@ -16,7 +16,7 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // XSMM-NOT: tpp.relu
 // XSMM: xsmm.unary relu
 // XSMM-NOT: tpp.gemm
-// XSMM: xsmm.matmul
+// XSMM: xsmm.gemm
 
 // LOOPS-LABEL: func.func @tpp_ops(
 // LOOPS-NOT: tpp.brgemm

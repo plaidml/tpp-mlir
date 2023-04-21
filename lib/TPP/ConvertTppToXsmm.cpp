@@ -135,7 +135,7 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
           xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
     }
 
-    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
@@ -192,7 +192,7 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
 
-    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;

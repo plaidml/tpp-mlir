@@ -57,7 +57,7 @@ func.func @perf_dialect(%A: tensor<4x8xf32>,
 
 func.func @xsmm_dialect(%arg0: memref<32x256xf32>, %arg1: memref<1x8x32x32xf32>) -> i64 {
   %0 = xsmm.unary.dispatch identity [5, 6, 5, 6] flags = (bcast_row) data_type = f32
-  %1 = xsmm.matmul.dispatch [3, 3, 3, 3, 3, 3] flags = (none) data_type = f32
+  %1 = xsmm.gemm.dispatch [3, 3, 3, 3, 3, 3] flags = (none) data_type = f32
   %2 = arith.addi %0, %1 : i64
   return %2: i64
 }

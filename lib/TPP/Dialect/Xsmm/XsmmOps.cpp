@@ -71,8 +71,7 @@ static ParseResult parserImpl(OpAsmParser &parser, OperationState &result) {
   return parser.parseOptionalAttrDict(result.attributes);
 }
 
-ParseResult MatmulDispatchOp::parse(OpAsmParser &parser,
-                                    OperationState &result) {
+ParseResult GemmDispatchOp::parse(OpAsmParser &parser, OperationState &result) {
   return parserImpl<GemmFlags>(parser, result);
 }
 
@@ -129,8 +128,8 @@ static void printerImpl(OpAsmPrinter &printer, OpTy op) {
       op->getAttrs(), /*elidedAttrs=*/{"dataType", "flags", "inputs", "kind"});
 }
 
-void MatmulDispatchOp::print(OpAsmPrinter &printer) {
-  printerImpl<MatmulDispatchOp, GemmFlagsAttr>(printer, *this);
+void GemmDispatchOp::print(OpAsmPrinter &printer) {
+  printerImpl<GemmDispatchOp, GemmFlagsAttr>(printer, *this);
 }
 
 void BrgemmDispatchOp::print(OpAsmPrinter &printer) {
@@ -197,8 +196,8 @@ template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
   return verifyGemmFlags(op.getFlags(), op.getDataType(), op);
 }
 
-LogicalResult MatmulDispatchOp::verify() {
-  return verifyGemmLikeOp<MatmulDispatchOp>(*this);
+LogicalResult GemmDispatchOp::verify() {
+  return verifyGemmLikeOp<GemmDispatchOp>(*this);
 }
 
 LogicalResult BrgemmDispatchOp::verify() {
