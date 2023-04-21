@@ -23,18 +23,21 @@
              "ref": {
                  "type": "C++",
                  "benchmark": "matmul",
+                 "environment": {},
                  "flags": [ "--input=64x64x64", "-v" ],
                  "extensions": [ "avx2" ]
              },
              "xsmm": {
                  "type": "C++",
                  "benchmark": "matmul",
+                 "environment": {},
                  "flags": [ "--input=64x64x64", "-v", "-xsmm" ],
                  "extensions": []
              },
              "mlir": {
                  "type": "MLIR",
                  "benchmark": "matmul_64x64x64_vnni.mlir",
+                 "environment": { { "OMP_NUM_THREADS": "32" } },
                  "flags": [ "-v" ],
                  "extensions": [ "avx512.*" ]
              },
@@ -117,26 +120,54 @@ class Environment(object):
             os.environ[path] = ":".join(environ)
         # Check if taskset is available
         # (every CPU we care about has at least 4 cores)
+        self.cpu_pinning = None
         taskset = shutil.which("taskset")
         if taskset:
             self.cpu_pinning = [ taskset, "-c", "3" ]
+
+    def pin_task(self, command):
+        """ Adds taskset if not forced through other means """
+        if not self.cpu_pinning:
+            return
+        if "KMP_AFFINITY" in os.environ:
+            return
+        command.extend(self.cpu_pinning)
 
 class BaseRun(object):
     """ Base class for all runs """
 
     def __init__(self, name, args, env, json, loglevel):
+        self.logger = Logger("driver.baserun", loglevel)
         self.name = name
         self.env = env
         self.args = args
         self.benchmark = json["benchmark"]
+        self.environment = json["environment"]
+        self.original_env = {}
         self.flags = json["flags"]
         self.runner = Execute(loglevel)
         self.stdout = ""
         self.stderr = ""
 
+    def setup(self):
+        # Setup environment for any run
+        for key, value in self.environment.items():
+            old_value = ""
+            if key in os.environ:
+                old_value = os.environ[key]
+            self.original_env[key] = old_value
+            self.logger.debug(f"export {key}={value}")
+            os.environ[key] = value
+
     def run(self):
         # This is mandatory
         return False
+
+    def teardown(self):
+        # Revert the environment to previous state
+        for key, value in self.original_env.items():
+            self.logger.debug(f"revert {key}={value}")
+            os.environ[key] = value
 
 class CPPRun(BaseRun):
     """ C++ runs """
@@ -147,9 +178,9 @@ class CPPRun(BaseRun):
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
     def run(self):
+        self.setup()
         command = list()
-        if self.env.cpu_pinning:
-            command.extend(self.env.cpu_pinning)
+        self.env.pin_task(command)
         command.append(self.benchmark)
         if self.flags:
             command.extend(self.flags)
@@ -158,6 +189,7 @@ class CPPRun(BaseRun):
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
+        self.teardown()
         return True
 
 class XSMMDNNRun(CPPRun):
@@ -167,6 +199,7 @@ class XSMMDNNRun(CPPRun):
         CPPRun.__init__(self, name, args, env, json, loglevel)
 
     def run(self):
+        # Doesn't need setup/teardown, as it uses CPPRun.run()
         if not CPPRun.run(self):
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
@@ -185,9 +218,9 @@ class MLIRRun(BaseRun):
         self.benchmark = os.path.join(env.test_dir, self.benchmark)
 
     def run(self):
+        self.setup()
         command = list()
-        if self.env.cpu_pinning:
-            command.extend(self.env.cpu_pinning)
+        self.env.pin_task(command)
         command.append(self.env.harness)
         if self.args.build:
             command.extend(["--build", self.args.build])
@@ -199,6 +232,7 @@ class MLIRRun(BaseRun):
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
+        self.teardown()
         return True
 
 class Benchmark(object):
