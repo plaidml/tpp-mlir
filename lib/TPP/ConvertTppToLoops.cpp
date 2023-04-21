@@ -231,7 +231,7 @@ struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
   }
 };
 
-// Convert tpp.matmul to SCF loops.
+// Convert tpp.gemm to SCF loops.
 struct ConvertTppGemmOp : public OpRewritePattern<GemmOp> {
   using OpRewritePattern<GemmOp>::OpRewritePattern;
 

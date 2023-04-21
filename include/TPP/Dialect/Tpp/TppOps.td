@@ -278,6 +278,7 @@ def Tpp_GemmOp : Tpp_TernaryOp<"gemm"> {
   let summary = "Performs matrix multiplication of two input.";
   let description = [{
     The `tpp.gemm` mirrors `linalg.matmul`.
+    C = beta * C + A * B (beta = 1).
 
     Example:
 

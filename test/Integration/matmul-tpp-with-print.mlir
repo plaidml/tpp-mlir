@@ -18,7 +18,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
- func.func @matmultpp(%A: memref<4x8xf32>,
+ func.func @gemmtpp(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) attributes {llvm.emit_c_interface} {
     // TPP: tpp.gemm
     linalg.generic {indexing_maps = [#map0, #map1, #map2],
@@ -48,7 +48,7 @@ module {
     linalg.fill ins(%cst_zero : f32) outs(%C : memref<4x4xf32>)
 
     // Call kernel.
-    call @matmultpp(%da, %db, %C)
+    call @gemmtpp(%da, %db, %C)
        : (memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
 
     // Print result.
