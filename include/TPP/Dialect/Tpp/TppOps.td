@@ -192,6 +192,7 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   let results = (outs Variadic<TppTensor>:$results);
 
   let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 
   let builders = [
     // Memref builder.
@@ -255,6 +256,7 @@ class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
   let results = (outs Variadic<TppBrgemmOperand>:$results);
 
   let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 
   let builders = [
     // Memref builder.
