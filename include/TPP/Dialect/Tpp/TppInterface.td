@@ -51,6 +51,18 @@ def TppOpInterface : OpInterface<"TppOp"> {
         assert($_op.getOutputs().size() == 1);
         return $_op.getOutputs()[0];
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the inputs.
+      }],
+      /*retTy=*/"ValueRange",
+      /*methodName*/"getInputs",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getInputs();
+      }]
     >, 
     InterfaceMethod<
       /*desc=*/[{
