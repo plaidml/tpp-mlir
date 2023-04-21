@@ -202,7 +202,7 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
 func.func @gemm(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -221,7 +221,7 @@ func.func @gemm(%A: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<6x6xbf16>
 func.func @gemm_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
                             %arg2: memref<6x6xbf16>) {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -280,7 +280,7 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   %0 = memref.get_global @__constant_2048x512xf32 : memref<2048x512xf32>
 
   // 1x1 Conv2D
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast
@@ -324,7 +324,7 @@ module @predict_function {
     xsmm.unary identity(dataType f32, %0, %arg2, %arg3) : (i64, memref<512xf32>, memref<128x512xf32>) -> ()
 
     // Gemm
-    // CHECK: call @xsmm_matmul_dispatch
+    // CHECK: call @xsmm_gemm_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
     // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]

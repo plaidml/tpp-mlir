@@ -435,7 +435,7 @@ struct ConvertGemmDispatchOp : public OpRewritePattern<GemmDispatchOp> {
   LogicalResult matchAndRewrite(GemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<GemmDispatchOp>(rewriter, dispatchOp,
-                                           "xsmm_matmul_dispatch", useMeta);
+                                           "xsmm_gemm_dispatch", useMeta);
   }
 
 private:

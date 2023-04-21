@@ -41,7 +41,7 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C1]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C0]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C1]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C0]])
 
 // -----
 
@@ -59,7 +59,7 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // Or between 2048 and 4096 (see enum for GemmFlags)
 // CHECK-DAG: %[[C6144:.+]] = arith.constant 6144 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C6144]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C6144]])
 
 // -----
 
@@ -77,7 +77,7 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // Or between 2048 and 4096 and 8192 (see enum for GemmFlags)
 // CHECK-DAG: %[[C14336:.+]] = arith.constant 14336 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C14336]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C14336]])
 
 // -----
 
@@ -95,7 +95,7 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // LIBXSMM is col-major check we swap the flag for A and B (see enum for GemmFlags)
 // CHECK-DAG: %[[C4096:.+]] = arith.constant 4096 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C4096]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C4096]])
 
 // -----
 
@@ -113,4 +113,4 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // LIBXSMM is col-major check we swap the flag for A and B (see enum for GemmFlags)
 // CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C2048]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C2048]])

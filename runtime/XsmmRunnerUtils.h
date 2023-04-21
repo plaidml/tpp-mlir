@@ -25,7 +25,7 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_gemm_invoke(
     const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
     UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_matmul_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_gemm_dispatch(
     const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
     int64_t, const libxsmm_gemm_flags);
 
@@ -81,7 +81,7 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_fused_brgemm_invoke(
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_brgemm_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_matmul_dispatch(void *context, void *params, void *reserved);
+iree_xsmm_gemm_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int
 iree_xsmm_unary_dispatch(void *context, void *params, void *reserved);
 extern "C" MLIR_RUNNERUTILS_EXPORT int

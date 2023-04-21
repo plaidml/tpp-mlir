@@ -23,7 +23,7 @@ module @predict_function  {
     tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
 
     // Matmul
-    // CHECK: call @xsmm_matmul_dispatch
+    // CHECK: call @xsmm_gemm_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
     // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
@@ -55,7 +55,7 @@ func.func @buffer_dealloc(%A: memref<512x128xf32>,
   // CHECK: %[[alloc:.*]] = memref.alloc
   %0 = memref.alloc() : memref<512x512xf32>
 
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
@@ -80,7 +80,7 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
   // CHECK: %[[alloc:.*]] = memref.alloc
   %0 = memref.alloc() : memref<4x4xf32>
 
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
@@ -105,7 +105,7 @@ func.func @heap_to_stack(%A: memref<4x8xf32>,
   // CHECK: %[[alloc:.*]] = memref.alloca
   %0 = memref.alloc() : memref<4x4xf32>
 
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]

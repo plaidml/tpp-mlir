@@ -6,7 +6,7 @@
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
 func.func @matmul(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -61,7 +61,7 @@ func.func @conv2d_1x1(
   %cst = arith.constant dense<0.00332225906> : !conv1x1_filter_tensor_t
 
   // 1x1 Conv2D
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast
@@ -92,7 +92,7 @@ func.func @conv2d_1x1_decomposed(
   %cst = arith.constant dense<0.00332225906> : tensor<2048x512xf32>
 
   // 1x1 Conv2D
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: scf.for
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast

@@ -6,7 +6,7 @@
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
 func.func @matmul(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -182,7 +182,7 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   %0 = memref.get_global @__constant_2048x512xf32 : memref<2048x512xf32>
 
   // 1x1 Conv2D
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast
@@ -227,7 +227,7 @@ module @predict_function  {
     }
 
     // Matmul
-    // CHECK: call @xsmm_matmul_dispatch
+    // CHECK: call @xsmm_gemm_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
     // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]

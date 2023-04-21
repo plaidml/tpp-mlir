@@ -7,7 +7,7 @@
 func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
                   %arg1: tensor<512x2048x2xbf16>,
                   %arg2: tensor<128x2048xbf16>) -> tensor<128x2048xbf16> {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -26,7 +26,7 @@ func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
 func.func @matmul_memref(%arg0: memref<128x1024xbf16>,
                   %arg1: memref<512x2048x2xbf16>,
                   %arg2: memref<128x2048xbf16>) -> memref<128x2048xbf16> {
-  // CHECK: call @xsmm_matmul_dispatch
+  // CHECK: call @xsmm_gemm_dispatch
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
@@ -47,7 +47,7 @@ func.func @matmul_memref(%arg0: memref<128x1024xbf16>,
 func.func @matmul_memref_result(%arg0: memref<128x1024xbf16>,
                   %arg1: memref<512x2048x2xbf16>,
                   %arg2: memref<128x2048xbf16>) -> memref<128x2048xbf16> {
-  // CHECK-NOT: call @xsmm_matmul_dispatch
+  // CHECK-NOT: call @xsmm_gemm_dispatch
   // CHECK-NOT: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK-NOT: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK-NOT: %[[cast2:.*]] = memref.cast %[[ARG2]]
