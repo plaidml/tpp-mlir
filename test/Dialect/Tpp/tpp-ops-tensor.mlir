@@ -7,8 +7,8 @@ func.func @tpp_dialect(%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>,
   %0 = tpp.identity (%arg0: tensor<5x4xf32>) -> tensor<5x4xf32>
   // CHECK: tpp.add
   %1 = tpp.add (%0: tensor<5x4xf32>, %arg0: tensor<5x4xf32>) -> tensor<5x4xf32>
-  // CHECK: tpp.matmul
-  %2 = tpp.matmul (%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>, 
+  // CHECK: tpp.gemm
+  %2 = tpp.gemm (%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>, 
                    %arg2: tensor<5x5xf32>) -> tensor<5x5xf32>
   // CHECK: tpp.brgemm
   %3 = tpp.brgemm (%arg3: tensor<8x5x5xf32>, %arg3: tensor<8x5x5xf32>, 

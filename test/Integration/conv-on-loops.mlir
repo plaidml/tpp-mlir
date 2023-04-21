@@ -23,7 +23,7 @@ module {
             %1 = memref.subview %arg1[%arg5, %arg6, 0, 0] [1, 1, 3, 8] [1, 1, 1, 1] : memref<2x2x3x8xf32> to memref<3x8xf32, #map2>
             %2 = affine.apply #map1(%arg4, %arg5)
             %3 = memref.subview %arg0[%arg3, %2, %arg6, 0] [1, 1, 2, 3] [1, 1, 1, 1] : memref<1x4x4x3xf32> to memref<2x3xf32, #map0>
-            tpp.matmul ins(%3 : memref<2x3xf32, #map0>, %1 : memref<3x8xf32, #map2>, %0 : memref<2x8xf32, #map2>) outs(%0 : memref<2x8xf32, #map2>)
+            tpp.gemm ins(%3 : memref<2x3xf32, #map0>, %1 : memref<3x8xf32, #map2>, %0 : memref<2x8xf32, #map2>) outs(%0 : memref<2x8xf32, #map2>)
           }
         }
       }

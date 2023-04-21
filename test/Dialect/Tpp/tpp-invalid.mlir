@@ -66,10 +66,10 @@ func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) 
 
 // -----
 
-func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
+func.func @tpp_gemm_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
                               %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
   // expected-error @below {{fails to verify operands dimensions mismatch}}
-  tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, %arg2: memref<5x5xf32>) 
+  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, %arg2: memref<5x5xf32>) 
              outs(%arg2: memref<5x5xf32>)
   return %arg2: memref<5x5xf32>
 }
@@ -106,11 +106,10 @@ func.func @tpp_matmul_invalid(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16
 
 // -----
 
-// Mixed types
-func.func @tpp_matmul_invalid(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
-                              %arg2: memref<3x3xbf16>) -> memref<3x3xbf16> {
+func.func @tpp_gemm_mixed_types(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
+                                %arg2: memref<3x3xbf16>) -> memref<3x3xbf16> {
   // expected-error @below {{requires the same element type for all operands}}
-  tpp.matmul ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>, %arg2: memref<3x3xbf16>) 
+  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>, %arg2: memref<3x3xbf16>) 
              outs(%arg2: memref<3x3xbf16>)
   return %arg2: memref<3x3xbf16>
 }
@@ -231,11 +230,11 @@ func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) {
 
 // -----
 
-func.func @non_unit_stride_mamtul(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
+func.func @non_unit_stride_gemm(%arg0: memref<12x9xf32, strided<[?, ?], offset: ?>>,
     %arg1: memref<9x6xf32, strided<[?, ?], offset: ?>>,
     %arg2: memref<12x6xf32, strided<[?, ?], offset: ?>>) {
   // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
-  tpp.matmul ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
+  tpp.gemm ins(%arg0 : memref<12x9xf32, strided<[?, ?], offset: ?>>,
                  %arg1 : memref<9x6xf32, strided<[?, ?], offset: ?>>,
                  %arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
              outs(%arg2 : memref<12x6xf32, strided<[?, ?], offset: ?>>)
@@ -260,9 +259,9 @@ func.func @tpp_add_check_broadcast_operand(%arg0: tensor<2x3xf32>, %arg1: tensor
 
 // -----
 
-func.func @tpp_matmul(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) {
+func.func @tpp_gemm(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) {
   // expected-error @below {{expect memref type}}
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) 
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) 
              outs(%arg2: tensor<2x2xf32>)
   return
 }
@@ -285,9 +284,9 @@ func.func @tpp_relu_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
 
 // -----
 
-func.func @tpp_matmul_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
+func.func @tpp_gemm_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
   // expected-error @below {{expect 3 input operands, but got: 2}}
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
              outs(%arg0: memref<2x2xf32>)
   return
 }
@@ -305,14 +304,6 @@ func.func @tpp_add_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<
 func.func @tpp_relu_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
   // expected-error @below {{expect 1 input operands, but got: 3}}
   %0 = tpp.relu (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
-  return %0: tensor<2x2xf32>
-}
-
-// -----
-
-func.func @tpp_matmul_invalid_number_of_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
-  // expected-error @below {{expect 3 input operands, but got: 2}}
-  %0 = tpp.matmul (%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
   return %0: tensor<2x2xf32>
 }
 

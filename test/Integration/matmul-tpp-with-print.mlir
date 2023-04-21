@@ -20,7 +20,7 @@ module {
 
  func.func @matmultpp(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) attributes {llvm.emit_c_interface} {
-    // TPP: tpp.matmul
+    // TPP: tpp.gemm
     linalg.generic {indexing_maps = [#map0, #map1, #map2],
                          iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%A, %B: memref<4x8xf32>, memref<8x4xf32>) outs(%C: memref<4x4xf32>) {

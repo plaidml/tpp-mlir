@@ -89,10 +89,10 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
 // Conversions
 //===----------------------------------------------------------------------===//
 
-struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
-  using OpRewritePattern<tpp::MatmulOp>::OpRewritePattern;
+struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
+  using OpRewritePattern<tpp::GemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(tpp::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(tpp::GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
 
@@ -789,7 +789,7 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 
 void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
-               ConvertTppAddOp, ConvertTppMatmulOp, ConvertTppVNNIMatmulOp,
+               ConvertTppAddOp, ConvertTppGemmOp, ConvertTppVNNIMatmulOp,
                ConvertTppBrgemmOp, ConvertTppVNNIBrgemmOp,
                ConvertTppFusedVNNIBrgemmOp, ConvertTppFusedBrgemmOp>(
       patterns.getContext());

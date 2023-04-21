@@ -23,9 +23,9 @@ func.func @tpp_dialect(%arg0: memref<2x2xf32>,
   // CHECK: tpp.add
   tpp.add ins(%arg5: memref<2xf32>, %arg5: memref<2xf32>) outs(%arg6: memref<2xf32>)
 
-  // CHECK: tpp.matmul
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>)
-             outs(%arg2: memref<2x2xf32>)
+  // CHECK: tpp.gemm
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>)
+           outs(%arg2: memref<2x2xf32>)
 
   // CHECK: tpp.zero
   tpp.zero ins(%arg1: memref<2x2xf32>) outs(%arg1: memref<2x2xf32>)
@@ -96,10 +96,10 @@ func.func @add_bcast_col_operand_one(%arg0: memref<6x1xf32>, %arg1: memref<6x5xf
   return
 }
 
-// CHECK-LABEL: test_matmul
-func.func @test_matmul(%arg0: memref<2x2xf32>) {
-  // CHECK: tpp.matmul
-  tpp.matmul ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
+// CHECK-LABEL: test_gemm
+func.func @test_gemm(%arg0: memref<2x2xf32>) {
+  // CHECK: tpp.gemm
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
              outs(%arg0: memref<2x2xf32>)
   return
 }

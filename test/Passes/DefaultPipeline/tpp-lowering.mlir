@@ -5,8 +5,8 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
     tpp.brgemm ins(%arg0 : memref<3x5x4xf32>, %arg1 : memref<3x4x5xf32>, %arg2 : memref<5x5xf32>) 
                outs(%arg2 : memref<5x5xf32>)
     tpp.relu ins(%arg2 : memref<5x5xf32>) outs(%arg2 : memref<5x5xf32>)
-    tpp.matmul ins(%arg2 : memref<5x5xf32>, %arg3 : memref<5x5xf32>, %arg2 : memref<5x5xf32>) 
-               outs(%arg2 : memref<5x5xf32>)
+    tpp.gemm ins(%arg2 : memref<5x5xf32>, %arg3 : memref<5x5xf32>, %arg2 : memref<5x5xf32>) 
+             outs(%arg2 : memref<5x5xf32>)
     return
   }
 
@@ -15,7 +15,7 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // XSMM: xsmm.brgemm
 // XSMM-NOT: tpp.relu
 // XSMM: xsmm.unary relu
-// XSMM-NOT: tpp.matmul
+// XSMM-NOT: tpp.gemm
 // XSMM: xsmm.matmul
 
 // LOOPS-LABEL: func.func @tpp_ops(
@@ -26,7 +26,7 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // LOOPS-NOT: tpp.relu
 // LOOPS: scf.for
 // LOOPS:   arith.maxf
-// LOOPS-NOT: tpp.matmul
+// LOOPS-NOT: tpp.gemm
 // LOOPS: scf.for
 // LOOPS:   arith.mulf
 // LOOPS:   arith.addf

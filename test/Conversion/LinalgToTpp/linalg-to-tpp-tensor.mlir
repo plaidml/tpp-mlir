@@ -15,16 +15,16 @@ func.func @brgemm_lowering(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
 
 // -----
 
-func.func @matmul_lowering(%arg0: tensor<8x9xf32>,
+func.func @gemm_lowering(%arg0: tensor<8x9xf32>,
                            %arg1: tensor<9x8xf32>, %arg2: tensor<8x8xf32>) -> tensor<8x8xf32> {
   %0 = linalg.matmul ins(%arg0, %arg1: tensor<8x9xf32>, tensor<9x8xf32>)
                      outs(%arg2: tensor<8x8xf32>) -> tensor<8x8xf32>
   return %0 : tensor<8x8xf32>
 }
 
-// CHECK-LABEL: matmul_lowering
+// CHECK-LABEL: gemm_lowering
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x9xf32>, %[[ARG1:.+]]: tensor<9x8xf32>, %[[ARG2:.+]]: tensor<8x8xf32>
-// CHECK: %{{.+}} = tpp.matmul
+// CHECK: %{{.+}} = tpp.gemm
 // CHECK-SAME: (%[[ARG0]] : tensor<8x9xf32>, %[[ARG1]] : tensor<9x8xf32>, %[[ARG2]] : tensor<8x8xf32>) 
 // CHECK-SAME:  -> (tensor<8x8xf32>)
 

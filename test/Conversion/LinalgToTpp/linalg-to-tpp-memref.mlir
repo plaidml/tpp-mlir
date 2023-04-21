@@ -14,13 +14,13 @@ func.func @brgemm_lowering(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 
 // -----
 
-// CHECK-LABEL: func.func @matmul_lowering(
+// CHECK-LABEL: func.func @gemm_lowering(
 // CHECK-SAME: %[[arg0:.*]]: memref<8x9xf32>,
 // CHECK-SAME: %[[arg1:.*]]: memref<9x8xf32>,
 // CHECK-SAME: %[[arg2:.*]]: memref<8x8xf32>) {
-func.func @matmul_lowering(%arg0: memref<8x9xf32>,
+func.func @gemm_lowering(%arg0: memref<8x9xf32>,
                            %arg1: memref<9x8xf32>, %arg2: memref<8x8xf32>) {
-  // CHECK: tpp.matmul ins(%[[arg0]] : memref<8x9xf32>, %[[arg1]] : memref<9x8xf32>, %[[arg2]] : memref<8x8xf32>) outs(%[[arg2]] : memref<8x8xf32>)
+  // CHECK: tpp.gemm ins(%[[arg0]] : memref<8x9xf32>, %[[arg1]] : memref<9x8xf32>, %[[arg2]] : memref<8x8xf32>) outs(%[[arg2]] : memref<8x8xf32>)
   linalg.matmul ins(%arg0, %arg1: memref<8x9xf32>, memref<9x8xf32>)
                 outs(%arg2: memref<8x8xf32>)
   return
@@ -306,7 +306,7 @@ func.func @matmul_mapping() -> memref<28x32xf32> {
   %alloc_0 = memref.alloc() : memref<55x32xf32>
   %alloc_1 = memref.alloc() : memref<28x32xf32>
   
-  // CHECK-NOT: tpp.matmul
+  // CHECK-NOT: tpp.gemm
   linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "parallel", "reduction"]} 

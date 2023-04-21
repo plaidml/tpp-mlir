@@ -66,7 +66,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
     if (linalgx::utils::isMatmulOp(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.matmul expects three operands");
-      rewriter.replaceOpWithNewOp<tpp::MatmulOp>(
+      rewriter.replaceOpWithNewOp<tpp::GemmOp>(
           linalgOp, ValueRange{operands[0], operands[1], operands[2]},
           operands[2]);
       return success();
@@ -115,7 +115,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
     inputs.push_back(matmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<tpp::MatmulOp>(matmulOp, inputs, outputs[0]);
+    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs, outputs[0]);
     return success();
   }
 };
