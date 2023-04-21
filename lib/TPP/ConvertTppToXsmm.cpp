@@ -144,8 +144,7 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
                           matmulOp->getOperands().end());
     // Drop the aliasing output operand.
     invokeOperands.pop_back();
-    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
-                                                invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
     return success();
   }
 };
@@ -200,8 +199,7 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     invokeOperands.push_back(dispatched);
     invokeOperands.append(matmulOp->getOperands().begin(),
                           matmulOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
-                                                invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
     return success();
   }
 };

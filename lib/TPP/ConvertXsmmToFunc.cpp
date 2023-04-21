@@ -196,18 +196,17 @@ private:
   bool useMeta = false;
 };
 
-struct ConvertMatmulXsmmOp : public OpRewritePattern<MatmulOp> {
-  ConvertMatmulXsmmOp(MLIRContext *context, bool useMeta,
-                      PatternBenefit benefit = 1)
-      : OpRewritePattern<MatmulOp>(context, benefit), useMeta(useMeta) {}
+struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
+  ConvertGemmXsmmOp(MLIRContext *context, bool useMeta,
+                    PatternBenefit benefit = 1)
+      : OpRewritePattern<GemmOp>(context, benefit), useMeta(useMeta) {}
 
-  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(GemmOp gemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_matmul_invoke";
-    if (succeeded(buildInvokeCall(matmulOp.getLoc(), funcName, matmulOp,
-                                  useMeta, rewriter,
-                                  matmulOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(matmulOp);
+    if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, useMeta,
+                                  rewriter, gemmOp.getDataTypeAttr()))) {
+      rewriter.eraseOp(gemmOp);
       return success();
     }
     return failure();
@@ -575,7 +574,7 @@ void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                            bool useExtractMetaData) {
   patterns
       .add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp, ConvertBinaryXsmmOp,
-           ConvertUnaryXsmmOp, ConvertMatmulXsmmOp, ConvertBrgemmXsmmOp>(
+           ConvertUnaryXsmmOp, ConvertGemmXsmmOp, ConvertBrgemmXsmmOp>(
           patterns.getContext(), useExtractMetaData);
   patterns.add<ConvertQuarternaryDispatchOp, ConvertTernaryDispatchOp,
                ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,

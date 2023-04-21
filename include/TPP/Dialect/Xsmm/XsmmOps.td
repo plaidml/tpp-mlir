@@ -142,10 +142,10 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// MatmulOp
+// GemmOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_MatmulOp : Xsmm_Op<"matmul"> {
+def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let summary = "matmul call operation.";
   let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
   
