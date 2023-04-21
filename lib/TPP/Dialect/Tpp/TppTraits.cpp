@@ -148,8 +148,6 @@ LogicalResult mlir::OpTrait::tpp::checkUnitStrideInnerLoop(Operation *op) {
 
 static LogicalResult verifyArityImpl(Operation *op, unsigned numInput,
                                      unsigned numOutput) {
-  assert(op->template hasTrait<OpTrait::AttrSizedOperandSegments>());
-  assert(isa<mlir::tpp::TppOp>(op) && "expect a tpp operation");
   auto attrName =
       OpTrait::AttrSizedOperandSegments<void>::getOperandSegmentSizeAttr();
   ArrayRef<int> sizeAttr =
