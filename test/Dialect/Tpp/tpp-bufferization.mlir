@@ -493,6 +493,9 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
 // -----
 
 // CHECK-LABEL: alloc_must_escape
+// The kernel allocates memory via tensor.empty. The allocation need
+// to survive, meaning that bufferization should not introduce a 
+// dealloc.
 func.func @alloc_must_escape(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   // CHECK-NOT: memref.dealloc
   // CHECK: memref.alloc
