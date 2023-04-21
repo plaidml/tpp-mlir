@@ -18,6 +18,9 @@ func.func @tpp_dialect(%arg0: tensor<5x4xf32>, %arg1: tensor<4x5xf32>,
   
   // CHECK: tpp.zero
   %5 = tpp.zero (%4: tensor<5x5xf32>) -> tensor<5x5xf32> 
+  
+  // CHECK: tpp.zero {{.+}} {myAttr = "myattr"}
+  %6 = tpp.zero (%4: tensor<5x5xf32>) -> tensor<5x5xf32> {myAttr = "myattr"}
   return %5 : tensor<5x5xf32>
 }
 

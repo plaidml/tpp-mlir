@@ -117,6 +117,8 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
     printCommaSeparatedList(printer, operands);
     printer << " -> (" << results << ")";
   }
+  printer.printOptionalAttrDict(op->getAttrs(),
+                                /*elidedAttrs=*/{"operand_segment_sizes"});
 }
 
 //===----------------------------------------------------------------------===//
