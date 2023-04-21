@@ -58,11 +58,11 @@ static bool isTransformUnary(const libxsmm_meltw_unary_type dtype) {
   }
 }
 
-extern "C" void _mlir_ciface_xsmm_matmul_invoke(const libxsmm_datatype dtype,
-                                                int64_t funcAddr,
-                                                UnrankedMemRefType<char> *A,
-                                                UnrankedMemRefType<char> *B,
-                                                UnrankedMemRefType<char> *C) {
+extern "C" void _mlir_ciface_xsmm_gemm_invoke(const libxsmm_datatype dtype,
+                                              int64_t funcAddr,
+                                              UnrankedMemRefType<char> *A,
+                                              UnrankedMemRefType<char> *B,
+                                              UnrankedMemRefType<char> *C) {
   DynamicMemRefType<char> matrixA = DynamicMemRefType<char>(*A);
   DynamicMemRefType<char> matrixB = DynamicMemRefType<char>(*B);
   DynamicMemRefType<char> matrixC = DynamicMemRefType<char>(*C);
@@ -684,8 +684,8 @@ extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
-                                       void *reserved) {
+extern "C" int iree_xsmm_gemm_invoke(void *context, void *params,
+                                     void *reserved) {
   typedef struct {
     int64_t dtype;
     int64_t gemm_addr;
@@ -695,8 +695,8 @@ extern "C" int iree_xsmm_matmul_invoke(void *context, void *params,
     iree_input_tensor_t *pB;
     int64_t rankC;
     iree_input_tensor_t *pC;
-  } xsmm_matmul_invoke_t;
-  xsmm_matmul_invoke_t *p = (xsmm_matmul_invoke_t *) params;
+  } xsmm_gemm_invoke_t;
+  xsmm_gemm_invoke_t *p = (xsmm_gemm_invoke_t *)params;
 
   check_integrity_of_iree_input_tensor(p->pA);
   check_integrity_of_iree_input_tensor(p->pB);

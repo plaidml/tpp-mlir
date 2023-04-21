@@ -203,7 +203,7 @@ struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
 
   LogicalResult matchAndRewrite(GemmOp gemmOp,
                                 PatternRewriter &rewriter) const override {
-    std::string funcName = "xsmm_matmul_invoke";
+    std::string funcName = "xsmm_gemm_invoke";
     if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, useMeta,
                                   rewriter, gemmOp.getDataTypeAttr()))) {
       rewriter.eraseOp(gemmOp);

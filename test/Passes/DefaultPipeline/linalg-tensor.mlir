@@ -10,7 +10,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
 
   return %D : tensor<4x4xf32>
@@ -65,7 +65,7 @@ func.func @conv2d_1x1(
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast
-  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %0 = tensor.empty() : !conv1x1_output_tensor_t
   %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : !conv1x1_output_tensor_t) -> !conv1x1_output_tensor_t
   %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
@@ -97,7 +97,7 @@ func.func @conv2d_1x1_decomposed(
   // CHECK:   %[[cast:.*]] = memref.cast
   // CHECK:   %[[cast1:.*]] = memref.cast
   // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK:   call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %cst_0 = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x7x7x512xf32>
   %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1x7x7x512xf32>) -> tensor<1x7x7x512xf32>

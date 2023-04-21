@@ -206,7 +206,7 @@ func.func @gemm(%A: memref<4x8xf32>,
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   %0 = xsmm.matmul.dispatch [4, 4, 8, 8, 4, 4] flags = (none) data_type = f32
   xsmm.gemm(dataType f32, %0, %A, %B, %C) : (i64, memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
 
@@ -225,7 +225,7 @@ func.func @gemm_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
   // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %0 = xsmm.matmul.dispatch [6, 6, 10, 10, 6, 6] flags = (vnni_b) data_type = bf16
   xsmm.gemm(dataType bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
 
@@ -284,7 +284,7 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   // CHECK: %[[cast:.*]] = memref.cast
   // CHECK: %[[cast1:.*]] = memref.cast
   // CHECK: %[[cast2:.*]] = memref.cast
-  // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x7x7x512xf32>
   linalg.fill ins(%cst : f32) outs(%alloc : memref<1x7x7x512xf32>)
   scf.for %arg1 = %c0 to %c7 step %c1 {
@@ -327,7 +327,7 @@ module @predict_function {
     // CHECK: call @xsmm_matmul_dispatch
     // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: call @xsmm_matmul_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
+    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
     %1 = xsmm.matmul.dispatch [128, 512, 256, 256, 512, 512] flags = (none) data_type = f32
     xsmm.gemm(dataType f32, %1, %arg0, %arg1, %arg3) : (i64, memref<128x256xf32>, memref<256x512xf32>, memref<128x512xf32>) -> ()
 
