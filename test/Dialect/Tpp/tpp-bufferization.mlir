@@ -554,3 +554,23 @@ func.func @add_in_place_mixed(%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>) ->
 // CHECK-SAME:  outs(%[[ALLOC]] : memref<4x4xf32>)
 // CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<4x4xf32>, %[[ALLOC]] : memref<4x4xf32>) outs(%[[ALLOC]] : memref<4x4xf32>)
 // CHECK-NEXT: return %[[ALLOC]] : memref<4x4xf32>
+
+// -----
+
+func.func @scalar_add(%arg0: tensor<3x3xf32>, %arg1: f32) -> tensor<3x3xf32> {
+  %0 = tpp.add(%arg0: tensor<3x3xf32>, %arg1: f32) -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: scalar_add
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: f32
+// CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG1]] : f32) outs(%[[ARG0]] : memref<3x3xf32>)
+
+// -----
+
+// CHECK-LABEL: add_out_of_place
+func.func @add_out_of_place(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf32> {
+  // CHECK: memref.alloc() {{.+}} : memref<3x3xf32>
+  %0 = tpp.add(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf32>
+  return %0: tensor<3x3xf32>
+}
