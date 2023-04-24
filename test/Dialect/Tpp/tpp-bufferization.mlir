@@ -497,8 +497,8 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
 // because it's a return value, meaning that bufferization should not introduce
 // a dealloc.
 func.func @alloc_must_escape(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
-  // CHECK-NOT: memref.dealloc
   // CHECK: memref.alloc
+  // CHECK-NOT: memref.dealloc
   %cst = arith.constant dense<0.00999999977> : tensor<1024x1024xf32>
   %cst_0 = arith.constant dense<2.000000e-02> : tensor<256x1024xf32>
   %0 = tensor.empty() : tensor<256x1024xf32>
@@ -512,3 +512,45 @@ func.func @alloc_must_escape(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32
   %4 = tpp.relu (%3 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>) 
   return %4 : tensor<256x1024xf32>
 }
+
+// -----
+
+func.func @add_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  %0 = tpp.add(%arg0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  %1 = tpp.add(%0: tensor<3x3xf32>, %0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: add_in_place
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
+// CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
+
+// -----
+
+// CHECK-LABEL: add_in_place_cst
+func.func @add_in_place_cst() -> tensor<3x3xf32> {
+  // CHECK: memref.get_global
+  // CHECK: memref.alloc
+  // CHECK: memref.copy
+  %cst = arith.constant dense<0.0> : tensor<3x3xf32>
+  %0 = tpp.add(%cst: tensor<3x3xf32>, %cst: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
+}
+
+// -----
+
+func.func @add_in_place_mixed(%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>) -> tensor<4x4xf32> {
+  %empty = tensor.empty() : tensor<4x4xf32>
+  %0 = tpp.gemm (%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>, %empty: tensor<4x4xf32>) -> tensor<4x4xf32>
+  %1 = tpp.add (%0: tensor<4x4xf32>, %0: tensor<4x4xf32>) -> tensor<4x4xf32>
+  return %1 : tensor<4x4xf32>
+}
+
+// CHECK-LABEL: add_in_place_mixed
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x3xf32>, %[[ARG1:.+]]: memref<3x4xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<4x4xf32>
+// CHECK-NEXT: tpp.gemm ins(%[[ARG0]] : memref<4x3xf32>, %[[ARG1]] : memref<3x4xf32>, %[[ALLOC]] : memref<4x4xf32>) 
+// CHECK-SAME:  outs(%[[ALLOC]] : memref<4x4xf32>)
+// CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<4x4xf32>, %[[ALLOC]] : memref<4x4xf32>) outs(%[[ALLOC]] : memref<4x4xf32>)
+// CHECK-NEXT: return %[[ALLOC]] : memref<4x4xf32>

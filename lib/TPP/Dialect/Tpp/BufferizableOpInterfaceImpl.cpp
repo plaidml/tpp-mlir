@@ -297,6 +297,14 @@ struct AddBufferizationInterface
     return bufferizesToMemoryWriteBinaryImpl(op, opOperand, state);
   }
 
+  bool isNotConflicting(Operation *op, OpOperand *uRead,
+                        OpOperand *uConflictingWrite,
+                        const AnalysisState &state) const {
+    // We support in-place operations. If the operands are the same
+    // value, ignore the conflict.
+    return uRead->get() == uConflictingWrite->get();
+  }
+
   AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     return getAliasingOpResultsBinaryImpl(op, opOperand, state);
