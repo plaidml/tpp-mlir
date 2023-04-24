@@ -647,7 +647,6 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
     patterns.add<DoItOnMatmul>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
@@ -725,7 +724,6 @@ struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
     RewritePatternSet patterns(ctx);
     patterns.add<DoItOnConv2DNhwcHwcf>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
@@ -764,12 +762,9 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    mlir::tpp::populateSinkPackPatterns(patterns);
-    mlir::tensor::populateSimplifyTensorPack(patterns);
     patterns.add<VNNIOnMatmul>(ctx);
     patterns.add<VNNIOnBRGemm>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
@@ -779,9 +774,19 @@ struct PropagatePackUnPack
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     tpp::populateSinkPackPatterns(patterns);
-    tensor::populateSimplifyTensorPack(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
+  }
+};
+
+struct SimplifyAndCanonicalizePack
+    : public SimplifyAndCanonicalizePackBase<SimplifyAndCanonicalizePack> {
+  void runOnOperation() override {
+    MLIRContext *ctx = getOperation().getContext();
+    RewritePatternSet patterns(ctx);
+    tensor::populateSimplifyTensorPack(patterns);
+    tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+    tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
@@ -815,4 +820,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createPropagatePackUnPackPass() {
   return std::make_unique<PropagatePackUnPack>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createSimplifyAndCanonicalizePackPass() {
+  return std::make_unique<SimplifyAndCanonicalizePack>();
 }

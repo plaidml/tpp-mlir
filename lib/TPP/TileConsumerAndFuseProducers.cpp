@@ -490,9 +490,10 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   scf::SCFTileAndFuseResult tileAndFuseResult;
   FailureOr<scf::SCFTilingResult> tilingResult =
       tileConsumer(rewriter, consumer, tileSizes);
-  if (failed(tilingResult))
+  if (failed(tilingResult)) {
     return rewriter.notifyMatchFailure(consumer,
                                        "failed to tile base operation");
+  }
   for (auto *tiledOp : tilingResult->tiledOps) {
     tileAndFuseResult.tiledAndFusedOps.insert(tiledOp);
     alreadyFusedOps.insert(tiledOp);
