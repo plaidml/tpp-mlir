@@ -79,18 +79,18 @@ func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2:
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_matmul(
+// CHECK: func.func @tpp_gemm(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
-func.func @tpp_matmul(%A: memref<4x8xf32>,
+func.func @tpp_gemm(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
   // CHECK:     scf.for
   // CHECK:       arith.mulf
   // CHECK:       arith.addf
-  tpp.matmul ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C: memref<4x4xf32>) 
+  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C: memref<4x4xf32>) 
              outs(%C : memref<4x4xf32>)
 
   return

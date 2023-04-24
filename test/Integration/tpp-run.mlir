@@ -66,15 +66,15 @@ func.func @entry(%A: tensor<4x8xf32>,
 // MID-DAG: memref.global "private" constant @__constant_8x4xf32 : memref<8x4xf32> = dense<1.000000e+00> {alignment = 64 : i64}
 // MID-LABEL: @_entry
 // MID: memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
-// MID: call @xsmm_matmul_dispatch
+// MID: call @xsmm_gemm_dispatch
 // MID: memref.cast
 // MID: memref.cast
 // MID: memref.cast
-// MID: call @xsmm_matmul_invoke
+// MID: call @xsmm_gemm_invoke
 // MID: linalg.generic
 // MID:   arith.addf
-// MID-DAG: @xsmm_matmul_invoke
-// MID-DAG: @xsmm_matmul_dispatch
+// MID-DAG: @xsmm_gemm_invoke
+// MID-DAG: @xsmm_gemm_dispatch
 // MID-LABEL: @entry
 // MID: memref.get_global @__constant_4x8xf32 : memref<4x8xf32>
 // MID: memref.get_global @__constant_4x4xf32 : memref<4x4xf32>
@@ -87,16 +87,16 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LATE-DAG: memref.global "private" constant @__constant_8x4xf32 : memref<8x4xf32> = dense<1.000000e+00> {alignment = 64 : i64}
 // LATE-LABEL: @_entry
 // LATE:   memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
-// LATE:   call @xsmm_matmul_dispatch
+// LATE:   call @xsmm_gemm_dispatch
 // LATE:   memref.cast
 // LATE:   memref.cast
 // LATE:   memref.cast
-// LATE:   call @xsmm_matmul_invoke
+// LATE:   call @xsmm_gemm_invoke
 // LATE:   scf.for
 // LATE:     memref.load
 // LATE:     arith.addf
-// LATE-DAG: @xsmm_matmul_invoke
-// LATE-DAG: @xsmm_matmul_dispatch
+// LATE-DAG: @xsmm_gemm_invoke
+// LATE-DAG: @xsmm_gemm_dispatch
 // LATE-LABEL: @entry
 // LATE:   memref.get_global @__constant_4x8xf32 : memref<4x8xf32>
 // LATE:   memref.get_global @__constant_4x4xf32 : memref<4x4xf32>
@@ -108,8 +108,8 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LLVM-DAG: llvm.mlir.global private constant @__constant_4x8xf32(dense<1.000000e+00> : tensor<4x8xf32>) {addr_space = 0 : i32, alignment = 64 : i64} : !llvm.array<4 x array<8 x f32>>
 // LLVM-DAG: llvm.mlir.global private constant @__constant_8x4xf32(dense<1.000000e+00> : tensor<8x4xf32>) {addr_space = 0 : i32, alignment = 64 : i64} : !llvm.array<8 x array<4 x f32>>
 // LLVM-LABEL: @_entry
-// LLVM:   llvm.call @xsmm_matmul_dispatch
-// LLVM:   llvm.call @xsmm_matmul_invoke
+// LLVM:   llvm.call @xsmm_gemm_dispatch
+// LLVM:   llvm.call @xsmm_gemm_invoke
 // LLVM:   llvm.cond_br %{{.*}}, [[BODY:.*]], [[LATCH:.*]]
 // LLVM:  [[BODY]]:
 // LLVM:    llvm.mul

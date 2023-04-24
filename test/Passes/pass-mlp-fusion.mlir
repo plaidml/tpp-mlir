@@ -14,7 +14,7 @@ func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
   } -> tensor<128x512xf32>
-  // CHECK: tpp.matmul ins(%{{.*}} : memref<32x256xf32, strided<[256, 1], offset: ?>>, %{{.*}} : memref<256x32xf32, strided<[512, 1], offset: ?>>, %{{.*}} : memref<32x32xf32>) outs(%{{.*}} : memref<32x32xf32>)
+  // CHECK: tpp.gemm ins(%{{.*}} : memref<32x256xf32, strided<[256, 1], offset: ?>>, %{{.*}} : memref<256x32xf32, strided<[512, 1], offset: ?>>, %{{.*}} : memref<32x32xf32>) outs(%{{.*}} : memref<32x32xf32>)
   %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
       %16 = arith.mulf %arg9, %arg10 : f32

@@ -26,7 +26,7 @@ func.func @linalg_dialect(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 // CHECK-NOT: linalg.generic
 // CHECK: tpp.relu
 // CHECK-NOT: linalg.matmul
-// CHECK: tpp.matmul
+// CHECK: tpp.gemm
 
 // -----
 

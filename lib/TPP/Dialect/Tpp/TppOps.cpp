@@ -265,18 +265,18 @@ void AddOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// MatmulOp
+// GemmOp
 //===----------------------------------------------------------------------===//
 
-static bool verifyMatmulShape(ShapedType shapedA, ShapedType shapedB,
-                              ShapedType shapedC) {
+static bool verifyGemmShape(ShapedType shapedA, ShapedType shapedB,
+                            ShapedType shapedC) {
   return !(shapedB.getRank() != 2 || shapedC.getRank() != 2 ||
            shapedA.getRank() != 2);
 }
 
-static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
-                                     ArrayRef<int64_t> shapeB,
-                                     ArrayRef<int64_t> shapeC) {
+static bool verifyGemmOperandsDims(ArrayRef<int64_t> shapeA,
+                                   ArrayRef<int64_t> shapeB,
+                                   ArrayRef<int64_t> shapeC) {
   int64_t m = shapeC[0];
   int64_t n = shapeC[1];
   int64_t k = shapeA[1];
@@ -285,33 +285,33 @@ static bool verifyMatmulOperandsDims(ArrayRef<int64_t> shapeA,
 }
 
 // Check that op to be 2d matmul in row-major.
-LogicalResult MatmulOp::verify() {
+LogicalResult GemmOp::verify() {
   auto shapedA = getInputs()[0].getType().cast<ShapedType>();
   auto shapedB = getInputs()[1].getType().cast<ShapedType>();
   auto shapedC = (hasTensorSemantics()) ? getResultType().cast<ShapedType>()
                                         : getOutputType().cast<ShapedType>();
-  if (!verifyMatmulShape(shapedA, shapedB, shapedC))
+  if (!verifyGemmShape(shapedA, shapedB, shapedC))
     return emitOpError("fails to verify operands shapes");
-  if (!verifyMatmulOperandsDims(shapedA.getShape(), shapedB.getShape(),
-                                shapedC.getShape()))
+  if (!verifyGemmOperandsDims(shapedA.getShape(), shapedB.getShape(),
+                              shapedC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
 
-void MatmulOp::build(OpBuilder &builder, OperationState &state,
-                     ValueRange inputs, Value output) {
+void GemmOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
+                   Value output) {
   tppOpBuilder(builder, state, inputs, output);
 }
 
-ParseResult MatmulOp::parse(OpAsmParser &parser, OperationState &result) {
+ParseResult GemmOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseTppOp(parser, result);
 }
 
-void MatmulOp::print(OpAsmPrinter &printer) {
+void GemmOp::print(OpAsmPrinter &printer) {
   printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
-void MatmulOp::getEffects(
+void GemmOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   getEffectsImpl(*this, effects);
@@ -338,9 +338,9 @@ LogicalResult BrgemmOp::verify() {
   if (shapedA.getShape()[0] != shapedB.getShape()[0])
     return emitOpError("fails to verify operands dimensions mismatch");
   // Check all others that must be 'matmul' like.
-  if (!verifyMatmulOperandsDims(shapedA.getShape().drop_front(),
-                                shapedB.getShape().drop_front(),
-                                shapedC.getShape()))
+  if (!verifyGemmOperandsDims(shapedA.getShape().drop_front(),
+                              shapedB.getShape().drop_front(),
+                              shapedC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }
@@ -378,9 +378,9 @@ LogicalResult FusedBrgemmOp::verify() {
   if (tensorA.getShape()[0] != tensorB.getShape()[0])
     return emitOpError("fails to verify operands dimensions mismatch");
   // Check all others that must be 'matmul' like.
-  if (!verifyMatmulOperandsDims(tensorA.getShape().drop_front(),
-                                tensorB.getShape().drop_front(),
-                                matrixC.getShape()))
+  if (!verifyGemmOperandsDims(tensorA.getShape().drop_front(),
+                              tensorB.getShape().drop_front(),
+                              matrixC.getShape()))
     return emitOpError("fails to verify operands dimensions mismatch");
   return success();
 }

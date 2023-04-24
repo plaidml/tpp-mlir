@@ -231,11 +231,11 @@ struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
   }
 };
 
-// Convert tpp.matmul to SCF loops.
-struct ConvertTppMatmulOp : public OpRewritePattern<MatmulOp> {
-  using OpRewritePattern<MatmulOp>::OpRewritePattern;
+// Convert tpp.gemm to SCF loops.
+struct ConvertTppGemmOp : public OpRewritePattern<GemmOp> {
+  using OpRewritePattern<GemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
 
@@ -329,7 +329,7 @@ void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
-               ConvertTppMatmulOp,
+               ConvertTppGemmOp,
                ConvertTppBrgemmOp,
                ConvertTppReluOp,
                ConvertTppZeroOp>(patterns.getContext());

@@ -196,18 +196,17 @@ private:
   bool useMeta = false;
 };
 
-struct ConvertMatmulXsmmOp : public OpRewritePattern<MatmulOp> {
-  ConvertMatmulXsmmOp(MLIRContext *context, bool useMeta,
-                      PatternBenefit benefit = 1)
-      : OpRewritePattern<MatmulOp>(context, benefit), useMeta(useMeta) {}
+struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
+  ConvertGemmXsmmOp(MLIRContext *context, bool useMeta,
+                    PatternBenefit benefit = 1)
+      : OpRewritePattern<GemmOp>(context, benefit), useMeta(useMeta) {}
 
-  LogicalResult matchAndRewrite(MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(GemmOp gemmOp,
                                 PatternRewriter &rewriter) const override {
-    std::string funcName = "xsmm_matmul_invoke";
-    if (succeeded(buildInvokeCall(matmulOp.getLoc(), funcName, matmulOp,
-                                  useMeta, rewriter,
-                                  matmulOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(matmulOp);
+    std::string funcName = "xsmm_gemm_invoke";
+    if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, useMeta,
+                                  rewriter, gemmOp.getDataTypeAttr()))) {
+      rewriter.eraseOp(gemmOp);
       return success();
     }
     return failure();
@@ -354,7 +353,7 @@ void addKindOperand(RewriterBase &rewriter, OpTy dispatchOp,
   dispatchOperandTypes.push_back(integer64);
 }
 
-void addKindOperand(RewriterBase &rewriter, MatmulDispatchOp dispatchOp,
+void addKindOperand(RewriterBase &rewriter, GemmDispatchOp dispatchOp,
                     SmallVectorImpl<Value> &dispatchOperands,
                     SmallVectorImpl<Type> &dispatchOperandTypes) {
   /* do nothing */
@@ -428,16 +427,15 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
   return success();
 }
 
-struct ConvertMatmulDispatchOp : public OpRewritePattern<MatmulDispatchOp> {
-  ConvertMatmulDispatchOp(MLIRContext *context, bool useMeta,
-                          PatternBenefit benefit = 1)
-      : OpRewritePattern<MatmulDispatchOp>(context, benefit), useMeta(useMeta) {
-  }
+struct ConvertGemmDispatchOp : public OpRewritePattern<GemmDispatchOp> {
+  ConvertGemmDispatchOp(MLIRContext *context, bool useMeta,
+                        PatternBenefit benefit = 1)
+      : OpRewritePattern<GemmDispatchOp>(context, benefit), useMeta(useMeta) {}
 
-  LogicalResult matchAndRewrite(MatmulDispatchOp dispatchOp,
+  LogicalResult matchAndRewrite(GemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    return buildDispatchOp<MatmulDispatchOp>(rewriter, dispatchOp,
-                                             "xsmm_matmul_dispatch", useMeta);
+    return buildDispatchOp<GemmDispatchOp>(rewriter, dispatchOp,
+                                           "xsmm_gemm_dispatch", useMeta);
   }
 
 private:
@@ -575,11 +573,11 @@ void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
                                            bool useExtractMetaData) {
   patterns
       .add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp, ConvertBinaryXsmmOp,
-           ConvertUnaryXsmmOp, ConvertMatmulXsmmOp, ConvertBrgemmXsmmOp>(
+           ConvertUnaryXsmmOp, ConvertGemmXsmmOp, ConvertBrgemmXsmmOp>(
           patterns.getContext(), useExtractMetaData);
   patterns.add<ConvertQuarternaryDispatchOp, ConvertTernaryDispatchOp,
                ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,
-               ConvertMatmulDispatchOp, ConvertBrgemmDispatchOp>(
+               ConvertGemmDispatchOp, ConvertBrgemmDispatchOp>(
       patterns.getContext(), useExtractMetaData);
 }
 

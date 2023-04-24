@@ -360,9 +360,9 @@ getAliasingOpResultsTernaryImpl(Operation *op, OpOperand &opOperand,
   return {};
 }
 
-struct MatmulBufferizationInterface
-    : public BufferizableOpInterface::ExternalModel<
-          MatmulBufferizationInterface, tpp::MatmulOp> {
+struct GemmBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<GemmBufferizationInterface,
+                                                    tpp::GemmOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return bufferizesToMemoryReadTernaryImpl(op, opOperand, state);
@@ -380,7 +380,7 @@ struct MatmulBufferizationInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    return bufferizeTernaryOp<tpp::MatmulOp>(op, rewriter, options);
+    return bufferizeTernaryOp<tpp::GemmOp>(op, rewriter, options);
   }
 };
 
@@ -420,7 +420,7 @@ void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     ReluOp::attachInterface<tpp::ReluBufferizationInterface>(*ctx);
     ZeroOp::attachInterface<tpp::ZeroBufferizationInterface>(*ctx);
     AddOp::attachInterface<tpp::AddBufferizationInterface>(*ctx);
-    MatmulOp::attachInterface<tpp::MatmulBufferizationInterface>(*ctx);
+    GemmOp::attachInterface<tpp::GemmBufferizationInterface>(*ctx);
     BrgemmOp::attachInterface<tpp::BrgemmBufferizationInterface>(*ctx);
   });
 }

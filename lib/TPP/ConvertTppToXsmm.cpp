@@ -89,10 +89,10 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
 // Conversions
 //===----------------------------------------------------------------------===//
 
-struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
-  using OpRewritePattern<tpp::MatmulOp>::OpRewritePattern;
+struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
+  using OpRewritePattern<tpp::GemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(tpp::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(tpp::GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
 
@@ -135,7 +135,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
           xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
     }
 
-    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
@@ -144,8 +144,7 @@ struct ConvertTppMatmulOp : public OpRewritePattern<tpp::MatmulOp> {
                           matmulOp->getOperands().end());
     // Drop the aliasing output operand.
     invokeOperands.pop_back();
-    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
-                                                invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
     return success();
   }
 };
@@ -193,15 +192,14 @@ struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
 
-    Value dispatched = rewriter.create<xsmm::MatmulDispatchOp>(
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(matmulOp->getOperands().begin(),
                           matmulOp->getOperands().end());
-    rewriter.replaceOpWithNewOp<xsmm::MatmulOp>(matmulOp, dtype,
-                                                invokeOperands);
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
     return success();
   }
 };
@@ -789,7 +787,7 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 
 void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
-               ConvertTppAddOp, ConvertTppMatmulOp, ConvertTppVNNIMatmulOp,
+               ConvertTppAddOp, ConvertTppGemmOp, ConvertTppVNNIMatmulOp,
                ConvertTppBrgemmOp, ConvertTppVNNIBrgemmOp,
                ConvertTppFusedVNNIBrgemmOp, ConvertTppFusedBrgemmOp>(
       patterns.getContext());

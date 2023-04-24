@@ -142,10 +142,10 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 }
 
 //===----------------------------------------------------------------------===//
-// MatmulOp
+// GemmOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_MatmulOp : Xsmm_Op<"matmul"> {
+def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let summary = "matmul call operation.";
   let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
   
@@ -266,13 +266,13 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
 }
 
 //===----------------------------------------------------------------------===//
-// MatmulDispatchOp
+// GemmDispatchOp
 //===----------------------------------------------------------------------===//
 
-class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
+class Xsmm_GemmLikeOp<string mnemonic, list<Trait> traits = []> :
   Xsmm_Op<mnemonic, !listconcat(traits, [Pure])> {
   let description = [{
-    Base class for 'matmul.dispatch' and 'brgemm.dispatch'. The operation has
+    Base class for 'gemm.dispatch' and 'brgemm.dispatch'. The operation has
     the following arguments: 1) inputs carry information on leading dimensions and
     sizes; for example,  in 'matmul.dispatch' the inputs are m, n, k, lda, ldb and
     ldc. Inputs is a dense attribute of I64 elements. 2) flags carry information on
@@ -290,7 +290,7 @@ class Xsmm_MatmulLikeOp<string mnemonic, list<Trait> traits = []> :
   let hasCustomAssemblyFormat = 1;
 }
 
-def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
+def Xsmm_GemmDispatchOp : Xsmm_GemmLikeOp<"gemm.dispatch"> {
   let summary = "dispatch for matmul operation."; 
   let hasVerifier = 1;
 }
@@ -299,7 +299,7 @@ def Xsmm_MatmulDispatchOp : Xsmm_MatmulLikeOp<"matmul.dispatch"> {
 // BrgemmDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BrgemmDispatchOp : Xsmm_MatmulLikeOp<"brgemm.dispatch"> {
+def Xsmm_BrgemmDispatchOp : Xsmm_GemmLikeOp<"brgemm.dispatch"> {
   let summary = "dispatch for brgemm operation."; 
   let hasVerifier = 1;
 }

@@ -30,7 +30,7 @@ func.func @dispatch_brgemm() -> i64 {
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (none) data_type = f32
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (none) data_type = f32
   return %0 : i64
 }
 
@@ -41,13 +41,13 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C1]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C0]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C1]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C0]])
 
 // -----
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b) data_type = bf16
   return %0 : i64
 }
 
@@ -59,13 +59,13 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // Or between 2048 and 4096 (see enum for GemmFlags)
 // CHECK-DAG: %[[C6144:.+]] = arith.constant 6144 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C6144]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C6144]])
 
 // -----
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b, vnni_c) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a, vnni_b, vnni_c) data_type = bf16
   return %0 : i64
 }
 
@@ -77,13 +77,13 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // Or between 2048 and 4096 and 8192 (see enum for GemmFlags)
 // CHECK-DAG: %[[C14336:.+]] = arith.constant 14336 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C14336]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C14336]])
 
 // -----
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_a) data_type = bf16
   return %0 : i64
 }
 
@@ -95,13 +95,13 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // LIBXSMM is col-major check we swap the flag for A and B (see enum for GemmFlags)
 // CHECK-DAG: %[[C4096:.+]] = arith.constant 4096 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C4096]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C4096]])
 
 // -----
 
 // CHECK-LABEL: dispatch_gemm
 func.func @dispatch_gemm() -> i64 {
-  %0 = xsmm.matmul.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_b) data_type = bf16
+  %0 = xsmm.gemm.dispatch [1, 2, 3, 4, 5, 6] flags = (vnni_b) data_type = bf16
   return %0 : i64
 }
 
@@ -113,4 +113,4 @@ func.func @dispatch_gemm() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // LIBXSMM is col-major check we swap the flag for A and B (see enum for GemmFlags)
 // CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : i64
-// CHECK: call @xsmm_matmul_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C2048]])
+// CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C2048]])

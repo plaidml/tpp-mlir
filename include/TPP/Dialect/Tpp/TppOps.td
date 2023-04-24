@@ -271,24 +271,25 @@ class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
 }
 
 //===----------------------------------------------------------------------===//
-// MatmulOp
+// GemmOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_MatmulOp : Tpp_TernaryOp<"matmul"> {
+def Tpp_GemmOp : Tpp_TernaryOp<"gemm"> {
   let summary = "Performs matrix multiplication of two input.";
   let description = [{
-    The `tpp.matmul` mirrors `linalg.matmul`.
+    The `tpp.gemm` mirrors `linalg.matmul`.
+    C = beta * C + A * B (beta = 1).
 
     Example:
 
     ```mlir
 
     // Memref abstraction.
-    tpp.matmul ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
+    tpp.gemm ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
                outs(%3: memref<2x2xf32>)
 
     // Tensor abstraction.
-    %0 = tpp.matmul (%1: tensor<2x2xf32>, %2: tensor<2x2xf32>, 
+    %0 = tpp.gemm (%1: tensor<2x2xf32>, %2: tensor<2x2xf32>, 
                      %3: tensor<2x2xf32>) -> tensor<2x2xf32>
 
     ```
