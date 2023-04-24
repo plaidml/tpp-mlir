@@ -82,11 +82,7 @@ Value createDenseTensor(OpBuilder &builder, TensorInitType initType,
 
   auto init = getTensorInit(initType, type.getElementType(), seed);
   auto floatInit = init->get(type);
-  auto initVal = builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
-  auto outBuf = builder.create<tensor::EmptyOp>(unkLoc, type, ValueRange{});
-  return builder
-      .create<linalg::CopyOp>(unkLoc, initVal.getResult(), outBuf.getResult())
-      .getResultTensors()[0];
+  return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);
 }
 
 Value createDenseMemref(OpBuilder &builder, ModuleOp module,

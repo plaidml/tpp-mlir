@@ -31,7 +31,8 @@ func::FuncOp createFunction(OpBuilder &builder, ModuleOp module,
                             llvm::StringRef name, TypeRange args,
                             TypeRange ret);
 
-// Create a local dense tensor
+// Create a local constant dense tensor
+// When a module is passed, create a writable global dense tensor instead
 Value createDenseTensor(OpBuilder &, TensorInitType, TensorType, int,
                         std::optional<ModuleOp> module = std::nullopt);
 
