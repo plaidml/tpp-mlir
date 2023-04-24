@@ -14,7 +14,6 @@
 
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
-#include "libxsmm_typedefs.h"
 
 // Helper function prototypes.
 static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
