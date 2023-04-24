@@ -11,4 +11,4 @@ add_llvm_executable(tpp-opt tpp-opt.cpp)
 
 llvm_update_compile_flags(tpp-opt)
 target_link_libraries(tpp-opt PRIVATE ${LIBS})
-install(TARGETS tpp-opt)
+install(TARGETS tpp-opt RUNTIME DESTINATION bin)

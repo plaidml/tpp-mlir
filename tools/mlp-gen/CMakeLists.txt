@@ -26,4 +26,4 @@ llvm_update_compile_flags(mlp-gen)
 
 target_link_libraries(mlp-gen PRIVATE ${LIBS})
 
-install(TARGETS mlp-gen)
+install(TARGETS mlp-gen RUNTIME DESTINATION bin)
