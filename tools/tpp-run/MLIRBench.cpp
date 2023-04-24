@@ -168,19 +168,19 @@ LogicalResult MLIRBench::createKernelArgs() {
   builder.setInsertionPointToStart(&mainBody);
 
   for (auto &ty : kernel.getArgumentTypes()) {
-    auto arg =
-        TypeSwitch<Type, llvm::Optional<Value>>(ty)
-            .Case<MemRefType>([&](auto memRefTy) {
-              // Create a memref global
-              return createDenseMemref(builder, module, initType, memRefTy,
-                                       seed);
-            })
-            .Case<TensorType>([&](auto tensorTy) {
-              // Create a dense const tensor and use it directly
-              // as an input to the kernel
-              return createDenseTensor(builder, initType, tensorTy, seed);
-            })
-            .Default([&](auto t) { return std::nullopt; });
+    auto arg = TypeSwitch<Type, llvm::Optional<Value>>(ty)
+                   .Case<MemRefType>([&](auto memRefTy) {
+                     // Create a memref global
+                     return createDenseMemref(builder, module, initType,
+                                              memRefTy, seed);
+                   })
+                   .Case<TensorType>([&](auto tensorTy) {
+                     // Create a dense const tensor and use it directly
+                     // as an input to the kernel
+                     return createDenseTensor(builder, initType, tensorTy, seed,
+                                              module);
+                   })
+                   .Default([&](auto t) { return std::nullopt; });
 
     if (!arg)
       return failure();
