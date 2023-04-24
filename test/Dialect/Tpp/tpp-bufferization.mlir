@@ -399,7 +399,7 @@ func.func @mlp_single_layer(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32>
   %2 = scf.forall (%arg1, %arg2) = (%c0, %c0) to (%c256, %c1024) step (%c32, %c32) shared_outs(%arg3 = %1) -> (tensor<256x1024xf32>) {
     %extracted_slice = tensor.extract_slice %arg0[%arg1, 0] [32, 1024] [1, 1] : tensor<256x1024xf32> to tensor<32x1024xf32>
     %extracted_slice_4 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
-    %3 = tpp.matmul (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_4 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+    %3 = tpp.gemm (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_4 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %4 = tpp.add (%3 : tensor<32x32xf32>, %cst : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %5 = tpp.relu (%4 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     scf.forall.in_parallel {
@@ -422,7 +422,7 @@ func.func @mlp_single_layer(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32>
 // CHECK-SAME:  : memref<256x1024xf32> to memref<32x1024xf32, strided<[1024, 1], offset: ?>>
 // CHECK: %[[SUBVIEW0:.+]] = memref.subview %[[ALLOC]][%[[ARG1]], %[[ARG2]]] [32, 32] [1, 1] 
 // CHECK-SAME:  : memref<256x1024xf32> to memref<32x32xf32, strided<[1024, 1], offset: ?>>
-// CHECK: tpp.matmul ins(%[[SUBVIEW]] : memref<32x1024xf32, strided<[1024, 1], offset: ?>>, %[[GLOBAL]] : memref<1024x32xf32>, %subview_0 : memref<32x32xf32, strided<[1024, 1], offset: ?>>) 
+// CHECK: tpp.gemm ins(%[[SUBVIEW]] : memref<32x1024xf32, strided<[1024, 1], offset: ?>>, %[[GLOBAL]] : memref<1024x32xf32>, %subview_0 : memref<32x32xf32, strided<[1024, 1], offset: ?>>) 
 // CHECK-SAME:  outs(%[[SUBVIEW0]] : memref<32x32xf32, strided<[1024, 1], offset: ?>>)
 // CHECK: tpp.add ins(%[[SUBVIEW0]] : memref<32x32xf32, strided<[1024, 1], offset: ?>>, %[[GLOBAL1]] : memref<32x32xf32>) 
 // CHECK-SAME:  outs(%[[SUBVIEW0]] : memref<32x32xf32, strided<[1024, 1], offset: ?>>)
@@ -450,7 +450,7 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   %2 = scf.forall (%arg1, %arg2) = (%c0, %c0) to (%c256, %c1024) step (%c32, %c32) shared_outs(%arg3 = %1) -> (tensor<256x1024xf32>) {
     %extracted_slice = tensor.extract_slice %arg0[%arg1, 0] [32, 1024] [1, 1] : tensor<256x1024xf32> to tensor<32x1024xf32>
     %extracted_slice_3 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
-    %9 = tpp.matmul (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+    %9 = tpp.gemm (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_4 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
     %10 = tpp.add (%9 : tensor<32x32xf32>, %cst : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_5 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
@@ -464,7 +464,7 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   %5 = scf.forall (%arg1, %arg2) = (%c0, %c0) to (%c256, %c1024) step (%c32, %c32) shared_outs(%arg3 = %4) -> (tensor<256x1024xf32>) {
     %extracted_slice = tensor.extract_slice %2[%arg1, 0] [32, 1024] [1, 1] : tensor<256x1024xf32> to tensor<32x1024xf32>
     %extracted_slice_3 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
-    %9 = tpp.matmul (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+    %9 = tpp.gemm (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_4 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
     %10 = tpp.add (%9 : tensor<32x32xf32>, %cst_0 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_5 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
@@ -478,7 +478,7 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   %8 = scf.forall (%arg1, %arg2) = (%c0, %c0) to (%c256, %c1024) step (%c32, %c32) shared_outs(%arg3 = %7) -> (tensor<256x1024xf32>) {
     %extracted_slice = tensor.extract_slice %5[%arg1, 0] [32, 1024] [1, 1] : tensor<256x1024xf32> to tensor<32x1024xf32>
     %extracted_slice_3 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
-    %9 = tpp.matmul (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
+    %9 = tpp.gemm (%extracted_slice : tensor<32x1024xf32>, %cst_1 : tensor<1024x32xf32>, %extracted_slice_3 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_4 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
     %10 = tpp.add (%9 : tensor<32x32xf32>, %cst_2 : tensor<32x32xf32>) -> (tensor<32x32xf32>)
     %extracted_slice_5 = tensor.extract_slice %arg3[%arg1, %arg2] [32, 32] [1, 1] : tensor<256x1024xf32> to tensor<32x32xf32>
