@@ -363,7 +363,6 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
 
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
-  applyPassManagerCLOptions(passManager);
 
   // Print IR of unoptimized kernel and main
   if (print == PrintStage::Early)
