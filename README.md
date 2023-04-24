@@ -82,30 +82,18 @@ export CUSTOM_LLVM_ROOT=`pwd`
 echo $CUSTOM_LLVM_ROOT
 export PATH=$CUSTOM_LLVM_ROOT/bin:$PATH
 
-# Configure Build (x86-64)
+# Configure Build
 cmake -G Ninja ../llvm \
    -DLLVM_ENABLE_PROJECTS="mlir" \
    -DLLVM_BUILD_EXAMPLES=ON \
    -DLLVM_INSTALL_UTILS=ON \
-   -DLLVM_TARGETS_TO_BUILD="X86;NVPTX;AMDGPU" \
+   -DLLVM_TARGETS_TO_BUILD="host" \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    -DCMAKE_C_COMPILER=clang \
    -DCMAKE_CXX_COMPILER=clang++ \
    -DLLVM_USE_LINKER=lld
 
-# Configure Build (aarch64)
-cmake -G Ninja ../llvm \
-   -DLLVM_ENABLE_PROJECTS="mlir" \
-   -DLLVM_BUILD_EXAMPLES=ON \
-   -DLLVM_INSTALL_UTILS=ON \
-   -DLLVM_TARGETS_TO_BUILD="AArch64;NVPTX;AMDGPU" \
-   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-   -DLLVM_ENABLE_ASSERTIONS=ON \
-   -DCMAKE_C_COMPILER=clang \
-   -DCMAKE_CXX_COMPILER=clang++ \
-   -DLLVM_USE_LINKER=lld
-   
 # Build
 ninja 
 
