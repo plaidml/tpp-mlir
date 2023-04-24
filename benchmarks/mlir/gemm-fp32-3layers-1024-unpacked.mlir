@@ -1,4 +1,4 @@
-// RUN: tpp-run %s -n 10 \
+// RUN: tpp-run %s -n 1000 \
 // RUN:  -e entry -entry-point-result=void
 
 // Total flops = matmul O(2*n*m*k) + BiasAdd (n*m) + ReLU (O(n*m) x 3

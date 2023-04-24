@@ -1,4 +1,4 @@
-// RUN: tpp-run %s -n 10 \
+// RUN: tpp-run %s -n 1000 \
 // RUN:  -e entry -entry-point-result=void -print \
 //
 // Total flops = O(2*n*k*m) = 2*48x96x64 = 589824
