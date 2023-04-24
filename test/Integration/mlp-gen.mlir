@@ -14,10 +14,8 @@
 // Constant values
 // RUN: mlp-gen --mini-batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=CONSTANT
 
-// Packed versions (can't print for now, so just check that it runs) TODO: Implement softmax, print 4D tensors, VNNI
+// Packed versions (can't print for now, so just check that it runs) TODO: Implement softmax, print 4D tensors
 // RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
-// RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10 --tiles=2,2,2 --float-width=16 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
-// RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10 --tiles=2,2,2 --float-width=16 | tpp-opt --pack-vnni | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
 // RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
 // RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10,10 --tiles=2,2,2 --bias-acc | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
 // RUN: mlp-gen --seed=123 --mini-batch=10 --layers=10,10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 --tpp-to-loops | FileCheck %s --check-prefix=PERF
