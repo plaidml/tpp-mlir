@@ -28,6 +28,7 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
@@ -44,7 +45,6 @@ namespace {
 
 struct Bufferize : public BufferizeBase<Bufferize> {
   Bufferize() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -58,13 +58,14 @@ struct Bufferize : public BufferizeBase<Bufferize> {
                 vnni::VNNIDialect,
                 perf::PerfDialect,
                 scf::SCFDialect,
+                tpp::TppDialect,
                 tensor::TensorDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
     vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
+    tpp::registerBufferizableOpInterfaceExternalModels(registry);
   }
-
   void runOnOperation() override;
 };
 

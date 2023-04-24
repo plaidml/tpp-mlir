@@ -22,6 +22,14 @@ namespace mlir {
 namespace tpp {
 namespace {
 
+FailureOr<Value> getBufferOrScalar(RewriterBase &rewriter, Value toBufferize,
+                                   BufferizationOptions const &options) {
+  // nothing to bufferize.
+  if (!isa<ShapedType>(toBufferize.getType()))
+    return toBufferize;
+  return getBuffer(rewriter, toBufferize, options);
+}
+
 //===----------------------------------------------------------------------===//
 // Unary
 //===----------------------------------------------------------------------===//
@@ -33,7 +41,7 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
   auto unaryOp = cast<OpTy>(op);
   auto loc = unaryOp.getLoc();
   FailureOr<Value> buffer =
-      getBuffer(rewriter, unaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, unaryOp.getInputs()[0], options);
   if (failed(buffer))
     return failure();
   // Out-of-place bufferization.
@@ -43,7 +51,7 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
-    FailureOr<Value> allocBuffer = getBuffer(rewriter, *alloc, options);
+    FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
     if (failed(allocBuffer))
       return failure();
     rewriter.create<OpTy>(loc, *buffer, *allocBuffer);
@@ -134,7 +142,8 @@ struct ZeroBufferizationInterface
                                                     tpp::ZeroOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return bufferizesToMemoryReadUnaryImpl(op, opOperand, state);
+    // tpp.zero has only write effects.
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -185,11 +194,11 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   auto binaryOp = cast<OpTy>(op);
   auto loc = binaryOp.getLoc();
   FailureOr<Value> lhsBuffer =
-      getBuffer(rewriter, binaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, binaryOp.getInputs()[0], options);
   if (failed(lhsBuffer))
     return failure();
   FailureOr<Value> rhsBuffer =
-      getBuffer(rewriter, binaryOp.getInputs()[1], options);
+      getBufferOrScalar(rewriter, binaryOp.getInputs()[1], options);
   if (failed(rhsBuffer))
     return failure();
   // Out-of-place bufferization.
@@ -203,7 +212,7 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
-    FailureOr<Value> allocBuffer = getBuffer(rewriter, *alloc, options);
+    FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
     if (failed(allocBuffer))
       return failure();
     rewriter.create<OpTy>(loc, ValueRange{*lhsBuffer, *rhsBuffer},
@@ -260,17 +269,23 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
   // If the rhs can bufferize in place with the result return the rhs.
   if (opOperand.getOperandNumber() == 1 &&
       opOperand.get().getType() == op->getResult(0).getType() &&
-      !isConstantVal(opOperand.get()))
+      !isConstantVal(opOperand.get())) {
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
+  }
   // If the lhs can bufferize in place with the result return the lhs. Note
   // that if both can bufferize with the result we select the rhs first.
   if (opOperand.getOperandNumber() == 0) {
-    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType())
+    // The lhs does not alias with op result if we can bufferize on the rhs.
+    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType() &&
+        !isConstantVal(op->getOpOperand(1).get())) {
       return {};
-    if (opOperand.get().getType() == op->getResult(0).getType())
+    }
+    // We cannot bufferize on rhs, lhs alias opResult.
+    if (opOperand.get().getType() == op->getResult(0).getType()) {
       return {{op->getOpResult(0), BufferRelation::Equivalent,
                /*isDefinite=*/true}};
+    }
   }
   return {};
 }
@@ -287,6 +302,14 @@ struct AddBufferizationInterface
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
     return bufferizesToMemoryWriteBinaryImpl(op, opOperand, state);
+  }
+
+  bool isNotConflicting(Operation *op, OpOperand *uRead,
+                        OpOperand *uConflictingWrite,
+                        const AnalysisState &state) const {
+    // We support in-place operations. If the operands are the same
+    // value, ignore the conflict.
+    return uRead->get() == uConflictingWrite->get();
   }
 
   AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
@@ -310,15 +333,15 @@ static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
                                         const BufferizationOptions &options) {
   auto ternaryOp = cast<OpTy>(op);
   FailureOr<Value> bufferA =
-      getBuffer(rewriter, ternaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[0], options);
   if (failed(bufferA))
     return failure();
   FailureOr<Value> bufferB =
-      getBuffer(rewriter, ternaryOp.getInputs()[1], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[1], options);
   if (failed(bufferB))
     return failure();
   FailureOr<Value> bufferC =
-      getBuffer(rewriter, ternaryOp.getInputs()[2], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[2], options);
   if (failed(bufferC))
     return failure();
   rewriter.create<OpTy>(ternaryOp.getLoc(),
@@ -335,8 +358,9 @@ static bool bufferizesToMemoryReadTernaryImpl(Operation *op,
   // read/write but only write. This allows to avoid allocation for GEMM and
   // BRGEMM if C is zero intialized.
   if (opOperand.getOperandNumber() == 2 &&
-      tpp::utils::isZeroTensor(opOperand.get()))
+      tpp::utils::isZeroTensor(opOperand.get())) {
     return false;
+  }
   return true;
 }
 
@@ -354,9 +378,10 @@ static bool bufferizesToMemoryWriteTernaryImpl(Operation *op,
 static AliasingOpResultList
 getAliasingOpResultsTernaryImpl(Operation *op, OpOperand &opOperand,
                                 const AnalysisState &state) {
-  if (opOperand.getOperandNumber() == 2)
+  if (opOperand.getOperandNumber() == 2) {
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
+  }
   return {};
 }
 
