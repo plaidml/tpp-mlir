@@ -22,8 +22,8 @@ namespace mlir {
 namespace tpp {
 namespace {
 
-FailureOr<Value> getMemrefBuffer(RewriterBase &rewriter, Value toBufferize,
-                                 BufferizationOptions const &options) {
+FailureOr<Value> getBufferOrScalar(RewriterBase &rewriter, Value toBufferize,
+                                   BufferizationOptions const &options) {
   // nothing to bufferize.
   if (!isa<ShapedType>(toBufferize.getType()))
     return toBufferize;
@@ -41,7 +41,7 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
   auto unaryOp = cast<OpTy>(op);
   auto loc = unaryOp.getLoc();
   FailureOr<Value> buffer =
-      getMemrefBuffer(rewriter, unaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, unaryOp.getInputs()[0], options);
   if (failed(buffer))
     return failure();
   // Out-of-place bufferization.
@@ -51,7 +51,7 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
-    FailureOr<Value> allocBuffer = getMemrefBuffer(rewriter, *alloc, options);
+    FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
     if (failed(allocBuffer))
       return failure();
     rewriter.create<OpTy>(loc, *buffer, *allocBuffer);
@@ -194,11 +194,11 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   auto binaryOp = cast<OpTy>(op);
   auto loc = binaryOp.getLoc();
   FailureOr<Value> lhsBuffer =
-      getMemrefBuffer(rewriter, binaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, binaryOp.getInputs()[0], options);
   if (failed(lhsBuffer))
     return failure();
   FailureOr<Value> rhsBuffer =
-      getMemrefBuffer(rewriter, binaryOp.getInputs()[1], options);
+      getBufferOrScalar(rewriter, binaryOp.getInputs()[1], options);
   if (failed(rhsBuffer))
     return failure();
   // Out-of-place bufferization.
@@ -212,7 +212,7 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
                                      /*escape=*/true, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
-    FailureOr<Value> allocBuffer = getMemrefBuffer(rewriter, *alloc, options);
+    FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
     if (failed(allocBuffer))
       return failure();
     rewriter.create<OpTy>(loc, ValueRange{*lhsBuffer, *rhsBuffer},
@@ -333,15 +333,15 @@ static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
                                         const BufferizationOptions &options) {
   auto ternaryOp = cast<OpTy>(op);
   FailureOr<Value> bufferA =
-      getMemrefBuffer(rewriter, ternaryOp.getInputs()[0], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[0], options);
   if (failed(bufferA))
     return failure();
   FailureOr<Value> bufferB =
-      getMemrefBuffer(rewriter, ternaryOp.getInputs()[1], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[1], options);
   if (failed(bufferB))
     return failure();
   FailureOr<Value> bufferC =
-      getMemrefBuffer(rewriter, ternaryOp.getInputs()[2], options);
+      getBufferOrScalar(rewriter, ternaryOp.getInputs()[2], options);
   if (failed(bufferC))
     return failure();
   rewriter.create<OpTy>(ternaryOp.getLoc(),
