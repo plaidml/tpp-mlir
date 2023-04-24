@@ -135,7 +135,7 @@ struct ZeroBufferizationInterface
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // TODO: here we may want to return false as tpp.zero
-    // as only "write" effects.
+    // has only "write" effects.
     return bufferizesToMemoryReadUnaryImpl(op, opOperand, state);
   }
 
@@ -261,7 +261,7 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return the rhs.
   if (opOperand.getOperandNumber() == 1 &&
-      opOperand.get().getType() == op->getResult(0).getType() &&
+      opOperand->getType() == op->getResult(0).getType() &&
       !isConstantVal(opOperand.get())) {
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
@@ -270,12 +270,12 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
   // that if both can bufferize with the result we select the rhs first.
   if (opOperand.getOperandNumber() == 0) {
     // The lhs does not alias with op result if we can bufferize on the rhs.
-    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType() &&
+    if (op->getOpOperand(1)->getType() == op->getResult(0).getType() &&
         !isConstantVal(op->getOpOperand(1).get())) {
       return {};
     }
     // We cannot bufferize on rhs, lhs alias opResult.
-    if (opOperand.get().getType() == op->getResult(0).getType()) {
+    if (opOperand->getType() == op->getResult(0).getType()) {
       return {{op->getOpResult(0), BufferRelation::Equivalent,
                /*isDefinite=*/true}};
     }

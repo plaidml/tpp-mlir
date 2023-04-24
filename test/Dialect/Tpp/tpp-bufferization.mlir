@@ -493,18 +493,22 @@ func.func @splitted_init(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
 // -----
 
 // CHECK-LABEL: alloc_must_escape
-// The kernel allocates memory via tensor.empty. The allocation need
-// to survive, meaning that bufferization should not introduce a 
-// dealloc.
+// The kernel allocates memory via tensor.empty. The allocation need to survive
+// because it's a return value, meaning that bufferization should not introduce
+// a dealloc.
 func.func @alloc_must_escape(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   // CHECK-NOT: memref.dealloc
   // CHECK: memref.alloc
   %cst = arith.constant dense<0.00999999977> : tensor<1024x1024xf32>
   %cst_0 = arith.constant dense<2.000000e-02> : tensor<256x1024xf32>
   %0 = tensor.empty() : tensor<256x1024xf32>
+  // tpp.zero bufferize on %0
   %1 = tpp.zero (%0 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>)
-  %2 = tpp.matmul (%arg0 : tensor<256x1024xf32>, %cst : tensor<1024x1024xf32>, %1 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>)
+  // tpp.gemm bufferize on %1 (alias %0)
+  %2 = tpp.gemm (%arg0 : tensor<256x1024xf32>, %cst : tensor<1024x1024xf32>, %1 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>)
+  // tpp.add bufferize on the lhs (%2 alias %0), since the rhs is constant.
   %3 = tpp.add (%2 : tensor<256x1024xf32>, %cst_0 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>)
+  // tpp.relu bufferize on %3 alias %0
   %4 = tpp.relu (%3 : tensor<256x1024xf32>) -> (tensor<256x1024xf32>) 
   return %4 : tensor<256x1024xf32>
 }
