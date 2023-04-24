@@ -104,7 +104,7 @@ llvm::cl::opt<std::string> triple("triple", llvm::cl::desc("Target triple"),
 llvm::cl::opt<std::string>
     cpuName("cpu", llvm::cl::desc("CPU name (sapphirerapids, alderlake, etc)"),
 #if defined(__x86_64__)
-            llvm::cl::init("skylake"));
+            llvm::cl::init("nehalem"));
 #elif defined(__aarch64__)
             llvm::cl::init("cortex-a53"));
 #else
@@ -116,7 +116,7 @@ llvm::cl::opt<std::string>
 llvm::cl::opt<std::string>
     fpuName("fpu", llvm::cl::desc("FPU name (avx, avx2, avx512bf16)"),
 #if defined(__x86_64__)
-            llvm::cl::init("avx2"));
+            llvm::cl::init("sse4.2"));
 #elif defined(__aarch64__)
             llvm::cl::init("neon"));
 #else
