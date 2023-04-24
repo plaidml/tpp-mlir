@@ -134,9 +134,8 @@ struct ZeroBufferizationInterface
                                                     tpp::ZeroOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // TODO: here we may want to return false as tpp.zero
-    // has only "write" effects.
-    return bufferizesToMemoryReadUnaryImpl(op, opOperand, state);
+    // tpp.zero has only write effects.
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
