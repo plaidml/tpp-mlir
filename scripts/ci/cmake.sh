@@ -30,14 +30,14 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
       ;;
     b)
       BLD_DIR=$(realpath ${OPTARG})
-      if not mkdir -p ${BLD_DIR}; then
+      if ! mkdir -p ${BLD_DIR}; then
         echo "Error creating build directory '${OPTARG}'"
         die_syntax
       fi
       ;;
     i)
       INST_DIR=$(realpath ${OPTARG})
-      if not mkdir -p ${INST_DIR}; then
+      if ! mkdir -p ${INST_DIR}; then
         echo "Error creating install directory '${OPTARG}'"
         die_syntax
       fi

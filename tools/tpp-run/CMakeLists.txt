@@ -47,4 +47,4 @@ target_link_options(tpp-run PRIVATE
   -Wl,--as-needed
 )
 
-install(TARGETS tpp-run)
+install(TARGETS tpp-run RUNTIME DESTINATION bin)

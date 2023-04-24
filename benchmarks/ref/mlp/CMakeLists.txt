@@ -16,4 +16,4 @@ llvm_update_compile_flags(bench_mlp)
 target_include_directories(bench_mlp PRIVATE ../include)
 target_link_libraries(bench_mlp PRIVATE ${LIBS})
 
-install(TARGETS bench_mlp)
+install(TARGETS bench_mlp RUNTIME DESTINATION bin)

@@ -6,7 +6,7 @@
 # Check if a program is in the PATH
 check_program() {
   PROG=$1
-  if not which $PROG > /dev/null; then
+  if ! which $PROG > /dev/null; then
     echo "Required program '$PROG' not found"
     exit 1
   fi

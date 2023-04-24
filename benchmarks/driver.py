@@ -65,18 +65,23 @@ from TPPHelper import TPPHelper
 class ExtensionFlags(object):
     def __init__(self, loglevel):
         self.logger = Logger("driver.flags", loglevel)
+        self.flags = None
+        self._getFlags("flags") # x86
+        if self.flags is None:
+            self._getFlags("Features") # Arm
+        self.logger.debug(f"CPU flags: {self.flags}")
+
+    def _getFlags(self, keyword):
         runner = Execute(loglevel)
-        command = ["grep", "-m1", "flags", "/proc/cpuinfo"]
+        command = ["grep", "-m1", keyword, "/proc/cpuinfo"]
         res = runner.run(command)
-        self.flags = list()
         if res.stderr:
             self.logger.error(f"Error on lscpu: {res.stderr}")
             return
         if not res.stdout:
-            self.logger.warning(f"No output from lscpu")
+            self.logger.warning(f"No extension found for '{keyword}'")
             return
         self.flags = shlex.split(res.stdout)
-        self.logger.debug(f"CPU flags: {self.flags}")
 
     def hasFlag(self, flag):
         if not self.flags:

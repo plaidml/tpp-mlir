@@ -91,19 +91,37 @@ llvm::cl::opt<unsigned>
 // Target Triple
 // Default x86_64, can be changed to aarch64 on other arches
 llvm::cl::opt<std::string> triple("triple", llvm::cl::desc("Target triple"),
+#if defined(__x86_64__)
                                   llvm::cl::init("x86_64-linux-gnu"));
+#elif defined(__aarch64__)
+                                  llvm::cl::init("aarch64-linux-gnu"));
+#else
+#error Unsupported architecture
+#endif
 
 // Target CPU name
 // Default skylake is old enough to be relevant for most cases
 llvm::cl::opt<std::string>
     cpuName("cpu", llvm::cl::desc("CPU name (sapphirerapids, alderlake, etc)"),
-            llvm::cl::init("skylake"));
+#if defined(__x86_64__)
+            llvm::cl::init("nehalem"));
+#elif defined(__aarch64__)
+            llvm::cl::init("cortex-a53"));
+#else
+#error Unsupported architecture
+#endif
 
 // Target FPU name
 // Default avx2 is old enough to be relevant for most cases
 llvm::cl::opt<std::string>
     fpuName("fpu", llvm::cl::desc("FPU name (avx, avx2, avx512bf16)"),
-            llvm::cl::init("avx2"));
+#if defined(__x86_64__)
+            llvm::cl::init("sse4.2"));
+#elif defined(__aarch64__)
+            llvm::cl::init("neon"));
+#else
+#error Unsupported architecture
+#endif
 
 // Initializer type
 // Default const if seed == 0, and normal otherwise
