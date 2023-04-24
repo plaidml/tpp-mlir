@@ -138,6 +138,11 @@ MLIRBench::PrintStage parsePrintStage(StringRef stage) {
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
+  // Randon options need seed
+  if (!seed && (splatRandom || initType == "random" || initType == "normal")) {
+    seed = std::time(0);
+  }
+
   // Benchmark object
   MLIRBenchConfig config(seed, tppToLoops, linalgToLoops,
                          parseTensorInitType(initType));
@@ -264,14 +269,6 @@ LogicalResult emitError(StringRef msg) {
 
 // Input validation
 LogicalResult validateInput() {
-  // Randon options need seed
-  if (!seed) {
-    if (splatRandom)
-      return emitError("Cannot replace splats with random without seed");
-    if (initType == "random" || initType == "normal")
-      return emitError("Cannot init random tensors without seed");
-  }
-
   // Parse tensor init
   auto init = parseTensorInitType(initType);
   if (init == TensorInitType::Invalid)
