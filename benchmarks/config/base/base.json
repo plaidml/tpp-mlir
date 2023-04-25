@@ -10,7 +10,7 @@
     },
     "matmul_64x64x64_mlir": {
       "type": "MLIR",
-      "benchmark": "matmul_64x64x64.mlir",
+      "benchmark": "matmul/matmul-fp32-64x64x64.mlir",
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": []
@@ -20,21 +20,21 @@
   "matmul": {
     "mlir_48x64x96": {
       "type": "MLIR",
-      "benchmark": "matmul_48x64x96.mlir",
+      "benchmark": "matmul/matmul-fp32-48x64x96.mlir",
       "environment": {},
       "flags": [ "-n", "100", "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
     },
     "mlir_64x48x96": {
       "type": "MLIR",
-      "benchmark": "matmul_64x48x96.mlir",
+      "benchmark": "matmul/matmul-fp32-64x48x96.mlir",
       "environment": {},
       "flags": [ "-n", "100", "-run-args='-def-pack-matmul=0'" ],
       "extensions": []
     },
     "mlir_64x64x64": {
       "type": "MLIR",
-      "benchmark": "matmul_64x64x64.mlir",
+      "benchmark": "matmul/matmul-fp32-64x64x64.mlir",
       "environment": {},
       "flags": [ "-n", "100", "-run-args='-def-pack-matmul=0'" ],
       "extensions": []

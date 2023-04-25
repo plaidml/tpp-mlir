@@ -47,7 +47,7 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
-if not ${SCRIPT_DIR}/ci/cmake.sh \
+if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
   -b ${BUILD_DIR}-${COMPILER} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
@@ -64,7 +64,7 @@ fi
 
 # Build
 echo "--- BUILD"
-if not ${SCRIPT_DIR}/ci/build.sh \
+if ! ${SCRIPT_DIR}/ci/build.sh \
   -b ${BUILD_DIR}-${COMPILER}
 then
   exit 1
@@ -73,7 +73,7 @@ fi
 # Check
 if [ "${CHECK}" ]; then
   echo "--- CHECK"
-  if not ${SCRIPT_DIR}/ci/build.sh \
+  if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BUILD_DIR}-${COMPILER} \
     -c
   then
@@ -84,7 +84,7 @@ fi
 # Install
 if [ "${INSTALL}" ]; then
   echo "--- INSTALL"
-  if not ${SCRIPT_DIR}/ci/build.sh \
+  if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BUILD_DIR}-${COMPILER} \
     -i
   then
