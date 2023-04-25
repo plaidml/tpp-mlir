@@ -1,0 +1,10 @@
+option(USE_OpenMP "Use OpenMP" ON)
+
+if(USE_OpenMP)
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    message(STATUS "OpenMP found")
+  else()
+    message(FATAL_ERROR "OpenMP required but not found")
+  endif()
+endif()
