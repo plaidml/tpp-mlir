@@ -7,6 +7,8 @@
 
 #include "TPP/BuilderUtils.h"
 
+#include <optional>
+
 namespace mlir {
 
 namespace {
@@ -27,8 +29,7 @@ arith::ConstantOp getConstant(OpBuilder &builder, Type type, ValueT value) {
 func::FuncOp createFunction(OpBuilder &builder, ModuleOp module, StringRef name,
                             TypeRange args, TypeRange ret) {
   auto unkLoc = builder.getUnknownLoc();
-  auto funcType =
-      FunctionType::get(builder.getContext(), args, ret);
+  auto funcType = FunctionType::get(builder.getContext(), args, ret);
   auto func = func::FuncOp::create(unkLoc, name, funcType);
   func.setVisibility(SymbolTable::Visibility::Public);
   auto *entryBlock = func.addEntryBlock();
@@ -40,25 +41,25 @@ func::FuncOp createFunction(OpBuilder &builder, ModuleOp module, StringRef name,
 
 Value getConstInt(OpBuilder &builder, int value, int width) {
   switch (width) {
-    case 32:
-      return getConstant(builder, builder.getI32Type(), value);
-    case 64:
-      return getConstant(builder, builder.getI64Type(), value);
-    default:
-      assert(false && "Invalid constant integer size");
+  case 32:
+    return getConstant(builder, builder.getI32Type(), value);
+  case 64:
+    return getConstant(builder, builder.getI64Type(), value);
+  default:
+    assert(false && "Invalid constant integer size");
   }
 }
 
 Value getConstFloat(OpBuilder &builder, float value, int width) {
   switch (width) {
-    case 16:
-      return getConstant(builder, builder.getBF16Type(), value);
-    case 32:
-      return getConstant(builder, builder.getF32Type(), value);
-    case 64:
-      return getConstant(builder, builder.getF64Type(), value);
-    default:
-      assert(false && "Invalid constant float size");
+  case 16:
+    return getConstant(builder, builder.getBF16Type(), value);
+  case 32:
+    return getConstant(builder, builder.getF32Type(), value);
+  case 64:
+    return getConstant(builder, builder.getF64Type(), value);
+  default:
+    assert(false && "Invalid constant float size");
   }
 }
 
@@ -80,32 +81,31 @@ Value createDenseMemref(OpBuilder &builder, ModuleOp module,
   StringRef globalName;
   // First create the global
   {
-      OpBuilder::InsertionGuard guard(builder);
-      builder.setInsertionPointToStart(&module->getRegions().front().front());
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&module->getRegions().front().front());
 
-      // Simple auto increment
-      static unsigned order = 0;
+    // Simple auto increment
+    static unsigned order = 0;
 
-      // Create global dense memrefs (Module insertion point)
-      auto privAttr = builder.getStringAttr("private");
+    // Create global dense memrefs (Module insertion point)
+    auto privAttr = builder.getStringAttr("private");
 
-      // Auto incremental naming system
-      std::string name = "__wrapper_" + std::to_string(order++);
+    // Auto incremental naming system
+    std::string name = "__wrapper_" + std::to_string(order++);
 
-      auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
-      auto init = getTensorInit(initType, type.getElementType(), seed);
-      auto floatInit = init->get(type);
+    auto alignment = builder.getIntegerAttr(builder.getI64Type(), 128);
+    auto init = getTensorInit(initType, type.getElementType(), seed);
+    auto floatInit = init->get(type);
 
-      // Create the global object in the Module's region
-      auto global = builder.create<memref::GlobalOp>(
-          unkLoc, StringRef(name), privAttr, type, floatInit,
-          /*constant=*/false, alignment);
-      globalName = global.getName();
+    // Create the global object in the Module's region
+    auto global = builder.create<memref::GlobalOp>(
+        unkLoc, StringRef(name), privAttr, type, floatInit,
+        /*constant=*/false, alignment);
+    globalName = global.getName();
   }
   // Get the created global value and use it
   // as an input to the kernel
   auto nameAttr = builder.getStringAttr(globalName);
-  return builder.create<memref::GetGlobalOp>(
-                         unkLoc, type, nameAttr);
+  return builder.create<memref::GetGlobalOp>(unkLoc, type, nameAttr);
 }
 } // namespace mlir

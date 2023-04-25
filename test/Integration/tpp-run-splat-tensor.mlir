@@ -27,6 +27,7 @@ func.func @entry(%input: tensor<4x2xf32>) {
   return
 }
 // Constants
+// SPLAT-DAG: memref.global "private" @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // SPLAT-LABEL: @_entry
 // SPLAT: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // SPLAT: arith.constant dense<1.000000e+00> : tensor<2x16xf64>
@@ -36,9 +37,10 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // SPLAT: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // SPLAT-LABEL: @entry
-// SPLAT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>
+// SPLAT: memref.get_global @__wrapper_0
 
 // Constants
+// RANDOM-NOT: memref.global "private" @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // RANDOM-LABEL: @_entry
 // RANDOM: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // RANDOM: arith.constant dense<1.000000e+00> : tensor<2x16xf64>
@@ -48,9 +50,10 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // RANDOM: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // RANDOM-LABEL: @entry
-// RANDOM-NOT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>
+// RANDOM: memref.get_global @__wrapper_0
 
 // Constants
+// RANDOM-SPLAT-NOT: memref.global "private" @__wrapper_0 : memref<4x2xf32> = dense<1.000000e+00>
 // RANDOM-SPLAT-LABEL: @_entry
 // RANDOM-SPLAT-NOT: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
 // RANDOM-SPLAT-NOT: arith.constant dense<1.000000e+00> : tensor<2x16xf64>
@@ -60,7 +63,7 @@ func.func @entry(%input: tensor<4x2xf32>) {
 // RANDOM-SPLAT: arith.constant dense<0> : tensor<4x8xi32>
 // Input
 // RANDOM-SPLAT-LABEL: @entry
-// RANDOM-SPLAT-NOT: arith.constant dense<1.000000e+00> : tensor<4x2xf32>
+// RANDOM-SPLAT: memref.get_global @__wrapper_0
 
 // OPT-CONST-LABEL: @_entry
 // OPT-CONST: arith.constant dense<1.000000e+00> : tensor<2x16xf32>
