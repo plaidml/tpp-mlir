@@ -227,7 +227,7 @@ class MLIRRun(BaseRun):
             if '-n' in command:
                 command[command.index('-n')+1] = self.args.n
             else:
-                command.extend(["-n", f"{self.args.n}"])
+                command.extend(["-n", self.args.n])
         command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
