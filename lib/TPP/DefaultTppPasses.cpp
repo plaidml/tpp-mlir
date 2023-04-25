@@ -19,6 +19,7 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
@@ -391,6 +392,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
     check::registerBufferizableOpInterfaceExternalModels(registry);
     vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
+    tpp::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Add all core MLIR dialects as the default TPP passes may contain any
     // combination of other passes.
