@@ -5,13 +5,13 @@
     TPP-MLIR Benchmark Driver
 
     Compares a known good MLIR kernel with a known good reference implementation
-    in C++ and XSMM.
+    in XSMM-DNN.
 
     Arguments:
      * directory: must have a JSON file with the configuration of the benchmark
 
     The directory file must have:
-     - Reference C++ file (to be built by CMake and left in the bin directory)
+     - A valid binary to run (XSMM-DNN)
      - At least one MLIR file (multiple if using options)
      - JSON file with the configuration on how to run it
 
@@ -20,19 +20,12 @@
          // This is the run name
          // You can have multiple runs on the same pass
          "64x64x64": {
-             "ref": {
-                 "type": "C++",
-                 "benchmark": "matmul",
-                 "environment": {},
-                 "flags": [ "--input=64x64x64", "-v" ],
-                 "extensions": [ "avx2" ]
-             },
              "xsmm": {
-                 "type": "C++",
-                 "benchmark": "matmul",
-                 "environment": {},
-                 "flags": [ "--input=64x64x64", "-v", "-xsmm" ],
-                 "extensions": []
+                  "type": "XSMM-DNN",
+                  "benchmark": "xsmm_dnn_mlp",
+                  "environment": {},
+                  "flags": [ "100", "64", "3", "F", "32", "32", "32", "1", "64", "64", "64", "64" ],
+                  "extensions": []
              },
              "mlir": {
                  "type": "MLIR",
@@ -201,7 +194,6 @@ class XSMMDNNRun(BaseRun):
         return True
 
     def run(self):
-        # Doesn't need setup/teardown, as it uses CPPRun.run()
         if not self._run():
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
@@ -256,9 +248,7 @@ class Benchmark(object):
     def addRun(self, name, json):
         runType = json["type"]
         self.logger.debug(f"Adding {runType} run {name} for {self.name}")
-        if runType == "C++":
-            self.runs.append(CPPRun(name, self.args, self.env, json, loglevel))
-        elif runType == "MLIR":
+        if runType == "MLIR":
             self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
         elif runType == "XSMM-DNN":
             self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
