@@ -174,15 +174,15 @@ class BaseRun(object):
             self.logger.debug(f"revert {key}={value}")
             os.environ[key] = value
 
-class CPPRun(BaseRun):
-    """ C++ runs """
+class XSMMDNNRun(BaseRun):
+    """ XSMM-DNN runs """
 
     def __init__(self, name, args, env, json, loglevel):
-        self.logger = Logger("driver.cpprun", loglevel)
+        self.logger = Logger("driver.xsmm-dnn", loglevel)
         BaseRun.__init__(self, name, args, env, json, loglevel)
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
-    def run(self):
+    def _run(self):
         self.setup()
         command = list()
         self.env.pin_task(command)
@@ -191,21 +191,18 @@ class CPPRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
+        # N in XSMM-DNN is the first argument after the program name
+        if self.args.n:
+            command[command.index(self.benchmark)+1] = self.args.n
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
         self.teardown()
         return True
 
-class XSMMDNNRun(CPPRun):
-    """ XSMM-DNN runs """
-    def __init__(self, name, args, env, json, loglevel):
-        self.logger = Logger("driver.xsmm-dnn", loglevel)
-        CPPRun.__init__(self, name, args, env, json, loglevel)
-
     def run(self):
         # Doesn't need setup/teardown, as it uses CPPRun.run()
-        if not CPPRun.run(self):
+        if not self._run():
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
         if not match:
@@ -233,6 +230,12 @@ class MLIRRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
+        # N in MLIR is an optional -n argument
+        if self.args.n:
+            if '-n' in command:
+                command[command.index('-n')+1] = self.args.n
+            else:
+                command.extend(["-n", f"{self.args.n}"])
         command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
@@ -370,6 +373,8 @@ if __name__ == '__main__':
     # Required argument: baseDir name (directory)
     parser.add_argument('-c', '--config', type=str, default="benchmarks.json",
                         help='JSON file containing benchmark configuration')
+    parser.add_argument('-n', type=str, default="",
+                        help='Force number of iterations on all benchmarks')
 
     # Optional
     parser.add_argument('--build', type=str, default="",
