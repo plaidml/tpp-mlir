@@ -5,13 +5,13 @@
     TPP-MLIR Benchmark Driver
 
     Compares a known good MLIR kernel with a known good reference implementation
-    in C++ and XSMM.
+    in XSMM-DNN.
 
     Arguments:
      * directory: must have a JSON file with the configuration of the benchmark
 
     The directory file must have:
-     - Reference C++ file (to be built by CMake and left in the bin directory)
+     - A valid binary to run (XSMM-DNN)
      - At least one MLIR file (multiple if using options)
      - JSON file with the configuration on how to run it
 
@@ -20,18 +20,11 @@
          // This is the run name
          // You can have multiple runs on the same pass
          "64x64x64": {
-             "ref": {
-                 "type": "C++",
-                 "benchmark": "matmul",
-                 "environment": {},
-                 "flags": [ "--input=64x64x64", "-v" ],
-                 "extensions": [ "avx2" ]
-             },
              "xsmm": {
-                 "type": "C++",
-                 "benchmark": "matmul",
+                 "type": "XSMM-DNN",
+                 "benchmark": "xsmm_dnn_mlp",
                  "environment": {},
-                 "flags": [ "--input=64x64x64", "-v", "-xsmm" ],
+                 "flags": [ "100", "64", "3", "F", "32", "32", "32", "1", "64", "64", "64", "64" ],
                  "extensions": []
              },
              "mlir": {
@@ -174,15 +167,15 @@ class BaseRun(object):
             self.logger.debug(f"revert {key}={value}")
             os.environ[key] = value
 
-class CPPRun(BaseRun):
-    """ C++ runs """
+class XSMMDNNRun(BaseRun):
+    """ XSMM-DNN runs """
 
     def __init__(self, name, args, env, json, loglevel):
-        self.logger = Logger("driver.cpprun", loglevel)
+        self.logger = Logger("driver.xsmm-dnn", loglevel)
         BaseRun.__init__(self, name, args, env, json, loglevel)
         self.benchmark = os.path.join(env.bin_dir, self.benchmark)
 
-    def run(self):
+    def _run(self):
         self.setup()
         command = list()
         self.env.pin_task(command)
@@ -191,21 +184,17 @@ class CPPRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
+        # N in XSMM-DNN is the first argument after the program name
+        if self.args.n:
+            command[command.index(self.benchmark)+1] = self.args.n
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
         self.teardown()
         return True
 
-class XSMMDNNRun(CPPRun):
-    """ XSMM-DNN runs """
-    def __init__(self, name, args, env, json, loglevel):
-        self.logger = Logger("driver.xsmm-dnn", loglevel)
-        CPPRun.__init__(self, name, args, env, json, loglevel)
-
     def run(self):
-        # Doesn't need setup/teardown, as it uses CPPRun.run()
-        if not CPPRun.run(self):
+        if not self._run():
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
         if not match:
@@ -233,6 +222,12 @@ class MLIRRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
+        # N in MLIR is an optional -n argument
+        if self.args.n:
+            if '-n' in command:
+                command[command.index('-n')+1] = self.args.n
+            else:
+                command.extend(["-n", self.args.n])
         command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
@@ -253,9 +248,7 @@ class Benchmark(object):
     def addRun(self, name, json):
         runType = json["type"]
         self.logger.debug(f"Adding {runType} run {name} for {self.name}")
-        if runType == "C++":
-            self.runs.append(CPPRun(name, self.args, self.env, json, loglevel))
-        elif runType == "MLIR":
+        if runType == "MLIR":
             self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
         elif runType == "XSMM-DNN":
             self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
@@ -283,51 +276,55 @@ class BenchmarkDriver(object):
         self.env = Environment(args, loglevel)
         self.loglevel = loglevel
         self.args = args
-        if not os.path.exists(self.args.config):
-            self.logger.error(f"JSON config '{self.args.config}' does not exist")
-            raise SyntaxError("Cannot find JSON config")
         self.benchs = list()
         self.exts = ExtensionFlags(loglevel)
 
     def scanBenchmarks(self):
-        """ Scan directory for JSON file and create a list with all runs """
+        """ Reads each JSON file and create a list with all runs """
 
         # Find and read the JSON file
-        self.logger.info(f"Reading up '{self.args.config}'")
-        with open(self.args.config) as jsonFile:
-            jsonCfg = json.load(jsonFile)
+        configs = self.args.config.split(",")
+        for config in configs:
+            # Error on specific files when invalid
+            if not os.path.exists(config):
+                self.logger.error(f"JSON config '{self.args.config}' does not exist")
+                raise SyntaxError("Cannot find JSON config")
 
-        # Parse and add all runs
-        for cfg in jsonCfg:
-            if len(cfg.keys()) > 1:
-                self.logger.error("List of dict with a single element expected")
-                return False
+            self.logger.info(f"Reading up '{config}'")
+            with open(config) as jsonFile:
+                jsonCfg = json.load(jsonFile)
 
-            name = list(cfg.keys())[0]
-            runs = cfg[name]
-            benchs = Benchmark(name, self.args, self.env, self.loglevel)
-            for key, run in runs.items():
-                # Make sure we support this benchmark in this machine
-                supported = False
-                if not run["extensions"]:
-                    # Empty means any machine supports it
-                    supported = True
-                else:
-                    # List of possible supported (ex. avx512 OR sve2)
-                    for ext in run["extensions"]:
-                        if self.exts.hasFlag(ext):
-                            self.logger.debug(f"{key} extension {ext} supported")
-                            supported = True
-                            break
-                if not supported:
-                    self.logger.warning(f"Skipping {key} as extension {ext} not supported")
-                    continue
-                if not benchs.addRun(key, run):
-                    self.logger.error(f"Error adding benchmark run {key} in {name}")
+            # Parse and add all runs
+            for cfg in jsonCfg:
+                if len(cfg.keys()) > 1:
+                    self.logger.error("List of dict with a single element expected")
                     return False
 
-            # Append to the benchmarks
-            self.benchs.append(benchs)
+                name = list(cfg.keys())[0]
+                runs = cfg[name]
+                benchs = Benchmark(name, self.args, self.env, self.loglevel)
+                for key, run in runs.items():
+                    # Make sure we support this benchmark in this machine
+                    supported = False
+                    if not run["extensions"]:
+                        # Empty means any machine supports it
+                        supported = True
+                    else:
+                        # List of possible supported (ex. avx512 OR sve2)
+                        for ext in run["extensions"]:
+                            if self.exts.hasFlag(ext):
+                                self.logger.debug(f"{key} extension {ext} supported")
+                                supported = True
+                                break
+                    if not supported:
+                        self.logger.warning(f"Skipping {key} as extension {ext} not supported")
+                        continue
+                    if not benchs.addRun(key, run):
+                        self.logger.error(f"Error adding benchmark run {key} in {name}")
+                        return False
+
+                # Append to the benchmarks
+                self.benchs.append(benchs)
 
         return True
 
@@ -370,6 +367,8 @@ if __name__ == '__main__':
     # Required argument: baseDir name (directory)
     parser.add_argument('-c', '--config', type=str, default="benchmarks.json",
                         help='JSON file containing benchmark configuration')
+    parser.add_argument('-n', type=str, default="",
+                        help='Force number of iterations on all benchmarks')
 
     # Optional
     parser.add_argument('--build', type=str, default="",

@@ -1,0 +1,64 @@
+[
+  {
+  "gemm_bf16_dp2_mlir": {
+    "gemm_bf16_dp2_3x1024_single_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "gemm_bf16_dp2_3x1024_omp_4_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "gemm_bf16_dp2_3x1024_omp_8_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "gemm_bf16_dp2_3x1024_omp_16_mlir": {
+      "type": "MLIR",
+      "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    }
+  }},
+  {
+  "mlp_bf16_dp2_mlir": {
+    "mlp_bf16_dp2_3x1024_single_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "mlp_bf16_dp2_3x1024_omp_4_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "mlp_bf16_dp2_3x1024_omp_8_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "mlp_bf16_dp2_3x1024_omp_16_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(avx2|asimd)" ]
+    }
+  }}
+]
