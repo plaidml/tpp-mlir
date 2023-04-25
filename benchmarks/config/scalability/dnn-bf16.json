@@ -1,0 +1,64 @@
+[
+  {
+  "gemm_bf16_dnn": {
+    "gemm_bf16_single_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "1" },
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "gemm_bf16_omp_4_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "gemm_bf16_omp_8_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "gemm_bf16_omp_16_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    }
+  }},
+  {
+  "mlp_bf16_dnn": {
+    "mlp_bf16_single_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "1" },
+      "flags": [ "100", "256", "3", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "mlp_bf16_omp_4_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "3", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "mlp_bf16_omp_8_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "3", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    },
+    "mlp_bf16_omp_16_dnn": {
+      "type": "XSMM-DNN",
+      "benchmark": "xsmm_dnn_mlp",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "100", "256", "3", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
+      "extensions": []
+    }
+  }}
+]
