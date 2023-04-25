@@ -21,11 +21,11 @@
          // You can have multiple runs on the same pass
          "64x64x64": {
              "xsmm": {
-                  "type": "XSMM-DNN",
-                  "benchmark": "xsmm_dnn_mlp",
-                  "environment": {},
-                  "flags": [ "100", "64", "3", "F", "32", "32", "32", "1", "64", "64", "64", "64" ],
-                  "extensions": []
+                 "type": "XSMM-DNN",
+                 "benchmark": "xsmm_dnn_mlp",
+                 "environment": {},
+                 "flags": [ "100", "64", "3", "F", "32", "32", "32", "1", "64", "64", "64", "64" ],
+                 "extensions": []
              },
              "mlir": {
                  "type": "MLIR",
