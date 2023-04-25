@@ -5,8 +5,8 @@
 #ifndef TPP_BUILDER_UTILS_H
 #define TPP_BUILDER_UTILS_H
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 #include "TPP/TensorInit.h"
 
@@ -31,7 +31,7 @@ func::FuncOp createFunction(OpBuilder &builder, ModuleOp module,
                             llvm::StringRef name, TypeRange args,
                             TypeRange ret);
 
-// Create a local dense tensor
+// Create a local constant dense tensor
 Value createDenseTensor(OpBuilder &, TensorInitType, TensorType, int);
 
 // Create a global dense memref
