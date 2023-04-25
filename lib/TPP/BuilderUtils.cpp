@@ -1,5 +1,4 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -69,17 +68,8 @@ Value getConstIndex(OpBuilder &builder, int value) {
 }
 
 Value createDenseTensor(OpBuilder &builder, TensorInitType initType,
-                        TensorType type, int seed,
-                        std::optional<ModuleOp> module) {
+                        TensorType type, int seed) {
   auto unkLoc = builder.getUnknownLoc();
-
-  if (module) {
-    auto memrefType = MemRefType::get(type.getShape(), type.getElementType());
-    auto data = createDenseMemref(builder, *module, initType, memrefType, seed);
-    return builder.create<bufferization::ToTensorOp>(
-        unkLoc, data, /*restrict=*/true, /*writable=*/true);
-  }
-
   auto init = getTensorInit(initType, type.getElementType(), seed);
   auto floatInit = init->get(type);
   return builder.create<arith::ConstantOp>(unkLoc, type, floatInit);

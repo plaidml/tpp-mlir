@@ -32,9 +32,7 @@ func::FuncOp createFunction(OpBuilder &builder, ModuleOp module,
                             TypeRange ret);
 
 // Create a local constant dense tensor
-// When a module is passed, create a writable global dense tensor instead
-Value createDenseTensor(OpBuilder &, TensorInitType, TensorType, int,
-                        std::optional<ModuleOp> module = std::nullopt);
+Value createDenseTensor(OpBuilder &, TensorInitType, TensorType, int);
 
 // Create a global dense memref
 Value createDenseMemref(OpBuilder &, ModuleOp, TensorInitType, MemRefType, int);

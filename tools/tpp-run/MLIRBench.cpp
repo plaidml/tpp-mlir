@@ -175,10 +175,16 @@ LogicalResult MLIRBench::createKernelArgs() {
                                               memRefTy, seed);
                    })
                    .Case<TensorType>([&](auto tensorTy) {
-                     // Create a dense const tensor and use it directly
-                     // as an input to the kernel
-                     return createDenseTensor(builder, initType, tensorTy, seed,
-                                              module);
+                     // Create a memref global and cast it to a tensor
+                     // to ensure that the buffer is writable and
+                     // bufferization does not insert extra
+                     // allocations + copies
+                     auto memrefType = MemRefType::get(
+                         tensorTy.getShape(), tensorTy.getElementType());
+                     auto data = createDenseMemref(builder, module, initType,
+                                                   memrefType, seed);
+                     return builder.create<bufferization::ToTensorOp>(
+                         unkLoc, data, /*restrict=*/true, /*writable=*/true);
                    })
                    .Default([&](auto t) { return std::nullopt; });
 
