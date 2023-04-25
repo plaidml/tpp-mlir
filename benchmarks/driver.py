@@ -276,51 +276,55 @@ class BenchmarkDriver(object):
         self.env = Environment(args, loglevel)
         self.loglevel = loglevel
         self.args = args
-        if not os.path.exists(self.args.config):
-            self.logger.error(f"JSON config '{self.args.config}' does not exist")
-            raise SyntaxError("Cannot find JSON config")
         self.benchs = list()
         self.exts = ExtensionFlags(loglevel)
 
     def scanBenchmarks(self):
-        """ Scan directory for JSON file and create a list with all runs """
+        """ Reads each JSON file and create a list with all runs """
 
         # Find and read the JSON file
-        self.logger.info(f"Reading up '{self.args.config}'")
-        with open(self.args.config) as jsonFile:
-            jsonCfg = json.load(jsonFile)
+        configs = self.args.config.split(",")
+        for config in configs:
+            # Error on specific files when invalid
+            if not os.path.exists(config):
+                self.logger.error(f"JSON config '{self.args.config}' does not exist")
+                raise SyntaxError("Cannot find JSON config")
 
-        # Parse and add all runs
-        for cfg in jsonCfg:
-            if len(cfg.keys()) > 1:
-                self.logger.error("List of dict with a single element expected")
-                return False
+            self.logger.info(f"Reading up '{config}'")
+            with open(config) as jsonFile:
+                jsonCfg = json.load(jsonFile)
 
-            name = list(cfg.keys())[0]
-            runs = cfg[name]
-            benchs = Benchmark(name, self.args, self.env, self.loglevel)
-            for key, run in runs.items():
-                # Make sure we support this benchmark in this machine
-                supported = False
-                if not run["extensions"]:
-                    # Empty means any machine supports it
-                    supported = True
-                else:
-                    # List of possible supported (ex. avx512 OR sve2)
-                    for ext in run["extensions"]:
-                        if self.exts.hasFlag(ext):
-                            self.logger.debug(f"{key} extension {ext} supported")
-                            supported = True
-                            break
-                if not supported:
-                    self.logger.warning(f"Skipping {key} as extension {ext} not supported")
-                    continue
-                if not benchs.addRun(key, run):
-                    self.logger.error(f"Error adding benchmark run {key} in {name}")
+            # Parse and add all runs
+            for cfg in jsonCfg:
+                if len(cfg.keys()) > 1:
+                    self.logger.error("List of dict with a single element expected")
                     return False
 
-            # Append to the benchmarks
-            self.benchs.append(benchs)
+                name = list(cfg.keys())[0]
+                runs = cfg[name]
+                benchs = Benchmark(name, self.args, self.env, self.loglevel)
+                for key, run in runs.items():
+                    # Make sure we support this benchmark in this machine
+                    supported = False
+                    if not run["extensions"]:
+                        # Empty means any machine supports it
+                        supported = True
+                    else:
+                        # List of possible supported (ex. avx512 OR sve2)
+                        for ext in run["extensions"]:
+                            if self.exts.hasFlag(ext):
+                                self.logger.debug(f"{key} extension {ext} supported")
+                                supported = True
+                                break
+                    if not supported:
+                        self.logger.warning(f"Skipping {key} as extension {ext} not supported")
+                        continue
+                    if not benchs.addRun(key, run):
+                        self.logger.error(f"Error adding benchmark run {key} in {name}")
+                        return False
+
+                # Append to the benchmarks
+                self.benchs.append(benchs)
 
         return True
 
