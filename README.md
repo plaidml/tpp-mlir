@@ -104,6 +104,9 @@ popd
 
 This setup assumes that you have built LLVM and MLIR in `$CUSTOM_LLVM_ROOT` as above.
 
+_Note: OpenMP is a requirement to get multi-threaded performance on our code.
+If you don't want to build with OpenMP, disable with the CMake flag `-DUSE_OpenMP=False`._
+
 ```sh
 # Clone
 git clone https://github.com/plaidml/tpp-mlir.git
