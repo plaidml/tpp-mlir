@@ -51,20 +51,37 @@
     }
   }},
   {
-  "matmul_256x1024x1024_bf16_mlir": {
-    "matmul_bf16_single_mlir": {
+  "matmul_256x1024x1024_bf16_dp2_mlir": {
+    "matmul_bf16_dp2_single_mlir": {
       "type": "MLIR",
-      "benchmark": "matmul/matmul-bf16-256x1024x1024.mlir",
+      "benchmark": "matmul/matmul-bf16-dp2-256x1024x1024.mlir",
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "matmul_bf16_omp_16_mlir": {
+    "matmul_bf16_dp2_omp_16_mlir": {
       "type": "MLIR",
-      "benchmark": "matmul/matmul-bf16-256x1024x1024.mlir",
+      "benchmark": "matmul/matmul-bf16-dp2-256x1024x1024.mlir",
       "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
+    }
+  }},
+  {
+  "matmul_256x1024x1024_bf16_dp4_mlir": {
+    "matmul_bf16_dp4_single_mlir": {
+      "type": "MLIR",
+      "benchmark": "matmul/matmul-bf16-dp4-256x1024x1024.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(svebf16)" ]
+    },
+    "matmul_bf16_dp4_omp_16_mlir": {
+      "type": "MLIR",
+      "benchmark": "matmul/matmul-bf16-dp4-256x1024x1024.mlir",
+      "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
+      "extensions": [ "(svebf16)" ]
     }
   }}
 ]
