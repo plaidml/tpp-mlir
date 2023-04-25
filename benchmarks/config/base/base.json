@@ -89,6 +89,13 @@
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
+    "fp32_fully_connected_mlir": {
+      "type": "MLIR",
+      "benchmark": "fully-connected-fp32-1layer.mlir",
+      "environment": {},
+      "flags": [],
+      "extensions": [ "(avx2|asimd)" ]
+    },
     "bf16_flat_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",

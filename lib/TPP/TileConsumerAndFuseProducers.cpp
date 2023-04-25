@@ -418,9 +418,11 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
     processingQueue.pop();
     for (OpOperand &operand : currentOp->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
+      // NOTE: We generally don't want to pull-in a linalg.fill in the fusion
+      // loop as it may create allocations.
       if (producer && isa<linalg::LinalgOp>(producer) &&
-          !worklist.count(producer) && producer->getNumResults() == 1 &&
-          !alreadyFusedOps.count(producer) &&
+          !isa<linalg::FillOp>(producer) && !worklist.count(producer) &&
+          producer->getNumResults() == 1 && !alreadyFusedOps.count(producer) &&
           hasCompatibleOuterParallelLoops(operand, producer, rootConsumer,
                                           tileSizes) &&
           hasAllUsersInWorklist(producer, worklist)) {
