@@ -83,7 +83,7 @@ if (NOT TPP_INSIDE_IREE)
   set(CONFIG_DIR "${BENCHMARK_DIR}/config")
   # Run a small set of benchmarks with small iterations on a stable machine (non-turbo) to track simple performance
   # A separate CI job should track longer running and larger benchmarks elsewhere
-  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
+  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 100
     -c ${CONFIG_DIR}/ci/base.json,${CONFIG_DIR}/omp/dnn-fp32.json,${CONFIG_DIR}/omp/dnn-bf16.json,${CONFIG_DIR}/omp/mlir-fp32.json,${CONFIG_DIR}/omp/mlir-bf16.json
                     DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
