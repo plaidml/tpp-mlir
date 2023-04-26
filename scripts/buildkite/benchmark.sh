@@ -51,3 +51,8 @@ benchmark omp/mlir-bf16.json "OpenMP TPP-MLIR BF16"
 
 # Matmul Benchmarks
 benchmark matmul/256x1024x1024.json "Matmul 256x1024x1024"
+benchmark matmul/256x1024x4096.json "Matmul 256x1024x4096"
+benchmark matmul/256x4096x1024.json "Matmul 256x4096x1024"
+benchmark matmul/128x1024x4096.json "Matmul 128x1024x4096"
+benchmark matmul/128x4096x1024.json "Matmul 128x4096x1024"
+benchmark matmul/128x1024x1024.json "Matmul 128x1024x1024"
