@@ -25,7 +25,7 @@ static void printXsmmStruct(const libxsmm_meltw_binary_shape &binaryShape,
 static void printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmShape,
                             FILE *outfile = stderr);
 
-static bool isTransformUnary(const libxsmm_meltw_unary_type dtype) {
+static bool hasImplicitComputeDtypeUnary(const libxsmm_meltw_unary_type dtype) {
   switch (dtype) {
     // Zero
     case LIBXSMM_MELTW_TYPE_UNARY_XOR:
@@ -185,7 +185,7 @@ _mlir_ciface_xsmm_unary_dispatch(const libxsmm_meltw_unary_type op_type,
   // Retarget computation type from bf16 to f32 due to missing hardware support.
   // Copy and Zero should remain in BF16 to avoid useless up/down casts
   auto force_fp32 =
-      (dtype == LIBXSMM_DATATYPE_BF16 && isTransformUnary(op_type));
+      (dtype == LIBXSMM_DATATYPE_BF16 && !hasImplicitComputeDtypeUnary(op_type));
   unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
   unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
