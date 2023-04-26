@@ -104,7 +104,6 @@ def CombineTppOps : Pass<"combine-tpp", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
 
-
 def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
   let constructor = "mlir::tpp::createTransformDropSchedulePass()";
@@ -257,10 +256,13 @@ def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
 }
 
-def SimplifyAndCanonicalizePack : Pass<"simplify-and-canonicalize-pack",
-                                       "func::FuncOp"> {
+def SimplifyAndCanonicalizePack : Pass<"simplify-pack", "func::FuncOp"> {
   let summary = "Simplify and canonicalize tensor.pack";
   let constructor = "mlir::tpp::createSimplifyAndCanonicalizePackPass()";
+  let description = [{
+    Apply `tensor.pack` and `tensor.unpack` canonicalization and simplification
+    patterns.
+  }];
 }
 
 def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
