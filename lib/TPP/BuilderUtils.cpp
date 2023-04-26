@@ -15,7 +15,7 @@ namespace {
 template <class ValueT>
 arith::ConstantOp getConstant(OpBuilder &builder, Type type, ValueT value) {
   auto unkLoc = builder.getUnknownLoc();
-  Attribute attr;
+  TypedAttr attr;
   if constexpr (std::numeric_limits<ValueT>::is_integer) {
     attr = builder.getIntegerAttr(type, value);
   } else if constexpr (llvm::is_one_of<ValueT, float, double>()) {

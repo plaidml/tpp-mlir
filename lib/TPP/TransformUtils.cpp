@@ -142,7 +142,7 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
         return failure();
       }
       ivsResult.push_back(
-          makeComposedAffineApply(builder, loc, resMap, touchedIvs)
+          affine::makeComposedAffineApply(builder, loc, resMap, touchedIvs)
               .getResult());
     } else
       // single dimension touched just return it.
@@ -266,8 +266,9 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
   AffineMap map = linalgOp.getShapesToLoopsMap();
   if (!map)
     return failure();
-  SmallVector<OpFoldResult> domain = makeComposedFoldedMultiResultAffineApply(
-      rewriter, loc, map, allShapeSizes);
+  SmallVector<OpFoldResult> domain =
+      affine::makeComposedFoldedMultiResultAffineApply(rewriter, loc, map,
+                                                       allShapeSizes);
   SmallVector<Range> loopRanges;
   for (unsigned idx = 0; idx < upTo; idx++)
     loopRanges.push_back(

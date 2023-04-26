@@ -59,6 +59,14 @@ namespace vnni {
 class VNNIDialect;
 } // namespace vnni
 
+namespace LLVM {
+class LLVMDialect;
+} // namespace LLVM
+
+namespace math {
+class MathDialect;
+} // namespace math
+
 namespace tpp {
 class TppDialect;
 

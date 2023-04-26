@@ -18,7 +18,7 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
     operations are converted using simple pattern matching (i.e., see `isTppAdd`).
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
-  let dependentDialects = ["linalg::LinalgDialect"]; 
+  let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
@@ -27,7 +27,7 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let description = [{
     Convert tpp operations to SCF loops.
   }];
-  let dependentDialects = ["scf::SCFDialect"];
+  let dependentDialects = ["scf::SCFDialect", "memref::MemRefDialect"];
 }
 
 def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
@@ -36,7 +36,9 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let description = [{
     Convert tpp operations to XSMM operations.
   }];
-  let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
+  let dependentDialects = ["func::FuncDialect", 
+                           "memref::MemRefDialect",
+                           "xsmm::XsmmDialect"];
 }
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
@@ -45,7 +47,10 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let description = [{
     Convert XSMM operations to libXSMM function calls.
   }];
-  let dependentDialects = ["func::FuncDialect"];
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "xsmm::XsmmDialect",
+                           "LLVM::LLVMDialect"];
 }
 
 def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
@@ -88,7 +93,10 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
   let description = [{
     Convert perf operations to function calls.
   }];
-  let dependentDialects = ["func::FuncDialect"];
+  let dependentDialects = ["func::FuncDialect", 
+                           "math::MathDialect",
+                           "memref::MemRefDialect",
+                           "tensor::TensorDialect"];
 }
 
 def CombineTppOps : Pass<"combine-tpp", "func::FuncOp"> {
@@ -177,6 +185,7 @@ def RewriteToBatchReduceGemm : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
     type is bf16 the VNNI layout is used.
   }];
   let constructor = "mlir::tpp::createRewriteToBatchReduceGemmPass()";
+  let dependentDialects = ["scf::SCFDialect", "vnni::VNNIDialect"];
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
@@ -203,7 +212,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
 }
 
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 
-                                         "func::FuncOp"> {
+                                       "func::FuncOp"> {
   let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
   let description = [{
     Rewrite a convolution to a matmul or brgemm operation.
@@ -213,6 +222,7 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
            "Rewrite convolution to BRGEMM if possible">
   ];
   let constructor = "mlir::tpp::createRewriteConvToMatmulOrBrgemmPass()";
+  let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
@@ -240,6 +250,7 @@ def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
     it to other linalg operations.
   }];
   let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";
+  let dependentDialects = ["scf::SCFDialect"];
 }
 
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {

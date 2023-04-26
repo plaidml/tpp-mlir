@@ -606,7 +606,6 @@ struct RewriteConvToMatmulOrBrgemm
     populateRewriteBlockedConvPatterns(patterns, enableBrgemm);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

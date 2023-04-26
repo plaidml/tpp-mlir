@@ -132,7 +132,7 @@ struct LocalDialectsLoweringPass
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<AffineDialect,
+        .insert<affine::AffineDialect,
                 arith::ArithDialect,
                 func::FuncDialect,
                 memref::MemRefDialect,
@@ -228,7 +228,9 @@ struct TppMappingPass : public TppMappingBase<TppMappingPass>,
     registry
         .insert<linalg::LinalgDialect,
                 memref::MemRefDialect,
-                tensor::TensorDialect>();
+                scf::SCFDialect,
+                tensor::TensorDialect,
+                vnni::VNNIDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
     vnni::registerBufferizableOpInterfaceExternalModels(registry);
@@ -341,6 +343,7 @@ struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
     registry
         .insert<xsmm::XsmmDialect,
                 scf::SCFDialect,
+                memref::MemRefDialect,
                 tpp::TppDialect>();
     // clang-format on
   }

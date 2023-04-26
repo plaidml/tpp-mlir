@@ -112,7 +112,6 @@ struct CombineTppOps : public CombineTppOpsBase<CombineTppOps> {
     RewritePatternSet patterns(&getContext());
     populatePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

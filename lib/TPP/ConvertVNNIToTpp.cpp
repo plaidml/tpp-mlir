@@ -68,7 +68,6 @@ struct ConvertVNNIToTpp : public ConvertVNNIToTppBase<ConvertVNNIToTpp> {
     RewritePatternSet patterns(&getContext());
     populateVNNIToTppPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

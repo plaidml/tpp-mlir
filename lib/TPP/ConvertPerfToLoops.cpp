@@ -103,7 +103,6 @@ struct ConvertPerfToLoops : public ConvertPerfToLoopsBase<ConvertPerfToLoops> {
     RewritePatternSet patterns(&getContext());
     populatePerfToLoopsPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
