@@ -97,6 +97,17 @@ if (NOT TPP_INSIDE_IREE)
     ${CONFIG_DIR}/matmul/128x1024x4096.json
     ${CONFIG_DIR}/matmul/128x4096x1024.json
     ${CONFIG_DIR}/matmul/128x1024x1024.json
+    ${CONFIG_DIR}/matmul/256x768x768.json
+    ${CONFIG_DIR}/matmul/128x768x768.json
+    ${CONFIG_DIR}/matmul/128x3072x768.json
+    ${CONFIG_DIR}/matmul/128x768x3072.json
+    ${CONFIG_DIR}/matmul/256x3072x768.json
+    ${CONFIG_DIR}/matmul/256x768x3072.json
+    ${CONFIG_DIR}/matmul/128x768x2304.json
+    ${CONFIG_DIR}/matmul/1024x2560x1024.json
+    ${CONFIG_DIR}/matmul/1024x1024x512.json
+    ${CONFIG_DIR}/matmul/1024x352x512.json
+    ${CONFIG_DIR}/matmul/1024x512x256.json
   )
   string(JOIN ',' PERF_CFGS_STR ${PERF_CFGS})
   add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
