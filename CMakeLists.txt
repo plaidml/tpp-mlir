@@ -90,8 +90,14 @@ if (NOT TPP_INSIDE_IREE)
                     COMMENT Run Quick Benchmarks)
 
   # Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
+  set(PERF_CFGS
+    ${CONFIG_DIR}/matmul/256x1024x1024.json
+    ${CONFIG_DIR}/matmul/256x1024x4096.json
+    ${CONFIG_DIR}/matmul/256x4096x1024.json
+  )
+  string(JOIN ',' PERF_CFGS_STR ${PERF_CFGS})
   add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-    -c ${CONFIG_DIR}/matmul/256x1024x1024.json,${CONFIG_DIR}/matmul/256x1024x4096.json,${CONFIG_DIR}/matmul/256x4096x1024.json
+    -c ${PERF_CFGS_STR}
                     DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Quick Performance Benchmarks)
