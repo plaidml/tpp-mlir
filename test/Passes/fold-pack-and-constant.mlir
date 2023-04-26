@@ -23,5 +23,8 @@ func.func @main() -> tensor<1x8x56x56x32xi64> {
 }
 
 // CHECK: func.func @main(
-// CHECK: %[[CST:.+]] = arith.constant dense<0> : tensor<1x8x56x56x32xi64>
-// CHECK-NEXT: return %[[CST]] : tensor<1x8x56x56x32xi64>
+// CHECK: %[[CST:.+]] = arith.constant 0 : i64
+// CHECK-NEXT: %[[EMPTY:.+]] = tensor.empty() : tensor<1x8x56x56x32xi64>
+// CHECK-NEXT: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : i64) 
+// CHECK-SAME:  outs(%[[EMPTY]] : tensor<1x8x56x56x32xi64>) -> tensor<1x8x56x56x32xi64>
+// CHECK-NEXT: return %[[FILL]] : tensor<1x8x56x56x32xi64>

@@ -163,19 +163,15 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(packOp, newDense);
   }
 
-  void foldPackIntoCstWithFill(RewriterBase &rewriter, tensor::PackOp packOp) {
+  void foldPackIntoFill(RewriterBase &rewriter, tensor::PackOp packOp) {
     OpBuilder::InsertionGuard guard(rewriter);
     Value sourcePack = packOp.getSource();
     auto fillOp = sourcePack.getDefiningOp<linalg::FillOp>();
     if (!fillOp)
       return;
-    auto cstOp = fillOp.getInputs()[0].getDefiningOp<arith::ConstantOp>();
-    if (!cstOp)
-      return;
-
-    rewriter.setInsertionPoint(fillOp);
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-        packOp, DenseElementsAttr::get(packOp.getDestType(), cstOp.getValue()));
+    rewriter.setInsertionPoint(packOp);
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(packOp, fillOp.getInputs()[0],
+                                                packOp.getDest());
   }
 
   void runOnOperation() override {
@@ -183,9 +179,8 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
     IRRewriter rewriter(&getContext());
     module->walk(
         [&](tensor::PackOp packOp) { foldPackIntoSplatCst(rewriter, packOp); });
-    module->walk([&](tensor::PackOp packOp) {
-      foldPackIntoCstWithFill(rewriter, packOp);
-    });
+    module->walk(
+        [&](tensor::PackOp packOp) { foldPackIntoFill(rewriter, packOp); });
     module->walk(
         [&](tensor::PackOp packOp) { foldPackIntoCst(rewriter, packOp); });
   }
