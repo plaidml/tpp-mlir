@@ -89,6 +89,13 @@ if (NOT TPP_INSIDE_IREE)
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Quick Benchmarks)
 
+  # Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
+  add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+    -c ${CONFIG_DIR}/matmul/256x1024x1024.json,${CONFIG_DIR}/matmul/256x1024x4096.json
+                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                    WORKING_DIRECTORY ${BENCHMARK_DIR}
+                    COMMENT Run Quick Performance Benchmarks)
+
   # Run baseline benchmarks with default iterations to track simple performance
   add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
     -c ${CONFIG_DIR}/base/base.json,${CONFIG_DIR}/omp/dnn-fp32.json,${CONFIG_DIR}/omp/dnn-bf16.json,${CONFIG_DIR}/omp/mlir-fp32.json,${CONFIG_DIR}/omp/mlir-bf16.json
