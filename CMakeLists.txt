@@ -89,9 +89,33 @@ if (NOT TPP_INSIDE_IREE)
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Quick Benchmarks)
 
+  # Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
+  set(PERF_CFGS
+    ${CONFIG_DIR}/matmul/256x1024x1024.json
+    ${CONFIG_DIR}/matmul/256x1024x4096.json
+    ${CONFIG_DIR}/matmul/256x4096x1024.json
+    ${CONFIG_DIR}/matmul/128x1024x4096.json
+    ${CONFIG_DIR}/matmul/128x4096x1024.json
+    ${CONFIG_DIR}/matmul/128x1024x1024.json
+  )
+  string(JOIN ',' PERF_CFGS_STR ${PERF_CFGS})
+  add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+    -c ${PERF_CFGS_STR}
+                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                    WORKING_DIRECTORY ${BENCHMARK_DIR}
+                    COMMENT Run Quick Performance Benchmarks)
+
   # Run baseline benchmarks with default iterations to track simple performance
+  set(BENCH_CFGS
+    ${CONFIG_DIR}/base/base.json
+    ${CONFIG_DIR}/omp/dnn-fp32.json
+    ${CONFIG_DIR}/omp/dnn-bf16.json
+    ${CONFIG_DIR}/omp/mlir-fp32.json
+    ${CONFIG_DIR}/omp/mlir-bf16.json
+  )
+  string(JOIN ',' BENCH_CFGS_STR ${BENCH_CFGS})
   add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-    -c ${CONFIG_DIR}/base/base.json,${CONFIG_DIR}/omp/dnn-fp32.json,${CONFIG_DIR}/omp/dnn-bf16.json,${CONFIG_DIR}/omp/mlir-fp32.json,${CONFIG_DIR}/omp/mlir-bf16.json
+    -c ${BENCH_CFGS_STR}
                     DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Benchmarks)
