@@ -9,7 +9,7 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
   %0 = xsmm.binary.dispatch add [3, 3, 3, 3, 3] flags = (none) data_type = f32
-  xsmm.binary add(dataType f32, %0, %arg0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  xsmm.binary add(data_type = f32, %0, %arg0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
 }
@@ -29,7 +29,7 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
     %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
     %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
     %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
-    xsmm.binary add(dataType f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32>, memref<10x10xf32>) -> ()
+    xsmm.binary add(data_type = f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32>, memref<10x10xf32>) -> ()
 
   return
 }
@@ -52,7 +52,7 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
     %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
-    xsmm.binary add(dataType f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
+    xsmm.binary add(data_type = f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
     scf.yield
   }
 
@@ -70,7 +70,7 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast1]]
   %0 = xsmm.unary.dispatch identity [3, 3, 1, 3] flags = (bcast_scalar) data_type = f32
-  xsmm.unary identity(dataType f32, %0, %arg1, %arg0) : (i64, memref<1x1xf32>, memref<3x3xf32>) -> ()
+  xsmm.unary identity(data_type = f32, %0, %arg1, %arg0) : (i64, memref<1x1xf32>, memref<3x3xf32>) -> ()
 
   return
 }
@@ -94,7 +94,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
   scf.parallel (%arg1, %arg2) = (%c0, %c0) to (%c12, %c56) step (%c1, %c1) {
     %subview = memref.subview %alloc[%arg1, %arg2, 0, 0] [1, 1, 56, 64] [1, 1, 1, 1] : memref<12x56x56x64xf32> to memref<56x64xf32, #map>
     %0 = xsmm.unary.dispatch identity [56, 64, 64, 64] flags = (bcast_col) data_type = f32
-    xsmm.unary identity(dataType f32, %0, %arg0, %subview) : (i64, memref<64xf32>, memref<56x64xf32, #map>) -> ()
+    xsmm.unary identity(data_type = f32, %0, %arg0, %subview) : (i64, memref<64xf32>, memref<56x64xf32, #map>) -> ()
     scf.yield
   }
 
@@ -110,7 +110,7 @@ func.func @zero(%arg0: memref<3x3xf32>) {
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
   %0 = xsmm.unary.dispatch zero [3, 3, 3, 3] flags = (none) data_type = f32
-  xsmm.unary zero(dataType f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  xsmm.unary zero(data_type = f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
 }
@@ -124,7 +124,7 @@ func.func @relu(%arg0: memref<3x3xf32>) {
   // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
   %0 = xsmm.unary.dispatch relu [3, 3, 3, 3] flags = (none) data_type = f32
-  xsmm.unary relu(dataType f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  xsmm.unary relu(data_type = f32, %0, %arg0, %arg0) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
 }
@@ -146,7 +146,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   scf.parallel (%arg1) = (%c0) to (%c64) step (%c1) {
     %subview = memref.subview %arg0[%arg1, 0, 0] [1, 32, 32] [1, 1, 1] : memref<64x32x32xf32> to memref<32x32xf32, #map>
     %0 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
-    xsmm.unary relu(dataType f32, %0, %subview, %subview) : (i64, memref<32x32xf32, #map>, memref<32x32xf32, #map>) -> ()
+    xsmm.unary relu(data_type = f32, %0, %subview, %subview) : (i64, memref<32x32xf32, #map>, memref<32x32xf32, #map>) -> ()
     scf.yield
   }
 
@@ -167,7 +167,7 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %c2_i64 = arith.constant 2 : i64
   %0 = xsmm.brgemm.dispatch [3, 3, 4, 4, 3, 3] flags = (none) data_type = f32
-  xsmm.brgemm(dataType f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
+  xsmm.brgemm(data_type = f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
     : (i64, memref<2x3x4xf32>, memref<2x4x3xf32>, memref<3x3xf32>, i64) -> ()
 
   return
@@ -188,7 +188,7 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %c64_i64 = arith.constant 64 : i64
   %0 = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4] flags = (vnni_b) data_type = bf16
-  xsmm.brgemm(dataType bf16, %0, %arg0, %arg1, %arg2, %c64_i64) 
+  xsmm.brgemm(data_type = bf16, %0, %arg0, %arg1, %arg2, %c64_i64) 
     : (i64, memref<64x4x4xbf16>, memref<64x2x4x2xbf16>, memref<4x4xbf16>, i64) -> ()
 
   return
@@ -208,7 +208,7 @@ func.func @gemm(%A: memref<4x8xf32>,
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
   %0 = xsmm.gemm.dispatch [4, 4, 8, 8, 4, 4] flags = (none) data_type = f32
-  xsmm.gemm(dataType f32, %0, %A, %B, %C) : (i64, memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
+  xsmm.gemm(data_type = f32, %0, %A, %B, %C) : (i64, memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
 
   return
 }
@@ -227,7 +227,7 @@ func.func @gemm_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
   // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
   %0 = xsmm.gemm.dispatch [6, 6, 10, 10, 6, 6] flags = (vnni_b) data_type = bf16
-  xsmm.gemm(dataType bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
+  xsmm.gemm(data_type = bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
 
   return
 }
@@ -255,7 +255,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
     %0 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32] flags = (none) data_type = f32
-    xsmm.brgemm(dataType f32, %0, %subview, %subview_0, %subview_1, %c16_i64) 
+    xsmm.brgemm(data_type = f32, %0, %subview, %subview_0, %subview_1, %c16_i64) 
       : (i64, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
          memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
          memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
@@ -291,7 +291,7 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
     %subview = memref.subview %arg0[0, %arg1, 0, 0] [1, 1, 7, 2048] [1, 1, 1, 1] : memref<1x7x7x2048xf32> to memref<7x2048xf32, strided<[2048, 1], offset: ?>>
     %subview_0 = memref.subview %alloc[0, %arg1, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : memref<1x7x7x512xf32> to memref<7x512xf32, strided<[512, 1], offset: ?>>
     %1 = xsmm.gemm.dispatch [7, 512, 2048, 2048, 512, 512] flags = (none) data_type = f32
-    xsmm.gemm(dataType f32, %1, %subview, %0, %subview_0) : (i64, memref<7x2048xf32, strided<[2048, 1], offset: ?>>, memref<2048x512xf32>, memref<7x512xf32, strided<[512, 1], offset: ?>>) -> ()
+    xsmm.gemm(data_type = f32, %1, %subview, %0, %subview_0) : (i64, memref<7x2048xf32, strided<[2048, 1], offset: ?>>, memref<2048x512xf32>, memref<7x512xf32, strided<[512, 1], offset: ?>>) -> ()
   }
 
   // CHECK: return {{.*}} : memref<1x7x7x512xf32>
@@ -321,7 +321,7 @@ module @predict_function {
     // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
     %0 = xsmm.unary.dispatch identity [128, 512, 512, 512] flags = (bcast_col) data_type = f32
-    xsmm.unary identity(dataType f32, %0, %arg2, %arg3) : (i64, memref<512xf32>, memref<128x512xf32>) -> ()
+    xsmm.unary identity(data_type = f32, %0, %arg2, %arg3) : (i64, memref<512xf32>, memref<128x512xf32>) -> ()
 
     // Gemm
     // CHECK: call @xsmm_gemm_dispatch
@@ -329,13 +329,13 @@ module @predict_function {
     // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
     // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
     %1 = xsmm.gemm.dispatch [128, 512, 256, 256, 512, 512] flags = (none) data_type = f32
-    xsmm.gemm(dataType f32, %1, %arg0, %arg1, %arg3) : (i64, memref<128x256xf32>, memref<256x512xf32>, memref<128x512xf32>) -> ()
+    xsmm.gemm(data_type = f32, %1, %arg0, %arg1, %arg3) : (i64, memref<128x256xf32>, memref<256x512xf32>, memref<128x512xf32>) -> ()
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
     // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
     %2 = xsmm.unary.dispatch relu [128, 512, 512, 512] flags = (none) data_type = f32
-    xsmm.unary relu(dataType f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
+    xsmm.unary relu(data_type = f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
     return
   }

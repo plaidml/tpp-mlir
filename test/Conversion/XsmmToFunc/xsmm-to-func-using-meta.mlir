@@ -6,7 +6,7 @@ func.func @dispatch_brgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
                            %arg2: memref<4x4xf32>) -> memref<4x4xf32> {
   %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5] flags = (none) data_type = f32
   %c2_i64 = arith.constant 2 : i64
-  xsmm.brgemm(dataType f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
+  xsmm.brgemm(data_type = f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
     : (i64, memref<2x5x4xf32>, memref<2x4x5xf32>, memref<4x4xf32>, i64) -> ()
   return %arg2 : memref<4x4xf32>
 }

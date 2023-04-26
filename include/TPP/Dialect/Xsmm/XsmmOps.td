@@ -38,7 +38,7 @@ def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary", []> {
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `dataType` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -74,7 +74,7 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `dataType` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -105,7 +105,7 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `dataType` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 }
@@ -125,7 +125,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `dataType` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -150,7 +150,7 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
   
   let assemblyFormat = [{
-    `(` `dataType` $dataType `,` $inputs `)`
+    `(` `data_type` `=` $dataType `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 }
@@ -164,7 +164,7 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
   let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    `(` `dataType` $dataType `,` $inputs `)`
+    `(` `data_type` `=` $dataType `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 }
