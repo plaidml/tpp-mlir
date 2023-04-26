@@ -19,6 +19,8 @@ steps:
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
     env:
       LOGRPTSUM: "mlir"
-      #LOGRPTFMT: "svg"
+      LOGRPTFMT: "svg"
+      LOGRPTFMT: "svg"
       #LOGRPTBND: "-"
+      LOGRPTSEP: "1"
       LOGRPTQRY: ""
