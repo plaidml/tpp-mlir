@@ -273,9 +273,8 @@ private:
     // mess up tensor producer-consumer chains used for analysis in the
     // following passes.
     pm.addPass(createPropagatePackUnPackPass());
-    pm.addPass(createCanonicalizerPass());
     pm.addPass(createConstantFoldPackPass());
-    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createSimplifyAndCanonicalizePackPass());
 
     pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
