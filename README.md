@@ -24,31 +24,22 @@ In order to build LLVM and TPP-MLIR, several software development tools such as 
 manager and package names, we opted for providing instructions for the user-level package manager ```conda```. This environment has been successfully tested on top of a Fedora Server
 minimal installation with less than 400 system-wide packages being installed.
 
-Initial Setup (for x86_64 machines):
+Initial Setup (using Conda):
 ```sh
 export TPPMLIR_WORKSPACE_DIR=/foo
 cd ${TPPMLIR_WORKSPACE_DIR}
-
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
+export ARCH_NAME=$(uname -m)
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH_NAME}.sh
+bash Miniconda3-latest-Linux-${ARCH_NAME}.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
 eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
 conda activate
 
-conda install cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools gcc_linux-64 gxx_linux-64 binutils
-python -m pip install coloredlogs
-```
-
-Initial Setup (for aarch64 machines):
-```sh
-export TPPMLIR_WORKSPACE_DIR=/foo
-cd ${TPPMLIR_WORKSPACE_DIR}
-
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
-bash Miniconda3-latest-Linux-aarch64.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
-eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
-conda activate
-
-conda install cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools gcc_linux-aarch64 gxx_linux-aarch64 binutils
+conda install cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils
+if [ "${ARCH_NAME}" == "aarch64" ]; then
+   conda install gcc_linux-aarch64 gxx_linux-aarch64
+elif [ "${ARCH_NAME}" == "x86_64" ]; then
+   conda install gcc_linux-64 gxx_linux-64
+fi
 python -m pip install coloredlogs
 ```
 
