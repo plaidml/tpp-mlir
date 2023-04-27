@@ -127,3 +127,15 @@ cmake --build . --target mlir-doc
 ## License
 
 This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
+
+## References
+
+BRGEMM: [High-Performance Deep Learning via a Single Building Block (2019)](https://arxiv.org/abs/1906.06440)
+
+TPP: [Tensor Processing Primitives: A Programming Abstraction for Efficiency and Portability in Deep Learning & HPC Workloads (2021)](https://arxiv.org/abs/2104.05755)
+
+PARLOOPER: [Harnessing Deep Learning and HPC Kernels via High-Level Loop and Tensor Abstractions on CPU Architectures (2023)](https://arxiv.org/abs/2304.12576)
+
+
+
+
