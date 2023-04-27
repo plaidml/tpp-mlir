@@ -5,11 +5,11 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
                         %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>) {
 
   // CHECK: xsmm.binary
-  xsmm.binary add(dataType f32, %arg0, %arg1)
+  xsmm.binary add(data_type = f32, %arg0, %arg1)
     : (memref<2x2xf32>, memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.unary
-  xsmm.unary relu(dataType f32, %arg0)
+  xsmm.unary relu(data_type = f32, %arg0)
     : (memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.binary.dispatch
@@ -19,7 +19,7 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
   %1 = xsmm.unary.dispatch identity [3, 2, 1, 3] flags = (bcast_row) data_type = f32
 
   // CHECK: xsmm.gemm
-  xsmm.gemm (dataType f32, %arg0, %arg1, %arg2) 
+  xsmm.gemm (data_type = f32, %arg0, %arg1, %arg2) 
     : (memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
   // CHECK: xsmm.gemm.dispatch
@@ -44,7 +44,7 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
   // CHECK: xsmm.unary.dispatch zero
   %11 = xsmm.unary.dispatch zero [2, 2, 2, 2] flags = (none) data_type = f32
   // CHECK: xsmm.unary zero
-  xsmm.unary zero(dataType f32, %11, %arg0, %arg0) : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
+  xsmm.unary zero(data_type = f32, %11, %arg0, %arg0) : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
   return
 }
