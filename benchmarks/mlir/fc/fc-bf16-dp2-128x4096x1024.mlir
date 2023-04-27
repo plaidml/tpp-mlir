@@ -16,7 +16,7 @@
 
 // GEMM packed with tile size: 64, 64, 64
 func.func @entry(%arg0: !A, %arg1: !B, %bias: !C, %output: !C) -> !C {
-  %cst = arith.constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : bf16
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]}
   ins(%arg0, %arg1 : !A, !B)
   outs(%output : !C) {
