@@ -299,12 +299,11 @@ private:
   bool useMeta = false;
 };
 
-// TODO: move rewriter as first arg.
-static func::CallOp buildDispatchCall(Location loc,
+static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
                                       ModuleOp module, FlatSymbolRefAttr fnName,
-                                      bool useMeta, RewriterBase &rewriter) {
+                                      bool useMeta) {
   auto libFnType = rewriter.getFunctionType(
       dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
 
@@ -407,8 +406,8 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
   dispatchOperandTypes.push_back(integer64);
 
   func::CallOp call =
-      buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                        fnName, useMeta, rewriter);
+      buildDispatchCall(rewriter, loc, dispatchOperands, dispatchOperandTypes,
+                        module, fnName, useMeta);
   rewriter.replaceOp(dispatchOp, call.getResult(0));
   return success();
 }
@@ -498,8 +497,8 @@ struct ConvertQuarternaryDispatchOp
       dispatchOperandTypes.push_back(integer64);
     }
     func::CallOp call =
-        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                          fnName, useMeta, rewriter);
+        buildDispatchCall(rewriter, loc, dispatchOperands, dispatchOperandTypes,
+                          module, fnName, useMeta);
     rewriter.replaceOp(dispatchOp, call.getResult(0));
     return success();
   }
