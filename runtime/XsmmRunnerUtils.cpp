@@ -71,15 +71,14 @@ typedef struct {
   int64_t sizes_and_strides[0]; // variable size: sizes[rank], strides[rank]
 } mlir_memref_descriptor_t;
 
-void *get_data_pointer_from_memref_desc(const libxsmm_datatype dType,
-                                        void *memrefDesc) {
-  mlir_memref_descriptor_t *desc = (mlir_memref_descriptor_t *)memrefDesc;
+void *get_base_ptr(const libxsmm_datatype dType, void *alignedPtr,
+                   int64_t offset) {
   if (dType == LIBXSMM_DATATYPE_F32) {
-    float *data_pointer = (float *)desc->alignedPtr + desc->offset;
-    return (void *)data_pointer;
+    float *base_ptr = (float *)alignedPtr + offset;
+    return (void *)base_ptr;
   } else if (dType == LIBXSMM_DATATYPE_BF16) {
-    bf16 *data_pointer = (bf16 *)desc->alignedPtr + desc->offset;
-    return (void *)data_pointer;
+    bf16 *base_ptr = (bf16 *)alignedPtr + offset;
+    return (void *)base_ptr;
   }
   fprintf(stderr, "Unhandled data type in get_data_pointer_from_memref_desc:%d",
           dType);
@@ -89,16 +88,16 @@ void *get_data_pointer_from_memref_desc(const libxsmm_datatype dType,
 } // namespace
 
 extern "C" void xsmm_gemm_invoke(const libxsmm_datatype dType, int64_t addr,
-                                 int64_t rankA, void *memrefDescA,
-                                 int64_t rankB, void *memrefDescB,
-                                 int64_t rankC, void *memrefDescC) {
+                                 void *alignedPtrA, int64_t offsetA,
+                                 void *alignedPtrB, int64_t offsetB,
+                                 void *alignedPtrC, int64_t offsetC) {
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
 
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = get_data_pointer_from_memref_desc(dType, memrefDescB);
-  gemm_param.b.primary = get_data_pointer_from_memref_desc(dType, memrefDescA);
-  gemm_param.c.primary = get_data_pointer_from_memref_desc(dType, memrefDescC);
+  gemm_param.a.primary = get_base_ptr(dType, alignedPtrB, offsetB);
+  gemm_param.b.primary = get_base_ptr(dType, alignedPtrA, offsetA);
+  gemm_param.c.primary = get_base_ptr(dType, alignedPtrC, offsetC);
 
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(addr);
   sgemm.gemm(&gemm_param);
@@ -223,13 +222,12 @@ xsmm_binary_dispatch(const libxsmm_meltw_binary_type op_type,
 }
 
 extern "C" void xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
-                                  int64_t inputRank, void *inputMemrefDesc,
-                                  int64_t outputRank, void *outputMemrefDesc) {
+                                  void *alignedPtrIn, int64_t offsetIn,
+                                  void *alignedPtrOut, int64_t offsetOut) {
   libxsmm_meltw_unary_param param;
 
-  param.in.primary = get_data_pointer_from_memref_desc(dType, inputMemrefDesc);
-  param.out.primary =
-      get_data_pointer_from_memref_desc(dType, outputMemrefDesc);
+  param.in.primary = get_base_ptr(dType, alignedPtrIn, offsetIn);
+  param.out.primary = get_base_ptr(dType, alignedPtrOut, offsetOut);
 
   libxsmm_meltwfunction_unary kernel =
       reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
@@ -237,14 +235,14 @@ extern "C" void xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
 }
 
 extern "C" void xsmm_binary_invoke(const libxsmm_datatype dType, int64_t addr,
-                                   int64_t lhsRank, void *lhsMemrefDesc,
-                                   int64_t rhsRank, void *rhsMemrefDesc,
-                                   int64_t outRank, void *outMemrefDesc) {
+                                   void *alignedPtrLhs, int64_t offsetLhs,
+                                   void *alignedPtrRhs, int64_t offsetRhs,
+                                   void *alignedPtrOut, int64_t offsetOut) {
   libxsmm_meltw_binary_param param;
 
-  param.in0.primary = get_data_pointer_from_memref_desc(dType, lhsMemrefDesc);
-  param.in1.primary = get_data_pointer_from_memref_desc(dType, rhsMemrefDesc);
-  param.out.primary = get_data_pointer_from_memref_desc(dType, outMemrefDesc);
+  param.in0.primary = get_base_ptr(dType, alignedPtrLhs, offsetLhs);
+  param.in1.primary = get_base_ptr(dType, alignedPtrRhs, offsetRhs);
+  param.out.primary = get_base_ptr(dType, alignedPtrOut, offsetOut);
 
   libxsmm_meltwfunction_binary kernel =
       reinterpret_cast<libxsmm_meltwfunction_binary>(addr);
@@ -253,23 +251,20 @@ extern "C" void xsmm_binary_invoke(const libxsmm_datatype dType, int64_t addr,
 
 extern "C" void xsmm_unary_scalar_invoke(const libxsmm_datatype dType,
                                          int64_t addr, float input,
-                                         int64_t rankOutput,
-                                         void *outputMemrefDesc) {
+                                         void *alignedOut, int64_t offsetOut) {
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
   libxsmm_meltw_unary_param param;
 
   param.in.primary = (void *)&input;
-  param.out.primary =
-      get_data_pointer_from_memref_desc(dType, outputMemrefDesc);
-
-  libxsmm_meltwfunction_unary kernel =
-      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
+  param.out.primary = get_base_ptr(dType, alignedOut, offsetOut);
   kernel(&param);
 }
 
 extern "C" void xsmm_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
-                                   int64_t rankA, void *memrefDescA,
-                                   int64_t rankB, void *memrefDescB,
-                                   int64_t rankC, void *memrefDescC,
+                                   void *alignedPtrA, int64_t offsetA,
+                                   void *alignedPtrB, int64_t offsetB,
+                                   void *alignedPtrC, int64_t offsetC,
                                    int64_t numBatches) {
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
@@ -278,9 +273,9 @@ extern "C" void xsmm_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
   gemm_param.op.tertiary = (void *)&numBatchesVar;
 
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = get_data_pointer_from_memref_desc(dType, memrefDescB);
-  gemm_param.b.primary = get_data_pointer_from_memref_desc(dType, memrefDescA);
-  gemm_param.c.primary = get_data_pointer_from_memref_desc(dType, memrefDescC);
+  gemm_param.a.primary = get_base_ptr(dType, alignedPtrB, offsetB);
+  gemm_param.b.primary = get_base_ptr(dType, alignedPtrA, offsetA);
+  gemm_param.c.primary = get_base_ptr(dType, alignedPtrC, offsetC);
 
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(addr);
   sgemm.gemm(&gemm_param);
@@ -344,11 +339,12 @@ extern "C" int64_t xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" void
-xsmm_fused_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
-                         int64_t rankA, void *memrefDescA, int64_t rankB,
-                         void *memrefDescB, int64_t rankC, void *memrefDescC,
-                         int64_t rankD, void *memrefDescD, int64_t numBatches) {
+extern "C" void xsmm_fused_brgemm_invoke(const libxsmm_datatype dType,
+                                         int64_t addr, void *alignedPtrA,
+                                         int64_t offsetA, void *alignedPtrB,
+                                         int64_t offsetB, void *alignedPtrC,
+                                         int64_t offsetC, void *alignedPtrD,
+                                         int64_t offsetD, int64_t numBatches) {
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_ext_param gemm_param;
 
@@ -356,10 +352,10 @@ xsmm_fused_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
   gemm_param.op.tertiary = (void *)&numBatchesVar;
 
   // LIBXSMM col-major change A with B.
-  gemm_param.a.primary = get_data_pointer_from_memref_desc(dType, memrefDescB);
-  gemm_param.b.primary = get_data_pointer_from_memref_desc(dType, memrefDescA);
-  gemm_param.c.primary = get_data_pointer_from_memref_desc(dType, memrefDescC);
-  gemm_param.d.primary = get_data_pointer_from_memref_desc(dType, memrefDescD);
+  gemm_param.a.primary = get_base_ptr(dType, alignedPtrB, offsetB);
+  gemm_param.b.primary = get_base_ptr(dType, alignedPtrA, offsetA);
+  gemm_param.c.primary = get_base_ptr(dType, alignedPtrC, offsetC);
+  gemm_param.d.primary = get_base_ptr(dType, alignedPtrD, offsetD);
 
   sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(addr);
   sgemm.gemm_ext(&gemm_param);
@@ -540,9 +536,11 @@ extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
   } xsmm_brgemm_invoke_t;
   xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *) params;
 
-  xsmm_brgemm_invoke((libxsmm_datatype)p->dtype, p->address, p->rankA,
-                     p->memrefDescA, p->rankB, p->memrefDescB, p->rankC,
-                     p->memrefDescC, p->numBatches);
+  xsmm_brgemm_invoke((libxsmm_datatype)p->dtype, p->address,
+                     p->memrefDescA->alignedPtr, p->memrefDescA->offset,
+                     p->memrefDescB->alignedPtr, p->memrefDescB->offset,
+                     p->memrefDescC->alignedPtr, p->memrefDescC->offset,
+                     p->numBatches);
   return 0;
 }
 
@@ -559,9 +557,10 @@ extern "C" int iree_xsmm_gemm_invoke(void *context, void *params,
     mlir_memref_descriptor_t *memrefDescC;
   } xsmm_gemm_invoke_t;
   xsmm_gemm_invoke_t *p = (xsmm_gemm_invoke_t *)params;
-  xsmm_gemm_invoke((libxsmm_datatype)p->dtype, p->gemm_addr, p->rankA,
-                   p->memrefDescA, p->rankB, p->memrefDescB, p->rankC,
-                   p->memrefDescC);
+  xsmm_gemm_invoke((libxsmm_datatype)p->dtype, p->gemm_addr,
+                   p->memrefDescA->alignedPtr, p->memrefDescA->offset,
+                   p->memrefDescB->alignedPtr, p->memrefDescB->offset,
+                   p->memrefDescC->alignedPtr, p->memrefDescC->offset);
   return 0;
 }
 
@@ -577,8 +576,10 @@ extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
   } xsmm_unary_invoke_t;
   xsmm_unary_invoke_t *p = (xsmm_unary_invoke_t *)params;
 
-  xsmm_unary_invoke((libxsmm_datatype)p->dtype, p->address, p->inputRank,
-                    p->inputMemrefDesc, p->outputRank, p->outputMemrefDesc);
+  xsmm_unary_invoke((libxsmm_datatype)p->dtype, p->address,
+                    p->inputMemrefDesc->alignedPtr, p->inputMemrefDesc->offset,
+                    p->outputMemrefDesc->alignedPtr,
+                    p->outputMemrefDesc->offset);
   return 0;
 }
 
@@ -596,9 +597,10 @@ extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
   } xsmm_binary_invoke_t;
   xsmm_binary_invoke_t *p = (xsmm_binary_invoke_t *)params;
 
-  xsmm_binary_invoke((libxsmm_datatype)p->dtype, p->address, p->lhsRank,
-                     p->lhsMemrefDesc, p->rhsRank, p->rhsMemrefDesc, p->outRank,
-                     p->outMemrefDesc);
+  xsmm_binary_invoke((libxsmm_datatype)p->dtype, p->address,
+                     p->lhsMemrefDesc->alignedPtr, p->lhsMemrefDesc->offset,
+                     p->rhsMemrefDesc->alignedPtr, p->rhsMemrefDesc->offset,
+                     p->outMemrefDesc->alignedPtr, p->outMemrefDesc->offset);
   return 0;
 }
 

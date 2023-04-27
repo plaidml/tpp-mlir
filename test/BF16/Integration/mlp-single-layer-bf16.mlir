@@ -1,9 +1,3 @@
-// RUN: tpp-opt %s -convert-check-to-loops -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts |\
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
-//
-
 // Validate default pipeline
 // RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
@@ -26,5 +20,13 @@ func.func @entry(){
   linalg.fill ins(%c1:bf16) outs(%result:memref<128x512xbf16>)
   %threshold = arith.constant 1.0:bf16
   check.expect_almost_eq(%arg3, %result, %threshold): memref<128x512xbf16>, memref<128x512xbf16>, bf16
+  // Explicit manual buffer deallocation is required as BufferDeallocationPass
+  // inserts automatic deallocation before type casts used in generated XSMM
+  // function calls which invalidates the memory before computation.
+  memref.dealloc %arg0 : memref<128x256xbf16>
+  memref.dealloc %arg2 : memref<512xbf16>
+  memref.dealloc %arg3 : memref<128x512xbf16>
+  memref.dealloc %wt : memref<128x512x2xbf16>
+  memref.dealloc %result : memref<128x512xbf16>
   return
 }
