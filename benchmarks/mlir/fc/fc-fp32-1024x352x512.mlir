@@ -10,11 +10,11 @@
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
-!A = tensor<16x8x64x64xf32>
-!B = tensor<11x8x64x32xf32>
-!C = tensor<16x11x64x32xf32>
+!A = tensor<32x16x32x32xf32>
+!B = tensor<11x16x32x32xf32>
+!C = tensor<32x11x32x32xf32>
 
-// GEMM packed with tile size: 64, 32, 64
+// GEMM packed with tile size: 32, 32, 32
 func.func @entry(%arg0: !A, %arg1: !B, %bias: !C, %output: !C) -> !C {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
