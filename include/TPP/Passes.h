@@ -67,6 +67,10 @@ namespace math {
 class MathDialect;
 } // namespace math
 
+namespace tensor {
+class TensorDialect;
+} // namespace tensor
+
 namespace tpp {
 class TppDialect;
 

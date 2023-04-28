@@ -68,6 +68,8 @@ def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "func::FuncOp"> {
   let description = [{
     Convert VNNI dialect to TPP dialect.
   }];
+  let dependentDialects = ["vnni::VNNIDialect", "tensor::TensorDialect",
+                           "tpp::TppDialect"];
 }
 
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
@@ -124,6 +126,7 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
                "Blocking factor for vnni layout">
   ];
   let constructor = "mlir::tpp::createPackVNNIPass()";
+  let dependentDialects = ["vnni::VNNIDialect", "tensor::TensorDialect"];
 }
 
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
