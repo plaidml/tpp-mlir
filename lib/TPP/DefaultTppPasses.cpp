@@ -211,7 +211,6 @@ private:
 
     // Postprocess buffers.
     pm.addPass(bufferization::createBufferHoistingPass());
-    pm.addPass(bufferization::createBufferDeallocationPass());
     if (defHeapToStack)
       pm.addPass(createHeapToStackPass());
 

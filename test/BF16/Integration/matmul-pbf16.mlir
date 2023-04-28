@@ -40,5 +40,9 @@ func.func @entry() {
   %f1 = arith.extf %v0:vector<4x4xbf16> to vector<4x4xf32>
   vector.print %f1 : vector<4x4xf32>
 
+  memref.dealloc %da : memref<4x8xbf16>
+  memref.dealloc %0 : memref<4x4x2xbf16>
+  memref.dealloc %D : memref<4x4xbf16>
+
   return
 }

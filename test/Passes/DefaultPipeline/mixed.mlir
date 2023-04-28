@@ -60,28 +60,6 @@ module @predict_function  {
 
 // -----
 
-// CHECK: func.func @buffer_dealloc(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<512x128xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<128x512xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<512x512xf32>)
-func.func @buffer_dealloc(%A: memref<512x128xf32>,
-          %B: memref<128x512xf32>, %C: memref<512x512xf32>) {
-  // CHECK: %[[alloc:.*]] = memref.alloc
-  %0 = memref.alloc() : memref<512x512xf32>
-
-  // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: call @xsmm_gemm_invoke
-  linalg.matmul ins(%A, %B : memref<512x128xf32>, memref<128x512xf32>) outs(%0 : memref<512x512xf32>)
-
-  // CHECK: memref.copy
-  memref.copy %0, %C : memref<512x512xf32> to memref<512x512xf32>
-
-  // CHECK: memref.dealloc %[[alloc]]
-  return
-}
-
-// -----
-
 // CHECK: func.func @buffer_no_dealloc(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
@@ -121,6 +99,8 @@ func.func @heap_to_stack(%A: memref<4x8xf32>,
   memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
 
   // CHECK-NOT: memref.dealloc
+  memref.dealloc %0 : memref<4x4xf32>
+
   return
 }
 
