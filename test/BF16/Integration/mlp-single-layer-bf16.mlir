@@ -26,5 +26,13 @@ func.func @entry(){
   linalg.fill ins(%c1:bf16) outs(%result:memref<128x512xbf16>)
   %threshold = arith.constant 1.0:bf16
   check.expect_almost_eq(%arg3, %result, %threshold): memref<128x512xbf16>, memref<128x512xbf16>, bf16
+  // Explicit manual buffer deallocation is required as BufferDeallocationPass
+  // inserts automatic deallocation before type casts used in generated XSMM
+  // function calls which invalidates the memory before computation.
+  memref.dealloc %arg0 : memref<128x256xbf16>
+  memref.dealloc %arg2 : memref<512xbf16>
+  memref.dealloc %arg3 : memref<128x512xbf16>
+  memref.dealloc %wt : memref<128x512x2xbf16>
+  memref.dealloc %result : memref<128x512xbf16>
   return
 }
