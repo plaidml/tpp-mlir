@@ -170,17 +170,18 @@ func.func @pack_matmul(
 
 // -----
 
-func.func @fold_const_pack() ->  tensor<8x2x1x1x32x32xi64> {
+func.func @const_pack() ->  tensor<8x2x1x1x32x32xi64> {
   %cst = arith.constant dense<1> : tensor<1x1x64x256xi64>
   %0 = tensor.empty() : tensor<8x2x1x1x32x32xi64>
   %pack = tensor.pack %cst outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %0 : tensor<1x1x64x256xi64> -> tensor<8x2x1x1x32x32xi64>
   return  %pack : tensor<8x2x1x1x32x32xi64>
 }
 
-// CHECK-LABEL: func.func @fold_const_pack(
-// CHECK-NOT: tensor.pack
-// CHECK: %[[CST:.+]] = arith.constant dense<1> : tensor<8x2x1x1x32x32xi64>
-// CHECK-NEXT: return %[[CST]] : tensor<8x2x1x1x32x32xi64>
+// By default we don't constant fold pack. Enable it using `fold-constant=true`.
+// CHECK-LABEL: func.func @const_pack(
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<8x2x1x1x32x32xi64>
+// CHECK: %[[PACKED:.+]] = scf.for
+// CHECK: return %[[PACKED]] : tensor<8x2x1x1x32x32xi64>
 
 // -----
 

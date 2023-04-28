@@ -5,7 +5,7 @@
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext &> %s.no.fold.mlir
 //
 
-// RUN: tpp-opt %s -constant-fold-pack -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-perf-to-loops -convert-perf-to-func -convert-linalg-to-parallel-loops -canonicalize -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
+// RUN: tpp-opt %s -constant-fold-pack="fold-constant=true" -generalize-tensor-pack-unpack -empty-tensor-to-alloc-tensor -one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map"  -canonicalize -drop-equivalent-buffer-results -finalizing-bufferize -convert-perf-to-loops -convert-perf-to-func -convert-linalg-to-parallel-loops -canonicalize -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -canonicalize -reconcile-unrealized-casts | \
 // RUN: mlir-cpu-runner \
 // RUN:  -e entry -entry-point-result=void  \
 // RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%llvmlibdir/libmlir_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext &> %s.with.fold.mlir
@@ -16,7 +16,7 @@
 // RUN: rm -rf %s.no.fold.mlir
 //
 
-// RUN: tpp-opt %s -constant-fold-pack -canonicalize | FileCheck %s
+// RUN: tpp-opt %s -constant-fold-pack="fold-constant=true" -canonicalize | FileCheck %s
 //
 
 // CHECK-LABEL: func.func @pack_fn

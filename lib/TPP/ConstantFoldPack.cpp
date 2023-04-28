@@ -177,12 +177,19 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
   void runOnOperation() override {
     auto module = getOperation();
     IRRewriter rewriter(&getContext());
-    module->walk(
-        [&](tensor::PackOp packOp) { foldPackIntoSplatCst(rewriter, packOp); });
+    // Enable folding constant and tensor.pack if the user requests it, as it
+    // changes the semantics of the program. `tensor.pack` is a writable
+    // operation while constant is not; thus, we don't know the user intent.
+    // Does the user want a writable tensor or a constant one?
+    if (foldConstant) {
+      module->walk([&](tensor::PackOp packOp) {
+        foldPackIntoSplatCst(rewriter, packOp);
+      });
+      module->walk(
+          [&](tensor::PackOp packOp) { foldPackIntoCst(rewriter, packOp); });
+    }
     module->walk(
         [&](tensor::PackOp packOp) { foldPackIntoFill(rewriter, packOp); });
-    module->walk(
-        [&](tensor::PackOp packOp) { foldPackIntoCst(rewriter, packOp); });
   }
 };
 
