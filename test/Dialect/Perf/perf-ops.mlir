@@ -165,11 +165,11 @@ func.func @perf_example(%A: tensor<4x8xf32>,
 // -----
 
 // Intended lowering of the perf dialect based on the above example.
-func.func private @perf_start_timer() -> i64 attributes {llvm.emit_c_interface}
-func.func private @perf_stop_timer(i64) -> f64 attributes {llvm.emit_c_interface}
-func.func private @perf_sink_tensor_f32(tensor<*xf32>) attributes {llvm.emit_c_interface}
-func.func private @perf_mean(memref<*xf64>) -> f64 attributes {llvm.emit_c_interface}
-func.func private @perf_stdev(memref<*xf64>, f64) -> f64 attributes {llvm.emit_c_interface}
+func.func private @perf_start_timer() -> i64 
+func.func private @perf_stop_timer(i64) -> f64 
+func.func private @perf_sink_tensor_f32(tensor<*xf32>) 
+func.func private @perf_mean(memref<*xf64>) -> f64 
+func.func private @perf_stdev(memref<*xf64>, f64) -> f64 
 
 // CHECK-LABEL: @perf_example_lowered
 func.func @perf_example_lowered(%A: tensor<4x8xf32>,

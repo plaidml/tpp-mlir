@@ -19,59 +19,51 @@
 #include "mlir/ExecutionEngine/Float16bits.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-// TODO: here we want to have dispatch/invoke only for unary/binary and ternary.
-// matmul, brgemm are way too specific.
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_gemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
+xsmm_gemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
+                   int64_t, int64_t, const libxsmm_gemm_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_gemm_dispatch(
-    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
-    int64_t, const libxsmm_gemm_flags);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_unary_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_unary_dispatch(
     const libxsmm_meltw_unary_type, const libxsmm_datatype, int64_t, int64_t,
     int64_t, int64_t, const libxsmm_meltw_unary_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_binary_dispatch(
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_binary_dispatch(
     const libxsmm_meltw_binary_type, const libxsmm_datatype, int64_t, int64_t,
     int64_t, int64_t, int64_t, const libxsmm_meltw_binary_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_xsmm_brgemm_dispatch(
-    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
-    int64_t, const libxsmm_gemm_flags);
-
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-_mlir_ciface_xsmm_fused_brgemm_dispatch(const libxsmm_datatype, bool isVNNI,
-                                        int64_t, int64_t, int64_t, int64_t,
-                                        int64_t, int64_t);
-
-//TODO: Remove this function as all unary ops are expected to work in place.
-extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke(const libxsmm_datatype, int64_t,
-                               UnrankedMemRefType<char> *,
-                               UnrankedMemRefType<char> *);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_binary_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *);
+xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
+                     int64_t, int64_t, const libxsmm_gemm_flags);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_invoke_inline(const libxsmm_datatype, int64_t,
-                                      UnrankedMemRefType<char> *);
+xsmm_gemm_invoke(const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
+                 int64_t offsetA, void *alignedPtrB, int64_t offsetB,
+                 void *alignedPtrC, int64_t offsetC);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-_mlir_ciface_xsmm_unary_scalar_invoke(const libxsmm_datatype, int64_t, float,
-                                      UnrankedMemRefType<char> *);
+xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
+                  void *alignedPtrIn, int64_t offsetIn, void *alignedPtrOut,
+                  int64_t offsetOut);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_brgemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_unary_scalar_invoke(const libxsmm_datatype, int64_t addr, float scalar,
+                         void *alignedPtrOut, int64_t offsetOut);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT void _mlir_ciface_xsmm_fused_brgemm_invoke(
-    const libxsmm_datatype, int64_t, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, UnrankedMemRefType<char> *,
-    UnrankedMemRefType<char> *, int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_binary_invoke(const libxsmm_datatype dType, int64_t addr,
+                   void *alignedPtrLhs, int64_t offsetLhs, void *alignedPtrRhs,
+                   int64_t offsetRhs, void *alignedPtrOut, int64_t offsetOut);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
+                   void *alignedPtrA, int64_t offsetA, void *alignedPtrB,
+                   int64_t offsetB, void *alignedPtrC, int64_t offsetC,
+                   int64_t numBatches);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void xsmm_fused_brgemm_invoke(
+    const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
+    int64_t offsetA, void *alignedPtrB, int64_t offsetB, void *alignedPtrC,
+    int64_t offsetC, void *alignedPtrD, int64_t offsetD, int64_t numBatches);
 
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.

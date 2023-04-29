@@ -16,7 +16,7 @@
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @bigadd(%A: tensor<32x16xf32>,
-                  %B: tensor<32x16xf32>) -> tensor<32x16xf32> attributes {llvm.emit_c_interface} {
+                  %B: tensor<32x16xf32>) -> tensor<32x16xf32>  {
   // TPP: tpp.add ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0, #map0],
                         iterator_types = ["parallel", "parallel"] }

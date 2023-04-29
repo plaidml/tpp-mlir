@@ -18,8 +18,8 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
- func.func @gemmtpp(%A: memref<4x8xf32>,
-          %B: memref<8x4xf32>, %C: memref<4x4xf32>) attributes {llvm.emit_c_interface} {
+ func.func @gemm_tpp(%A: memref<4x8xf32>,
+           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
     // TPP: tpp.gemm
     linalg.generic {indexing_maps = [#map0, #map1, #map2],
                          iterator_types = ["parallel", "parallel", "reduction"]}
@@ -48,7 +48,7 @@ module {
     linalg.fill ins(%cst_zero : f32) outs(%C : memref<4x4xf32>)
 
     // Call kernel.
-    call @gemmtpp(%da, %db, %C)
+    call @gemm_tpp(%da, %db, %C)
        : (memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
 
     // Print result.
@@ -69,5 +69,5 @@ module {
 
     return
   }
-  func.func private @printMemrefF32(%ptr : memref<*xf32>) attributes {llvm.emit_c_interface}
+  func.func private @printMemrefF32(%ptr : memref<*xf32>) 
 }

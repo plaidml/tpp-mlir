@@ -18,7 +18,7 @@
 module {
 
   func.func @copytpp(%A: tensor<4x4xf32>,
-                     %B:tensor<4x4xf32> ) -> tensor<4x4xf32> attributes {llvm.emit_c_interface} {
+                     %B:tensor<4x4xf32> ) -> tensor<4x4xf32>  {
     // TPP: tpp.identity
     %O = linalg.generic { indexing_maps = [#map0, #map0],
                           iterator_types = ["parallel", "parallel"] }

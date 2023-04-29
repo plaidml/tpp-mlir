@@ -24,29 +24,9 @@ using namespace mlir::xsmm;
 
 namespace {
 
-// Cast memref to unranked memref and leave all the other operands as they are.
 static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands,
+                                                   IndexType indexType,
                                                    PatternRewriter &rewriter) {
-  SmallVector<Type> results;
-  // One extra operand for datatype
-  results.reserve(operands.size() + 1);
-  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-  results.push_back(integer64);
-  for (Value operand : operands) {
-    Type operandType = operand.getType();
-    if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
-      UnrankedMemRefType unrankedMemref = UnrankedMemRefType::get(
-          memrefType.getElementType(), memrefType.getMemorySpace());
-      results.push_back(unrankedMemref);
-    } else
-      results.push_back(operandType);
-  }
-  return results;
-}
-
-static SmallVector<Type>
-extractInvokeOperandTypesForMeta(OperandRange operands, IndexType indexType,
-                                 PatternRewriter &rewriter) {
   SmallVector<Type> results;
   // One extra operand for datatype
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -66,41 +46,11 @@ extractInvokeOperandTypesForMeta(OperandRange operands, IndexType indexType,
   return results;
 }
 
-// Similar to 'extractInvokeOperandTypes' but acting on Value. Memref
-// are casted by introducing castOp. We cast the memref to clear the shape
-// and have a single function signature in the runtime.
-static SmallVector<Value> getMemRefOperands(OpBuilder &b, Location loc,
-                                            ValueRange operands,
-                                            IntegerAttr dataTypeAttr) {
-  SmallVector<Value> res;
-  // One extra operand for datatype
-  res.reserve(operands.size() + 1);
-  IntegerType integer64 = IntegerType::get(b.getContext(), 64);
-  res.push_back(b.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
-  llvm::DenseMap<Value, Value> operandToCastedOperand;
-  for (Value operand : operands) {
-    auto memrefType = operand.getType().dyn_cast<MemRefType>();
-    if (!memrefType)
-      res.push_back(operand);
-    else {
-      MemRefType rankedMemref = operand.getType().dyn_cast<MemRefType>();
-      UnrankedMemRefType unrankedMemref = UnrankedMemRefType::get(
-          rankedMemref.getElementType(), rankedMemref.getMemorySpace());
-      if (operandToCastedOperand.count(operand)) {
-        res.push_back(operandToCastedOperand[operand]);
-        continue;
-      }
-      Value cast = b.create<memref::CastOp>(loc, unrankedMemref, operand);
-      operandToCastedOperand[operand] = cast;
-      res.push_back(cast);
-    }
-  }
-  return res;
-}
-
-static SmallVector<Value>
-getMemRefOperandsUsingMetadata(OpBuilder &builder, Location loc,
-                               ValueRange operands, IntegerAttr dataTypeAttr) {
+// Extract the operands to be used in the function call. For each memref operand
+// extract the aligned pointer and the offset.
+static SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
+                                      ValueRange operands,
+                                      IntegerAttr dataTypeAttr) {
   SmallVector<Value> res;
   IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
   res.push_back(
@@ -120,32 +70,30 @@ getMemRefOperandsUsingMetadata(OpBuilder &builder, Location loc,
     SmallVector<Type> stridesTypes(memrefType.getRank(), offsetType);
     auto meta = builder.create<memref::ExtractStridedMetadataOp>(
         loc, baseMemrefType, offsetType, sizesTypes, stridesTypes, operand);
-    Value basePointerAsIndex =
+    Value alignedPointerAsIndex =
         builder.create<memref::ExtractAlignedPointerAsIndexOp>(loc, basePtrType,
                                                                operand);
-    Value basePointerAsI64 = builder.create<arith::IndexCastOp>(
-        loc, builder.getIntegerType(64), basePointerAsIndex);
-
+    Value alignedPointerAsI64 = builder.create<arith::IndexCastOp>(
+        loc, builder.getIntegerType(64), alignedPointerAsIndex);
     // TODO: non-POD will require an LLVMTypeConverter.
-    Value basePointer = builder.create<LLVM::IntToPtrOp>(
+    Value alignedPointer = builder.create<LLVM::IntToPtrOp>(
         loc, LLVM::LLVMPointerType::get(memrefType.getElementType()),
-        basePointerAsI64);
-    res.push_back(basePointer);
-    res.push_back(meta.getOffset());
+        alignedPointerAsI64);
+    Value offset = meta.getOffset();
+    res.push_back(alignedPointer);
+    res.push_back(offset);
   }
   return res;
 }
 
 static LogicalResult buildInvokeCall(Location loc, std::string funcName,
-                                     Operation *op, bool useMeta,
-                                     PatternRewriter &rewriter,
+                                     Operation *op, PatternRewriter &rewriter,
                                      IntegerAttr dataTypeAttr) {
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
   auto libFnType = rewriter.getFunctionType(
-      (!useMeta) ? extractInvokeOperandTypes(op->getOperands(), rewriter)
-                 : extractInvokeOperandTypesForMeta(
-                       op->getOperands(), rewriter.getIndexType(), rewriter),
+      extractInvokeOperandTypes(op->getOperands(), rewriter.getIndexType(),
+                                rewriter),
       {});
 
   if (!module.lookupSymbol(fnName)) {
@@ -155,114 +103,80 @@ static LogicalResult buildInvokeCall(Location loc, std::string funcName,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    if (!useMeta) {
-      // Insert a function attribute that will trigger the emission of the
-      // corresponding `_mlir_ciface_xxx` interface so that external libraries
-      // see a normalized ABI.
-      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                      UnitAttr::get(op->getContext()));
-    }
     funcOp.setPrivate();
   }
 
   rewriter.create<func::CallOp>(
       loc, fnName.getValue(), TypeRange(),
-      (!useMeta)
-          ? getMemRefOperands(rewriter, loc, op->getOperands(), dataTypeAttr)
-          : getMemRefOperandsUsingMetadata(rewriter, loc, op->getOperands(),
-                                           dataTypeAttr));
+      getOperands(rewriter, loc, op->getOperands(), dataTypeAttr));
   return success();
 }
 
 struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
-  ConvertTernaryXsmmOp(MLIRContext *context, bool useMeta,
-                       PatternBenefit benefit = 1)
-      : OpRewritePattern<TernaryOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<TernaryOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TernaryOp ternaryOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName =
         "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
-                                  useMeta, rewriter,
-                                  ternaryOp.getDataTypeAttr()))) {
+                                  rewriter, ternaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(ternaryOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
-  ConvertGemmXsmmOp(MLIRContext *context, bool useMeta,
-                    PatternBenefit benefit = 1)
-      : OpRewritePattern<GemmOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<GemmOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GemmOp gemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_gemm_invoke";
-    if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, useMeta,
-                                  rewriter, gemmOp.getDataTypeAttr()))) {
+    if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, rewriter,
+                                  gemmOp.getDataTypeAttr()))) {
       rewriter.eraseOp(gemmOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertBrgemmXsmmOp : public OpRewritePattern<BrgemmOp> {
-  ConvertBrgemmXsmmOp(MLIRContext *context, bool useMeta,
-                      PatternBenefit benefit = 1)
-      : OpRewritePattern<BrgemmOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<BrgemmOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_brgemm_invoke";
     if (succeeded(buildInvokeCall(brgemmOp.getLoc(), funcName, brgemmOp,
-                                  useMeta, rewriter,
-                                  brgemmOp.getDataTypeAttr()))) {
+                                  rewriter, brgemmOp.getDataTypeAttr()))) {
       rewriter.eraseOp(brgemmOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertQuarternaryXsmmOp : public OpRewritePattern<QuarternaryOp> {
-  ConvertQuarternaryXsmmOp(MLIRContext *context, bool useMeta,
-                           PatternBenefit benefit = 1)
-      : OpRewritePattern<QuarternaryOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<QuarternaryOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(QuarternaryOp quarternaryOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName =
         "xsmm_" + stringifyEnum(quarternaryOp.getCallee()).str() + "_invoke";
     if (succeeded(buildInvokeCall(quarternaryOp.getLoc(), funcName,
-                                  quarternaryOp, useMeta, rewriter,
+                                  quarternaryOp, rewriter,
                                   quarternaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(quarternaryOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
-  ConvertUnaryXsmmOp(MLIRContext *context, bool useMeta,
-                     PatternBenefit benefit = 1)
-      : OpRewritePattern<UnaryOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<UnaryOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(UnaryOp unaryOp,
                                 PatternRewriter &rewriter) const override {
@@ -273,45 +187,35 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
-    if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, useMeta,
-                                  rewriter, unaryOp.getDataTypeAttr()))) {
+    if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, rewriter,
+                                  unaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(unaryOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
-  ConvertBinaryXsmmOp(MLIRContext *context, bool useMeta,
-                      PatternBenefit benefit = 1)
-      : OpRewritePattern<BinaryOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<BinaryOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_binary_invoke";
     if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
-                                  useMeta, rewriter,
-                                  binaryOp.getDataTypeAttr()))) {
+                                  rewriter, binaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(binaryOp);
       return success();
     }
     return failure();
   }
-
-private:
-  bool useMeta = false;
 };
 
-// TODO: move rewriter as first arg.
-static func::CallOp buildDispatchCall(Location loc,
+static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
-                                      ModuleOp module, FlatSymbolRefAttr fnName,
-                                      bool useMeta, RewriterBase &rewriter) {
+                                      ModuleOp module,
+                                      FlatSymbolRefAttr fnName) {
   auto libFnType = rewriter.getFunctionType(
       dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
 
@@ -322,13 +226,6 @@ static func::CallOp buildDispatchCall(Location loc,
                                std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
         rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    if (!useMeta) {
-      // Insert a function attribute that will trigger the emission of the
-      // corresponding `_mlir_ciface_xxx` interface so that external libraries
-      // see a normalized ABI.
-      funcOp->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
-                      UnitAttr::get(rewriter.getContext()));
-    }
     funcOp.setPrivate();
   }
 
@@ -367,7 +264,7 @@ void addKindOperand(RewriterBase &rewriter, BrgemmDispatchOp dispatchOp,
 
 template <typename OpTy>
 static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
-                                     std::string funcName, bool useMeta) {
+                                     std::string funcName) {
   Location loc = dispatchOp.getLoc();
   FlatSymbolRefAttr fnName =
       SymbolRefAttr::get(rewriter.getContext(), funcName);
@@ -420,66 +317,45 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
 
-  func::CallOp call =
-      buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                        fnName, useMeta, rewriter);
+  func::CallOp call = buildDispatchCall(rewriter, loc, dispatchOperands,
+                                        dispatchOperandTypes, module, fnName);
   rewriter.replaceOp(dispatchOp, call.getResult(0));
   return success();
 }
 
 struct ConvertGemmDispatchOp : public OpRewritePattern<GemmDispatchOp> {
-  ConvertGemmDispatchOp(MLIRContext *context, bool useMeta,
-                        PatternBenefit benefit = 1)
-      : OpRewritePattern<GemmDispatchOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<GemmDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<GemmDispatchOp>(rewriter, dispatchOp,
-                                           "xsmm_gemm_dispatch", useMeta);
+                                           "xsmm_gemm_dispatch");
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertBrgemmDispatchOp : public OpRewritePattern<BrgemmDispatchOp> {
-  ConvertBrgemmDispatchOp(MLIRContext *context, bool useMeta,
-                          PatternBenefit benefit = 1)
-      : OpRewritePattern<BrgemmDispatchOp>(context, benefit), useMeta(useMeta) {
-  }
+  using OpRewritePattern<BrgemmDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BrgemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<BrgemmDispatchOp>(rewriter, dispatchOp,
-                                             "xsmm_brgemm_dispatch", useMeta);
+                                             "xsmm_brgemm_dispatch");
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertTernaryDispatchOp : public OpRewritePattern<TernaryDispatchOp> {
-  ConvertTernaryDispatchOp(MLIRContext *context, bool useMeta,
-                           PatternBenefit benefit = 1)
-      : OpRewritePattern<TernaryDispatchOp>(context, benefit),
-        useMeta(useMeta) {}
+  using OpRewritePattern<TernaryDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(TernaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<TernaryDispatchOp>(rewriter, dispatchOp,
-                                              "xsmm_ternary_dispatch", useMeta);
+                                              "xsmm_ternary_dispatch");
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertQuarternaryDispatchOp
     : public OpRewritePattern<QuarternaryDispatchOp> {
-  ConvertQuarternaryDispatchOp(MLIRContext *context, bool useMeta,
-                               PatternBenefit benefit = 1)
-      : OpRewritePattern<QuarternaryDispatchOp>(context, benefit),
-        useMeta(useMeta) {}
+  using OpRewritePattern<QuarternaryDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(QuarternaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
@@ -511,74 +387,54 @@ struct ConvertQuarternaryDispatchOp
           rewriter.create<arith::ConstantOp>(loc, integer64, attr));
       dispatchOperandTypes.push_back(integer64);
     }
-    func::CallOp call =
-        buildDispatchCall(loc, dispatchOperands, dispatchOperandTypes, module,
-                          fnName, useMeta, rewriter);
+    func::CallOp call = buildDispatchCall(rewriter, loc, dispatchOperands,
+                                          dispatchOperandTypes, module, fnName);
     rewriter.replaceOp(dispatchOp, call.getResult(0));
     return success();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertBinaryDispatchOp : public OpRewritePattern<BinaryDispatchOp> {
-  ConvertBinaryDispatchOp(MLIRContext *context, bool useMeta,
-                          PatternBenefit benefit = 1)
-      : OpRewritePattern<BinaryDispatchOp>(context, benefit), useMeta(useMeta) {
-  }
+  using OpRewritePattern<BinaryDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BinaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<BinaryDispatchOp>(rewriter, dispatchOp,
-                                             "xsmm_binary_dispatch", useMeta);
+                                             "xsmm_binary_dispatch");
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
-  ConvertUnaryDispatchOp(MLIRContext *context, bool useMeta,
-                         PatternBenefit benefit = 1)
-      : OpRewritePattern<UnaryDispatchOp>(context, benefit), useMeta(useMeta) {}
+  using OpRewritePattern<UnaryDispatchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(UnaryDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<UnaryDispatchOp>(rewriter, dispatchOp,
-                                            "xsmm_unary_dispatch", useMeta);
+                                            "xsmm_unary_dispatch");
     return success();
   }
-
-private:
-  bool useMeta = false;
 };
 
 struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
   ConvertXsmmToFunc() = default;
-  ConvertXsmmToFunc(bool useExtractMetaData) {
-    this->useExtractMetaData = useExtractMetaData;
-  }
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    tpp::populateXsmmToFuncPatterns(patterns, useExtractMetaData);
+    tpp::populateXsmmToFuncPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
 } // namespace
 
-void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns,
-                                           bool useExtractMetaData) {
+void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   patterns
       .add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp, ConvertBinaryXsmmOp,
            ConvertUnaryXsmmOp, ConvertGemmXsmmOp, ConvertBrgemmXsmmOp>(
-          patterns.getContext(), useExtractMetaData);
+          patterns.getContext());
   patterns.add<ConvertQuarternaryDispatchOp, ConvertTernaryDispatchOp,
                ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,
                ConvertGemmDispatchOp, ConvertBrgemmDispatchOp>(
-      patterns.getContext(), useExtractMetaData);
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>

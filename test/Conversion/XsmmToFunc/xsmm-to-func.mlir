@@ -114,3 +114,111 @@ func.func @dispatch_gemm() -> i64 {
 // LIBXSMM is col-major check we swap the flag for A and B (see enum for GemmFlags)
 // CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : i64
 // CHECK: call @xsmm_gemm_dispatch(%[[C2]], %[[C1]], %[[C2]], %[[C3]], %[[C4]], %[[C5]], %[[C6]], %[[C2048]])
+
+// -----
+
+func.func @invoke_brgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
+                           %arg2: memref<4x4xf32>) -> memref<4x4xf32> {
+  %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5] flags = (none) data_type = f32
+  %c2_i64 = arith.constant 2 : i64
+  xsmm.brgemm(data_type = f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
+    : (i64, memref<2x5x4xf32>, memref<2x4x5xf32>, memref<4x4xf32>, i64) -> ()
+  return %arg2 : memref<4x4xf32>
+}
+
+// CHECK-LABEL: invoke_brgemm
+// CHECK-SAME: %[[ARG0:.+]]: memref<2x5x4xf32>, %[[ARG1:.+]]: memref<2x4x5xf32>, %[[ARG2:.+]]: memref<4x4xf32>
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK: %[[ADDR:.+]] = call @xsmm_brgemm_dispatch
+// CHECK: %[[PTR:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK-NEXT: %[[CST_PTR:.+]] = arith.index_cast %[[PTR]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR:.+]] = llvm.inttoptr %[[CST_PTR]] : i64 to !llvm.ptr<f32>
+// CHECK: %[[PTR1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+// CHECK-NEXT: %[[CST_PTR1:.+]] = arith.index_cast %[[PTR1]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR1:.+]] = llvm.inttoptr %[[CST_PTR1]] : i64 to !llvm.ptr<f32>
+// CHECK: %[[PTR2:.+]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+// CHECK-NEXT: %[[CST_PTR2:.+]] = arith.index_cast %[[PTR2]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR2:.+]] = llvm.inttoptr %[[CST_PTR2]] : i64 to !llvm.ptr<f32>
+// CHECK: xsmm_brgemm_invoke(%[[C1]], %[[ADDR]], %[[LLVM_PTR]], %[[C0]], %[[LLVM_PTR1]], %[[C0]], %[[LLVM_PTR2]], %[[C0]], %[[C2]])
+
+// -----
+
+func.func @invoke_unary(%arg0: memref<512xbf16>, %arg1: memref<128x512xbf16>) {
+  %0 = xsmm.unary.dispatch identity [128, 512, 512, 512]  flags = (bcast_col) data_type = bf16
+  xsmm.unary identity(data_type = bf16, %0, %arg0, %arg1) : (i64, memref<512xbf16>, memref<128x512xbf16>) -> ()
+  return
+}
+
+// CHECK-LABEL: invoke_unary
+// CHECK-SAME: %[[ARG0:.+]]: memref<512xbf16>, %[[ARG1:.+]]: memref<128x512xbf16>
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK: %[[ADDR:.+]] = call @xsmm_unary_dispatch
+// CHECK: %[[PTR:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK-NEXT: %[[PTR_CST:.+]] = arith.index_cast %[[PTR]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR:.+]] = llvm.inttoptr %[[PTR_CST]] : i64 to !llvm.ptr<bf16>
+// CHECK: %[[PTR1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+// CHECK-NEXT: %[[PTR_CST1:.+]] = arith.index_cast %[[PTR1]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR1:.+]] = llvm.inttoptr %[[PTR_CST1]] : i64 to !llvm.ptr<bf16>
+// CHECK: call @xsmm_unary_invoke(%[[C2]], %[[ADDR]], %[[LLVM_PTR]], %[[C0]], %[[LLVM_PTR1]], %[[C0]])
+
+// -----
+
+func.func @invoke_gemm_vnni(%arg0: memref<128x256xbf16>, %arg1: memref<128x512x2xbf16>, %arg2: memref<128x512xbf16>) {
+  %0 = xsmm.gemm.dispatch [128, 512, 256, 256, 512, 512]  flags = (vnni_b) data_type = bf16
+  xsmm.gemm(data_type = bf16, %0, %arg0, %arg1, %arg2) 
+    : (i64, memref<128x256xbf16>, memref<128x512x2xbf16>, memref<128x512xbf16>) -> ()
+  return
+}
+
+// CHECK-LABEL: invoke_gemm_vnni
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x256xbf16>, %[[ARG1:.+]]: memref<128x512x2xbf16>, %[[ARG2:.+]]: memref<128x512xbf16>
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK: %[[ADDR:.+]] = call @xsmm_gemm_dispatch
+// CHECK: %[[PTR:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK-NEXT: %[[PTR_CST:.+]] = arith.index_cast %[[PTR]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR:.+]] = llvm.inttoptr %[[PTR_CST]] : i64 to !llvm.ptr<bf16>
+// CHECK: %[[PTR1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+// CHECK-NEXT: %[[PTR_CST1:.+]] = arith.index_cast %[[PTR1]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR1:.+]] = llvm.inttoptr %[[PTR_CST1]] : i64 to !llvm.ptr<bf16>
+// CHECK: %[[PTR2:.+]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+// CHECK-NEXT: %[[PTR_CST2:.+]] = arith.index_cast %[[PTR2]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR2:.+]] = llvm.inttoptr %[[PTR_CST2]] : i64 to !llvm.ptr<bf16>
+// CHECK: call @xsmm_gemm_invoke(%[[C2]], %[[ADDR]], %[[LLVM_PTR]], %[[C0]], %[[LLVM_PTR1]], %[[C0]], %[[LLVM_PTR2]], %[[C0]])
+
+// -----
+
+// CHECK-LABEL: dispatch_gemm_vnni
+func.func @dispatch_gemm_vnni() -> i64 {
+  // CHECK: %[[C2:.+]] = arith.constant 2 : i64
+  // CHECK-DAG: %[[C128:.+]] = arith.constant 128 : i64
+  // CHECK-DAG: %[[C512:.+]] = arith.constant 512 : i64
+  // CHECK-DAG: %[[C256:.+]] = arith.constant 256 : i64
+  // CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : i64
+  %0 = xsmm.gemm.dispatch [128, 512, 256, 256, 512, 512]  flags = (vnni_b) data_type = bf16
+  return %0 : i64
+}
+
+// -----
+
+func.func @invoke_inplace_relu(%arg0: memref<128x512xbf16>) {
+  %0 = xsmm.unary.dispatch relu [128, 512, 512, 512]  flags = (none) data_type = bf16
+  xsmm.unary relu(data_type = bf16, %0, %arg0, %arg0) : (i64, memref<128x512xbf16>, memref<128x512xbf16>) -> ()
+  return 
+}
+
+// CHECK-LABEL: invoke_inplace_relu
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x512xbf16>
+// CHECK: %[[C0]] = arith.constant 0 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK: %[[ADDR:.+]] = call @xsmm_unary_dispatch
+// CHECK: %[[PTR:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK-NEXT: %[[PTR_CAST:.+]] = arith.index_cast %[[PTR]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR:.+]] = llvm.inttoptr %[[PTR_CAST]] : i64 to !llvm.ptr<bf16>
+// CHECK: %[[PTR1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK-NEXT: %[[PTR_CAST1:.+]] = arith.index_cast %[[PTR1]] : index to i64
+// CHECK-NEXT: %[[LLVM_PTR1:.+]] = llvm.inttoptr %[[PTR_CAST1]] : i64 to !llvm.ptr<bf16>
+// CHECK: call @xsmm_unary_invoke(%[[C2]], %[[ADDR]], %[[LLVM_PTR]], %[[C0]], %[[LLVM_PTR1]], %[[C0]])

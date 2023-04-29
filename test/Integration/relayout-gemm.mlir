@@ -34,7 +34,7 @@
 
 
 func.func @matmulrelayouts(%A: tensor<6x8xf32>,
-  %B: tensor<8x16xf32>, %C: tensor<6x16xf32>) -> tensor<6x16xf32> attributes {llvm.emit_c_interface} {
+  %B: tensor<8x16xf32>, %C: tensor<6x16xf32>) -> tensor<6x16xf32>  {
   // MNmn += MKmk * NKkn
   // N = 16
   // M = 6

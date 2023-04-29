@@ -14,19 +14,33 @@
 module @predict_function  {
   func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
     %arg2: memref<512xf32>,  %arg3: memref<128x512xf32>) {
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
 
     // Identity
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
-    // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
+    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+    // CHECK-NEXT: %[[ptr0_cast:.*]] = arith.index_cast %[[ptr0]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr0_cast]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
+    // CHECK-NEXT: %[[ptr1_cast:.*]] = arith.index_cast %[[ptr1]] : index to i64    
+    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr1_cast]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
 
     // Matmul
     // CHECK: call @xsmm_gemm_dispatch
-    // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
-    // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
+    
+    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+    // CHECK-NEXT: %[[ptr2_cast:.*]] = arith.index_cast %[[ptr2]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr2_cast]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: %[[ptr3:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+    // CHECK-NEXT: %[[ptr3_cast:.*]] = arith.index_cast %[[ptr3]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr3_cast]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : memref<128x256xf32>, memref<256x512xf32>) outs(%arg3 : memref<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%in: f32, %in_0: f32, %out: f32):
       %0 = arith.mulf %in, %in_0 : f32
@@ -36,7 +50,7 @@ module @predict_function  {
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr1]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     %2 = xsmm.unary.dispatch relu [128, 512, 512, 512] flags = (none) data_type = f32
     xsmm.unary relu(data_type = f32, %2, %arg3, %arg3) : (i64, memref<128x512xf32>, memref<128x512xf32>) -> ()
 
@@ -56,10 +70,7 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
   %0 = memref.alloc() : memref<4x4xf32>
 
   // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke
   linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%0 : memref<4x4xf32>)
 
   // CHECK: memref.copy
@@ -81,10 +92,7 @@ func.func @heap_to_stack(%A: memref<4x8xf32>,
   %0 = memref.alloc() : memref<4x4xf32>
 
   // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[alloc]]
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  // CHECK: call @xsmm_gemm_invoke
   linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%0 : memref<4x4xf32>)
 
   // CHECK: memref.copy

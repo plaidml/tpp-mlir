@@ -19,8 +19,8 @@
 // Perf dialect utils
 //===----------------------------------------------------------------------===//
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t _mlir_ciface_perf_start_timer();
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t perf_start_timer();
 
-extern "C" MLIR_RUNNERUTILS_EXPORT double _mlir_ciface_perf_stop_timer(int64_t);
+extern "C" MLIR_RUNNERUTILS_EXPORT double perf_stop_timer(int64_t);
 
 #endif // TPP_EXECUTIONENGINE_PERFRUNNERUTILS_H

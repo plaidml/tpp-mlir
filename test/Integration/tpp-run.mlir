@@ -69,9 +69,6 @@ func.func @entry(%A: tensor<4x8xf32>,
 // MID-LABEL: @_entry
 // MID: memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
 // MID: call @xsmm_gemm_dispatch
-// MID: memref.cast
-// MID: memref.cast
-// MID: memref.cast
 // MID: call @xsmm_gemm_invoke
 // MID: linalg.generic
 // MID:   arith.addf
@@ -91,9 +88,6 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LATE-LABEL: @_entry
 // LATE:   memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
 // LATE:   call @xsmm_gemm_dispatch
-// LATE:   memref.cast
-// LATE:   memref.cast
-// LATE:   memref.cast
 // LATE:   call @xsmm_gemm_invoke
 // LATE:   scf.for
 // LATE:     memref.load

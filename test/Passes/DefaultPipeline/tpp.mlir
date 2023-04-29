@@ -4,10 +4,15 @@
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>
 func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
   // CHECK: call @xsmm_binary_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast0]], %[[cast1]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
   tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
 
   return
@@ -22,9 +27,9 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   // CHECK: memref.subview
   // CHECK-NOT: scf.parallel
   // CHECK: call @xsmm_binary_dispatch
-  // CHECK: %[[cast:.*]] = memref.cast
-  // CHECK: %[[cast1:.*]] = memref.cast
-  // CHECK: call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
+  // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}
   %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   tpp.add ins(%subview : memref<10x10xf32>, %subview_0 : memref<10x10xf32>) outs(%subview_0 : memref<10x10xf32>)
@@ -40,9 +45,9 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
 func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10x10xf32>) {
   // CHECK: call @xsmm_binary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   call @xsmm_binary_invoke({{.*}}%[[cast]], %[[cast1]]
+  // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}
   %c0 = arith.constant 0 : index
   %c10 = arith.constant 10 : index
   %c1 = arith.constant 1 : index
@@ -62,10 +67,15 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<1x1xf32>
 func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_unary_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
-  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast1]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
   tpp.identity ins(%arg1: memref<1x1xf32>) outs(%arg0: memref<3x3xf32>)
 
   return
@@ -79,9 +89,9 @@ func.func @identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast1]]
+  // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}
   %c0 = arith.constant 0 : index
   %c12 = arith.constant 12 : index
   %c1 = arith.constant 1 : index
@@ -101,9 +111,12 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
 // CHECK: func.func @relu(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
 func.func @relu(%arg0: memref<3x3xf32>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_unary_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr0]], %[[C0]]
   tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
 
   return
@@ -118,8 +131,8 @@ func.func @relu(%arg0: memref<3x3xf32>) {
 func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast]]
+  // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   call @xsmm_unary_invoke({{.*}}%[[ptr0]], %{{.+}}
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c1 = arith.constant 1 : index
@@ -139,11 +152,21 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
 // CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>
 func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_brgemm_dispatch
-  // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+  
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
+  
+  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
              outs(%arg2: memref<3x3xf32>)
 
@@ -158,11 +181,21 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xbf16>
 func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
                               %arg2: memref<4x4xbf16>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_brgemm_dispatch
-  // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<bf16>
+
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<bf16>
+
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<bf16>
+
+  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   tpp.vnni_brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>) outs(%arg2: memref<4x4xbf16>)
 
   return
@@ -176,11 +209,20 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
 func.func @gemm(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[cast0:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast0]], %[[cast1]], %[[cast2]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+  
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C : memref<4x4xf32>) 
            outs(%C : memref<4x4xf32>)
 
@@ -195,11 +237,20 @@ func.func @gemm(%A: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<6x6xbf16>
 func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
                             %arg2: memref<6x6xbf16>) {
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[cast:.*]] = memref.cast %[[ARG0]]
-  // CHECK: %[[cast1:.*]] = memref.cast %[[ARG1]]
-  // CHECK: %[[cast2:.*]] = memref.cast %[[ARG2]]
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<bf16>
+  
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<bf16>
+  
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<bf16>
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   tpp.vnni_matmul ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>) outs(%arg2: memref<6x6xbf16>)
 
   return
@@ -214,10 +265,10 @@ func.func @matmul_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
 func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x32xf32>, %arg2: memref<4x8x32x32xf32>) {
   // CHECK: call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}, %[[ptr2]], %{{.+}}
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
@@ -253,10 +304,10 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   // 1x1 Conv2D
   // CHECK: call @xsmm_gemm_dispatch
   // CHECK: scf.for
-  // CHECK:   %[[cast:.*]] = memref.cast
-  // CHECK:   %[[cast1:.*]] = memref.cast
-  // CHECK:   %[[cast2:.*]] = memref.cast
-  // CHECK:   call @xsmm_gemm_invoke({{.*}}%[[cast]], %[[cast1]], %[[cast2]]
+  // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
+  // CHECK:   call @xsmm_gemm_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}, %[[ptr2]], %{{.+}}
   %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x7x7x512xf32>
   linalg.fill ins(%cst : f32) outs(%alloc : memref<1x7x7x512xf32>)
   scf.for %arg1 = %c0 to %c7 step %c1 {
@@ -289,24 +340,38 @@ module @predict_function  {
   func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
     %arg2: memref<512xf32>,  %arg3: memref<128x512xf32>) {
 
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+
     // Identity
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[cast:.*]] = memref.cast %[[ARG2]]
-    // CHECK: %[[cast0:.*]] = memref.cast %[[ARG3]]
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast]], %[[cast0]]
+    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+    // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
+    // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
 
     // Matmul
     // CHECK: call @xsmm_gemm_dispatch
-    // CHECK: %[[cast1:.*]] = memref.cast %[[ARG0]]
-    // CHECK: %[[cast2:.*]] = memref.cast %[[ARG1]]
-    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[cast1]], %[[cast2]], %[[cast0]]
+    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+    // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
+    
+    // CHECK: %[[ptr3:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+    // CHECK-NEXT: %[[ptr_cast3:.*]] = arith.index_cast %[[ptr3]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr_cast3]] : i64 to !llvm.ptr<f32>
+
+    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>) 
                outs(%arg3 : memref<128x512xf32>)
 
     // Relu
     // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[cast0]], %[[cast0]]
+    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr1]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
     tpp.relu ins(%arg3 : memref<128x512xf32>) outs(%arg3 : memref<128x512xf32>)
 
     return

@@ -38,4 +38,4 @@ func.func @entry() {
   return 
 }
 
-func.func private @printMemrefF32(%ptr : tensor<*xf32>) attributes {llvm.emit_c_interface}
+func.func private @printMemrefF32(%ptr : tensor<*xf32>) 
