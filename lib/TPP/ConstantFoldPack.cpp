@@ -48,11 +48,22 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
   }
 
   void foldPackIntoCst(RewriterBase &rewriter, tensor::PackOp packOp) {
+    // Bail out if the user uses pack as a writable operation
+    // (i.e., the destination is not a tensor.empty).
+    if (!packOp.getDest().getDefiningOp<tensor::EmptyOp>())
+      return;
     OpBuilder::InsertionGuard guard(rewriter);
     auto cstAndAttribute = getDenseAttributeAndConstant(packOp);
     if (failed(cstAndAttribute))
       return;
     auto [cstOp, oldDense] = *(cstAndAttribute);
+    // Happy path, splat constant.
+    if (oldDense.isSplat()) {
+      auto newDense = oldDense.reshape(packOp.getDestType());
+      rewriter.setInsertionPoint(cstOp);
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(packOp, newDense);
+      return;
+    }
     LLVM_DEBUG(llvm::dbgs()
                << "NUM ELEMENT: " << oldDense.getNumElements() << "\n");
     const int64_t bytes =
@@ -149,20 +160,6 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(packOp, newDense);
   }
 
-  void foldPackIntoSplatCst(RewriterBase &rewriter, tensor::PackOp packOp) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto cstAndAttribute = getDenseAttributeAndConstant(packOp);
-    if (failed(cstAndAttribute))
-      return;
-    auto [cstOp, oldDense] = *(cstAndAttribute);
-    if (!oldDense.isSplat())
-      return;
-    auto newDense = oldDense.reshape(packOp.getDestType());
-
-    rewriter.setInsertionPoint(cstOp);
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(packOp, newDense);
-  }
-
   void foldPackIntoFill(RewriterBase &rewriter, tensor::PackOp packOp) {
     OpBuilder::InsertionGuard guard(rewriter);
     Value sourcePack = packOp.getSource();
@@ -177,8 +174,6 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
   void runOnOperation() override {
     auto module = getOperation();
     IRRewriter rewriter(&getContext());
-    module->walk(
-        [&](tensor::PackOp packOp) { foldPackIntoSplatCst(rewriter, packOp); });
     module->walk(
         [&](tensor::PackOp packOp) { foldPackIntoFill(rewriter, packOp); });
     module->walk(
