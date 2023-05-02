@@ -21,4 +21,5 @@ steps:
       LOGRPTSUM: "mlir"
       LOGRPTFMT: "svg pdf"
       #LOGRPTBND: "-"
+      LOGRPT_DEBUG: 1
       LOGRPTQRY: ""
