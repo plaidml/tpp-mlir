@@ -16,7 +16,7 @@ steps:
 
   - label: "TPP-MLIR-gcc"
     command: "${SRUN} --partition=clxtrb,clxaptrb --time=0:30:00 -- \
-              'KIND=RelWithDebInfo COMPILER=gcc \
+              'KIND=RelWithDebInfo COMPILER=gcc CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
 
   - label: "TPP-MLIR-clang"
