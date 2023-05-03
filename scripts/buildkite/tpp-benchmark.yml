@@ -17,9 +17,8 @@ steps:
     command:
       - "${SRUN} --partition=clx --time=0:30:00 -- \
             'KIND=Release COMPILER=clang LINKER=lld CHECK=1 BENCH=1 \
-             scripts/buildkite/build_tpp.sh'"
-      - "echo \"artifact_paths: $${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}/\""
-      - "ls -1 \"$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}/*\""
+             scripts/buildkite/build_tpp.sh && sync'"
+      - "ls -1 \"$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}/*\" || true"
     artifact_paths:
       - "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}/*"
     env:
