@@ -283,24 +283,6 @@ transform::CollapseTo2dOp::getReassociationIndices(linalg::GenericOp linalgOp) {
 // Reshape2dOp
 //===----------------------------------------------------------------------===//
 
-// Tiling function to remove all but the zero and first dimension.
-// Tile of zero means no tiling on this dimension. The other
-// dimensions are materialized as loops by tiling with a factor
-// of 1.
-static SmallVector<Value, 4> getTileSizes(OpBuilder &builder,
-                                          linalg::LinalgOp linalgOp) {
-  SmallVector<Value, 4> tppTiles;
-  size_t numberOfLoops = linalgOp.getNumLoops();
-  for (size_t i = 0; i < numberOfLoops; i++)
-    tppTiles.push_back(
-        builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 1));
-  Value zeroVal =
-      builder.createOrFold<arith::ConstantIndexOp>(linalgOp.getLoc(), 0);
-  tppTiles[numberOfLoops - 1] = zeroVal;
-  tppTiles[numberOfLoops - 2] = zeroVal;
-  return tppTiles;
-}
-
 DiagnosedSilenceableFailure
 transform::Reshape2dOp::apply(transform::TransformResults &results,
                               transform::TransformState &state) {
@@ -328,8 +310,23 @@ transform::Reshape2dOp::apply(transform::TransformResults &results,
     linalg::LinalgTilingLoopType loopsTypes =
         (useParallelLoops) ? linalg::LinalgTilingLoopType::ParallelLoops
                            : linalg::LinalgTilingLoopType::Loops;
+    // Tiling function to remove all but the zero and first dimension.
+    // Tile of zero means no tiling on this dimension. The other
+    // dimensions are materialized as loops by tiling with a factor
+    // of 1.
     linalgTilingOptions.setLoopType(loopsTypes)
-        .setTileSizeComputationFunction(getTileSizes);
+        .setTileSizeComputationFunction([&](OpBuilder &builder, Operation *) {
+          SmallVector<Value, 4> tppTiles;
+          size_t numberOfLoops = currentTarget.getNumLoops();
+          Location loc = currentTarget.getLoc();
+          for (size_t i = 0; i < numberOfLoops; i++)
+            tppTiles.push_back(
+                builder.createOrFold<arith::ConstantIndexOp>(loc, 1));
+          Value zeroVal = builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
+          tppTiles[numberOfLoops - 1] = zeroVal;
+          tppTiles[numberOfLoops - 2] = zeroVal;
+          return tppTiles;
+        });
     IRRewriter rewriter(currentTarget->getContext());
     FailureOr<linalg::TiledLinalgOp> tiledOp =
         linalg::tileLinalgOp(rewriter, currentTarget, linalgTilingOptions);

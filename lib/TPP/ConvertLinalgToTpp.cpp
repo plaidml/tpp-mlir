@@ -152,7 +152,6 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
     tpp::populateConvertLinalgToTppPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

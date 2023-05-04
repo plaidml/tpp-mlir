@@ -9,11 +9,11 @@
 #ifndef VNNI_TPP_OPS_H
 #define VNNI_TPP_OPS_H
 
+#include "TPP/Dialect/VNNI/VNNIDialect.h"
+#include "TPP/Dialect/VNNI/VNNIInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Dialect/Transform/IR/TransformOps.h"
-#include "TPP/Dialect/VNNI/VNNIInterfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/VNNI/VNNIOps.h.inc"

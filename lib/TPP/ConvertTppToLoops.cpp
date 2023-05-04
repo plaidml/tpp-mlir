@@ -341,7 +341,6 @@ struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
     RewritePatternSet patterns(&getContext());
     populateTppToLoopsPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

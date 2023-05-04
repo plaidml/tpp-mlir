@@ -142,8 +142,9 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
     auto constant = dyn_cast<arith::ConstantOp>(op);
     if (!constant)
       continue;
-    auto newAttr = replaceSplat(constant.getType(), constant.getValueAttr());
-    constant.setValueAttr(newAttr);
+    auto newAttr = replaceSplat(constant.getType().cast<ShapedType>(),
+                                constant.getValueAttr());
+    constant.setValueAttr(cast<TypedAttr>(newAttr));
   }
 
   return success();

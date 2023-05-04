@@ -9,6 +9,7 @@
 #include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -68,7 +69,6 @@ struct ConvertVNNIToTpp : public ConvertVNNIToTppBase<ConvertVNNIToTpp> {
     RewritePatternSet patterns(&getContext());
     populateVNNIToTppPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

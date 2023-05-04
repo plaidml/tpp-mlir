@@ -14,27 +14,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-
-namespace mlir {
-namespace xsmm {
-enum class BinaryKind : uint64_t;
-class BinaryKindAttr;
-enum class TernaryKind : uint64_t;
-class TernaryKindAttr;
-enum class QuarternaryKind : uint64_t;
-class QuarternaryKindAttr;
-enum class UnaryKind : uint64_t;
-class UnaryKindAttr;
-enum class UnaryFlags : uint64_t;
-class UnaryFlagsAttr;
-enum class BinaryFlags : uint64_t;
-class BinaryFlagsAttr;
-enum class DataType : uint64_t;
-class DataTypeAttr;
-enum class GemmFlags : uint64_t;
-class GemmFlagsAttr;
-} // namespace xsmm
-} // namespace mlir
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOps.h.inc"

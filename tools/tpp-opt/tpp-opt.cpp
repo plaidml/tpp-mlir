@@ -54,6 +54,5 @@ int main(int argc, char **argv) {
   registerAllDialects(registry);
 
   return mlir::asMainReturnCode(
-      mlir::MlirOptMain(argc, argv, "TPP optimizer driver\n", registry,
-                        /*preload in context*/ true));
+      mlir::MlirOptMain(argc, argv, "TPP optimizer driver\n", registry));
 }

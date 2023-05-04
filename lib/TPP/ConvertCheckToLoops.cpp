@@ -181,7 +181,6 @@ struct ConvertCheckToLoops
     RewritePatternSet patterns(&getContext());
     populateCheckToLoopsPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

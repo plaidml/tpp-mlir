@@ -42,9 +42,10 @@ static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles);
-  ShapedType result = tensor::PackOp::inferPackedType(
-      input.getType(), staticTiles, innerDimsPos, outerDimsPerm);
-  ShapedType inputType = input.getType().cast<ShapedType>();
+  RankedTensorType result =
+      tensor::PackOp::inferPackedType(input.getType().cast<RankedTensorType>(),
+                                      staticTiles, innerDimsPos, outerDimsPerm);
+  auto inputType = input.getType().cast<RankedTensorType>();
   ArrayRef<int64_t> shape = result.getShape();
   Value output =
       builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
@@ -685,7 +686,6 @@ struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
     RewritePatternSet patterns(ctx);
     patterns.add<DoItOnConv2DNchwFchw>(ctx, blockingFactors);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

@@ -246,7 +246,7 @@ void addKindOperand(RewriterBase &rewriter, OpTy dispatchOp,
   Location loc = dispatchOp.getLoc();
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, dispatchOp.getKindAttr()));
+      loc, integer64, cast<TypedAttr>(dispatchOp.getKindAttr())));
   dispatchOperandTypes.push_back(integer64);
 }
 
@@ -285,7 +285,7 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
 
   // Dispatch the data type.
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, dispatchOp.getDataTypeAttr()));
+      loc, integer64, cast<TypedAttr>(dispatchOp.getDataTypeAttr())));
   dispatchOperandTypes.push_back(integer64);
 
   // Dispatch the inputs.
@@ -370,7 +370,7 @@ struct ConvertQuarternaryDispatchOp
     SmallVector<Type, 10> dispatchOperandTypes;
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, dispatchOp.getDataTypeAttr()));
+        loc, integer64, cast<TypedAttr>(dispatchOp.getDataTypeAttr())));
     dispatchOperandTypes.push_back(integer64);
 
     BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());

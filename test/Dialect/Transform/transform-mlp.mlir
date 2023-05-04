@@ -93,14 +93,17 @@ transform.sequence failures(propagate) {
       : (!pdl.operation) -> (!pdl.operation)
     %fourth_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#3[0]
       : (!pdl.operation) -> (!pdl.operation)
-    %all_relus = transform.merge_handles %first_relu, %second_relu,
-      %third_relu, %fourth_relu : !pdl.operation
-
+    %first_second = transform.merge_handles %first_relu, %second_relu : !pdl.operation
+    %third_fourth = transform.merge_handles %third_relu, %fourth_relu : !pdl.operation
 
     // Fuse matmul + relu and map the matmul to BRGEMM
-    %9, %loop1 = transform.structured.fuse %all_relus { tile_sizes = [1, 0, 0] }
+    %9, %loop1 = transform.structured.fuse %first_second { tile_sizes = [1, 0, 0] }
     %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
     transform.structured.rewrite_to_brgemm %10
+
+    %11, %loop2 = transform.structured.fuse %third_fourth { tile_sizes = [1, 0, 0] }
+    %12 = get_producer_of_operand %11[0] : (!pdl.operation) -> !pdl.operation
+    transform.structured.rewrite_to_brgemm %12
 }
 
 // We have 4 layers. 1 loop for each layer and 1 outermost loop for all the layers

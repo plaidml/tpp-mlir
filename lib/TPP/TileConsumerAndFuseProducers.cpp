@@ -603,8 +603,10 @@ getLastFusableConsumer(linalg::LinalgOp linalgOp,
     if (visitedConsumers.count(op))
       return false;
 
-    if (!isa<linalg::LinalgOp>(op) || !linalg::isElementwise(op))
+    if (!isa<linalg::LinalgOp>(op) ||
+        !linalg::isElementwise(cast<linalg::LinalgOp>(op))) {
       return false;
+    }
     // Require same iteration space.
     if (cast<linalg::LinalgOp>(op).getNumParallelLoops() !=
         cast<linalg::LinalgOp>(currentConsumer).getNumParallelLoops())
@@ -641,11 +643,11 @@ struct TileConsumerAndFuseProducers
     // Set to keep track of fused ops.
     llvm::SmallDenseSet<Operation *> fusedOps;
 
-    SmallVector<Operation *> linalgOperations;
+    SmallVector<linalg::LinalgOp> linalgOperations;
     func->walk([&](linalg::LinalgOp linalgOp) {
       if ((isConvolutionLike(linalgOp) || isMatmulLike(linalgOp)) &&
           linalgOp.hasTensorSemantics())
-        linalgOperations.push_back(linalgOp.getOperation());
+        linalgOperations.push_back(linalgOp);
     });
 
     std::reverse(linalgOperations.begin(), linalgOperations.end());
@@ -714,8 +716,10 @@ static bool areFusableOps(Operation *producerOp, Operation *consumerOp) {
   if ((!isa<linalg::LinalgOp>(producerOp)) ||
       (!isa<linalg::LinalgOp>(consumerOp)))
     return false;
-  if (!linalg::isElementwise(producerOp) || !linalg::isElementwise(consumerOp))
+  if (!linalg::isElementwise(cast<linalg::LinalgOp>(producerOp)) ||
+      !linalg::isElementwise(cast<linalg::LinalgOp>(consumerOp))) {
     return false;
+  }
   return producerOp->hasOneUse();
 }
 
@@ -735,7 +739,6 @@ struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  fuseElementwiseOpsControlFn);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 

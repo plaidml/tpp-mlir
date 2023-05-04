@@ -436,7 +436,6 @@ struct RewriteToBatchReduceGemm
             patterns.getContext());
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
 };
 
