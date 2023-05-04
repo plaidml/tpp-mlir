@@ -268,7 +268,7 @@ static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
 static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
                                           Operation *op,
                                           PatternRewriter &rewriter) {
-  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
+  (void)createPerfFuncPrototype(loc, funcName, op, rewriter);
   return success();
 }
 
