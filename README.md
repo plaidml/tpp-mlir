@@ -34,11 +34,11 @@ bash Miniconda3-latest-Linux-${ARCH_NAME}.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/mini
 eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
 conda activate
 
-conda install cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils
+conda install -y cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils
 if [ "${ARCH_NAME}" == "aarch64" ]; then
-   conda install gcc_linux-aarch64 gxx_linux-aarch64
+   conda install -y gcc_linux-aarch64 gxx_linux-aarch64
 elif [ "${ARCH_NAME}" == "x86_64" ]; then
-   conda install gcc_linux-64 gxx_linux-64
+   conda install -y gcc_linux-64 gxx_linux-64
 fi
 python -m pip install coloredlogs
 ```
