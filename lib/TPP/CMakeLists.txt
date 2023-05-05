@@ -9,7 +9,6 @@ add_mlir_library(MLIRTPP
     ToBlockLayoutAndBack.cpp
     RewriteToBatchReduceGemm.cpp
     TransformDialectInterpreter.cpp
-    IteratorCollapsing.cpp
     RewriteConvToMatmulImpl.cpp
     TileConsumerAndFuseProducers.cpp
     RewriteConvsToMatmulOrBrgemm.cpp
