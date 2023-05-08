@@ -10,15 +10,19 @@ env:
 
 steps:
   - label: "LLVM"
-    command: "${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/check_llvm.sh"
+    command: "scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-performance"
-    command: "${SRUN} --partition=clxtrb --time=1:30:00 -- \
-              'KIND=Release COMPILER=clang LINKER=lld \
-              $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/benchmark.sh'"
+    command:
+      - "${SRUN} --partition=clxtrb --time=1:30:00 -- \
+            'KIND=Release COMPILER=clang LINKER=lld \
+             scripts/buildkite/benchmark.sh'"
+      # make absolute path (do not resolve symlinks with pwd -P, mount point is different on head/compute node)
+      - buildkite-agent artifact upload \
+        "$(cd "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}" && pwd)/*"
     env:
       LOGRPTSUM: "mlir"
-      #LOGRPTFMT: "svg"
       #LOGRPTBND: "-"
       LOGRPTQRY: ""
+      LOGRPTSEP: 1
