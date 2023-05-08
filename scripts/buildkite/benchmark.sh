@@ -4,15 +4,19 @@
 # Environment variables must have been declared already.
 #
 # Run long benchmarks after building TPP-MLIR.
+# shellcheck disable=SC1091
 
-SCRIPT_DIR=$(realpath $(dirname $0)/..)
-source ${SCRIPT_DIR}/ci/common.sh
+SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
+source "${SCRIPT_DIR}/ci/common.sh"
 
 BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH}/benchmarks
 CONFIG_DIR=${BENCH_DIR}/config
 
+LOGFILE=$(mktemp)
+trap 'rm ${LOGFILE}' EXIT
+
 # Build
-${SCRIPT_DIR}/buildkite/build_tpp.sh
+eval "${SCRIPT_DIR}/buildkite/build_tpp.sh"
 
 # Benchmark
 benchmark () {
@@ -28,19 +32,13 @@ benchmark () {
   fi
 
   echo "--- BENCHMARK '${NAME}'"
-  export LOGFILE=benchmark-output.txt
-  pushd ${BENCH_DIR}
+  pushd "${BENCH_DIR}" || exit 1
   echo_run ./driver.py -v \
            -n 1000 \
-           -c ${CONFIG_DIR}/${JSON} \
-           --build ${BUILD_DIR}-${COMPILER} \
-           | tee ${LOGFILE}
-  if [ "main" = "${BUILDKITE_BRANCH}" ]; then
-    export LOGRPTBRN=main
-  fi
-  echo "Benchmark Report"
-  cat ${LOGFILE} | ${LIBXSMMROOT}/scripts/tool_logrept.sh
-  popd
+           -c "${CONFIG_DIR}/${JSON}" \
+           --build "${BUILD_DIR}-${COMPILER}" \
+           | tee -a "${LOGFILE}"
+  popd || exit 1
 }
 
 # OpenMP Benchmarks
@@ -86,3 +84,10 @@ benchmark fc/1024x2560x1024.json "FC 1024x2560x1024"
 benchmark fc/1024x1024x512.json "FC 1024x1024x512"
 benchmark fc/1024x352x512.json "FC 1024x352x512"
 benchmark fc/1024x512x256.json "FC 1024x512x256"
+
+# Summary report for all benchmarks
+echo "+++ REPORT"
+if [ "main" = "${BUILDKITE_BRANCH}" ]; then
+  export LOGRPTBRN=main
+fi
+eval "${LIBXSMMROOT}/scripts/tool_logrept.sh ${LOGFILE}"

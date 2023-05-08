@@ -18,8 +18,9 @@ steps:
       - "${SRUN} --partition=clx --time=0:30:00 -- \
             'KIND=Release COMPILER=clang LINKER=lld CHECK=1 BENCH=1 \
              scripts/buildkite/build_tpp.sh'"
-    artifact_paths:
-      - "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}/*"
+      # make absolute path (do not resolve symlinks with pwd -P, mount point is different on head/compute node)
+      - buildkite-agent artifact upload \
+        "$(cd "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}" && pwd)/*"
     env:
       LOGRPTSUM: "mlir"
       LOGRPTFMT: "svg pdf"
