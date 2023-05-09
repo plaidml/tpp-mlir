@@ -25,11 +25,17 @@
 
 using namespace mlir;
 
+// Type of kernel to be generated
+llvm::cl::opt<std::string> kernel("kernel",
+                                  llvm::cl::desc("Kernel to be generated"),
+                                  llvm::cl::value_desc("mlp,matmul,fc"),
+                                  llvm::cl::init("mlp"));
+
 // Input layer
 llvm::cl::opt<unsigned> miniBatch("mini-batch",
-                                   llvm::cl::desc("Mini batch size"),
-                                   llvm::cl::value_desc("256"),
-                                   llvm::cl::init(256));
+                                  llvm::cl::desc("Mini batch size"),
+                                  llvm::cl::value_desc("256"),
+                                  llvm::cl::init(256));
 
 // Hidden layers
 llvm::cl::opt<std::string> layers(
@@ -38,10 +44,10 @@ llvm::cl::opt<std::string> layers(
     llvm::cl::value_desc("128,256,512"), llvm::cl::init("128,256,512"));
 
 // Tile sizes (N, C, K)
-llvm::cl::opt<std::string> tiles(
-    "tiles",
-    llvm::cl::desc("Comma-separated values of size of each tile (N,K,C)"),
-    llvm::cl::value_desc("32,32,32"), llvm::cl::init(""));
+llvm::cl::opt<std::string>
+    tiles("tiles",
+          llvm::cl::desc("Comma-separated values of size of each tile (N,K,C)"),
+          llvm::cl::value_desc("32,32,32"), llvm::cl::init(""));
 
 // Float width
 llvm::cl::opt<unsigned> floatWidth("float-width",
@@ -51,7 +57,7 @@ llvm::cl::opt<unsigned> floatWidth("float-width",
 
 // Random seed
 llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"),
-                             llvm::cl::value_desc("int"), llvm::cl::init(0));
+                        llvm::cl::value_desc("int"), llvm::cl::init(0));
 
 // Output filename
 llvm::cl::opt<std::string> filename("o", llvm::cl::desc("Output filename"),
@@ -60,8 +66,8 @@ llvm::cl::opt<std::string> filename("o", llvm::cl::desc("Output filename"),
 
 // Enable softmax at the last layer
 llvm::cl::opt<bool> enableSoftmax("softmax", llvm::cl::desc("Enable softmax"),
-                                    llvm::cl::value_desc("bool"),
-                                    llvm::cl::init(false));
+                                  llvm::cl::value_desc("bool"),
+                                  llvm::cl::init(false));
 
 // Initialize accumulation matrix with bias
 llvm::cl::opt<bool> biasAcc("bias-acc", llvm::cl::desc("Accumulate on bias"),
@@ -70,8 +76,7 @@ llvm::cl::opt<bool> biasAcc("bias-acc", llvm::cl::desc("Accumulate on bias"),
 
 // Enable optimal packing (including VNNI for BF16)
 llvm::cl::opt<bool> pack("pack", llvm::cl::desc("Optimal packing (+VNNI)"),
-                            llvm::cl::value_desc("bool"),
-                            llvm::cl::init(false));
+                         llvm::cl::value_desc("bool"), llvm::cl::init(false));
 
 int main(int argc, char **argv) {
   // Add the following to include *all* MLIR Core dialects, or selectively
@@ -82,7 +87,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLP Generator");
 
-  MLPGenerator gen(miniBatch, layers, tiles, floatWidth, seed, enableSoftmax,
-                   biasAcc);
+  MLPGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
+                   enableSoftmax, biasAcc);
   return gen.generate(filename);
 }

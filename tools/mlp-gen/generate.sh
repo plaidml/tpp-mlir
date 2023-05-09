@@ -82,9 +82,26 @@ done
 LAYER_SIZES=${LAYER_SIZES#","}
 debug "CmdLine: $ITER $MB $FUSE $PASS $TILE_SIZES $LAYER_SIZES"
 
+# Parse other optional arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -bf16)
+      BF16=1
+      shift # past argument
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      shift # past argument
+      ;;
+  esac
+done
+
 # BF16
 FLOAT_SIZE=32
-if [ "$1" == "-bf16" ]; then FLOAT_SIZE="16"; fi
+if [ BF16 ]; then FLOAT_SIZE="16"; fi
 
 # Find binaries
 ROOT=$(git rev-parse --show-toplevel)

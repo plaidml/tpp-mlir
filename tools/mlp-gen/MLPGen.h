@@ -18,6 +18,8 @@
 
 #include "TPP/BuilderUtils.h"
 
+#include <optional>
+
 namespace mlir {
 class ModuleOp;
 class MemRefType;
@@ -67,6 +69,12 @@ class MLPGenerator {
 
   /// Initialize accumulation matrix with bias
   bool biasAcc;
+
+  /// List of supported kernel types that can be generated
+  enum class KernelType { MLP, MATMUL, FULLY_CONNECTED };
+
+  /// Type of kernel to be generated
+  KernelType kernelType;
 
   // ============================ Helpers
 
@@ -137,7 +145,10 @@ class MLPGenerator {
   /// Classifies the output of the last layer and put it in the second argumnent
   Value createOutputLayer(Value, Value);
 
-  /// Creates the entry point, that calls all other layers
+  /// Creates an MLP kernel
+  void createMlpKernel();
+
+  /// Creates the entry point, that creates and executes chosen kernel
   /// No need to return the function, as all we need is to dump the module
   void createEntryPoint();
 
@@ -145,11 +156,10 @@ public:
   /// Creates a specific module. Different configurations need different modules
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
-  MLPGenerator(unsigned, StringRef, StringRef, unsigned, int, bool, bool);
+  MLPGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
+               bool);
 
-  ~MLPGenerator() {
-    module->destroy();
-  }
+  ~MLPGenerator() { module->destroy(); }
 
   /// Generates the whole IR and write to file
   /// Return 0 on success, 1 on failure
