@@ -205,10 +205,32 @@ void MLPGenerator::createMlpKernel() {
   builder.create<func::ReturnOp>(loc, data);
 }
 
+void MLPGenerator::createMatmulKernel() {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // First, create the kernel with the entry point name "entry"
+  // Ignore all hidden layers - only a single matmul operation is needed
+  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
+  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
+  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
+  auto func = createFunction(builder, module, "entry",
+                             {inputType, weightType, outputType}, {outputType});
+
+  // Add only matmul without bias or activation func
+  auto data = lowerMatmul({func.getArgument(0), func.getArgument(1),
+                           /*bias=*/nullptr, /*output=*/func.getArgument(2)});
+
+  // Data is now output
+  builder.create<func::ReturnOp>(loc, data);
+}
+
 void MLPGenerator::createEntryPoint() {
   switch (kernelType) {
   case KernelType::MLP:
     createMlpKernel();
+    break;
+  case KernelType::MATMUL:
+    createMatmulKernel();
     break;
   default:
     assert(false && "Unsupported kernel type");

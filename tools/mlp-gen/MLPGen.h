@@ -148,6 +148,9 @@ class MLPGenerator {
   /// Creates an MLP kernel
   void createMlpKernel();
 
+  /// Creates a Matmul kernel
+  void createMatmulKernel();
+
   /// Creates the entry point, that creates and executes chosen kernel
   /// No need to return the function, as all we need is to dump the module
   void createEntryPoint();
