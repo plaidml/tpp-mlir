@@ -339,8 +339,8 @@ Value MLPGenerator::lowerBiasAdd(Value input, Value bias) {
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
   auto sum = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{input, bias}, ValueRange{input},
-      ArrayRef<AffineMap>{map, map, map}, getIterators(MAP_PARALLEL),
+      loc, outTy, ValueRange{bias}, ValueRange{input},
+      ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
         auto arg0 = blockArgs[0];
         auto arg1 = blockArgs[1];
@@ -354,15 +354,15 @@ Value MLPGenerator::lowerRelu(Value input) {
   auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
-  auto sum = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{input}, ValueRange{input},
-      ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
+  auto relu = builder.create<linalg::GenericOp>(
+      loc, outTy, ValueRange{}, ValueRange{input}, ArrayRef<AffineMap>{map},
+      getIterators(MAP_PARALLEL),
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
         auto arg0 = blockArgs[0];
-        auto add = nestedBuilder.create<arith::MaxFOp>(loc, arg0, zero);
-        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
+        auto max = nestedBuilder.create<arith::MaxFOp>(loc, arg0, zero);
+        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
       });
-  return sum.getResult(0);
+  return relu.getResult(0);
 }
 
 Value MLPGenerator::lowerSoftmax(Value input, Value output) {
