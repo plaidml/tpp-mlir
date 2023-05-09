@@ -414,19 +414,19 @@ TensorType MLPGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
     case PACK_INPUT:
       assert(x % n == 0 && "Invalid tile size for N dim");
       assert(y % c == 0 && "Invalid tile size for C dim");
-      // B x C -> BN x BC x bn x bc
-      return RankedTensorType::get({x / n, y / c, c, n}, dataType);
+      // N x C -> BN x BC x bn x bc
+      return RankedTensorType::get({x / n, y / c, n, c}, dataType);
     case PACK_WEIGHT:
       // VNNI packing can be done via tpp-opt --vnni-pack
       assert(x % k == 0 && "Invalid tile size for K dim");
       assert(y % c == 0 && "Invalid tile size for C dim");
-      // K x C -> BK x BC x bc x bk
-      return RankedTensorType::get({x / k, y / c, c, k}, dataType);
+      // C x K -> BK x BC x bc x bk
+      return RankedTensorType::get({y / k, x / c, c, k}, dataType);
     case PACK_OUTPUT:
       assert(x % n == 0 && "Invalid tile size for N dim");
       assert(y % k == 0 && "Invalid tile size for K dim");
-      // B x K -> BN x BK x bk x bc
-      return RankedTensorType::get({x / n, y / k, k, n}, dataType);
+      // N x K -> BN x BK x bn x bk
+      return RankedTensorType::get({x / n, y / k, n, k}, dataType);
     }
   }
 
