@@ -217,8 +217,33 @@ void MLPGenerator::createMatmulKernel() {
                              {inputType, weightType, outputType}, {outputType});
 
   // Add only matmul without bias or activation func
-  auto data = lowerMatmul({func.getArgument(0), func.getArgument(1),
+  auto data = lowerMatmul({/*input=*/func.getArgument(0),
+                           /*weight=*/func.getArgument(1),
                            /*bias=*/nullptr, /*output=*/func.getArgument(2)});
+
+  // Data is now output
+  builder.create<func::ReturnOp>(loc, data);
+}
+
+void MLPGenerator::createFcKernel() {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // First, create the kernel with the entry point name "entry"
+  // Ignore all hidden layers - only a single matmul operation is needed
+  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
+  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
+  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
+  auto biasType = outputType;
+  auto func = createFunction(builder, module, "entry",
+                             {inputType, weightType, biasType, outputType},
+                             {outputType});
+
+  // Add only matmul without bias or activation func
+  Value data = lowerMatmul({/*input=*/func.getArgument(0),
+                            /*weight=*/func.getArgument(1),
+                            /*bias=*/func.getArgument(2),
+                            /*output=*/func.getArgument(3)});
+  data = lowerRelu(data);
 
   // Data is now output
   builder.create<func::ReturnOp>(loc, data);
@@ -232,8 +257,9 @@ void MLPGenerator::createEntryPoint() {
   case KernelType::MATMUL:
     createMatmulKernel();
     break;
-  default:
-    assert(false && "Unsupported kernel type");
+  case KernelType::FULLY_CONNECTED:
+    createFcKernel();
+    break;
   }
 }
 

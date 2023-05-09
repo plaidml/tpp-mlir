@@ -148,8 +148,11 @@ class MLPGenerator {
   /// Creates an MLP kernel
   void createMlpKernel();
 
-  /// Creates a Matmul kernel
+  /// Creates a matmul kernel
   void createMatmulKernel();
+
+  /// Creates a fully connected kernel
+  void createFcKernel();
 
   /// Creates the entry point, that creates and executes chosen kernel
   /// No need to return the function, as all we need is to dump the module
