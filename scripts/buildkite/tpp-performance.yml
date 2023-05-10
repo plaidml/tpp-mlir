@@ -23,6 +23,6 @@ steps:
         "$(cd "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}" && pwd)/*"
     env:
       LOGRPTSUM: "mlir"
-      #LOGRPTBND: "-"
+      LOGRPTBND: "-"
       LOGRPTQRY: ""
       LOGRPTSEP: 1
