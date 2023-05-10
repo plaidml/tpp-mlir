@@ -76,6 +76,9 @@ class MLPGenerator {
   /// Type of kernel to be generated
   KernelType kernelType;
 
+  /// VNNI packing factor
+  int vnniFactor;
+
   // ============================ Helpers
 
   /// Return current random seed, update next
@@ -163,7 +166,7 @@ public:
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
   MLPGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
-               bool);
+               bool, int);
 
   ~MLPGenerator() { module->destroy(); }
 

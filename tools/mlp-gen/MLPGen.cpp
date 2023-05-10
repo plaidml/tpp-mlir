@@ -70,9 +70,10 @@ SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
 MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
                            StringRef layersStr, StringRef tilesStr,
                            unsigned typeWidth, int seed, bool enableSoftmax,
-                           bool biasAcc)
+                           bool biasAcc, int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), miniBatch(miniBatch),
-      seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc) {
+      seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
+      vnniFactor(vnniBlockingFactor) {
 
   // Register all necessary dialects
   context
@@ -115,6 +116,12 @@ MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
     return;
   }
 
+  // Disable VNNI packing if it is not BF16 data type
+  if (!dataType.isBF16())
+    vnniFactor = 0;
+  assert(((vnniFactor >= 0) && (vnniFactor % 2 == 0)) &&
+         "Invalid VNNI packing factor");
+
   // Initialize random seed, if needed
   if (seed) {
     initType = TensorInitType::Normal;
@@ -124,7 +131,8 @@ MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
   }
 
   /// Initialize affine map expressions
-  for (int i = 0; i < 6; i++)
+  int numDims = (vnniFactor != 0) ? 7 : 6;
+  for (int i = 0; i < numDims; i++)
     affineExprs.push_back(getAffineDimExpr(i, &context));
 
   // Create module
@@ -446,6 +454,12 @@ TensorType MLPGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
       // VNNI packing can be done via tpp-opt --vnni-pack
       assert(x % k == 0 && "Invalid tile size for K dim");
       assert(y % c == 0 && "Invalid tile size for C dim");
+
+      // VNNI: C x K -> BK x BC x bc/vnni x bk x vnni
+      if (vnniFactor != 0)
+        return RankedTensorType::get(
+            {y / k, x / c, c / vnniFactor, k, vnniFactor}, dataType);
+
       // C x K -> BK x BC x bc x bk
       return RankedTensorType::get({y / k, x / c, c, k}, dataType);
     case PACK_OUTPUT:
@@ -464,6 +478,7 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
   auto n = tensor.getType().cast<ShapedType>().getRank();
   // Packed tensors are either 4 or 5 dim, map needs to be 6 or 7
   bool packed = (n > 2);
+  bool vnniPacked = packed && vnniFactor != 0;
   SmallVector<AffineExpr> list;
   auto zero = getAffineConstantExpr(0, builder.getContext());
   auto pushDim = [&](size_t index, ArrayRef<int64_t> order) {
@@ -475,6 +490,11 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
     } else {
       list.push_back(affineExprs[index]);
     }
+  };
+
+  auto getDims = [&](ArrayRef<int64_t> dims) {
+    for (auto &dim : dims)
+      list.push_back(affineExprs[dim]);
   };
 
   // For each map type, check if it's packed or not, build the order and
@@ -497,32 +517,40 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
   case MAP_MATMUL_INPUT:
     // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
     n = packed ? 6 : 3;
-    for (unsigned i = 0; i < n; i++) {
-      if (packed)
-        pushDim(i, {0, 2, 3, 5});
-      else
-        pushDim(i, {0, 2});
-    }
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({0, 2, 4, 6});
+    } else if (packed)
+      getDims({0, 2, 3, 5});
+    else
+      getDims({0, 2});
     break;
   case MAP_MATMUL_WEIGHT:
     // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
     n = packed ? 6 : 3;
-    for (unsigned i = 0; i < n; i++) {
-      if (packed)
-        pushDim(i, {1, 2, 5, 4});
-      else
-        pushDim(i, {2, 1});
-    }
+    // Extra VNNI packing reduction dim
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({1, 2, 6, 5, 3});
+      list[2] = list[2].floorDiv(vnniFactor);
+    } else if (packed)
+      getDims({1, 2, 5, 4});
+    else
+      getDims({2, 1});
     break;
   case MAP_MATMUL_OUTPUT:
     // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
     n = packed ? 6 : 3;
-    for (unsigned i = 0; i < n; i++) {
-      if (packed)
-        pushDim(i, {0, 1, 3, 4});
-      else
-        pushDim(i, {0, 1});
-    }
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({0, 1, 4, 5});
+    } else if (packed)
+      getDims({0, 1, 3, 4});
+    else
+      getDims({0, 1});
     break;
   }
 
@@ -532,6 +560,7 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
 
 SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   bool packed = tiles.size();
+  bool vnniPacked = packed && vnniFactor != 0;
   switch (type) {
   case MAP_PARALLEL:
     if (packed)
@@ -552,7 +581,13 @@ SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   case MAP_MATMUL_WEIGHT:
   case MAP_MATMUL_OUTPUT:
   case MAP_MATMUL:
-    if (packed)
+    // Extra VNNI packing reduction dim
+    if (vnniPacked)
+      return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
+              utils::IteratorType::reduction, utils::IteratorType::reduction,
+              utils::IteratorType::parallel,  utils::IteratorType::parallel,
+              utils::IteratorType::reduction};
+    else if (packed)
       return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
               utils::IteratorType::reduction, utils::IteratorType::parallel,
               utils::IteratorType::parallel,  utils::IteratorType::reduction};

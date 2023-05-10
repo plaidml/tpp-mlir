@@ -74,9 +74,10 @@ llvm::cl::opt<bool> biasAcc("bias-acc", llvm::cl::desc("Accumulate on bias"),
                             llvm::cl::value_desc("bool"),
                             llvm::cl::init(false));
 
-// Enable optimal packing (including VNNI for BF16)
-llvm::cl::opt<bool> pack("pack", llvm::cl::desc("Optimal packing (+VNNI)"),
-                         llvm::cl::value_desc("bool"), llvm::cl::init(false));
+// Set VNNI packing factor for BF16
+llvm::cl::opt<int>
+    vnni("vnni", llvm::cl::desc("VNNI packing factor (disabled if zero)"),
+         llvm::cl::value_desc("0|2|4"), llvm::cl::init(0));
 
 int main(int argc, char **argv) {
   // Add the following to include *all* MLIR Core dialects, or selectively
@@ -88,6 +89,6 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLP Generator");
 
   MLPGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
-                   enableSoftmax, biasAcc);
+                   enableSoftmax, biasAcc, vnni);
   return gen.generate(filename);
 }
