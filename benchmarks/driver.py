@@ -31,9 +31,16 @@
                  "type": "MLIR",
                  "benchmark": "matmul_64x64x64_vnni.mlir",
                  "environment": { { "OMP_NUM_THREADS": "32" } },
-                 "flags": [ "-v" ],
+                 "flags": [ "-n", "100", "-v" ],
                  "extensions": [ "avx512.*" ]
              },
+             "irgen": {
+                 "type": "IR-GEN",
+                 "benchmark": [ "mlp-gen", "--kernel=matmul --float-width=16 --vnni=2 --mini-batch=64 --layers=64,64 --tiles=32,32,32" ],
+                 "environment": { "OMP_NUM_THREADS": "32" },
+                 "flags": [ "-n", "100" ],
+                 "extensions": [ "(avx2|asimd)" ]
+             }
          },
          "128x256x512":  {
              ...
@@ -235,6 +242,54 @@ class MLIRRun(BaseRun):
         self.teardown()
         return True
 
+class IrGeneratorRun(BaseRun):
+    """ Generic IR generator runs """
+
+    def __init__(self, name, args, env, json, loglevel):
+        self.logger = Logger("driver.ir-gen", loglevel)
+        BaseRun.__init__(self, name, args, env, json, loglevel)
+        cmd = list()
+        cmd.append(os.path.join(env.bin_dir, self.benchmark[0]))
+        # Split all extra arguments into separate items
+        for val in self.benchmark[1:]:
+            cmd.extend(val.split(" "))
+        self.benchmark = cmd
+
+    def run(self):
+        self.setup()
+        gen_cmd = list()
+        # Generate benchmarking code
+        gen_cmd.extend(self.benchmark)
+        res = self.runner.run(gen_cmd)
+        if 0 != res.returncode:
+            # Failed to generate IR, bail out
+            self.stdout = res.stdout
+            self.stderr = res.stderr
+            self.teardown()
+            return True
+        # Pass the generated IR to runner
+        irContents = res.stdout
+        command = list()
+        self.env.pin_task(command)
+        command.append(self.env.harness)
+        if self.args.build:
+            command.extend(["--build", self.args.build])
+        if self.flags:
+            command.extend(self.flags)
+        if self.env.extra_args:
+            command.extend(self.env.extra_args)
+        # N in MLIR is an optional -n argument
+        if self.args.n:
+            if '-n' in command:
+                command[command.index('-n')+1] = self.args.n
+            else:
+                command.extend(["-n", self.args.n])
+        res = self.runner.run(command, input=irContents)
+        self.stdout = res.stdout
+        self.stderr = res.stderr
+        self.teardown()
+        return True
+
 class Benchmark(object):
     """ A collection of runs """
 
@@ -252,6 +307,8 @@ class Benchmark(object):
             self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
         elif runType == "XSMM-DNN":
             self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
+        elif runType == "IR-GEN":
+            self.runs.append(IrGeneratorRun(name, self.args, self.env, json, loglevel))
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False

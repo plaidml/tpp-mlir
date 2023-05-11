@@ -38,7 +38,7 @@ class FileCheckParser(object):
         """ Scan the file for FileCheck lines and update the results cache """
 
         runLine = ""
-        for line in file.readlines():
+        for line in file:
             # First the easy one: flops
             m = self.flopsRE.match(line)
             if m:
@@ -86,12 +86,15 @@ class FileCheckParser(object):
             self.result['shared-libs'] = m.group(1)
             self.logger.debug(f"Shared libraries detected: {m.group(1)}")
 
-    def parse(self, filename):
+    def parse(self, input):
         """Parses an IR file, returns a dictsionary with the data found"""
 
         try:
-            with open(filename) as file:
-                self._parseLines(file)
+            if len(input) > 1:
+                self._parseLines(input.split('\n'))
+            else:
+                with open(input) as file:
+                    self._parseLines(file)
         except IOError as err:
             self.logger.error("Cannot open file '{filename}': {err.strerror}")
             return {}

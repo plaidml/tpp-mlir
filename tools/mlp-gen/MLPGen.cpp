@@ -22,6 +22,7 @@
 #include "mlir/InitAllDialects.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "MLPGen.h"
@@ -56,7 +57,7 @@ SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
   shape.push_back(n);
 
   // Just splat high dims onto the output type
-  for (int i=2, rank=lhs.getRank(); i<rank; i++) {
+  for (int i = 2, rank = lhs.getRank(); i < rank; i++) {
     assert(lhs.getDimSize(i) == rhs.getDimSize(i) &&
            "low dimensions must be the same");
     shape.push_back(lhs.getDimSize(i));
@@ -66,11 +67,13 @@ SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
 
 } // anonymous namespace
 
-MLPGenerator::MLPGenerator(unsigned miniBatch, StringRef layersStr,
-                           StringRef tilesStr, unsigned typeWidth, int seed,
-                           bool enableSoftmax, bool biasAcc)
+MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
+                           StringRef layersStr, StringRef tilesStr,
+                           unsigned typeWidth, int seed, bool enableSoftmax,
+                           bool biasAcc, int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), miniBatch(miniBatch),
-      seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc) {
+      seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
+      vnniFactor(vnniBlockingFactor) {
 
   // Register all necessary dialects
   context
@@ -78,6 +81,15 @@ MLPGenerator::MLPGenerator(unsigned miniBatch, StringRef layersStr,
                    bufferization::BufferizationDialect, tensor::TensorDialect,
                    linalg::LinalgDialect, math::MathDialect,
                    arith::ArithDialect, scf::SCFDialect>();
+
+  // Parse kernel type
+  auto optKernel = llvm::StringSwitch<std::optional<KernelType>>(kernelStr)
+                       .CaseLower("mlp", KernelType::MLP)
+                       .CaseLower("matmul", KernelType::MATMUL)
+                       .CaseLower("fc", KernelType::FULLY_CONNECTED)
+                       .Default(std::nullopt);
+  assert(optKernel && "Invalid kernel type");
+  kernelType = *optKernel;
 
   // Argument validation
   assert(miniBatch != 0 && "MiniBatch cannot be zero");
@@ -93,16 +105,22 @@ MLPGenerator::MLPGenerator(unsigned miniBatch, StringRef layersStr,
 
   // Pick data type
   switch (typeWidth) {
-    case 32:
-      dataType = builder.getF32Type();
-      break;
-    case 16:
-      dataType = builder.getBF16Type();
-      break;
-    default:
-      assert(false && "Unsupported type width");
-      return;
+  case 32:
+    dataType = builder.getF32Type();
+    break;
+  case 16:
+    dataType = builder.getBF16Type();
+    break;
+  default:
+    assert(false && "Unsupported type width");
+    return;
   }
+
+  // Disable VNNI packing if it is not BF16 data type
+  if (!dataType.isBF16())
+    vnniFactor = 0;
+  assert(((vnniFactor >= 0) && (vnniFactor % 2 == 0)) &&
+         "Invalid VNNI packing factor");
 
   // Initialize random seed, if needed
   if (seed) {
@@ -113,7 +131,8 @@ MLPGenerator::MLPGenerator(unsigned miniBatch, StringRef layersStr,
   }
 
   /// Initialize affine map expressions
-  for (int i=0; i<6; i++)
+  int numDims = (vnniFactor != 0) ? 7 : 6;
+  for (int i = 0; i < numDims; i++)
     affineExprs.push_back(getAffineDimExpr(i, &context));
 
   // Create module
@@ -126,7 +145,7 @@ Value MLPGenerator::createLayer(unsigned index, Value arg) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Input to the layer is previous size
-  unsigned input = layers[index-1];
+  unsigned input = layers[index - 1];
 
   // Output to the layer is current size
   auto output = layers[index];
@@ -136,10 +155,8 @@ Value MLPGenerator::createLayer(unsigned index, Value arg) {
   auto outputType = getShape({miniBatch, output}, PACK_OUTPUT);
 
   // Add matmul/bias/relu as it comes from tensorflow
-  auto weight =
-      createDenseTensor(builder, initType, weightType, getRand());
-  auto bias =
-      createDenseTensor(builder, initType, outputType, getRand());
+  auto weight = createDenseTensor(builder, initType, weightType, getRand());
+  auto bias = createDenseTensor(builder, initType, outputType, getRand());
   auto matmul = lowerMatmul({arg, weight, bias, /*output=*/nullptr});
   auto relu = lowerRelu(matmul);
 
@@ -150,17 +167,16 @@ Value MLPGenerator::createLayer(unsigned index, Value arg) {
 Value MLPGenerator::createOutputLayer(Value arg, Value out) {
   OpBuilder::InsertionGuard guard(builder);
 
-  auto last = layers.size()-1;
+  auto last = layers.size() - 1;
   // Input to the layer is penultimate size
-  auto input = layers[last-1];
+  auto input = layers[last - 1];
 
   // Output to the layer is last size
   auto output = layers[last];
 
   // Add softmax
   auto weightType = getShape({input, output}, PACK_WEIGHT);
-  auto weight =
-      createDenseTensor(builder, initType, weightType, getRand());
+  auto weight = createDenseTensor(builder, initType, weightType, getRand());
 
   if (enableSoftmax) {
     // Return the softmax of the last layer
@@ -174,18 +190,59 @@ Value MLPGenerator::createOutputLayer(Value arg, Value out) {
   return lowerMatmul({arg, weight, /*bias=*/nullptr, out});
 }
 
-void MLPGenerator::createEntryPoint() {
+std::string MLPGenerator::createMetadata() {
+  std::string data = "";
+
+  auto addRunnerString = [&]() {
+    data += "// RUN: tpp-run %s -n 10 \\\n";
+    data += "// RUN:  -e entry -entry-point-result=void\n";
+    data += "\n";
+  };
+
+  auto addFlopsInfo = [&](uint64_t flops) {
+    data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
+    data += "\n";
+  };
+
+  switch (kernelType) {
+  case KernelType::MATMUL: {
+    addRunnerString();
+    // Total flops = matmul O(2*n*m*k)
+    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
+    addFlopsInfo(flops);
+    break;
+  }
+  case KernelType::FULLY_CONNECTED: {
+    addRunnerString();
+    // Total flops = matmul O(2*n*m*k)
+    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
+    // + BiasAdd O(n*m)
+    flops += miniBatch * layers.back();
+    // + ReLU O(n*m)
+    flops += miniBatch * layers.back();
+    addFlopsInfo(flops);
+    break;
+  }
+  default:
+    break;
+  }
+  data += "\n";
+
+  return data;
+}
+
+void MLPGenerator::createMlpKernel() {
   OpBuilder::InsertionGuard guard(builder);
 
   // First, create the kernel with the entry point name "entry"
-  auto inputType = getShape({miniBatch,layers.front()}, PACK_INPUT);
-  auto outputType = getShape({miniBatch,layers.back()}, PACK_OUTPUT);
+  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
+  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
   auto func = createFunction(builder, module, "entry", {inputType, outputType},
                              {outputType});
 
   // Now pass the input through all layers
   Value data = func.getArgument(0);
-  for (unsigned i=1, max=layers.size()-1; i<max; i++) {
+  for (unsigned i = 1, max = layers.size() - 1; i < max; i++) {
     data = createLayer(i, data);
   }
 
@@ -195,6 +252,64 @@ void MLPGenerator::createEntryPoint() {
 
   // Data is now output
   builder.create<func::ReturnOp>(loc, data);
+}
+
+void MLPGenerator::createMatmulKernel() {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // First, create the kernel with the entry point name "entry"
+  // Ignore all hidden layers - only a single matmul operation is needed
+  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
+  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
+  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
+  auto func = createFunction(builder, module, "entry",
+                             {inputType, weightType, outputType}, {outputType});
+
+  // Add only matmul without bias or activation func
+  auto data = lowerMatmul({/*input=*/func.getArgument(0),
+                           /*weight=*/func.getArgument(1),
+                           /*bias=*/nullptr, /*output=*/func.getArgument(2)});
+
+  // Data is now output
+  builder.create<func::ReturnOp>(loc, data);
+}
+
+void MLPGenerator::createFcKernel() {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // First, create the kernel with the entry point name "entry"
+  // Ignore all hidden layers - only a single matmul operation is needed
+  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
+  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
+  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
+  auto biasType = outputType;
+  auto func = createFunction(builder, module, "entry",
+                             {inputType, weightType, biasType, outputType},
+                             {outputType});
+
+  // Create a fully connected (FC) kernel that is: matmul + bias + relu
+  Value data = lowerMatmul({/*input=*/func.getArgument(0),
+                            /*weight=*/func.getArgument(1),
+                            /*bias=*/func.getArgument(2),
+                            /*output=*/func.getArgument(3)});
+  data = lowerRelu(data);
+
+  // Data is now output
+  builder.create<func::ReturnOp>(loc, data);
+}
+
+void MLPGenerator::createEntryPoint() {
+  switch (kernelType) {
+  case KernelType::MLP:
+    createMlpKernel();
+    break;
+  case KernelType::MATMUL:
+    createMatmulKernel();
+    break;
+  case KernelType::FULLY_CONNECTED:
+    createFcKernel();
+    break;
+  }
 }
 
 int MLPGenerator::generate(StringRef filename) {
@@ -218,6 +333,7 @@ int MLPGenerator::generate(StringRef filename) {
     return 1;
   }
 
+  outfile << createMetadata();
   module->print(outfile);
 
   return 0;
@@ -273,8 +389,8 @@ Value MLPGenerator::lowerBiasAdd(Value input, Value bias) {
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
   auto sum = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{input, bias}, ValueRange{input},
-      ArrayRef<AffineMap>{map, map, map}, getIterators(MAP_PARALLEL),
+      loc, outTy, ValueRange{bias}, ValueRange{input},
+      ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
         auto arg0 = blockArgs[0];
         auto arg1 = blockArgs[1];
@@ -288,15 +404,15 @@ Value MLPGenerator::lowerRelu(Value input) {
   auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
-  auto sum = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{input}, ValueRange{input},
-      ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
+  auto relu = builder.create<linalg::GenericOp>(
+      loc, outTy, ValueRange{}, ValueRange{input}, ArrayRef<AffineMap>{map},
+      getIterators(MAP_PARALLEL),
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
         auto arg0 = blockArgs[0];
-        auto add = nestedBuilder.create<arith::MaxFOp>(loc, arg0, zero);
-        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
+        auto max = nestedBuilder.create<arith::MaxFOp>(loc, arg0, zero);
+        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
       });
-  return sum.getResult(0);
+  return relu.getResult(0);
 }
 
 Value MLPGenerator::lowerSoftmax(Value input, Value output) {
@@ -318,7 +434,7 @@ Value MLPGenerator::lowerSoftmax(Value input, Value output) {
       });
 
   // Second, we sum-reduce and splat
-  SmallVector<int64_t> dims {miniBatch, 1};
+  SmallVector<int64_t> dims{miniBatch, 1};
   auto redTy = getShape(dims, PACK_OUTPUT);
   Value redTensor =
       builder.create<tensor::EmptyOp>(loc, dims, outTy.getElementType());
@@ -371,22 +487,28 @@ TensorType MLPGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
     auto x = dims[0];
     auto y = dims[1];
     switch (type) {
-      case PACK_INPUT:
-        assert(x % n == 0 && "Invalid tile size for N dim");
-        assert(y % c == 0 && "Invalid tile size for C dim");
-        // B x C -> BN x BC x bn x bc
-        return RankedTensorType::get({x/n, y/c, c, n}, dataType);
-      case PACK_WEIGHT:
-        // VNNI packing can be done via tpp-opt --vnni-pack
-        assert(x % k == 0 && "Invalid tile size for K dim");
-        assert(y % c == 0 && "Invalid tile size for C dim");
-        // K x C -> BK x BC x bc x bk
-        return RankedTensorType::get({x / k, y / c, c, k}, dataType);
-      case PACK_OUTPUT:
-        assert(x % n == 0 && "Invalid tile size for N dim");
-        assert(y % k == 0 && "Invalid tile size for K dim");
-        // B x K -> BN x BK x bk x bc
-        return RankedTensorType::get({x/n, y/k, k, n}, dataType);
+    case PACK_INPUT:
+      assert(x % n == 0 && "Invalid tile size for N dim");
+      assert(y % c == 0 && "Invalid tile size for C dim");
+      // N x C -> BN x BC x bn x bc
+      return RankedTensorType::get({x / n, y / c, n, c}, dataType);
+    case PACK_WEIGHT:
+      // VNNI packing can be done via tpp-opt --vnni-pack
+      assert(x % k == 0 && "Invalid tile size for K dim");
+      assert(y % c == 0 && "Invalid tile size for C dim");
+
+      // VNNI: C x K -> BK x BC x bc/vnni x bk x vnni
+      if (vnniFactor != 0)
+        return RankedTensorType::get(
+            {y / k, x / c, c / vnniFactor, k, vnniFactor}, dataType);
+
+      // C x K -> BK x BC x bc x bk
+      return RankedTensorType::get({y / k, x / c, c, k}, dataType);
+    case PACK_OUTPUT:
+      assert(x % n == 0 && "Invalid tile size for N dim");
+      assert(y % k == 0 && "Invalid tile size for K dim");
+      // N x K -> BN x BK x bn x bk
+      return RankedTensorType::get({x / n, y / k, n, k}, dataType);
     }
   }
 
@@ -398,6 +520,7 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
   auto n = tensor.getType().cast<ShapedType>().getRank();
   // Packed tensors are either 4 or 5 dim, map needs to be 6 or 7
   bool packed = (n > 2);
+  bool vnniPacked = packed && vnniFactor != 0;
   SmallVector<AffineExpr> list;
   auto zero = getAffineConstantExpr(0, builder.getContext());
   auto pushDim = [&](size_t index, ArrayRef<int64_t> order) {
@@ -411,53 +534,65 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
     }
   };
 
+  auto getDims = [&](ArrayRef<int64_t> dims) {
+    for (auto &dim : dims)
+      list.push_back(affineExprs[dim]);
+  };
+
   // For each map type, check if it's packed or not, build the order and
   // return the map.
   SmallVector<int64_t, 5> iter;
   switch (type) {
-    case MAP_MATMUL:
-      assert(false && "Invalid map type");
-    case MAP_PARALLEL:
-      // Parallel only depends on the tensor rank
-      for (unsigned i=0; i<n; i++)
-        pushDim(i, iter);
-      break;
-    case MAP_REDUCTION:
-      // TODO: Work out how reduction works on packed tensors
-      for (unsigned i=0; i<n-1; i++)
-        pushDim(i, iter);
-      list.push_back(zero);
-      break;
-    case MAP_MATMUL_INPUT:
-      // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
-      n = packed ? 6 : 3;
-      for (unsigned i=0; i<n; i++) {
-        if (packed)
-          pushDim(i, {0, 2, 3, 5});
-        else
-          pushDim(i, {0, 2});
-      }
-      break;
-    case MAP_MATMUL_WEIGHT:
-      // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
-      n = packed ? 6 : 3;
-      for (unsigned i=0; i<n; i++) {
-        if (packed)
-          pushDim(i, {1, 2, 5, 4});
-        else
-          pushDim(i, {2, 1});
-      }
-      break;
-    case MAP_MATMUL_OUTPUT:
-      // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
-      n = packed ? 6 : 3;
-      for (unsigned i=0; i<n; i++) {
-        if (packed)
-          pushDim(i, {0, 1, 3, 4});
-        else
-          pushDim(i, {0, 1});
-      }
-      break;
+  case MAP_MATMUL:
+    assert(false && "Invalid map type");
+  case MAP_PARALLEL:
+    // Parallel only depends on the tensor rank
+    for (unsigned i = 0; i < n; i++)
+      pushDim(i, iter);
+    break;
+  case MAP_REDUCTION:
+    // TODO: Work out how reduction works on packed tensors
+    for (unsigned i = 0; i < n - 1; i++)
+      pushDim(i, iter);
+    list.push_back(zero);
+    break;
+  case MAP_MATMUL_INPUT:
+    // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
+    n = packed ? 6 : 3;
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({0, 2, 4, 6});
+    } else if (packed)
+      getDims({0, 2, 3, 5});
+    else
+      getDims({0, 2});
+    break;
+  case MAP_MATMUL_WEIGHT:
+    // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
+    n = packed ? 6 : 3;
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({1, 2, 6, 5, 3});
+      list[2] = list[2].floorDiv(vnniFactor);
+    } else if (packed)
+      getDims({1, 2, 5, 4});
+    else
+      getDims({2, 1});
+    break;
+  case MAP_MATMUL_OUTPUT:
+    // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
+    n = packed ? 6 : 3;
+    if (vnniPacked) {
+      // Extra VNNI packing reduction dim
+      n += 1;
+      getDims({0, 1, 4, 5});
+    } else if (packed)
+      getDims({0, 1, 3, 4});
+    else
+      getDims({0, 1});
+    break;
   }
 
   auto map = AffineMap::get(n, 0, list, &context);
@@ -466,34 +601,40 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
 
 SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   bool packed = tiles.size();
+  bool vnniPacked = packed && vnniFactor != 0;
   switch (type) {
-    case MAP_PARALLEL:
-      if (packed)
-        return {utils::IteratorType::parallel, utils::IteratorType::parallel,
-                utils::IteratorType::parallel, utils::IteratorType::parallel};
-      else
-        return {utils::IteratorType::parallel, utils::IteratorType::parallel};
-      break;
-    case MAP_REDUCTION:
-      // TODO: Work out how reduction works on packed tensors
-      if (packed)
-        return {utils::IteratorType::parallel, utils::IteratorType::reduction,
-                utils::IteratorType::parallel, utils::IteratorType::reduction};
-      else
-        return {utils::IteratorType::parallel, utils::IteratorType::reduction};
-      break;
-    case MAP_MATMUL_INPUT:
-    case MAP_MATMUL_WEIGHT:
-    case MAP_MATMUL_OUTPUT:
-    case MAP_MATMUL:
-      if (packed)
-          return {
+  case MAP_PARALLEL:
+    if (packed)
+      return {utils::IteratorType::parallel, utils::IteratorType::parallel,
+              utils::IteratorType::parallel, utils::IteratorType::parallel};
+    else
+      return {utils::IteratorType::parallel, utils::IteratorType::parallel};
+    break;
+  case MAP_REDUCTION:
+    // TODO: Work out how reduction works on packed tensors
+    if (packed)
+      return {utils::IteratorType::parallel, utils::IteratorType::reduction,
+              utils::IteratorType::parallel, utils::IteratorType::reduction};
+    else
+      return {utils::IteratorType::parallel, utils::IteratorType::reduction};
+    break;
+  case MAP_MATMUL_INPUT:
+  case MAP_MATMUL_WEIGHT:
+  case MAP_MATMUL_OUTPUT:
+  case MAP_MATMUL:
+    if (vnniPacked)
+      // Extra VNNI packing reduction dim
+      return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
+              utils::IteratorType::reduction, utils::IteratorType::reduction,
               utils::IteratorType::parallel,  utils::IteratorType::parallel,
+              utils::IteratorType::reduction};
+    else if (packed)
+      return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
               utils::IteratorType::reduction, utils::IteratorType::parallel,
               utils::IteratorType::parallel,  utils::IteratorType::reduction};
-      else
-          return {utils::IteratorType::parallel, utils::IteratorType::parallel,
-                  utils::IteratorType::reduction};
+    else
+      return {utils::IteratorType::parallel, utils::IteratorType::parallel,
+              utils::IteratorType::reduction};
   }
   return {};
 }

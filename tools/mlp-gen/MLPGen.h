@@ -68,6 +68,15 @@ class MLPGenerator {
   /// Initialize accumulation matrix with bias
   bool biasAcc;
 
+  /// List of supported kernel types that can be generated
+  enum class KernelType { MLP, MATMUL, FULLY_CONNECTED };
+
+  /// Type of kernel to be generated
+  KernelType kernelType;
+
+  /// VNNI packing factor
+  int vnniFactor;
+
   // ============================ Helpers
 
   /// Return current random seed, update next
@@ -129,6 +138,9 @@ class MLPGenerator {
 
   // ============================ Main API
 
+  /// Creates metadata string containing run command, flops info etc.
+  std::string createMetadata();
+
   /// Creates a hidden layer function, to be called by the kernel
   /// There will be one per hidden layer
   Value createLayer(unsigned, Value);
@@ -137,19 +149,28 @@ class MLPGenerator {
   /// Classifies the output of the last layer and put it in the second argumnent
   Value createOutputLayer(Value, Value);
 
-  /// Creates the entry point, that calls all other layers
+  /// Creates an MLP kernel
+  void createMlpKernel();
+
+  /// Creates a matmul kernel
+  void createMatmulKernel();
+
+  /// Creates a fully connected kernel
+  void createFcKernel();
+
+  /// Creates the entry point, that creates and executes chosen kernel
   /// No need to return the function, as all we need is to dump the module
+  /// with metadata appended to the file
   void createEntryPoint();
 
 public:
   /// Creates a specific module. Different configurations need different modules
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
-  MLPGenerator(unsigned, StringRef, StringRef, unsigned, int, bool, bool);
+  MLPGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
+               bool, int);
 
-  ~MLPGenerator() {
-    module->destroy();
-  }
+  ~MLPGenerator() { module->destroy(); }
 
   /// Generates the whole IR and write to file
   /// Return 0 on success, 1 on failure

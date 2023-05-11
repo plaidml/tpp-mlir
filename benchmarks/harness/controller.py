@@ -30,6 +30,7 @@ import sys
 import re
 import shlex
 import argparse
+import io
 
 from Logger import Logger
 from Execute import Execute
@@ -56,13 +57,32 @@ class BenchmarkController(object):
         self.stdev = 0.0
         # Output is always in seconds, we need to convert anyway
         self.unit = "ms" # or 'gflops'
+        self.benchmark = self._read_input(args.benchmark)
+
+    def _read_input(self, input):
+        """Reads an input and returns its contents"""
+
+        if isinstance(input, io.IOBase):
+            data = input.read()
+            input.close()
+            return data
+
+        try:
+            with open(input) as file:
+                return file.read()
+        except IOError as err:
+            self.logger.error("Cannot open file '{input}': {err.strerror}")
+            return {}
+        except Exception as err:
+            self.logger.error("Uncaught error while parsing file: {err.strerror}")
+            return {}
 
     def verifyArgs(self):
         """ Verify cmd-line and IR file arguments, update defaults, etc """
 
         # Parse the IR file for user arguments
         self.logger.info("Parsing FileCheck lines, updating arguments")
-        fileArgs = FileCheckParser(self.loglevel).parse(args.benchmark_name)
+        fileArgs = FileCheckParser(self.loglevel).parse(self.benchmark)
 
         # Command line arguments have preference
         if (not self.args.n and 'iters' in fileArgs):
@@ -98,19 +118,18 @@ class BenchmarkController(object):
         # Only run tpp-opt if we have the arguments
         if self.args.opt_args:
             self.logger.info("Running optimiser, to prepare the IR file")
-            optCmd = [ self.programs['tpp-opt'], self.args.benchmark_name ]
+            optCmd = [ self.programs['tpp-opt'] ]
             optCmd.extend(shlex.split(self.args.opt_args))
 
             # Run tpp-opt and capture the output IR
-            optResult = executor.run(optCmd)
+            optResult = executor.run(optCmd, input=self.benchmark)
             if 0 != optResult.returncode:
                 self.logger.error(f"Error executing tpp-opt: {optResult.stderr}")
                 return False
             irContents = optResult.stdout
         else:
             # Bypass tpp-opt and just dump the file
-            with open(self.args.benchmark_name) as file:
-                irContents = file.read()
+            irContents = self.benchmark
 
         # Actually run the file in benchmark mode, no output
         self.logger.info("Running the kernel with the arguments provided")
@@ -165,8 +184,9 @@ class BenchmarkController(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TPP-MLIR Benchmark Harness')
 
-    # Required argument: benchmark name (can be a file or a directory)
-    parser.add_argument('benchmark_name', type=str,
+    # Required argument: benchmark name (can be a file, a directory, or stdin)
+    parser.add_argument('benchmark', nargs='?', type=argparse.FileType('r'),
+                        default=sys.stdin,
                         help='MLIR file or directory containing MLIR files')
 
     # Required, but auto-detected if omitted
