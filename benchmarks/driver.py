@@ -31,9 +31,16 @@
                  "type": "MLIR",
                  "benchmark": "matmul_64x64x64_vnni.mlir",
                  "environment": { { "OMP_NUM_THREADS": "32" } },
-                 "flags": [ "-v" ],
+                 "flags": [ "-n", "100", "-v" ],
                  "extensions": [ "avx512.*" ]
              },
+             "irgen": {
+                 "type": "IR-GEN",
+                 "benchmark": [ "mlp-gen", "--kernel=matmul --float-width=16 --vnni=2 --mini-batch=64 --layers=64,64 --tiles=32,32,32" ],
+                 "environment": { "OMP_NUM_THREADS": "32" },
+                 "flags": [ "-n", "100" ],
+                 "extensions": [ "(avx2|asimd)" ]
+             }
          },
          "128x256x512":  {
              ...
