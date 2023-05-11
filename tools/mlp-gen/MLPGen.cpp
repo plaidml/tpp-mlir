@@ -571,7 +571,6 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
   case MAP_MATMUL_WEIGHT:
     // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
     n = packed ? 6 : 3;
-    // Extra VNNI packing reduction dim
     if (vnniPacked) {
       // Extra VNNI packing reduction dim
       n += 1;
@@ -623,8 +622,8 @@ SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   case MAP_MATMUL_WEIGHT:
   case MAP_MATMUL_OUTPUT:
   case MAP_MATMUL:
-    // Extra VNNI packing reduction dim
     if (vnniPacked)
+      // Extra VNNI packing reduction dim
       return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
               utils::IteratorType::reduction, utils::IteratorType::reduction,
               utils::IteratorType::parallel,  utils::IteratorType::parallel,

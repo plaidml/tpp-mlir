@@ -18,8 +18,6 @@
 
 #include "TPP/BuilderUtils.h"
 
-#include <optional>
-
 namespace mlir {
 class ModuleOp;
 class MemRefType;
