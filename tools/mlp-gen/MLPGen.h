@@ -140,6 +140,9 @@ class MLPGenerator {
 
   // ============================ Main API
 
+  /// Creates metadata string containing run command, flops info etc.
+  std::string createMetadata();
+
   /// Creates a hidden layer function, to be called by the kernel
   /// There will be one per hidden layer
   Value createLayer(unsigned, Value);
@@ -159,6 +162,7 @@ class MLPGenerator {
 
   /// Creates the entry point, that creates and executes chosen kernel
   /// No need to return the function, as all we need is to dump the module
+  /// with metadata appended to the file
   void createEntryPoint();
 
 public:

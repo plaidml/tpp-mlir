@@ -190,6 +190,47 @@ Value MLPGenerator::createOutputLayer(Value arg, Value out) {
   return lowerMatmul({arg, weight, /*bias=*/nullptr, out});
 }
 
+std::string MLPGenerator::createMetadata() {
+  std::string data = "";
+
+  auto addRunnerString = [&]() {
+    data += "// RUN: tpp-run %s -n 10 \\\n";
+    data += "// RUN:  -e entry -entry-point-result=void\n";
+    data += "\n";
+  };
+
+  auto addFlopsInfo = [&](int flops) {
+    data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
+    data += "\n";
+  };
+
+  switch (kernelType) {
+  case KernelType::MATMUL: {
+    addRunnerString();
+    // Total flops = matmul O(2*n*m*k)
+    int flops = 2 * miniBatch * layers.front() * layers.back();
+    addFlopsInfo(flops);
+    break;
+  }
+  case KernelType::FULLY_CONNECTED: {
+    addRunnerString();
+    // Total flops = matmul O(2*n*m*k)
+    int flops = 2 * miniBatch * layers.front() * layers.back();
+    // + BiasAdd O(n*m)
+    flops += miniBatch * layers.back();
+    // + ReLU O(n*m)
+    flops += miniBatch * layers.back();
+    addFlopsInfo(flops);
+    break;
+  }
+  default:
+    break;
+  }
+  data += "\n";
+
+  return data;
+}
+
 void MLPGenerator::createMlpKernel() {
   OpBuilder::InsertionGuard guard(builder);
 
@@ -292,6 +333,7 @@ int MLPGenerator::generate(StringRef filename) {
     return 1;
   }
 
+  outfile << createMetadata();
   module->print(outfile);
 
   return 0;
