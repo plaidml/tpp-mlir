@@ -287,7 +287,7 @@ void MLPGenerator::createFcKernel() {
                              {inputType, weightType, biasType, outputType},
                              {outputType});
 
-  // Add only matmul without bias or activation func
+  // Create a fully connected (FC) kernel that is: matmul + bias + relu
   Value data = lowerMatmul({/*input=*/func.getArgument(0),
                             /*weight=*/func.getArgument(1),
                             /*bias=*/func.getArgument(2),
