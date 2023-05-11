@@ -199,7 +199,7 @@ std::string MLPGenerator::createMetadata() {
     data += "\n";
   };
 
-  auto addFlopsInfo = [&](int flops) {
+  auto addFlopsInfo = [&](uint64_t flops) {
     data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
     data += "\n";
   };
@@ -208,14 +208,14 @@ std::string MLPGenerator::createMetadata() {
   case KernelType::MATMUL: {
     addRunnerString();
     // Total flops = matmul O(2*n*m*k)
-    int flops = 2 * miniBatch * layers.front() * layers.back();
+    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
     addFlopsInfo(flops);
     break;
   }
   case KernelType::FULLY_CONNECTED: {
     addRunnerString();
     // Total flops = matmul O(2*n*m*k)
-    int flops = 2 * miniBatch * layers.front() * layers.back();
+    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
     // + BiasAdd O(n*m)
     flops += miniBatch * layers.back();
     // + ReLU O(n*m)
