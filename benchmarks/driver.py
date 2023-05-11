@@ -272,6 +272,8 @@ class IrGeneratorRun(BaseRun):
         command = list()
         self.env.pin_task(command)
         command.append(self.env.harness)
+        if self.args.build:
+            command.extend(["--build", self.args.build])
         if self.flags:
             command.extend(self.flags)
         if self.env.extra_args:
