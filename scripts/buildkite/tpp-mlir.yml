@@ -23,5 +23,5 @@ steps:
     concurrency: 1
     concurrency_group: "tpp-mlir"
     command: "${SRUN} --partition=clxtrb,clxaptrb --time=0:30:00 -- \
-              'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 INSTALL=1 \
+              'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
