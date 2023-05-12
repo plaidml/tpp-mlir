@@ -40,7 +40,7 @@ if [ "${INSTALL}" ]; then
   if [ -d "${INSTALL_PREFIX}" ]; then
     INSTALL_OPTION="-i ${INSTALL_PREFIX}"
   else
-    echo "Installation requites INSTALL_PREFIX (=${INSTALL_PREFIX}) to be a valid directory"
+    echo "Installation requires INSTALL_PREFIX (=${INSTALL_PREFIX}) to be a valid directory"
     exit 1
   fi
 fi
