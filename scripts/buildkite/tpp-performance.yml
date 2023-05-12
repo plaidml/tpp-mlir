@@ -15,12 +15,10 @@ steps:
 
   - label: "TPP-MLIR-performance"
     command:
-      - "${SRUN} --partition=clxtrb --time=1:30:00 -- \
-            'KIND=Release COMPILER=clang LINKER=lld \
-             scripts/buildkite/benchmark.sh'"
-      # make absolute path (do not resolve symlinks with pwd -P, mount point is different on head/compute node)
-      - buildkite-agent artifact upload \
-        "$(cd "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}" && pwd)/*"
+      - "${SRUN} --partition=clxtrb --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'";
+        # absolute path but symlinks not resolved (-P), mount point is different on head/compute node, upload even if failure
+        buildkite-agent artifact upload \
+            "$(cd "$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}" && pwd)/*"
     env:
       LOGRPTSUM: "mlir"
       LOGRPTBND: "-"
