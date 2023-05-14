@@ -28,7 +28,7 @@ func.func @entry(){
     scf.for %arg5 = %c0 to %c16 step %c1 {
       %subview_3 = memref.subview %wt_alloc[%arg5, 0, 0, 0, 0] [1, 64, 2, 4, 2] [1, 1, 1, 1, 1] : memref<128x64x2x4x2xbf16> to memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>
       %subview_4 = memref.subview %subview_2[%arg5, 0, 0] [1, 4, 4] [1, 1, 1] : memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>> to memref<4x4xbf16, strided<[4, 1], offset: ?>>
-      tpp.vnni_brgemm ins(%subview:memref<64x4x4xbf16, strided<[16, 4,1], offset:?>>, %subview_3 : memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>) outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>)
+      tpp.brgemm ins(%subview:memref<64x4x4xbf16, strided<[16, 4,1], offset:?>>, %subview_3 : memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>, %subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>)
       tpp.relu ins(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>)
       %d1 = arith.constant -1.0 : bf16
       %v0 = vector.transfer_read %subview_4[%c0, %c0], %d1 : memref<4x4xbf16, strided<[4,1], offset:?>>, vector<4x4xbf16>

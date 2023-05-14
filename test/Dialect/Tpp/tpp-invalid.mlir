@@ -68,9 +68,9 @@ func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) 
 
 func.func @tpp_gemm_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
                               %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
-  // expected-error @below {{fails to verify operands dimensions mismatch}}
+  // expected-error @below {{operand 0 fails to verify expected shape}}
   tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, %arg2: memref<5x5xf32>) 
-             outs(%arg2: memref<5x5xf32>)
+           outs(%arg2: memref<5x5xf32>)
   return %arg2: memref<5x5xf32>
 }
 
@@ -79,7 +79,7 @@ func.func @tpp_gemm_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
 // The batch dimension must agree in both arg0 and arg1.
 func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>,
                               %arg2: memref<2x2xf32>) -> memref<2x2xf32> {
-  // expected-error @below {{fails to verify operands dimensions mismatch}}
+  // expected-error @below {{operand 1 fails to verify expected shape}}
   tpp.brgemm ins(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>, %arg2: memref<2x2xf32>) 
              outs(%arg2: memref<2x2xf32>)
   return %arg2: memref<2x2xf32>
@@ -89,8 +89,9 @@ func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>
 
 func.func @tpp_matmul_invalid(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>,
                               %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
-  // expected-error @below {{fails to verify operands dimensions mismatch}}
-  tpp.vnni_matmul ins(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>) outs(%arg2: memref<6x6xbf16>)
+  // expected-error @below {{operand 1 fails to verify expected shape}}
+  tpp.gemm ins(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xbf16>) 
+           outs(%arg2: memref<6x6xbf16>)
   return %arg2: memref<6x6xbf16>
 }
 
@@ -100,7 +101,8 @@ func.func @tpp_matmul_invalid(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>
 func.func @tpp_matmul_invalid(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
                               %arg2: memref<6x6xf32>) -> memref<6x6xf32> {
   // expected-error @below {{requires the same element type for all operands}}
-  tpp.vnni_matmul ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>) outs(%arg2: memref<6x6xf32>)
+  tpp.gemm ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xf32>) 
+           outs(%arg2: memref<6x6xf32>)
   return %arg2: memref<6x6xf32>
 }
 
@@ -329,4 +331,48 @@ func.func @unary_invalid_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
   // expected-error @below {{expect 1 input operands, but got: 2}}
   %0 = tpp.zero(%arg0: tensor<2x2xf32>, %arg0: tensor<2x2xf32>) -> tensor<2x2xf32>
   return %0 : tensor<2x2xf32>
+}
+
+// -----
+
+func.func @vnni_gemm_b_operand_wrong_type(%arg0: tensor<32x32xf32>,        
+                                          %arg1: tensor<16x32x2xf32>,
+                                          %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // expected-error @below {{operand 1 invalid element type for VNNI layout expect bf16, but got: 'f32'}}
+  %0 = tpp.gemm (%arg0: tensor<32x32xf32>, %arg1: tensor<16x32x2xf32>,
+                 %arg2: tensor<32x32xf32>) -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}
+
+// -----
+
+func.func @vnni_wrong_layout(%arg0: tensor<32x32xbf16>,        
+                             %arg1: tensor<16x32x3xbf16>,
+                             %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  // expected-error @below {{operand 1 invalid VNNI layout expect inner dims to be 2 or 4, but got: 3}}
+  %0 = tpp.gemm (%arg0: tensor<32x32xbf16>, %arg1: tensor<16x32x3xbf16>,
+                 %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16>
+  return %0: tensor<32x32xbf16>
+}
+
+// -----
+
+func.func @vnni_gemm_b_operand_wrong_shape(%arg0: tensor<32x32xbf16>,        
+                                           %arg1: tensor<15x32x2xbf16>,
+                                           %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  // expected-error @below {{operand 1 fails to verify expected shape}}
+  %0 = tpp.gemm (%arg0: tensor<32x32xbf16>, %arg1: tensor<15x32x2xbf16>,
+                 %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16>
+  return %0: tensor<32x32xbf16>
+}
+
+// -----
+
+func.func @tied_type_result_to_arg2(%arg0: tensor<32x32xf32>,        
+                                    %arg1: tensor<16x32x2xf32>,
+                                    %arg2: tensor<1x32xf32>) -> tensor<32x32xf32> {
+  // expected-error @below {{result type differs from destination operand type}}
+  %0 = tpp.gemm (%arg0: tensor<32x32xf32>, %arg1: tensor<16x32x2xf32>,
+                 %arg2: tensor<1x32xf32>) -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
 }

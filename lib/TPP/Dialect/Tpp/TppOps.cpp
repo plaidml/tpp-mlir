@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/VNNIUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
@@ -117,8 +118,9 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
     printCommaSeparatedList(printer, operands);
     printer << " -> (" << results << ")";
   }
-  printer.printOptionalAttrDict(op->getAttrs(),
-                                /*elidedAttrs=*/{"operand_segment_sizes"});
+  printer.printOptionalAttrDict(
+      op->getAttrs(),
+      /*elidedAttrs=*/{"operand_segment_sizes", "unary_type", "binary_type"});
 }
 
 static void tppOpBuilder(OpBuilder &builder, OperationState &state,
@@ -268,35 +270,92 @@ void AddOp::getEffects(
 // GemmOp
 //===----------------------------------------------------------------------===//
 
-static bool verifyGemmShape(ShapedType shapedA, ShapedType shapedB,
-                            ShapedType shapedC) {
-  return !(shapedB.getRank() != 2 || shapedC.getRank() != 2 ||
-           shapedA.getRank() != 2);
-}
+template <typename OpTy>
+static LogicalResult
+validateVnniGemmOperand(OpTy operation, ArrayRef<int64_t> shape,
+                        Type elementType, int dimI, int dimJ) {
 
-static bool verifyGemmOperandsDims(ArrayRef<int64_t> shapeA,
-                                   ArrayRef<int64_t> shapeB,
-                                   ArrayRef<int64_t> shapeC) {
-  int64_t m = shapeC[0];
-  int64_t n = shapeC[1];
-  int64_t k = shapeA[1];
-  // Verify C(m, n) = A(m, k) B(k, n)
-  return !(shapeB[0] != k || shapeB[1] != n || shapeA[0] != m);
-}
-
-// Check that op to be 2d matmul in row-major.
-LogicalResult GemmOp::verify() {
-  auto shapedA = getInputs()[0].getType().cast<ShapedType>();
-  auto shapedB = getInputs()[1].getType().cast<ShapedType>();
-  auto shapedC = (hasTensorSemantics()) ? getResultType().cast<ShapedType>()
-                                        : getOutputType().cast<ShapedType>();
-  if (!verifyGemmShape(shapedA, shapedB, shapedC))
-    return emitOpError("fails to verify operands shapes");
-  if (!verifyGemmOperandsDims(shapedA.getShape(), shapedB.getShape(),
-                              shapedC.getShape()))
-    return emitOpError("fails to verify operands dimensions mismatch");
+  if (shape.size() != 2 && shape.size() != 3) {
+    return operation->emitOpError("expect rank 2 or 3 for operand 1");
+  }
+  if (shape.size() == 2) {
+    if (shape[0] != dimI || shape[1] != dimJ)
+      return operation->emitOpError("operand 1 fails to verify expected shape");
+    return success();
+  }
+  if (!elementType.isBF16()) {
+    return operation->emitOpError() << "operand 1 invalid element type for "
+                                       "VNNI layout expect bf16, but got: "
+                                    << elementType << "\n";
+  }
+  if (shape[2] != vnni::utils::getVnniBlockingFactor(elementType)) {
+    return operation->emitOpError() << "operand 1 invalid VNNI layout expect "
+                                       "inner dims to be 2 or 4, but got: "
+                                    << shape[shape.size() - 1] << "\n";
+  }
+  // VNNI layout: [K/VNNI][J][VNNI]
+  if (shape[0] * shape[2] != dimI || shape[1] != dimJ)
+    return operation->emitOpError("operand 1 fails to verify expected shape");
   return success();
 }
+
+template <typename OpTy>
+static LogicalResult verifyGemmLikeOperands(OpTy operation) {
+
+  static_assert(llvm::is_one_of<OpTy, BrgemmOp, FusedBrgemmOp, GemmOp>::value,
+                "applies to brgemm, fused_brgemm or gemm operations");
+
+  auto shapedA = operation.getInputs()[0].getType().template cast<ShapedType>();
+  auto shapedB = operation.getInputs()[1].getType().template cast<ShapedType>();
+  auto shapedC = operation.getInputs()[2].getType().template cast<ShapedType>();
+  auto shapedResult =
+      (operation.hasTensorSemantics())
+          ? operation.getResultType().template cast<ShapedType>()
+          : operation.getOutputType().template cast<ShapedType>();
+
+  if (shapedC != shapedResult) {
+    return operation.emitOpError()
+           << "result type differs from destination operand type";
+  }
+
+  // Validate operand C.
+  if (shapedC.getRank() != 2) {
+    return operation.emitOpError()
+           << "operand 2 expects rank 2, but got: " << shapedC.getRank()
+           << "\n";
+  }
+  int64_t m = shapedC.getShape()[0];
+  int64_t n = shapedC.getShape()[1];
+
+  // Validate operand A.
+  bool isGemmOp = isa<tpp::GemmOp>(operation.getOperation());
+  // Brgemm has size 3 for A while Gemm has size 2.
+  auto expectRankA = (isGemmOp) ? 2 : 3;
+  if (shapedA.getRank() != expectRankA) {
+    return operation.emitOpError()
+           << "operand 0 expects rank " << expectRankA
+           << ", but got: " << shapedA.getRank() << "\n";
+  }
+  int64_t k = shapedA.getShape()[shapedA.getRank() - 1];
+  // On A operand the 'm' dimension is at position 0 for Gemm while 1 for
+  // Brgemm.
+  int64_t idxMOnA = (isGemmOp) ? 0 : 1;
+  if (shapedA.getShape()[idxMOnA] != m)
+    return operation.emitOpError("operand 0 fails to verify expected shape");
+
+  // Validate operand B.
+  int64_t batch = shapedA.getShape()[0];
+  if (!isGemmOp && shapedB.getShape()[0] != batch)
+    return operation.emitOpError("operand 1 fails to verify expected shape");
+  // Drop the batch dim for brgemm, already checked.
+  auto shapeB =
+      (isGemmOp) ? shapedB.getShape() : shapedB.getShape().drop_front();
+  return validateVnniGemmOperand(operation, shapeB, shapedB.getElementType(), k,
+                                 n);
+}
+
+// Verify gemm operation.
+LogicalResult GemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
 void GemmOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
                    Value output) {
@@ -321,29 +380,7 @@ void GemmOp::getEffects(
 // BrgemmOp
 //===----------------------------------------------------------------------===//
 
-static bool verifyBRGemmShape(ShapedType shapedA, ShapedType shapedB,
-                              ShapedType shapedC) {
-  return !(shapedB.getRank() != 3 || shapedC.getRank() != 2 ||
-           shapedA.getRank() != 3);
-}
-
-LogicalResult BrgemmOp::verify() {
-  auto shapedA = getInputs()[0].getType().cast<ShapedType>();
-  auto shapedB = getInputs()[1].getType().cast<ShapedType>();
-  auto shapedC = (hasTensorSemantics()) ? getResultType().cast<ShapedType>()
-                                        : getOutputType().cast<ShapedType>();
-  if (!verifyBRGemmShape(shapedA, shapedB, shapedC))
-    return emitOpError("fails to verify operands shapes");
-  // Check batch dimension.
-  if (shapedA.getShape()[0] != shapedB.getShape()[0])
-    return emitOpError("fails to verify operands dimensions mismatch");
-  // Check all others that must be 'matmul' like.
-  if (!verifyGemmOperandsDims(shapedA.getShape().drop_front(),
-                              shapedB.getShape().drop_front(),
-                              shapedC.getShape()))
-    return emitOpError("fails to verify operands dimensions mismatch");
-  return success();
-}
+LogicalResult BrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
@@ -368,113 +405,61 @@ void BrgemmOp::getEffects(
 // FusedBrgemmOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult FusedBrgemmOp::verify() {
-  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
-  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
-  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
-  if (!verifyBRGemmShape(tensorA, tensorB, matrixC))
-    return emitOpError("fails to verify operands shapes");
-  // Check batch dimension.
-  if (tensorA.getShape()[0] != tensorB.getShape()[0])
-    return emitOpError("fails to verify operands dimensions mismatch");
-  // Check all others that must be 'matmul' like.
-  if (!verifyGemmOperandsDims(tensorA.getShape().drop_front(),
-                              tensorB.getShape().drop_front(),
-                              matrixC.getShape()))
-    return emitOpError("fails to verify operands dimensions mismatch");
-  return success();
-}
+LogicalResult FusedBrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
-                          ValueRange inputs, Value output) {
-  FusedBrgemmOp::build(
-      builder, state, inputs[0], inputs[1], inputs[2],
-      tpp::FusedOpTypeAttr::get(builder.getContext(), tpp::FusedOpType::NONE),
-      output);
+                          ValueRange inputs, Value output,
+                          FusedUnaryOpTypeAttr unaryType,
+                          FusedBinaryOpTypeAttr binaryType) {
+  tppOpBuilder(builder, state, inputs, output);
+  state.addAttribute("unary_type", unaryType);
+  state.addAttribute("binary_type", binaryType);
 }
 
-//===----------------------------------------------------------------------===//
-// VNNIMatmulOp
-//===----------------------------------------------------------------------===//
-
-static bool verifyVNNIMatmulShape(MemRefType memrefA, MemRefType memrefB,
-                                  MemRefType memrefC) {
-  return !(memrefB.getRank() != 3 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 2);
-}
-
-static bool verifyVNNIMatmulOperandsDims(ArrayRef<int64_t> shapeA,
-                                         ArrayRef<int64_t> shapeB,
-                                         ArrayRef<int64_t> shapeC) {
-  int64_t m = shapeC[0];
-  int64_t n = shapeC[1];
-  int64_t k = shapeA[1];
-  return !(shapeB[0] * shapeB[2] != k || shapeB[1] != n || shapeA[0] != m);
-}
-
-LogicalResult VNNIMatmulOp::verify() {
-  MemRefType memrefA = getMatrixA().getType().cast<MemRefType>();
-  MemRefType memrefB = getMatrixB().getType().cast<MemRefType>();
-  MemRefType memrefC = getMatrixC().getType().cast<MemRefType>();
-  assert(memrefB.getElementType().isBF16() && memrefB.getRank() == 3);
-  if (!verifyVNNIMatmulShape(memrefA, memrefB, memrefC))
-    return emitOpError("fails to verify operands shapes");
-  if (!verifyVNNIMatmulOperandsDims(memrefA.getShape(), memrefB.getShape(),
-                                    memrefC.getShape()))
-    return emitOpError("fails to verify operands dimensions mismatch");
+template <typename EnumClass>
+static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
+  StringRef flag;
+  auto loc = parser.getCurrentLocation();
+  if (parser.parseKeyword(&flag))
+    return failure();
+  auto flagAttr = symbolizeEnum<EnumClass>(flag);
+  if (!flagAttr)
+    return parser.emitError(loc, "invalid enum ") << flag;
+  value = *flagAttr;
   return success();
 }
 
-void VNNIMatmulOp::build(OpBuilder &builder, OperationState &state,
-                         ValueRange inputs, Value output) {
-  VNNIMatmulOp::build(builder, state, inputs[0], inputs[1], output);
+ParseResult FusedBrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
+  if (parser.parseLSquare() || parser.parseKeyword("unary") ||
+      parser.parseEqual())
+    return failure();
+  FusedUnaryOpType unaryType;
+  if (parseEnum(unaryType, parser))
+    return failure();
+  if (parser.parseComma() || parser.parseKeyword("binary") ||
+      parser.parseEqual())
+    return failure();
+  FusedBinaryOpType binaryType;
+  if (parseEnum(binaryType, parser))
+    return failure();
+  if (parser.parseRSquare())
+    return failure();
+  auto ctx = parser.getBuilder().getContext();
+  result.addAttribute("unary_type", FusedUnaryOpTypeAttr::get(ctx, unaryType));
+  result.addAttribute("binary_type",
+                      FusedBinaryOpTypeAttr::get(ctx, binaryType));
+  return parseTppOp(parser, result);
 }
 
-//===----------------------------------------------------------------------===//
-// VNNIBrgemmOp
-//===----------------------------------------------------------------------===//
-
-static bool verifyVNNIBRGemmShape(MemRefType memrefA, MemRefType memrefB,
-                                  MemRefType memrefC) {
-  return !(memrefB.getRank() != 4 || memrefC.getRank() != 2 ||
-           memrefA.getRank() != 3);
+void FusedBrgemmOp::print(OpAsmPrinter &printer) {
+  printer << " [unary = " << tpp::stringifyFusedUnaryOpType(getUnaryType())
+          << ", binary = " << tpp::stringifyFusedBinaryOpType(getBinaryType())
+          << "]";
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
-LogicalResult VNNIBrgemmOp::verify() {
-  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
-  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
-  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
-  if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
-    return emitOpError("fails to verify operands shapes");
-  // Check batch dimension.
-  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[2])
-    return emitOpError("fails to verify operands dimensions mismatch");
-  return success();
-}
-
-void VNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
-                         ValueRange inputs, Value output) {
-  VNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], output);
-}
-
-//===----------------------------------------------------------------------===//
-// FusedVNNIBrgemmOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult FusedVNNIBrgemmOp::verify() {
-  MemRefType tensorA = getBatchMatrixA().getType().cast<MemRefType>();
-  MemRefType tensorB = getBatchMatrixB().getType().cast<MemRefType>();
-  MemRefType matrixC = getMatrixC().getType().cast<MemRefType>();
-  if (!verifyVNNIBRGemmShape(tensorA, tensorB, matrixC))
-    return emitOpError("fails to verify operands shapes");
-  // Check batch dimension.
-  if (tensorB.getShape()[1] * tensorB.getShape()[3] != tensorA.getShape()[2])
-    return emitOpError("fails to verify operands dimensions mismatch");
-  return success();
-}
-
-void FusedVNNIBrgemmOp::build(OpBuilder &builder, OperationState &state,
-                              ValueRange inputs, Value output) {
-  FusedVNNIBrgemmOp::build(builder, state, inputs[0], inputs[1], inputs[2],
-                           output);
+void FusedBrgemmOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
 }

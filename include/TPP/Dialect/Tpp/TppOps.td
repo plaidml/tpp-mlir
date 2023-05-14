@@ -11,10 +11,7 @@
 
 include "TPP/Dialect/Tpp/TppDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "TPP/Dialect/Tpp/TppAttr.td"
-include "TPP/Dialect/Tpp/TppInterface.td"
-include "mlir/IR/OpBase.td"
 
 class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
     Type<And<[MemRefOf<allowedTypes>.predicate,
@@ -33,11 +30,8 @@ class StaticTensorRankOf<list<Type> allowedTypes, list<int> ranks> :
 def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
 def TppTensor : StaticTensorRankOf<[AnyFloat], [1, 2]>;
 
-def TppBrgemmMemRef : StaticMemRefRankOf<[AnyFloat], [2, 3]>;
-def TppBrgemmTensor : StaticTensorRankOf<[AnyFloat], [2, 3]>;
-
-def TppVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [3]>;
-def TppBRGEMMVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [4]>;
+def TppGemmLikeMemRef : StaticMemRefRankOf<[AnyFloat], [2, 3, 4]>;
+def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [2, 3, 4]>;
 
 // Tpp operands:
 // input operand: is a scalar float or a static memref with rank 1 or 2.
@@ -45,43 +39,16 @@ def TppBRGEMMVNNIMemrefInput : StaticMemRefRankOf<[AnyFloat], [4]>;
 def TppInputOperand : AnyTypeOf<[TppMemRef, TppTensor, AnyFloat]>;
 def TppOutputOperand : AnyTypeOf<[TppMemRef, TppTensor]>;
 
-// Tpp operands for Ternary ops - ranke 2 or 3.
-def TppBrgemmOperand : AnyTypeOf<[TppBrgemmMemRef, TppBrgemmTensor]>;
-
-// Tpp operands for VNNI layout.
-def TppVNNIOperand : AnyTypeOf<[TppVNNIMemrefInput, AnyFloat]>;
-
-//===----------------------------------------------------------------------===//
-// Tpp Traits
-//===----------------------------------------------------------------------===//
-
-// Tpp operation trait - make sure the operand are broadcastable.
-// Two dimensions are compatible when:
-// 1. they are equal, or
-// 2. one of them is 1.
-def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
-
-// Tpp operation trait - make sure the stride in the fastest-varying
-// dimension is one.
-def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
-
-// Tpp operation trait - verify tpp operand segment size.
-def UnaryOp : NativeOpTrait<"tpp::UnaryOp">;
-def BinaryOp : NativeOpTrait<"tpp::BinaryOp">;
-def TernaryOp : NativeOpTrait<"tpp::TernaryOp">;
+// Tpp operands for gemm and brgemm ops - rank 2, 3 or 4.
+def TppGemmLikeOperand : AnyTypeOf<[TppGemmLikeMemRef, TppGemmLikeTensor]>;
 
 //===----------------------------------------------------------------------===//
 // Unary Operations
 //===----------------------------------------------------------------------===//
 
 class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
-                                        BroadcastableShape,
-                                        DeclareOpInterfaceMethods<
-                                            MemoryEffectsOpInterface>,
-                                        UnaryOp,
-                                        UnitStrideInnerLoop,
-                                        TppOpInterface])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [BroadcastableShape,
+                                        UnaryOp])> {
   
   let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
@@ -91,7 +58,6 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   let skipDefaultBuilders = 1; 
 
   let builders = [
-    // Memref builder.
     OpBuilder<(ins "Value":$input, "Value":$output)>
   ]; 
 }
@@ -183,13 +149,8 @@ def Tpp_ZeroOp : Tpp_UnaryOp<"zero"> {
 //===----------------------------------------------------------------------===//
 
 class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments,
-                                        BinaryOp,
-                                        BroadcastableShape,
-                                        DeclareOpInterfaceMethods<
-                                            MemoryEffectsOpInterface>,
-                                        UnitStrideInnerLoop,
-                                        TppOpInterface])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [BinaryOp,
+                                        BroadcastableShape])> {
 
   let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
@@ -199,7 +160,6 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   let skipDefaultBuilders = 1;
 
   let builders = [
-    // Memref builder.
     OpBuilder<(ins "ValueRange":$inputs, "Value":$out)>
   ];
 }
@@ -250,22 +210,16 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 //===----------------------------------------------------------------------===//
 
 class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
-  Tpp_Op<mnemonic, !listconcat(traits, [AttrSizedOperandSegments, 
-                                        DeclareOpInterfaceMethods<
-                                          MemoryEffectsOpInterface>,
-                                        UnitStrideInnerLoop,
-                                        TernaryOp,
-                                        TppOpInterface])> {
+  Tpp_Op<mnemonic, !listconcat(traits, [TernaryOp])> {
 
-  let arguments = (ins Variadic<TppBrgemmOperand>:$inputs,
-                       Variadic<TppBrgemmOperand>:$outputs); 
-  let results = (outs Variadic<TppBrgemmOperand>:$results);
+  let arguments = (ins Variadic<TppGemmLikeOperand>:$inputs,
+                       Variadic<TppGemmLikeOperand>:$outputs); 
+  let results = (outs Variadic<TppGemmLikeOperand>:$results);
 
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;
 
   let builders = [
-    // Memref builder.
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
   ]; 
 }
@@ -286,11 +240,15 @@ def Tpp_GemmOp : Tpp_TernaryOp<"gemm"> {
 
     // Memref abstraction.
     tpp.gemm ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
-               outs(%3: memref<2x2xf32>)
+             outs(%3: memref<2x2xf32>)
 
     // Tensor abstraction.
-    %0 = tpp.gemm (%1: tensor<2x2xf32>, %2: tensor<2x2xf32>, 
-                     %3: tensor<2x2xf32>) -> tensor<2x2xf32>
+    %0 = tpp.gemm(%1: tensor<2x2xf32>, %2: tensor<2x2xf32>, 
+                  %3: tensor<2x2xf32>) -> tensor<2x2xf32>
+
+    // Tensor abstraction with VNNI layout on B.
+    %0 = tpp.gemm(%1: tensor<32x32xbf16>, %2: tensor<16x32x2xbf16>
+                  %3: tensor<32x32xf32>) -> tensor<32x32xf32>
 
     ```
   }];
@@ -325,114 +283,33 @@ def Tpp_BrgemmOp : Tpp_TernaryOp<"brgemm"> {
 }
 
 //===----------------------------------------------------------------------===//
-// VNNI_MatmulOp
+// Quaternary Operations
 //===----------------------------------------------------------------------===//
 
-def Tpp_VNNIMatmulOp : Tpp_Op<"vnni_matmul"> {
-  let summary = [{
-    Performs matrix multiplication of two inputs with first
-    operand in VNNI format.}];
+class Tpp_QuaternaryOp<string mnemonic, list<Trait> traits = []> :
+  Tpp_Op<mnemonic, !listconcat(traits, [QuaternaryOp])> {
 
-  let description = [{
-    The `tpp.vnni_matmul` mirrors `linalg.matmul`.
+  let arguments = (ins Variadic<TppGemmLikeOperand>:$inputs,
+                       Variadic<TppGemmLikeOperand>:$outputs); 
+  let results = (outs Variadic<TppGemmLikeOperand>:$results);
 
-    Example:
-
-    ```mlir
-
-    tpp.vnni_matmul ins(%1: memref<4x4xf32>, %2: memref<2x2x2xf32>)
-    		       outs(%3: memref<4x2xf32>)
-
-    ```
-  }];
-
-  let arguments = (ins TppInputOperand:$matrixA, TppVNNIOperand:$matrixB,
-                       TppOutputOperand:$matrixC);
-
-  let assemblyFormat = [{
-      `ins` `(` $matrixA `:` type($matrixA) `,` $matrixB `:` type($matrixB) `)`
-      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    MemRefType getMatrixCType() {
-      return getMatrixC().getType().cast<MemRefType>();
-    }
-    MemRefType getMatrixAType() {
-      return getMatrixA().getType().cast<MemRefType>();
-    }
-    MemRefType getMatrixBType() {
-      return getMatrixB().getType().cast<MemRefType>();
-    }
-  }];
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
-  ];
-
-  let hasVerifier = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// VNNI_BrgemmOp
-//===----------------------------------------------------------------------===//
-
-def Tpp_VNNIBrgemmOp : Tpp_Op<"vnni_brgemm"> {
-  let summary = [{
-    Performs batch reduced matrix multiplication of two inputs with second
-    input (weight) in VNNI format}];
-
-  let description = [{
-    The `tpp.vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
-
-    Example:
-
-    ```mlir
-
-      tpp.vnni_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x2x5x2xf32>)
-                      outs(%3: memref<6x5xf32>)
-    ```
-  }];
-
-  let arguments = (ins TppBrgemmMemRef:$batchMatrixA,
-                       TppBRGEMMVNNIMemrefInput:$batchMatrixB,
-                       TppMemRef:$matrixC);
-
-  let assemblyFormat = [{
-      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
-                $batchMatrixB `:` type($batchMatrixB) `)`
-      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    MemRefType getMatrixCType() {
-      return getMatrixC().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixAType() {
-      return getBatchMatrixA().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixBType() {
-      return getBatchMatrixB().getType().cast<MemRefType>();
-    }
-  }];
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
-  ];
-
-  let hasVerifier = 1;
+  ]; 
 }
 
 //===----------------------------------------------------------------------===//
 // FusedBrgemmOp
 //===----------------------------------------------------------------------===//
 
-def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
+def Tpp_FusedBrgemmOp : Tpp_QuaternaryOp<"fused_brgemm"> {
   let summary = [{
-    Performs batch reduced matrix multiplication followed by bias 
-    addition and relu
+    Performs batch reduced matrix multiplication. On the result performs
+    a binary operation specified by `binary_type` followed by a unary
+    operation specified in `unary_type`.
   }];
 
   let description = [{
@@ -443,98 +320,22 @@ def Tpp_FusedBrgemmOp : Tpp_Op<"fused_brgemm"> {
 
     ```mlir
 
-      tpp.fused_brgemm ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, 
+      tpp.fused_brgemm [unary = relu, binary = add] 
+                       ins(%1: memref<3x6x4xf32>, %2: memref<3x4x4xf32>, 
                            %3: memref<4xf32>, %4: i64)
-                      outs(%5: memref<6x4xf32>)
+                       outs(%5: memref<6x4xf32>)
     ```
   }];
 
-  let arguments = (ins TppBrgemmMemRef:$batchMatrixA,
-                       TppBrgemmMemRef:$batchMatrixB,
-                       TppMemRef: $bias,
-		                   Tpp_FusedOpType: $fusedOpType,
-		                   TppMemRef:$matrixC);
-
-  let assemblyFormat = [{
-      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
-                $batchMatrixB `:` type($batchMatrixB) `,`
-		$bias `:` type($bias)  `,`
-		$fusedOpType `)`
-      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    MemRefType getMatrixCType() {
-      return getMatrixC().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixAType() {
-      return getBatchMatrixA().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixBType() {
-      return getBatchMatrixB().getType().cast<MemRefType>();
-    }
-  }];
+  let arguments = (ins Variadic<TppGemmLikeOperand>:$inputs,
+                       Variadic<TppGemmLikeOperand>:$outputs, 
+                       Tpp_FusedUnaryOpType:$unary_type,
+                       Tpp_FusedBinaryOpType:$binary_type);
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
-  ];
-
-  let hasVerifier = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// FusedVNNIBrgemmOp
-//===----------------------------------------------------------------------===//
-
-def Tpp_FusedVNNIBrgemmOp : Tpp_Op<"fused_vnni_brgemm"> {
-  let summary = [{
-    Performs batch reduced matrix multiplication followed by bias addition and relu
-    with second operand in VNNI format}];
-
-  let description = [{
-    The `tpp.fused_vnni_brgemm` is an implementation of the Batch GEMM operation in oneAPI.
-
-    Example:
-
-    ```mlir
-
-      tpp.fused_vnni_brgemm ins(%1: memref<3x6x4xbf16>, 
-                                %2: memref<3x2x4x2xbf16>, 
-                                %3: memref<4xbf16>)
-                            outs(%3: memref<6x4xbf16>)
-    ```
-  }];
-
-  let arguments = (ins TppBrgemmMemRef:$batchMatrixA,
-                       TppBRGEMMVNNIMemrefInput:$batchMatrixB,
-                       TppMemRef: $bias,
-		                   TppMemRef:$matrixC);
-
-  let assemblyFormat = [{
-      `ins` `(` $batchMatrixA `:` type($batchMatrixA) `,`
-                $batchMatrixB `:` type($batchMatrixB) `,`
-		$bias `:` type($bias) `)`
-      `outs` `(` $matrixC `:` type($matrixC) `)` attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    MemRefType getMatrixCType() {
-      return getMatrixC().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixAType() {
-      return getBatchMatrixA().getType().cast<MemRefType>();
-    }
-
-    MemRefType getBatchMatrixBType() {
-      return getBatchMatrixB().getType().cast<MemRefType>();
-    }
-  }];
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output, 
+                   "FusedUnaryOpTypeAttr":$unary_type,
+                   "FusedBinaryOpTypeAttr":$binary_type)>
   ];
 
   let hasVerifier = 1;

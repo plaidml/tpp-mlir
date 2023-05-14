@@ -56,8 +56,8 @@ func.func @vnni_layout_brgemm(%arg0: tensor<48x32x32xbf16>,
         %12 = arith.addf %out, %11 : bf16
         linalg.yield %12 : bf16
   } -> tensor<32x32xbf16>
-  // CHECK: vnni.brgemm ins(%[[ARG0]] : tensor<48x32x32xbf16>, %[[ARG1]] : tensor<48x16x32x2xbf16>) 
-  // CHECK-SAME:        outs(%[[ARG2]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+  // CHECK: tpp.brgemm (%[[ARG0]] : tensor<48x32x32xbf16>, %[[ARG1]] : tensor<48x16x32x2xbf16>, 
+  // CHECK-SAME:        %[[ARG2]] : tensor<32x32xbf16>) -> (tensor<32x32xbf16>)
   return %0 : tensor<32x32xbf16>
 }
 
@@ -66,10 +66,10 @@ func.func @vnni_layout_brgemm(%arg0: tensor<48x32x32xbf16>,
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5 floordiv 2, d4, d2)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4)>
+
 //CHECK-LABEL: func.func @vnni_layout_brgemm2
 func.func @vnni_layout_brgemm2(%arg0: tensor<32x48x32x32xbf16>, 
                               %arg1: tensor<32x48x16x32x2xbf16>, %arg2: tensor<32x32x32xbf16>) -> tensor<32x32x32xbf16> {
-  // CHECK: %{{.*}} = vnni.brgemm ins(%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>) outs(%{{.+}} : tensor<32x32xbf16>) -> tensor<32x32xbf16>
    %0 = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} 
@@ -80,7 +80,9 @@ func.func @vnni_layout_brgemm2(%arg0: tensor<32x48x32x32xbf16>,
         %12 = arith.addf %out, %11 : bf16
         linalg.yield %12 : bf16
   } -> tensor<32x32x32xbf16>
-
+  // CHECK: %{{.+}} = scf.for
+  // CHECK: %{{.+}} = tpp.brgemm (%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>, 
+  // CHECK-SAME:                  %{{.+}} : tensor<32x32xbf16>) -> (tensor<32x32xbf16>)
   return %0 : tensor<32x32x32xbf16>
 }
 
@@ -89,10 +91,10 @@ func.func @vnni_layout_brgemm2(%arg0: tensor<32x48x32x32xbf16>,
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6 floordiv 2, d5, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
+
 // CHECK-LABEL: func.func @vnni_layout_brgemm3
 func.func @vnni_layout_brgemm3(%arg0: tensor<32x32x48x32x32xbf16>, 
                               %arg1: tensor<32x32x48x16x32x2xbf16>, %arg2: tensor<32x32x32x32xbf16>) -> tensor<32x32x32x32xbf16> {
-  // CHECK: %{{.*}} = vnni.brgemm ins(%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>) outs(%{{.+}} : tensor<32x32xbf16>) -> tensor<32x32xbf16>
   %0 = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} 
@@ -103,5 +105,103 @@ func.func @vnni_layout_brgemm3(%arg0: tensor<32x32x48x32x32xbf16>,
         %12 = arith.addf %out, %11 : bf16
         linalg.yield %12 : bf16
   } -> tensor<32x32x32x32xbf16>
- return %0 : tensor<32x32x32x32xbf16>
+  // CHECK: %{{.+}} = scf.for
+  // CHECK-NEXT: %{{.+}} = scf.for
+  // CHECK: %{{.+}} = tpp.brgemm (%{{.+}} : tensor<48x32x32xbf16>, %{{.+}} : tensor<48x16x32x2xbf16>, 
+  // CHECK-SAME:                  %{{.+}} : tensor<32x32xbf16>) -> (tensor<32x32xbf16>)
+  return %0 : tensor<32x32x32x32xbf16>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+
+// CHECK-LABEL: func.func @vnni_layout_brgemm_memref
+// CHECK-SAME:  %[[ARG0:.+]]: memref<48x32x32xbf16>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<48x16x32x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<32x32xbf16>
+func.func @vnni_layout_brgemm_memref(%arg0: memref<48x32x32xbf16>, 
+                                     %arg1: memref<48x16x32x2xbf16>, %arg2: memref<32x32xbf16>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : memref<48x32x32xbf16>, memref<48x16x32x2xbf16>) 
+    outs(%arg2 : memref<32x32xbf16>) {
+      ^bb0(%in: bf16, %in_8: bf16, %out: bf16):
+        %11 = arith.mulf %in, %in_8 : bf16
+        %12 = arith.addf %out, %11 : bf16
+        linalg.yield %12 : bf16
+  }
+  // CHECK: tpp.brgemm ins(%[[ARG0]] : memref<48x32x32xbf16>, %[[ARG1]] : memref<48x16x32x2xbf16>, 
+  // CHECK-SAME:           %[[ARG2]] : memref<32x32xbf16>) outs(%[[ARG2]] : memref<32x32xbf16>)
+  return
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: rewrite_to_brgemm_with_consumer
+// CHECK-SAME: %[[ARG0:.+]]: tensor<4x32x32xf32>, %[[ARG1]]: tensor<4x32x32xf32>, %[[ARG2]]: tensor<32x32xf32>
+func.func @rewrite_to_brgemm_with_consumer(%arg0: tensor<4x32x32xf32>, %arg1: tensor<4x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1: tensor<4x32x32xf32>, tensor<4x32x32xf32>)
+    outs(%arg2: tensor<32x32xf32>) {
+      ^bb0(%in: f32, %in_1: f32, %out: f32):
+        %1 = arith.mulf %in, %in_1 : f32
+        %2 = arith.addf %out, %1 : f32
+        linalg.yield %2 : f32
+    } -> tensor<32x32xf32>
+  // CHECK: linalg.batch_reduce_matmul ins(%[[ARG0]], %[[ARG1]] : tensor<4x32x32xf32>, tensor<4x32x32xf32>) 
+  // CHECK-SAME:    outs(%[[ARG2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %1 = linalg.generic {
+    indexing_maps = [#map3], 
+    iterator_types = ["parallel", "parallel"]}
+    outs(%0: tensor<32x32xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %out : f32
+    } -> tensor<32x32xf32>
+  return %1: tensor<32x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @vnni_layout_brgemm
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<48x32x32xbf16>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<48x16x32x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<32x32xbf16>
+func.func @vnni_layout_brgemm_with_consumer(%arg0: tensor<48x32x32xbf16>, 
+                              %arg1: tensor<48x16x32x2xbf16>, %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : tensor<48x32x32xbf16>, tensor<48x16x32x2xbf16>) 
+    outs(%arg2 : tensor<32x32xbf16>) {
+      ^bb0(%in: bf16, %in_8: bf16, %out: bf16):
+        %11 = arith.mulf %in, %in_8 : bf16
+        %12 = arith.addf %out, %11 : bf16
+        linalg.yield %12 : bf16
+  } -> tensor<32x32xbf16>
+  // CHECK: tpp.brgemm (%[[ARG0]] : tensor<48x32x32xbf16>, %[[ARG1]] : tensor<48x16x32x2xbf16>, 
+  // CHECK-SAME:        %[[ARG2]] : tensor<32x32xbf16>) -> (tensor<32x32xbf16>)
+  %1 = linalg.generic {
+    indexing_maps = [#map3],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%0: tensor<32x32xbf16>) {
+      ^bb0(%out: bf16):
+        linalg.yield %out : bf16
+    } -> tensor<32x32xbf16>
+  return %1 : tensor<32x32xbf16>
 }

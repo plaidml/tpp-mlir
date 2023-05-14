@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/VNNI/VNNIOps.h"
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"

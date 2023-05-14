@@ -12,8 +12,8 @@
 
 func.func @matmultpp(%A: memref<4x8xbf16>,
           %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>)  {
-  tpp.vnni_matmul ins(%A: memref<4x8xbf16>, %B: memref<4x4x2xbf16>)
-             outs(%C: memref<4x4xbf16>)
+  tpp.gemm ins(%A: memref<4x8xbf16>, %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>)
+           outs(%C: memref<4x4xbf16>)
   return
 }
 

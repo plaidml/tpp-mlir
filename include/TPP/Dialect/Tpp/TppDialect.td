@@ -10,6 +10,8 @@
 #define TPP_TPP_DIALECT
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
+include "TPP/Dialect/Tpp/TppInterface.td"
 
 //===----------------------------------------------------------------------===//
 // TPP dialect definition.
@@ -27,10 +29,35 @@ def Tpp_Dialect : Dialect {
 }
 
 //===----------------------------------------------------------------------===//
+// Tpp Traits
+//===----------------------------------------------------------------------===//
+
+// Tpp operation trait - make sure the operand are broadcastable.
+// Two dimensions are compatible when:
+// 1. they are equal, or
+// 2. one of them is 1.
+def BroadcastableShape : NativeOpTrait<"tpp::BroadcastableShape">;
+
+// Tpp operation trait - make sure the stride in the fastest-varying
+// dimension is one.
+def UnitStrideInnerLoop : NativeOpTrait<"tpp::UnitStrideInnerLoop">;
+
+// Tpp operation trait - verify tpp operand segment size.
+def UnaryOp : NativeOpTrait<"tpp::UnaryOp">;
+def BinaryOp : NativeOpTrait<"tpp::BinaryOp">;
+def TernaryOp : NativeOpTrait<"tpp::TernaryOp">;
+def QuaternaryOp : NativeOpTrait<"tpp::QuaternaryOp">;
+
+//===----------------------------------------------------------------------===//
 // Base operation definition.
 //===----------------------------------------------------------------------===//
 
 class Tpp_Op<string mnemonic, list<Trait> traits = []> :
-        Op<Tpp_Dialect, mnemonic, !listconcat(traits, [SameOperandsElementType])>;
+        Op<Tpp_Dialect, mnemonic, !listconcat(traits, [
+                AttrSizedOperandSegments,
+                DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+                UnitStrideInnerLoop,   
+                SameOperandsElementType,
+                TppOpInterface])>;
 
 #endif // TPP_TPP_DIALECT

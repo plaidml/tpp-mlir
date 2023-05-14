@@ -1,4 +1,4 @@
-//===- MapToBatchReduceGemm.cpp ----------------------------------*- C++-*-===//
+//===- RewriteToBatchReduceGemm.cpp.cpp --------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
-#include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
@@ -28,7 +28,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "mlir-rewrite-to-brgemm"
 
-// Look for [p ... p] brgemm [r p p r r]
+// Look for [p ... p] brgemm [r r p p r]
 static LogicalResult checkVNNIStructure(linalg::LinalgOp linalgOp) {
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
@@ -108,7 +108,7 @@ static LogicalResult checkVNNIAccessPatterns(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> expectedMaps;
   bindDims(linalgOp.getContext(), r1, r2, p4, p5, r3);
   auto blockingFactor =
-      vnni::utils::getVNNIBlockingFactor(linalgOp->getOperands()[0].getType());
+      vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
   // Unsupported blocking factor for type.
   if (!blockingFactor)
     return failure();
@@ -288,8 +288,11 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
             : builder.create<linalg::BatchReduceMatmulOp>(
                   loc, ValueRange{slicedOperands[0], slicedOperands[1]},
                   slicedOperands[2]);
-    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                     brgemm->getResults());
+    tensorResults =
+        (loopRanges.empty())
+            ? brgemm->getResults()
+            : insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                               brgemm->getResults());
 
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };
@@ -358,15 +361,16 @@ rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
     }
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
-    vnni::BRGemmOp brgemm =
-        (linalgOp.hasTensorSemantics())
-            ? builder.create<vnni::BRGemmOp>(
-                  loc, slicedOperands[2].getType(), slicedOperands[0],
-                  slicedOperands[1], slicedOperands[2])
-            : builder.create<vnni::BRGemmOp>(
-                  loc, slicedOperands[0], slicedOperands[1], slicedOperands[2]);
-    tensorResults = insertSlicesBack(builder, loc, linalgOp, slicedOperands,
-                                     brgemm->getResults());
+    auto brgemm = builder.create<tpp::BrgemmOp>(
+        loc,
+        ValueRange{slicedOperands[0], slicedOperands[1], slicedOperands[2]},
+        slicedOperands[2]);
+    tensorResults =
+        (loopRanges.empty())
+            ? brgemm->getResults()
+            : insertSlicesBack(builder, loc, linalgOp, slicedOperands,
+                               brgemm->getResults());
+
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };
 
@@ -434,7 +438,6 @@ struct RewriteToBatchReduceGemm
     patterns
         .add<RewriteToBatchReduceGemmImpl, RewriteToBatchReduceGemmVnniImpl>(
             patterns.getContext());
-    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

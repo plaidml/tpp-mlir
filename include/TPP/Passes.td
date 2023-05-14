@@ -62,16 +62,6 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def ConvertVNNIToTpp : Pass<"convert-vnni-to-tpp", "func::FuncOp"> {
-  let summary = "Convert VNNI to TPP";
-  let constructor = "mlir::tpp::createConvertVNNIToTppPass()";
-  let description = [{
-    Convert VNNI dialect to TPP dialect.
-  }];
-  let dependentDialects = ["vnni::VNNIDialect", "tensor::TensorDialect",
-                           "tpp::TppDialect"];
-}
-
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
   let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
@@ -101,7 +91,7 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
                            "tensor::TensorDialect"];
 }
 
-def CombineTppOps : Pass<"combine-tpp", "func::FuncOp"> {
+def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
   let summary = "Combine tpps into bigger tpp";
   let constructor = "mlir::tpp::createCombineTppPass()";
   let description = [{
@@ -118,15 +108,16 @@ def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
 def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
   let summary = "Convert matmul/brgemm to vnni layout";
   let description = [{
-    VNNI Matmul as: C[M][N]=A[M][K]*B[K/b][N][b]
-    VNNI BRGemm as: C[M][N]=A[R][M][K]*B[R][K/b][N][b]
+    VNNI Matmul as: C[M][N]= A[M][K] * B[K/b][N][b]
+    VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/b][N][b]
+    b is the VNNI factor.
   }];
   let options = [
     ListOption<"blockingFactors", "block-factors", "int64_t", 
                "Blocking factor for vnni layout">
   ];
   let constructor = "mlir::tpp::createPackVNNIPass()";
-  let dependentDialects = ["vnni::VNNIDialect", "tensor::TensorDialect"];
+  let dependentDialects = ["tensor::TensorDialect", "tpp::TppDialect"];
 }
 
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
@@ -188,7 +179,7 @@ def RewriteToBatchReduceGemm : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
     type is bf16 the VNNI layout is used.
   }];
   let constructor = "mlir::tpp::createRewriteToBatchReduceGemmPass()";
-  let dependentDialects = ["scf::SCFDialect", "vnni::VNNIDialect"];
+  let dependentDialects = ["scf::SCFDialect", "tpp::TppDialect"];
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 

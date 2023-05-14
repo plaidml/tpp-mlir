@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
-#include "TPP/Dialect/VNNI/VNNIOps.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
@@ -444,7 +444,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 
   Location loc = matmulOp.getLoc();
   auto blockingFactor =
-      vnni::utils::getVNNIBlockingFactor(matmulOp.getInputs()[1].getType());
+      vnni::utils::getVnniBlockingFactor(matmulOp.getInputs()[1].getType());
   if (!blockingFactor)
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
@@ -515,7 +515,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   return replacementOp;
 }
 
-FailureOr<vnni::BRGemmOp>
+FailureOr<tpp::BrgemmOp>
 mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                 linalg::BatchReduceMatmulOp brgemmOp) {
   if (!vnni::utils::isBF16Type(brgemmOp.getInputs()[0].getType()))
@@ -536,9 +536,11 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   // reshape input B.
   Value packedMatrixB =
       toPackBRGemmLayout_VNNI(rewriter, loc, brgemmOp.getInputs()[1], tilesOnB);
-  auto replacementOp = rewriter.create<vnni::BRGemmOp>(
-      loc, brgemmOp.getOutputs()[0].getType(), brgemmOp.getInputs()[0],
-      packedMatrixB, brgemmOp.getOutputs()[0]);
+  auto replacementOp = rewriter.create<tpp::BrgemmOp>(
+      loc,
+      ValueRange{brgemmOp.getInputs()[0], packedMatrixB,
+                 brgemmOp.getOutputs()[0]},
+      brgemmOp.getOutputs()[0]);
   rewriter.replaceOp(brgemmOp, replacementOp.getResult(0));
   return replacementOp;
 }
@@ -747,7 +749,7 @@ struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
       : OpRewritePattern<linalg::BatchReduceMatmulOp>(context, benefit) {}
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<vnni::BRGemmOp> packedBRGemm =
+    FailureOr<tpp::BrgemmOp> packedBRGemm =
         mlir::linalgx::packVNNIBRGemmOp(rewriter, brgemmOp);
     if (failed(packedBRGemm))
       return failure();

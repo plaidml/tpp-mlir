@@ -31,8 +31,6 @@
 #include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 
 using namespace mlir;
@@ -55,14 +53,12 @@ struct Bufferize : public BufferizeBase<Bufferize> {
                 linalg::LinalgDialect,
                 memref::MemRefDialect,
                 check::CheckDialect,
-                vnni::VNNIDialect,
                 perf::PerfDialect,
                 scf::SCFDialect,
                 tpp::TppDialect,
                 tensor::TensorDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
-    vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
     tpp::registerBufferizableOpInterfaceExternalModels(registry);
   }

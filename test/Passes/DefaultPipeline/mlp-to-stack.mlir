@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -def-heap-to-stack=1 -default-tpp-passes -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -def-heap-to-stack=1 -default-tpp-passes | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>

@@ -20,91 +20,44 @@ using namespace mlir;
 
 namespace {
 
-struct CombineTppOpPattern : public OpRewritePattern<tpp::ReluOp> {
+struct CombineBrgemmAddAndRelu : public OpRewritePattern<tpp::ReluOp> {
   using OpRewritePattern<tpp::ReluOp>::OpRewritePattern;
-
-  // TODO this is not a sufficient check.
-  static bool isVNNILayout(Operation *brgemmOp) {
-    if (!brgemmOp->getOpOperands()[0]
-             .get()
-             .getType()
-             .cast<ShapedType>()
-             .getElementType()
-             .isBF16())
-      return false;
-    return (brgemmOp->getOpOperands()[0]
-                    .get()
-                    .getType()
-                    .cast<ShapedType>()
-                    .getRank() +
-                1 ==
-            brgemmOp->getOpOperands()[1]
-                .get()
-                .getType()
-                .cast<ShapedType>()
-                .getRank());
-  }
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-
-    auto definingOp = reluOp->getOperands()[0].getDefiningOp();
-    Operation *addOp = NULL;
-    for (Operation *user : definingOp->getUsers()) {
-      if (user == definingOp || user == reluOp ||
-          isa<memref::DeallocOp>(user)) {
+    if (!reluOp.hasTensorSemantics())
+      return failure();
+    Value operandRelu = reluOp.getInputs()[0];
+    auto maybeAdd = operandRelu.getDefiningOp<tpp::AddOp>();
+    if (!maybeAdd)
+      return failure();
+    SmallVector<Value> brgemmOperands;
+    Value addOperand;
+    bool hasBrgemmProducer = false;
+    for (Value operand : maybeAdd.getInputs()) {
+      if (auto brgemmOp = operand.getDefiningOp<tpp::BrgemmOp>()) {
+        brgemmOperands = brgemmOp.getInputs();
+        hasBrgemmProducer = true;
         continue;
       }
-      // assert(user.isa<tpp::AddBCastOp>());
-      addOp = user;
-      break;
+      addOperand = operand;
     }
-
-    if (addOp == NULL) {
+    if (!hasBrgemmProducer)
       return failure();
-    }
-    auto brgemmResultBuffer = addOp->getOperands()[0].getDefiningOp();
-    Operation *brgemmOp = NULL;
-    for (Operation *user : brgemmResultBuffer->getUsers()) {
-      if (isa<memref::CastOp>(user)) {
-        for (Operation *castUser : user->getUsers()) {
-          if (isa<tpp::BrgemmOp>(castUser) ||
-              isa<tpp::VNNIBrgemmOp>(castUser)) {
-            brgemmOp = castUser;
-            break;
-          }
-        }
-      }
-      if (brgemmOp != NULL)
-        break;
-    }
-
-    if (brgemmOp == NULL) {
-      return failure();
-    }
-    // Replace brgemm-addbcast-relu ops into one large tpp op
-    if (isVNNILayout(brgemmOp)) {
-      rewriter.create<tpp::FusedVNNIBrgemmOp>(
-          reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
-          brgemmOp->getOpOperands()[1].get(), addOp->getOpOperands()[1].get(),
-          reluOp->getOpOperands()[1].get());
-    } else {
-      rewriter.create<tpp::FusedBrgemmOp>(
-          reluOp.getLoc(), brgemmOp->getOpOperands()[0].get(),
-          brgemmOp->getOpOperands()[1].get(), addOp->getOpOperands()[1].get(),
-          tpp::FusedOpTypeAttr::get(brgemmOp->getContext(),
-                                    tpp::FusedOpType::RELU),
-          reluOp->getOpOperands()[1].get());
-    }
-    rewriter.eraseOp(reluOp);
-    rewriter.eraseOp(addOp);
-    rewriter.eraseOp(brgemmOp);
+    brgemmOperands.push_back(addOperand);
+    auto ctx = rewriter.getContext();
+    auto unaryType =
+        tpp::FusedUnaryOpTypeAttr::get(ctx, tpp::FusedUnaryOpType::RELU);
+    auto binaryType =
+        tpp::FusedBinaryOpTypeAttr::get(ctx, tpp::FusedBinaryOpType::ADD);
+    rewriter.replaceOpWithNewOp<tpp::FusedBrgemmOp>(
+        reluOp, brgemmOperands, addOperand, unaryType, binaryType);
     return success();
   }
 };
 
 void populatePatterns(RewritePatternSet &patterns) {
-  patterns.add<CombineTppOpPattern>(patterns.getContext());
+  patterns.add<CombineBrgemmAddAndRelu>(patterns.getContext());
 }
 
 struct CombineTppOps : public CombineTppOpsBase<CombineTppOps> {

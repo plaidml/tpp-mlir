@@ -11,6 +11,7 @@
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
+#include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -112,7 +113,9 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
     auto ldbDim = getLeadingDim(memrefB);
     if (failed(ldbDim))
       return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
+    int64_t ldb = (vnni::utils::isInVnniLayout(memrefB))
+                      ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
+                      : *ldbDim;
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
@@ -123,7 +126,11 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::GemmFlagsAttr gemmFlag =
-        xsmm::GemmFlagsAttr::get(matmulOp.getContext(), xsmm::GemmFlags::NONE);
+        (vnni::utils::isInVnniLayout(memrefB))
+            ? xsmm::GemmFlagsAttr::get(matmulOp.getContext(),
+                                       xsmm::GemmFlags::VNNI_B)
+            : xsmm::GemmFlagsAttr::get(matmulOp.getContext(),
+                                       xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype;
     if (memrefC.getElementType().isBF16()) {
       dtype =
@@ -144,61 +151,6 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
                           matmulOp->getOperands().end());
     // Drop the aliasing output operand.
     invokeOperands.pop_back();
-    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
-    return success();
-  }
-};
-
-struct ConvertTppVNNIMatmulOp : public OpRewritePattern<tpp::VNNIMatmulOp> {
-  using OpRewritePattern<tpp::VNNIMatmulOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tpp::VNNIMatmulOp matmulOp,
-                                PatternRewriter &rewriter) const override {
-    assert(matmulOp.getMatrixC().getType().isa<MemRefType>() &&
-           "tpp.vnni_matmul expects a memref type");
-
-    Location loc = matmulOp.getLoc();
-
-    MemRefType memrefC = matmulOp.getMatrixCType();
-    MemRefType memrefA = matmulOp.getMatrixAType();
-    MemRefType memrefB = matmulOp.getMatrixBType();
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[1];
-    auto ldaDim = getLeadingDim(memrefA);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-
-    auto ldbDim = getLeadingDim(memrefB);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
-    auto divLdbDim = getLeadingDim(memrefB, 1);
-    if (failed(divLdbDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
-    ldb = ldb / (*divLdbDim);
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
-        matmulOp.getContext(), xsmm::GemmFlags::VNNI_B);
-    xsmm::DataTypeAttr dtype =
-        xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
-
-    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
-        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
-
-    SmallVector<Value, 6> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(matmulOp->getOperands().begin(),
-                          matmulOp->getOperands().end());
     rewriter.replaceOpWithNewOp<xsmm::GemmOp>(matmulOp, dtype, invokeOperands);
     return success();
   }
@@ -228,7 +180,9 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     auto ldbDim = getLeadingDim(memrefB, 1);
     if (failed(ldbDim))
       return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
+    int64_t ldb = (vnni::utils::isInVnniLayout(memrefB))
+                      ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
+                      : *ldbDim;
 
     auto ldcDim = getLeadingDim(memrefC);
     if (failed(ldcDim))
@@ -239,7 +193,11 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     xsmm::GemmFlagsAttr gemmFlag =
-        xsmm::GemmFlagsAttr::get(brgemmOp.getContext(), xsmm::GemmFlags::NONE);
+        (vnni::utils::isInVnniLayout(memrefB))
+            ? xsmm::GemmFlagsAttr::get(brgemmOp.getContext(),
+                                       xsmm::GemmFlags::VNNI_B)
+            : xsmm::GemmFlagsAttr::get(brgemmOp.getContext(),
+                                       xsmm::GemmFlags::NONE);
     xsmm::DataTypeAttr dtype =
         xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
     if (memrefC.getElementType().isBF16()) {
@@ -270,195 +228,14 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
   }
 };
 
-struct ConvertTppVNNIBrgemmOp : public OpRewritePattern<tpp::VNNIBrgemmOp> {
-  using OpRewritePattern<tpp::VNNIBrgemmOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tpp::VNNIBrgemmOp brgemmOp,
-                                PatternRewriter &rewriter) const override {
-    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
-           "tpp.vnni_brgemm expects a memref type");
-
-    Location loc = brgemmOp.getLoc();
-
-    MemRefType memrefC = brgemmOp.getMatrixCType();
-    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
-    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[2];
-    int64_t batchSize = memrefB.getShape()[0];
-
-    auto ldaDim = getLeadingDim(memrefA, 1);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-
-    auto ldbDim = getLeadingDim(memrefB, 1);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
-    auto divLdbDim = getLeadingDim(memrefB, 2);
-    if (failed(divLdbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    ldb = ldb / (*divLdbDim);
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmFlag = xsmm::GemmFlagsAttr::get(
-        brgemmOp.getContext(), xsmm::GemmFlags::VNNI_B);
-    xsmm::DataTypeAttr dtype =
-        xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
-
-    Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
-
-    Value batchDim = rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
-    SmallVector<Value, 6> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(brgemmOp->getOperands().begin(),
-                          brgemmOp->getOperands().end());
-    invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(brgemmOp, dtype,
-                                                invokeOperands);
-    return success();
-  }
-};
-
 struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
   using OpRewritePattern<tpp::FusedBrgemmOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tpp::FusedBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
-           "tpp.fused_brgemm expects a memref type");
-
-    Location loc = brgemmOp.getLoc();
-
-    MemRefType memrefC = brgemmOp.getMatrixCType();
-    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
-    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[2];
-    int64_t batchSize = memrefB.getShape()[0];
-
-    auto ldaDim = getLeadingDim(memrefA, 1);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-
-    auto ldbDim = getLeadingDim(memrefB, 1);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
-    auto divLdbDim = getLeadingDim(memrefB, 2);
-    if (failed(divLdbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    ldb = ldb / (*divLdbDim);
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::QuarternaryKindAttr attr = xsmm::QuarternaryKindAttr::get(
-        brgemmOp.getContext(), xsmm::QuarternaryKind::FUSED_BRGEMM);
-    xsmm::DataTypeAttr dtype;
-    if (memrefC.cast<ShapedType>().getElementType().isBF16()) {
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
-    } else {
-      assert(memrefC.cast<ShapedType>().getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
-    }
-
-    Value dispatched = rewriter.create<xsmm::QuarternaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(brgemmOp.getContext(), false));
-    Value batchDim = rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
-    SmallVector<Value, 7> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(brgemmOp->getOperands().begin(),
-                          brgemmOp->getOperands().end());
-    invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::QuarternaryOp>(brgemmOp, dtype, attr,
-                                                     invokeOperands);
-    return success();
-  }
-};
-
-struct ConvertTppFusedVNNIBrgemmOp
-    : public OpRewritePattern<tpp::FusedVNNIBrgemmOp> {
-  using OpRewritePattern<tpp::FusedVNNIBrgemmOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tpp::FusedVNNIBrgemmOp brgemmOp,
-                                PatternRewriter &rewriter) const override {
-    assert(brgemmOp.getMatrixC().getType().isa<MemRefType>() &&
-           "tpp.fused_vnni_brgemm expects a memref type");
-
-    Location loc = brgemmOp.getLoc();
-
-    MemRefType memrefC = brgemmOp.getMatrixCType();
-    MemRefType memrefA = brgemmOp.getBatchMatrixAType();
-    MemRefType memrefB = brgemmOp.getBatchMatrixBType();
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[2];
-    int64_t batchSize = memrefB.getShape()[0];
-
-    auto ldaDim = getLeadingDim(memrefA, 1);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-
-    auto ldbDim = getLeadingDim(memrefB, 1);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    int64_t ldb = *ldbDim;
-    auto divLdbDim = getLeadingDim(memrefB, 2);
-    if (failed(divLdbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    ldb = ldb / (*divLdbDim);
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::QuarternaryKindAttr attr = xsmm::QuarternaryKindAttr::get(
-        brgemmOp.getContext(), xsmm::QuarternaryKind::FUSED_BRGEMM);
-    xsmm::DataTypeAttr dtype =
-        xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
-
-    Value dispatched = rewriter.create<xsmm::QuarternaryDispatchOp>(
-        loc, integer64, attr, dims, dtype,
-        BoolAttr::get(brgemmOp.getContext(), true));
-    Value batchDim = rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
-    SmallVector<Value, 7> invokeOperands;
-    invokeOperands.push_back(dispatched);
-    invokeOperands.append(brgemmOp->getOperands().begin(),
-                          brgemmOp->getOperands().end());
-    invokeOperands.push_back(batchDim);
-    rewriter.replaceOpWithNewOp<xsmm::QuarternaryOp>(brgemmOp, dtype, attr,
-                                                     invokeOperands);
-    return success();
+    // TODO: Handle the conversion. Was not tested and questionable.
+    // Will follow-up on this.
+    return failure();
   }
 };
 
@@ -786,10 +563,8 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 
 void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
-               ConvertTppAddOp, ConvertTppGemmOp, ConvertTppVNNIMatmulOp,
-               ConvertTppBrgemmOp, ConvertTppVNNIBrgemmOp,
-               ConvertTppFusedVNNIBrgemmOp, ConvertTppFusedBrgemmOp>(
-      patterns.getContext());
+               ConvertTppAddOp, ConvertTppGemmOp, ConvertTppBrgemmOp,
+               ConvertTppFusedBrgemmOp>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
