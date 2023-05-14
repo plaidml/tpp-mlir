@@ -512,11 +512,11 @@ struct InterchangeAfterBlockingAndCollapsing
     // clang-format off
     // N       [parallel]
     //  K'     [parallel]
-    //   P + Q [parallel]
+    //   P * Q [parallel]
     //    k    [parallel]
     //     C'  [reduction]
     //      c  [reduction]
-    //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    //        output[N][K'][P * Q][k] += image[N][C'][H * W][c] * filter[K'][C'][c][k]
 
     // expose BRGEMM by interchange:
 
@@ -524,10 +524,10 @@ struct InterchangeAfterBlockingAndCollapsing
     //  K'     [parallel]
     //   C'    [reduction] // BRGEMM red dimension
     //   /* GEMM */
-    //   P + Q [parallel]
+    //   P * Q [parallel]
     //    k    [parallel]
     //      c  [reduction]
-    //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
+    //        output[N][K'][P * Q][k] += image[N][C'][H * W][c] * filter[K'][C'][c][k]
     // clang-format on
 
     SmallVector<unsigned> interchangeVector = {0, 1, 4, 2, 3, 5};
@@ -573,11 +573,11 @@ void populateRewriteBlockedConvPatterns(RewritePatternSet &patterns,
   //
   // blocked conv: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
   //
-  // if (R = S = 1) -> [P + Q] == [H + W]
+  // if (R = S = 1) -> [P * Q] == [H * W]
   //
-  // collapsing: [N][K'][P + Q][k] = [N][C'][H + W][c] * [K'][C'][c][k]
-  // [*][* ][P + Q][k] = [*][* ][H + W][c] * [* ][* ][c][k] // GEMM with c as red.
-  // [*][* ][P + Q][k] = [*][C'][H + W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
+  // collapsing: [N][K'][P * Q][k] = [N][C'][H * W][c] * [K'][C'][c][k]
+  // [*][* ][P * Q][k] = [*][* ][H * W][c] * [* ][* ][c][k] // GEMM with c as red.
+  // [*][* ][P * Q][k] = [*][C'][H * W][c] * [* ][C'][c][k] // BRGEMM with C' as red.
   //
   // clang-format on
 
