@@ -124,6 +124,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createHeapToStackPass(unsigned maxAllocSizeInBytes = 4096);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyAndCanonicalizePackPass();
+std::unique_ptr<OperationPass<ModuleOp>> createGpuPipeline();
 
 void registerTestStructuralMatchers();
 

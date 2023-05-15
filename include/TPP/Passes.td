@@ -379,4 +379,9 @@ def HeapToStack : Pass<"heap-to-stack", "func::FuncOp"> {
   let constructor = "mlir::tpp::createHeapToStackPass()";
 }
 
+def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
+  let summary = "Lower all eligible operations into GPU compatible IR";
+  let constructor = "mlir::tpp::createGpuPipeline()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
