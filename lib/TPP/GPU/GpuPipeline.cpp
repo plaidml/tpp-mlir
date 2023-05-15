@@ -11,9 +11,13 @@
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -21,7 +25,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "llvm/Support/CommandLine.h"
@@ -68,7 +71,11 @@ protected:
 struct GpuToCuda
     : public PassWrapper<GpuToCuda, OperationPass<gpu::GPUModuleOp>>,
       UtilityPassBase<gpu::GPUModuleOp> {
-  GpuToCuda() = default;
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuToCuda)
+
+  GpuToCuda(StringRef gpuTriple = "nvptx64-nvidia-cuda",
+            StringRef gpuChip = "sm_35", StringRef gpuFeatures = "+ptx60")
+      : gpuTriple(gpuTriple), gpuChip(gpuChip), gpuFeatures(gpuFeatures){};
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -89,6 +96,10 @@ struct GpuToCuda
   }
 
 private:
+  std::string gpuTriple;
+  std::string gpuChip;
+  std::string gpuFeatures;
+
   void constructPipeline() override {
     pm.clear();
 
@@ -96,12 +107,17 @@ private:
     pm.addPass(createStripDebugInfoPass());
     pm.addPass(createLowerGpuOpsToNVVMOpsPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
-    pm.addPass(createGpuSerializeToCubinPass());
+    pm.addPass(createGpuSerializeToCubinPass(gpuTriple, gpuChip, gpuFeatures));
   }
 };
 
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>> createGpuToCuda() {
   return std::make_unique<GpuToCuda>();
+}
+
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
+createGpuToCuda(StringRef gpuTriple, StringRef gpuChip, StringRef gpuFeatures) {
+  return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
 }
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
@@ -111,14 +127,13 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tpp::TppDialect>();
+    registry.insert<linalg::LinalgDialect>();
+    registry.insert<scf::SCFDialect>();
+    registry.insert<memref::MemRefDialect>();
     registry.insert<gpu::GPUDialect>();
-    bufferization::registerAllocationOpInterfaceExternalModels(registry);
-    linalgx::registerTransformDialectExtension(registry);
-    tpp::registerBufferizableOpInterfaceExternalModels(registry);
-
-    // Add all core MLIR dialects as the default TPP passes may contain any
-    // combination of other passes.
-    registerAllDialects(registry);
+    registry.insert<LLVM::LLVMDialect>();
+    registry.insert<NVVM::NVVMDialect>();
+    registry.insert<nvgpu::NVGPUDialect>();
   }
 
   void runOnOperation() override {
