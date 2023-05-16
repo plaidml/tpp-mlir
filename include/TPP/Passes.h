@@ -71,6 +71,11 @@ namespace tensor {
 class TensorDialect;
 } // namespace tensor
 
+namespace gpu {
+class GPUModuleOp;
+class GpuDialect;
+} // namespace gpu
+
 namespace tpp {
 class TppDialect;
 
@@ -124,7 +129,11 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createHeapToStackPass(unsigned maxAllocSizeInBytes = 4096);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyAndCanonicalizePackPass();
-std::unique_ptr<OperationPass<ModuleOp>> createGpuPipeline();
+std::unique_ptr<OperationPass<ModuleOp>> createGpuPipelinePass();
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>> createGpuToCudaPass();
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
+createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
+                    StringRef gpuFeatures);
 
 void registerTestStructuralMatchers();
 

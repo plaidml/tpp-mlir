@@ -56,58 +56,6 @@ GpuType parseGpuOption(StringRef gpuStr) {
       .Default(GpuType::NONE);
 }
 
-struct GpuToCuda
-    : public PassWrapper<GpuToCuda, OperationPass<gpu::GPUModuleOp>>,
-      UtilityPassBase<gpu::GPUModuleOp> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuToCuda)
-
-  GpuToCuda(StringRef gpuTriple = "nvptx64-nvidia-cuda",
-            StringRef gpuChip = "sm_35", StringRef gpuFeatures = "+ptx60")
-      : gpuTriple(gpuTriple), gpuChip(gpuChip), gpuFeatures(gpuFeatures){};
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
-    registry.insert<NVVM::NVVMDialect>();
-    registry.insert<nvgpu::NVGPUDialect>();
-  }
-
-  void runOnOperation() override {
-    auto module = getOperation();
-
-    // Initialize the pipeline if needed.
-    // Otherwise, just run the cached one.
-    if (pm.empty())
-      constructPipeline();
-
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
-  }
-
-private:
-  std::string gpuTriple;
-  std::string gpuChip;
-  std::string gpuFeatures;
-
-  void constructPipeline() override {
-    pm.clear();
-
-    // Create GPU kernels.
-    pm.addPass(createStripDebugInfoPass());
-    pm.addPass(createLowerGpuOpsToNVVMOpsPass());
-    pm.addPass(createReconcileUnrealizedCastsPass());
-    pm.addPass(createGpuSerializeToCubinPass(gpuTriple, gpuChip, gpuFeatures));
-  }
-};
-
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>> createGpuToCuda() {
-  return std::make_unique<GpuToCuda>();
-}
-
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
-createGpuToCuda(StringRef gpuTriple, StringRef gpuChip, StringRef gpuFeatures) {
-  return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
-}
-
 // GPU pipeline - map and lower operations to enable execution on a GPU.
 struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
                      UtilityPassBase<ModuleOp> {
@@ -161,7 +109,7 @@ private:
 
     // Lower GPU to CUDA backend.
     if (gpuType == GpuType::CUDA)
-      pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCuda());
+      pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
 
     // Finalize GPU lowering.
     pm.addPass(createGpuToLLVMConversionPass());
@@ -177,6 +125,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuPipeline() {
+std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuPipelinePass() {
   return std::make_unique<GpuPipeline>();
 }
