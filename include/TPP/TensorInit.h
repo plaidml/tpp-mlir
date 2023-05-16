@@ -1,6 +1,3 @@
-#ifndef TPP_RUN_TENSORINIT_H
-#define TPP_RUN_TENSORINIT_H
-
 //===- TensorInit.h - MLIR Tensor Initialization --------------------------===//
 //
 // Initializes tensors for kernel input/output handling with some reasonable
@@ -8,6 +5,9 @@
 // or exploding values at the end of a large model (0.0 ~ 1.0).
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef TPP_RUN_TENSORINIT_H
+#define TPP_RUN_TENSORINIT_H
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Types.h"
