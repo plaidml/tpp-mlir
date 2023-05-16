@@ -178,7 +178,11 @@ private:
     pm.addPass(createGpuToLLVMConversionPass());
 
     // Clean up after the GPU pipeline.
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    // Use upstream passes directly instead of the cleanup pass as the GPU
+    // kernel is at the LLVM dialect level which is not compatible with the
+    // custom TPP passes.
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
   }
 };
 
