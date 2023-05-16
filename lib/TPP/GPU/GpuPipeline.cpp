@@ -34,11 +34,6 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-// Select target GPU backend for the pipeline.
-llvm::cl::opt<std::string>
-    defGpuType("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-               llvm::cl::value_desc("none,cuda"), llvm::cl::init("none"));
-
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
@@ -59,7 +54,8 @@ GpuType parseGpuOption(StringRef gpuStr) {
 // GPU pipeline - map and lower operations to enable execution on a GPU.
 struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
                      UtilityPassBase<ModuleOp> {
-  GpuPipeline() { this->gpuType = parseGpuOption(defGpuType); }
+  GpuPipeline() = default;
+  GpuPipeline(StringRef gpuBackend) { this->gpuBackend = gpuBackend.str(); }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tpp::TppDialect>();
@@ -74,24 +70,22 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
 
   void runOnOperation() override {
     // Do nothing when no GPU is selected.
-    if (gpuType != GpuType::NONE) {
-      auto module = getOperation();
+    auto module = getOperation();
 
-      // Initialize the pipeline if needed.
-      // Otherwise, just run the cached one.
-      if (pm.empty())
-        constructPipeline();
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
 
-      if (failed(runPipeline(pm, module)))
-        return signalPassFailure();
-    }
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
   }
 
 private:
-  GpuType gpuType;
-
   void constructPipeline() override {
     pm.clear();
+
+    GpuType gpuType = parseGpuOption(this->gpuBackend);
 
     // Add no passes when no GPU is selected.
     if (gpuType == GpuType::NONE)
@@ -124,4 +118,9 @@ private:
 
 std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuPipelinePass() {
   return std::make_unique<GpuPipeline>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createGpuPipelinePass(StringRef gpuBackend) {
+  return std::make_unique<GpuPipeline>(gpuBackend);
 }

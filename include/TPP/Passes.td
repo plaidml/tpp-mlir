@@ -382,6 +382,11 @@ def HeapToStack : Pass<"heap-to-stack", "func::FuncOp"> {
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let summary = "Lower all eligible operations into GPU compatible IR";
   let constructor = "mlir::tpp::createGpuPipelinePass()";
+  let options = [
+    Option<"gpuBackend", "gpu", "std::string",
+            /*default=*/"\"none\"",
+           "Target GPU backend for lowering.">,
+  ];
 }
 
 def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
