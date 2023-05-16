@@ -405,8 +405,10 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
+  passManager.addPass(createGpuToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // Print IR of kernel and main in LLVM dialect

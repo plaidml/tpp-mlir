@@ -107,12 +107,9 @@ private:
     // Create GPU kernels.
     pm.addPass(createGpuKernelOutliningPass());
 
-    // Lower GPU to CUDA backend.
+    // Lower GPU ops to the chosen GPU backend.
     if (gpuType == GpuType::CUDA)
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
-
-    // Finalize GPU lowering.
-    pm.addPass(createGpuToLLVMConversionPass());
 
     // Clean up after the GPU pipeline.
     // Use upstream passes directly instead of the cleanup pass as the GPU
