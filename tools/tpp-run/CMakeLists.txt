@@ -37,6 +37,10 @@ if (TPP_GPU)
   target_compile_definitions(tpp-run
     PRIVATE TPP_GPU_ENABLE=1
   )
+
+  set(TPP_GPU_LINK_FLAGS
+      -lmlir_cuda_runtime
+    )
 endif()
 
 message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
@@ -49,6 +53,7 @@ target_link_options(tpp-run PRIVATE
   -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
+  ${TPP_GPU_LINK_FLAGS}
   -lomp
   -Wl,--as-needed
 )
