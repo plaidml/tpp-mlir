@@ -2,6 +2,7 @@
 // Utilities to help build MLIR passes
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef TPP_PASS_UTILS_H
 #define TPP_PASS_UTILS_H
 
