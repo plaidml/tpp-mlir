@@ -33,6 +33,12 @@ llvm_update_compile_flags(tpp-run)
 
 target_link_libraries(tpp-run PRIVATE ${LIBS})
 
+if (TPP_GPU)
+  target_compile_definitions(tpp-run
+    PRIVATE TPP_GPU_ENABLE=1
+  )
+endif()
+
 message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
 message(STATUS "MLIR libraries at: ${LLVM_LIBRARY_DIR}")
 # Add TPP/MLIR library path so we don't need --shared-libs on every call

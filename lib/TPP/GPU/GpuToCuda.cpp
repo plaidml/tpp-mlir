@@ -67,11 +67,13 @@ private:
   void constructPipeline() override {
     pm.clear();
 
+#ifdef TPP_GPU_ENABLE
     // Create GPU kernels.
     pm.addPass(createStripDebugInfoPass());
     pm.addPass(createLowerGpuOpsToNVVMOpsPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
     pm.addPass(createGpuSerializeToCubinPass(gpuTriple, gpuChip, gpuFeatures));
+#endif // TPP_GPU_ENABLE
   }
 };
 

@@ -311,10 +311,12 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTargetAsmParser();
 
   // Initialize LLVM NVPTX backend.
+#ifdef TPP_GPU_ENABLE
   LLVMInitializeNVPTXTarget();
   LLVMInitializeNVPTXTargetInfo();
   LLVMInitializeNVPTXTargetMC();
   LLVMInitializeNVPTXAsmPrinter();
+#endif // TPP_GPU_ENABLE
 
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that
