@@ -27,6 +27,7 @@
 
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -54,19 +55,6 @@ GpuType parseGpuOption(StringRef gpuStr) {
       .CaseLower("cuda", GpuType::CUDA)
       .Default(GpuType::NONE);
 }
-
-template <typename OpT> class UtilityPassBase {
-public:
-  UtilityPassBase()
-      : pm(OpT::getOperationName(), mlir::OpPassManager::Nesting::Implicit){};
-  virtual ~UtilityPassBase() = default;
-
-protected:
-  OpPassManager pm;
-
-  // Create the pass processing pipeline.
-  virtual void constructPipeline() = 0;
-};
 
 struct GpuToCuda
     : public PassWrapper<GpuToCuda, OperationPass<gpu::GPUModuleOp>>,
