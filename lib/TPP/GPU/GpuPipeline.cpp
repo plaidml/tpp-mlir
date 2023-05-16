@@ -33,10 +33,10 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-// Select target GPU for the pipeline.
+// Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
-    defGpuType("gpu", llvm::cl::desc("Target GPU for the lowering"),
-               llvm::cl::value_desc("none,nvidia"), llvm::cl::init("none"));
+    defGpuType("gpu", llvm::cl::desc("Target GPU backend for lowering"),
+               llvm::cl::value_desc("none,cuda"), llvm::cl::init("none"));
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
@@ -44,14 +44,14 @@ llvm::cl::opt<std::string>
 namespace {
 
 enum class GpuType {
-  NONE,   // no target GPU
-  NVIDIA, // CUDA backend
+  NONE, // no target GPU
+  CUDA,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
   return llvm::StringSwitch<GpuType>(gpuStr)
       .CaseLower("none", GpuType::NONE)
-      .CaseLower("nvidia", GpuType::NVIDIA)
+      .CaseLower("cuda", GpuType::CUDA)
       .Default(GpuType::NONE);
 }
 
@@ -172,7 +172,8 @@ private:
     pm.addPass(createGpuKernelOutliningPass());
 
     // Lower GPU to CUDA backend.
-    pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCuda());
+    if (gpuType == GpuType::CUDA)
+      pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCuda());
 
     // Finalize GPU lowering.
     pm.addPass(createGpuToLLVMConversionPass());
