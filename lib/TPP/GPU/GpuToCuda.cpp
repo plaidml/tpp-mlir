@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -68,11 +69,20 @@ private:
     pm.clear();
 
 #ifdef TPP_GPU_ENABLE
+    // Preprocess and lower standard ops.
+    pm.addPass(arith::createArithExpandOpsPass());
+    pm.addPass(createLowerAffinePass());
+    pm.addPass(createConvertSCFToCFPass());
+
     // Create GPU kernels.
     pm.addPass(createStripDebugInfoPass());
     pm.addPass(createLowerGpuOpsToNVVMOpsPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
     pm.addPass(createGpuSerializeToCubinPass(gpuTriple, gpuChip, gpuFeatures));
+
+    // Cleanup IR.
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
 #endif // TPP_GPU_ENABLE
   }
 };

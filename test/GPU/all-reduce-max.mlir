@@ -75,6 +75,6 @@ func.func private @printMemrefI32(memref<*xi32>)
 // CHECK:       }
 // CHECK: gpu.module @main_kernel attributes {gpu.binary = "
 // CHECK-LABEL: llvm.func @main_kernel
-// CHECK-DAG: nvvm.read
-// CHECK-DAG: nvvm.shfl.sync
-// CHECK-DAG: nvvm.barrier
+// CHECK-DAG:     nvvm.read
+// CHECK-DAG:     nvvm.shfl.sync
+// CHECK-DAG:     nvvm.barrier
