@@ -61,9 +61,15 @@ cmake -G Ninja .. \
 ## Troubleshooting
 - CUDA driver vs runtime version mismatch:
     - check if CUDA driver and cuda-toolkit versions are the same:
-    ```
-    $ nvidia-smi
-    $ dpkg -l | grep cuda-toolkit
-    ```
+        ```
+        nvidia-smi
+        dpkg -l | grep cuda-toolkit
+        ```
     - thread with more details - [link](https://forums.developer.nvidia.com/t/cuda-driver-version-is-insufficient-for-cuda-runtime-version-wsl2-ubuntu-18-04/178720/11)
 - MLIR CUDA_ERROR_ILLEGAL_ADDRESS bug - [link](https://bugs.llvm.org/show_bug.cgi?id=51107)
+
+## Notes
+- Monitor GPU usage
+    ```sh
+    watch -n 0.1 nvidia-smi
+    ```
