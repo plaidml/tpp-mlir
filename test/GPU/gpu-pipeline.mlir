@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s --gpu-pipeline=gpu=cuda | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s
 
 func.func @entry() {
   %0 = memref.alloc() : memref<8x8xf32>

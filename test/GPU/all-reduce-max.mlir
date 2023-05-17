@@ -5,7 +5,7 @@
 // RUN: | mlir-opt -canonicalize -cse \
 // RUN: | FileCheck %s
 
-// RUN: tpp-opt %s --gpu-pipeline=gpu=cuda | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s
 
 // Original test from: llvm-project/mlir/test/Integration/GPU/CUDA/all-reduce-max.mlir
 
