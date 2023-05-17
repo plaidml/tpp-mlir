@@ -69,7 +69,6 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
   }
 
   void runOnOperation() override {
-    // Do nothing when no GPU is selected.
     auto module = getOperation();
 
     // Initialize the pipeline if needed.
@@ -104,6 +103,8 @@ private:
     // Lower GPU ops to the chosen GPU backend.
     if (gpuType == GpuType::Cuda)
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
+    else
+      assert(false && "Unsupported GPU backend");
 
     // Clean up after the GPU pipeline.
     // Use upstream passes directly instead of the cleanup pass as the GPU
