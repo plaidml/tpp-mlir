@@ -40,15 +40,15 @@ using namespace mlir::tpp;
 namespace {
 
 enum class GpuType {
-  NONE, // no target GPU
-  CUDA,
+  None, // no target GPU
+  Cuda,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
   return llvm::StringSwitch<GpuType>(gpuStr)
-      .CaseLower("none", GpuType::NONE)
-      .CaseLower("cuda", GpuType::CUDA)
-      .Default(GpuType::NONE);
+      .CaseLower("none", GpuType::None)
+      .CaseLower("cuda", GpuType::Cuda)
+      .Default(GpuType::None);
 }
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
@@ -88,7 +88,7 @@ private:
     GpuType gpuType = parseGpuOption(this->gpuBackend);
 
     // Add no passes when no GPU is selected.
-    if (gpuType == GpuType::NONE)
+    if (gpuType == GpuType::None)
       return;
 
     // Map and lower ops to GPU-compatible format.
@@ -102,7 +102,7 @@ private:
     pm.addPass(createGpuKernelOutliningPass());
 
     // Lower GPU ops to the chosen GPU backend.
-    if (gpuType == GpuType::CUDA)
+    if (gpuType == GpuType::Cuda)
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
 
     // Clean up after the GPU pipeline.
