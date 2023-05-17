@@ -1,4 +1,5 @@
-// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline=gpu=none | FileCheck %s --check-prefix=NONE
+// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s --check-prefix=CUDA
 
 func.func @entry() {
   %0 = memref.alloc() : memref<8x8xf32>
@@ -22,19 +23,23 @@ func.func @entry() {
 
 func.func private @printMemrefF32(memref<*xf32>)
 
-// CHECK: module attributes {gpu.container_module}
-// CHECK-LABEL: func.func @entry
-// CHECK:         %[[C1:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C1]]
-// CHECK:         %[[C2:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C2]]
-// CHECK:         %[[C3:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C3]]
-// CHECK:         gpu.launch_func  @entry_kernel::@entry_kernel
-// CHECK:         call @printMemrefF32
-// CHECK:       }
-// CHECK: gpu.module @entry_kernel attributes {gpu.binary = "
-// CHECK-LABEL: llvm.func @entry_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
+// NONE-LABEL: func.func @entry
+// NONE:         linalg.matmul
+// NONE:       }
+
+// CUDA: module attributes {gpu.container_module}
+// CUDA-LABEL: func.func @entry
+// CUDA:         %[[C1:.*]] = memref.cast
+// CUDA:         gpu.host_register %[[C1]]
+// CUDA:         %[[C2:.*]] = memref.cast
+// CUDA:         gpu.host_register %[[C2]]
+// CUDA:         %[[C3:.*]] = memref.cast
+// CUDA:         gpu.host_register %[[C3]]
+// CUDA:         gpu.launch_func  @entry_kernel::@entry_kernel
+// CUDA:         call @printMemrefF32
+// CUDA:       }
+// CUDA: gpu.module @entry_kernel attributes {gpu.binary = "
+// CUDA-LABEL: llvm.func @entry_kernel
+// CUDA-DAG:     nvvm.read
+// CUDA-DAG:     llvm.mul
+// CUDA-DAG:     llvm.add
