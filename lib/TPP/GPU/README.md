@@ -61,7 +61,7 @@ cmake -G Ninja .. \
 ## Troubleshooting
 - CUDA driver vs runtime version mismatch:
     - check if CUDA driver and cuda-toolkit versions are the same:
-        ```
+        ```sh
         nvidia-smi
         dpkg -l | grep cuda-toolkit
         ```
