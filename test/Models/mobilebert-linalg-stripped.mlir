@@ -12,7 +12,7 @@
 #map11 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map12 = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
 module attributes {tf_saved_model.semantics} {
-  func.func @main(%arg0: tensor<1x384xi32> {iree.identifier = "serving_default_input_word_ids:0", tf_saved_model.index_path = ["input_word_ids"]}, %arg1: tensor<1x384xi32> {iree.identifier = "serving_default_input_type_ids:0", tf_saved_model.index_path = ["input_type_ids"]}, %arg2: tensor<1x384xi32> {iree.identifier = "serving_default_input_mask:0", tf_saved_model.index_path = ["input_mask"]}) -> (tensor<1x384xf32> {iree.identifier = "StatefulPartitionedCall:0", tf_saved_model.index_path = ["end_positions"]}, tensor<1x384xf32> {iree.identifier = "StatefulPartitionedCall:1", tf_saved_model.index_path = ["start_positions"]}) attributes {tf_saved_model.exported_names = ["serving_default"]} {
+  func.func @main(%arg0: tensor<1x384xf32> {iree.identifier = "serving_default_input_word_ids:0", tf_saved_model.index_path = ["input_word_ids"]}, %arg1: tensor<1x384xf32> {iree.identifier = "serving_default_input_type_ids:0", tf_saved_model.index_path = ["input_type_ids"]}, %arg2: tensor<1x384xf32> {iree.identifier = "serving_default_input_mask:0", tf_saved_model.index_path = ["input_mask"]}) -> (tensor<1x384xf32> {iree.identifier = "StatefulPartitionedCall:0", tf_saved_model.index_path = ["end_positions"]}) attributes {tf_saved_model.exported_names = ["serving_default"]} {
     %cst = arith.constant dense<1.000000e+00> : tensor<1x128xf32>
     %cst_0 = arith.constant dense<5.000000e-01> : tensor<1x128xf32>
     %cst_1 = arith.constant dense<0.333333343> : tensor<1x128xf32>
@@ -969,10 +969,9 @@ module attributes {tf_saved_model.semantics} {
     %cst_950 = arith.constant dense<0.00105485227> : tensor<512xf32>
     %cst_951 = arith.constant dense<0.00105374074> : tensor<2xf32>
     %0 = tensor.empty() : tensor<1x384xf32>
-    %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x384xi32>) outs(%0 : tensor<1x384xf32>) {
-    ^bb0(%in: i32, %out: f32):
-      %4421 = arith.sitofp %in : i32 to f32
-      linalg.yield %4421 : f32
+    %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<1x384xf32>) outs(%0 : tensor<1x384xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
     } -> tensor<1x384xf32>
     %2 = tensor.empty() : tensor<1x384x384xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%1, %cst_244 : tensor<1x384xf32>, tensor<1x384xf32>) outs(%2 : tensor<1x384x384xf32>) {
@@ -994,19 +993,21 @@ module attributes {tf_saved_model.semantics} {
       linalg.yield %4421 : f32
     } -> tensor<1x1x384x384xf32>
     %8 = tensor.empty() : tensor<1x384x512xf32>
-    %9 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<1x384xi32>) outs(%8 : tensor<1x384x512xf32>) {
-    ^bb0(%in: i32, %out: f32):
+    %9 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<1x384xf32>) outs(%8 : tensor<1x384x512xf32>) {
+    ^bb0(%in: f32, %out: f32):
       %4421 = linalg.index 0 : index
-      %4422 = arith.index_cast %in : i32 to index
+      %fpToUi = arith.fptoui %in : f32 to i32
+      %4422 = arith.index_cast %fpToUi : i32 to index
       %4423 = linalg.index 2 : index
       %extracted = tensor.extract %cst_609[%4421, %4422, %4423] : tensor<1x2x512xf32>
       linalg.yield %extracted : f32
     } -> tensor<1x384x512xf32>
     %10 = tensor.empty() : tensor<1x384x128xf32>
-    %11 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1x384xi32>) outs(%10 : tensor<1x384x128xf32>) {
-    ^bb0(%in: i32, %out: f32):
+    %11 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1x384xf32>) outs(%10 : tensor<1x384x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
       %4421 = linalg.index 0 : index
-      %4422 = arith.index_cast %in : i32 to index
+      %fpToUi = arith.fptoui %in : f32 to i32
+      %4422 = arith.index_cast %fpToUi : i32 to index
       %4423 = linalg.index 2 : index
       %extracted = tensor.extract %cst_608[%4421, %4422, %4423] : tensor<1x30522x128xf32>
       linalg.yield %extracted : f32
@@ -12540,7 +12541,8 @@ module attributes {tf_saved_model.semantics} {
     %collapsed_2784 = tensor.collapse_shape %extracted_slice_2783 [[0, 1], [2]] : tensor<1x1x384xf32> into tensor<1x384xf32>
     %extracted_slice_2785 = tensor.extract_slice %4420[1, 0, 0] [1, 1, 384] [1, 1, 1] : tensor<2x1x384xf32> to tensor<1x1x384xf32>
     %collapsed_2786 = tensor.collapse_shape %extracted_slice_2785 [[0, 1], [2]] : tensor<1x1x384xf32> into tensor<1x384xf32>
-    return %collapsed_2786, %collapsed_2784 : tensor<1x384xf32>, tensor<1x384xf32>
+    %final_add = tpp.add (%collapsed_2786 : tensor<1x384xf32>, %collapsed_2784 : tensor<1x384xf32>) -> tensor<1x384xf32>
+    return %final_add : tensor<1x384xf32>
   }
 }
 
