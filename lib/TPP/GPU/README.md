@@ -6,7 +6,7 @@ _Note: the GPU support is disabled by default. It is an opt-in feature which can
 
 ## LLVM with GPU support
 Extra flags required:
-```
+```sh
 -DLLVM_TARGETS_TO_BUILD="host;NVPTX;AMDGPU" \
 -DCMAKE_CUDA_COMPILER=nvcc \
 -DMLIR_ENABLE_CUDA_RUNNER=ON \
@@ -15,7 +15,7 @@ Extra flags required:
 -DMLIR_ENABLE_VULKAN_RUNNER=ON
 ```
 Full build command:
-```
+```sh
 cd llvm-project/build
 
 cmake -G Ninja ../llvm \
@@ -35,11 +35,11 @@ cmake -G Ninja ../llvm \
 ```
 ## TPP MLIR with GPU support
 Extra flags required:
-```
+```sh
 -DTPP_GPU=ON
 ```
 Full build command:
-```
+```sh
 cd tpp-mlir/build
 
 cmake -G Ninja .. \
