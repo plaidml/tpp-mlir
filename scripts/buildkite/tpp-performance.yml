@@ -7,7 +7,7 @@ env:
   NPROCS_LIMIT_LINK: "8"
   #LIBXSMM_VERBOSE: 4
   #LIBXSMMFETCH: 1
-  TPP_CLANGVER: "16.0.0"
+  TPP_CLANGVER: "16.0.4"
   TPP_GCCVER: "12.3.0"
 
 # upload with absolute path but symlinks not resolved (-P), mount point is different on head/compute node, upload even if failure
