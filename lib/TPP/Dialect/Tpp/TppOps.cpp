@@ -18,6 +18,16 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
+namespace {
+constexpr std::string_view INS = "ins";
+constexpr std::string_view OUTS = "outs";
+constexpr std::string_view OPERAND_SEGMENT_SIZE = "operand_segment_sizes";
+constexpr std::string_view UNARY_KIND = "unary_kind";
+constexpr std::string_view BINARY_KIND = "binary_kind";
+constexpr std::string_view UNARY = "unary";
+constexpr std::string_view BINARY = "binary";
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
@@ -37,7 +47,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   SmallVector<Type> operandsTypes;
 
   bool isMemRef = false;
-  if (succeeded(parser.parseOptionalKeyword("ins")))
+  if (succeeded(parser.parseOptionalKeyword(INS)))
     isMemRef = true;
 
   // Parse operands.
@@ -59,7 +69,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
 
   if (isMemRef) {
     locsOperands.push_back(parser.getCurrentLocation());
-    if (parser.parseKeyword("outs") || parser.parseLParen() ||
+    if (parser.parseKeyword(OUTS) || parser.parseLParen() ||
         parser.parseOperand(operands.emplace_back()) ||
         parser.parseColonType(operandsTypes.emplace_back()) ||
         parser.parseRParen())
@@ -94,10 +104,10 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(attrs))
     return failure();
   // Check if we parsed `operand_segment_sizes` already, otherwise add it.
-  if (!attrs.get("operand_segment_sizes")) {
+  if (!attrs.get(OPERAND_SEGMENT_SIZE)) {
     auto operandSegmentSize = parser.getBuilder().getDenseI32ArrayAttr(
         {numberOfInputs, numberOfOutputs});
-    result.addAttribute("operand_segment_sizes", operandSegmentSize);
+    result.addAttribute(OPERAND_SEGMENT_SIZE, operandSegmentSize);
   }
   result.addAttributes(attrs);
   return success();
@@ -109,10 +119,10 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
                        ValueRange outs, TypeRange results, Operation *op) {
   printer << ' ';
   if (results.empty()) {
-    printer << "ins";
+    printer << INS;
     printCommaSeparatedList(printer, operands);
     printer << ' ';
-    printer << "outs";
+    printer << OUTS;
     printCommaSeparatedList(printer, outs);
   } else {
     printCommaSeparatedList(printer, operands);
@@ -120,7 +130,7 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
   }
   printer.printOptionalAttrDict(
       op->getAttrs(),
-      /*elidedAttrs=*/{"operand_segment_sizes", "unary_kind", "binary_kind"});
+      /*elidedAttrs=*/{OPERAND_SEGMENT_SIZE, UNARY_KIND, BINARY_KIND});
 }
 
 static void tppOpBuilder(OpBuilder &builder, OperationState &state,
@@ -131,13 +141,13 @@ static void tppOpBuilder(OpBuilder &builder, OperationState &state,
           outputs[0].getType().dyn_cast_or_null<RankedTensorType>()) {
     state.addTypes(outputs.getTypes());
     state.addAttribute(
-        "operand_segment_sizes",
+        OPERAND_SEGMENT_SIZE,
         builder.getDenseI32ArrayAttr(
             {static_cast<int>(inputs.size()), /*numOutputs=*/0}));
   } else {
     state.addOperands(outputs);
     state.addAttribute(
-        "operand_segment_sizes",
+        OPERAND_SEGMENT_SIZE,
         builder.getDenseI32ArrayAttr({static_cast<int>(inputs.size()),
                                       static_cast<int>(outputs.size())}));
   }
@@ -412,8 +422,8 @@ void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
                           FusedUnaryOpKindAttr unaryKind,
                           FusedBinaryOpKindAttr binaryKind) {
   tppOpBuilder(builder, state, inputs, output);
-  state.addAttribute("unary_kind", unaryKind);
-  state.addAttribute("binary_kind", binaryKind);
+  state.addAttribute(UNARY_KIND, unaryKind);
+  state.addAttribute(BINARY_KIND, binaryKind);
 }
 
 template <typename EnumClass>
@@ -430,14 +440,13 @@ static ParseResult parseEnum(EnumClass &value, OpAsmParser &parser) {
 }
 
 ParseResult FusedBrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
-  if (parser.parseLSquare() || parser.parseKeyword("unary") ||
+  if (parser.parseLSquare() || parser.parseKeyword(UNARY) ||
       parser.parseEqual())
     return failure();
   FusedUnaryOpKind unaryKind;
   if (parseEnum(unaryKind, parser))
     return failure();
-  if (parser.parseComma() || parser.parseKeyword("binary") ||
-      parser.parseEqual())
+  if (parser.parseComma() || parser.parseKeyword(BINARY) || parser.parseEqual())
     return failure();
   FusedBinaryOpKind binaryKind;
   if (parseEnum(binaryKind, parser))
@@ -445,16 +454,15 @@ ParseResult FusedBrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseRSquare())
     return failure();
   auto ctx = parser.getBuilder().getContext();
-  result.addAttribute("unary_kind", FusedUnaryOpKindAttr::get(ctx, unaryKind));
-  result.addAttribute("binary_kind",
-                      FusedBinaryOpKindAttr::get(ctx, binaryKind));
+  result.addAttribute(UNARY_KIND, FusedUnaryOpKindAttr::get(ctx, unaryKind));
+  result.addAttribute(BINARY_KIND, FusedBinaryOpKindAttr::get(ctx, binaryKind));
   return parseTppOp(parser, result);
 }
 
 void FusedBrgemmOp::print(OpAsmPrinter &printer) {
-  printer << " [unary = " << tpp::stringifyFusedUnaryOpKind(getUnaryKind())
-          << ", binary = " << tpp::stringifyFusedBinaryOpKind(getBinaryKind())
-          << "]";
+  printer << " [" << UNARY << " = "
+          << tpp::stringifyFusedUnaryOpKind(getUnaryKind()) << ", " << BINARY
+          << " = " << tpp::stringifyFusedBinaryOpKind(getBinaryKind()) << "]";
   printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
 
