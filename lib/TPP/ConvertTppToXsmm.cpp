@@ -90,60 +90,99 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
 // Conversions
 //===----------------------------------------------------------------------===//
 
+template <typename OpTy>
+static FailureOr<DenseI64ArrayAttr>
+getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
+  assert(opTy.hasBufferSemantics() && "expects buffer semantics");
+
+  bool isBrgemm = isa<tpp::BrgemmOp>(opTy.getOperation()) ||
+                  isa<tpp::FusedBrgemmOp>(opTy.getOperation());
+
+  auto memrefC = opTy.getOutputType();
+  auto memrefA = opTy.getMemRefInputType(0);
+  auto memrefB = opTy.getMemRefInputType(1);
+
+  int64_t m = memrefC.getShape()[0];
+  int64_t n = memrefC.getShape()[1];
+  int64_t k = (isBrgemm) ? memrefA.getShape()[2] : memrefA.getShape()[1];
+
+  auto ldaDim =
+      (isBrgemm) ? getLeadingDim(memrefA, /*pos=*/1) : getLeadingDim(memrefA);
+  if (failed(ldaDim)) {
+    LLVM_DEBUG(llvm::dbgs() << "Cannot compute lda\n");
+    return failure();
+  }
+  int64_t lda = *ldaDim;
+
+  auto ldbDim =
+      (isBrgemm) ? getLeadingDim(memrefB, /*pos=*/1) : getLeadingDim(memrefB);
+  if (failed(ldbDim)) {
+    LLVM_DEBUG(llvm::dbgs() << "Cannot compute ldb\n");
+    return failure();
+  }
+  int64_t ldb = (vnni::utils::isInVnniLayout(memrefB))
+                    ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
+                    : *ldbDim;
+
+  auto ldcDim = getLeadingDim(memrefC);
+  if (failed(ldcDim)) {
+    LLVM_DEBUG(llvm::dbgs() << "Cannot compute ldc\n");
+    return failure();
+  }
+  int64_t ldc = *ldcDim;
+
+  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+      rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
+  return dims;
+}
+
+template <typename OpTy>
+static ArrayAttr getGemmFlags(RewriterBase &rewriter, OpTy opTy) {
+  auto memrefB = opTy.getMemRefInputType(1);
+  xsmm::GemmFlagsAttr gemmFlag =
+      (vnni::utils::isInVnniLayout(memrefB))
+          ? xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                     xsmm::GemmFlags::VNNI_B)
+          : xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                     xsmm::GemmFlags::NONE);
+  return rewriter.getArrayAttr(gemmFlag);
+}
+
+template <typename OpTy>
+static xsmm::DataTypeAttr getDataType(RewriterBase &rewriter, OpTy opTy) {
+  xsmm::DataTypeAttr dtype;
+  auto memrefC = opTy.getOutputType();
+
+  if (memrefC.getElementType().isBF16()) {
+    dtype =
+        xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::BF16);
+  } else {
+    assert(memrefC.getElementType().isF32() &&
+           "Element type neither bf16 nor f32");
+    dtype = xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::F32);
+  }
+  return dtype;
+}
+
 struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
   using OpRewritePattern<tpp::GemmOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tpp::GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
+    assert(matmulOp.hasBufferSemantics() &&
+           "tpp.matmul expects buffer semantics");
 
     Location loc = matmulOp.getLoc();
-
-    auto memrefC = matmulOp.getOutputType();
-    auto memrefA = matmulOp.getMemRefInputType(0);
-    auto memrefB = matmulOp.getMemRefInputType(1);
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[1];
-    auto ldaDim = getLeadingDim(memrefA);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-
-    auto ldbDim = getLeadingDim(memrefB);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldb");
-    int64_t ldb = (vnni::utils::isInVnniLayout(memrefB))
-                      ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
-                      : *ldbDim;
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(matmulOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmFlag =
-        (vnni::utils::isInVnniLayout(memrefB))
-            ? xsmm::GemmFlagsAttr::get(matmulOp.getContext(),
-                                       xsmm::GemmFlags::VNNI_B)
-            : xsmm::GemmFlagsAttr::get(matmulOp.getContext(),
-                                       xsmm::GemmFlags::NONE);
-    xsmm::DataTypeAttr dtype;
-    if (memrefC.getElementType().isBF16()) {
-      dtype =
-          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::BF16);
-    } else {
-      assert(memrefC.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype =
-          xsmm::DataTypeAttr::get(matmulOp.getContext(), xsmm::DataType::F32);
+    auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, matmulOp);
+    if (failed(dims)) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Cannot compute leading dims or sizes");
     }
 
+    auto dtype = getDataType(rewriter, matmulOp);
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
-        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+        loc, integer64, *dims, getGemmFlags(rewriter, matmulOp), dtype);
 
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
@@ -161,57 +200,23 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(brgemmOp.hasBufferSemantics() && "tpp.brgemm expects a memref type");
+    assert(brgemmOp.hasBufferSemantics() &&
+           "tpp.brgemm expects buffer semantics");
 
     Location loc = brgemmOp.getLoc();
-
-    auto memrefC = brgemmOp.getOutputType();
-    auto memrefA = brgemmOp.getMemRefInputType(0);
+    auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
+    if (failed(dims)) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Cannot compute leading dims or sizes");
+    }
     auto memrefB = brgemmOp.getMemRefInputType(1);
-    int64_t m = memrefC.getShape()[0];
-    int64_t n = memrefC.getShape()[1];
-    int64_t k = memrefA.getShape()[2];
     int64_t batchSize = memrefB.getShape()[0];
 
-    auto ldaDim = getLeadingDim(memrefA, 1);
-    if (failed(ldaDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute lda");
-    int64_t lda = *ldaDim;
-    auto ldbDim = getLeadingDim(memrefB, 1);
-    if (failed(ldbDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldb");
-    int64_t ldb = (vnni::utils::isInVnniLayout(memrefB))
-                      ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
-                      : *ldbDim;
-
-    auto ldcDim = getLeadingDim(memrefC);
-    if (failed(ldcDim))
-      return rewriter.notifyMatchFailure(brgemmOp, "Cannot compute ldc");
-    int64_t ldc = *ldcDim;
-
+    auto dtype = getDataType(rewriter, brgemmOp);
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-    xsmm::GemmFlagsAttr gemmFlag =
-        (vnni::utils::isInVnniLayout(memrefB))
-            ? xsmm::GemmFlagsAttr::get(brgemmOp.getContext(),
-                                       xsmm::GemmFlags::VNNI_B)
-            : xsmm::GemmFlagsAttr::get(brgemmOp.getContext(),
-                                       xsmm::GemmFlags::NONE);
-    xsmm::DataTypeAttr dtype =
-        xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
-    if (memrefC.getElementType().isBF16()) {
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::BF16);
-    } else {
-      assert(memrefC.getElementType().isF32() &&
-             "Element type neither bf16 nor f32");
-      dtype =
-          xsmm::DataTypeAttr::get(brgemmOp.getContext(), xsmm::DataType::F32);
-    }
 
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-        loc, integer64, dims, rewriter.getArrayAttr(gemmFlag), dtype);
+        loc, integer64, *dims, getGemmFlags(rewriter, brgemmOp), dtype);
 
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
@@ -228,14 +233,87 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
   }
 };
 
+// Forward decl.
+static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
+                                        MemRefType outputType,
+                                        size_t operandNumber);
+
 struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
   using OpRewritePattern<tpp::FusedBrgemmOp>::OpRewritePattern;
 
+  ArrayAttr getUnaryFlags(RewriterBase &rewriter,
+                          tpp::FusedBrgemmOp brgemmOp) const {
+    return rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
+        rewriter.getContext(), xsmm::UnaryFlags::NONE));
+  }
+
+  ArrayAttr getBinaryFlags(RewriterBase &rewriter,
+                           tpp::FusedBrgemmOp brgemmOp) const {
+    auto binaryInputType =
+        brgemmOp.getBinaryOperand().getType().cast<MemRefType>();
+    auto outputType = brgemmOp.getOutputType();
+    return rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
+        rewriter.getContext(),
+        getBinaryBCast(binaryInputType, outputType, /*operandNumber=*/0)));
+  }
+
+  xsmm::BinaryKindAttr getBinaryKind(RewriterBase &rewriter,
+                                     tpp::FusedBrgemmOp brgemmOp) const {
+    auto kind = brgemmOp.getBinaryKind();
+    auto ctx = rewriter.getContext();
+    if (kind == tpp::FusedBinaryOpKind::NONE)
+      return xsmm::BinaryKindAttr::get(ctx, xsmm::BinaryKind::NONE);
+    if (kind == tpp::FusedBinaryOpKind::ADD)
+      return xsmm::BinaryKindAttr::get(ctx, xsmm::BinaryKind::ADD);
+    assert(false && "invalid binary kind");
+  }
+
+  xsmm::UnaryKindAttr getUnaryKind(RewriterBase &rewriter,
+                                   tpp::FusedBrgemmOp brgemmOp) const {
+    auto kind = brgemmOp.getUnaryKind();
+    auto ctx = rewriter.getContext();
+    if (kind == tpp::FusedUnaryOpKind::NONE)
+      return xsmm::UnaryKindAttr::get(ctx, xsmm::UnaryKind::NONE);
+    if (kind == tpp::FusedUnaryOpKind::RELU)
+      return xsmm::UnaryKindAttr::get(ctx, xsmm::UnaryKind::RELU);
+    assert(false && "invalid unary kind");
+  }
+
   LogicalResult matchAndRewrite(tpp::FusedBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    // TODO: Handle the conversion. Was not tested and questionable.
-    // Will follow-up on this.
-    return failure();
+    assert(brgemmOp.hasBufferSemantics() &&
+           "tpp.fused_brgemm expects buffer semantics");
+
+    Location loc = brgemmOp.getLoc();
+    auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
+    if (failed(dims)) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Cannot compute leading dims or sizes");
+    }
+    auto memrefB = brgemmOp.getMemRefInputType(1);
+    int64_t batchSize = memrefB.getShape()[0];
+
+    auto dtype = getDataType(rewriter, brgemmOp);
+    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+    Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
+        loc, integer64, *dims, getBinaryKind(rewriter, brgemmOp),
+        getUnaryKind(rewriter, brgemmOp), getGemmFlags(rewriter, brgemmOp),
+        getUnaryFlags(rewriter, brgemmOp), getBinaryFlags(rewriter, brgemmOp),
+        dtype);
+
+    Value batchDim = rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, batchSize));
+    SmallVector<Value, 6> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(brgemmOp->getOperands().begin(),
+                          brgemmOp->getOperands().end());
+    // Drop the aliasing output operand.
+    invokeOperands.pop_back();
+    invokeOperands.push_back(batchDim);
+    rewriter.replaceOpWithNewOp<xsmm::FusedBrgemmOp>(brgemmOp, dtype,
+                                                     invokeOperands);
+    return success();
   }
 };
 
@@ -434,77 +512,80 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
   }
 };
 
-struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
-  using OpRewritePattern<tpp::AddOp>::OpRewritePattern;
+// Given the operand type and the output type return the broadcast
+// to use in the XSMM call.
+static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
+                                        MemRefType outputType,
+                                        size_t operandNumber) {
 
   enum class BCastType { NONE = 0, SCALAR, ROW, COL };
 
-  // Given the operand type and the output type return the broadcast
-  // to use in the XSMM call.
-  xsmm::BinaryFlags getBCast(MemRefType operandType, MemRefType outputType,
-                             size_t operandNumber) const {
-    auto shapeOutput = outputType.getShape();
-    auto shapeOperand = operandType.getShape();
-    assert(shapeOutput.size() >= shapeOperand.size() &&
-           "Output rank must be >= operand rank");
-    SmallVector<int64_t> bOperandShape;
-    computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
-    assert(shapeOutput.size() == bOperandShape.size());
-    assert(shapeOutput.size() == 1 || shapeOutput.size() == 2);
+  auto shapeOutput = outputType.getShape();
+  auto shapeOperand = operandType.getShape();
+  assert(shapeOutput.size() >= shapeOperand.size() &&
+         "Output rank must be >= operand rank");
+  SmallVector<int64_t> bOperandShape;
+  computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
+  assert(shapeOutput.size() == bOperandShape.size());
+  assert(shapeOutput.size() == 1 || shapeOutput.size() == 2);
 
-    auto getBCastEnum =
-        [](BCastType bCastType,
-           std::optional<unsigned> operand) -> xsmm::BinaryFlags {
-      if (bCastType == BCastType::NONE)
-        return xsmm::BinaryFlags::NONE;
+  auto getBCastEnum = [](BCastType bCastType,
+                         std::optional<unsigned> operand) -> xsmm::BinaryFlags {
+    switch (bCastType) {
+    case BCastType::NONE:
+      return xsmm::BinaryFlags::NONE;
+    case BCastType::SCALAR:
       assert(operand != std::nullopt && "Require operand idx");
       assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
-      if (bCastType == BCastType::SCALAR) {
-        if (*operand == 0)
-          return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
-        else
-          return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
-      }
-      if (bCastType == BCastType::ROW) {
-        if (*operand == 0)
-          return xsmm::BinaryFlags::BCAST_ROW_IN_0;
-        else
-          return xsmm::BinaryFlags::BCAST_ROW_IN_1;
-      }
-      if (bCastType == BCastType::COL) {
-        if (*operand == 0)
-          return xsmm::BinaryFlags::BCAST_COL_IN_0;
-        else
-          return xsmm::BinaryFlags::BCAST_COL_IN_1;
-      }
-      assert(false && "BCast not supported");
-      return xsmm::BinaryFlags::NONE;
-    };
-
-    int64_t rankOutput = shapeOutput.size();
-
-    // Multiple way to define a scalar. Check if the memref
-    // is a scalar here.
-    auto isOne = [](int64_t val) { return val == 1; };
-    if (llvm::all_of(bOperandShape, isOne))
-      return getBCastEnum(BCastType::SCALAR, operandNumber);
-
-    // BCast on 1d memref.
-    if (rankOutput == 1) {
-      if (bOperandShape[0] == 1 && shapeOutput[0] != 1)
-        return getBCastEnum(BCastType::ROW, operandNumber);
-      if (bOperandShape == shapeOutput)
-        return getBCastEnum(BCastType::NONE, std::nullopt);
-    } else { // BCast on 2d memref.
-      if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
-        return getBCastEnum(BCastType::ROW, operandNumber);
-      if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
-        return getBCastEnum(BCastType::COL, operandNumber);
-      if (bOperandShape == shapeOutput)
-        return getBCastEnum(BCastType::NONE, operandNumber);
+      if (*operand == 0)
+        return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
+      else
+        return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
+    case BCastType::ROW:
+      assert(operand != std::nullopt && "Require operand idx");
+      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
+      if (*operand == 0)
+        return xsmm::BinaryFlags::BCAST_ROW_IN_0;
+      else
+        return xsmm::BinaryFlags::BCAST_ROW_IN_1;
+    case BCastType::COL:
+      assert(operand != std::nullopt && "Require operand idx");
+      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
+      if (*operand == 0)
+        return xsmm::BinaryFlags::BCAST_COL_IN_0;
+      else
+        return xsmm::BinaryFlags::BCAST_COL_IN_1;
     }
-    assert(false && "failed to get bCast for tpp.add");
+    assert(false && "unrechable");
+  };
+
+  int64_t rankOutput = shapeOutput.size();
+
+  // Multiple way to define a scalar. Check if the memref
+  // is a scalar here.
+  auto isOne = [](int64_t val) { return val == 1; };
+  if (llvm::all_of(bOperandShape, isOne))
+    return getBCastEnum(BCastType::SCALAR, operandNumber);
+
+  // BCast on 1d memref.
+  if (rankOutput == 1) {
+    if (bOperandShape[0] == 1 && shapeOutput[0] != 1)
+      return getBCastEnum(BCastType::ROW, operandNumber);
+    if (bOperandShape == shapeOutput)
+      return getBCastEnum(BCastType::NONE, std::nullopt);
+  } else { // BCast on 2d memref.
+    if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
+      return getBCastEnum(BCastType::ROW, operandNumber);
+    if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
+      return getBCastEnum(BCastType::COL, operandNumber);
+    if (bOperandShape == shapeOutput)
+      return getBCastEnum(BCastType::NONE, operandNumber);
   }
+  assert(false && "failed to get bCast for tpp.add");
+}
+
+struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
+  using OpRewritePattern<tpp::AddOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
@@ -536,8 +617,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
     int64_t ldo = *ldoDim;
 
-    xsmm::BinaryFlags bCastOnLhs = getBCast(lhsMemRef, outputMemRef, 0);
-    xsmm::BinaryFlags bCastOnRhs = getBCast(rhsMemRef, outputMemRef, 1);
+    xsmm::BinaryFlags bCastOnLhs = getBinaryBCast(lhsMemRef, outputMemRef, 0);
+    xsmm::BinaryFlags bCastOnRhs = getBinaryBCast(rhsMemRef, outputMemRef, 1);
 
     LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(bCastOnLhs) << "\n");
     LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(bCastOnRhs) << "\n");

@@ -337,7 +337,10 @@ def Tpp_FusedBrgemmOp : Tpp_QuaternaryOp<"fused_brgemm"> {
                    "FusedUnaryOpKindAttr":$unary_kind,
                    "FusedBinaryOpKindAttr":$binary_kind)>
   ];
-
+  let extraClassDeclaration = [{
+    // Get the operand to be used as input to the binary operation.
+    Value getBinaryOperand() { return getInputs()[3]; };
+  }];
   let hasVerifier = 1;
 }
 
