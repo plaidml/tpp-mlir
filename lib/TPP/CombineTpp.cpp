@@ -47,9 +47,9 @@ struct CombineBrgemmAddAndRelu : public OpRewritePattern<tpp::ReluOp> {
     brgemmOperands.push_back(addOperand);
     auto ctx = rewriter.getContext();
     auto unaryType =
-        tpp::FusedUnaryOpTypeAttr::get(ctx, tpp::FusedUnaryOpType::RELU);
+        tpp::FusedUnaryOpKindAttr::get(ctx, tpp::FusedUnaryOpKind::RELU);
     auto binaryType =
-        tpp::FusedBinaryOpTypeAttr::get(ctx, tpp::FusedBinaryOpType::ADD);
+        tpp::FusedBinaryOpKindAttr::get(ctx, tpp::FusedBinaryOpKind::ADD);
     rewriter.replaceOpWithNewOp<tpp::FusedBrgemmOp>(
         reluOp, brgemmOperands, addOperand, unaryType, binaryType);
     return success();

@@ -120,7 +120,7 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
   }
   printer.printOptionalAttrDict(
       op->getAttrs(),
-      /*elidedAttrs=*/{"operand_segment_sizes", "unary_type", "binary_type"});
+      /*elidedAttrs=*/{"operand_segment_sizes", "unary_kind", "binary_kind"});
 }
 
 static void tppOpBuilder(OpBuilder &builder, OperationState &state,
@@ -409,11 +409,11 @@ LogicalResult FusedBrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
                           ValueRange inputs, Value output,
-                          FusedUnaryOpTypeAttr unaryType,
-                          FusedBinaryOpTypeAttr binaryType) {
+                          FusedUnaryOpKindAttr unaryKind,
+                          FusedBinaryOpKindAttr binaryKind) {
   tppOpBuilder(builder, state, inputs, output);
-  state.addAttribute("unary_type", unaryType);
-  state.addAttribute("binary_type", binaryType);
+  state.addAttribute("unary_kind", unaryKind);
+  state.addAttribute("binary_kind", binaryKind);
 }
 
 template <typename EnumClass>
@@ -433,27 +433,27 @@ ParseResult FusedBrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseLSquare() || parser.parseKeyword("unary") ||
       parser.parseEqual())
     return failure();
-  FusedUnaryOpType unaryType;
-  if (parseEnum(unaryType, parser))
+  FusedUnaryOpKind unaryKind;
+  if (parseEnum(unaryKind, parser))
     return failure();
   if (parser.parseComma() || parser.parseKeyword("binary") ||
       parser.parseEqual())
     return failure();
-  FusedBinaryOpType binaryType;
-  if (parseEnum(binaryType, parser))
+  FusedBinaryOpKind binaryKind;
+  if (parseEnum(binaryKind, parser))
     return failure();
   if (parser.parseRSquare())
     return failure();
   auto ctx = parser.getBuilder().getContext();
-  result.addAttribute("unary_type", FusedUnaryOpTypeAttr::get(ctx, unaryType));
-  result.addAttribute("binary_type",
-                      FusedBinaryOpTypeAttr::get(ctx, binaryType));
+  result.addAttribute("unary_kind", FusedUnaryOpKindAttr::get(ctx, unaryKind));
+  result.addAttribute("binary_kind",
+                      FusedBinaryOpKindAttr::get(ctx, binaryKind));
   return parseTppOp(parser, result);
 }
 
 void FusedBrgemmOp::print(OpAsmPrinter &printer) {
-  printer << " [unary = " << tpp::stringifyFusedUnaryOpType(getUnaryType())
-          << ", binary = " << tpp::stringifyFusedBinaryOpType(getBinaryType())
+  printer << " [unary = " << tpp::stringifyFusedUnaryOpKind(getUnaryKind())
+          << ", binary = " << tpp::stringifyFusedBinaryOpKind(getBinaryKind())
           << "]";
   printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
 }
