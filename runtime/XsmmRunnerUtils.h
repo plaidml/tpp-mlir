@@ -35,6 +35,14 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
 xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
                      int64_t, int64_t, const libxsmm_gemm_flags);
 
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_fused_brgemm_dispatch(
+    const libxsmm_datatype data_type, int64_t m, int64_t n, int64_t k,
+    int64_t lda, int64_t ldb, int64_t ldc, const libxsmm_gemm_flags gemm_flags,
+    const libxsmm_meltw_unary_flags unary_flags,
+    const libxsmm_meltw_unary_type unary_op_type,
+    const libxsmm_meltw_binary_flags binary_flags,
+    const libxsmm_meltw_binary_type binary_op_type);
+
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 xsmm_gemm_invoke(const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
                  int64_t offsetA, void *alignedPtrB, int64_t offsetB,

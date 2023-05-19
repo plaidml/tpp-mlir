@@ -22,6 +22,10 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
   xsmm.gemm (data_type = f32, %arg0, %arg1, %arg2) 
     : (memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
+  // CHECK: xsmm.fused_brgemm
+  xsmm.fused_brgemm (data_type = f32, %arg0, %arg1, %arg2, %arg2)
+    : (memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
+
   // CHECK: xsmm.gemm.dispatch
   %2 = xsmm.gemm.dispatch [3, 2, 1, 3, 2, 1] flags = (none) data_type = f32
   // CHECK-NEXT: xsmm.gemm.dispatch
@@ -43,6 +47,11 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
 
   // CHECK: xsmm.unary.dispatch zero
   %11 = xsmm.unary.dispatch zero [2, 2, 2, 2] flags = (none) data_type = f32
+  
+  // CHECK: xsmm.fused_brgemm.dispatch
+  %12 = xsmm.fused_brgemm.dispatch [3, 2, 1, 3, 2, 1] [add, relu]
+    flags = (beta_0) binary_flags = (none) unary_flags = (none) data_type = f32
+
   // CHECK: xsmm.unary zero
   xsmm.unary zero(data_type = f32, %11, %arg0, %arg0) : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
 

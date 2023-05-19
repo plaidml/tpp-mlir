@@ -18,42 +18,6 @@ def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [2]>]>;
 def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
 
 //===----------------------------------------------------------------------===//
-// QuarternaryOp
-//===----------------------------------------------------------------------===//
-
-def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary"> {
-  let summary = "quarternary operation.";
-  let description = [{
-    Quarternary operation. The operation kind carries information about the
-    name of the LIBXSMM function to invoke. Additionally, the operation takes six
-    operands. The first is an I64 type representing the datatype. The second must
-    be an I64 type and must result from a dispatch operation (it represents the
-    function pointer to use during invocation). The other operands are of Float
-    types and represent the operands to use for computation.  For example, a fused
-    brgemm has the following signature: data_type, I64, memref<MxNxf32>,
-    memref<BxMxKxf32>, memref<BxKxNxf32>, memref<Nxf32>.
-  }];
-
-  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_QuarternaryKind:$callee, 
-                       Variadic<XsmmMemRef>:$inputs);
-
-  let assemblyFormat = [{
-    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
-    attr-dict `:` functional-type($inputs, results)
-  }];
-
-  let extraClassDeclaration = [{
-    // Get the argument operands.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-    operand_iterator arg_operand_begin() { return operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-  }];
-}
-
-
-//===----------------------------------------------------------------------===//
 // TernaryOp
 //===----------------------------------------------------------------------===//
 
@@ -170,26 +134,16 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
 }
 
 //===----------------------------------------------------------------------===//
-// QuarternaryDispatchOp
+// FusedBrgemmOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch", [Pure]> {
-  let summary = "dispatch quarternary operation.";
-  let description = [{
-    The 'kind' carries information about the name of the LIBXSMM function to
-    dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
-    data_type is passed to set the datatype in libxsmm call.
-    Additional I64 operands are passed based on the operation to
-    dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
-    the pointer to call as I64.
-  }];
-
-  let arguments = (ins Xsmm_QuarternaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_DataType:$data_type, BoolAttr:$isVNNI);
-  let results = (outs I64:$results);
+def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
+  let summary = "fused brgemm call operation.";
+  let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `data_type` $data_type `,` `isVNNI` $isVNNI `)` attr-dict
+    `(` `data_type` `=` $data_type `,` $inputs `)`
+    attr-dict `:` functional-type($inputs, results)
   }];
 }
 
@@ -301,6 +255,39 @@ def Xsmm_GemmDispatchOp : Xsmm_GemmLikeOp<"gemm.dispatch"> {
 
 def Xsmm_BrgemmDispatchOp : Xsmm_GemmLikeOp<"brgemm.dispatch"> {
   let summary = "dispatch for brgemm operation."; 
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// FusedBrgemmDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_FusedBrgemmDispatchOp : Xsmm_Op<"fused_brgemm.dispatch", [Pure]> {
+  let summary = "dispatch fused brgemm operation.";
+  let description = [{
+    Implements C = unary(binary(BRGEMM(A, B), D)). The operation has the
+    following arguments: 1) inputs carry information on leading dimensions and
+    sizes; Inputs is a dense attribute of I64 elements. 2) `binary_kind` and
+    `unary_kind` to represent the kind of unary and binary to invoke, respectively.
+    3) `flags` carry the flags associated with the brgemm operation (i.e., beta 0
+    or 1). `unary_flags` and `binary_flags` are the flags associated with the unary
+    and binary, respectively.
+  }];
+
+  
+  let arguments = (ins
+    ConfinedAttr<DenseI64ArrayAttr,
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    Xsmm_BinaryKind:$binary_kind,
+    Xsmm_UnaryKind:$unary_kind,
+    TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags,
+    TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$unary_flags,
+    TypedArrayAttrBase<Xsmm_BinaryFlags, "binary flags">:$binary_flags,
+    Xsmm_DataType:$data_type);
+  
+  let results = (outs I64:$results);
+  let hasCustomAssemblyFormat = 1;
+
   let hasVerifier = 1;
 }
 

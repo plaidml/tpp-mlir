@@ -361,10 +361,14 @@ extern "C" void xsmm_fused_brgemm_invoke(const libxsmm_datatype dType,
   sgemm.gemm_ext(&gemm_param);
 }
 
-extern "C" int64_t xsmm_fused_brgemm_dispatch(const libxsmm_datatype dtype,
-                                              bool isVNNI, int64_t m, int64_t n,
-                                              int64_t k, int64_t lda,
-                                              int64_t ldb, int64_t ldc) {
+extern "C" int64_t
+xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
+                           int64_t n, int64_t k, int64_t lda, int64_t ldb,
+                           int64_t ldc, const libxsmm_gemm_flags gemm_flags,
+                           const libxsmm_meltw_unary_flags unary_flags,
+                           const libxsmm_meltw_unary_type unary_op_type,
+                           const libxsmm_meltw_binary_flags binary_flags,
+                           const libxsmm_meltw_binary_type binary_op_type) {
   // std::cout << "lda: " << lda << "\n";
   // std::cout << "lbd: " << ldb << "\n";
   // std::cout << "ldc: " << ldc << "\n";
@@ -380,18 +384,13 @@ extern "C" int64_t xsmm_fused_brgemm_dispatch(const libxsmm_datatype dtype,
   libxsmm_blasint k_int = k;
   // TODO: move stride computation to dispatch
   // operation as in: https://github.com/plaidml/plaidml/pull/1983
-  auto typeSize = dtype == LIBXSMM_DATATYPE_F32 ? sizeof(float) : sizeof(bf16);
+  auto typeSize =
+      data_type == LIBXSMM_DATATYPE_F32 ? sizeof(float) : sizeof(bf16);
   libxsmm_blasint stride_a = lda * m * typeSize;
   libxsmm_blasint stride_b = ldb * k * typeSize;
 
   libxsmm_gemm_shape l_shape;
-  libxsmm_bitfield l_flags;
-  if (isVNNI) {
-    assert(dtype == LIBXSMM_DATATYPE_BF16);
-    l_flags = LIBXSMM_GEMM_VNNI_FLAGS('N', 'N', 'V', 'N');
-  } else {
-    l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
-  }
+  libxsmm_bitfield l_flags = gemm_flags;
   libxsmm_bitfield l_prefetch_flags = 0;
 
   l_shape.m = n_int;
@@ -400,12 +399,12 @@ extern "C" int64_t xsmm_fused_brgemm_dispatch(const libxsmm_datatype dtype,
   l_shape.lda = ldb_int;
   l_shape.ldb = lda_int;
   l_shape.ldc = ldc_int;
-  l_shape.a_in_type = dtype;
-  l_shape.b_in_type = dtype;
-  l_shape.out_type = dtype;
+  l_shape.a_in_type = data_type;
+  l_shape.b_in_type = data_type;
+  l_shape.out_type = data_type;
   // Retarget computation type from bf16 to f32 due to missing hardware support.
   l_shape.comp_type =
-      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
+      data_type == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : data_type;
 
   libxsmm_gemm_batch_reduce_config l_brconfig;
   l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
@@ -415,22 +414,23 @@ extern "C" int64_t xsmm_fused_brgemm_dispatch(const libxsmm_datatype dtype,
 
   libxsmm_gemm_ext_unary_argops l_argops;
   memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.cp_unary_flags = LIBXSMM_MELTW_FLAG_UNARY_NONE;
   l_argops.ldcp = ldc;
-  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+  l_argops.cp_unary_type = unary_op_type;
 
   libxsmm_gemm_ext_binary_postops l_postops;
   memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
-  l_postops.d_in_type = dtype;
+  l_postops.d_in_type = data_type;
 
-  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
-  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.d_binary_flags = binary_flags;
+  l_postops.d_binary_type = binary_op_type;
   l_postops.ldd = ldc;
 
   auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
       l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
   if (!sgemm) {
     fprintf(stderr, "failed to generate fused brgemm func\n");
-    fprintf(stderr, "dtype: %u\n", dtype);
+    fprintf(stderr, "data_type: %u\n", data_type);
     printXsmmStruct(l_shape);
     printXsmmStruct(l_brconfig);
     exit(-1);
@@ -438,6 +438,7 @@ extern "C" int64_t xsmm_fused_brgemm_dispatch(const libxsmm_datatype dtype,
 
   return reinterpret_cast<int64_t>(sgemm);
 }
+
 //----------------------------------------------------------------------------//
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//

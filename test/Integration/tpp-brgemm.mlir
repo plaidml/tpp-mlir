@@ -10,7 +10,7 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-func.func @brgemmtpp(%A: tensor<1x4x8xf32>,
+func.func @brgemm_tpp(%A: tensor<1x4x8xf32>,
                      %B: tensor<1x8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32>  {
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<1x4x8xf32>, tensor<1x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
   return %D: tensor<4x4xf32>
@@ -41,7 +41,7 @@ func.func @entry() {
 
   // Call kernel.
   %C = arith.constant dense<0.0> : tensor<4x4xf32>
-  %0 = call @brgemmtpp(%da, %db, %C)
+  %0 = call @brgemm_tpp(%da, %db, %C)
       : (tensor<1x4x8xf32>, tensor<1x8x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 
   //

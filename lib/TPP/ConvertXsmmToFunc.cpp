@@ -158,23 +158,6 @@ struct ConvertBrgemmXsmmOp : public OpRewritePattern<BrgemmOp> {
   }
 };
 
-struct ConvertQuarternaryXsmmOp : public OpRewritePattern<QuarternaryOp> {
-  using OpRewritePattern<QuarternaryOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(QuarternaryOp quarternaryOp,
-                                PatternRewriter &rewriter) const override {
-    std::string funcName =
-        "xsmm_" + stringifyEnum(quarternaryOp.getCallee()).str() + "_invoke";
-    if (succeeded(buildInvokeCall(quarternaryOp.getLoc(), funcName,
-                                  quarternaryOp, rewriter,
-                                  quarternaryOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(quarternaryOp);
-      return success();
-    }
-    return failure();
-  }
-};
-
 struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
   using OpRewritePattern<UnaryOp>::OpRewritePattern;
 
@@ -205,6 +188,22 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
     if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
                                   rewriter, binaryOp.getDataTypeAttr()))) {
       rewriter.eraseOp(binaryOp);
+      return success();
+    }
+    return failure();
+  }
+};
+
+struct ConvertFusedBrgemmXsmmOp : public OpRewritePattern<FusedBrgemmOp> {
+  using OpRewritePattern<FusedBrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(FusedBrgemmOp fusedBrgemmOp,
+                                PatternRewriter &rewriter) const override {
+    std::string funcName = "xsmm_fused_brgemm_invoke";
+    if (succeeded(buildInvokeCall(fusedBrgemmOp.getLoc(), funcName,
+                                  fusedBrgemmOp, rewriter,
+                                  fusedBrgemmOp.getDataTypeAttr()))) {
+      rewriter.eraseOp(fusedBrgemmOp);
       return success();
     }
     return failure();
@@ -262,6 +261,51 @@ void addKindOperand(RewriterBase &rewriter, BrgemmDispatchOp dispatchOp,
   /* do nothing */
 }
 
+void addKindOperand(RewriterBase &rewriter, FusedBrgemmDispatchOp dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  /* do nothing */
+}
+
+// Fused brgemm requires additional flags:
+// 1. Unary flags.
+// 2. Type of the unary operation (i.e., relu).
+// 3. Binary flags.
+// 4. Type of the binary operation (i.e., add).
+void addUnaryAndBinaryFlags(RewriterBase &rewriter,
+                            FusedBrgemmDispatchOp dispatchOp,
+                            SmallVectorImpl<Value> &dispatchOperands,
+                            SmallVectorImpl<Type> &dispatchOperandTypes) {
+  Location loc = dispatchOp.getLoc();
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+
+  int64_t oredFlag = 0;
+  for (auto flag : dispatchOp.getUnaryFlags()) {
+    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
+    oredFlag |= intAttr;
+  }
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
+  dispatchOperandTypes.push_back(integer64);
+
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, cast<TypedAttr>(dispatchOp.getUnaryKindAttr())));
+  dispatchOperandTypes.push_back(integer64);
+
+  oredFlag = 0;
+  for (auto flag : dispatchOp.getBinaryFlags()) {
+    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
+    oredFlag |= intAttr;
+  }
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
+  dispatchOperandTypes.push_back(integer64);
+
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, cast<TypedAttr>(dispatchOp.getBinaryKindAttr())));
+  dispatchOperandTypes.push_back(integer64);
+}
+
 template <typename OpTy>
 static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
                                      std::string funcName) {
@@ -317,6 +361,12 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
 
+  if (auto dispatchBrgemmOp = dyn_cast_or_null<xsmm::FusedBrgemmDispatchOp>(
+          dispatchOp.getOperation())) {
+    addUnaryAndBinaryFlags(rewriter, dispatchBrgemmOp, dispatchOperands,
+                           dispatchOperandTypes);
+  }
+
   func::CallOp call = buildDispatchCall(rewriter, loc, dispatchOperands,
                                         dispatchOperandTypes, module, fnName);
   rewriter.replaceOp(dispatchOp, call.getResult(0));
@@ -353,47 +403,6 @@ struct ConvertTernaryDispatchOp : public OpRewritePattern<TernaryDispatchOp> {
   }
 };
 
-struct ConvertQuarternaryDispatchOp
-    : public OpRewritePattern<QuarternaryDispatchOp> {
-  using OpRewritePattern<QuarternaryDispatchOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(QuarternaryDispatchOp dispatchOp,
-                                PatternRewriter &rewriter) const override {
-    Location loc = dispatchOp.getLoc();
-    std::string kindAsString = stringifyEnum(dispatchOp.getKind()).str();
-    kindAsString = "xsmm_" + kindAsString + "_dispatch";
-    FlatSymbolRefAttr fnName =
-        SymbolRefAttr::get(rewriter.getContext(), kindAsString);
-
-    ModuleOp module = dispatchOp->getParentOfType<ModuleOp>();
-    SmallVector<Value, 10> dispatchOperands;
-    SmallVector<Type, 10> dispatchOperandTypes;
-    IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, cast<TypedAttr>(dispatchOp.getDataTypeAttr())));
-    dispatchOperandTypes.push_back(integer64);
-
-    BoolAttr isVNNIAttr = rewriter.getBoolAttr(dispatchOp.getIsVNNI());
-    IntegerType boolType = IntegerType::get(rewriter.getContext(), 1);
-    dispatchOperands.push_back(
-        rewriter.create<arith::ConstantOp>(loc, boolType, isVNNIAttr));
-    dispatchOperandTypes.push_back(boolType);
-
-    ArrayRef<int64_t> integers = dispatchOp.getInputsAttr().asArrayRef();
-    size_t arrayAttrSize = integers.size();
-    for (size_t idx = 0; idx < arrayAttrSize; idx++) {
-      IntegerAttr attr = IntegerAttr::get(rewriter.getI64Type(), integers[idx]);
-      dispatchOperands.push_back(
-          rewriter.create<arith::ConstantOp>(loc, integer64, attr));
-      dispatchOperandTypes.push_back(integer64);
-    }
-    func::CallOp call = buildDispatchCall(rewriter, loc, dispatchOperands,
-                                          dispatchOperandTypes, module, fnName);
-    rewriter.replaceOp(dispatchOp, call.getResult(0));
-    return success();
-  }
-};
-
 struct ConvertBinaryDispatchOp : public OpRewritePattern<BinaryDispatchOp> {
   using OpRewritePattern<BinaryDispatchOp>::OpRewritePattern;
 
@@ -411,7 +420,23 @@ struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
                                 PatternRewriter &rewriter) const override {
     return buildDispatchOp<UnaryDispatchOp>(rewriter, dispatchOp,
                                             "xsmm_unary_dispatch");
-    return success();
+  }
+};
+
+struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
+  using OpRewritePattern<FusedBrgemmDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(FusedBrgemmDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    // Currently LIBXSMM support only BCAST_COL_IN_0 as binary flag.
+    auto binaryFlags = dispatchOp.getBinaryFlags();
+    if (binaryFlags.size() != 1 ||
+        binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
+            BinaryFlags::BCAST_COL_IN_0) {
+      return failure();
+    }
+    return buildDispatchOp<FusedBrgemmDispatchOp>(rewriter, dispatchOp,
+                                                  "xsmm_fused_brgemm_dispatch");
   }
 };
 
@@ -428,12 +453,12 @@ struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
 
 void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
   patterns
-      .add<ConvertQuarternaryXsmmOp, ConvertTernaryXsmmOp, ConvertBinaryXsmmOp,
-           ConvertUnaryXsmmOp, ConvertGemmXsmmOp, ConvertBrgemmXsmmOp>(
+      .add<ConvertTernaryXsmmOp, ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
+           ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
           patterns.getContext());
-  patterns.add<ConvertQuarternaryDispatchOp, ConvertTernaryDispatchOp,
-               ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,
-               ConvertGemmDispatchOp, ConvertBrgemmDispatchOp>(
+  patterns.add<ConvertTernaryDispatchOp, ConvertBinaryDispatchOp,
+               ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
+               ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
       patterns.getContext());
 }
 

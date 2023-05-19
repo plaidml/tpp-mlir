@@ -27,15 +27,6 @@ def Xsmm_TernaryKind : I64EnumAttr<
   let cppNamespace = "mlir::xsmm";
 }
 
-def Xsmm_QuarternaryKind : I64EnumAttr<
-    "QuarternaryKind", "",
-    [
-      I64EnumAttrCase<"NONE", 0, "none">,
-      I64EnumAttrCase<"FUSED_BRGEMM", 1, "fused_brgemm">,
-    ]> {
-  let cppNamespace = "mlir::xsmm";
-}
-
 def Xsmm_BinaryKind : I64EnumAttr<
     "BinaryKind", "see: libxsmm_meltw_binary_type",
     [
