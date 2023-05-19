@@ -208,10 +208,5 @@ func.func @blocked_matmul(%arg0: tensor<?x32x32xf32>, %arg1: tensor<?x32x32xf32>
 
 // CHECK: func.func @blocked_matmul(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?x32x32xf32>, %[[ARG1:.+]]: tensor<?x32x32xf32>, %[[ARG2:.+]]: tensor<32x32xf32>)
-// CHECK: %[[C0:.+]] = arith.constant 0 : index
-// CHECK: %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x32x32xf32>
-// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG0]][0, 0, 0] [%[[DIM]], 32, 32] [1, 1, 1] : tensor<?x32x32xf32> to tensor<?x32x32xf32>
-// CHECK: %[[DIM1:.+]] = tensor.dim %[[ARG1]], %[[C0]] : tensor<?x32x32xf32>
-// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %[[ARG1]][0, 0, 0] [%[[DIM1]], 32, 32] [1, 1, 1] : tensor<?x32x32xf32> to tensor<?x32x32xf32>
-// CHECK: %[[MUL:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE1]], %[[SLICE2]] : tensor<?x32x32xf32>, tensor<?x32x32xf32>) outs(%[[ARG2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[MUL:.+]] = linalg.batch_reduce_matmul ins(%[[ARG0]], %[[ARG1]] : tensor<?x32x32xf32>, tensor<?x32x32xf32>) outs(%[[ARG2]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: return %[[MUL]] : tensor<32x32xf32>

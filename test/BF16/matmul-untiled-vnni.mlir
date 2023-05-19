@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s --pack-vnni| FileCheck %s
+// RUN: tpp-opt %s --pack-vnni | FileCheck %s
 
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
 #map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>

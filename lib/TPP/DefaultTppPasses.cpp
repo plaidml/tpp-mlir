@@ -22,8 +22,6 @@
 #include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/VNNI/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/VNNI/VNNIDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -189,7 +187,6 @@ struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
                 scf::SCFDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
-    vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
   }
 
@@ -230,10 +227,9 @@ struct TppMappingPass : public TppMappingBase<TppMappingPass>,
                 memref::MemRefDialect,
                 scf::SCFDialect,
                 tensor::TensorDialect,
-                vnni::VNNIDialect>();
+                tpp::TppDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
-    vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
   }
 
@@ -295,7 +291,6 @@ struct TppConversionPass : public TppConversionBase<TppConversionPass>,
     // clang-format off
     registry
         .insert<linalg::LinalgDialect,
-                vnni::VNNIDialect,
                 tpp::TppDialect>();
     // clang-format on
   }
@@ -328,7 +323,6 @@ private:
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
-    pm.addPass(createConvertVNNIToTppPass());
   }
 };
 
@@ -386,12 +380,10 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
     registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
-    registry.insert<vnni::VNNIDialect>();
     registry.insert<perf::PerfDialect>();
     bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
-    vnni::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
     tpp::registerBufferizableOpInterfaceExternalModels(registry);
 

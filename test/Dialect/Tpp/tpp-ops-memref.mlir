@@ -61,17 +61,19 @@ func.func @test_brgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
 
 // CHECK-LABEL: func.func @test_gemm_with_Bf16
 func.func @test_gemm_with_Bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
-                            %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
-  // CHECK: tpp.vnni_matmul
-  tpp.vnni_matmul ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>) outs(%arg2: memref<6x6xbf16>)
+                               %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
+  // CHECK: tpp.gemm
+  tpp.gemm ins(%arg0: memref<6x10xbf16>, 
+              %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xbf16>) outs(%arg2: memref<6x6xbf16>)
   return %arg2: memref<6x6xbf16>
 }
 
 // CHECK-LABEL: func.func @test_brgemm_with_Bf16
 func.func @test_brgemm_with_Bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
                               %arg2: memref<4x4xbf16>) -> memref<4x4xbf16> {
-  // CHECK: tpp.vnni_brgemm
-  tpp.vnni_brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>) outs(%arg2: memref<4x4xbf16>)
+  // CHECK: tpp.brgemm
+  tpp.brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, 
+                 %arg2: memref<4x4xbf16>) outs(%arg2: memref<4x4xbf16>)
   return %arg2: memref<4x4xbf16>
 }
 
@@ -101,5 +103,15 @@ func.func @test_gemm(%arg0: memref<2x2xf32>) {
   // CHECK: tpp.gemm
   tpp.gemm ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
              outs(%arg0: memref<2x2xf32>)
+  return
+}
+
+// CHECK-LABEL: fused_brgemm
+func.func @fused_brgemm(%arg0: memref<3x32x32xf32>, %arg1: memref<3x32x32xf32>, %arg2: memref<32x32xf32>,
+                        %arg3: memref<32x32xf32>) {
+  // CHECK: tpp.fused_brgemm
+  tpp.fused_brgemm [unary = relu, binary = add] 
+                   ins(%arg0: memref<3x32x32xf32>, %arg1: memref<3x32x32xf32>, 
+                       %arg2: memref<32x32xf32>, %arg3: memref<32x32xf32>) outs(%arg3: memref<32x32xf32>)
   return
 }

@@ -127,7 +127,7 @@ func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %ar
 // CHECK:       tensor.extract_slice{{[^:]+}}: tensor<32x4x4xbf16> to tensor<2xbf16>
 // CHECK:       linalg.transpose
 // CHECK:       tensor.insert_slice{{[^:]+}}: tensor<2xbf16> into tensor<32x2x4x2xbf16>
-// CHECK: vnni.brgemm
+// CHECK: tpp.brgemm
 
 // -----
 

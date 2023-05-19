@@ -7,14 +7,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/VNNIUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/TypeUtilities.h"
+#include "mlir/IR/Types.h"
 
 namespace mlir {
 namespace vnni {
 namespace utils {
 
-Optional<int64_t> getVNNIBlockingFactor(Type type) {
-  if (!isa<ShapedType>(type) ||
-      !type.cast<ShapedType>().getElementType().isBF16())
+std::optional<int64_t> getVnniBlockingFactor(Type type) {
+  auto elementType = getElementTypeOrSelf(type);
+  if (!elementType.isBF16())
     return std::nullopt;
   // @ TODO we should call LIBXSMM here to query the 
   // VNNI packing factor we need to match to
@@ -28,10 +31,17 @@ Optional<int64_t> getVNNIBlockingFactor(Type type) {
 }
 
 bool isBF16Type(Type type) {
-  if (!isa<ShapedType>(type))
-    return false;
-  return type.cast<ShapedType>().getElementType().isBF16();
+  auto elementType = getElementTypeOrSelf(type);
+  return elementType.isBF16();
 }
+
+bool isInVnniLayout(MemRefType memref) {
+  if (memref.getRank() < 3 || !memref.getElementType().isBF16())
+    return false;
+  return memref.getShape()[memref.getRank() - 1] ==
+         vnni::utils::getVnniBlockingFactor(memref);
+}
+
 } // namespace utils
 } // namespace vnni
 } // namespace mlir

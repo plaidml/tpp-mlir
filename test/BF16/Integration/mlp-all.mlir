@@ -1,20 +1,14 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni  -generalize-tensor-pack-unpack -bufferize -rewrite-to-brgemm -convert-vnni-to-tpp -canonicalize -convert-tpp-to-xsmm -convert-xsmm-to-func -canonicalize -convert-check-to-loops -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf -expand-strided-metadata -lower-affine -convert-arith-to-llvm -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts |\
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext
+// RUN: tpp-run %s -print \
+// RUN:  -e entry -entry-point-result=void
 //
 // This should really be in the passes directory, not here
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni -generalize-tensor-pack-unpack -bufferize -rewrite-to-brgemm  -convert-linalg-to-tpp -convert-vnni-to-tpp | FileCheck %s -check-prefix=TPP
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni -generalize-tensor-pack-unpack -bufferize -rewrite-to-brgemm  -convert-linalg-to-tpp | FileCheck %s -check-prefix=TPP
 // 
 // Total flops = sum(broadcast O(n*m) + matmul O(2*n*m*k) + ReLU (O(n*m))
 // 2*128x512 (131072) + 2*128x256x512 (33554432) + 2*128x1024 (262144) + 2*128x512x1024 (134217728) + 2*128x2048 (524288) + 2*128x1024x2048 (536870912) + 2*128x1000 (256000) + 2*128x2048x1000 (524288000) = 1230102376
 // BENCH_TOTAL_FLOPS: 1230102376
 
-// Validate default pipeline
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni | \
-// RUN: tpp-run \
-// RUN:  -e entry -entry-point-result=void
- 
+
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
@@ -32,7 +26,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
     linalg.yield %arg9 : bf16
   } -> tensor<128x512xbf16>
   // TPP: scf.parallel
-  // TPP: tpp.vnni_brgemm
+  // TPP: tpp.brgemm
   %2 = linalg.matmul ins(%arg0, %arg1: tensor<128x256xbf16>, tensor<256x512xbf16>) outs(%1: tensor<128x512xbf16>) -> tensor<128x512xbf16> 
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xbf16>) {
   ^bb0(%arg9: bf16):
@@ -44,7 +38,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
     linalg.yield %arg9 : bf16
   } -> tensor<128x1024xbf16>
  // TPP: scf.parallel
- // TPP: tpp.vnni_brgemm 
+ // TPP: tpp.brgemm 
   %6 = linalg.matmul  ins(%3, %arg3 : tensor<128x512xbf16>, tensor<512x1024xbf16>) outs(%5 : tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
   %7 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%6 : tensor<128x1024xbf16>)  {
   ^bb0(%arg9: bf16):
@@ -57,7 +51,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
     linalg.yield %arg9 : bf16
   } -> tensor<128x2048xbf16>
   // TPP: scf.parallel
-  // TPP: tpp.vnni_brgemm
+  // TPP: tpp.brgemm
   %10 = linalg.matmul ins(%7, %arg5 : tensor<128x1024xbf16>, tensor<1024x2048xbf16>) outs(%9 : tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
   %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%10 : tensor<128x2048xbf16>) {
   ^bb0(%arg9: bf16):
@@ -70,7 +64,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
     linalg.yield %arg9 : bf16
   } -> tensor<128x1024xbf16>
   // TPP: scf.parallel
-  // TPP: tpp.vnni_brgemm
+  // TPP: tpp.brgemm
   %14 = linalg.matmul  ins(%11, %arg7 : tensor<128x2048xbf16>, tensor<2048x1024xbf16>) outs(%13 : tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
   %15 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%14 : tensor<128x1024xbf16>) {
   ^bb0(%arg9: bf16):

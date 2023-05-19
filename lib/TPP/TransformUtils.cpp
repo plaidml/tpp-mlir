@@ -218,6 +218,9 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
   ShapedType operandType = operandToUse.getType().cast<ShapedType>();
   size_t rank = operandType.getRank();
+  // Happy path, use the current operand.
+  if (rank == desiredResultRank)
+    return operandToUse;
 
   SmallVector<OpFoldResult> offsets, sizes;
   offsets.reserve(rank);

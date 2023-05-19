@@ -19,31 +19,6 @@ func.func @tpp_ops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref
 
 // -----
 
-// Direct linalg lowering to loops should leave all VNNI operations untouched.
-// CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @vnni_ops(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<128x1024xbf16>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<512x2048x2xbf16>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<128x2048xbf16>,
-// CHECK-SAME:  %[[ARG3:.+]]: memref<4x256x512xbf16>,
-// CHECK-SAME:  %[[ARG4:.+]]: memref<4x256x1024x2xbf16>,
-// CHECK-SAME:  %[[ARG5:.+]]: memref<256x1024xbf16>)
-func.func @vnni_ops(%arg0: tensor<128x1024xbf16>,
-                  %arg1: tensor<512x2048x2xbf16>,
-                  %arg2: tensor<128x2048xbf16>,
-                  %arg3: tensor<4x256x512xbf16>,
-                  %arg4: tensor<4x256x1024x2xbf16>,
-                  %arg5: tensor<256x1024xbf16>) -> (tensor<128x2048xbf16>, tensor<256x1024xbf16>) {
-  // CHECK: vnni.matmul
-  // CHECK: vnni.brgemm
-  %0 = vnni.matmul ins(%arg0 : tensor<128x1024xbf16>, %arg1 : tensor<512x2048x2xbf16>) outs(%arg2 : tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
-  %1 = vnni.brgemm ins(%arg3 : tensor<4x256x512xbf16>, %arg4 : tensor<4x256x1024x2xbf16>) outs(%arg5 : tensor<256x1024xbf16>) -> tensor<256x1024xbf16>
-
-  return %0, %1 : tensor<128x2048xbf16>, tensor<256x1024xbf16>
-}
-
-// -----
-
 // CHECK-NOT: func.func private @xsmm_
 // CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,

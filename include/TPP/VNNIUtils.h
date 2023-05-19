@@ -1,6 +1,3 @@
-#ifndef TPP_VNNIUTILS_H
-#define TPP_VNNIUTILS_H
-
 //===- VNNIUtils.cpp ---------------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -9,18 +6,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Types.h"
+#ifndef TPP_VNNIUTILS_H
+#define TPP_VNNIUTILS_H
+
+#include <cstdint>
+#include <optional>
 
 namespace mlir {
+class Type;
+class MemRefType;
+
 namespace vnni {
 namespace utils {
 
 // Returns the VNNI blocking factor: 2 for BF16 and 4 for BF8.
-Optional<int64_t> getVNNIBlockingFactor(Type type);
+std::optional<int64_t> getVnniBlockingFactor(Type type);
 
 // Returns true if the type is BF16.
 bool isBF16Type(Type type);
+
+// Return true if the memref is in VNNI layout.
+bool isInVnniLayout(MemRefType memref);
 
 } // namespace utils
 } // namespace vnni

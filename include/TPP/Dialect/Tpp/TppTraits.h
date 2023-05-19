@@ -47,6 +47,11 @@ struct TernaryOp : public OpTrait::TraitBase<ConcreteType, TernaryOp> {
   static LogicalResult verifyTrait(Operation *op) { return verifyArity(op, 3); }
 };
 
+template <typename ConcreteType>
+struct QuaternaryOp : public OpTrait::TraitBase<ConcreteType, QuaternaryOp> {
+  static LogicalResult verifyTrait(Operation *op) { return verifyArity(op, 4); }
+};
+
 } // namespace tpp
 } // namespace OpTrait
 } // namespace mlir

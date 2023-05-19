@@ -32,7 +32,6 @@ add_mlir_library(MLIRTPP
     ConvertTppToXsmm.cpp
     ConvertXsmmToFunc.cpp
     ConvertCheckToLoops.cpp
-    ConvertVNNIToTpp.cpp
     ConvertPerfToLoops.cpp
     ConvertPerfToFunc.cpp
 
@@ -50,7 +49,6 @@ add_mlir_library(MLIRTPP
     TPPIR
     TPPTppDialect
     TPPXsmmDialect
-    TPPVNNIDialect
     TPPPerfDialect
 
     MLIRIR

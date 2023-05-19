@@ -37,3 +37,23 @@ func.func @tpp_relu_tensor_scalar_bcast(%arg0: f32) -> tensor<32x32xf32> {
   %0 = tpp.relu (%arg0: f32) -> tensor<32x32xf32>
   return %0 : tensor<32x32xf32>
 }
+
+// CHECK-LABEL: func.func @vnni_gemm_b_operand
+func.func @vnni_gemm_b_operand(%arg0: tensor<32x32xbf16>, 
+                               %arg1: tensor<16x32x2xbf16>,
+                               %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  // CHECK: tpp.gemm
+  %0 = tpp.gemm (%arg0: tensor<32x32xbf16>, %arg1: tensor<16x32x2xbf16>,
+                 %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16>
+  return %0: tensor<32x32xbf16>
+}
+
+// CHECK-LABEL: func.func @fused_brgemm
+func.func @fused_brgemm(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, %arg2: tensor<32x32xf32>,
+                        %arg3: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // CHECK: tpp.fused_brgemm
+  %0 = tpp.fused_brgemm [unary = relu, binary = add] 
+                        (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, 
+                         %arg2: tensor<32x32xf32>, %arg3: tensor<32x32xf32>) -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}
