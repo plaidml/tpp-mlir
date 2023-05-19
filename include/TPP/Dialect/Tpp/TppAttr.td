@@ -12,18 +12,17 @@
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
-def Tpp_FusedUnaryOpType: I64EnumAttr<
-    "FusedUnaryOpType", "",
+def Tpp_FusedUnaryOpKind: I64EnumAttr<
+    "FusedUnaryOpKind", "",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"RELU", 1, "relu">,
-      I64EnumAttrCase<"TANH", 2, "tanh">
     ]>{
    let cppNamespace = "mlir::tpp";
 }
 
-def Tpp_FusedBinaryOpType: I64EnumAttr<
-    "FusedBinaryOpType", "",
+def Tpp_FusedBinaryOpKind: I64EnumAttr<
+    "FusedBinaryOpKind", "",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"ADD", 1, "add">
