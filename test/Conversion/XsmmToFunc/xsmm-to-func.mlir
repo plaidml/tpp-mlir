@@ -222,3 +222,68 @@ func.func @invoke_inplace_relu(%arg0: memref<128x512xbf16>) {
 // CHECK-NEXT: %[[PTR_CAST1:.+]] = arith.index_cast %[[PTR1]] : index to i64
 // CHECK-NEXT: %[[LLVM_PTR1:.+]] = llvm.inttoptr %[[PTR_CAST1]] : i64 to !llvm.ptr<bf16>
 // CHECK: call @xsmm_unary_invoke(%[[C2]], %[[ADDR]], %[[LLVM_PTR]], %[[C0]], %[[LLVM_PTR1]], %[[C0]])
+
+// -----
+
+func.func @dispatch_fused_brgemm() -> i64 { 
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, relu]
+    flags = (vnni_a) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
+  return %0 : i64
+}
+
+// CHECK-LABEL: dispatch_fused_brgemm
+// CHECK: %[[DATA_TYPE:.+]] = arith.constant 2 : i64
+// CHECK-DAG: %[[DIM:.+]] = arith.constant 13 : i64
+// CHECK-DAG: %[[GEMM_FLAGS:.+]] = arith.constant 4096 : i64
+// CHECK-DAG: %[[UNARY_FLAGS:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[UNARY_KIND:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[BINARY_FLAGS:.+]] = arith.constant 4 : i64
+// CHECK-DAG: %[[BINARY_KIND:.+]] = arith.constant 1 : i64
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[DATA_TYPE]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[GEMM_FLAGS]], %[[UNARY_FLAGS]], %[[UNARY_KIND]], %[[BINARY_FLAGS]], %[[BINARY_KIND]])
+
+// -----
+
+// Current limitation in LIBXSMM we can use only bcast_col_in0 as flag for binary.
+// see: https://github.com/libxsmm/libxsmm/issues/766
+// CHECK-LABEL: dispatch_fused_brgemm
+func.func @dispatch_fused_brgemm() -> i64 {
+  // CHECK-NOT: xsmm_fused_brgemm.dispatch 
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, relu]
+    flags = (vnni_a) binary_flags = (none) unary_flags = (none) data_type = bf16
+  return %0 : i64
+}
+
+// -----
+
+func.func @dispatch_fused_brgemm() -> i64 { 
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, none]
+    flags = (vnni_a) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
+  return %0 : i64
+}
+
+// CHECK-LABEL: dispatch_fused_brgemm
+// CHECK: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK-DAG: %[[C13:.+]] = arith.constant 13 : i64
+// CHECK-DAG: %[[C4096:.+]] = arith.constant 4096 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C4096]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
+
+// -----
+
+func.func @multiple_gemm_flags_fused_brgemm() -> i64 {
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, none]
+    flags = (vnni_a, vnni_b, vnni_c) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
+  return %0 : i64
+}
+
+// CHECK-LABEL: multiple_gemm_flags_fused_brgemm
+// CHECK: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK-DAG: %[[C13:.+]] = arith.constant 13 : i64
+// Or between 2048 and 4096 and 8192 (see enum for GemmFlags)
+// CHECK-DAG: %[[C14336:.+]] = arith.constant 14336 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C14336]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
