@@ -385,6 +385,64 @@ getAliasingOpResultsTernaryImpl(Operation *op, OpOperand &opOperand,
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+// Quaternary
+//===----------------------------------------------------------------------===//
+
+// Helper function to bufferize quaternary operations.
+template <typename OpTy>
+static LogicalResult
+bufferizeQuaternaryOp(Operation *op, RewriterBase &rewriter,
+                      const BufferizationOptions &options) {
+  auto quaternaryOp = cast<OpTy>(op);
+  FailureOr<Value> bufferA =
+      getBufferOrScalar(rewriter, quaternaryOp.getInputs()[0], options);
+  if (failed(bufferA))
+    return failure();
+  FailureOr<Value> bufferB =
+      getBufferOrScalar(rewriter, quaternaryOp.getInputs()[1], options);
+  if (failed(bufferB))
+    return failure();
+  FailureOr<Value> bufferC =
+      getBufferOrScalar(rewriter, quaternaryOp.getInputs()[2], options);
+  if (failed(bufferC))
+    return failure();
+  FailureOr<Value> bufferD =
+      getBufferOrScalar(rewriter, quaternaryOp.getInputs()[3], options);
+  rewriter.create<OpTy>(quaternaryOp.getLoc(),
+                        ValueRange{*bufferA, *bufferB, *bufferC, *bufferD},
+                        *bufferC, quaternaryOp.getUnaryKindAttr(),
+                        quaternaryOp.getBinaryKindAttr());
+  replaceOpWithBufferizedValues(rewriter, op, *bufferC);
+  return success();
+}
+
+// Helper function to bufferize quaternary operations. We read from all the
+// operands. If the 3 operand is zero filled we can simply write to it, similar
+// on how we do for ternary.
+static bool bufferizesToMemoryReadQuaternaryImpl(Operation *op,
+                                                 OpOperand &opOperand,
+                                                 const AnalysisState &state) {
+  return bufferizesToMemoryReadTernaryImpl(op, opOperand, state);
+}
+
+// Helper function to bufferize quaternary operations.
+// The third operand has write (and read) semantics, thus it bufferize to a
+// memory write.
+static bool bufferizesToMemoryWriteQuaternaryImpl(Operation *op,
+                                                  OpOperand &opOperand,
+                                                  const AnalysisState &state) {
+  return opOperand.getOperandNumber() == 2;
+}
+
+// Helper function to bufferize quaternary operations. The result alias
+// with the third operand, reuse the same logic as ternary.
+static AliasingOpResultList
+getAliasingOpResultsQuaternaryImpl(Operation *op, OpOperand &opOperand,
+                                   const AnalysisState &state) {
+  return getAliasingOpResultsTernaryImpl(op, opOperand, state);
+}
+
 struct GemmBufferizationInterface
     : public BufferizableOpInterface::ExternalModel<GemmBufferizationInterface,
                                                     tpp::GemmOp> {
@@ -433,6 +491,31 @@ struct BrgemmBufferizationInterface
   }
 };
 
+struct FusedBrgemmBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<
+          FusedBrgemmBufferizationInterface, tpp::FusedBrgemmOp> {
+
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return bufferizesToMemoryReadQuaternaryImpl(op, opOperand, state);
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return bufferizesToMemoryWriteQuaternaryImpl(op, opOperand, state);
+  }
+
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return getAliasingOpResultsQuaternaryImpl(op, opOperand, state);
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    return bufferizeQuaternaryOp<tpp::FusedBrgemmOp>(op, rewriter, options);
+  }
+};
+
 } // namespace
 } // namespace tpp
 } // namespace mlir
@@ -447,6 +530,8 @@ void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     AddOp::attachInterface<tpp::AddBufferizationInterface>(*ctx);
     GemmOp::attachInterface<tpp::GemmBufferizationInterface>(*ctx);
     BrgemmOp::attachInterface<tpp::BrgemmBufferizationInterface>(*ctx);
+    FusedBrgemmOp::attachInterface<tpp::FusedBrgemmBufferizationInterface>(
+        *ctx);
   });
 }
 } // namespace tpp

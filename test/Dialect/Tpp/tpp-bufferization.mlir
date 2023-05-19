@@ -574,3 +574,19 @@ func.func @add_out_of_place(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf3
   %0 = tpp.add(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf32>
   return %0: tensor<3x3xf32>
 }
+
+// -----
+
+// CHECK-LABEL: fused_brgemm_op
+// CHECK-SAME:  %[[ARG0:.+]]: memref<1x3x3xf32>, %[[ARG1:.+]]: memref<1x3x3xf32>, 
+// CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>, %[[ARG3:.+]]: memref<3x3xf32>
+func.func @fused_brgemm_op(%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>, 
+                           %arg2: tensor<3x3xf32>, %arg3: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // CHECK: tpp.fused_brgemm [unary = relu, binary = add] 
+  // CHECK-SAME:  ins(%[[ARG0]] : memref<1x3x3xf32>, %[[ARG1]] : memref<1x3x3xf32>, 
+  // CHECK-SAME:  %[[ARG2]] : memref<3x3xf32>, %[[ARG3]] : memref<3x3xf32>) outs(%[[ARG2]] : memref<3x3xf32>)
+  %0 = tpp.fused_brgemm [unary = relu, binary = add] 
+    (%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>, 
+     %arg2: tensor<3x3xf32>, %arg3: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %0: tensor<3x3xf32>
+} 
