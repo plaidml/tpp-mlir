@@ -21,7 +21,7 @@ def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
 // QuarternaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary", []> {
+def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary"> {
   let summary = "quarternary operation.";
   let description = [{
     Quarternary operation. The operation kind carries information about the
@@ -30,15 +30,15 @@ def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary", []> {
     be an I64 type and must result from a dispatch operation (it represents the
     function pointer to use during invocation). The other operands are of Float
     types and represent the operands to use for computation.  For example, a fused
-    brgemm has the following signature: dataType, I64, memref<MxNxf32>,
+    brgemm has the following signature: data_type, I64, memref<MxNxf32>,
     memref<BxMxKxf32>, memref<BxKxNxf32>, memref<Nxf32>.
   }];
 
-  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_QuarternaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_QuarternaryKind:$callee, 
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -57,7 +57,7 @@ def Xsmm_QuarternaryOp : Xsmm_Op<"quarternary", []> {
 // TernaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
+def Xsmm_TernaryOp : Xsmm_Op<"ternary"> {
   let summary = "ternary operation.";
   let description = [{
     Ternary operation. The operation kind carries information about the name of
@@ -66,15 +66,15 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
     an I64 type and must result from a dispatch operation (it represents the
     function pointer to use during invocation). The other operands are of Float
     types and represent the operands to use for computation.
-    For example, a matmul has the following signature: dataType, I64, memref<MxNxf32>,
+    For example, a matmul has the following signature: data_type, I64, memref<MxNxf32>,
     memref<MxKxf32>, memref<KxNxf32>.
   }];
 
-  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_TernaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_TernaryKind:$callee, 
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -93,7 +93,7 @@ def Xsmm_TernaryOp : Xsmm_Op<"ternary", []> {
 // BinaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
+def Xsmm_BinaryOp : Xsmm_Op<"binary"> {
   let summary = "binary operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
@@ -101,11 +101,11 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
     two.
   }];
 
-  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_BinaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_BinaryKind:$callee, 
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 }
@@ -114,18 +114,18 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", []> {
 // UnaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
+def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
   let summary = "unary call operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
     difference is the number of operands for the computation is restricted to one.
   }];
 
-  let arguments = (ins Xsmm_DataType:$dataType, Xsmm_UnaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_UnaryKind:$callee, 
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $dataType `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
 
@@ -147,10 +147,10 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", []> {
 
 def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let summary = "matmul call operation.";
-  let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
   
   let assemblyFormat = [{
-    `(` `data_type` `=` $dataType `,` $inputs `)`
+    `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 }
@@ -161,10 +161,10 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
 
 def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
   let summary = "brgemm call operation.";
-  let arguments = (ins Xsmm_DataType:$dataType, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    `(` `data_type` `=` $dataType `,` $inputs `)`
+    `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 }
@@ -173,23 +173,23 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
 // QuarternaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch",[Pure]> {
+def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch", [Pure]> {
   let summary = "dispatch quarternary operation.";
   let description = [{
     The 'kind' carries information about the name of the LIBXSMM function to
     dispatch. isVNNI flag is passed to set VNNI flag in libxsmm call. 
-    dataType is passed to set the datatype in libxsmm call.
+    data_type is passed to set the datatype in libxsmm call.
     Additional I64 operands are passed based on the operation to
     dispatch. For example, matmul requires m, n, k, lda, ldb and ldc. Returns
     the pointer to call as I64.
   }];
 
   let arguments = (ins Xsmm_QuarternaryKind:$kind, DenseI64ArrayAttr:$inputs,
-                       Xsmm_DataType:$dataType, BoolAttr:$isVNNI);
+                       Xsmm_DataType:$data_type, BoolAttr:$isVNNI);
   let results = (outs I64:$results);
 
   let assemblyFormat = [{
-    $kind $inputs `(` `dataType` $dataType `,` `isVNNI` $isVNNI `)` attr-dict
+    $kind $inputs `(` `data_type` $data_type `,` `isVNNI` $isVNNI `)` attr-dict
   }];
 }
 
@@ -197,11 +197,11 @@ def Xsmm_QuarternaryDispatchOp : Xsmm_Op<"quarternary.dispatch",[Pure]> {
 // TernaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
+def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch", [Pure]> {
   let summary = "dispatch ternary operation.";
   let description = [{
     The 'kind' carries information about the name of the LIBXSMM function to
-    dispatch.  'dataType' is passed to set the datatype in libxsmm call.
+    dispatch.  'data_type' is passed to set the datatype in libxsmm call.
     Additional I64 operands are passed based on the operation to dispatch. For
     example, leading dimensions or sizes. Returns the pointer to call as I64.
   }];
@@ -211,7 +211,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
     TypedArrayAttrBase<Xsmm_TernaryFlags, "ternary flags">:$flags,
-    Xsmm_DataType:$dataType);
+    Xsmm_DataType:$data_type);
   
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
@@ -223,7 +223,7 @@ def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch",[Pure]> {
 // BinaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
+def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch", [Pure]> {
   let summary = "dispatch binary operation.";
   let description = [{
     See 'ternary.dispatch'.
@@ -234,7 +234,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
     TypedArrayAttrBase<Xsmm_BinaryFlags, "binary flags">:$flags,
-    Xsmm_DataType:$dataType);
+    Xsmm_DataType:$data_type);
   
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
@@ -246,7 +246,7 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch",[Pure]> {
 // UnaryDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
+def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch", [Pure]> {
   let summary = "dispatch unary operation.";
   let description = [{
     See 'ternary.dispatch'.
@@ -257,7 +257,7 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch",[Pure]> {
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
     TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$flags, 
-    Xsmm_DataType:$dataType);
+    Xsmm_DataType:$data_type);
   
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
@@ -284,7 +284,7 @@ class Xsmm_GemmLikeOp<string mnemonic, list<Trait> traits = []> :
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs, 
     TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
-    Xsmm_DataType:$dataType);
+    Xsmm_DataType:$data_type);
   
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
