@@ -5,8 +5,7 @@
 
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
-// See: #298
-// RUN: tpp-opt %s -transform-drop-schedule | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s

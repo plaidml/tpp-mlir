@@ -410,9 +410,8 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Run transforms first and clean them up afterwards.
-    pm.addPass(createTransformPass());
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    // Default pipeline does not support transforms yet
+    pm.addPass(createTransformDropSchedulePass());
 
     // TODO: Add here propagation, constant fold and blocking.
 
@@ -424,7 +423,6 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     } else {
       // Lower IR through TPP operations.
-      // Transform operations to be TPP compatible.
       pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
