@@ -28,8 +28,11 @@ func.func @gemm_lowering(%arg0: memref<8x9xf32>,
 
 // -----
 
+// Expect not to map. TPP ops require rank 2 on output.
 #map = affine_map<(d0) -> (d0)>
-func.func @add_mapping(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
+// CHECK-LABEL: add_mapping_1d_output
+func.func @add_mapping_1d_output(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
+  // CHECK-NOT: tpp-add
   linalg.generic {
     indexing_maps = [#map, #map], 
     iterator_types = ["parallel"]} 
@@ -40,11 +43,6 @@ func.func @add_mapping(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
   }
   return 
 }
-
-// CHECK: func.func @add_mapping(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<1xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<1xf32>)
-// CHECK: tpp.add ins(%[[ARG0]] : memref<1xf32>, %[[ARG1]] : memref<1xf32>) outs(%[[ARG1]] : memref<1xf32>)
 
 // -----
 
@@ -219,11 +217,12 @@ func.func @relu_max_with_only_zeros(%arg0: memref<3xf32>, %arg1: memref<3xf32>) 
 
 #map = affine_map<(d0) -> (d0)>
 
-// CHECK-LABEL: func.func @relu_mapping
+// CHECK-LABEL: func.func @relu_mapping_1d_output
 // CHECK-SAME: %[[ARG0:.+]]: memref<3xf32>, %[[ARG1:.+]]: memref<3xf32>
-func.func @relu_mapping(%arg0: memref<3xf32>, %arg1: memref<3xf32>) -> memref<3xf32> {
+func.func @relu_mapping_1d_output(%arg0: memref<3xf32>, 
+                                  %arg1: memref<3xf32>) -> memref<3xf32> {
   %c0 = arith.constant 0.0 : f32
-  // CHECK: tpp.relu ins(%[[ARG1]] : memref<3xf32>) outs(%[[ARG1]] : memref<3xf32>)
+  // CHECK-NOT: tpp.relu
   linalg.generic {
     indexing_maps = [#map, #map],
     iterator_types = ["parallel"]}

@@ -4,7 +4,7 @@
 func.func @tpp_dialect(%arg0: memref<2x2xf32>,
                        %arg1: memref<2x2xf32>,
                        %arg2: memref<2x2xf32>, %arg3: f32, %arg4: f32,
-                       %arg5: memref<2xf32>, %arg6: memref<2xf32>) {
+                       %arg5: memref<1x2xf32>, %arg6: memref<1x2xf32>) {
   // CHECK: tpp.add
   tpp.add ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg2: memref<2x2xf32>)
 
@@ -18,10 +18,10 @@ func.func @tpp_dialect(%arg0: memref<2x2xf32>,
   tpp.relu ins(%arg0: memref<2x2xf32>) outs(%arg0: memref<2x2xf32>)
 
   // CHECK: tpp.relu
-  tpp.relu ins(%arg5: memref<2xf32>) outs(%arg6: memref<2xf32>)
+  tpp.relu ins(%arg5: memref<1x2xf32>) outs(%arg6: memref<1x2xf32>)
 
   // CHECK: tpp.add
-  tpp.add ins(%arg5: memref<2xf32>, %arg5: memref<2xf32>) outs(%arg6: memref<2xf32>)
+  tpp.add ins(%arg5: memref<1x2xf32>, %arg5: memref<1x2xf32>) outs(%arg6: memref<1x2xf32>)
 
   // CHECK: tpp.gemm
   tpp.gemm ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>)

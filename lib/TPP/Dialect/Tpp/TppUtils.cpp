@@ -151,7 +151,7 @@ static bool isTppBinaryOp(linalg::GenericOp linalgOp) {
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(_OR(EqualsTo(1), EqualsTo(2))))
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
-          .operation(NumOfLoops(LessThanOrEqualTo(2)))
+          .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
           .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape));
@@ -165,7 +165,7 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(_OR(EqualsTo(0), EqualsTo(1))))
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
-          .operation(NumOfLoops(LessThanOrEqualTo(2)))
+          .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
           .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape));

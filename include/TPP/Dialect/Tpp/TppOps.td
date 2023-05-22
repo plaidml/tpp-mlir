@@ -27,8 +27,10 @@ class StaticTensorRankOf<list<Type> allowedTypes, list<int> ranks> :
       TensorOf<allowedTypes>.summary,
       "::mlir::RankedTensorType">;
 
-def TppMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
-def TppTensor : StaticTensorRankOf<[AnyFloat], [1, 2]>;
+def TppMemRefInput : StaticMemRefRankOf<[AnyFloat], [1, 2]>;
+def TppTensorInput : StaticTensorRankOf<[AnyFloat], [1, 2]>;
+def TppMemRefOutput : StaticMemRefRankOf<[AnyFloat], [2]>;
+def TppTensorOutput : StaticTensorRankOf<[AnyFloat], [2]>;
 
 def TppGemmLikeMemRef : StaticMemRefRankOf<[AnyFloat], [2, 3, 4]>;
 def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [2, 3, 4]>;
@@ -36,8 +38,8 @@ def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [2, 3, 4]>;
 // Tpp operands:
 // input operand: is a scalar float or a static memref with rank 1 or 2.
 // output operand: static memref with rank 1 or 2.
-def TppInputOperand : AnyTypeOf<[TppMemRef, TppTensor, AnyFloat]>;
-def TppOutputOperand : AnyTypeOf<[TppMemRef, TppTensor]>;
+def TppInputOperand : AnyTypeOf<[TppMemRefInput, TppTensorInput, AnyFloat]>;
+def TppOutputOperand : AnyTypeOf<[TppMemRefOutput, TppTensorOutput]>;
 
 // Tpp operands for gemm and brgemm ops - rank 2, 3 or 4.
 def TppGemmLikeOperand : AnyTypeOf<[TppGemmLikeMemRef, TppGemmLikeTensor]>;
@@ -52,7 +54,7 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   
   let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
-  let results = (outs Variadic<TppTensor>:$results);
+  let results = (outs Variadic<TppTensorOutput>:$results);
 
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1; 
@@ -154,7 +156,7 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
 
   let arguments = (ins Variadic<TppInputOperand>:$inputs, 
                        Variadic<TppOutputOperand>:$outputs);
-  let results = (outs Variadic<TppTensor>:$results);
+  let results = (outs Variadic<TppTensorOutput>:$results);
 
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;

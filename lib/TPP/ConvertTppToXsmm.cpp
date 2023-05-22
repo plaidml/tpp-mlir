@@ -431,29 +431,26 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
                                 PatternRewriter &rewriter) const override {
     assert(identityOp.hasBufferSemantics() &&
            "tpp.identity expects a memref type");
-
-    MemRefType outputMemRefType = identityOp.getOutputType();
-    if (outputMemRefType.getRank() != 2)
-      return rewriter.notifyMatchFailure(identityOp, "not a 2-D memref type");
+    MemRefType outputMemRef = identityOp.getOutputType();
+    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
     int64_t outputOffset;
     SmallVector<int64_t> outputStrides;
-    if (failed(
-            getStridesAndOffset(outputMemRefType, outputStrides, outputOffset)))
+    if (failed(getStridesAndOffset(outputMemRef, outputStrides, outputOffset)))
       return rewriter.notifyMatchFailure(identityOp, "not a strided memref");
     if (outputStrides.back() != 1)
       return rewriter.notifyMatchFailure(identityOp,
                                          "most minor stride is != 1");
 
-    int64_t m = outputMemRefType.getShape()[0];
-    int64_t n = outputMemRefType.getShape()[1];
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
     int64_t ldo = outputStrides.front();
     std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
         getLdiAndBCast(identityOp, ldo);
     int64_t ldi = ldiAndBCast.first;
 
     return lowerUnaryTPPtoXSMM(
-        identityOp, rewriter, outputMemRefType.getElementType(),
+        identityOp, rewriter, outputMemRef.getElementType(),
         xsmm::UnaryKind::IDENTITY, ldiAndBCast.second, {m, n, ldi, ldo});
   }
 };
@@ -466,12 +463,10 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
     assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
 
     MemRefType outputMemRef = reluOp.getOutputType();
-    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
-           "expect memref with rank 1 or 2");
+    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
-    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
-    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
-                                              : outputMemRef.getShape()[0];
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
 
     auto leadDim = getLeadingDim(outputMemRef);
     if (failed(leadDim))
@@ -491,14 +486,11 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
   LogicalResult matchAndRewrite(tpp::ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
     assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
-
     MemRefType outputMemRef = zeroOp.getOutputType();
-    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
-           "expect memref with rank 1 or 2");
+    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
-    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
-    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
-                                              : outputMemRef.getShape()[0];
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
 
     auto leadDim = getLeadingDim(outputMemRef);
     if (failed(leadDim))
@@ -527,7 +519,7 @@ static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
   SmallVector<int64_t> bOperandShape;
   computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
   assert(shapeOutput.size() == bOperandShape.size());
-  assert(shapeOutput.size() == 1 || shapeOutput.size() == 2);
+  assert(shapeOutput.size() == 2);
 
   auto getBCastEnum = [](BCastType bCastType,
                          std::optional<unsigned> operand) -> xsmm::BinaryFlags {
@@ -559,28 +551,19 @@ static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
     assert(false && "unrechable");
   };
 
-  int64_t rankOutput = shapeOutput.size();
-
   // Multiple way to define a scalar. Check if the memref
   // is a scalar here.
   auto isOne = [](int64_t val) { return val == 1; };
   if (llvm::all_of(bOperandShape, isOne))
     return getBCastEnum(BCastType::SCALAR, operandNumber);
 
-  // BCast on 1d memref.
-  if (rankOutput == 1) {
-    if (bOperandShape[0] == 1 && shapeOutput[0] != 1)
-      return getBCastEnum(BCastType::ROW, operandNumber);
-    if (bOperandShape == shapeOutput)
-      return getBCastEnum(BCastType::NONE, std::nullopt);
-  } else { // BCast on 2d memref.
-    if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
-      return getBCastEnum(BCastType::ROW, operandNumber);
-    if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
-      return getBCastEnum(BCastType::COL, operandNumber);
-    if (bOperandShape == shapeOutput)
-      return getBCastEnum(BCastType::NONE, operandNumber);
-  }
+  if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
+    return getBCastEnum(BCastType::ROW, operandNumber);
+  if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
+    return getBCastEnum(BCastType::COL, operandNumber);
+  if (bOperandShape == shapeOutput)
+    return getBCastEnum(BCastType::NONE, operandNumber);
+
   assert(false && "failed to get bCast for tpp.add");
 }
 
@@ -591,13 +574,11 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
                                 PatternRewriter &rewriter) const override {
     assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
 
-    auto outputMemRef = addOp.getOutputType();
-    assert((outputMemRef.getRank() == 1 || outputMemRef.getRank() == 2) &&
-           "expect memref with rank 1 or 2");
+    MemRefType outputMemRef = addOp.getOutputType();
+    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
-    int64_t m = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[0] : 1;
-    int64_t n = (outputMemRef.getRank() == 2) ? outputMemRef.getShape()[1]
-                                              : outputMemRef.getShape()[0];
+    int64_t m = outputMemRef.getShape()[0];
+    int64_t n = outputMemRef.getShape()[1];
 
     auto lhsMemRef = addOp.getInputs()[0].getType().cast<MemRefType>();
     auto rhsMemRef = addOp.getInputs()[1].getType().cast<MemRefType>();

@@ -23,10 +23,10 @@ func.func @relu_to_xsmm(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 // -----
 
 // CHECK-LABEL: func.func @relu_to_xsmm(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<32xf32>)
-func.func @relu_to_xsmm(%arg0: memref<32xf32>) {
+// CHECK-SAME:  %[[ARG0:.+]]: memref<1x32xf32>)
+func.func @relu_to_xsmm(%arg0: memref<1x32xf32>) {
   // CHECK: %[[DISPATCH:.+]] = xsmm.unary.dispatch relu [1, 32, 32, 32] flags = (none) data_type = f32
   // CHECK-NEXT: xsmm.unary relu(data_type = f32, %[[DISPATCH]], %[[ARG0]], %[[ARG0]])
-  tpp.relu ins(%arg0: memref<32xf32>) outs(%arg0: memref<32xf32>)
+  tpp.relu ins(%arg0: memref<1x32xf32>) outs(%arg0: memref<1x32xf32>)
   return
 }

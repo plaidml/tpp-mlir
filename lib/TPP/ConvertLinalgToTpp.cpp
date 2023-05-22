@@ -134,12 +134,12 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
     if (!tpp::utils::isZeroTensor(inputs[0]))
       return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
 
-    auto outputs = fillOp.getOutputs();
-    if (outputs[0].getType().cast<ShapedType>().getRank() > 2)
-      return rewriter.notifyMatchFailure(fillOp,
-                                         "Expect output rank at most 2");
+    auto output = fillOp.getOutputs()[0];
+    auto outputRank = output.getType().cast<ShapedType>().getRank();
+    if (outputRank != 2)
+      return rewriter.notifyMatchFailure(fillOp, "Expect output rank 2");
 
-    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, outputs[0], outputs[0]);
+    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, output);
     return success();
   }
 };
