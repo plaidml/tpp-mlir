@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -split-input-file -verify-diagnostics
 
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{operand #2 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values, but got 'f32'}}
+  // expected-error @below {{operand #2 must be 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
   tpp.add ins(%arg0: f32, %arg0: f32) outs(%arg1: f32)
   return
 }
@@ -9,7 +9,7 @@ func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
 // -----
 
 func.func @tpp_relu_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{operand #1 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values, but got 'f32'}}
+  // expected-error @below {{operand #1 must be 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
   tpp.relu ins(%arg0: f32) outs(%arg1: f32)
   return
 }
@@ -217,7 +217,7 @@ func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) {
 // -----
 
 func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> memref<3x3xf32> {
-  // expected-error @below {{result #0 must be 1D/2D tensor of floating-point values, but got 'memref<3x3xf32>'}}
+  // expected-error @below {{result #0 must be 2D tensor of floating-point values, but got 'memref<3x3xf32>'}}
   %0 = tpp.add (%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> memref<3x3xf32>
   return %0 : memref<3x3xf32>
 }

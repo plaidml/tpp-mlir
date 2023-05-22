@@ -26,24 +26,12 @@ namespace {
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
-  bool isScalarOp(AddOp addOp) const {
-    return !addOp.getInputs()[0].getType().isa<ShapedType>();
-  }
-
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
     assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
 
     Location loc = addOp.getLoc();
-    // handle scalar case.
-    if (isScalarOp(addOp)) {
-      Value scalarAdd = rewriter.create<arith::AddFOp>(
-          loc, addOp.getInputs()[0], addOp.getInputs()[1]);
-      rewriter.replaceAllUsesWith(addOp.getOutput(), scalarAdd);
-      rewriter.eraseOp(addOp);
-      return success();
-    }
-    // handle memref case.
+
     SmallVector<Value> ubs;
     size_t rank = addOp.getInputs()[0].getType().cast<MemRefType>().getRank();
     for (size_t idx = 0; idx < rank; idx++) {
@@ -109,25 +97,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
     return val.getType().cast<ShapedType>().getRank() == 1;
   }
 
-  bool isScalarOp(IdentityOp identityOp) const {
-    return (isScalar(identityOp.getInputs()[0]) &&
-            isScalar(identityOp.getOutput()));
-  }
-
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
     assert(identityOp.hasBufferSemantics() &&
            "tpp.identity expects a memref type");
 
-    // Handle scalar.
-    if (isScalarOp(identityOp)) {
-      rewriter.replaceAllUsesWith(identityOp.getOutput(),
-                                  identityOp.getInputs());
-      rewriter.eraseOp(identityOp);
-      return success();
-    }
-
-    // Handle memref.
     auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
       Value input = identityOp.getInputs()[0];
       // input is scalar.
@@ -165,23 +139,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   using OpRewritePattern<ReluOp>::OpRewritePattern;
 
-  bool isScalarOp(ReluOp reluOp) const {
-    return !reluOp.getOutput().getType().isa<ShapedType>();
-  }
-
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
     assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
 
     Location loc = reluOp.getLoc();
-    // handle scalar case.
-    if (isScalarOp(reluOp)) {
-      rewriter.create<arith::MaxFOp>(loc, reluOp.getOutput());
-      rewriter.eraseOp(reluOp);
-      return success();
-    }
-
-    // handle memref case.
     Type elementType =
         reluOp.getOutput().getType().cast<MemRefType>().getElementType();
     Value zeroConstant = rewriter.create<arith::ConstantOp>(
@@ -203,10 +165,6 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
 // Convert tpp.zero to SCF loops.
 struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
   using OpRewritePattern<ZeroOp>::OpRewritePattern;
-
-  bool isScalarOp(ZeroOp zeroOp) const {
-    return !zeroOp.getOutput().getType().isa<ShapedType>();
-  }
 
   LogicalResult matchAndRewrite(ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
