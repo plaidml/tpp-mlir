@@ -410,8 +410,8 @@ bufferizeQuaternaryOp(Operation *op, RewriterBase &rewriter,
   FailureOr<Value> bufferD =
       getBufferOrScalar(rewriter, quaternaryOp.getInputs()[3], options);
   rewriter.create<OpTy>(quaternaryOp.getLoc(),
-                        ValueRange{*bufferA, *bufferB, *bufferC, *bufferD},
-                        *bufferC, quaternaryOp.getUnaryKindAttr(),
+                        ValueRange{*bufferA, *bufferB, *bufferC}, *bufferC,
+                        *bufferD, quaternaryOp.getUnaryKindAttr(),
                         quaternaryOp.getBinaryKindAttr());
   replaceOpWithBufferizedValues(rewriter, op, *bufferC);
   return success();

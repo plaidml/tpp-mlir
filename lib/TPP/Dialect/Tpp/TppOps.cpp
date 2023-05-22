@@ -418,10 +418,13 @@ void BrgemmOp::getEffects(
 LogicalResult FusedBrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
-                          ValueRange inputs, Value output,
+                          ValueRange inputs, Value output, Value bias,
                           FusedUnaryOpKindAttr unaryKind,
                           FusedBinaryOpKindAttr binaryKind) {
-  tppOpBuilder(builder, state, inputs, output);
+  assert(inputs.size() == 3);
+  auto allInputs = llvm::to_vector(inputs);
+  allInputs.emplace_back(bias);
+  tppOpBuilder(builder, state, allInputs, output);
   state.addAttribute(UNARY_KIND, unaryKind);
   state.addAttribute(BINARY_KIND, binaryKind);
 }
