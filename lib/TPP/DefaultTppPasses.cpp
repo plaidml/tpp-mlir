@@ -323,6 +323,7 @@ private:
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
+    pm.addPass(createCombineTppPass());
   }
 };
 
