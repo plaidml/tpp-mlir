@@ -11,23 +11,17 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 
+#include "libxsmm.h"
+
 namespace mlir {
 namespace vnni {
 namespace utils {
 
 std::optional<int64_t> getVnniBlockingFactor(Type type) {
   auto elementType = getElementTypeOrSelf(type);
-  if (!elementType.isBF16())
-    return std::nullopt;
-  // @ TODO we should call LIBXSMM here to query the 
-  // VNNI packing factor we need to match to
-#if defined(__x86_64__)
-  return 2;
-#elif defined(__aarch64__)
-  return 4;
-#else
-#error Unsupported architecture
-#endif
+  if (elementType.isBF16())
+    return libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
+  return std::nullopt;
 }
 
 bool isBF16Type(Type type) {

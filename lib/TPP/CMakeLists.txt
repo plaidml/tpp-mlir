@@ -58,6 +58,7 @@ add_mlir_library(MLIRTPP
 
 target_include_directories(MLIRTPP
   PUBLIC
+    ${XSMM_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${TPP_GEN_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${TPP_MAIN_INCLUDE_DIR}>
 )
