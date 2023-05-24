@@ -24,11 +24,6 @@ std::optional<int64_t> getVnniBlockingFactor(Type type) {
   return std::nullopt;
 }
 
-bool isBF16Type(Type type) {
-  auto elementType = getElementTypeOrSelf(type);
-  return elementType.isBF16();
-}
-
 bool isInVnniLayout(MemRefType memref) {
   if (memref.getRank() < 3 || !memref.getElementType().isBF16())
     return false;

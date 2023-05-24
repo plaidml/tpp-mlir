@@ -22,9 +22,6 @@ namespace utils {
 // Returns the VNNI blocking factor: 2 for BF16 and 4 for BF8.
 std::optional<int64_t> getVnniBlockingFactor(Type type);
 
-// Returns true if the type is BF16.
-bool isBF16Type(Type type);
-
 // Return true if the memref is in VNNI layout.
 bool isInVnniLayout(MemRefType memref);
 

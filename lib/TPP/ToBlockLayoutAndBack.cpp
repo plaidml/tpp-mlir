@@ -426,9 +426,11 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                 linalg::GenericOp matmulOp) {
-  if (matmulOp.getInputs().size() > 0 &&
-      !vnni::utils::isBF16Type(matmulOp.getInputs()[0].getType()))
-    return rewriter.notifyMatchFailure(matmulOp, "require bf16 type");
+  if (matmulOp.getInputs().size() > 0) {
+    auto elementType = getElementTypeOrSelf(matmulOp.getInputs()[0].getType());
+    if (!elementType.isBF16())
+      return rewriter.notifyMatchFailure(matmulOp, "require bf16 type");
+  }
 
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
@@ -518,7 +520,8 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 FailureOr<tpp::BrgemmOp>
 mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                 linalg::BatchReduceMatmulOp brgemmOp) {
-  if (!vnni::utils::isBF16Type(brgemmOp.getInputs()[0].getType()))
+  auto elementType = getElementTypeOrSelf(brgemmOp.getInputs()[0].getType());
+  if (!elementType.isBF16())
     return rewriter.notifyMatchFailure(brgemmOp, "require bf16 type");
 
   if (brgemmOp.hasDynamicShape())
@@ -527,7 +530,6 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   if (brgemmOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(brgemmOp, "require tensor semantics");
 
-  assert(vnni::utils::isBF16Type(brgemmOp.getInputs()[0].getType()));
   // Set blocking factor to size 2
   OpFoldResult tileOnI = rewriter.getI64IntegerAttr(2);
   SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
