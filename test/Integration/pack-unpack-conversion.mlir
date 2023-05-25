@@ -6,6 +6,10 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// RUN: tpp-run %s -linalg-to-loops -print \
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
+
 // FIXME: This test fails to bufferize when lowering linalg to loops
 
 func.func private @generate_1D_source(%width : index) -> tensor<?xf32> {

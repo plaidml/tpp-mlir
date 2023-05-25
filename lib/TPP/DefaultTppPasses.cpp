@@ -419,6 +419,8 @@ private:
     if (linalgToLoops) {
       // Lower linalg directly to loops.
       // Skip all TPP transformations.
+      // Generalize tensor.pack and tensor.unpack.
+      pm.addPass(createGeneralizeTensorPackAndUnPackPass());
       pm.addPass(createBufferizePass());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
