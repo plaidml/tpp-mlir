@@ -13,6 +13,7 @@ die_syntax() {
   echo "  -c: Optional compiler flag, default to clang"
   echo "  -g: Optional gcc toolchain flag, may be needed by clang"
   echo "  -l: Optional linker flag, default to system linker"
+  echo "  -G: Optional GPU support flag, default to none"
   echo "  -S: Optional sanitizer flag, default to none"
   echo "  -n: Optional link jobs flag, default same as CPUs"
   exit 1

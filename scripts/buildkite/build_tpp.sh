@@ -57,8 +57,8 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \
-  -c ${COMPILER} \
   ${GPU} \
+  -c ${COMPILER} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
   -n ${NPROCS_LIMIT_LINK}
