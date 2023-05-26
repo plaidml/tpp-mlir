@@ -34,10 +34,6 @@ llvm_update_compile_flags(tpp-run)
 target_link_libraries(tpp-run PRIVATE ${LIBS})
 
 if (TPP_GPU)
-  target_compile_definitions(tpp-run
-    PRIVATE TPP_GPU_ENABLE=1
-  )
-
   set(TPP_GPU_LINK_FLAGS
       -lmlir_cuda_runtime
     )

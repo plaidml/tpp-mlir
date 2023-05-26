@@ -47,6 +47,7 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/GPU/Utils.h"
 #include "TPP/Passes.h"
 
 using namespace mlir;
@@ -310,13 +311,8 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
 
-  // Initialize LLVM NVPTX backend.
-#ifdef TPP_GPU_ENABLE
-  LLVMInitializeNVPTXTarget();
-  LLVMInitializeNVPTXTargetInfo();
-  LLVMInitializeNVPTXTargetMC();
-  LLVMInitializeNVPTXAsmPrinter();
-#endif // TPP_GPU_ENABLE
+  // Initialize GPU-related LLVM machinery
+  tpp::initializeGpuTargets();
 
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that

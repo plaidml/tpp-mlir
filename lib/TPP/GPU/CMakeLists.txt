@@ -1,4 +1,5 @@
 add_mlir_library(TPPGPU
+  Utils.cpp
   GpuPipeline.cpp
   GpuConversion.cpp
   GpuToCuda.cpp
