@@ -1,4 +1,3 @@
-// RUN: tpp-opt %s -gpu-pipeline=gpu=none | FileCheck %s --check-prefix=NONE
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s --check-prefix=CUDA
 
 func.func @entry() {
@@ -22,10 +21,6 @@ func.func @entry() {
 }
 
 func.func private @printMemrefF32(memref<*xf32>)
-
-// NONE-LABEL: func.func @entry
-// NONE:         linalg.matmul
-// NONE:       }
 
 // CUDA: module attributes {gpu.container_module}
 // CUDA-LABEL: func.func @entry

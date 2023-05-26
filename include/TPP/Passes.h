@@ -132,6 +132,7 @@ createSimplifyAndCanonicalizePackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createGpuPipelinePass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuPipelinePass(StringRef gpuBackend);
+std::unique_ptr<OperationPass<ModuleOp>> createGpuConversionPass();
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>> createGpuToCudaPass();
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,

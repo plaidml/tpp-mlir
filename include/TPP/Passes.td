@@ -384,9 +384,17 @@ def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let constructor = "mlir::tpp::createGpuPipelinePass()";
   let options = [
     Option<"gpuBackend", "gpu", "std::string",
-            /*default=*/"\"none\"",
-           "Target GPU backend for lowering.">,
+            /*default=*/"\"cuda\"",
+           "Target GPU backend for lowering (cuda).">,
   ];
+}
+
+def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
+  let summary = "Convert operations to GPU";
+  let description = [{
+    Convert all eligble operations into generic GPU operations.
+  }];
+  let constructor = "mlir::tpp::createGpuConversionPass()";
 }
 
 def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {

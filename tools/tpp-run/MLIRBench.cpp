@@ -47,7 +47,7 @@ llvm::cl::opt<bool>
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("none,cuda"), llvm::cl::init("none"));
+                  llvm::cl::value_desc("cuda"), llvm::cl::init(""));
 
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
@@ -381,7 +381,7 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   if (print == PrintStage::Early)
     passManager.addPass(createPrintIRPass());
 
-  if (defGpuBackend != "none") {
+  if (!defGpuBackend.empty()) {
     // Apply the custom GPU lowering pipeline
     passManager.addPass(tpp::createGpuPipelinePass(defGpuBackend));
   } else {

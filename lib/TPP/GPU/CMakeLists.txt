@@ -1,5 +1,6 @@
 add_mlir_library(TPPGPU
   GpuPipeline.cpp
+  GpuConversion.cpp
   GpuToCuda.cpp
 
   ADDITIONAL_HEADER_DIRS

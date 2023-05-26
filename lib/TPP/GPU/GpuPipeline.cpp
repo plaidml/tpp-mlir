@@ -31,6 +31,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+#include <optional>
+
 using namespace mlir;
 using namespace mlir::tpp;
 
@@ -40,15 +42,16 @@ using namespace mlir::tpp;
 namespace {
 
 enum class GpuType {
-  None, // no target GPU
   Cuda,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
-  return llvm::StringSwitch<GpuType>(gpuStr)
-      .CaseLower("none", GpuType::None)
-      .CaseLower("cuda", GpuType::Cuda)
-      .Default(GpuType::None);
+  auto type = llvm::StringSwitch<std::optional<GpuType>>(gpuStr)
+                  .CaseLower("cuda", GpuType::Cuda)
+                  .Default(std::nullopt);
+  assert(type && "Unsupported GPU backend");
+
+  return *type;
 }
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
@@ -86,25 +89,15 @@ private:
 
     GpuType gpuType = parseGpuOption(this->gpuBackend);
 
-    // Add no passes when no GPU is selected.
-    if (gpuType == GpuType::None)
-      return;
-
-    // Map and lower ops to GPU-compatible format.
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
-    pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
-    pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
-
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
-
-    // Create GPU kernels.
-    pm.addPass(createGpuKernelOutliningPass());
+    // Convert to generic GPU ops.
+    pm.addPass(createGpuConversionPass());
 
     // Lower GPU ops to the chosen GPU backend.
-    if (gpuType == GpuType::Cuda)
+    switch (gpuType) {
+    case GpuType::Cuda:
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
-    else
-      assert(false && "Unsupported GPU backend");
+      break;
+    }
 
     // Clean up after the GPU pipeline.
     // Use upstream passes directly instead of the cleanup pass as the GPU

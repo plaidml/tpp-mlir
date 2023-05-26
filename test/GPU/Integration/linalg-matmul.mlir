@@ -1,4 +1,4 @@
-// RUN: tpp-run %s -gpu=none \
+// RUN: tpp-run %s \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s --check-prefix=NONE
 
