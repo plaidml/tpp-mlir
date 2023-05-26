@@ -13,14 +13,14 @@ die_syntax() {
   echo "  -c: Optional compiler flag, default to clang"
   echo "  -g: Optional gcc toolchain flag, may be needed by clang"
   echo "  -l: Optional linker flag, default to system linker"
-  echo "  -G: Optional GPU support flag, default to none"
   echo "  -S: Optional sanitizer flag, default to none"
+  echo "  -G: Optional GPU support flag, default to none"
   echo "  -n: Optional link jobs flag, default same as CPUs"
   exit 1
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:S:G" arg; do
+while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -100,11 +100,11 @@ while getopts "s:b:i:m:t:c:g:l:n:S:G" arg; do
         die_syntax
       fi
       ;;
-    G)
-      ENABLE_GPU="-DTPP_GPU=ON"
-      ;;
     S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
+      ;;
+    G)
+      ENABLE_GPU="-DTPP_GPU=ON"
       ;;
     n)
       PROCS=$(nproc)
