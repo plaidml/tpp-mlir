@@ -34,8 +34,6 @@ using namespace mlir::tpp;
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
-#ifdef TPP_GPU_ENABLE
-
 namespace {
 
 // Lower generic GPU ops to CUDA backend.
@@ -70,6 +68,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
+#ifdef TPP_GPU_ENABLE
     // Preprocess and lower standard ops.
     pm.addPass(arith::createArithExpandOpsPass());
     pm.addPass(createLowerAffinePass());
@@ -84,6 +83,7 @@ private:
     // Cleanup IR.
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
+#endif // TPP_GPU_ENABLE
   }
 };
 
@@ -99,18 +99,3 @@ mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
                                StringRef gpuFeatures) {
   return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
 }
-
-#else // TPP_GPU_ENABLE
-
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
-mlir::tpp::createGpuToCudaPass() {
-  return std::make_unique<GpuToCudaBase>();
-}
-
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
-mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
-                               StringRef gpuFeatures) {
-  return std::make_unique<GpuToCudaBase>(gpuTriple, gpuChip, gpuFeatures);
-}
-
-#endif // TPP_GPU_ENABLE
