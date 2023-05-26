@@ -47,6 +47,9 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
+if [ "${GPU}" ]; then
+  GPU="-G"
+fi
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
   -b ${BUILD_DIR}-${COMPILER} \
@@ -55,6 +58,7 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -t ${KIND} \
   ${SANITIZERS} \
   -c ${COMPILER} \
+  ${GPU} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
   -n ${NPROCS_LIMIT_LINK}

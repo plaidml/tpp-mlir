@@ -19,7 +19,7 @@ die_syntax() {
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
+while getopts "s:b:i:m:t:c:g:l:n:S:G" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -99,6 +99,9 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
         die_syntax
       fi
       ;;
+    G)
+      ENABLE_GPU="-DTPP_GPU=ON"
+      ;;
     S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
@@ -154,4 +157,5 @@ echo_run cmake -Wno-dev -G Ninja \
     ${BUILD_OPTIONS} \
     ${GCC_TOOLCHAIN_OPTIONS} \
     ${LINKER_OPTIONS} \
-    ${SAN_OPTIONS}
+    ${SAN_OPTIONS} \
+    ${ENABLE_GPU}
