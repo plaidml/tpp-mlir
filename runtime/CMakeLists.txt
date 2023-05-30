@@ -11,7 +11,7 @@ if (NOT TPP_INSIDE_IREE)
   target_compile_definitions(tpp_c_runner_utils PRIVATE mlir_c_runner_utils_EXPORTS)
 else()
   add_library(tpp_c_runner_utils
-    STATIC
+    SHARED
     XsmmRunnerUtils.cpp
     PerfRunnerUtils.cpp
   )
