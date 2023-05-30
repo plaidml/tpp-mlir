@@ -53,7 +53,7 @@ llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [config.tpp_tools_dir, config.llvm_tools_dir]
 tools = [
-    'mlp-gen',
+    'mlir-gen',
     'tpp-opt',
     'tpp-run'
 ]

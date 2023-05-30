@@ -1,6 +1,6 @@
-//===- MLPGen.h MLP Generator ---------------------------------------------===//
+//===- MLIRGen.h MLIR Generator ---------------------------------------------===//
 //
-// Class that handles MLIR generation for the MLP options.
+// Class that handles MLIR generation for the MLIR options.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +25,7 @@
 #include <optional>
 #include <string>
 
-#include "MLPGen.h"
+#include "MLIRGen.h"
 
 using namespace mlir;
 
@@ -67,7 +67,7 @@ SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
 
 } // anonymous namespace
 
-MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
+MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
                            StringRef layersStr, StringRef tilesStr,
                            unsigned typeWidth, int seed, bool enableSoftmax,
                            bool biasAcc, int vnniBlockingFactor)
@@ -140,7 +140,7 @@ MLPGenerator::MLPGenerator(StringRef kernelStr, unsigned miniBatch,
   builder.setInsertionPoint(module);
 }
 
-Value MLPGenerator::createLayer(unsigned index, Value arg) {
+Value MLIRGenerator::createLayer(unsigned index, Value arg) {
   assert(index < layers.size() && "out of bounds access");
   OpBuilder::InsertionGuard guard(builder);
 
@@ -164,7 +164,7 @@ Value MLPGenerator::createLayer(unsigned index, Value arg) {
   return relu;
 }
 
-Value MLPGenerator::createOutputLayer(Value arg, Value out) {
+Value MLIRGenerator::createOutputLayer(Value arg, Value out) {
   OpBuilder::InsertionGuard guard(builder);
 
   auto last = layers.size() - 1;
@@ -190,7 +190,7 @@ Value MLPGenerator::createOutputLayer(Value arg, Value out) {
   return lowerMatmul({arg, weight, /*bias=*/nullptr, out});
 }
 
-std::string MLPGenerator::createMetadata() {
+std::string MLIRGenerator::createMetadata() {
   std::string data = "";
 
   auto addRunnerString = [&]() {
@@ -231,7 +231,7 @@ std::string MLPGenerator::createMetadata() {
   return data;
 }
 
-void MLPGenerator::createMlpKernel() {
+void MLIRGenerator::createMlpKernel() {
   OpBuilder::InsertionGuard guard(builder);
 
   // First, create the kernel with the entry point name "entry"
@@ -254,7 +254,7 @@ void MLPGenerator::createMlpKernel() {
   builder.create<func::ReturnOp>(loc, data);
 }
 
-void MLPGenerator::createMatmulKernel() {
+void MLIRGenerator::createMatmulKernel() {
   OpBuilder::InsertionGuard guard(builder);
 
   // First, create the kernel with the entry point name "entry"
@@ -274,7 +274,7 @@ void MLPGenerator::createMatmulKernel() {
   builder.create<func::ReturnOp>(loc, data);
 }
 
-void MLPGenerator::createFcKernel() {
+void MLIRGenerator::createFcKernel() {
   OpBuilder::InsertionGuard guard(builder);
 
   // First, create the kernel with the entry point name "entry"
@@ -298,7 +298,7 @@ void MLPGenerator::createFcKernel() {
   builder.create<func::ReturnOp>(loc, data);
 }
 
-void MLPGenerator::createEntryPoint() {
+void MLIRGenerator::createEntryPoint() {
   switch (kernelType) {
   case KernelType::MLP:
     createMlpKernel();
@@ -312,7 +312,7 @@ void MLPGenerator::createEntryPoint() {
   }
 }
 
-int MLPGenerator::generate(StringRef filename) {
+int MLIRGenerator::generate(StringRef filename) {
   // First, populate the module with all functions
   createEntryPoint();
 
@@ -341,7 +341,7 @@ int MLPGenerator::generate(StringRef filename) {
 
 // ============================================= Helpers
 
-Value MLPGenerator::lowerMatmul(MatMulArgs args) {
+Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
   // If not using bias as accumulator, and output not provided,
   // create a zero filled tensor
   if (!args.output && biasAcc && args.bias) {
@@ -385,7 +385,7 @@ Value MLPGenerator::lowerMatmul(MatMulArgs args) {
   return matmul;
 }
 
-Value MLPGenerator::lowerBiasAdd(Value input, Value bias) {
+Value MLIRGenerator::lowerBiasAdd(Value input, Value bias) {
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
   auto sum = builder.create<linalg::GenericOp>(
@@ -400,7 +400,7 @@ Value MLPGenerator::lowerBiasAdd(Value input, Value bias) {
   return sum.getResult(0);
 }
 
-Value MLPGenerator::lowerRelu(Value input) {
+Value MLIRGenerator::lowerRelu(Value input) {
   auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
@@ -415,7 +415,7 @@ Value MLPGenerator::lowerRelu(Value input) {
   return relu.getResult(0);
 }
 
-Value MLPGenerator::lowerSoftmax(Value input, Value output) {
+Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
   assert(input.getType().cast<ShapedType>().getRank() == 2 &&
          "Packed softmax not implemented yet");
   auto map1 = getMap(input, MAP_PARALLEL);
@@ -474,7 +474,7 @@ Value MLPGenerator::lowerSoftmax(Value input, Value output) {
   return softmax.getResult(0);
 }
 
-TensorType MLPGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
+TensorType MLIRGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
   // Already packed type, just return ND tensor
   if (dims.size() > 2)
     return RankedTensorType::get(dims, dataType);
@@ -516,7 +516,7 @@ TensorType MLPGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
   return RankedTensorType::get(dims, dataType);
 }
 
-AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
+AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
   auto n = tensor.getType().cast<ShapedType>().getRank();
   // Packed tensors are either 4 or 5 dim, map needs to be 6 or 7
   bool packed = (n > 2);
@@ -599,7 +599,7 @@ AffineMap MLPGenerator::getMap(Value tensor, MapType type) {
   return map;
 }
 
-SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
+SmallVector<utils::IteratorType> MLIRGenerator::getIterators(MapType type) {
   bool packed = tiles.size();
   bool vnniPacked = packed && vnniFactor != 0;
   switch (type) {
@@ -639,7 +639,7 @@ SmallVector<utils::IteratorType> MLPGenerator::getIterators(MapType type) {
   return {};
 }
 
-int MLPGenerator::getRand() {
+int MLIRGenerator::getRand() {
   // Not random
   if (!seed) {
     return 0;

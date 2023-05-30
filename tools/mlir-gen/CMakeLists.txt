@@ -18,12 +18,12 @@ set(LLVM_LINK_COMPONENTS
   native
   )
 
-add_llvm_executable(mlp-gen
-  MLPGen.cpp
-  mlp-gen.cpp)
+add_llvm_executable(mlir-gen
+  MLIRGen.cpp
+  mlir-gen.cpp)
 
-llvm_update_compile_flags(mlp-gen)
+llvm_update_compile_flags(mlir-gen)
 
-target_link_libraries(mlp-gen PRIVATE ${LIBS})
+target_link_libraries(mlir-gen PRIVATE ${LIBS})
 
-install(TARGETS mlp-gen RUNTIME DESTINATION bin)
+install(TARGETS mlir-gen RUNTIME DESTINATION bin)

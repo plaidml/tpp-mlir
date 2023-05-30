@@ -1,6 +1,6 @@
-//===- MLPGen.h MLP Generator ---------------------------------------------===//
+//===- MLIRGen.h MLIR Generator -------------------------------------------===//
 //
-// Class that handles MLIR generation for the MLP options.
+// Class that handles MLIR generation for the MLIR options.
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,9 +27,9 @@ namespace func {
 class FuncOp;
 } // namespace func
 
-/// MLP Generator: produces MLIR linalg-on-tensor dialect for an MLP mopdel with
+/// MLIR Generator: produces MLIR linalg-on-tensor dialect for an MLIR mopdel with
 /// the appropriate number of hidden layers and other properties selected.
-class MLPGenerator {
+class MLIRGenerator {
   /// MLIR Context
   MLIRContext context;
 
@@ -167,10 +167,10 @@ public:
   /// Creates a specific module. Different configurations need different modules
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
-  MLPGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
+  MLIRGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
                bool, int);
 
-  ~MLPGenerator() { module->destroy(); }
+  ~MLIRGenerator() { module->destroy(); }
 
   /// Generates the whole IR and write to file
   /// Return 0 on success, 1 on failure

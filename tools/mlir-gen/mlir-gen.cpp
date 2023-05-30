@@ -1,6 +1,6 @@
-//===- mlp-gen MLP Generator ----------------------------------------------===//
+//===- mlir-gen MLIR Generator --------------------------------------------===//
 //
-// Main entry-point to the MLP generator. Creates an MLP model with input,
+// Main entry-point to the MLIR generator. Creates an MLIR model with input,
 // output and multiple hidden layers, different activation functions, etc.
 // Handles multiple tensor sizes, conversion, broadcast, etc.
 //
@@ -19,7 +19,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/ValueRange.h"
 
-#include "MLPGen.h"
+#include "MLIRGen.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 
@@ -86,9 +86,9 @@ int main(int argc, char **argv) {
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "MLP Generator");
+  llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR Generator");
 
-  MLPGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
+  MLIRGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
                    enableSoftmax, biasAcc, vnni);
   return gen.generate(filename);
 }

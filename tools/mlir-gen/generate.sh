@@ -2,7 +2,7 @@
 #
 # This script emulates the libxsmm-dnn command line to call the MLIR generator
 # in the same way in hopes it will generate the same network. The IR is generated
-# by mlp-gen, which is then passed to tpp-run to optimize and run the benchmark.
+# by mlir-gen, which is then passed to tpp-run to optimize and run the benchmark.
 # See: https://github.com/plaidml/tpp-mlir/issues/341
 
 # Comment to disable debug messages
@@ -108,14 +108,14 @@ ROOT=$(git rev-parse --show-toplevel)
 if [ ! -d $ROOT ]; then
   ROOT=$PWD
 fi
-MLP_GEN=$(find $ROOT -type f -name mlp-gen | head -n1)
+MLIR_GEN=$(find $ROOT -type f -name mlir-gen | head -n1)
 TPP_OPT=$(find $ROOT -type f -name tpp-opt | head -n1)
 TPP_RUN=$(find $ROOT -type f -name tpp-run | head -n1)
-if [ -z "$MLP_GEN" ] || [ -z "$TPP_OPT" ] || [ -z "$TPP_RUN" ]; then
+if [ -z "$MLIR_GEN" ] || [ -z "$TPP_OPT" ] || [ -z "$TPP_RUN" ]; then
   echo "Could not find binaries"
   exit 1
 fi
-debug "Generator: $MLP_GEN"
+debug "Generator: $MLIR_GEN"
 debug "Optimizer: $TPP_OPT"
 debug "Runner: $TPP_RUN"
 
@@ -126,10 +126,10 @@ debug "Random seed: $SEED"
 # Defaults
 
 # Command line to extract and run
-MLP_GEN_ARGS="--float-width=$FLOAT_SIZE --seed=$SEED --mini-batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
-ORIG_MLIR="mlp-gen-original.mlir"
-debug "\nCreating the original MLP model:"
-run "$MLP_GEN $MLP_GEN_ARGS" $ORIG_MLIR
+MLIR_GEN_ARGS="--float-width=$FLOAT_SIZE --seed=$SEED --mini-batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
+ORIG_MLIR="mlir-gen-original.mlir"
+debug "\nCreating the original MLIR model:"
+run "$MLIR_GEN $MLIR_GEN_ARGS" $ORIG_MLIR
 
 # FIXME: --pack-matmul isn't quite working with the rest of the pipeline
 # Once it works, we can pass the TILE variables to it
@@ -137,7 +137,7 @@ TPP_OPT_ARGS="--default-tpp-passes"
 if [ "$FLOAT_SIZE" == "16" ]; then
   TPP_OPT_ARGS="--pack-vnni $TPP_OPT_ARGS"
 fi
-OPT_MLIR="mlp-gen-optimized.mlir"
+OPT_MLIR="mlir-gen-optimized.mlir"
 debug "\nOptimizing model:"
 run "$TPP_OPT $TPP_OPT_ARGS $ORIG_MLIR" $OPT_MLIR
 

@@ -36,7 +36,7 @@
              },
              "irgen": {
                  "type": "IR-GEN",
-                 "benchmark": [ "mlp-gen", "--kernel=matmul --float-width=16 --vnni=2 --mini-batch=64 --layers=64,64 --tiles=32,32,32" ],
+                 "benchmark": [ "mlir-gen", "--kernel=matmul --float-width=16 --vnni=2 --mini-batch=64 --layers=64,64 --tiles=32,32,32" ],
                  "environment": { "OMP_NUM_THREADS": "32" },
                  "flags": [ "-n", "100" ],
                  "extensions": [ "(avx2|asimd)" ]
