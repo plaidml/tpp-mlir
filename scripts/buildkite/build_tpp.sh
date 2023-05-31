@@ -48,7 +48,7 @@ if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
 if [ "${GPU}" ]; then
-  GPU="-G"
+  GPU_OPTION="-G"
 fi
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
@@ -57,13 +57,26 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \
-  ${GPU} \
+  ${GPU_OPTION} \
   -c ${COMPILER} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
   -n ${NPROCS_LIMIT_LINK}
 then
   exit 1
+fi
+
+echo "--- CUDA CONFIG"
+CUDA_DRIVER=/usr/lib64/libcuda.so.1
+if [ ! -f "${CUDA_DRIVER}" ]; then
+  if [ "${GPU}" ]; then
+    # When GPU is used, proper driver must be present.
+    exit 1
+  else
+    # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
+    ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BUILD_DIR}-${COMPILER}/lib/libcuda.so.1
+    ln -s ${BUILD_DIR}-${COMPILER}/lib/libcuda.so.1 ${BUILD_DIR}-${COMPILER}/lib/libcuda.so
+  fi
 fi
 
 # Build
