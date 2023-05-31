@@ -411,6 +411,13 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
             /*default=*/"\"+ptx60\"",
            "GPU target features.">,
   ];
+
+def DeallocReturns : Pass<"dealloc-returns", "func::FuncOp"> {
+  let summary = "Deallocate returned buffers";
+  let description = [{
+    Deallocate memory buffers returned by function calls.
+  }];
+  let constructor = "mlir::tpp::createDeallocReturnsPass()";
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

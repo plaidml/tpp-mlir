@@ -1,5 +1,4 @@
-// RUN: tpp-opt %s -split-input-file | FileCheck %s
-// -return-dealloc
+// RUN: tpp-opt %s -split-input-file -dealloc-returns | FileCheck %s
 
 func.func @kernel(%arg0: memref<8x8xf32>) -> memref<8x8xf32> {
   %c0 = arith.constant 0 : index
@@ -84,13 +83,13 @@ func.func @chained_alloc_return() {
 }
 
 // CHECK-LABEL: func.func @middleman
-// CHECK: %[[ret:.+]] = call @kernel
-// CHECK-NOT: memref.dealloc %[[ret]]
-// CHECK: return %[[ret]]
+// CHECK: %[[retKernel:.+]] = call @kernel
+// CHECK-NOT: memref.dealloc %[[retKernel]]
+// CHECK: return %[[retKernel]]
 
 // CHECK-LABEL: func.func @chained_alloc_return
 // CHECK: %[[alloc:.+]] = memref.alloc
-// CHECK: %[[ret:.+]] = call @middleman
+// CHECK: %[[retMid:.+]] = call @middleman
 // CHECK-DAG: memref.dealloc %[[alloc]]
-// CHECK-DAG: memref.dealloc %[[ret]]
+// CHECK-DAG: memref.dealloc %[[retMid]]
 // CHECK: return

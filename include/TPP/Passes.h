@@ -137,6 +137,7 @@ std::unique_ptr<OperationPass<gpu::GPUModuleOp>> createGpuToCudaPass();
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
                     StringRef gpuFeatures);
+std::unique_ptr<OperationPass<func::FuncOp>> createDeallocReturnsPass();
 
 void registerTestStructuralMatchers();
 
