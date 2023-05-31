@@ -11,11 +11,12 @@
 // RUN: FileCheck %s
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.generalize %0
-    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-    transform.structured.rewrite_conv_to_matmul %2
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+      : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
 }
 
 func.func @conv(%img: tensor<1x4x4x3xf32>, %filt: tensor<2x2x3x8xf32>,

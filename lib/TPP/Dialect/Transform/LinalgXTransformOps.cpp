@@ -30,12 +30,9 @@ using namespace mlir::transform;
 // PackOpExt
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::PackOpExt::applyToOne(linalg::LinalgOp target,
-                                 ApplyToEachResultList &results,
-                                 transform::TransformState &state) {
-  IRRewriter rewriter(target->getContext());
-  rewriter.setInsertionPoint(target);
+DiagnosedSilenceableFailure transform::PackOpExt::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    ApplyToEachResultList &results, transform::TransformState &state) {
   SmallVector<OpFoldResult> blockingFactors =
       getAsOpFoldResult(rewriter.getI64ArrayAttr(getBlockingFactors()));
   Operation *currentTarget = target;
@@ -74,14 +71,11 @@ transform::PackOpExt::applyToOne(linalg::LinalgOp target,
 // CollapseOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::CollapseOp::applyToOne(linalg::LinalgOp target,
-                                  ApplyToEachResultList &results,
-                                  transform::TransformState &state) {
+DiagnosedSilenceableFailure transform::CollapseOp::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    ApplyToEachResultList &results, transform::TransformState &state) {
   if (!isa<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  IRRewriter rewriter(target->getContext());
-  rewriter.setInsertionPoint(target);
   FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
       rewriter, cast<linalg::GenericOp>(target), getReassociationIndices());
   if (failed(collapsedOp))
@@ -105,14 +99,11 @@ transform::CollapseOp::getReassociationIndices() {
 // RewriteToBrgemmOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::RewriteToBrgemmOp::applyToOne(linalg::LinalgOp target,
-                                         ApplyToEachResultList &results,
-                                         transform::TransformState &state) {
+DiagnosedSilenceableFailure transform::RewriteToBrgemmOp::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    ApplyToEachResultList &results, transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::success();
-  IRRewriter rewriter(target->getContext());
-  rewriter.setInsertionPoint(target);
   FailureOr<SmallVector<Value>> brgemmLoops = mlir::linalgx::rewriteToBRGemmOp(
       rewriter, cast<linalg::GenericOp>(target));
   return DiagnosedSilenceableFailure::success();
@@ -122,14 +113,11 @@ transform::RewriteToBrgemmOp::applyToOne(linalg::LinalgOp target,
 // RewriteConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::RewriteConvToMatmulOp::applyToOne(linalg::LinalgOp target,
-                                             ApplyToEachResultList &results,
-                                             transform::TransformState &state) {
+DiagnosedSilenceableFailure transform::RewriteConvToMatmulOp::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    ApplyToEachResultList &results, transform::TransformState &state) {
   if (!llvm::isa_and_nonnull<linalg::GenericOp>(target))
     return DiagnosedSilenceableFailure::definiteFailure();
-  IRRewriter rewriter(target->getContext());
-  rewriter.setInsertionPoint(target);
   FailureOr<linalg::MatmulOp> matmul = mlir::linalgx::rewriteConvToMatmul(
       rewriter, cast<linalg::GenericOp>(target));
   if (failed(matmul)) {
@@ -145,7 +133,8 @@ transform::RewriteConvToMatmulOp::applyToOne(linalg::LinalgOp target,
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
-    Operation *target, ApplyToEachResultList &results, TransformState &state) {
+    transform::TransformRewriter &rewriter, Operation *target,
+    ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -169,7 +158,8 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
-    Operation *target, ApplyToEachResultList &results, TransformState &state) {
+    transform::TransformRewriter &rewriter, Operation *target,
+    ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -190,7 +180,8 @@ DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
-    Operation *target, ApplyToEachResultList &results, TransformState &state) {
+    transform::TransformRewriter &rewriter, Operation *target,
+    ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -218,7 +209,8 @@ DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
-    Operation *target, ApplyToEachResultList &results, TransformState &state) {
+    transform::TransformRewriter &rewriter, Operation *target,
+    ApplyToEachResultList &results, TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     auto diag = this->emitOpError("requires isolated-from-above targets");
     diag.attachNote(target->getLoc()) << "non-isolated target";
@@ -235,124 +227,15 @@ DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
 }
 
 //===----------------------------------------------------------------------===//
-// CollapseTo2DOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform::CollapseTo2dOp::apply(transform::TransformResults &results,
-                                 transform::TransformState &state) {
-  SmallVector<Operation *> collapsed;
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
-  for (Operation *op : payloadOps) {
-    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
-    if (!currentTarget) {
-      auto diag = this->emitOpError()
-                  << "Cannot collapse non-generic: " << *op << "\n";
-      diag.attachNote(op->getLoc()) << "when applied to this op";
-      return DiagnosedSilenceableFailure::definiteFailure();
-    }
-    IRRewriter rewriter(currentTarget->getContext());
-    rewriter.setInsertionPoint(currentTarget);
-    FailureOr<linalg::GenericOp> collapsedOp = mlir::linalgx::collapseIterators(
-        rewriter, currentTarget, getReassociationIndices(currentTarget));
-    if (failed(collapsedOp))
-      return DiagnosedSilenceableFailure::definiteFailure();
-    collapsed.append(1, *collapsedOp);
-  }
-  results.set(getCollapsedLinalgOp().cast<OpResult>(), collapsed);
-  return DiagnosedSilenceableFailure::success();
-}
-
-SmallVector<ReassociationIndices, 4>
-transform::CollapseTo2dOp::getReassociationIndices(linalg::GenericOp linalgOp) {
-  SmallVector<ReassociationIndices, 4> reassociationIndices;
-  int64_t numLoops = linalgOp.getNumLoops();
-  int64_t outerLoop = 0;
-  SmallVector<int64_t, 2> outerReassociation;
-  while (outerLoop <= numLoops - 2) {
-    outerReassociation.push_back(outerLoop++);
-  }
-  reassociationIndices.push_back(outerReassociation);
-  while (outerLoop < numLoops) {
-    reassociationIndices.push_back({outerLoop++});
-  }
-  return reassociationIndices;
-}
-
-//===----------------------------------------------------------------------===//
-// Reshape2dOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform::Reshape2dOp::apply(transform::TransformResults &results,
-                              transform::TransformState &state) {
-  bool useParallelLoops = getUseParallelLoops();
-
-  SmallVector<Operation *> tiled;
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
-  for (Operation *op : payloadOps) {
-    linalg::GenericOp currentTarget = dyn_cast_or_null<linalg::GenericOp>(op);
-    if (!currentTarget) {
-      auto diag = this->emitOpError()
-                  << "Cannot reshape non-generic: " << *op << "\n";
-      diag.attachNote(op->getLoc()) << "when applied to this op";
-      return DiagnosedSilenceableFailure::definiteFailure();
-    }
-    if (currentTarget.getNumLoops() <= 2) {
-      DiagnosedSilenceableFailure diag =
-          emitSilenceableError() << "Expect at least two loops:" << *op << "\n";
-      diag.attachNote(currentTarget->getLoc()) << "when applied to this op";
-      results.set(getResult().cast<OpResult>(), {});
-      return diag;
-    }
-
-    linalg::LinalgTilingOptions linalgTilingOptions;
-    linalg::LinalgTilingLoopType loopsTypes =
-        (useParallelLoops) ? linalg::LinalgTilingLoopType::ParallelLoops
-                           : linalg::LinalgTilingLoopType::Loops;
-    // Tiling function to remove all but the zero and first dimension.
-    // Tile of zero means no tiling on this dimension. The other
-    // dimensions are materialized as loops by tiling with a factor
-    // of 1.
-    linalgTilingOptions.setLoopType(loopsTypes)
-        .setTileSizeComputationFunction([&](OpBuilder &builder, Operation *) {
-          SmallVector<Value, 4> tppTiles;
-          size_t numberOfLoops = currentTarget.getNumLoops();
-          Location loc = currentTarget.getLoc();
-          for (size_t i = 0; i < numberOfLoops; i++)
-            tppTiles.push_back(
-                builder.createOrFold<arith::ConstantIndexOp>(loc, 1));
-          Value zeroVal = builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
-          tppTiles[numberOfLoops - 1] = zeroVal;
-          tppTiles[numberOfLoops - 2] = zeroVal;
-          return tppTiles;
-        });
-    IRRewriter rewriter(currentTarget->getContext());
-    FailureOr<linalg::TiledLinalgOp> tiledOp =
-        linalg::tileLinalgOp(rewriter, currentTarget, linalgTilingOptions);
-    if (failed(tiledOp))
-      return DiagnosedSilenceableFailure::definiteFailure();
-
-    if (currentTarget.hasBufferSemantics())
-      rewriter.eraseOp(currentTarget);
-    else
-      rewriter.replaceOp(currentTarget, tiledOp->tensorResults);
-
-    tiled.append(1, tiledOp->op);
-  }
-  results.set(getTiledLinalgOp().cast<OpResult>(), tiled);
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
 // GetBlockedConvolutions
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::GetBlockedConvolutions::apply(transform::TransformResults &results,
+transform::GetBlockedConvolutions::apply(transform::TransformRewriter &rewriter,
+                                         transform::TransformResults &results,
                                          transform::TransformState &state) {
   SmallVector<Operation *> res;
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  auto payloadOps = state.getPayloadOps(getTarget());
   for (Operation *op : payloadOps) {
     if (linalgx::utils::isBlockedConvolution(op))
       res.push_back(op);
@@ -366,10 +249,11 @@ transform::GetBlockedConvolutions::apply(transform::TransformResults &results,
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform::GetBlockedMatmuls::apply(transform::TransformResults &results,
+transform::GetBlockedMatmuls::apply(transform::TransformRewriter &rewriter,
+                                    transform::TransformResults &results,
                                     transform::TransformState &state) {
   SmallVector<Operation *> res;
-  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  auto payloadOps = state.getPayloadOps(getTarget());
   for (Operation *op : payloadOps) {
     if (linalgx::utils::isBlockedMatmul(op))
       res.push_back(op);

@@ -14,9 +14,9 @@ func.func @propagation(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %0
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %0 : !transform.any_op
 }
 
 // CHECK: func.func @propagation(
@@ -43,10 +43,10 @@ func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64x
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %1
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = get_closest_isolated_parent %0 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %1 : !transform.any_op
 }
 
 // CHECK: func.func @propagation1(
@@ -74,10 +74,10 @@ func.func @main(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!pdl.operation) -> !pdl.operation
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     // expected-error @below {{op requires isolated-from-above targets}}
-    transform.structured.packing_propagation %0
+    transform.structured.packing_propagation %0 : !transform.any_op
 }
 
 // -----
@@ -96,11 +96,11 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
@@ -138,11 +138,11 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
@@ -183,11 +183,11 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
@@ -224,11 +224,11 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
@@ -269,11 +269,11 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
@@ -316,11 +316,11 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
@@ -368,11 +368,11 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg0: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 }
 
 // CONV-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>

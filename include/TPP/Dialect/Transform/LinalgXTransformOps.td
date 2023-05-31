@@ -35,15 +35,17 @@ def PackOpExt : Op<Transform_Dialect, "structured.pack_ext", [
     $target
     (`blocking_factors` `=` $blocking_factors^)? 
      attr-dict
+    `:` type($target) `->` type($packed_linalg_op)
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    ConfinedAttr<DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">,
                                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$blocking_factors);
-  let results = (outs PDL_Operation:$packed_linalg_op);
+  let results = (outs TransformHandleTypeInterface:$packed_linalg_op);
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::linalg::LinalgOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -64,13 +66,17 @@ def CollapseOp : Op<Transform_Dialect, "structured.collapse", [
     Collapse the iterators target operation using the given reassociation.
   }];
 
-  let arguments = (ins PDL_Operation:$target, IndexListArrayAttr:$reassociation);
-  let results = (outs PDL_Operation:$collapsed_linalg_op);
+  let arguments = (ins TransformHandleTypeInterface:$target, IndexListArrayAttr:$reassociation);
+  let results = (outs TransformHandleTypeInterface:$collapsed_linalg_op);
 
-  let assemblyFormat = "$target $reassociation attr-dict";
+  let assemblyFormat = [{
+    $target $reassociation attr-dict
+    `:` type($target) `->` type($collapsed_linalg_op)
+  }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::linalg::LinalgOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -98,13 +104,16 @@ def RewriteToBrgemmOp : Op<Transform_Dialect, "structured.rewrite_to_brgemm", [
     operation if needed.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target attr-dict `:` type($target)
+  }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::linalg::LinalgOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         mlir::transform::TransformState &state);
@@ -129,15 +138,16 @@ def RewriteConvToMatmulOp : Op<Transform_Dialect,
     operation if needed.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
   let assemblyFormat = [{
-    $target attr-dict
+    $target attr-dict `:` type($target)
   }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::linalg::LinalgOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -167,15 +177,16 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
     operation that is contained inside the propagation target boundaries.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
   let assemblyFormat = [{
-    $target attr-dict
+    $target attr-dict `:` type($target)
   }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -187,7 +198,6 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
 //===----------------------------------------------------------------------===//
 
 // TODO: this does not compose as it invalidate all the handles.
-// TODO: retire this and use `CollapseTo2dOp`.
 def FoldUnitExtentDimsOp : Op<Transform_Dialect, "structured.fold_unit_extent_dims", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
@@ -204,15 +214,16 @@ def FoldUnitExtentDimsOp : Op<Transform_Dialect, "structured.fold_unit_extent_di
     operation contained in the target operation.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
   let assemblyFormat = [{
-    $target attr-dict
+    $target attr-dict `:` type($target)
   }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -249,6 +260,7 @@ def CanonicalizeOp : Op<Transform_Dialect, "structured.canonicalize", [
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);
@@ -274,83 +286,19 @@ def ConvertLinalgToTpp : Op<Transform_Dialect,
     operation contained in the target operation.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
   let assemblyFormat = [{
-    $target attr-dict
+    $target attr-dict `:` type($target)
   }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// Reshape2DOp
-//===----------------------------------------------------------------------===//
-
-def Reshape2dOp : Op<Transform_Dialect, "structured.reshape_2d", [
-    FunctionalStyleTransformOpTrait,
-    MemoryEffectsOpInterface,
-    TransformEachOpTrait,
-    TransformOpInterface]> {
-
-  let description = [{
-    Given a linalg.generic operation reshape it as a 2-dimensional operation by
-    tiling out all but the two innermost loops. Only the handle to the tiled
-    operation is returned. use_parallel_loops allows to materialize parallel
-    loops (at the memref abstraction) if the loop is parallel.
-  }];
-
-  let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<BoolAttr, "false">:$use_parallel_loops);
-  let results = (outs PDL_Operation:$tiled_linalg_op);
-
-  let assemblyFormat = [{
-     `in` $target attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-      ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state);
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// CollapseTo2dOp
-//===----------------------------------------------------------------------===//
-
-def CollapseTo2dOp : Op<Transform_Dialect, "structured.collapse_to_2d", [
-    FunctionalStyleTransformOpTrait,
-    MemoryEffectsOpInterface,
-    TransformEachOpTrait,
-    TransformOpInterface]> {
-
-  let description = [{
-    Given a linalg.generic operation make it a 2-dimensional by collapsing
-    outer dimensions.
-  }];
-
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$collapsed_linalg_op);
-
-  let assemblyFormat = [{
-     `in` $target attr-dict
-  }];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-      ::mlir::transform::TransformResults &transformResults,
-      ::mlir::transform::TransformState &state);
-
-    // Get reassociation for 2d collapsing.
-    SmallVector<ReassociationIndices, 4>
-      getReassociationIndices(linalg::GenericOp linalgOp);
   }];
 }
 
@@ -365,7 +313,7 @@ def GetBlockedConvolutions : Op<Transform_Dialect,
     TransformEachOpTrait,
     TransformOpInterface]> {
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (
     outs Transform_ConcreteOpType<"linalg.generic">:$blocked_convolutions);
   
@@ -375,6 +323,7 @@ def GetBlockedConvolutions : Op<Transform_Dialect,
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::transform::TransformResults &transformResults,
       ::mlir::transform::TransformState &state);
   }];
@@ -391,7 +340,7 @@ def GetBlockedMatmuls : Op<Transform_Dialect,
     TransformEachOpTrait,
     TransformOpInterface]> {
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (
     outs Transform_ConcreteOpType<"linalg.generic">:$blocked_matmuls);
   
@@ -401,6 +350,7 @@ def GetBlockedMatmuls : Op<Transform_Dialect,
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::transform::TransformResults &transformResults,
       ::mlir::transform::TransformState &state);
   }];

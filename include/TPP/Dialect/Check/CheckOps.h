@@ -9,6 +9,7 @@
 #ifndef TPP_DIALECT_CHECK_CHECKOPS_H
 #define TPP_DIALECT_CHECK_CHECKOPS_H
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

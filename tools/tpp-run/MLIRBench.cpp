@@ -188,7 +188,7 @@ LogicalResult MLIRBench::createKernelArgs() {
   builder.setInsertionPointToStart(&mainBody);
 
   for (auto &ty : kernel.getArgumentTypes()) {
-    auto arg = TypeSwitch<Type, llvm::Optional<Value>>(ty)
+    auto arg = TypeSwitch<Type, std::optional<Value>>(ty)
                    .Case<MemRefType>([&](auto memRefTy) {
                      // Create a memref global
                      return createDenseMemref(builder, module, initType,

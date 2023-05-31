@@ -53,14 +53,14 @@ func.func @matmul_static(
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2, 2] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2, 2] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %3
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %3 : !transform.any_op
 }
 
 func.func @entry() {

@@ -1,9 +1,9 @@
 // RUN: tpp-opt -transform-dialect-interpreter -canonicalize -split-input-file %s | FileCheck %s
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %1, %loops:3 = transform.structured.tile %0 [4, 4, 4] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %1, %loops:3 = transform.structured.tile %0 [4, 4, 4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 }
 
 // CHECK-LABEL: func @tile_linalg_matmul(
@@ -37,9 +37,9 @@ func.func @tile_linalg_matmul(
 // -----
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
 }
 
 func.func @block_linalg_matmul(
@@ -89,37 +89,39 @@ func.func @matmul_and_relu(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32
 
 // Cooking recipe for matmul
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
+  ^bb0(%arg1: !transform.any_op):
     // Get the matmul
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
     // Pack the matmul with blocking factors of 32 along i, j and k
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
     // Get parent operation (aka func.func)
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
     // Propagate the packing down through the relu
-    transform.structured.packing_propagation %2
+    transform.structured.packing_propagation %2 : !transform.any_op
 
     // Simply map linalg.generic to tpp.relu
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3 
-      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+      : (!transform.any_op) -> (!transform.op<"linalg.generic">)
     %relus = transform.get_consumers_of_result %4[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
-    %casted_relus = transform.cast %relus : !transform.op<"linalg.generic"> to !pdl.operation
+    %casted_relus = transform.cast %relus : !transform.op<"linalg.generic"> to !transform.any_op
 
     // Cooking recipe for relu
     // Fuse the relu into the matmul. Fuse the 2 outermost loops
     %5, %loop:2 = transform.structured.fuse %casted_relus { tile_sizes = [1, 1, 0, 0] }
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     // Get the producer for the relu (aka the packed matmul)
     %6 = get_producer_of_operand %5[0] 
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
     // Map the matmul to brgemm
-    transform.structured.rewrite_to_brgemm %6
+    transform.structured.rewrite_to_brgemm %6 : !transform.any_op
 
     // Clean-up IR after transformations
-    transform.structured.canonicalize %arg1 {
+    %arg1_cast = transform.cast %arg1 : !transform.any_op to !pdl.operation
+    transform.structured.canonicalize %arg1_cast {
       merge_tensor_slices = true }
 }
 

@@ -393,6 +393,9 @@ func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x
 // CHECK-SAME: %[[ARG1:.+]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: tensor<1x1x64x64xf32>
 // CHECK: %[[RES:.+]] = tensor.empty() : tensor<1x56x56x64xf32>
+// CHECK: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
+// CHECK: %[[PACKED_FILL:.+]] = linalg.fill ins(%[[ARG0]] : f32)
+// CHECK-SAME: outs(%[[EMPTY_FILL]] : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] 
 // CHECK-SAME: outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] 
@@ -401,9 +404,6 @@ func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x
 // CHECK: %[[PACK_ARG2:.+]] = tensor.pack %[[ARG2]] 
 // CHECK-SAME: outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] 
 // CHECK-SAME: into %[[EMPTY_ARG2]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
-// CHECK: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
-// CHECK: %[[PACKED_FILL:.+]] = linalg.fill ins(%[[ARG0]] : f32) 
-// CHECK-SAME: outs(%[[EMPTY_FILL]] : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[GEN:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: ins(%[[PACK_ARG1]], %[[PACK_ARG2]]
