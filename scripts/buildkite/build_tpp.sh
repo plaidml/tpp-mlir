@@ -50,9 +50,11 @@ fi
 if [ "${GPU}" ]; then
   GPU_OPTION="-G"
 fi
+
+BLD_DIR="${BUILD_DIR}-${COMPILER}"
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
-  -b ${BUILD_DIR}-${COMPILER} \
+  -b ${BLD_DIR} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
@@ -74,15 +76,15 @@ if [ ! -f "${CUDA_DRIVER}" ]; then
     exit 1
   else
     # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
-    ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BUILD_DIR}-${COMPILER}/lib/libcuda.so.1
-    ln -s ${BUILD_DIR}-${COMPILER}/lib/libcuda.so.1 ${BUILD_DIR}-${COMPILER}/lib/libcuda.so
+    ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+    ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
   fi
 fi
 
 # Build
 echo "--- BUILD"
 if ! ${SCRIPT_DIR}/ci/build.sh \
-  -b ${BUILD_DIR}-${COMPILER}
+  -b ${BLD_DIR}
 then
   exit 1
 fi
@@ -91,7 +93,7 @@ fi
 if [ "${CHECK}" ]; then
   echo "--- CHECK"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -c
   then
     exit 1
@@ -102,7 +104,7 @@ fi
 if [ "${INSTALL}" ]; then
   echo "--- INSTALL"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -i
   then
     exit 1
@@ -114,7 +116,7 @@ if [ "${BENCH}" ]; then
   echo "--- BENCHMARK"
   export LOGFILE=benchmark-output.txt
   ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -B | tee ${LOGFILE}
   echo "--- RESULTS"
   if [ "main" = "${BUILDKITE_BRANCH}" ]; then
