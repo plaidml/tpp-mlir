@@ -37,6 +37,18 @@ if (TPP_GPU)
   set(TPP_GPU_LINK_FLAGS
       -lmlir_cuda_runtime
     )
+
+  include(CheckLanguage)
+  check_language(CUDA)
+  if (CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    find_package(CUDAToolkit)
+    target_link_libraries(tpp-run PRIVATE CUDA::cudart)
+    target_link_libraries(tpp-run PRIVATE CUDA::cuda_driver)
+  else()
+    message(SEND_ERROR
+      "Building mlir with cuda support requires a working CUDA install")
+  endif()
 endif()
 
 message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
