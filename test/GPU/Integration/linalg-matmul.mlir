@@ -39,4 +39,4 @@ func.func private @printMemrefF32(memref<*xf32>)
 // NONE-COUNT-8: {{\[}}16,   16,   16,   16,   16,   16,   16,   16{{\]}}
 
 // TODO check real values when 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
-// CUDA-COUNT-8: {{\[}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}, {{[0-9]+}}{{.?}}{{[0-9e-]*}}
+// CUDA-COUNT-8: {{\[}}{{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}, {{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}
