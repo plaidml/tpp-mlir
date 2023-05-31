@@ -68,14 +68,15 @@ then
   exit 1
 fi
 
-echo "--- CUDA CONFIG"
+echo "Configuring CUDA"
 CUDA_DRIVER=/usr/lib64/libcuda.so.1
 if [ ! -f "${CUDA_DRIVER}" ]; then
   if [ "${GPU}" ]; then
-    # When GPU is used, proper driver must be present.
+    echo "GPU support requires full CUDA driver to be present"
     exit 1
   else
     # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
+    echo "Creating links to CUDA stubs"
     ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
     ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
   fi
