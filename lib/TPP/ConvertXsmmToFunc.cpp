@@ -22,6 +22,11 @@ using namespace mlir::xsmm;
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
+// NOTE: The ordering of operands to XSMM function calls as it is defined here
+// is strictly followed by XsmmRunnerUtils for IREE XSMM calls. Please change
+// the ordering of the fields in XsmmRunnerUtils for any such change in this
+// file.
+
 namespace {
 
 static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands,

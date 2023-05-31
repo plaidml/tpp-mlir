@@ -58,17 +58,16 @@ static bool hasImplicitComputeDtypeUnary(const libxsmm_meltw_unary_type dtype) {
 }
 
 namespace {
-// Definition of this struct needs to match with the definition used in
+// Although, definition of this struct should match with the definition used in
 // MemrefToLLVM pass.
-// https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283
+// https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283,
+// we are using only alignedPtr and offset fields from the structure.
 //
 // This definition is used by LLVM to convert Memref into C struct in order to
 // pass to our iree_*_invoke functions.
 typedef struct {
-  void *allocatedPtr;
   void *alignedPtr;
   int64_t offset;
-  int64_t sizes_and_strides[0]; // variable size: sizes[rank], strides[rank]
 } mlir_memref_descriptor_t;
 
 void *get_base_ptr(const libxsmm_datatype dType, void *alignedPtr,
@@ -443,8 +442,11 @@ xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
 // BRGEMM connection on the IREE side.
 //----------------------------------------------------------------------------//
 
-extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
+extern "C" int iree_xsmm_brgemm_dispatch(void *params, void *context,
                                          void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t address;
     int64_t dtype;
@@ -462,8 +464,11 @@ extern "C" int iree_xsmm_brgemm_dispatch(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_gemm_dispatch(void *context, void *params,
+extern "C" int iree_xsmm_gemm_dispatch(void *params, void *context,
                                        void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t gemm_addr;
     int64_t dtype;
@@ -481,16 +486,19 @@ extern "C" int iree_xsmm_gemm_dispatch(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
+extern "C" int iree_xsmm_unary_dispatch(void *params, void *context,
                                         void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t address;
+    int64_t type;
     int64_t dtype;
     int64_t m;
     int64_t n;
     int64_t ldi;
     int64_t ldo;
-    int64_t type;
     const libxsmm_meltw_unary_flags flags;
   } xsmm_unary_dispatch_t;
   xsmm_unary_dispatch_t *p = (xsmm_unary_dispatch_t *)params;
@@ -500,17 +508,20 @@ extern "C" int iree_xsmm_unary_dispatch(void *context, void *params,
   return 0;
 }
 
-extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
+extern "C" int iree_xsmm_binary_dispatch(void *params, void *context,
                                          void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t address;
+    int64_t type;
     int64_t dtype;
     int64_t m;
     int64_t n;
     int64_t ldiLhs;
     int64_t ldiRhs;
     int64_t ldo;
-    int64_t type;
     const libxsmm_meltw_binary_flags flags;
   } xsmm_binary_dispatch_t;
   xsmm_binary_dispatch_t *p = (xsmm_binary_dispatch_t *)params;
@@ -522,86 +533,87 @@ extern "C" int iree_xsmm_binary_dispatch(void *context, void *params,
 
 // TODO: struct slicing. BRGEMM struct is the same as the GEMM one plus the
 // batch parameter.
-extern "C" int iree_xsmm_brgemm_invoke(void *context, void *params,
+extern "C" int iree_xsmm_brgemm_invoke(void *params, void *context,
                                        void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t dtype;
-    int64_t address;
-    int64_t rankA;
-    mlir_memref_descriptor_t *memrefDescA;
-    int64_t rankB;
-    mlir_memref_descriptor_t *memrefDescB;
-    int64_t rankC;
-    mlir_memref_descriptor_t *memrefDescC;
+    int64_t function_address;
+    mlir_memref_descriptor_t memrefDescA;
+    mlir_memref_descriptor_t memrefDescB;
+    mlir_memref_descriptor_t memrefDescC;
     int64_t numBatches;
   } xsmm_brgemm_invoke_t;
   xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *) params;
 
-  xsmm_brgemm_invoke((libxsmm_datatype)p->dtype, p->address,
-                     p->memrefDescA->alignedPtr, p->memrefDescA->offset,
-                     p->memrefDescB->alignedPtr, p->memrefDescB->offset,
-                     p->memrefDescC->alignedPtr, p->memrefDescC->offset,
+  xsmm_brgemm_invoke((libxsmm_datatype)p->dtype, p->function_address,
+                     p->memrefDescA.alignedPtr, p->memrefDescA.offset,
+                     p->memrefDescB.alignedPtr, p->memrefDescB.offset,
+                     p->memrefDescC.alignedPtr, p->memrefDescC.offset,
                      p->numBatches);
   return 0;
 }
 
-extern "C" int iree_xsmm_gemm_invoke(void *context, void *params,
+extern "C" int iree_xsmm_gemm_invoke(void *params, void *context,
                                      void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t dtype;
-    int64_t gemm_addr;
-    int64_t rankA;
-    mlir_memref_descriptor_t *memrefDescA;
-    int64_t rankB;
-    mlir_memref_descriptor_t *memrefDescB;
-    int64_t rankC;
-    mlir_memref_descriptor_t *memrefDescC;
+    int64_t function_address;
+    mlir_memref_descriptor_t memrefDescA;
+    mlir_memref_descriptor_t memrefDescB;
+    mlir_memref_descriptor_t memrefDescC;
   } xsmm_gemm_invoke_t;
   xsmm_gemm_invoke_t *p = (xsmm_gemm_invoke_t *)params;
-  xsmm_gemm_invoke((libxsmm_datatype)p->dtype, p->gemm_addr,
-                   p->memrefDescA->alignedPtr, p->memrefDescA->offset,
-                   p->memrefDescB->alignedPtr, p->memrefDescB->offset,
-                   p->memrefDescC->alignedPtr, p->memrefDescC->offset);
+  xsmm_gemm_invoke((libxsmm_datatype)p->dtype, p->function_address,
+                   p->memrefDescA.alignedPtr, p->memrefDescA.offset,
+                   p->memrefDescB.alignedPtr, p->memrefDescB.offset,
+                   p->memrefDescC.alignedPtr, p->memrefDescC.offset);
   return 0;
 }
 
-extern "C" int iree_xsmm_unary_invoke(void *context, void *params,
+extern "C" int iree_xsmm_unary_invoke(void *params, void *context,
                                       void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t dtype;
-    int64_t address;
-    int64_t inputRank;
-    mlir_memref_descriptor_t *inputMemrefDesc;
-    int64_t outputRank;
-    mlir_memref_descriptor_t *outputMemrefDesc;
+    int64_t function_address;
+    mlir_memref_descriptor_t inputMemrefDesc;
+    mlir_memref_descriptor_t outputMemrefDesc;
   } xsmm_unary_invoke_t;
   xsmm_unary_invoke_t *p = (xsmm_unary_invoke_t *)params;
 
-  xsmm_unary_invoke((libxsmm_datatype)p->dtype, p->address,
-                    p->inputMemrefDesc->alignedPtr, p->inputMemrefDesc->offset,
-                    p->outputMemrefDesc->alignedPtr,
-                    p->outputMemrefDesc->offset);
+  xsmm_unary_invoke((libxsmm_datatype)p->dtype, p->function_address,
+                    p->inputMemrefDesc.alignedPtr, p->inputMemrefDesc.offset,
+                    p->outputMemrefDesc.alignedPtr,
+                    p->outputMemrefDesc.offset);
   return 0;
 }
 
-extern "C" int iree_xsmm_binary_invoke(void *context, void *params,
+extern "C" int iree_xsmm_binary_invoke(void *params, void *context,
                                        void *reserved) {
+  // The ordering of fields in the structure below is closely tied to code
+  // in ConvertXsmmToFunc pass in TPP-MLIR. Any change to that pass would
+  // also need change in below structure.
   typedef struct {
     int64_t dtype;
-    int64_t address;
-    int64_t lhsRank;
-    mlir_memref_descriptor_t *lhsMemrefDesc;
-    int64_t rhsRank;
-    mlir_memref_descriptor_t *rhsMemrefDesc;
-    int64_t outRank;
-    mlir_memref_descriptor_t *outMemrefDesc;
+    int64_t function_address;
+    mlir_memref_descriptor_t lhsMemrefDesc;
+    mlir_memref_descriptor_t rhsMemrefDesc;
+    mlir_memref_descriptor_t outMemrefDesc;
   } xsmm_binary_invoke_t;
   xsmm_binary_invoke_t *p = (xsmm_binary_invoke_t *)params;
 
-  xsmm_binary_invoke((libxsmm_datatype)p->dtype, p->address,
-                     p->lhsMemrefDesc->alignedPtr, p->lhsMemrefDesc->offset,
-                     p->rhsMemrefDesc->alignedPtr, p->rhsMemrefDesc->offset,
-                     p->outMemrefDesc->alignedPtr, p->outMemrefDesc->offset);
+  xsmm_binary_invoke((libxsmm_datatype)p->dtype, p->function_address,
+                     p->lhsMemrefDesc.alignedPtr, p->lhsMemrefDesc.offset,
+                     p->rhsMemrefDesc.alignedPtr, p->rhsMemrefDesc.offset,
+                     p->outMemrefDesc.alignedPtr, p->outMemrefDesc.offset);
   return 0;
 }
 
