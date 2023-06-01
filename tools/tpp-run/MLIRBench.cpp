@@ -403,6 +403,10 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(createConvertVectorToSCFPass());
   passManager.addPass(arith::createArithExpandOpsPass());
   passManager.addPass(createLowerAffinePass());
+  // Dealloc buffers returned from function calls
+  // This addresses memory leaks when test kernels are not bufferized
+  // using destination passing style
+  passManager.addNestedPass<func::FuncOp>(tpp::createDeallocReturnsPass());
 
   // Print IR of optimized kernel and main
   if (print == PrintStage::Late)
