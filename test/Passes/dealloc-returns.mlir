@@ -204,3 +204,32 @@ func.func @partial_manual_dealloc() {
 // CHECK-DAG: memref.dealloc %[[ret]]#1
 // CHECK-NOT: memref.dealloc %[[ret]]
 // CHECK: return
+
+// -----
+
+func.func @kernel(%arg0: memref<8x8xf32>) -> index {
+  %cst = arith.constant 0 : index
+  return %cst : index
+}
+
+func.func @no_alloc_returns() {
+  %cst = arith.constant -1.000000e+00 : f32
+  %cst_0 = arith.constant -1.000000e+01 : f32
+
+  %alloc = memref.alloc() : memref<8x8xf32>
+  linalg.fill ins(%cst_0 : f32) outs(%alloc : memref<8x8xf32>)
+  %int = call @kernel(%alloc) : (memref<8x8xf32>) -> index
+
+  %1 = vector.transfer_read %alloc[%int, %int], %cst {in_bounds = [true, true]} : memref<8x8xf32>, vector<8x8xf32>
+  vector.print %1 : vector<8x8xf32>
+
+  memref.dealloc %alloc : memref<8x8xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @no_alloc_returns
+// CHECK: %[[alloc:.+]] = memref.alloc
+// CHECK: %[[ret:.+]] = call @kernel
+// CHECK-DAG: memref.dealloc %[[alloc]]
+// CHECK-NOT: memref.dealloc %[[ret]]
+// CHECK: return
