@@ -47,6 +47,7 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/GPU/Utils.h"
 #include "TPP/Passes.h"
 
 using namespace mlir;
@@ -130,10 +131,10 @@ llvm::cl::opt<std::string> initType(
     llvm::cl::init(""));
 
 // Print MLIR before lowering
-llvm::cl::opt<std::string> printMLIR(
-    "print-mlir",
-    llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
-    llvm::cl::init(""));
+llvm::cl::opt<std::string>
+    printMLIR("print-mlir",
+              llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
+              llvm::cl::init(""));
 
 // Print LLVM IR before lowering
 llvm::cl::opt<bool> printLLVM("print-llvm",
@@ -309,6 +310,9 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
+
+  // Initialize GPU-related LLVM machinery
+  tpp::initializeGpuTargets();
 
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that

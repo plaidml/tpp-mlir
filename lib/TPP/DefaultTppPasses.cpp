@@ -23,6 +23,7 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -53,19 +54,6 @@ llvm::cl::opt<bool>
 #include "TPP/Passes.h.inc"
 
 namespace {
-
-template <typename OpT> class UtilityPassBase {
-public:
-  UtilityPassBase()
-      : pm(OpT::getOperationName(), mlir::OpPassManager::Nesting::Implicit){};
-  virtual ~UtilityPassBase() = default;
-
-protected:
-  OpPassManager pm;
-
-  // Create the pass processing pipeline.
-  virtual void constructPipeline() = 0;
-};
 
 // A general cleanup pass that performs general IR normalization and
 // generic optimizations without any lowering or any logical changes.

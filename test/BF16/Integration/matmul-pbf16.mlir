@@ -1,11 +1,3 @@
-// RUN: tpp-opt %s -convert-linalg-to-loops -convert-tpp-to-xsmm -convert-xsmm-to-func  -convert-vector-to-scf -convert-scf-to-cf -lower-affine -convert-vector-to-llvm -finalize-memref-to-llvm -arith-expand -convert-math-to-llvm -convert-func-to-llvm -reconcile-unrealized-casts |\
-// RUN: mlir-cpu-runner \
-// RUN:  -e entry -entry-point-result=void  \
-// RUN: -shared-libs=%llvmlibdir/libmlir_c_runner_utils%shlibext,%tpplibdir/libtpp_c_runner_utils%shlibext | \
-// RUN: FileCheck %s
-//
-
-// Validate default pipeline
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s

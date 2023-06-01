@@ -14,12 +14,13 @@ die_syntax() {
   echo "  -g: Optional gcc toolchain flag, may be needed by clang"
   echo "  -l: Optional linker flag, default to system linker"
   echo "  -S: Optional sanitizer flag, default to none"
+  echo "  -G: Optional GPU support flag, default to none"
   echo "  -n: Optional link jobs flag, default same as CPUs"
   exit 1
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
+while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -102,6 +103,9 @@ while getopts "s:b:i:m:t:c:g:l:n:S" arg; do
     S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
+    G)
+      ENABLE_GPU="-DTPP_GPU=ON"
+      ;;
     n)
       PROCS=$(nproc)
       if [ "${OPTARG}" -gt "0" ] && [ "${OPTARG}" -lt "${PROCS}" ]; then
@@ -154,4 +158,5 @@ echo_run cmake -Wno-dev -G Ninja \
     ${BUILD_OPTIONS} \
     ${GCC_TOOLCHAIN_OPTIONS} \
     ${LINKER_OPTIONS} \
-    ${SAN_OPTIONS}
+    ${SAN_OPTIONS} \
+    ${ENABLE_GPU}

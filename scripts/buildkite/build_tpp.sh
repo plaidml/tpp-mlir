@@ -47,13 +47,19 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
+if [ "${GPU}" ]; then
+  GPU_OPTION="-G"
+fi
+
+BLD_DIR="${BUILD_DIR}-${COMPILER}"
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
-  -b ${BUILD_DIR}-${COMPILER} \
+  -b ${BLD_DIR} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \
+  ${GPU_OPTION} \
   -c ${COMPILER} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
@@ -62,10 +68,24 @@ then
   exit 1
 fi
 
+echo "Configuring CUDA"
+CUDA_DRIVER=/usr/lib64/libcuda.so.1
+if [ ! -f "${CUDA_DRIVER}" ]; then
+  if [ "${GPU}" ]; then
+    echo "GPU support requires full CUDA driver to be present"
+    exit 1
+  else
+    # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
+    echo "Creating links to CUDA stubs"
+    ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+    ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
+  fi
+fi
+
 # Build
 echo "--- BUILD"
 if ! ${SCRIPT_DIR}/ci/build.sh \
-  -b ${BUILD_DIR}-${COMPILER}
+  -b ${BLD_DIR}
 then
   exit 1
 fi
@@ -74,7 +94,7 @@ fi
 if [ "${CHECK}" ]; then
   echo "--- CHECK"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -c
   then
     exit 1
@@ -85,7 +105,7 @@ fi
 if [ "${INSTALL}" ]; then
   echo "--- INSTALL"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -i
   then
     exit 1
@@ -97,7 +117,7 @@ if [ "${BENCH}" ]; then
   echo "--- BENCHMARK"
   export LOGFILE=benchmark-output.txt
   ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR}-${COMPILER} \
+    -b ${BLD_DIR} \
     -B | tee ${LOGFILE}
   echo "--- RESULTS"
   if [ "main" = "${BUILDKITE_BRANCH}" ]; then

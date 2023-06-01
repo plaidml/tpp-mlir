@@ -1,5 +1,6 @@
 add_subdirectory(Dialect)
 add_subdirectory(IR)
+add_subdirectory(GPU)
 
 get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 
@@ -50,6 +51,7 @@ add_mlir_library(MLIRTPP
     TPPTppDialect
     TPPXsmmDialect
     TPPPerfDialect
+    TPPGPU
 
     MLIRIR
     MLIRInferTypeOpInterface

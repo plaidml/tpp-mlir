@@ -379,4 +379,38 @@ def HeapToStack : Pass<"heap-to-stack", "func::FuncOp"> {
   let constructor = "mlir::tpp::createHeapToStackPass()";
 }
 
+def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
+  let summary = "Lower all eligible operations into GPU compatible IR";
+  let constructor = "mlir::tpp::createGpuPipelinePass()";
+  let options = [
+    Option<"gpuBackend", "gpu", "std::string",
+            /*default=*/"\"cuda\"",
+           "Target GPU backend for lowering (cuda).">,
+  ];
+}
+
+def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
+  let summary = "Convert operations to GPU";
+  let description = [{
+    Convert all eligble operations into generic GPU operations.
+  }];
+  let constructor = "mlir::tpp::createGpuConversionPass()";
+}
+
+def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
+  let summary = "Lower generic GPU operations to CUDA backend";
+  let constructor = "mlir::tpp::createGpuToCudaPass()";
+  let options = [
+    Option<"gpuTriple", "triple", "std::string",
+            /*default=*/"\"nvptx64-nvidia-cuda\"",
+           "GPU target triple.">,
+    Option<"gpuChip", "chip", "std::string",
+            /*default=*/"\"sm_35\"",
+           "GPU target architecture.">,
+    Option<"gpuFeatures", "features", "std::string",
+            /*default=*/"\"+ptx60\"",
+           "GPU target features.">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

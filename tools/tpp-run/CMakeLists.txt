@@ -33,6 +33,12 @@ llvm_update_compile_flags(tpp-run)
 
 target_link_libraries(tpp-run PRIVATE ${LIBS})
 
+if (TPP_GPU)
+  set(TPP_GPU_LINK_FLAGS
+      -lmlir_cuda_runtime
+    )
+endif()
+
 message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
 message(STATUS "MLIR libraries at: ${LLVM_LIBRARY_DIR}")
 # Add TPP/MLIR library path so we don't need --shared-libs on every call
@@ -43,6 +49,7 @@ target_link_options(tpp-run PRIVATE
   -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
+  ${TPP_GPU_LINK_FLAGS}
   -lomp
   -Wl,--as-needed
 )

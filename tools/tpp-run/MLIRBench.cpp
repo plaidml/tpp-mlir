@@ -38,10 +38,16 @@
 
 using namespace mlir;
 
+// Control parallelism.
 llvm::cl::opt<bool>
     defParallel("def-parallel",
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
+
+// Select target GPU backend for the pipeline.
+llvm::cl::opt<std::string>
+    defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
+                  llvm::cl::value_desc("cuda"), llvm::cl::init(""));
 
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
@@ -375,8 +381,13 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   if (print == PrintStage::Early)
     passManager.addPass(createPrintIRPass());
 
-  // Apply the default preprocessing pass
-  passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
+  if (!defGpuBackend.empty()) {
+    // Apply the custom GPU lowering pipeline
+    passManager.addPass(tpp::createGpuPipelinePass(defGpuBackend));
+  } else {
+    // Apply the default preprocessing pass
+    passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
+  }
 
   if (print == PrintStage::Mid)
     passManager.addPass(createPrintIRPass());
@@ -405,8 +416,10 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
+  passManager.addPass(createGpuToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // Print IR of kernel and main in LLVM dialect
