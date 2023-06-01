@@ -38,6 +38,9 @@ struct DeallocFuncReturn : public OpRewritePattern<func::CallOp> {
       return rewriter.notifyMatchFailure(callOp, "Expected memref returns");
 
     auto terminator = callOp->getParentRegion()->begin()->getTerminator();
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(terminator);
+
     for (auto &buf : buffs) {
       // Do not deallocate if the buffer is returned from the current region.
       if (llvm::any_of(terminator->getOperands(),
@@ -50,8 +53,6 @@ struct DeallocFuncReturn : public OpRewritePattern<func::CallOp> {
           }))
         continue;
 
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPoint(terminator);
       rewriter.create<memref::DeallocOp>(loc, buf);
     }
 
