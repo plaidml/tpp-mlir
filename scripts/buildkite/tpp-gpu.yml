@@ -11,6 +11,9 @@ env:
   TPP_CLANGVER: "16.0.4"
   TPP_GCCVER: "9.5.0" # Use an older version to match CUDA requirements
   TPP_CUDAVER: "11.5"
+  # ASAN flags required due to incompatibility with CUDA
+  # See: https://github.com/google/sanitizers/issues/629
+  ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
 
 steps:
   - label: "LLVM"
