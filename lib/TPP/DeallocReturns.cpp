@@ -18,7 +18,7 @@ using namespace mlir;
 
 namespace {
 
-// Convert buffers from heap to stack allocation.
+// Deallocate buffers returned by function calls.
 struct DeallocFuncReturn : public OpRewritePattern<func::CallOp> {
   using OpRewritePattern<func::CallOp>::OpRewritePattern;
 
@@ -60,6 +60,7 @@ struct DeallocFuncReturn : public OpRewritePattern<func::CallOp> {
   }
 };
 
+// Deallocate returned buffers.
 struct DeallocReturns : public DeallocReturnsBase<DeallocReturns> {
   DeallocReturns() = default;
 
