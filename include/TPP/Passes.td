@@ -411,6 +411,7 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
             /*default=*/"\"+ptx60\"",
            "GPU target features.">,
   ];
+}
 
 def DeallocReturns : Pass<"dealloc-returns", "func::FuncOp"> {
   let summary = "Deallocate returned buffers";
