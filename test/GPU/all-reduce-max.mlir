@@ -1,3 +1,4 @@
+// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: mlir-opt %s -convert-linalg-to-parallel-loops -gpu-map-parallel-loops \
 // RUN:   -convert-parallel-loops-to-gpu -gpu-kernel-outlining \
 // RUN:   -canonicalize -cse \
@@ -5,6 +6,7 @@
 // RUN: | mlir-opt -canonicalize -cse \
 // RUN: | FileCheck %s
 
+// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s
 
 // Original test from: llvm-project/mlir/test/Integration/GPU/CUDA/all-reduce-max.mlir

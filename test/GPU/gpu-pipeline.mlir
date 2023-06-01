@@ -1,3 +1,4 @@
+// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s --check-prefix=CUDA
 
 func.func @entry() {
