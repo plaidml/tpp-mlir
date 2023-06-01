@@ -226,12 +226,14 @@ func.func @skip_connection(%skip : !first_conv1x1_input_tensor_t, %input : !seco
 }
 
 func.func @extract_results_for_printing(%input : !second_conv1x1_output_tensor_t) -> !tensor_print_t {
-    %ret = tensor.extract_slice %input[0, 0, 0, 0][1, 1, 1, 8][1, 1, 1, 1] : !second_conv1x1_output_tensor_t to !tensor_print_t
+    %slice = tensor.extract_slice %input[0, 0, 0, 0][1, 1, 1, 8][1, 1, 1, 1] : !second_conv1x1_output_tensor_t to !tensor_print_t
+    %out = tensor.empty() : !tensor_print_t
+    %ret = linalg.copy ins(%slice : !tensor_print_t) outs(%out : !tensor_print_t) -> !tensor_print_t
 
     return %ret : !tensor_print_t
 }
 
-func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %output : !tensor_print_t) -> !tensor_print_t {
+func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t) -> !tensor_print_t {
 
     // Call first 1x1 Conv
     %first_conv1x1_output = call @first_conv2d_1x1_biasadd_relu(%input) :
@@ -261,19 +263,8 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
     %ret = call @extract_results_for_printing(%skip) :
         (!second_conv1x1_output_tensor_t) -> (!tensor_print_t)
 
-    // Copy to output to avoid deallocation / double-free problem with the last result (see IR for more details)
-    %copy = linalg.copy ins(%ret : !tensor_print_t) outs(%output : !tensor_print_t) -> !tensor_print_t
-
-    // Cleanup temporary buffers
-    bufferization.dealloc_tensor %first_conv1x1_output : !first_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %padded_first_conv1x1_output : !conv3x3_input_tensor_t
-    bufferization.dealloc_tensor %conv3x3_output : !conv3x3_output_tensor_t
-    bufferization.dealloc_tensor %second_conv1x1_output : !second_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %skip : !second_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %ret : !tensor_print_t
-
     // Return value to keep copy above intact
-    return %copy : !tensor_print_t
+    return %ret : !tensor_print_t
 }
 
 // Output

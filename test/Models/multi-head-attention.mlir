@@ -31,7 +31,7 @@
 !tensor_print_t = tensor<1x8xf32>
 
 func.func @multi_head_attention(
-        %input : !multi_head_attention_input_tensor_t, %output : !tensor_print_t) -> !tensor_print_t {
+        %input : !multi_head_attention_input_tensor_t) -> !tensor_print_t {
     %cst = arith.constant 0xFF800000 : f32
     %cst_0 = arith.constant -0.000000e+00 : f32
     %cst_1 = arith.constant 0.000000e+00 : f32
@@ -252,12 +252,12 @@ func.func @multi_head_attention(
       linalg.yield %490 : f32
     } -> tensor<32x8x128xf32>
     // Extract a 2D slice for printing
+    // Explicitly copy the slice to a tensor which can be returned
     %149 = tensor.extract_slice %148[0, 0, 0][1, 1, 8][1, 1, 1] : tensor<32x8x128xf32> to !tensor_print_t
-    // Copy the slice to the argument output tensor
-    // This ensures that no allocated buffers are returned from the test kernel which prevent memory leaks
-    %ret = linalg.copy ins(%149 : !tensor_print_t) outs(%output : !tensor_print_t) -> !tensor_print_t
+    %150 = tensor.empty() : !tensor_print_t
+    %151 = linalg.copy ins(%149 : !tensor_print_t) outs(%150 : !tensor_print_t) -> !tensor_print_t
 
-    return %ret : !tensor_print_t
+    return %151 : !tensor_print_t
 }
 
 // Output
