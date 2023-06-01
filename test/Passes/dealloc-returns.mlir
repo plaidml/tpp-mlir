@@ -72,6 +72,49 @@ func.func @chained_alloc_return() {
 
 // -----
 
+func.func @kernel(%arg0: memref<8x8xf32>) -> (memref<8x8xf32>, memref<8x8xf32>) {
+  %alloc = memref.alloc() : memref<8x8xf32>
+  memref.copy %arg0, %alloc : memref<8x8xf32> to memref<8x8xf32>
+  %alloc1 = memref.alloc() : memref<8x8xf32>
+  return %alloc, %alloc1 : memref<8x8xf32>, memref<8x8xf32>
+}
+
+func.func @middleman(%arg0: memref<8x8xf32>) -> memref<8x8xf32> {
+  %0, %1 = call @kernel(%arg0) : (memref<8x8xf32>) -> (memref<8x8xf32>, memref<8x8xf32>)
+  return %0 : memref<8x8xf32>
+}
+
+func.func @partial_chained_alloc_return() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant -1.000000e+00 : f32
+  %cst_0 = arith.constant -1.000000e+01 : f32
+
+  %alloc = memref.alloc() : memref<8x8xf32>
+  linalg.fill ins(%cst_0 : f32) outs(%alloc : memref<8x8xf32>)
+  %0 = call @middleman(%alloc) : (memref<8x8xf32>) -> memref<8x8xf32>
+
+  %1 = vector.transfer_read %0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<8x8xf32>, vector<8x8xf32>
+  vector.print %1 : vector<8x8xf32>
+
+  memref.dealloc %alloc : memref<8x8xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @middleman
+// CHECK: %[[retKernel:.+]]:2 = call @kernel
+// CHECK: memref.dealloc %[[retKernel]]#1
+// CHECK-NOT: memref.dealloc %[[retKernel]]#0
+// CHECK: return %[[retKernel]]#0
+
+// CHECK-LABEL: func.func @partial_chained_alloc_return
+// CHECK: %[[alloc:.+]] = memref.alloc
+// CHECK: %[[retMid:.+]] = call @middleman
+// CHECK-DAG: memref.dealloc %[[alloc]]
+// CHECK-DAG: memref.dealloc %[[retMid]]
+// CHECK: return
+
+// -----
+
 func.func @kernel(%arg0: memref<8x8xf32>) -> (i32, memref<8x8xf32>) {
   %cst = arith.constant 42 : i32
   %alloc = memref.alloc() : memref<8x8xf32>
