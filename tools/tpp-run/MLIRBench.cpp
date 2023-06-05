@@ -39,6 +39,8 @@
 #include "TPP/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
 
+#include <string>
+
 using namespace mlir;
 
 // Control parallelism.
@@ -50,7 +52,7 @@ llvm::cl::opt<bool>
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda"), llvm::cl::init(""));
+                  llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
 
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
@@ -429,11 +431,16 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
     passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
-  passManager.addPass(createGpuToLLVMConversionPass());
+
+  if (defGpuBackend.getValue() == "cuda")
+    passManager.addPass(createGpuToLLVMConversionPass());
+
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
+
+  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
 
   // Print IR of kernel and main in LLVM dialect
   if (print == PrintStage::LLVM)

@@ -139,6 +139,7 @@ std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
                     StringRef gpuChip = "sm_35",
                     StringRef gpuFeatures = "+ptx60");
+std::unique_ptr<OperationPass<ModuleOp>> createGpuToVulkanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteBatchMatmulToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertMemRefToTppPass();

@@ -422,6 +422,11 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
   ];
 }
 
+def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
+  let summary = "Lower generic GPU operations to Vulkan backend";
+  let constructor = "mlir::tpp::createGpuToVulkanPass()";
+}
+
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
   let summary = "Convert generic ops into named ops";
   let constructor = "mlir::linalg::createLinalgDeGeneralizationPass()";

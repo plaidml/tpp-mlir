@@ -3,6 +3,7 @@ add_mlir_library(TPPGPU
   GpuPipeline.cpp
   GpuConversion.cpp
   GpuToCuda.cpp
+  GpuToVulkan.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
@@ -12,6 +13,10 @@ add_mlir_library(TPPGPU
     MLIRGPUTransforms
     MLIRSCFToGPU
     MLIRGPUToNVVMTransforms
+    MLIRSPIRVDialect
+    MLIRSPIRVTransforms
+    MLIRGPUToVulkanTransforms
+    MLIRGPUToSPIRV
 )
 
 if (TPP_GPU MATCHES "cuda")
