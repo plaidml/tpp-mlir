@@ -413,4 +413,9 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
   ];
 }
 
+def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
+  let summary = "Lower generic GPU operations to Vulkan backend";
+  let constructor = "mlir::tpp::createGpuToVulkanPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

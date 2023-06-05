@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -43,11 +44,13 @@ namespace {
 
 enum class GpuType {
   Cuda,
+  Vulkan,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
   auto type = llvm::StringSwitch<std::optional<GpuType>>(gpuStr)
                   .CaseLower("cuda", GpuType::Cuda)
+                  .CaseLower("vulkan", GpuType::Vulkan)
                   .Default(std::nullopt);
   assert(type && "Unsupported GPU backend");
 
@@ -69,6 +72,7 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
     registry.insert<LLVM::LLVMDialect>();
     registry.insert<NVVM::NVVMDialect>();
     registry.insert<nvgpu::NVGPUDialect>();
+    registry.insert<spirv::SPIRVDialect>();
   }
 
   void runOnOperation() override {
@@ -96,6 +100,9 @@ private:
     switch (gpuType) {
     case GpuType::Cuda:
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
+      break;
+    case GpuType::Vulkan:
+      pm.addPass(createGpuToVulkanPass());
       break;
     }
 
