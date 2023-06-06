@@ -16,7 +16,7 @@
 #include <random>
 
 // Base class for float data types.
-struct TensorInitFloat :: public TensorInit<llvm::APFloat> {
+struct TensorInitFloat : public TensorInit<llvm::APFloat> {
   // Data type. (TODO: Support 8-bit data types)
   enum DataType { FP32, FP64, BF16 };
 
@@ -59,12 +59,6 @@ protected:
 
   // Tensor element data type.
   DataType type;
-
-  // Insert element indexed on the buffer.
-  void insert(size_t index, float value) override final;
-
-  // Insert element at the end of the buffer.
-  void push(float value) override final;
 
   // Convert value to the tensor's data type (by reference).
   void convertType(llvm::APFloat &value) override final;

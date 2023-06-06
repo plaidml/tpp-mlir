@@ -76,13 +76,13 @@ DenseElementsAttr TensorInit::get(ShapedType shape) {
   return mlir::DenseElementsAttr::get(tensorType, buffer);
 }
 
-void TensorInit::insert(size_t index, float value) {
-  buffer[index] = llvm::APFloat(value);
+template <typename T> void TensorInit::insert(size_t index, T value) {
+  buffer[index] = value;
   convertType(buffer[index]);
 }
 
-void TensorInit::push(float value) {
-  buffer.push_back(llvm::APFloat(value));
+template <typename T> void TensorInit::push(T value) {
+  buffer.push_back(value);
   convertType(buffer.back());
 }
 

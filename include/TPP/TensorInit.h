@@ -15,14 +15,13 @@
 #include <vector>
 
 // Base class.
-template <typename T>
-struct TensorInit {
+template <typename T> struct TensorInit {
   TensorInit() : size(1) {}
   virtual ~TensorInit() {}
 
   // Returns a dense attribute with a specified shape, initialized
   // with a particular implementation (see derived classes) with
-  // a reasonable distribution (0.0 ~ 1.0)
+  // a reasonable distribution
   virtual mlir::DenseElementsAttr get(mlir::ShapedType shape) = 0;
 
 protected:
@@ -32,10 +31,10 @@ protected:
   std::vector<T> buffer;
 
   // Insert element indexed on the buffer
-  virtual void insert(size_t index, float value) = 0;
+  virtual void insert(size_t index, T value);
 
   // Insert element at the end of the buffer
-  virtual void push(T value) = 0;
+  virtual void push(T value);
 
   // Convert value to the tensor's data type (by reference)
   virtual void convertType(T &value) = 0;
