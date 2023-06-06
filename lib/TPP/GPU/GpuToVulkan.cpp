@@ -60,7 +60,7 @@ private:
     pm.clear();
 
 #ifdef TPP_GPU_ENABLE
-    // Create SPIRV kernel.
+    // Create SPIRV kernels.
     pm.addPass(createConvertGPUToSPIRVPass());
     pm.addNestedPass<spirv::ModuleOp>(
         spirv::createSPIRVLowerABIAttributesPass());

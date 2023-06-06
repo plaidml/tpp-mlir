@@ -74,7 +74,7 @@ private:
     pm.addPass(createLowerAffinePass());
     pm.addPass(createConvertSCFToCFPass());
 
-    // Create GPU kernels.
+    // Create CUDA kernels.
     pm.addPass(createStripDebugInfoPass());
     pm.addPass(createLowerGpuOpsToNVVMOpsPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
