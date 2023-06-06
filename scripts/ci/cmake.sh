@@ -104,7 +104,7 @@ while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
     G)
-      ENABLE_GPU="-DTPP_GPU=ON -DCMAKE_EXE_LINKER_FLAGS=\"-Wl,-allow-shlib-undefined\""
+      ENABLE_GPU="-DTPP_GPU=ON"
       ;;
     n)
       PROCS=$(nproc)
