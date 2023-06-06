@@ -8,6 +8,7 @@
 
 #include "TPP/TensorInit.h"
 #include "TPP/TensorInitFloat.h"
+#include "TPP/TensorInitInt.h"
 
 using namespace mlir;
 
@@ -47,6 +48,26 @@ TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType, int seed) {
     case TensorInitType::Normal:
       assert(seed && "Can't call random initializers without seed");
       return std::make_unique<NormalTensorInitFloat>(dataType, seed);
+    default:
+      assert(false && "Invalid tensor initializer type");
+    }
+  }
+
+  if (TensorInitInt::isTypeSupported(elmType)) {
+    auto dataType = TensorInitInt::getTensorInitDataType(elmType);
+    switch (type) {
+    case TensorInitType::Constant:
+      return std::make_unique<ConstantTensorInitInt>(dataType);
+    case TensorInitType::Simple:
+      return std::make_unique<SimpleTensorInitInt>(dataType);
+    case TensorInitType::Continuous:
+      return std::make_unique<ContinuousTensorInitInt>(dataType);
+    case TensorInitType::Random:
+      assert(seed && "Can't call random initializers without seed");
+      return std::make_unique<RandomTensorInitInt>(dataType, seed);
+    case TensorInitType::Normal:
+      assert(seed && "Can't call random initializers without seed");
+      return std::make_unique<NormalTensorInitInt>(dataType, seed);
     default:
       assert(false && "Invalid tensor initializer type");
     }

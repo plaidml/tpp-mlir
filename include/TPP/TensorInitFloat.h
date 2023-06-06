@@ -56,11 +56,11 @@ protected:
   // Tensor element data type.
   DataType type;
 
-  // Insert element indexed on the buffer
+  // Insert element indexed on the buffer.
   using TensorInit::insert;
   void insert(size_t index, float value);
 
-  // Insert element at the end of the buffer
+  // Insert element at the end of the buffer.
   using TensorInit::push;
   void push(float value);
 

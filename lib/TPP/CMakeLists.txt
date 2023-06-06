@@ -24,6 +24,7 @@ add_mlir_library(MLIRTPP
   # Utils
     TensorInit.cpp
     TensorInitFloat.cpp
+    TensorInitInt.cpp
     BuilderUtils.cpp
     TransformUtils.cpp
     VNNIUtils.cpp
