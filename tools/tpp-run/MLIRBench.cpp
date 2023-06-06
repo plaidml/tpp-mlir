@@ -34,6 +34,8 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
+#include "TPP/TensorInit.h"
+#include "TPP/TensorInitFloat.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
@@ -119,7 +121,7 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
   auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
     // We only change float types
     auto elmTy = shape.getElementType();
-    if (!TensorInit::isTypeSupported(elmTy))
+    if (!TensorInitFloat::isTypeSupported(elmTy))
       return attr;
     // We only change dense attributes that are splat
     auto value = dyn_cast<DenseElementsAttr>(attr);

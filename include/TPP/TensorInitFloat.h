@@ -6,34 +6,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_RUN_TENSORINITFLOAT_H
-#define TPP_RUN_TENSORINITFLOAT_H
+#ifndef TPP_TENSORINITFLOAT_H
+#define TPP_TENSORINITFLOAT_H
 
+#include "TPP/TensorInit.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Types.h"
 
 #include <algorithm>
 #include <random>
 
-// Base class for float data types.
+// Base class for float values.
 struct TensorInitFloat : public TensorInit<llvm::APFloat> {
   // Data type. (TODO: Support 8-bit data types)
-  enum DataType { FP32, FP64, BF16 };
+  enum class DataType { FP32, FP64, BF16 };
 
-  static bool isTypeSupported(const mlir::Type &type) const {
+  static bool isTypeSupported(const mlir::Type &type) {
     return type.isF32() || type.isF64() || type.isBF16();
   }
 
-  // Get data type from element type
-  static DataType getTensorInitDataType(mlir::Type type) const;
+  // Get data type from element type.
+  static DataType getTensorInitDataType(mlir::Type type);
 
   TensorInitFloat(DataType type) : type(type) {}
-  virtual ~TensorInitFloat() {}
-
-  // Returns a dense attribute with a specified shape, initialized
-  // with a particular implementation (see derived classes) with
-  // a reasonable distribution (0.0 ~ 1.0).
-  virtual mlir::DenseElementsAttr get(mlir::ShapedType shape) override;
+  virtual ~TensorInitFloat() = default;
 
 protected:
   // FP32 conversion (by reference).
@@ -60,6 +56,14 @@ protected:
   // Tensor element data type.
   DataType type;
 
+  // Insert element indexed on the buffer
+  using TensorInit::insert;
+  void insert(size_t index, float value);
+
+  // Insert element at the end of the buffer
+  using TensorInit::push;
+  void push(float value);
+
   // Convert value to the tensor's data type (by reference).
   void convertType(llvm::APFloat &value) override final;
 
@@ -70,7 +74,7 @@ protected:
 
 // Constant init (all-ones, do not use!).
 struct ConstantTensorInitFloat : TensorInitFloat {
-  ConstantTensorInit(DataType type) : TensorInitFloat(type) {}
+  ConstantTensorInitFloat(DataType type) : TensorInitFloat(type) {}
 
   // Return a dense<1.0> repeated throughout the shape.
   mlir::DenseElementsAttr get(mlir::ShapedType shape) override;
@@ -80,7 +84,7 @@ struct ConstantTensorInitFloat : TensorInitFloat {
 
 // Simple init (basic example, not useful).
 struct SimpleTensorInitFloat : TensorInitFloat {
-  SimpleTensorInit(DataType type) : TensorInitFloat(type) {}
+  SimpleTensorInitFloat(DataType type) : TensorInitFloat(type) {}
 
   // Return a dense<0.3, 0.6, 0.9> repeated throughout the shape.
   void fillData() override;
@@ -88,7 +92,7 @@ struct SimpleTensorInitFloat : TensorInitFloat {
 
 // Continuous init (normalized affine range).
 struct ContinuousTensorInitFloat : TensorInitFloat {
-  ContinuousTensorInit(DataType type) : TensorInitFloat(type) {}
+  ContinuousTensorInitFloat(DataType type) : TensorInitFloat(type) {}
 
   // Return a dense<0.0 ... 1.0> throughout the shape.
   void fillData() override;
@@ -96,7 +100,7 @@ struct ContinuousTensorInitFloat : TensorInitFloat {
 
 // Random init (uniform).
 struct RandomTensorInitFloat : TensorInitFloat {
-  RandomTensorInit(DataType type, int seed)
+  RandomTensorInitFloat(DataType type, int seed)
       : TensorInitFloat(type), generator(seed), distribution(0.0, 1.0) {}
 
   // Next random uniform number.
@@ -114,7 +118,7 @@ private:
 
 // Random init (normal).
 struct NormalTensorInitFloat : TensorInitFloat {
-  NormalTensorInit(DataType type, int seed)
+  NormalTensorInitFloat(DataType type, int seed)
       : TensorInitFloat(type), generator(seed), distribution(0.0, 0.2) {}
 
   // Next random number.
@@ -134,4 +138,4 @@ private:
   std::normal_distribution<float> distribution;
 };
 
-#endif // TPP_RUN_TENSORINITFLOAT_H
+#endif // TPP_TENSORINITFLOAT_H
