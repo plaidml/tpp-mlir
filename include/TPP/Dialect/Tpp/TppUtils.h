@@ -26,11 +26,8 @@ class YieldOp;
 namespace tpp {
 namespace utils {
 
-// Returns true if the linalg operation has been marked by the tpp detection
-// pass and the operation can be mapped to a tpp operation.
-bool hasTppMark(linalg::LinalgOp linalgOp);
-
 // Returns true if the linalg operation is marked with 'target'.
+// FIXME: This should be unnecessary but it's still used by convolutions
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
 // Returns true if the linalg operation has copy semantics.

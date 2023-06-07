@@ -25,25 +25,10 @@ namespace mlir {
 namespace tpp {
 namespace utils {
 
-bool hasTppMark(linalg::LinalgOp linalgOp) {
-  // Here we are abusing a bit the linalg library name machinery.
-  // Main asserts if we query the name at tensor level. Inspect
-  // only generic operation annotated by us.
-  if (!isa<linalg::GenericOp>(linalgOp))
-    return false;
-  std::string libraryCall = linalgOp.getLibraryCallName();
-  if (libraryCall.empty())
-    return false;
-  std::string delimiter = ".";
-  std::string prefix = libraryCall.substr(0, libraryCall.find(delimiter));
-  return prefix.compare("tpp") == 0;
-}
-
+// TODO: Remove this once convolutions stop using it
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
-  if (!hasTppMark(linalgOp))
-    return false;
-  std::string libraryCall = linalgOp.getLibraryCallName();
-  return libraryCall.compare(target) == 0;
+  return isa<linalg::GenericOp>(linalgOp) &&
+         linalgOp.getLibraryCallName() == target;
 }
 
 // Returns true if the value is a constant float or integer.
