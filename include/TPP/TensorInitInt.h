@@ -1,8 +1,15 @@
 //===- TensorInitInt.h - MLIR Tensor Initialization -----------------------===//
 //
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Initializes tensors for kernel input/output handling with some reasonable
 // distribution to allow for layout testing (reorder, pad) without vanishing
-// or exploding values at the end of a large model (0.0 ~ 1.0).
+// or exploding values at the end of a large model - uses quantization range
+// within <0 - 255> integer values.
 //
 //===----------------------------------------------------------------------===//
 
