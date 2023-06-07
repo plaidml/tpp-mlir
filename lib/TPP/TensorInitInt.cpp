@@ -11,13 +11,13 @@
 using namespace mlir;
 
 TensorInitInt::DataType TensorInitInt::getTensorInitDataType(mlir::Type type) {
-  if (type.isInteger(8))
+  if (type.isSignlessInteger(8))
     return DataType::I8;
-  if (type.isInteger(16))
+  if (type.isSignlessInteger(16))
     return DataType::I16;
-  if (type.isInteger(32))
+  if (type.isSignlessInteger(32))
     return DataType::I32;
-  if (type.isInteger(64))
+  if (type.isSignlessInteger(64))
     return DataType::I64;
   assert(false && "Invalid tensor init data type (only I8, I16, I32, I64)");
 }

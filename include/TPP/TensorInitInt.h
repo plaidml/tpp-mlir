@@ -18,12 +18,13 @@
 
 // Base class for integer values.
 struct TensorInitInt : public TensorInit<llvm::APInt> {
-  // Data type. (TODO: Support more data types)
+  // Supported data types.
+  // TODO: Support signed (si32) and unsinged (ui32) integers
   enum class DataType { I8, I16, I32, I64 };
 
   static bool isTypeSupported(const mlir::Type &type) {
-    return type.isInteger(8) || type.isInteger(16) || type.isInteger(32) ||
-           type.isInteger(64);
+    return type.isSignlessInteger(8) || type.isSignlessInteger(16) ||
+           type.isSignlessInteger(32) || type.isSignlessInteger(64);
   }
 
   // Get data type from element type.
@@ -124,7 +125,7 @@ struct NormalTensorInitInt : TensorInitInt {
     return value;
   }
 
-  // Return a dense<normal(0.0, 1.0)> throughout the shape.
+  // Return a dense<normal(0, 255)> throughout the shape.
   void fillData() override;
 
 private:

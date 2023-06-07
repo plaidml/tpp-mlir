@@ -18,7 +18,7 @@
 
 // Base class for float values.
 struct TensorInitFloat : public TensorInit<llvm::APFloat> {
-  // Data type. (TODO: Support 8-bit data types)
+  // Supported data types. (TODO: Support 8-bit data types)
   enum class DataType { FP32, FP64, BF16 };
 
   static bool isTypeSupported(const mlir::Type &type) {
