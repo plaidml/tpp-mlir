@@ -159,7 +159,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 
 void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
-  // cla/hasDynng-format off
+  // clang-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
                ConvertMatmulToTpp,
