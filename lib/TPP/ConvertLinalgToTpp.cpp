@@ -78,7 +78,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::hasStaticShape(linalgOp))
+    if (linalgOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");
     return rewriteToTppOp(linalgOp, rewriter);
@@ -92,7 +92,7 @@ struct ConvertBrgemmToTpp
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::hasStaticShape(brMatmulOp))
+    if (brMatmulOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
@@ -109,7 +109,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::hasStaticShape(matmulOp))
+    if (matmulOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
@@ -126,7 +126,7 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::hasStaticShape(fillOp))
+    if (fillOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           fillOp, "Expect static shape when mapping to tpp");
 
@@ -159,7 +159,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
 
 void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
-  // clang-format off
+  // cla/hasDynng-format off
   patterns.add<ConvertGenericOpToTpp,
                ConvertBrgemmToTpp,
                ConvertMatmulToTpp,

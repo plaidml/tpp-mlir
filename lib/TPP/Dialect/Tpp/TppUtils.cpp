@@ -25,10 +25,6 @@ namespace mlir {
 namespace tpp {
 namespace utils {
 
-bool hasStaticShape(linalg::LinalgOp linalgOp) {
-  return !linalgOp.hasDynamicShape();
-}
-
 bool hasTppMark(linalg::LinalgOp linalgOp) {
   // Here we are abusing a bit the linalg library name machinery.
   // Main asserts if we query the name at tensor level. Inspect
