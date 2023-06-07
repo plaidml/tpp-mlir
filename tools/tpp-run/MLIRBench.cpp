@@ -34,6 +34,9 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
+#include "TPP/TensorInit.h"
+#include "TPP/TensorInitFloat.h"
+#include "TPP/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
@@ -117,17 +120,25 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
 
   // Only replace attribute if it's a dense splat
   auto replaceSplat = [&](ShapedType shape, Attribute attr) -> Attribute {
-    // We only change float types
-    auto elmTy = shape.getElementType();
-    if (!TensorInit::isTypeSupported(elmTy))
-      return attr;
     // We only change dense attributes that are splat
     auto value = dyn_cast<DenseElementsAttr>(attr);
     if (!value || !value.isSplat())
       return attr;
-    // Only positive float data type (zero may be for ReLU, -1 for fill)
-    auto elm = value.getSplatValue<FloatAttr>().getValueAsDouble();
-    if (elm <= 0.0)
+    // Validate element data type
+    // Only positive data type (zero may be for ReLU, -1 for fill)
+    auto elmTy = shape.getElementType();
+    bool isTypeValid = false;
+    if (TensorInitFloat::isTypeSupported(elmTy)) {
+      auto elm = value.getSplatValue<FloatAttr>().getValueAsDouble();
+      if (elm > 0.0)
+        isTypeValid = true;
+    }
+    if (TensorInitInt::isTypeSupported(elmTy)) {
+      auto elm = value.getSplatValue<IntegerAttr>().getValue();
+      if (elm.sgt(0))
+        isTypeValid = true;
+    }
+    if (!isTypeValid)
       return attr;
     // Generate a new random dense and return
     auto init = getTensorInit(initType, elmTy, seed);
