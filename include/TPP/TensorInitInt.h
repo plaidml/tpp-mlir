@@ -53,11 +53,11 @@ protected:
 
   // Insert element indexed on the buffer.
   using TensorInit::insert;
-  void insert(size_t index, uint64_t value);
+  virtual void insert(size_t index, uint64_t value);
 
   // Insert element at the end of the buffer.
   using TensorInit::push;
-  void push(uint64_t value);
+  virtual void push(uint64_t value);
 
   // Convert value to the tensor's data type (by reference).
   void convertType(llvm::APInt &value) override final;

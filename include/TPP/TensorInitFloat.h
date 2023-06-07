@@ -58,11 +58,11 @@ protected:
 
   // Insert element indexed on the buffer.
   using TensorInit::insert;
-  void insert(size_t index, float value);
+  virtual void insert(size_t index, float value);
 
   // Insert element at the end of the buffer.
   using TensorInit::push;
-  void push(float value);
+  virtual void push(float value);
 
   // Convert value to the tensor's data type (by reference).
   void convertType(llvm::APFloat &value) override final;
