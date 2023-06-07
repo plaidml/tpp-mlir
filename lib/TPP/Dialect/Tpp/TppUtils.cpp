@@ -316,6 +316,27 @@ LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
   return success();
 }
 
+// Return true if the linalg.generic can be mapped to a tpp.add + tpp.max.
+// FIXME: This is necessary because IREE fuses addf + maxf and we don't match
+// TODO: This will be done at tpp.group level later on
+bool isTppBiasRelu(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+  using namespace tpp::structured_match;
+  auto biasReluMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithOpChain<arith::AddFOp, arith::MaxFOp>(operands));
+
+  if (!isTppBinaryOp(linalgOp) || !biasReluMatcher.match(linalgOp))
+    return false;
+
+  // Only take the output as tpp.add + tpp.relu should be in-place operations.
+  auto output = linalgOp.getOutputs()[0];
+  if (!output.getType().isa<ShapedType>())
+    return false;
+
+  operands->push_back(output);
+  return true;
+}
+
+
 } // namespace utils
 } // namespace tpp
 } // namespace mlir

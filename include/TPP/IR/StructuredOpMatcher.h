@@ -10,6 +10,7 @@
 #define TPP_STRUCTUREDOPMATCHERS_H
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <functional>
 
@@ -277,6 +278,27 @@ template <typename OpTy> struct WithSingleOp {
 
 private:
   SmallVectorImpl<Value> *captures;
+};
+
+// Implemenation to allow definition in cpp file
+using TypeCheckFunc = std::function<bool(Operation*)>;
+bool withOpChainImpl(Region *region, Operation *op, SmallVectorImpl<Value> *,
+                     SmallVectorImpl<TypeCheckFunc>&);
+
+// Callable object to check the region for a chain of operations.
+template <typename... OpTy> struct WithOpChain {
+  WithOpChain() : WithOpChain(nullptr){};
+  WithOpChain(SmallVectorImpl<Value> *captures) : captures(captures) {
+    (typeChecks.push_back([](Operation *op) { return isa<OpTy>(op); }), ...);
+  };
+
+  bool operator()(Region *region, Operation *op) {
+    return withOpChainImpl(region, op, captures, typeChecks);
+  }
+
+private:
+  SmallVectorImpl<Value> *captures;
+  SmallVector<TypeCheckFunc> typeChecks;
 };
 
 class StructuredOpMatcher {
