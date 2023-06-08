@@ -28,6 +28,9 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
     Convert tpp operations to SCF loops.
   }];
   let dependentDialects = ["scf::SCFDialect", "memref::MemRefDialect"];
+  let options = [
+    Option<"parallel", "parallel", "bool", "false", "use parallel loops">
+  ];
 }
 
 def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {

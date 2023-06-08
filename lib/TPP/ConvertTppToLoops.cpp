@@ -26,9 +26,14 @@ namespace {
 struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
+  ConvertTppAddOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
+
   LogicalResult matchAndRewrite(AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
+    if (!addOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          addOp, "Tpp loop lowering expects memref type");
 
     Location loc = addOp.getLoc();
 
@@ -54,17 +59,23 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
       b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(), localIvs);
     };
 
-    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
-    rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
+    if (parallel)
+      rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
+    else
+      (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
 
     rewriter.eraseOp(addOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
 void buildUnaryLoop(
     PatternRewriter &rewriter, TppOp tppOp,
-    function_ref<void(OpBuilder &, Location, ValueRange)> bodyBuilder) {
+    function_ref<void(OpBuilder &, Location, ValueRange)> bodyBuilder,
+    bool parallel = false) {
   assert(tppOp.isUnary() && "Expect tpp unary op");
 
   Location loc = tppOp.getLoc();
@@ -83,13 +94,18 @@ void buildUnaryLoop(
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Value> steps(rank, one);
 
-  // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
-  rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
+  if (parallel)
+    rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
+  else
+    (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
 }
 
 // Converts tpp.identity to SCF loops.
 struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
   using OpRewritePattern<IdentityOp>::OpRewritePattern;
+
+  ConvertTppIdentityOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
 
   bool isScalar(Value val) const { return !val.getType().isa<ShapedType>(); }
 
@@ -101,8 +117,9 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
 
   LogicalResult matchAndRewrite(IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    assert(identityOp.hasBufferSemantics() &&
-           "tpp.identity expects a memref type");
+    if (!identityOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          identityOp, "Tpp loop lowering expects memref type");
 
     auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
       Value input = identityOp.getInputs()[0];
@@ -130,20 +147,28 @@ struct ConvertTppIdentityOp : public OpRewritePattern<IdentityOp> {
                                   localIvs);
       }
     };
-    buildUnaryLoop(rewriter, identityOp, bodyBuilder);
+    buildUnaryLoop(rewriter, identityOp, bodyBuilder, parallel);
 
     rewriter.eraseOp(identityOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
 // Convert tpp.relu to SCF loops.
 struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
   using OpRewritePattern<ReluOp>::OpRewritePattern;
 
+  ConvertTppReluOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
+
   LogicalResult matchAndRewrite(ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
+    if (!reluOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          reluOp, "Tpp loop lowering expects memref type");
 
     Location loc = reluOp.getLoc();
     Type elementType =
@@ -157,20 +182,28 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
       Value scalarRelu = b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
       b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(), localIvs);
     };
-    buildUnaryLoop(rewriter, reluOp, bodyBuilder);
+    buildUnaryLoop(rewriter, reluOp, bodyBuilder, parallel);
 
     rewriter.eraseOp(reluOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
 // Convert tpp.zero to SCF loops.
 struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
   using OpRewritePattern<ZeroOp>::OpRewritePattern;
 
+  ConvertTppZeroOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
+
   LogicalResult matchAndRewrite(ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
-    assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
+    if (!zeroOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          zeroOp, "Tpp loop lowering expects memref type");
 
     Location loc = zeroOp.getLoc();
 
@@ -184,20 +217,28 @@ struct ConvertTppZeroOp : public OpRewritePattern<ZeroOp> {
       b.create<memref::StoreOp>(loc, zeroConstant, zeroOp.getOutput(),
                                 localIvs);
     };
-    buildUnaryLoop(rewriter, zeroOp, bodyBuilder);
+    buildUnaryLoop(rewriter, zeroOp, bodyBuilder, parallel);
 
     rewriter.eraseOp(zeroOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
 // Convert tpp.gemm to SCF loops.
 struct ConvertTppGemmOp : public OpRewritePattern<GemmOp> {
   using OpRewritePattern<GemmOp>::OpRewritePattern;
 
+  ConvertTppGemmOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
+
   LogicalResult matchAndRewrite(GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    assert(matmulOp.hasBufferSemantics() && "tpp.matmul expects a memref type");
+    if (!matmulOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Tpp loop lowering expects memref type");
 
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC = matmulOp.getOutputType().getShape();
@@ -240,34 +281,43 @@ struct ConvertTppGemmOp : public OpRewritePattern<GemmOp> {
                                 ValueRange{localI, localJ});
     };
 
-    auto parallelLoop = rewriter.create<scf::ParallelOp>(
-        loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
-    auto parallelIvs = parallelLoop.getInductionVars();
-    ivs.append(parallelIvs.begin(), parallelIvs.end());
+    if (parallel) {
+      auto parallelLoop = rewriter.create<scf::ParallelOp>(
+          loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
+      auto parallelIvs = parallelLoop.getInductionVars();
+      ivs.append(parallelIvs.begin(), parallelIvs.end());
 
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
-    rewriter.create<scf::ForOp>(
-        loc, zero, k, one, std::nullopt,
-        [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
-          bodyBuilder(b, loc, iv);
-          b.create<scf::YieldOp>(loc);
-        });
-
-    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
+      rewriter.create<scf::ForOp>(
+          loc, zero, k, one, std::nullopt,
+          [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+            bodyBuilder(b, loc, iv);
+            b.create<scf::YieldOp>(loc);
+          });
+    } else
+      (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
 
     rewriter.eraseOp(matmulOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
 // Convert tpp.brgemm to SCF loops.
 struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
   using OpRewritePattern<BrgemmOp>::OpRewritePattern;
 
+  ConvertTppBrgemmOp(MLIRContext *ctx, bool parallel)
+      : OpRewritePattern(ctx), parallel(parallel) {}
+
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(brgemmOp.hasBufferSemantics() && "tpp.brgemm expects a memref type");
+    if (!brgemmOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Tpp loop lowering expects memref type");
 
     Location loc = brgemmOp.getLoc();
     ArrayRef<int64_t> shapeC = brgemmOp.getOutputType().getShape();
@@ -307,48 +357,55 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
                                 ValueRange{localI, localJ});
     };
 
-    auto parallelLoop = rewriter.create<scf::ParallelOp>(
-        loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
-    auto parallelIvs = parallelLoop.getInductionVars();
+    if (parallel) {
+      auto parallelLoop = rewriter.create<scf::ParallelOp>(
+          loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
+      auto parallelIvs = parallelLoop.getInductionVars();
 
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
-    auto batchLoop = rewriter.create<scf::ForOp>(loc, zero, b, one);
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
+      auto batchLoop = rewriter.create<scf::ForOp>(loc, zero, b, one);
 
-    // Keep IVs in the original order: b, i, j, k.
-    ivs.push_back(batchLoop.getInductionVar());
-    ivs.append(parallelIvs.begin(), parallelIvs.end());
+      // Keep IVs in the original order: b, i, j, k.
+      ivs.push_back(batchLoop.getInductionVar());
+      ivs.append(parallelIvs.begin(), parallelIvs.end());
 
-    rewriter.setInsertionPoint(batchLoop.getBody()->getTerminator());
-    rewriter.create<scf::ForOp>(
-        loc, zero, k, one, std::nullopt,
-        [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
-          bodyBuilder(b, loc, iv);
-          b.create<scf::YieldOp>(loc);
-        });
-
-    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+      rewriter.setInsertionPoint(batchLoop.getBody()->getTerminator());
+      rewriter.create<scf::ForOp>(
+          loc, zero, k, one, std::nullopt,
+          [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+            bodyBuilder(b, loc, iv);
+            b.create<scf::YieldOp>(loc);
+          });
+    } else
+      (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
 
     rewriter.eraseOp(brgemmOp);
     return success();
   }
+
+private:
+  bool parallel;
 };
 
-void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
+void populateTppToLoopsPatterns(RewritePatternSet &patterns, bool parallel) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
                ConvertTppGemmOp,
                ConvertTppBrgemmOp,
                ConvertTppReluOp,
-               ConvertTppZeroOp>(patterns.getContext());
+               ConvertTppZeroOp>(patterns.getContext(), parallel);
   // clang-format on
 }
 
 struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
+  ConvertTppToLoops() = default;
+  ConvertTppToLoops(bool parallel) { this->parallel = parallel; }
+
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateTppToLoopsPatterns(patterns);
+    populateTppToLoopsPatterns(patterns, parallel);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -358,4 +415,9 @@ struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertTppToLoopsPass() {
   return std::make_unique<ConvertTppToLoops>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createConvertTppToLoopsPass(bool parallel) {
+  return std::make_unique<ConvertTppToLoops>(parallel);
 }
