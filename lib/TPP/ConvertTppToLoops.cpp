@@ -44,18 +44,19 @@ struct ConvertTppAddOp : public OpRewritePattern<AddOp> {
     SmallVector<Value> lbs(rank, zero);
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> steps(rank, one);
-    (void)scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          Value scalarLhs =
-              b.create<memref::LoadOp>(loc, addOp.getInputs()[0], localIvs);
-          Value scalarRhs =
-              b.create<memref::LoadOp>(loc, addOp.getInputs()[1], localIvs);
-          Value addLhsAndRhs =
-              b.create<arith::AddFOp>(loc, scalarLhs, scalarRhs);
-          b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(),
-                                    localIvs);
-        });
+
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      Value scalarLhs =
+          b.create<memref::LoadOp>(loc, addOp.getInputs()[0], localIvs);
+      Value scalarRhs =
+          b.create<memref::LoadOp>(loc, addOp.getInputs()[1], localIvs);
+      Value addLhsAndRhs = b.create<arith::AddFOp>(loc, scalarLhs, scalarRhs);
+      b.create<memref::StoreOp>(loc, addLhsAndRhs, addOp.getOutput(), localIvs);
+    };
+
+    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+    rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
+
     rewriter.eraseOp(addOp);
     return success();
   }
@@ -82,7 +83,8 @@ void buildUnaryLoop(
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Value> steps(rank, one);
 
-  (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+  // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+  rewriter.create<scf::ParallelOp>(loc, lbs, ubs, steps, bodyBuilder);
 }
 
 // Converts tpp.identity to SCF loops.
@@ -205,33 +207,54 @@ struct ConvertTppGemmOp : public OpRewritePattern<GemmOp> {
       return rewriter.notifyMatchFailure(matmulOp,
                                          "Packed BF16 loops unsupported");
     }
+    // Parallel dims.
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
+    // Reduction dim.
     Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
     SmallVector<Value> ubs = {i, j, k};
+    // Lbs.
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> lbs = {zero, zero, zero};
+    // Step.
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> steps = {one, one, one};
+    SmallVector<Value> ivs;
 
-    (void)scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          assert(localIvs.size() == 3);
-          Value localI = localIvs[0];
-          Value localJ = localIvs[1];
-          Value localK = localIvs[2];
-          Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[0],
-                                                   ValueRange{localI, localK});
-          Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[1],
-                                                   ValueRange{localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[2],
-                                                   ValueRange{localI, localJ});
-          Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
-          Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
-          b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.getOutput(),
-                                    ValueRange{localI, localJ});
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      SmallVector<Value> loopIvs = ivs;
+      loopIvs.append(localIvs.begin(), localIvs.end());
+      assert(loopIvs.size() == 3);
+      Value localI = loopIvs[0];
+      Value localJ = loopIvs[1];
+      Value localK = loopIvs[2];
+      Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[0],
+                                               ValueRange{localI, localK});
+      Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[1],
+                                               ValueRange{localK, localJ});
+      Value scalarC = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[2],
+                                               ValueRange{localI, localJ});
+      Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
+      Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
+      b.create<memref::StoreOp>(loc, scalarAdd, matmulOp.getOutput(),
+                                ValueRange{localI, localJ});
+    };
+
+    auto parallelLoop = rewriter.create<scf::ParallelOp>(
+        loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
+    auto parallelIvs = parallelLoop.getInductionVars();
+    ivs.append(parallelIvs.begin(), parallelIvs.end());
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
+    rewriter.create<scf::ForOp>(
+        loc, zero, k, one, std::nullopt,
+        [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+          bodyBuilder(b, loc, iv);
+          b.create<scf::YieldOp>(loc);
         });
+
+    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
 
     rewriter.eraseOp(matmulOp);
     return success();
@@ -249,35 +272,63 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<BrgemmOp> {
     Location loc = brgemmOp.getLoc();
     ArrayRef<int64_t> shapeC = brgemmOp.getOutputType().getShape();
     ArrayRef<int64_t> shapeA = brgemmOp.getMemRefInputType(0).getShape();
+    // Parallel dims.
     Value i = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeC[1]);
+    // Reduction dims.
     Value k = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[2]);
     Value b = rewriter.createOrFold<arith::ConstantIndexOp>(loc, shapeA[0]);
     SmallVector<Value> ubs = {b, i, j, k};
+    // Lbs.
     Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> lbs = {zero, zero, zero, zero};
+    // Step.
     Value one = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> steps = {one, one, one, one};
+    SmallVector<Value> ivs;
 
-    (void)scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps,
-        [&](OpBuilder &b, Location loc, ValueRange localIvs) {
-          assert(localIvs.size() == 4);
-          Value localB = localIvs[0];
-          Value localI = localIvs[1];
-          Value localJ = localIvs[2];
-          Value localK = localIvs[3];
-          Value scalarA = b.create<memref::LoadOp>(
-              loc, brgemmOp.getInputs()[0], ValueRange{localB, localI, localK});
-          Value scalarB = b.create<memref::LoadOp>(
-              loc, brgemmOp.getInputs()[1], ValueRange{localB, localK, localJ});
-          Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getInputs()[2],
-                                                   ValueRange{localI, localJ});
-          Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
-          Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
-          b.create<memref::StoreOp>(loc, scalarAdd, brgemmOp.getOutput(),
-                                    ValueRange{localI, localJ});
+    auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
+      SmallVector<Value> loopIvs = ivs;
+      loopIvs.append(localIvs.begin(), localIvs.end());
+      assert(loopIvs.size() == 4);
+      Value localB = loopIvs[0];
+      Value localI = loopIvs[1];
+      Value localJ = loopIvs[2];
+      Value localK = loopIvs[3];
+      Value scalarA = b.create<memref::LoadOp>(
+          loc, brgemmOp.getInputs()[0], ValueRange{localB, localI, localK});
+      Value scalarB = b.create<memref::LoadOp>(
+          loc, brgemmOp.getInputs()[1], ValueRange{localB, localK, localJ});
+      Value scalarC = b.create<memref::LoadOp>(loc, brgemmOp.getInputs()[2],
+                                               ValueRange{localI, localJ});
+      Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
+      Value scalarAdd = b.create<arith::AddFOp>(loc, scalarC, scalarMul);
+      b.create<memref::StoreOp>(loc, scalarAdd, brgemmOp.getOutput(),
+                                ValueRange{localI, localJ});
+    };
+
+    auto parallelLoop = rewriter.create<scf::ParallelOp>(
+        loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
+    auto parallelIvs = parallelLoop.getInductionVars();
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
+    auto batchLoop = rewriter.create<scf::ForOp>(loc, zero, b, one);
+
+    // Keep IVs in the original order: b, i, j, k.
+    ivs.push_back(batchLoop.getInductionVar());
+    ivs.append(parallelIvs.begin(), parallelIvs.end());
+
+    rewriter.setInsertionPoint(batchLoop.getBody()->getTerminator());
+    rewriter.create<scf::ForOp>(
+        loc, zero, k, one, std::nullopt,
+        [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+          bodyBuilder(b, loc, iv);
+          b.create<scf::YieldOp>(loc);
         });
+
+    // (void)scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, bodyBuilder);
+
     rewriter.eraseOp(brgemmOp);
     return success();
   }
