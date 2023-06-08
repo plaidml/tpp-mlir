@@ -48,7 +48,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK:     %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
   // CHECK:     memref.store %[[max]], %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
   tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
-  return 
+  return
 }
 
 // -----
@@ -107,7 +107,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3xf32>) {
 
 // -----
 
-func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) { 
+func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
   tpp.identity ins(%arg1: memref<1x3xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
@@ -125,7 +125,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
 
 // -----
 
-func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) { 
+func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   tpp.identity ins(%arg1: memref<1x1xf32>) outs(%arg0: memref<3x3xf32>)
   return
 }
@@ -143,7 +143,7 @@ func.func @identity_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 
 // -----
 
-func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) { 
+func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
   tpp.identity ins(%arg0: memref<5x1xf32>) outs(%arg1: memref<5x6xf32>)
   return
 }
@@ -162,8 +162,8 @@ func.func @identity_to_loops(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 
 // -----
 
-func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) { 
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
+func.func @brgemm_to_loops(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>)
              outs(%arg2: memref<3x3xf32>)
   return
 }
