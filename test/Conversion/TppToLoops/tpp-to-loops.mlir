@@ -206,3 +206,28 @@ func.func @add_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: m
 // CHECK:     %[[load2:.*]] = memref.load %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
 // CHECK:     %[[add:.*]] = arith.addf %[[load1]], %[[load2]] : f32
 // CHECK:     memref.store %[[add]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+
+// -----
+
+func.func @gemm_to_loops(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memref<8x10xf32>) {
+  tpp.gemm ins(%arg0 : memref<8x9xf32>, %arg1 : memref<9x10xf32>, %arg2: memref<8x10xf32>)
+           outs(%arg2: memref<8x10xf32>)
+  return
+}
+
+// CHECK: func.func @gemm_to_loops(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<8x9xf32>, %[[ARG1:.+]]: memref<9x10xf32>, %[[ARG2:.+]]: memref<8x10xf32>) {
+// CHECK-DAG: %[[ubP1:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[ubP2:.*]] = arith.constant 10 : index
+// CHECK-DAG: %[[ubR:.*]] = arith.constant 9 : index
+// CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+// CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ubP1]] step %[[step]] {
+// CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ubP2]] step %[[step]] {
+// CHECK:     scf.for %[[k:.*]] = %[[lb]] to %[[ubR]] step %[[step]] {
+// CHECK:       %[[load0:.*]] = memref.load %[[ARG0]][%[[i]], %[[k]]] : memref<8x9xf32>
+// CHECK:       %[[load1:.*]] = memref.load %[[ARG1]][%[[k]], %[[j]]] : memref<9x10xf32>
+// CHECK:       %[[load2:.*]] = memref.load %[[ARG2]][%[[i]], %[[j]]] : memref<8x10xf32>
+// CHECK:       %[[mul:.*]] = arith.mulf %[[load0]], %[[load1]] : f32
+// CHECK:       %[[add:.*]] = arith.addf %[[load2]], %[[mul]] : f32
+// CHECK:       memref.store %[[add]], %[[ARG2]][%[[i]], %[[j]]] : memref<8x10xf32>
