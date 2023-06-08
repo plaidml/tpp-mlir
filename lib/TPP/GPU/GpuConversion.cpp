@@ -64,6 +64,7 @@ private:
     pm.clear();
 
     // Map and lower ops to GPU-compatible format.
+    pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass(true));
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
     pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
     pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());

@@ -87,13 +87,17 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    GpuType gpuType = parseGpuOption(this->gpuBackend);
+    // Preprocess and bufferize as further conversion requires memref
+    // abstraction.
+    pm.addPass(createGeneralizeTensorPackAndUnPackPass());
+    pm.addPass(createBufferizePass());
+    pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.
     pm.addPass(createGpuConversionPass());
 
     // Lower GPU ops to the chosen GPU backend.
-    switch (gpuType) {
+    switch (parseGpuOption(this->gpuBackend)) {
     case GpuType::Cuda:
       pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
       break;
