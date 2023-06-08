@@ -43,7 +43,7 @@ llvm::cl::opt<bool> defPipePack("def-pack",
 llvm::cl::opt<bool> defTppOnTensors(
     "def-tpp-on-tensors",
     llvm::cl::desc("Default pipeline - convert to tpp on tensors"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
