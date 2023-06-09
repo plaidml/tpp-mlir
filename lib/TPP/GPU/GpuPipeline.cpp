@@ -114,10 +114,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuPipelinePass() {
-  return std::make_unique<GpuPipeline>();
-}
-
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createGpuPipelinePass(StringRef gpuBackend) {
   return std::make_unique<GpuPipeline>(gpuBackend);
