@@ -90,11 +90,6 @@ private:
 } // namespace
 
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
-mlir::tpp::createGpuToCudaPass() {
-  return std::make_unique<GpuToCuda>();
-}
-
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
                                StringRef gpuFeatures) {
   return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
