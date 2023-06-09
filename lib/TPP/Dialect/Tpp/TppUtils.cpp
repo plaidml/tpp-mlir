@@ -120,7 +120,9 @@ static bool isTppOp(linalg::GenericOp linalgOp) {
   auto tppMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
           .output(MatchAll(), HasStaticShape())
+          .output(MatchAll(), HasRank({2}))
           .input(MatchAll(), HasStaticShape())
+          .input(MatchAll(), HasRank({HasRank::SCALAR, 1, 2}))
           .operation(NumRegions(EqualsTo(1)))
           .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
   return tppMatcher.match(linalgOp);

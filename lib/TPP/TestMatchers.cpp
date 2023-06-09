@@ -159,6 +159,28 @@ void testTppIdentity(FunctionOpInterface funcOp) {
   });
 }
 
+void testTppRank(FunctionOpInterface funcOp) {
+  // clang-format off
+  auto matcherRank1 =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchAll(), HasRank({1}));
+  auto matcherRank2 =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchAll(), HasRank({2}));
+  auto matcherScalar = 
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchAll(), HasRank({HasRank::SCALAR}));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcherRank1.match(linalgOp))
+      llvm::outs() << "match rank 1\n";
+    if (matcherRank2.match(linalgOp))
+      llvm::outs() << "match rank 2\n";
+    if (matcherScalar.match(linalgOp))
+      llvm::outs() << "match scalar\n";
+  });
+}
+
 void TestStructuralMatchers::runOnOperation() {
   auto f = getOperation();
   llvm::outs() << f.getName() << "\n";
@@ -176,6 +198,8 @@ void TestStructuralMatchers::runOnOperation() {
     testInterfaces(f);
   if (f.getName() == "test_tpp_identity")
     testTppIdentity(f);
+  if (f.getName() == "test_rank")
+    testTppRank(f);
 }
 
 namespace mlir {
