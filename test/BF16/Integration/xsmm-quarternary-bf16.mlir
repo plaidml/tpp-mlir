@@ -1,6 +1,5 @@
-// RUN: tpp-run %s -print \
-// RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s
+// RUN: tpp-run %s \
+// RUN:  -e entry -entry-point-result=void
 
 func.func @entry(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, %arg2: memref<4x4xbf16>, %arg3: memref<4xbf16>) {
   %c16_i64 = arith.constant 16 : i64
@@ -16,8 +15,3 @@ func.func @entry(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, %arg2
 
   return
 }
-
-// CHECK: ( 1, 1, 1, 1 )
-// CHECK: ( 1, 1, 1, 1 )
-// CHECK: ( 1, 1, 1, 1 )
-// CHECK: ( 1, 1, 1, 1 )

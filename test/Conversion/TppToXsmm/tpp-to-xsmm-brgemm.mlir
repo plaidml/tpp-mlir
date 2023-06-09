@@ -39,13 +39,15 @@ func.func @brgemm_fused(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
   return
 }
 
+// TODO remove split after LIBXSMM binary flag is fixed
 // CHECK-LABEL: brgemm_fused
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x5x4xf32>, %[[ARG1:.+]]: memref<3x4x5xf32>, 
 // CHECK-SAME:  %[[ARG2:.+]]: memref<5x5xf32>, %[[ARG3:.+]]: memref<5x5xf32>
 // CHECK: %[[C3:.+]] = arith.constant 3 : i64
-// CHECK: %[[DIS:.+]] = xsmm.fused_brgemm.dispatch [5, 5, 4, 4, 5, 5] 
-// CHECK-SAME:  [none,none]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = f32
-// CHECK: xsmm.fused_brgemm(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[C3]])
+// CHECK-NOT: xsmm.fused_brgemm.dispatch [5, 5, 4, 4, 5, 5] [none,none]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = f32
+// CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5] flags = (none) data_type = f32
+// CHECK-NOT: xsmm.fused_brgemm(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[C3]])
+// CHECK: xsmm.brgemm(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[C3]])
 
 // -----
 
@@ -65,3 +67,21 @@ func.func @brgemm_fused(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>,
 // CHECK: %[[DIS:.+]] = xsmm.fused_brgemm.dispatch [5, 5, 4, 4, 5, 5] 
 // CHECK-SAME:  [add,relu]  flags = (none)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
 // CHECK: xsmm.fused_brgemm(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[C3]])
+
+// -----
+
+func.func @brgemm_fused(%arg0 : memref<5x2x2xf32>, %arg1 : memref<5x2x2xf32>,
+                            %arg2 : memref<2x2xf32>, %arg3 : memref<2x2xf32>) {
+  tpp.fused_brgemm [unary = relu, binary = add]
+    ins(%arg0 : memref<5x2x2xf32>, %arg1 : memref<5x2x2xf32>,
+        %arg2 : memref<2x2xf32>, %arg3 : memref<2x2xf32>)
+    outs(%arg2 : memref<2x2xf32>)
+  return
+}
+
+// TODO remove split after LIBXSMM binary flag is fixed
+// CHECK-LABEL: brgemm_fused
+// CHECK-NOT: xsmm.fused_brgemm.dispatch [2, 2, 2, 2, 2, 2][add,relu]{{.*}}binary_flags = (none)
+// CHECK: xsmm.brgemm.dispatch [2, 2, 2, 2, 2, 2]
+// CHECK: xsmm.binary.dispatch add [2, 2, 2, 2, 2]
+// CHECK: xsmm.unary.dispatch relu [2, 2, 2, 2]
