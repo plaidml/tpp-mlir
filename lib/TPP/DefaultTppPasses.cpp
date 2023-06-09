@@ -40,11 +40,6 @@ llvm::cl::opt<bool> defPipePack("def-pack",
                                 llvm::cl::desc("Default pipeline - packing"),
                                 llvm::cl::init(true));
 
-llvm::cl::opt<bool> defTppOnTensors(
-    "def-tpp-on-tensors",
-    llvm::cl::desc("Default pipeline - convert to tpp on tensors"),
-    llvm::cl::init(true));
-
 llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
                    llvm::cl::desc("Disable default pipeline execution"),
@@ -302,7 +297,6 @@ private:
     // allow direct use of scf.parallel loops. This prevents different
     // lowering outputs between input linalg on tensors and memrefs.
     pm.addPass(createRewriteToBatchReduceGemmPass());
-    pm.addPass(createConvertForToForAllOpPass());
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
@@ -412,11 +406,9 @@ private:
       pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
-      if (defTppOnTensors) {
-        // Lower operations to TPP.
-        pm.addNestedPass<func::FuncOp>(createTppConversionPass());
-        pm.addNestedPass<func::FuncOp>(createCleanupPass());
-      }
+      // Lower operations to TPP.
+      pm.addNestedPass<func::FuncOp>(createTppConversionPass());
+      pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       pm.addPass(createBufferizePass());
 
@@ -424,12 +416,6 @@ private:
       // as scf.parallel does not handle tensor. Fix it upstream or keep the
       // pass after `createBufferizePass`.
       pm.addPass(createConvertForAllToParallelOpPass());
-
-      if (!defTppOnTensors) {
-        // Lower operations to TPP.
-        pm.addNestedPass<func::FuncOp>(createTppConversionPass());
-        pm.addNestedPass<func::FuncOp>(createCleanupPass());
-      }
 
       // Lower all TPP operations.
       pm.addNestedPass<func::FuncOp>(createTppLoweringPass(tppToLoops));
