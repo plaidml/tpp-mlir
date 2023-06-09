@@ -433,11 +433,13 @@ struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
 
   LogicalResult matchAndRewrite(FusedBrgemmDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
-    // Currently LIBXSMM support only BCAST_COL_IN_0 as binary flag.
+    // Currently LIBXSMM support only BCAST_COL_IN_0 as binary flag with bias
+    // addition.
+    auto isFusedAdd = dispatchOp.getBinaryKind() == xsmm::BinaryKind::ADD;
     auto binaryFlags = dispatchOp.getBinaryFlags();
-    if (binaryFlags.size() != 1 ||
-        binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
-            BinaryFlags::BCAST_COL_IN_0) {
+    if (isFusedAdd && (binaryFlags.size() != 1 ||
+                       binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
+                           BinaryFlags::BCAST_COL_IN_0)) {
       return failure();
     }
     return buildDispatchOp<FusedBrgemmDispatchOp>(rewriter, dispatchOp,

@@ -1,5 +1,6 @@
 // RUN: tpp-run %s \
-// RUN:  -e entry -entry-point-result=void
+// RUN:  -e entry -entry-point-result=void | \
+// RUN: FileCheck %s
 
 memref.global "private" constant @__biasBcast : memref<1x4xf32> =
   dense<[[1.0, 2.0, 3.0, 4.0]]>
@@ -28,11 +29,11 @@ func.func @entry(%arg0: memref<64x4x4xf32>, %arg1: memref<64x4x4xf32>, %arg2: me
 }
 func.func private @printMemrefF32(memref<*xf32>)
 
-// CHECK: [[258,   259,   260,   261],
 // CHECK:  [258,   259,   260,   261],
 // CHECK:  [258,   259,   260,   261],
-// CHECK:  [258,   259,   260,   261]]
-// CHECK: [[258,   259,   260,   261],
+// CHECK:  [258,   259,   260,   261],
+// CHECK:  [258,   259,   260,   261]
 // CHECK:  [258,   259,   260,   261],
 // CHECK:  [258,   259,   260,   261],
-// CHECK:  [258,   259,   260,   261]]
+// CHECK:  [258,   259,   260,   261],
+// CHECK:  [258,   259,   260,   261]
