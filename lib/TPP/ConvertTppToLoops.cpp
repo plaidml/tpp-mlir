@@ -388,12 +388,51 @@ private:
   bool parallel;
 };
 
-void populateTppToLoopsPatterns(RewritePatternSet &patterns, bool parallel) {
+// Convert tpp.fused_brgemm to SCF loops.
+struct ConvertTppFusedBrgemmOp : public OpRewritePattern<FusedBrgemmOp> {
+  using OpRewritePattern<FusedBrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(FusedBrgemmOp fusedBrgemmOp,
+                                PatternRewriter &rewriter) const override {
+    assert(fusedBrgemmOp.hasBufferSemantics() &&
+           "tpp.fused_brgemm expects a memref type");
+
+    Location loc = fusedBrgemmOp.getLoc();
+
+    // Split fused op into individual operations for further lowering.
+    auto ins = fusedBrgemmOp.getInputs();
+    auto out = fusedBrgemmOp.getOutput();
+    rewriter.create<tpp::BrgemmOp>(loc, ValueRange{ins[0], ins[1], ins[2]},
+                                   out);
+
+    switch (fusedBrgemmOp.getBinaryKind()) {
+    case tpp::FusedBinaryOpKind::ADD:
+      rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
+      break;
+    case tpp::FusedBinaryOpKind::NONE:
+      break;
+    }
+
+    switch (fusedBrgemmOp.getUnaryKind()) {
+    case tpp::FusedUnaryOpKind::RELU:
+      rewriter.create<tpp::ReluOp>(loc, out, out);
+      break;
+    case tpp::FusedUnaryOpKind::NONE:
+      break;
+    }
+
+    rewriter.eraseOp(fusedBrgemmOp);
+    return success();
+  }
+};
+
+void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
                ConvertTppGemmOp,
                ConvertTppBrgemmOp,
+               ConvertTppFusedBrgemmOp,
                ConvertTppReluOp,
                ConvertTppZeroOp>(patterns.getContext(), parallel);
   // clang-format on
