@@ -19,23 +19,21 @@
       "type": "MLIR",
       "benchmark": "gemm-bf16-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100"],
       "extensions": [ "avx2" ]
     },
     "bf16_dp2_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "--disable-lsan",
-                 "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "avx2" ]
     },
     "bf16_dp4_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-bf16_dp4-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "--disable-lsan",
-                 "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "svebf16" ]
     }
   }},
@@ -52,7 +50,7 @@
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_flat_3x1024_unp_mlir": {
@@ -73,16 +71,14 @@
       "type": "MLIR",
       "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "--disable-lsan",
-                 "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_dp4_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16_dp4-3layers-1024.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "--disable-lsan",
-                 "-run-args='-def-heap-to-stack=1'" ],
+      "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "svebf16" ]
     }
   }},

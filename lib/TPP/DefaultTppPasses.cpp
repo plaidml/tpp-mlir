@@ -41,11 +41,6 @@ llvm::cl::opt<bool> defPipePack("def-pack",
                                 llvm::cl::init(true));
 
 llvm::cl::opt<bool>
-    defHeapToStack("def-heap-to-stack",
-                   llvm::cl::desc("Default pipeline - heap to stack allocs"),
-                   llvm::cl::init(false));
-
-llvm::cl::opt<bool>
     disableDefPipe("disable-def-pipe",
                    llvm::cl::desc("Disable default pipeline execution"),
                    llvm::cl::init(false));
@@ -196,8 +191,6 @@ private:
 
     // Postprocess buffers.
     pm.addPass(bufferization::createBufferHoistingPass());
-    if (defHeapToStack)
-      pm.addPass(createHeapToStackPass());
 
     // Run general cleanup to normalize IR.
     pm.addPass(createCleanupPass());

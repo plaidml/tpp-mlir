@@ -126,8 +126,6 @@ createTppLoweringPass(bool loops = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createHeapToStackPass(unsigned maxAllocSizeInBytes = 4096);
-std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyAndCanonicalizePackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createGpuPipelinePass();
 std::unique_ptr<OperationPass<ModuleOp>>
