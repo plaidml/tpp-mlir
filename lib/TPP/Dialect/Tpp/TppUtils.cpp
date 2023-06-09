@@ -157,9 +157,8 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
 // Return true if the linalg.generic can be mapped to a tpp.add.
 bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  auto addMatcher =
-      StructuredOpMatcher::make<linalg::GenericOp>()
-          .region(MatchOne(0), WithSingleOp<arith::AddFOp>(operands));
+  auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithSingleOp<arith::AddFOp>(operands));
   return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
 }
 
@@ -226,8 +225,8 @@ private:
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  auto reluMatcher = StructuredOpMatcher::make<linalg::GenericOp>()
-                         .region(MatchOne(0), WithReluBody(operands));
+  auto reluMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithReluBody(operands));
   return isTppUnaryOp(linalgOp) && reluMatcher.match(linalgOp);
 }
 
@@ -236,9 +235,8 @@ bool isTppIdentity(linalg::GenericOp linalgOp,
                    SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
   SmallVector<Value, 2> linalgOperands;
-  auto identityMatcher =
-      StructuredOpMatcher::make<linalg::GenericOp>()
-          .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
+  auto identityMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
 
   if (!isTppUnaryOp(linalgOp) || !identityMatcher.match(linalgOp))
     return false;
@@ -253,8 +251,8 @@ bool isTppIdentity(linalg::GenericOp linalgOp,
 // Return true if the linalg.generic can be mapped to a tpp.zero.
 bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  auto zeroMatcher = StructuredOpMatcher::make<linalg::GenericOp>()
-                         .region(MatchOne(0), WithSingleOp<linalg::YieldOp>());
+  auto zeroMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithSingleOp<linalg::YieldOp>());
 
   if (!isTppUnaryOp(linalgOp) || !zeroMatcher.match(linalgOp))
     return false;
@@ -270,6 +268,34 @@ bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
 
   operands->push_back(output);
   return true;
+}
+
+void splitFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp, PatternRewriter &rewriter) {
+  assert(fusedBrgemmOp.hasBufferSemantics() &&
+         "tpp.fused_brgemm expects a memref type");
+
+  Location loc = fusedBrgemmOp.getLoc();
+
+  // Split the fused op into individual operations.
+  auto ins = fusedBrgemmOp.getInputs();
+  auto out = fusedBrgemmOp.getOutput();
+  rewriter.create<tpp::BrgemmOp>(loc, ValueRange{ins[0], ins[1], ins[2]}, out);
+
+  switch (fusedBrgemmOp.getBinaryKind()) {
+  case tpp::FusedBinaryOpKind::ADD:
+    rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
+    break;
+  case tpp::FusedBinaryOpKind::NONE:
+    break;
+  }
+
+  switch (fusedBrgemmOp.getUnaryKind()) {
+  case tpp::FusedUnaryOpKind::RELU:
+    rewriter.create<tpp::ReluOp>(loc, out, out);
+    break;
+  case tpp::FusedUnaryOpKind::NONE:
+    break;
+  }
 }
 
 } // namespace utils
