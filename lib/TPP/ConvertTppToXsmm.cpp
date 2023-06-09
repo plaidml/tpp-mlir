@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
@@ -285,6 +286,20 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
            "tpp.fused_brgemm expects buffer semantics");
 
     Location loc = brgemmOp.getLoc();
+
+    // Current limitation in LIBXSMM, only bcast_col_in0 as flag for
+    // binary is supported. Split into separate operations if other flags
+    // are present.
+    // TODO: remove the split once LIBXSMM is fixed.
+    auto binaryFlag = getBinaryFlags(rewriter, brgemmOp)[0]
+                          .cast<xsmm::BinaryFlagsAttr>()
+                          .getValue();
+    if (binaryFlag != xsmm::BinaryFlags::BCAST_COL_IN_0) {
+      tpp::utils::splitFusedOp(brgemmOp, rewriter);
+      rewriter.eraseOp(brgemmOp);
+      return success();
+    }
+
     auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
     if (failed(dims)) {
       return rewriter.notifyMatchFailure(
