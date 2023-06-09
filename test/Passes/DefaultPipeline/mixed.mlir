@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -def-heap-to-stack=1 -default-tpp-passes -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -78,30 +78,6 @@ func.func @buffer_no_dealloc(%A: memref<4x8xf32>,
 
   // CHECK-NOT: memref.dealloc %[[alloc]]
   return %0 : memref<4x4xf32>
-}
-
-// -----
-
-// CHECK: func.func @heap_to_stack(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
-func.func @heap_to_stack(%A: memref<4x8xf32>,
-          %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
-  // CHECK: %[[alloc:.*]] = memref.alloca
-  %0 = memref.alloc() : memref<4x4xf32>
-
-  // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: call @xsmm_gemm_invoke
-  linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>) outs(%0 : memref<4x4xf32>)
-
-  // CHECK: memref.copy
-  memref.copy %0, %C : memref<4x4xf32> to memref<4x4xf32>
-
-  // CHECK-NOT: memref.dealloc
-  memref.dealloc %0 : memref<4x4xf32>
-
-  return
 }
 
 // -----
