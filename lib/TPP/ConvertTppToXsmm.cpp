@@ -287,9 +287,10 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
 
     Location loc = brgemmOp.getLoc();
 
-    // Current limitation in LIBXSMM, only bcast_col_in0 as flag for
-    // binary is supported. Split into separate operations if other flags
-    // are present.
+    // Current limitation in LIBXSMM.
+    // See: https://github.com/libxsmm/libxsmm/issues/766
+    // Split into separate operations if bcast_col_in0 is not present when add
+    // is fused.
     // TODO: remove the split once LIBXSMM is fixed.
     auto isBiasAdd = brgemmOp.getBinaryKind() == tpp::FusedBinaryOpKind::ADD;
     auto binaryFlag = getBinaryFlags(rewriter, brgemmOp)[0]
