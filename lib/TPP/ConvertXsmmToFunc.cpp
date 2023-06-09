@@ -436,8 +436,10 @@ struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
     // Currently LIBXSMM support only BCAST_COL_IN_0 as binary flag.
     auto binaryFlags = dispatchOp.getBinaryFlags();
     if (binaryFlags.size() != 1 ||
-        binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
-            BinaryFlags::BCAST_COL_IN_0) {
+        ((binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
+          BinaryFlags::BCAST_COL_IN_0) &&
+         (binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
+          BinaryFlags::NONE))) {
       return failure();
     }
     return buildDispatchOp<FusedBrgemmDispatchOp>(rewriter, dispatchOp,

@@ -245,13 +245,20 @@ func.func @dispatch_fused_brgemm() -> i64 {
 
 // Current limitation in LIBXSMM we can use only bcast_col_in0 as flag for binary.
 // see: https://github.com/libxsmm/libxsmm/issues/766
-// CHECK-LABEL: dispatch_fused_brgemm
 func.func @dispatch_fused_brgemm() -> i64 {
-  // CHECK-NOT: xsmm_fused_brgemm.dispatch 
   %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, relu]
     flags = (vnni_a) binary_flags = (none) unary_flags = (none) data_type = bf16
   return %0 : i64
 }
+
+// CHECK-LABEL: dispatch_fused_brgemm
+// CHECK: %[[C2:.+]] = arith.constant 2 : i64
+// CHECK-DAG: %[[C13:.+]] = arith.constant 13 : i64
+// CHECK-DAG: %[[C4096:.+]] = arith.constant 4096 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C4096]], %[[C0]], %[[C5]], %[[C0]], %[[C1]])
 
 // -----
 
