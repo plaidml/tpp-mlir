@@ -231,3 +231,50 @@ func.func @gemm_to_loops(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2:
 // CHECK:       %[[mul:.*]] = arith.mulf %[[load0]], %[[load1]] : f32
 // CHECK:       %[[add:.*]] = arith.addf %[[load2]], %[[mul]] : f32
 // CHECK:       memref.store %[[add]], %[[ARG2]][%[[i]], %[[j]]] : memref<8x10xf32>
+
+// -----
+
+func.func @fused_brgemm_to_loops(%arg0 : memref<2x3x4xf32>, %arg1 : memref<2x4x3xf32>,
+                                 %arg2 : memref<3x3xf32>, %arg3 : memref<3x3xf32>) {
+  tpp.fused_brgemm [unary = relu, binary = add]
+    ins(%arg0 : memref<2x3x4xf32>, %arg1 : memref<2x4x3xf32>,
+        %arg2 : memref<3x3xf32>, %arg3 : memref<3x3xf32>)
+    outs(%arg2 : memref<3x3xf32>)
+  return
+}
+
+// CHECK: func.func @fused_brgemm_to_loops(
+// CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>,
+// CHECK-SAME:  %[[ARG3:.+]]: memref<3x3xf32>) {
+// CHECK-DAG: %[[three:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[four:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[two:.*]] = arith.constant 2 : index
+// CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[zeroF32:.*]] = arith.constant 0.000000e+00 : f32
+// -- BRGEMM
+// CHECK: scf.for %[[b:.*]] = %[[zero]] to %[[two]] step %[[one]] {
+// CHECK:   scf.for %[[i:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:     scf.for %[[j:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:       scf.for %[[k:.*]] = %[[zero]] to %[[four]] step %[[one]] {
+// CHECK:         %[[ma:.*]] = memref.load %[[ARG0]][%[[b]], %[[i]], %[[k]]] : memref<2x3x4xf32>
+// CHECK:         %[[mb:.*]] = memref.load %[[ARG1]][%[[b]], %[[k]], %[[j]]] : memref<2x4x3xf32>
+// CHECK:         %[[mc:.*]] = memref.load %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+// CHECK:         %[[mul:.*]] = arith.mulf %[[ma]], %[[mb]] : f32
+// CHECK:         %[[add:.*]] = arith.addf %[[mc]], %[[mul]] : f32
+// CHECK:         memref.store %[[add]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+// -- ADD
+// CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:   scf.for %[[j:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:     %[[addBias:.*]] = memref.load %[[ARG3]][%[[i]], %[[j]]] : memref<3x3xf32>
+// CHECK:     %[[addVal:.*]] = memref.load %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+// CHECK:     %[[addRes:.*]] = arith.addf %[[addBias]], %[[addVal]] : f32
+// CHECK:     memref.store %[[addRes]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+// -- ReLU
+// CHECK: scf.for %[[i:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:   scf.for %[[j:.*]] = %[[zero]] to %[[three]] step %[[one]] {
+// CHECK:     %[[reluVal:.*]] = memref.load %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
+// CHECK:     %[[reluRes:.*]] = arith.maxf %[[reluVal]], %[[zeroF32]] : f32
+// CHECK:     memref.store %[[reluRes]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
