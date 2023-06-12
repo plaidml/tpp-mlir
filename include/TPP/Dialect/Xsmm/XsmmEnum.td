@@ -31,7 +31,8 @@ def Xsmm_BinaryKind : I64EnumAttr<
     "BinaryKind", "see: libxsmm_meltw_binary_type",
     [
       I64EnumAttrCase<"NONE", 0, "none">,
-      I64EnumAttrCase<"ADD", 1, "add">
+      I64EnumAttrCase<"ADD", 1, "add">,
+      I64EnumAttrCase<"SUB", 3, "sub">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }

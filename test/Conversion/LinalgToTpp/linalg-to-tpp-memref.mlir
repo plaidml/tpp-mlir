@@ -46,6 +46,24 @@ func.func @add_mapping_1d_output(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 
 // -----
 
+// Expect not to map. TPP ops require rank 2 on output.
+#map = affine_map<(d0) -> (d0)>
+// CHECK-LABEL: sub_mapping_1d_output
+func.func @sub_mapping_1d_output(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
+  // CHECK-NOT: tpp-sub
+  linalg.generic {
+    indexing_maps = [#map, #map], 
+    iterator_types = ["parallel"]} 
+    ins(%arg0: memref<1xf32>) outs(%arg1: memref<1xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.subf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return 
+}
+
+// -----
+
 // Scalar operands we don't expect any mapping to tpp.
 #map = affine_map<() -> ()>
 func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
@@ -63,9 +81,28 @@ func.func @add_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
 
 // -----
 
+// Scalar operands we don't expect any mapping to tpp.
+#map = affine_map<() -> ()>
+// CHECK-LABEL: sub_mapping_scalar
+func.func @sub_mapping_scalar(%arg0: memref<f32>, %arg1: memref<f32>) {
+  // CHECK-NOT: tpp.sub
+  linalg.generic {
+    indexing_maps = [#map, #map], 
+    iterator_types = []} ins(%arg0: memref<f32>) 
+    outs(%arg1: memref<f32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.subf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return
+}
+
+// -----
+
 // Output affine map is not an identity.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
+// CHECK-LABEL: add_mapping_brcst
 func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
   // CHECK-NOT: tpp.add
   linalg.generic {
@@ -74,6 +111,25 @@ func.func @add_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
     ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<1x3xf32>) {
       ^bb0(%in: f32, %out: f32):
         %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return
+}
+
+// -----
+
+// Output affine map is not an identity.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (0, d1)>
+// CHECK-LABEL: sub_mapping_brcst
+func.func @sub_mapping_brcst(%arg0: memref<3x3xf32>, %arg1: memref<1x3xf32>) {
+  // CHECK-NOT: tpp.sub
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<1x3xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.subf %in, %out : f32
         linalg.yield %0 : f32
   }
   return
@@ -116,6 +172,23 @@ func.func @add_mapping(%arg0: memref<1x1x1xf32>, %arg1: memref<1x1x1xf32>) {
 
 // -----
 
+// tpp have 2d rank.
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @sub_mapping(%arg0: memref<1x1x1xf32>, %arg1: memref<1x1x1xf32>) {
+  // CHECK-NOT: tpp.sub
+  linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg0: memref<1x1x1xf32>) outs(%arg1: memref<1x1x1xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.subf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return
+}
+
+// -----
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @add_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
   linalg.generic {
@@ -132,6 +205,26 @@ func.func @add_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
 // CHECK: func.func @add_mapping(%[[ARG0:.+]]: memref<1x1xf32>, %[[ARG1:.+]]: memref<1x1xf32>)
 // CHECK: tpp.add ins(%[[ARG0]] : memref<1x1xf32>, %[[ARG1]] : memref<1x1xf32>) 
 // CHECK-SAME:    outs(%[[ARG1]] : memref<1x1xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @sub_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0: memref<1x1xf32>) outs(%arg1: memref<1x1xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.subf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return
+}
+
+// CHECK: func.func @sub_mapping(%[[ARG0:.+]]: memref<1x1xf32>, %[[ARG1:.+]]: memref<1x1xf32>)
+// CHECK: tpp.sub ins(%[[ARG0]] : memref<1x1xf32>, %[[ARG1]] : memref<1x1xf32>)
+// CHECK-SAME:    outs(%[[ARG1]] : memref<1x1xf32>)
+
 
 // -----
 

@@ -64,6 +64,13 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
+    if (tpp::utils::isTppSub(linalgOp, &operands)) {
+      assert(operands.size() == 3 && "tpp.add expects three operands");
+      rewriter.replaceOpWithNewOp<tpp::SubOp>(
+          linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
+      return success();
+    }
+
     if (linalgx::utils::isMatmulOp(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.matmul expects three operands");
       rewriter.replaceOpWithNewOp<tpp::GemmOp>(

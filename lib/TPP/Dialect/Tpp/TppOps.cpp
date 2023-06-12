@@ -277,6 +277,29 @@ void AddOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// SubOp
+//===----------------------------------------------------------------------===//
+
+void SubOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
+                  Value output) {
+  tppOpBuilder(builder, state, inputs, output);
+}
+
+void SubOp::print(OpAsmPrinter &printer) {
+  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
+}
+
+ParseResult SubOp::parse(OpAsmParser &parser, OperationState &result) {
+  return parseTppOp(parser, result);
+}
+
+void SubOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  getEffectsImpl(*this, effects);
+}
+
+//===----------------------------------------------------------------------===//
 // GemmOp
 //===----------------------------------------------------------------------===//
 

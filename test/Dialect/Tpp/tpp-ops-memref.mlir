@@ -8,6 +8,9 @@ func.func @tpp_dialect(%arg0: memref<2x2xf32>,
   // CHECK: tpp.add
   tpp.add ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg2: memref<2x2xf32>)
 
+  // CHECK: tpp.sub
+  tpp.sub ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) outs(%arg2: memref<2x2xf32>)
+
   // CHECK: tpp.identity
   tpp.identity ins(%arg0: memref<2x2xf32>) outs(%arg2: memref<2x2xf32>)
 
@@ -113,5 +116,26 @@ func.func @fused_brgemm(%arg0: memref<3x32x32xf32>, %arg1: memref<3x32x32xf32>, 
   tpp.fused_brgemm [unary = relu, binary = add] 
                    ins(%arg0: memref<3x32x32xf32>, %arg1: memref<3x32x32xf32>, 
                        %arg2: memref<32x32xf32>, %arg3: memref<32x32xf32>) outs(%arg3: memref<32x32xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @sub_bcast_row_operand_one
+func.func @sub_bcast_row_operand_one(%arg0: memref<5xf32>, %arg1: memref<6x5xf32>, 
+                                     %arg2: memref<1x5xf32> ) {
+  // CHECK: tpp.sub
+  tpp.sub ins(%arg0: memref<5xf32>, %arg1: memref<6x5xf32>) outs(%arg1: memref<6x5xf32>)
+  // CHECK-NEXT: tpp.sub
+  tpp.sub ins(%arg1: memref<6x5xf32>, %arg0: memref<5xf32>) outs(%arg1: memref<6x5xf32>)
+  // CHECK-NEXT: tpp.sub
+  tpp.sub ins(%arg0: memref<5xf32>, %arg2: memref<1x5xf32>) outs(%arg1: memref<6x5xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @sub_bcast_col_operand_one
+func.func @sub_bcast_col_operand_one(%arg0: memref<6x1xf32>, %arg1: memref<6x5xf32>) {
+  // CHECK: tpp.sub
+  tpp.sub ins(%arg0: memref<6x1xf32>, %arg1: memref<6x5xf32>) outs(%arg1: memref<6x5xf32>)
+  // CHECK-NEXT: tpp.sub
+  tpp.sub ins(%arg1: memref<6x5xf32>, %arg0: memref<6x1xf32>) outs(%arg1: memref<6x5xf32>)
   return
 }

@@ -589,4 +589,66 @@ func.func @fused_brgemm_op(%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>,
     (%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>, 
      %arg2: tensor<3x3xf32>, %arg3: tensor<3x3xf32>) -> tensor<3x3xf32>
   return %0: tensor<3x3xf32>
-} 
+}
+
+// -----
+
+func.func @sub_in_place_mixed(%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>) -> tensor<4x4xf32> {
+  %empty = tensor.empty() : tensor<4x4xf32>
+  %0 = tpp.gemm (%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>, %empty: tensor<4x4xf32>) -> tensor<4x4xf32>
+  %1 = tpp.sub (%0: tensor<4x4xf32>, %0: tensor<4x4xf32>) -> tensor<4x4xf32>
+  return %1 : tensor<4x4xf32>
+}
+
+// CHECK-LABEL: sub_in_place_mixed
+// CHECK-SAME: %[[ARG0:.+]]: memref<4x3xf32>, %[[ARG1:.+]]: memref<3x4xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<4x4xf32>
+// CHECK-NEXT: tpp.gemm ins(%[[ARG0]] : memref<4x3xf32>, %[[ARG1]] : memref<3x4xf32>, %[[ALLOC]] : memref<4x4xf32>) 
+// CHECK-SAME:  outs(%[[ALLOC]] : memref<4x4xf32>)
+// CHECK-NEXT: tpp.sub ins(%[[ALLOC]] : memref<4x4xf32>, %[[ALLOC]] : memref<4x4xf32>) outs(%[[ALLOC]] : memref<4x4xf32>)
+// CHECK-NEXT: return %[[ALLOC]] : memref<4x4xf32>
+
+// -----
+
+func.func @scalar_sub(%arg0: tensor<3x3xf32>, %arg1: f32) -> tensor<3x3xf32> {
+  %0 = tpp.sub(%arg0: tensor<3x3xf32>, %arg1: f32) -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: scalar_sub
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: f32
+// CHECK: tpp.sub ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG1]] : f32) outs(%[[ARG0]] : memref<3x3xf32>)
+
+// -----
+
+// CHECK-LABEL: sub_out_of_place
+func.func @sub_out_of_place(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf32> {
+  // CHECK: memref.alloc() {{.+}} : memref<3x3xf32>
+  %0 = tpp.sub(%arg0: tensor<1x3xf32>, %arg1: f32) -> tensor<3x3xf32>
+  return %0: tensor<3x3xf32>
+}
+
+// -----
+
+func.func @sub_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  %0 = tpp.sub(%arg0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  %1 = tpp.sub(%0: tensor<3x3xf32>, %0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: sub_in_place
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK: tpp.sub ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
+// CHECK-NEXT: tpp.sub ins(%[[ARG0]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
+
+// -----
+
+// CHECK-LABEL: sub_in_place_cst
+func.func @sub_in_place_cst() -> tensor<3x3xf32> {
+  // CHECK: memref.get_global
+  // CHECK: memref.alloc
+  // CHECK: memref.copy
+  %cst = arith.constant dense<0.0> : tensor<3x3xf32>
+  %0 = tpp.sub(%cst: tensor<3x3xf32>, %cst: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
+}

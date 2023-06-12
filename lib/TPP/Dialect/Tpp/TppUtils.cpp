@@ -163,6 +163,14 @@ bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
 }
 
+// Return true if the linalg.generic can be mapped to a tpp.sub.
+bool isTppSub(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+  using namespace tpp::structured_match;
+  auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+      MatchOne(0), WithSingleOp<arith::SubFOp>(operands));
+  return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
+}
+
 static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   if (!isa<linalg::GenericOp>(op))
     return false;

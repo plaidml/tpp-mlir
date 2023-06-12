@@ -208,6 +208,47 @@ def Tpp_AddOp : Tpp_BinaryOp<"add"> {
 }
 
 //===----------------------------------------------------------------------===//
+// SubOp
+//===----------------------------------------------------------------------===//
+
+def Tpp_SubOp : Tpp_BinaryOp<"sub"> {
+  let summary = "Element-wise subtraction.";
+  let description = [{
+    The `tpp.sub` operation performs element-wise subtraction on two-dimensional
+    memrefs or ranked tensors, writing the result on the output memref (or in the
+    result at tensor abstraction). At memref, no checks or assumption are made on
+    the input/output arguments so the same memref can be passed both as input and
+    output. At tensor level the operation produces a new tensor. In both cases, the
+    op supports broadcast semantic see `BroadcastableShape` rules. 
+
+    Example:
+
+    ```mlir
+
+    // A = A - A - memref abstraction.
+    tpp.sub ins(%1: memref<2x2xf32>, %1: memref<2x2xf32>)
+            outs(%1: memref<2x2xf32>)
+
+    // B = A - B - memref abstraction.
+    tpp.sub ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>) 
+            outs(%2: memref<2x2xf32>)
+
+    // C = A - B - memref abstraction.
+    tpp.sub ins(%1: memref<2x2xf32>, %2: memref<2x2xf32>)
+            outs(%3: memref<2x2xf32>)
+
+    // bcast.
+    tpp.sub ins(%1: memref<1x3xf32>, %2: memref<3xf32>)
+            outs(%3: memref<3x3xf32>) 
+
+    // tensor abstraction.
+    tpp.sub (%1: tensor<3x3xf32>, %2: tensor<3x3xf32>) -> tensor<3x3xf32>
+
+    ```
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Ternary Operations
 //===----------------------------------------------------------------------===//
 

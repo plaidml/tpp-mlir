@@ -323,6 +323,39 @@ struct AddBufferizationInterface
   }
 };
 
+struct SubBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<SubBufferizationInterface,
+                                                    tpp::SubOp> {
+
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return bufferizesToMemoryReadBinaryImpl(op, opOperand, state);
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return bufferizesToMemoryWriteBinaryImpl(op, opOperand, state);
+  }
+
+  bool isNotConflicting(Operation *op, OpOperand *uRead,
+                        OpOperand *uConflictingWrite,
+                        const AnalysisState &state) const {
+    // We support in-place operations. If the operands are the same
+    // value, ignore the conflict.
+    return uRead->get() == uConflictingWrite->get();
+  }
+
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return getAliasingOpResultsBinaryImpl(op, opOperand, state);
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    return bufferizeBinaryOp<tpp::SubOp>(op, rewriter, options);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Ternary
 //===----------------------------------------------------------------------===//
@@ -528,6 +561,7 @@ void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     ReluOp::attachInterface<tpp::ReluBufferizationInterface>(*ctx);
     ZeroOp::attachInterface<tpp::ZeroBufferizationInterface>(*ctx);
     AddOp::attachInterface<tpp::AddBufferizationInterface>(*ctx);
+    SubOp::attachInterface<tpp::SubBufferizationInterface>(*ctx);
     GemmOp::attachInterface<tpp::GemmBufferizationInterface>(*ctx);
     BrgemmOp::attachInterface<tpp::BrgemmBufferizationInterface>(*ctx);
     FusedBrgemmOp::attachInterface<tpp::FusedBrgemmBufferizationInterface>(
