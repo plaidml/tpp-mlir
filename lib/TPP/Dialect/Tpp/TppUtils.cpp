@@ -270,32 +270,45 @@ bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   return true;
 }
 
-void splitFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp, PatternRewriter &rewriter) {
+SmallVector<Operation *> splitFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                                      PatternRewriter &rewriter) {
   assert(fusedBrgemmOp.hasBufferSemantics() &&
          "tpp.fused_brgemm expects a memref type");
 
+  SmallVector<Operation *> splitOps;
   Location loc = fusedBrgemmOp.getLoc();
 
   // Split the fused op into individual operations.
   auto ins = fusedBrgemmOp.getInputs();
   auto out = fusedBrgemmOp.getOutput();
-  rewriter.create<tpp::BrgemmOp>(loc, ValueRange{ins[0], ins[1], ins[2]}, out);
+  Operation *brgemm = rewriter.create<tpp::BrgemmOp>(
+      loc, ValueRange{ins[0], ins[1], ins[2]}, out);
+  splitOps.push_back(brgemm);
 
   switch (fusedBrgemmOp.getBinaryKind()) {
-  case tpp::FusedBinaryOpKind::ADD:
-    rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
+  case tpp::FusedBinaryOpKind::ADD: {
+    Operation *add =
+        rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
+    splitOps.push_back(add);
     break;
-  case tpp::FusedBinaryOpKind::NONE:
+  }
+  case tpp::FusedBinaryOpKind::NONE: {
     break;
+  }
   }
 
   switch (fusedBrgemmOp.getUnaryKind()) {
-  case tpp::FusedUnaryOpKind::RELU:
-    rewriter.create<tpp::ReluOp>(loc, out, out);
-    break;
-  case tpp::FusedUnaryOpKind::NONE:
+  case tpp::FusedUnaryOpKind::RELU: {
+    Operation *relu = rewriter.create<tpp::ReluOp>(loc, out, out);
+    splitOps.push_back(relu);
     break;
   }
+  case tpp::FusedUnaryOpKind::NONE: {
+    break;
+  }
+  }
+
+  return splitOps;
 }
 
 } // namespace utils

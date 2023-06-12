@@ -299,7 +299,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
     auto isBitSet = static_cast<uint64_t>(binaryFlag) &
                     static_cast<uint64_t>(xsmm::BinaryFlags::BCAST_COL_IN_0);
     if (isBiasAdd && !isBitSet) {
-      tpp::utils::splitFusedOp(brgemmOp, rewriter);
+      (void)tpp::utils::splitFusedOp(brgemmOp, rewriter);
       rewriter.eraseOp(brgemmOp);
       return success();
     }
