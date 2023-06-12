@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
-#include "TPP/Dialect/TppUtils.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -405,7 +405,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<FusedBrgemmOp> {
   }
 };
 
-void populateTppToLoopsPatterns(RewritePatternSet &patterns) {
+void populateTppToLoopsPatterns(RewritePatternSet &patterns, bool parallel) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
