@@ -120,7 +120,9 @@ struct LocalDialectsLoweringPass
                 check::CheckDialect,
                 perf::PerfDialect,
                 scf::SCFDialect,
-                tensor::TensorDialect>();
+                tensor::TensorDialect,
+                xsmm::XsmmDialect,
+                LLVM::LLVMDialect>();
     // clang-format on
   }
 
