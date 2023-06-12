@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/TppUtils.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -394,33 +395,11 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<FusedBrgemmOp> {
 
   LogicalResult matchAndRewrite(FusedBrgemmOp fusedBrgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(fusedBrgemmOp.hasBufferSemantics() &&
-           "tpp.fused_brgemm expects a memref type");
+    if (!fusedBrgemmOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          fusedBrgemmOp, "Tpp loop lowering expects memref type");
 
-    Location loc = fusedBrgemmOp.getLoc();
-
-    // Split fused op into individual operations for further lowering.
-    auto ins = fusedBrgemmOp.getInputs();
-    auto out = fusedBrgemmOp.getOutput();
-    rewriter.create<tpp::BrgemmOp>(loc, ValueRange{ins[0], ins[1], ins[2]},
-                                   out);
-
-    switch (fusedBrgemmOp.getBinaryKind()) {
-    case tpp::FusedBinaryOpKind::ADD:
-      rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
-      break;
-    case tpp::FusedBinaryOpKind::NONE:
-      break;
-    }
-
-    switch (fusedBrgemmOp.getUnaryKind()) {
-    case tpp::FusedUnaryOpKind::RELU:
-      rewriter.create<tpp::ReluOp>(loc, out, out);
-      break;
-    case tpp::FusedUnaryOpKind::NONE:
-      break;
-    }
-
+    (void)tpp::utils::splitFusedOp(fusedBrgemmOp, rewriter);
     rewriter.eraseOp(fusedBrgemmOp);
     return success();
   }
