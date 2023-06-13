@@ -1,6 +1,3 @@
-// TODO Enable leak detection after bufferization fix
-// See #586
-// RUN: ASAN_OPTIONS=detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
@@ -13,7 +10,6 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: ASAN_OPTIONS=detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -pack-matmul="block-factors=2,2,2" | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -32,7 +28,7 @@
 
 
 func.func @matmul_static(
-    %A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {
+    %A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) {
 
   // Expanding bias beforehand may be easier to fuse and completely fold away than post-hoc addBias to matmul.
   %expanded_bias = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]}
@@ -53,7 +49,12 @@ func.func @matmul_static(
       linalg.yield %16 : f32
   } -> !C_tensor_t
 
-  return %res : !C_tensor_t
+  %cst = arith.constant 0 : index
+  %d1 = arith.constant -1.0 : f32
+  %v0 = vector.transfer_read %res[%cst, %cst], %d1 : tensor<4x16xf32>, vector<4x16xf32>
+  vector.print %v0 : vector<4x16xf32>
+
+  return
 }
 
 func.func @entry() {
@@ -77,17 +78,14 @@ func.func @entry() {
   %Bias = arith.constant dense<[
           1.9, 2.9, 3.9, 4.9, 5.9, 6.9, 7.9, 8.9, 9.9, 10.9, 11.9, 12.9, 13.9, 14.9, 15.9, 16.9
   ]> : !Bias_tensor_t
-  %result = call @matmul_static(%A, %B, %C, %Bias) : (!A_tensor_t, !B_tensor_t, !C_tensor_t, !Bias_tensor_t) -> !C_tensor_t
-  %c0 = arith.constant 0 : index
-  %d1 = arith.constant -1.0 : f32
-  %v0 = vector.transfer_read %result[%c0, %c0], %d1 : tensor<4x16xf32>, vector<4x16xf32>
+  call @matmul_static(%A, %B, %C, %Bias) : (!A_tensor_t, !B_tensor_t, !C_tensor_t, !Bias_tensor_t) -> ()
 
-  //
-  // CHECK:     ( ( 59.46, 97.26, 135.06, 172.86, 210.66, 248.46, 286.26, 324.06, 361.86, 399.66, 437.46, 475.26, 513.06, 550.86, 588.66, 626.46 ),
-  // CHECK-SAME:  ( 60.62, 99.22, 137.82, 176.42, 215.02, 253.62, 292.22, 330.82, 369.42, 408.02, 446.62, 485.22, 523.82, 562.42, 601.02, 639.62 ),
-  // CHECK-SAME:  ( 61.78, 101.18, 140.58, 179.98, 219.38, 258.78, 298.18, 337.58, 376.98, 416.38, 455.78, 495.18, 534.58, 573.98, 613.38, 652.78 ),
-  // CHECK-SAME:  ( 62.94, 103.14, 143.34, 183.54, 223.74, 263.94, 304.14, 344.34, 384.54, 424.74, 464.94, 505.14, 545.34, 585.54, 625.74, 665.94 ) )
-  //
-  vector.print %v0 : vector<4x16xf32>
   return
 }
+
+//
+// CHECK:     ( ( 59.46, 97.26, 135.06, 172.86, 210.66, 248.46, 286.26, 324.06, 361.86, 399.66, 437.46, 475.26, 513.06, 550.86, 588.66, 626.46 ),
+// CHECK-SAME:  ( 60.62, 99.22, 137.82, 176.42, 215.02, 253.62, 292.22, 330.82, 369.42, 408.02, 446.62, 485.22, 523.82, 562.42, 601.02, 639.62 ),
+// CHECK-SAME:  ( 61.78, 101.18, 140.58, 179.98, 219.38, 258.78, 298.18, 337.58, 376.98, 416.38, 455.78, 495.18, 534.58, 573.98, 613.38, 652.78 ),
+// CHECK-SAME:  ( 62.94, 103.14, 143.34, 183.54, 223.74, 263.94, 304.14, 344.34, 384.54, 424.74, 464.94, 505.14, 545.34, 585.54, 625.74, 665.94 ) )
+//
