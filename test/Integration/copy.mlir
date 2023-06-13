@@ -1,6 +1,3 @@
-// This should really be in the passes directory, not here
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
-
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
@@ -23,7 +20,6 @@
 
 func.func @copytpp(%A: tensor<9x6xf32>,
                     %B:tensor<9x6xf32> ) -> tensor<9x6xf32>  {
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map0, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<9x6xf32>) outs(%B: tensor<9x6xf32>) {
@@ -35,7 +31,6 @@ func.func @copytpp(%A: tensor<9x6xf32>,
 
 func.func @copytppbrcast(%A: tensor<1x6xf32>,
                            %B: tensor<9x6xf32>) -> tensor<9x6xf32>  {
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map1, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<1x6xf32>) outs(%B: tensor<9x6xf32>) {
@@ -47,7 +42,6 @@ func.func @copytppbrcast(%A: tensor<1x6xf32>,
 
 func.func @copytppbrcastother(%A: tensor<6x1xf32>,
                                 %B: tensor<6x9xf32>) -> tensor<6x9xf32>  {
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map2, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<6x1xf32>) outs(%B: tensor<6x9xf32>) {
@@ -59,7 +53,6 @@ func.func @copytppbrcastother(%A: tensor<6x1xf32>,
 
 func.func @copyscalar(%A: f32,
                         %B: tensor<6x9xf32>) -> tensor<6x9xf32>  {
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map3, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: f32) outs(%B: tensor<6x9xf32>) {
@@ -71,7 +64,6 @@ func.func @copyscalar(%A: f32,
 
 func.func @copyscalarother(%A: tensor<1x1xf32>,
                              %B: tensor<6x9xf32>) -> tensor<6x9xf32>  {
-  // TPP: tpp.identity ins({{.*}} : {{.*}}) outs({{.*}} : {{.*}})
   %O = linalg.generic { indexing_maps = [#map4, #map0],
                           iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<1x1xf32>) outs(%B: tensor<6x9xf32>) {
