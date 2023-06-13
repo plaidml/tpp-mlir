@@ -376,3 +376,28 @@ func.func @tied_type_result_to_arg2(%arg0: tensor<32x32xf32>,
                  %arg2: tensor<1x32xf32>) -> tensor<32x32xf32>
   return %0: tensor<32x32xf32>
 }
+
+// -----
+
+func.func @fused_brgemm_invalid_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, 
+    %arg2: tensor<32x32xf32>, %bias: tensor<32x32x32x32xf32>) -> tensor<32x32xf32> {
+  // expected-error @below {{expected shaped type with rank 1 or 2 for bias}}
+  %0 = tpp.fused_brgemm [unary = relu, binary = add]
+                        (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
+                         %arg2: tensor<32x32xf32>, 
+                         %bias: tensor<32x32x32x32xf32>) -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
+
+// -----
+
+// TODO: (lorenzo) we should handle scalar type too but requires a bit of work
+// during xsmm conversion, and an overloading function in the runtime.
+func.func @fused_brgemm_scalar_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
+    %arg2: tensor<32x32xf32>, %bias: f32) -> tensor<32x32xf32> {
+  // expected-error @below {{must be 1D/2D/3D/4D memref of floating-point values or 1D/2D/3D/4D tensor of floating-point values, but got 'f32'}}
+  %0 = tpp.fused_brgemm [unary = relu, binary = add]
+                        (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
+                         %arg2: tensor<32x32xf32>, %bias: f32) -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}

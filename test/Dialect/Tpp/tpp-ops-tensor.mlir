@@ -50,10 +50,20 @@ func.func @vnni_gemm_b_operand(%arg0: tensor<32x32xbf16>,
 
 // CHECK-LABEL: func.func @fused_brgemm
 func.func @fused_brgemm(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, %arg2: tensor<32x32xf32>,
-                        %arg3: tensor<32x32xf32>) -> tensor<32x32xf32> {
+                        %bias: tensor<32x32xf32>) -> tensor<32x32xf32> {
   // CHECK: tpp.fused_brgemm
   %0 = tpp.fused_brgemm [unary = relu, binary = add] 
                         (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, 
-                         %arg2: tensor<32x32xf32>, %arg3: tensor<32x32xf32>) -> tensor<32x32xf32>
+                         %arg2: tensor<32x32xf32>, %bias: tensor<32x32xf32>) -> tensor<32x32xf32>
+  return %0: tensor<32x32xf32>
+}
+
+// CHECK-LABEL: func.func @fused_brgemm_with_1d_bias
+func.func @fused_brgemm_with_1d_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, 
+    %arg2: tensor<32x32xf32>, %bias: tensor<32xf32>) -> tensor<32x32xf32> {
+  // CHECK: tpp.fused_brgemm
+  %0 = tpp.fused_brgemm [unary = relu, binary = add]
+                        (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
+                         %arg2: tensor<32x32xf32>, %bias: tensor<32xf32>) -> tensor<32x32xf32>
   return %0: tensor<32x32xf32>
 }
