@@ -112,7 +112,7 @@ func.func @scalar_identity(%arg0: f32, %arg1: tensor<8x32xf32>) -> tensor<8x32xf
 
 // -----
 
-#map = affine_map<(d0, d1) -> ()>
+#map = affine_map<(d0, d1) -> (0, 0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @scalar_identity_ranked(%arg0: tensor<1x1xf32>, %arg1: tensor<8x32xf32>) -> tensor<8x32xf32> {
@@ -128,7 +128,7 @@ func.func @scalar_identity_ranked(%arg0: tensor<1x1xf32>, %arg1: tensor<8x32xf32
 
 // CHECK-LABEL: scalar_identity
 // CHECK-SAME: %[[ARG0:.+]]: tensor<1x1xf32>, %[[ARG1:.+]]: tensor<8x32xf32>
-// CHECK: %{{.+}} = tpp.identity (%[[ARG0]] : f32) -> (tensor<8x32xf32>)
+// CHECK: %{{.+}} = tpp.identity (%[[ARG0]] : tensor<1x1xf32>) -> (tensor<8x32xf32>)
 
 // -----
 
