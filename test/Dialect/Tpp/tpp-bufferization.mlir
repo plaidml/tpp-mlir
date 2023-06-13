@@ -779,3 +779,24 @@ func.func @non_conflicting_adds(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) 
   %1 = tpp.add(%0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32>
   return %1 : tensor<3x3xf32>
 }
+
+// -----
+
+func.func @gemm_back_to_back(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %cst_0 = arith.constant dense<0.0> : tensor<10x10xf32>
+  %cst_1 = arith.constant dense<1.0> : tensor<10x10xf32>
+  %0 = tensor.empty() : tensor<10x10xf32>
+  %1 = tpp.zero (%0 : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+  %2 = tpp.gemm (%arg0 : tensor<10x10xf32>, %cst_0 : tensor<10x10xf32>, %1 : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+  %3 = tpp.gemm (%2 : tensor<10x10xf32>, %cst_1 : tensor<10x10xf32>, %1 : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+  return %3 : tensor<10x10xf32>
+}
+
+// CHECK-LABEL: gemm_back_to_back
+// CHECK-SAME: %[[ARG0:.+]]: memref<10x10xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
+// CHECK: tpp.zero ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
+// CHECK: %[[ALLOC_1:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
+// CHECK: memref.copy %[[ALLOC]], %[[ALLOC_1]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %{{.+}} : memref<10x10xf32>, %[[ALLOC_1]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
+// CHECK: tpp.gemm ins(%[[ALLOC_1]] : memref<10x10xf32>, %{{.+}} : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
