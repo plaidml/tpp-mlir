@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -345,8 +346,14 @@ struct AddBufferizationInterface
                         OpOperand *uConflictingWrite,
                         const AnalysisState &state) const {
     // We support in-place operations. If the operands are the same
-    // value, ignore the conflict.
-    return uRead->get() == uConflictingWrite->get();
+    // value, ignore the conflict. Bufferization sees a conflict as
+    // the operand where we bufferize has read/write effects. We can
+    // ignore the conflict only if the operand where we bufferize is
+    // dead after this operation.
+    if (uRead->get() != uConflictingWrite->get())
+      return false;
+    Liveness liveness(op->getParentOfType<mlir::CallableOpInterface>());
+    return liveness.isDeadAfter(uRead->get(), op);
   }
 
   AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
