@@ -38,7 +38,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
   // CHECK: call @xsmm_brgemm_dispatch
-  // CHECK: scf.parallel
+  // CHECK: scf.for
   // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
@@ -152,6 +152,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
   // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK-DAG: %[[alloc:.*]] = memref.alloc{{.*}}: memref<128x512xf32>
 
   // Identity:
   // CHECK: call @xsmm_unary_dispatch
@@ -159,16 +160,16 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // CHECK-NEXT: %[[cast_ptr0:.*]] = arith.index_cast %[[ptr0]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[cast_ptr0]] : i64 to !llvm.ptr<f32>
 
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[alloc]]
   // CHECK-NEXT: %[[cast_ptr1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[cast_ptr1]] : i64 to !llvm.ptr<f32>
   // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
 
   // CHECK-DAG: call @xsmm_brgemm_dispatch
   // CHECK-DAG: call @xsmm_unary_dispatch 
-  // CHECK: scf.parallel (%[[I:.+]], %[[J:.+]]) = 
-  // CHECK-SAME: (%[[C0]], %[[C0]]) to (%[[C4]], %[[C16]]) step (%[[C1]], %[[C1]])
-  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
+  // CHECK: scf.parallel
+  %outShape = tensor.empty() : tensor<128x512xf32>
+  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%outShape : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
   } -> tensor<128x512xf32>
