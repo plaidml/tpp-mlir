@@ -46,9 +46,12 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
     return failure();
   // Out-of-place bufferization.
   if (unaryOp.getInputs()[0].getType() != unaryOp.getResultType()) {
-    FailureOr<Value> alloc =
-        allocateTensorForShapedValue(rewriter, loc, unaryOp.getResult(0),
-                                     /*escape=*/true, options, /*copy=*/false);
+    AnalysisState analysisState(options);
+    bool dealloc = shouldDeallocateOpResult(
+        unaryOp.getResult(0).template cast<OpResult>(), options);
+    FailureOr<Value> alloc = allocateTensorForShapedValue(
+        rewriter, loc, unaryOp.getResult(0),
+        /*escape=*/!dealloc, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
     FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
@@ -89,6 +92,15 @@ getAliasingOpResultsUnaryImpl(Operation *op, OpOperand &opOperand,
   return {};
 }
 
+// Return true if the opResult bufferize out of place. Unary operations
+// bufferize out of place when the type of the result does not match the type of
+// the input.
+static bool bufferizesToAllocationUnaryImpl(Operation *op, OpResult opResult) {
+  auto unaryOp = cast<tpp::TppOp>(op);
+  assert(unaryOp && unaryOp.isUnary());
+  return unaryOp.getInputs()[0].getType() != opResult.getType();
+}
+
 struct ReluBufferizationInterface
     : public BufferizableOpInterface::ExternalModel<ReluBufferizationInterface,
                                                     tpp::ReluOp> {
@@ -110,6 +122,10 @@ struct ReluBufferizationInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
     return bufferizeUnaryOp<tpp::ReluOp>(op, rewriter, options);
+  }
+
+  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
+    return bufferizesToAllocationUnaryImpl(op, opResult);
   }
 };
 
@@ -135,6 +151,10 @@ struct IdentityBufferizationInterface
                           const BufferizationOptions &options) const {
     return bufferizeUnaryOp<tpp::IdentityOp>(op, rewriter, options);
   }
+
+  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
+    return bufferizesToAllocationUnaryImpl(op, opResult);
+  }
 };
 
 struct ZeroBufferizationInterface
@@ -159,6 +179,11 @@ struct ZeroBufferizationInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
     return bufferizeUnaryOp<tpp::ZeroOp>(op, rewriter, options);
+  }
+
+  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
+    // tpp.zero is by construction always in place.
+    return false;
   }
 };
 
@@ -207,9 +232,11 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   auto rhsVal = binaryOp.getInputs()[1];
   auto rhsType = rhsVal.getType();
   if ((outType != lhsType) && (outType != rhsType)) {
-    FailureOr<Value> alloc =
-        allocateTensorForShapedValue(rewriter, loc, binaryOp.getResult(0),
-                                     /*escape=*/true, options, /*copy=*/false);
+    bool dealloc = shouldDeallocateOpResult(
+        binaryOp.getResult(0).template cast<OpResult>(), options);
+    FailureOr<Value> alloc = allocateTensorForShapedValue(
+        rewriter, loc, binaryOp.getResult(0),
+        /*escape=*/!dealloc, options, /*copy=*/false);
     if (failed(alloc))
       return failure();
     FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
@@ -290,6 +317,16 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
   return {};
 }
 
+// Return true if the opResult bufferize out of place. Binary operations
+// bufferize out of place when the type of the result does not match the type of
+// any of the inputs.
+static bool bufferizesToAllocationBinaryImpl(Operation *op, OpResult opResult) {
+  auto binaryOp = cast<tpp::TppOp>(op);
+  assert(binaryOp && binaryOp.isBinary());
+  return binaryOp.getInputs()[0].getType() != opResult.getType() &&
+         binaryOp.getInputs()[1].getType() != opResult.getType();
+}
+
 struct AddBufferizationInterface
     : public BufferizableOpInterface::ExternalModel<AddBufferizationInterface,
                                                     tpp::AddOp> {
@@ -320,6 +357,10 @@ struct AddBufferizationInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
     return bufferizeBinaryOp<tpp::AddOp>(op, rewriter, options);
+  }
+
+  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
+    return bufferizesToAllocationBinaryImpl(op, opResult);
   }
 };
 
