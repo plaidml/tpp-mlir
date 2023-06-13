@@ -1,8 +1,5 @@
-// RUN: tpp-run %s -print \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
-//
-// This should really be in the passes directory, not here
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -pack-vnni -generalize-tensor-pack-unpack -bufferize -rewrite-to-brgemm  -convert-linalg-to-tpp | FileCheck %s -check-prefix=TPP
 // 
 // Total flops = sum(broadcast O(n*m) + matmul O(2*n*m*k) + ReLU (O(n*m))
 // 2*128x512 (131072) + 2*128x256x512 (33554432) + 2*128x1024 (262144) + 2*128x512x1024 (134217728) + 2*128x2048 (524288) + 2*128x1024x2048 (536870912) + 2*128x1000 (256000) + 2*128x2048x1000 (524288000) = 1230102376
@@ -18,7 +15,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
                  %arg6: tensor<2048xbf16>, %arg7: tensor<2048x1024xbf16>,
                  %arg8: tensor<1024xbf16>, %output1: tensor<128x2048xbf16>, 
                  %output2: tensor<128x1024xbf16>,%ouput3: tensor<128x512xbf16>, 
-		 %output: tensor<128x1024xbf16>) -> tensor<128x1024xbf16> {
+		 %output: tensor<128x1024xbf16>) {
   %c0 = arith.constant 0.0 : bf16
   %c1 = arith.constant 1.0 : bf16
    %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xbf16>) outs(%ouput3 : tensor<128x512xbf16>) {
@@ -70,8 +67,15 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   ^bb0(%arg9: bf16):
     %16 = arith.maxf %arg9, %c0 : bf16
     linalg.yield %16 : bf16
-  } -> tensor<128x1024xbf16> 
-  return %15 : tensor<128x1024xbf16>
+  } -> tensor<128x1024xbf16>
+
+  %threshold = arith.constant 0.0 : bf16
+  %constant = arith.constant 2.74878e+11: bf16
+  %interim = tensor.empty(): tensor<128x1024xbf16>
+  %buf = linalg.fill ins(%constant: bf16) outs(%interim: tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
+  check.expect_almost_eq(%15, %buf, %threshold): tensor<128x1024xbf16>, tensor<128x1024xbf16>, bf16
+
+  return
 }
 
 func.func @entry() {
@@ -89,18 +93,11 @@ func.func @entry() {
   %output3 = arith.constant dense<0.0> : tensor<128x512xbf16>
   %output = arith.constant dense<0.0> : tensor<128x1024xbf16>
 
-  %result = call @mlp(%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %output1, %output2, %output3, %output) :
+  call @mlp(%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %output1, %output2, %output3, %output) :
     (tensor<128x256xbf16>, tensor<256x512xbf16>, tensor<512xbf16>, tensor<512x1024xbf16>,
      tensor<1024xbf16>, tensor<1024x2048xbf16>, tensor<2048xbf16>, tensor<2048x1024xbf16>, 
      tensor<1024xbf16>, tensor<128x2048xbf16>, tensor<128x1024xbf16>, tensor<128x512xbf16>, 
-     tensor<128x1024xbf16>) -> tensor<128x1024xbf16>  
-  %threshold = arith.constant 0.0 : bf16
-  %constant = arith.constant 2.74878e+11: bf16
-  // TPP: %[[ALLOC4:.+]] = memref.alloc() {alignment = 64 : i64} : memref<128x1024xbf16>
-  // TPP: linalg.fill
-  // TPP: check.expect_almost_eq
-  %interim = tensor.empty(): tensor<128x1024xbf16>
-  %buf = linalg.fill ins(%constant:bf16) outs(%interim: tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
-  check.expect_almost_eq(%result, %buf, %threshold): tensor<128x1024xbf16>, tensor<128x1024xbf16>, bf16
+     tensor<128x1024xbf16>) -> ()
+
   return
 }
