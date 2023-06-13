@@ -140,7 +140,9 @@ createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
                     StringRef gpuChip = "sm_35",
                     StringRef gpuFeatures = "+ptx60");
 
+// Testing passes.
 void registerTestStructuralMatchers();
+void registerTestForToForAllRewrite();
 
 } // namespace tpp
 } // namespace mlir

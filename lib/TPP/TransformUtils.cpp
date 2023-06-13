@@ -9,10 +9,12 @@
 #include <utility>
 
 #include "TPP/IR/StructuredOpMatcher.h"
+#include "TPP/TransformUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExprVisitor.h"
 
@@ -564,6 +566,115 @@ bool isMatmulOp(Operation *op, SmallVectorImpl<Value> *operands) {
           .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
           .region(MatchOne(0), WithMulAddBody(operands));
   return matmulMatcher.match(linalgOp);
+}
+
+namespace {
+
+// Convert scf.for to scf.forall after fusion.
+struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                PatternRewriter &rewriter) const override {
+    auto metadata = forOp->getAttrOfType<StringAttr>(linalgx::utils::kLoopId);
+    if (!metadata || metadata.getValue() != linalgx::utils::kLoopRoot)
+      return failure();
+    if (forOp.getNumRegionIterArgs() != 1)
+      return failure();
+
+    // Only top-level loops.
+    auto parent = forOp->getParentOp();
+    if (!parent || isa<LoopLikeOpInterface>(parent))
+      return failure();
+
+    SmallVector<scf::ForOp> nestedLoops;
+    getPerfectlyNestedLoops(nestedLoops, forOp);
+    if (nestedLoops.size() == 0)
+      return failure();
+
+    SmallVector<Value> loopArgs;
+    SmallVector<OpFoldResult> lbs, ubs, steps;
+    scf::ForOp innerMostLoop = nestedLoops[nestedLoops.size() - 1];
+    for (scf::ForOp &currentLoop : nestedLoops) {
+      if (currentLoop.getNumRegionIterArgs() != 1)
+        return failure();
+      loopArgs.push_back(currentLoop.getInductionVar());
+      lbs.push_back(currentLoop.getLowerBound());
+      ubs.push_back(currentLoop.getUpperBound());
+      steps.push_back(currentLoop.getStep());
+      if (currentLoop == innerMostLoop) {
+        // We can only replace if the last operation before the terminator is
+        // an insert slice.
+        auto yieldOp =
+            cast<scf::YieldOp>(currentLoop.getBody()->getTerminator());
+        auto insertSlice =
+            yieldOp.getOperands()[0].getDefiningOp<tensor::InsertSliceOp>();
+        if (!insertSlice)
+          return failure();
+        loopArgs.push_back(currentLoop.getRegionIterArg(0));
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<scf::ForallOp>(
+        forOp, lbs, ubs, steps, ValueRange{forOp.getInitArgs()},
+        /*mapping=*/std::nullopt,
+        [&](OpBuilder &nestedBuilder, Location loc, ValueRange regionArgs) {
+          IRMapping mapping;
+          assert(loopArgs.size() == regionArgs.size() &&
+                 "expect same region args");
+          mapping.map(loopArgs, regionArgs);
+          Block *innerLoopBlock = nestedLoops[nestedLoops.size() - 1].getBody();
+          auto yieldOp = cast<scf::YieldOp>(innerLoopBlock->getTerminator());
+          auto insertSlice =
+              yieldOp.getOperands()[0].getDefiningOp<tensor::InsertSliceOp>();
+          assert(insertSlice && "must be an insert slice");
+          for (auto &nestedOp : innerLoopBlock->without_terminator()) {
+            if (&nestedOp == insertSlice.getOperation()) {
+              auto term = nestedBuilder.create<scf::InParallelOp>(loc);
+              nestedBuilder.setInsertionPointToStart(term.getBody());
+              Value sourceVal = mapping.lookup(insertSlice.getSource());
+              Value destVal = mapping.lookup(insertSlice.getDest());
+              SmallVector<OpFoldResult> offsets;
+              for (OpFoldResult offset : insertSlice.getMixedOffsets()) {
+                if (auto valueOffset = offset.dyn_cast<Value>())
+                  offsets.push_back(mapping.lookup(valueOffset));
+                else
+                  offsets.push_back(offset);
+              }
+              SmallVector<OpFoldResult> sizes;
+              for (OpFoldResult size : insertSlice.getMixedSizes()) {
+                if (auto valueSize = size.dyn_cast<Value>())
+                  sizes.push_back(mapping.lookupOrDefault(valueSize));
+                else
+                  sizes.push_back(size);
+              }
+              SmallVector<OpFoldResult> strides;
+              for (OpFoldResult stride : insertSlice.getMixedStrides()) {
+                if (auto valueStride = stride.dyn_cast<Value>())
+                  strides.push_back(mapping.lookupOrDefault(valueStride));
+                else
+                  strides.push_back(stride);
+              }
+              assert(offsets.size() == sizes.size());
+              assert(offsets.size() == strides.size());
+
+              nestedBuilder.create<tensor::ParallelInsertSliceOp>(
+                  loc, sourceVal, destVal, offsets, sizes, strides);
+              continue;
+            }
+            Operation *clone = nestedBuilder.clone(nestedOp, mapping);
+            mapping.map(nestedOp.getResults(), clone->getResults());
+          }
+        });
+    return success();
+  }
+};
+
+} // namespace
+
+// Populate patterns to rewrite scf.for with scf.forall.
+void populateScfForToForAllRewritePattern(RewritePatternSet &patterns) {
+  patterns.add<ConvertToForAll>(patterns.getContext());
 }
 
 } // namespace utils

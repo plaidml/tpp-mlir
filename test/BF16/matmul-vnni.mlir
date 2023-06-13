@@ -31,6 +31,5 @@ func.func @matmul_static(
 // CHECK: %[[PACKED_VNNI_ARG1:.+]] = tensor.pack %[[PACKED_ARG1]] 
 // CHECK-SAME:  inner_dims_pos = [2] inner_tiles = [2] 
 // CHECK-SAME:  into %[[EMPTY_VNNI]] : tensor<32x16x32x32xbf16> -> tensor<32x16x16x32x2xbf16>
-// CHECK: %{{.+}} = scf.for
-// CHECK: %{{.+}} = scf.for
+// CHECK: %{{.+}} = scf.forall
 // CHECK: %{{.+}} = tpp.brgemm (%{{.+}} : tensor<16x32x32xbf16>, %{{.+}} : tensor<16x16x32x2xbf16>, %{{.+}} : tensor<32x32xbf16>) -> (tensor<32x32xbf16>)

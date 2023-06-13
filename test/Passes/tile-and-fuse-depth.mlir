@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=0" | FileCheck -check-prefix=DEPTH0 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=1" | FileCheck -check-prefix=DEPTH1 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=2" | FileCheck -check-prefix=DEPTH2 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=3" | FileCheck -check-prefix=DEPTH3 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=0 use-for-all=false" | FileCheck -check-prefix=DEPTH0 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=1 use-for-all=false" | FileCheck -check-prefix=DEPTH1 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=2 use-for-all=false" | FileCheck -check-prefix=DEPTH2 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=3 use-for-all=false" | FileCheck -check-prefix=DEPTH3 %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
