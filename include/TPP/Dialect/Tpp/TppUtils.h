@@ -78,11 +78,12 @@ bool isValConstZero(Value val);
 // Returns true if the op defining `val` represents a zero filled tensor.
 bool isZeroTensor(Value val);
 
-// Splits fused op into its individual components and returns created
-// operations.
-// The passed fused op remains untouched.
-SmallVector<Operation *> splitFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
-                                      PatternRewriter &rewriter);
+// Splits and replaces fused op with its individual components.
+// Temporary workaround for:
+// https://github.com/libxsmm/libxsmm/issues/766
+// TODO: Move into tpp-to-loops as a private helper.
+void splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                            PatternRewriter &rewriter);
 
 } // namespace utils
 } // namespace tpp
