@@ -312,7 +312,7 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
 
   Operation *outermostLoop = getOuterMostLoop(ivs);
   if (outermostLoop && isa<scf::ForOp>(outermostLoop)) {
-    outermostLoop->setAttr(linalgx::utils::kLoopId,
+    outermostLoop->setAttr(linalgx::utils::kLoopParallel,
                            rewriter.getStringAttr(linalgx::utils::kLoopRoot));
   }
 
@@ -393,7 +393,7 @@ rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
 
   Operation *outermostLoop = getOuterMostLoop(ivs);
   if (outermostLoop && isa<scf::ForOp>(outermostLoop)) {
-    outermostLoop->setAttr(linalgx::utils::kLoopId,
+    outermostLoop->setAttr(linalgx::utils::kLoopParallel,
                            rewriter.getStringAttr(linalgx::utils::kLoopRoot));
   }
   rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()

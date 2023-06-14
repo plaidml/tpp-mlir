@@ -55,7 +55,8 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
-    auto metadata = forOp->getAttrOfType<StringAttr>(linalgx::utils::kLoopId);
+    auto metadata =
+        forOp->getAttrOfType<StringAttr>(linalgx::utils::kLoopParallel);
     if (!metadata || metadata.getValue() != linalgx::utils::kLoopRoot)
       return failure();
     if (forOp.getNumRegionIterArgs() != 1)
@@ -416,7 +417,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   }
   if (!tilingResult->loops.empty()) {
     tilingResult->loops[0]->setAttr(
-        linalgx::utils::kLoopId,
+        linalgx::utils::kLoopParallel,
         rewriter.getStringAttr(linalgx::utils::kLoopRoot));
   }
   tileAndFuseResult.loops = std::move(tilingResult->loops);

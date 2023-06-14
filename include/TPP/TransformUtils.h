@@ -80,7 +80,7 @@ bool hasMulAddBody(linalg::LinalgOp linalgOp,
 
 // Rewrite scf.for to scf.forall. Assumes the loop to be parallel and
 // marked with `kLoopId`.
-constexpr const static llvm::StringLiteral kLoopId = "parallel";
+constexpr const static llvm::StringLiteral kLoopParallel = "parallel";
 constexpr const static llvm::StringLiteral kLoopRoot = "root";
 void populateScfForToForAllRewritePattern(RewritePatternSet &patterns);
 

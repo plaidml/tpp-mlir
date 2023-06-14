@@ -576,7 +576,8 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
-    auto metadata = forOp->getAttrOfType<StringAttr>(linalgx::utils::kLoopId);
+    auto metadata =
+        forOp->getAttrOfType<StringAttr>(linalgx::utils::kLoopParallel);
     if (!metadata || metadata.getValue() != linalgx::utils::kLoopRoot)
       return failure();
     if (forOp.getNumRegionIterArgs() != 1)
