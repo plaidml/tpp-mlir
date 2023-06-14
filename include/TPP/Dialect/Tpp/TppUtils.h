@@ -82,8 +82,8 @@ bool isZeroTensor(Value val);
 // Temporary workaround for:
 // https://github.com/libxsmm/libxsmm/issues/766
 // TODO: Move into tpp-to-loops as a private helper.
-void splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
-                            PatternRewriter &rewriter);
+LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                                     PatternRewriter &rewriter);
 
 } // namespace utils
 } // namespace tpp

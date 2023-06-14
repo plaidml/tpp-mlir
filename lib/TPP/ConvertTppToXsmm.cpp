@@ -298,10 +298,8 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
                           .getValue();
     auto isBitSet = static_cast<uint64_t>(binaryFlag) &
                     static_cast<uint64_t>(xsmm::BinaryFlags::BCAST_COL_IN_0);
-    if (isBiasAdd && !isBitSet) {
-      tpp::utils::splitAndReplaceFusedOp(brgemmOp, rewriter);
-      return success();
-    }
+    if (isBiasAdd && !isBitSet)
+      return tpp::utils::splitAndReplaceFusedOp(brgemmOp, rewriter);
 
     auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
     if (failed(dims)) {

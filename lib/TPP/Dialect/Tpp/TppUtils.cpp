@@ -272,10 +272,10 @@ bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   return true;
 }
 
-void splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
-                            PatternRewriter &rewriter) {
-  assert(fusedBrgemmOp.hasBufferSemantics() &&
-         "tpp.fused_brgemm expects a memref type");
+LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                                     PatternRewriter &rewriter) {
+  if (!fusedBrgemmOp.hasBufferSemantics())
+    return failure();
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(fusedBrgemmOp);
@@ -304,6 +304,7 @@ void splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
   }
 
   rewriter.eraseOp(fusedBrgemmOp);
+  return success();
 }
 
 } // namespace utils
