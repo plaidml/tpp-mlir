@@ -589,4 +589,151 @@ func.func @fused_brgemm_op(%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>,
     (%arg0: tensor<1x3x3xf32>, %arg1: tensor<1x3x3xf32>, 
      %arg2: tensor<3x3xf32>, %arg3: tensor<3x3xf32>) -> tensor<3x3xf32>
   return %0: tensor<3x3xf32>
-} 
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_not_escape_unary
+func.func @allocation_should_not_escape_unary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK: memref.alloc
+  %0 = tpp.identity (%arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0, %0 : tensor<10x10xf32>, tensor<10x10xf32>) 
+    outs(%arg2 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK: memref.dealloc
+  // CHECK-NEXT: return
+  return %1 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_not_escape_unary
+func.func @allocation_should_not_escape_unary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK: memref.alloc
+  %0 = tpp.relu (%arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0, %0 : tensor<10x10xf32>, tensor<10x10xf32>) 
+    outs(%arg2 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK: memref.dealloc
+  // CHECK-NEXT: return
+  return %1 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_not_escape_unary
+func.func @allocation_should_not_escape_unary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK-NOT: memref.alloc
+  %0 = tpp.zero (%arg1 : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0, %0 : tensor<10x10xf32>, tensor<10x10xf32>) 
+    outs(%arg2 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK-NOT: memref.dealloc
+  return %1 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_not_escape_binary
+func.func @allocation_should_not_escape_binary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK: memref.alloc
+  %0 = tpp.add (%arg1 : tensor<10xf32>, %arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0, %0 : tensor<10x10xf32>, tensor<10x10xf32>) 
+    outs(%arg2 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK: memref.dealloc
+  // CHECK-NEXT: return
+  return %1 : tensor<10x10xf32>
+}
+
+// -----
+
+// CHECK-LABEL: allocation_should_escape_unary
+func.func @allocation_should_escape_unary(%arg1: tensor<10xf32>) -> tensor<10x10xf32> {
+  // CHECK: memref.alloc
+  %0 = tpp.relu (%arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  // CHECK-NOT: memref.dealloc
+  return %0 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_escape_unary
+func.func @allocation_should_escape_unary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.*}} : memref<10x10xf32>
+  %0 = tpp.identity (%arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg2 : tensor<10x10xf32>, tensor<10x10xf32>)
+    outs(%0 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK-NOT: memref.dealloc
+  // CHECK: return %[[ALLOC]] : memref<10x10xf32>
+  return %1 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: allocation_should_escape_binary
+func.func @allocation_should_escape_binary(
+    %arg0: tensor<10x10xf32>, %arg1: tensor<10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.*}} : memref<10x10xf32>
+  %0 = tpp.add (%arg1 : tensor<10xf32>, %arg1 : tensor<10xf32>) -> (tensor<10x10xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg2 : tensor<10x10xf32>, tensor<10x10xf32>)
+    outs(%0 : tensor<10x10xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %2 = arith.divf %in, %in_0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<10x10xf32>
+  // CHECK-NOT: memref.dealloc
+  // CHECK: return %[[ALLOC]] : memref<10x10xf32>
+  return %1 : tensor<10x10xf32>
+}
