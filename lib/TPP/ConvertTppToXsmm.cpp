@@ -170,8 +170,10 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
 
   LogicalResult matchAndRewrite(tpp::GemmOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    assert(matmulOp.hasBufferSemantics() &&
-           "tpp.matmul expects buffer semantics");
+    if (!matmulOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "xsmm expects buffer semantics");
+    }
 
     Location loc = matmulOp.getLoc();
     auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, matmulOp);
@@ -201,8 +203,10 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(brgemmOp.hasBufferSemantics() &&
-           "tpp.brgemm expects buffer semantics");
+    if (!brgemmOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(brgemmOp,
+                                         "xsmm expects buffer semantics");
+    }
 
     Location loc = brgemmOp.getLoc();
     auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
@@ -282,8 +286,10 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
 
   LogicalResult matchAndRewrite(tpp::FusedBrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    assert(brgemmOp.hasBufferSemantics() &&
-           "tpp.fused_brgemm expects buffer semantics");
+    if (!brgemmOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(brgemmOp,
+                                         "xsmm expects buffer semantics");
+    }
 
     Location loc = brgemmOp.getLoc();
 
@@ -445,8 +451,11 @@ struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
 
   LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    assert(identityOp.hasBufferSemantics() &&
-           "tpp.identity expects a memref type");
+    if (!identityOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(identityOp,
+                                         "xsmm expects a memref type");
+    }
+
     MemRefType outputMemRef = identityOp.getOutputType();
     assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
@@ -476,7 +485,8 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    assert(reluOp.hasBufferSemantics() && "tpp.relu expects a memref type");
+    if (!reluOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(reluOp, "xsmm expects a memref type");
 
     MemRefType outputMemRef = reluOp.getOutputType();
     assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
@@ -501,7 +511,9 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
 
   LogicalResult matchAndRewrite(tpp::ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
-    assert(zeroOp.hasBufferSemantics() && "tpp.zero expects a memref type");
+    if (!zeroOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(zeroOp, "xsmm expects a memref type");
+
     MemRefType outputMemRef = zeroOp.getOutputType();
     assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
 
@@ -588,7 +600,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 
   LogicalResult matchAndRewrite(tpp::AddOp addOp,
                                 PatternRewriter &rewriter) const override {
-    assert(addOp.hasBufferSemantics() && "tpp.add expects a memref type");
+    if (!addOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(addOp, "xsmm expects a memref type");
 
     MemRefType outputMemRef = addOp.getOutputType();
     assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
