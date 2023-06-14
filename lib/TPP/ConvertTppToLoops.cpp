@@ -399,9 +399,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<FusedBrgemmOp> {
       return rewriter.notifyMatchFailure(
           fusedBrgemmOp, "Tpp loop lowering expects memref type");
 
-    (void)tpp::utils::splitFusedOp(fusedBrgemmOp, rewriter);
-    rewriter.eraseOp(fusedBrgemmOp);
-    return success();
+    return tpp::utils::splitAndReplaceFusedOp(fusedBrgemmOp, rewriter);
   }
 };
 
