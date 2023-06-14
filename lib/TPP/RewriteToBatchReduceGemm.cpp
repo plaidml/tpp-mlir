@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
@@ -298,6 +299,8 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
   };
 
   if (linalgOp.hasBufferSemantics()) {
+    // TODO: (lorenzo) this is legacy. It will be removed from linalg too.
+    // Use the tiling interface.
     linalg::GenerateLoopNest<scf::ParallelOp>::doit(
         rewriter, linalgOp.getLoc(), loopRanges, linalgOp,
         linalgOp.getIteratorTypesArray(), brgemmBuilder);
@@ -308,6 +311,10 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
   }
 
   Operation *outermostLoop = getOuterMostLoop(ivs);
+  if (outermostLoop && isa<scf::ForOp>(outermostLoop)) {
+    outermostLoop->setAttr(linalgx::utils::kLoopParallel,
+                           rewriter.getStringAttr(linalgx::utils::kLoopRoot));
+  }
 
   rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
                                              : tensorResults);
@@ -385,6 +392,10 @@ rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   }
 
   Operation *outermostLoop = getOuterMostLoop(ivs);
+  if (outermostLoop && isa<scf::ForOp>(outermostLoop)) {
+    outermostLoop->setAttr(linalgx::utils::kLoopParallel,
+                           rewriter.getStringAttr(linalgx::utils::kLoopRoot));
+  }
   rewriter.replaceOp(linalgOp, outermostLoop ? outermostLoop->getResults()
                                              : tensorResults);
   return outermostLoop ? outermostLoop->getResults() : tensorResults;
@@ -434,11 +445,19 @@ struct RewriteToBatchReduceGemmVnniImpl
 struct RewriteToBatchReduceGemm
     : public RewriteToBatchReduceGemmBase<RewriteToBatchReduceGemm> {
   void runOnOperation() override {
-    RewritePatternSet patterns(getOperation().getContext());
-    patterns
-        .add<RewriteToBatchReduceGemmImpl, RewriteToBatchReduceGemmVnniImpl>(
-            patterns.getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    auto &ctx = getContext();
+    {
+      RewritePatternSet patterns(&ctx);
+      patterns
+          .add<RewriteToBatchReduceGemmImpl, RewriteToBatchReduceGemmVnniImpl>(
+              patterns.getContext());
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
+    {
+      RewritePatternSet patterns(&ctx);
+      linalgx::utils::populateScfForToForAllRewritePattern(patterns);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
   }
 };
 

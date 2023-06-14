@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5" -cse | FileCheck %s
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=0,0" -cse | FileCheck %s
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5,5" -cse | FileCheck %s
-// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,0" -cse | FileCheck -check-prefix=TILE %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5 use-for-all=false" -cse | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=0,0 use-for-all=false" -cse | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=5,5,5 use-for-all=false" -cse | FileCheck %s
+// RUN: tpp-opt %s -split-input-file -tile-consumer-and-fuse-producers="tile-sizes=1,0 use-for-all=false" -cse | FileCheck -check-prefix=TILE %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
