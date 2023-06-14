@@ -737,3 +737,45 @@ func.func @allocation_should_escape_binary(
   // CHECK: return %[[ALLOC]] : memref<10x10xf32>
   return %1 : tensor<10x10xf32>
 }
+
+// -----
+
+func.func @conflicting_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  %0 = tpp.add(%arg0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  %1 = tpp.add(%0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: conflicting_in_place
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<3x3xf32>
+// CHECK-NEXT: memref.copy %[[ARG0]], %[[ALLOC]] : memref<3x3xf32> to memref<3x3xf32>
+// CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
+// CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
+// CHECK-NEXT: memref.dealloc %[[ALLOC]] : memref<3x3xf32>
+
+// -----
+
+func.func @conflicting_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  %0 = tpp.add(%arg0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  %1 = tpp.add(%arg0: tensor<3x3xf32>, %0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
+
+// CHECK-LABEL: conflicting_in_place
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<3x3xf32>
+// CHECK-NEXT: memref.copy %[[ARG0]], %[[ALLOC]] : memref<3x3xf32> to memref<3x3xf32>
+// CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
+// CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
+// CHECK-NEXT: return %[[ALLOC]] : memref<3x3xf32>
+
+// -----
+
+// CHECK-LABEL: non_conflicting_adds
+func.func @non_conflicting_adds(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // CHECK-NOT: memref.alloc
+  %0 = tpp.add(%arg0: tensor<3x3xf32>, %arg0: tensor<3x3xf32>) -> tensor<3x3xf32>
+  %1 = tpp.add(%0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
