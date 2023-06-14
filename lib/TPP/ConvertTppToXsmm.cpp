@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
@@ -285,6 +286,21 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
            "tpp.fused_brgemm expects buffer semantics");
 
     Location loc = brgemmOp.getLoc();
+
+    // Current limitation in LIBXSMM.
+    // See: https://github.com/libxsmm/libxsmm/issues/766
+    // Split into separate operations if bcast_col_in0 is not present when add
+    // is fused.
+    // TODO: remove the split once LIBXSMM is fixed.
+    auto isBiasAdd = brgemmOp.getBinaryKind() == tpp::FusedBinaryOpKind::ADD;
+    auto binaryFlag = getBinaryFlags(rewriter, brgemmOp)[0]
+                          .cast<xsmm::BinaryFlagsAttr>()
+                          .getValue();
+    auto isBitSet = static_cast<uint64_t>(binaryFlag) &
+                    static_cast<uint64_t>(xsmm::BinaryFlags::BCAST_COL_IN_0);
+    if (isBiasAdd && !isBitSet)
+      return tpp::utils::splitAndReplaceFusedOp(brgemmOp, rewriter);
+
     auto dims = getSizesAndLeadingDimsForGemmLikeOp(rewriter, brgemmOp);
     if (failed(dims)) {
       return rewriter.notifyMatchFailure(

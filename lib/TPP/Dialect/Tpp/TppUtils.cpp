@@ -272,6 +272,41 @@ bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   return true;
 }
 
+LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                                     PatternRewriter &rewriter) {
+  if (!fusedBrgemmOp.hasBufferSemantics())
+    return failure();
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(fusedBrgemmOp);
+
+  Location loc = fusedBrgemmOp.getLoc();
+
+  // Split the fused op into individual operations.
+  auto ins = fusedBrgemmOp.getInputs();
+  auto out = fusedBrgemmOp.getOutput();
+  rewriter.create<tpp::BrgemmOp>(loc, ValueRange{ins[0], ins[1], ins[2]}, out);
+
+  switch (fusedBrgemmOp.getBinaryKind()) {
+  case tpp::FusedBinaryOpKind::ADD:
+    rewriter.create<tpp::AddOp>(loc, ValueRange{ins[3], out}, out);
+    break;
+  case tpp::FusedBinaryOpKind::NONE:
+    break;
+  }
+
+  switch (fusedBrgemmOp.getUnaryKind()) {
+  case tpp::FusedUnaryOpKind::RELU:
+    rewriter.create<tpp::ReluOp>(loc, out, out);
+    break;
+  case tpp::FusedUnaryOpKind::NONE:
+    break;
+  }
+
+  rewriter.eraseOp(fusedBrgemmOp);
+  return success();
+}
+
 } // namespace utils
 } // namespace tpp
 } // namespace mlir

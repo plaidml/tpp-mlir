@@ -16,6 +16,7 @@
 namespace mlir {
 class TypeRange;
 class Value;
+class PatternRewriter;
 
 namespace linalg {
 class LinalgOp;
@@ -24,6 +25,8 @@ class YieldOp;
 } // end namespace linalg
 
 namespace tpp {
+class FusedBrgemmOp;
+
 namespace utils {
 
 // Returns true if the linalg operation is marked with 'target'.
@@ -74,6 +77,13 @@ bool isValConstZero(Value val);
 
 // Returns true if the op defining `val` represents a zero filled tensor.
 bool isZeroTensor(Value val);
+
+// Splits and replaces fused op with its individual components.
+// Temporary workaround for:
+// https://github.com/libxsmm/libxsmm/issues/766
+// TODO: Move into tpp-to-loops as a private helper.
+LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,
+                                     PatternRewriter &rewriter);
 
 } // namespace utils
 } // namespace tpp
