@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
+#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -388,12 +389,27 @@ private:
   bool parallel;
 };
 
+// Convert tpp.fused_brgemm to SCF loops.
+struct ConvertTppFusedBrgemmOp : public OpRewritePattern<FusedBrgemmOp> {
+  using OpRewritePattern<FusedBrgemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(FusedBrgemmOp fusedBrgemmOp,
+                                PatternRewriter &rewriter) const override {
+    if (!fusedBrgemmOp.hasBufferSemantics())
+      return rewriter.notifyMatchFailure(
+          fusedBrgemmOp, "Tpp loop lowering expects memref type");
+
+    return tpp::utils::splitAndReplaceFusedOp(fusedBrgemmOp, rewriter);
+  }
+};
+
 void populateTppToLoopsPatterns(RewritePatternSet &patterns, bool parallel) {
   // clang-format off
   patterns.add<ConvertTppAddOp, 
                ConvertTppIdentityOp,
                ConvertTppGemmOp,
                ConvertTppBrgemmOp,
+               ConvertTppFusedBrgemmOp,
                ConvertTppReluOp,
                ConvertTppZeroOp>(patterns.getContext(), parallel);
   // clang-format on
