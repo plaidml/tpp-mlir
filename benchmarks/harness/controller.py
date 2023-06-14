@@ -137,6 +137,8 @@ class BenchmarkController(object):
                                              '-e', self.args.entry,
                                              '--entry-point-result=void',
                                              '--print=0',
+                                             '--seed=123',
+                                             '--splat-to-random',
                   ]
         if self.args.run_args:
             runCmd.extend(shlex.split(self.args.run_args))
