@@ -8,7 +8,7 @@
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_3x512_unpacked.mlir": {
+    "fp32_3x1024_unp_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-fp32-3layers-1024-unpacked.mlir",
       "environment": {},
