@@ -387,20 +387,6 @@ packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   return replacementOp;
 }
 
-bool isVNNIPacked(linalg::GenericOp matmulOp) {
-  // TODO add VNNI packing checks here
-  auto indexingMap = matmulOp.getIndexingMapsArray()[1];
-  auto inputRank =
-      matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank();
-  return (inputRank == 5 && indexingMap.getNumDims() == 7) ||
-         (inputRank == 4 && indexingMap.getNumDims() == 5);
-}
-
-bool isMatmulOp(linalg::GenericOp matmulOp) {
-  // TODO check structural and access pattern.
-  return linalgx::utils::hasMulAddBody(matmulOp);
-}
-
 //===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
@@ -423,6 +409,12 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   return packMatmulOpImpl(rewriter, matmulOp, tiles);
 }
 
+//===----------------------------------------------------------------------===//
+// MatmulOp (VNNI packing)
+//===----------------------------------------------------------------------===//
+// Original layout: [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
+// New      layout:
+//      [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
 FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                 linalg::GenericOp matmulOp) {
@@ -438,78 +430,47 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   if (matmulOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
-  if (!isMatmulOp(matmulOp))
+  if (!linalgx::utils::isBlockedMatmul(matmulOp))
     return rewriter.notifyMatchFailure(matmulOp, "require matmul semantics");
 
-  if (isVNNIPacked(matmulOp))
+  Value operandB = matmulOp.getInputs()[1];
+  if (operandB.getType().cast<ShapedType>().getRank() != 4)
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
 
   Location loc = matmulOp.getLoc();
-  auto blockingFactor =
-      vnni::utils::getVnniBlockingFactor(matmulOp.getInputs()[1].getType());
-  if (!blockingFactor)
+  auto blockingFactor = vnni::utils::getVnniBlockingFactor(operandB.getType());
+  if (!blockingFactor) {
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
-  OpFoldResult tileOnI = rewriter.getI64IntegerAttr(*blockingFactor);
-  SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
+  }
+  SmallVector<OpFoldResult, 1> tilesOnSmallK = {
+      rewriter.getI64IntegerAttr(*blockingFactor)};
   // reshape input B.
   Value packedMatrixB =
-      toPackLayout_VNNI(rewriter, loc, matmulOp.getInputs()[1], tilesOnB);
+      toPackLayout_VNNI(rewriter, loc, operandB, tilesOnSmallK);
   MLIRContext *ctx = matmulOp.getContext();
   AffineExpr p1, p2, r1, p3, p4, r2, r3;
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
-  int64_t dims;
   AffineMap mapA, mapB, mapC;
   Value matrixC = matmulOp.getOutputs()[0];
-  linalg::GenericOp replacementOp;
-  // TODO: Replace the following block.
-  // This approach is not scalable as we can't add one if else block
-  // everytime the tensor shape increases by some size. The base case
-  // is the same i.e., [r, r, p, p, r] iterators to be set to the innerost
-  // loops.
-  if (matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() == 4) {
-    dims = 7;
-    bindDims(ctx, p1, p2, r1, r3, p3, p4, r2);
-    mapA = AffineMap::get(dims, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
-    mapB = AffineMap::get(dims, /*symbols=*/0,
-                          {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
-    mapC = AffineMap::get(dims, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
-    replacementOp = rewriter.create<linalg::GenericOp>(
-        loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
-        ArrayRef<AffineMap>{mapA, mapB, mapC},
-        ArrayRef<mlir::utils::IteratorType>{
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::reduction,
-            mlir::utils::IteratorType::reduction,
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::reduction},
-        /*doc=*/"", /*libraryCall=*/"");
 
-  } else {
-    // TODO: validate operands earlier
-    if (matmulOp.getInputs()[1].getType().cast<ShapedType>().getRank() != 3)
-      return rewriter.notifyMatchFailure(matmulOp,
-                                         "invalid second operand shape");
+  bindDims(ctx, p1, p2, r1, r3, p3, p4, r2);
+  mapA = AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
+  mapB = AffineMap::get(/*dims=*/7, /*symbols=*/0,
+                        {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
+  mapC = AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
+  auto replacementOp = rewriter.create<linalg::GenericOp>(
+      loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
+      ArrayRef<AffineMap>{mapA, mapB, mapC},
+      ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::reduction},
+      /*doc=*/"", /*libraryCall=*/"");
 
-    dims = 5;
-    bindDims(ctx, r1, r3, p3, p4, r2);
-    mapA = AffineMap::get(dims, /*symbols=*/0, {r1, p3, r2}, ctx);
-    mapB = AffineMap::get(dims, /*symbols=*/0,
-                          {r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
-    mapC = AffineMap::get(dims, /*symbols=*/0, {p3, p4}, ctx);
-    replacementOp = rewriter.create<linalg::GenericOp>(
-        loc, matrixC.getType(), packedInputs, ValueRange{matrixC},
-        ArrayRef<AffineMap>{mapA, mapB, mapC},
-        ArrayRef<mlir::utils::IteratorType>{
-            mlir::utils::IteratorType::reduction,
-            mlir::utils::IteratorType::reduction,
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::parallel,
-            mlir::utils::IteratorType::reduction},
-        /*doc=*/"", /*libraryCall=*/"");
-  }
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
 
@@ -517,6 +478,11 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   return replacementOp;
 }
 
+//===----------------------------------------------------------------------===//
+// BrgemmOp (VNNI layout)
+//===----------------------------------------------------------------------===//
+// Original layout: [I][J] += [R][I][K] * [R][K][J]
+// New      layout: [I][J] += [R][I][K] * [R][K/VNNI][J][VNNI]
 FailureOr<tpp::BrgemmOp>
 mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                 linalg::BatchReduceMatmulOp brgemmOp) {
@@ -530,14 +496,19 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   if (brgemmOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(brgemmOp, "require tensor semantics");
 
-  // Set blocking factor to size 2
-  OpFoldResult tileOnI = rewriter.getI64IntegerAttr(2);
-  SmallVector<OpFoldResult, 1> tilesOnB = {tileOnI};
+  Value operandB = brgemmOp.getInputs()[1];
+  // Blocking factor on the `k` dimension.
+  auto blockingFactor = vnni::utils::getVnniBlockingFactor(operandB.getType());
+  if (!blockingFactor) {
+    return rewriter.notifyMatchFailure(brgemmOp,
+                                       "unsupported blocking factor for type");
+  }
+  SmallVector<OpFoldResult, 1> tilesOnK = {rewriter.getI64IntegerAttr(2)};
 
   Location loc = brgemmOp.getLoc();
-  // reshape input B.
+  // Reshape input B.
   Value packedMatrixB =
-      toPackBRGemmLayout_VNNI(rewriter, loc, brgemmOp.getInputs()[1], tilesOnB);
+      toPackBRGemmLayout_VNNI(rewriter, loc, operandB, tilesOnK);
   auto replacementOp = rewriter.create<tpp::BrgemmOp>(
       loc,
       ValueRange{brgemmOp.getInputs()[0], packedMatrixB,
@@ -546,6 +517,7 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   rewriter.replaceOp(brgemmOp, replacementOp.getResult(0));
   return replacementOp;
 }
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -629,6 +601,24 @@ struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
     SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
     SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
     rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
+        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
+    return success();
+  }
+};
+
+// From linalg.generic to linalg.batch_reduce_matmul.
+struct DeGeneralizeBatchReduce : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasTensorSemantics())
+      return failure();
+    if (!linalgx::utils::isBrgemmOp(linalgOp))
+      return failure();
+    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
+    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
+    rewriter.replaceOpWithNewOp<linalg::BatchReduceMatmulOp>(
         linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
     return success();
   }
@@ -766,8 +756,7 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<VNNIOnMatmul>(ctx);
-    patterns.add<VNNIOnBRGemm>(ctx);
+    patterns.add<VNNIOnMatmul, DeGeneralizeBatchReduce, VNNIOnBRGemm>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

@@ -544,14 +544,11 @@ private:
 bool isMatmulOp(Operation *op, SmallVectorImpl<Value> *operands) {
   if (isa_and_nonnull<linalg::MatmulOp>(op))
     return true;
-  if (!isa_and_nonnull<linalg::GenericOp>(op))
-    return false;
-  auto linalgOp = cast<linalg::GenericOp>(op);
   using namespace tpp::structured_match;
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
   AffineExpr i, j, k;
-  bindDims(linalgOp.getContext(), i, j, k);
+  bindDims(op->getContext(), i, j, k);
   auto mapList = infer({{i, k}, {k, j}, {i, j}});
   auto matmulMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
@@ -565,7 +562,32 @@ bool isMatmulOp(Operation *op, SmallVectorImpl<Value> *operands) {
           .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
           .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
           .region(MatchOne(0), WithMulAddBody(operands));
-  return matmulMatcher.match(linalgOp);
+  return matmulMatcher.match(op);
+}
+
+bool isBrgemmOp(Operation *op, SmallVectorImpl<Value> *operands) {
+  if (isa_and_nonnull<linalg::BatchReduceMatmulOp>(op))
+    return true;
+  using namespace tpp::structured_match;
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr r, i, j, k;
+  bindDims(op->getContext(), r, i, j, k);
+  auto mapList = infer({{r, i, k}, {r, k, j}, {i, j}});
+  auto brgemmMatcher =
+      StructuredOpMatcher::make<linalg::GenericOp>()
+          .operation(NumDpsInits(EqualsTo(1)))
+          .operation(NumDpsInputs(EqualsTo(2)))
+          .operation(NumRegions(EqualsTo(1)))
+          .dim(MatchAll(), {mlir::utils::IteratorType::reduction,
+                            mlir::utils::IteratorType::parallel,
+                            mlir::utils::IteratorType::parallel,
+                            mlir::utils::IteratorType::reduction})
+          .input(MatchOne(0), HasMap(EqualsTo(mapList[0])))
+          .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
+          .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
+          .region(MatchOne(0), WithMulAddBody(operands));
+  return brgemmMatcher.match(op);
 }
 
 namespace {

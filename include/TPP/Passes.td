@@ -111,9 +111,11 @@ def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
 def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
   let summary = "Convert matmul/brgemm to vnni layout";
   let description = [{
-    VNNI Matmul as: C[M][N]= A[M][K] * B[K/b][N][b]
-    VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/b][N][b]
-    b is the VNNI factor.
+    Relayout following matmuls and brgemm as following:
+    - VNNI Matmul as: C[M][N]= A[M][K] * B[K/VNNI][N][VNNI]
+    - VNNI Blocked Matmul as:
+      [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
+    - VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/VNNI][N][VNNI]
   }];
   let options = [
     ListOption<"blockingFactors", "block-factors", "int64_t", 
