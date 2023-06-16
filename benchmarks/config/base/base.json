@@ -8,7 +8,7 @@
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_3x512_unpacked.mlir": {
+    "fp32_3x1024_unp_mlir": {
       "type": "MLIR",
       "benchmark": "gemm-fp32-3layers-1024-unpacked.mlir",
       "environment": {},
@@ -64,7 +64,7 @@
       "type": "MLIR",
       "benchmark": "mlp-bf16-10layers-3584.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='-def-pack=0'" ],
+      "flags": [ "-n", "100" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_dp2_3x1024_mlir": {
