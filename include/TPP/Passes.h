@@ -143,6 +143,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteBatchMatmulToMatmulPass();
 
 // Testing passes.
+std::unique_ptr<OperationPass<func::FuncOp>> createSimplifyAndCanonicalizePackPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertTppToIdentityPass();
 void registerTestStructuralMatchers();
 void registerTestForToForAllRewrite();
 

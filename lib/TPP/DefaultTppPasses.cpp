@@ -261,6 +261,7 @@ private:
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
+    pm.addPass(createConvertTppToIdentityPass());
 
     // Generalize tensor.pack and tensor.unpack.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
