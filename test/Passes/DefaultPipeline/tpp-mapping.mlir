@@ -45,6 +45,11 @@ func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x
 // Conv as matmul
 // CHECK: scf.for
 // CHECK:   linalg.matmul
+// Unpack
+// CHECK: scf.for
+// CHECK-NEXT: scf.for
+// CHECK-NEXT: scf.for
+// CHECK: linalg.transpose
 
 // -----
 
@@ -55,6 +60,7 @@ func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1
 }
 
 // CHECK-LABEL: func.func @conv_2d_nchw_fchw(
+// CHECK-SAME: %{{.+}}: tensor<14x512x28x28xf32>, %{{.+}}: tensor<1024x512x1x1xf32>, %[[ARG2:.+]]: tensor<14x1024x28x28xf32>
 // CHECK-NOT: linalg.conv_2d_nchw_fchw
 // Generalized pack of the first input, and output
 // CHECK: %[[ARG0_EXP:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0], [1, 2], [3], [4]] : tensor<14x512x28x28xf32> into tensor<14x16x32x28x28xf32>
@@ -66,10 +72,14 @@ func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1
 // CHECK: %[[ARG2_EXP:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0], [1, 2], [3], [4]] : tensor<14x1024x28x28xf32> into tensor<14x32x32x28x28xf32>
 // CHECK-NEXT: %{{.+}} = linalg.transpose ins(%[[ARG2_EXP]] : tensor<14x32x32x28x28xf32>) outs(%{{.+}} : tensor<14x32x28x28x32xf32>) 
 // CHECK-SAME:  permutation = [0, 1, 3, 4, 2]
-
 // Conv as matmul
 // CHECK: scf.for
 // CHECK:   linalg.matmul
+// CHECK: %[[EMPTY_T:.+]] = tensor.empty() : tensor<14x32x32x28x28xf32>
+// CHECK-NEXT: %[[T:.+]] = linalg.transpose ins(%{{.+}} : tensor<14x32x28x28x32xf32>) outs(%[[EMPTY_T]] : tensor<14x32x32x28x28xf32>) 
+// CHECK-SAME:  permutation = [0, 1, 4, 2, 3]
+// CHECK-NEXT: %[[CLP:.+]] = tensor.collapse_shape %[[T]] {{\[}}[0], [1, 2], [3], [4]] : tensor<14x32x32x28x28xf32> into tensor<14x1024x28x28xf32>
+// CHECK-NEXT: %{{.+}} = linalg.copy ins(%[[CLP]] : tensor<14x1024x28x28xf32>) outs(%[[ARG2]] : tensor<14x1024x28x28xf32>) -> tensor<14x1024x28x28xf32>
 
 // -----
 
@@ -119,6 +129,7 @@ func.func @pack_matmul(
 }
 
 // CHECK-LABEL: func.func @pack_matmul(
+// CHECK-SAME: %{{.+}}: tensor<128x128xf32>, %{{.+}}: tensor<128x128xf32>, %[[ARG2:.+]]: tensor<128x128xf32>
 // CHECK-NOT: linalg.matmul
 // Generalized pack of the first input, and output
 // CHECK: %[[ARG0_EXP:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2, 3]] : tensor<128x128xf32> into tensor<4x32x4x32xf32>
@@ -137,6 +148,11 @@ func.func @pack_matmul(
 // CHECK-SAME: outs({{.*}}: tensor<4x4x32x32xf32>)
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
+// CHECK: %[[EMPTY_T:.+]] = tensor.empty() : tensor<4x32x4x32xf32>
+// CHECK-NEXT: %[[T:.+]] = linalg.transpose ins(%{{.+}} : tensor<4x4x32x32xf32>) outs(%[[EMPTY_T]] : tensor<4x32x4x32xf32>) 
+// CHECK-SAME:  permutation = [0, 2, 1, 3]
+// CHECK-NEXT: %[[CLP:.+]] = tensor.collapse_shape %[[T]] {{\[}}[0, 1], [2, 3]] : tensor<4x32x4x32xf32> into tensor<128x128xf32>
+// CHECK-NEXT: %{{.+}} = linalg.copy ins(%[[CLP]] : tensor<128x128xf32>) outs(%[[ARG2]] : tensor<128x128xf32>) -> tensor<128x128xf32>
 
 // -----
 
@@ -183,6 +199,7 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
 }
 
 // CHECK-LABEL: func.func @propagate_pack_unpack(
+// CHECK-SAME: %{{.+}}: tensor<128x512xf32>, %{{.+}}: tensor<512x256xf32>, %[[ARG2:.+]]: tensor<128x256xf32>
 // CHECK: %[[ARG0_EXP:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2, 3]] : tensor<128x512xf32> into tensor<4x32x16x32xf32>
 // CHECK-NEXT: %{{.+}} = linalg.transpose ins(%expanded : tensor<4x32x16x32xf32>) outs(%0 : tensor<4x16x32x32xf32>) 
 // CHECK-SAME:  permutation = [0, 2, 1, 3]
@@ -198,7 +215,8 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
 // CHECK: %[[EMPTY_UNPACK:.+]] = tensor.empty() : tensor<4x32x8x32xf32>
 // CHECK-NEXT: %[[T_UNPACK:.+]] = linalg.transpose ins(%{{.+}} : tensor<4x8x32x32xf32>) outs(%[[EMPTY_UNPACK]] : tensor<4x32x8x32xf32>) 
 // CHECK-SAME:  permutation = [0, 2, 1, 3]
-// CHECK: %{{.+}} = tensor.collapse_shape %transposed_4 {{\[}}[0, 1], [2, 3]] : tensor<4x32x8x32xf32> into tensor<128x256xf32>
+// CHECK-NEXT: %[[CLP:.+]] = tensor.collapse_shape %transposed_4 {{\[}}[0, 1], [2, 3]] : tensor<4x32x8x32xf32> into tensor<128x256xf32>
+// CHECK-NEXT: %{{.+}} = linalg.copy ins(%[[CLP]] : tensor<128x256xf32>) outs(%[[ARG2]] : tensor<128x256xf32>) -> tensor<128x256xf32>
 
 // -----
 
@@ -250,6 +268,7 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 }
 
 // CHECK-LABEL: func.func @tile_and_fuse(
+// CHECK-SAME:  %{{.+}}: tensor<64x64xf32>, %{{.+}}: tensor<64x64xf32>, %[[ARG2:.+]]: tensor<64x64xf32>
 // CHECK: %[[ARG0_EXP:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2, 3]] : tensor<64x64xf32> into tensor<2x32x2x32xf32>
 // CHECK-NEXT: {{.+}} = linalg.transpose ins(%[[ARG0_EXP]] : tensor<2x32x2x32xf32>) outs(%{{.+}} : tensor<2x2x32x32xf32>) 
 // CHECK-SAME:  permutation = [0, 2, 1, 3]
@@ -267,3 +286,8 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK:   arith.addf
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.maxf
+// CHECK: %[[EMPTY_T:.+]] = tensor.empty() : tensor<2x32x2x32xf32>
+// CHECK-NEXT: %[[T:.+]] = linalg.transpose ins(%{{.+}} : tensor<2x2x32x32xf32>) outs(%[[EMPTY_T]] : tensor<2x32x2x32xf32>) 
+// CHECK-SAME:  permutation = [0, 2, 1, 3]
+// CHECK-NEXT: %[[CLP:.+]] = tensor.collapse_shape %[[T]] {{\[}}[0, 1], [2, 3]] : tensor<2x32x2x32xf32> into tensor<64x64xf32>
+// CHECK-NEXT: %{{.+}} = linalg.copy ins(%[[CLP]] : tensor<64x64xf32>) outs(%[[ARG2]] : tensor<64x64xf32>) -> tensor<64x64xf32>
