@@ -415,7 +415,15 @@ void BrgemmOp::getEffects(
 // FusedBrgemmOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult FusedBrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
+LogicalResult FusedBrgemmOp::verify() {
+  if (failed(verifyGemmLikeOperands(*this)))
+    return failure();
+  Type biasType = getBiasOperand().getType();
+  int64_t rank = biasType.cast<ShapedType>().getRank();
+  if (rank != 1 && rank != 2) 
+    return emitOpError() << "expected shaped type with rank 1 or 2 for bias";
+  return success();
+}
 
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
                           ValueRange inputs, Value output, Value bias,

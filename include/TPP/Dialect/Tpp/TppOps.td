@@ -32,8 +32,8 @@ def TppTensorInput : StaticTensorRankOf<[AnyFloat], [1, 2]>;
 def TppMemRefOutput : StaticMemRefRankOf<[AnyFloat], [2]>;
 def TppTensorOutput : StaticTensorRankOf<[AnyFloat], [2]>;
 
-def TppGemmLikeMemRef : StaticMemRefRankOf<[AnyFloat], [2, 3, 4]>;
-def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [2, 3, 4]>;
+def TppGemmLikeMemRef : StaticMemRefRankOf<[AnyFloat], [1, 2, 3, 4]>;
+def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [1, 2, 3, 4]>;
 
 // Tpp operands:
 // input operand: is a scalar float or a static memref with rank 1 or 2.
@@ -41,7 +41,7 @@ def TppGemmLikeTensor : StaticTensorRankOf<[AnyFloat], [2, 3, 4]>;
 def TppInputOperand : AnyTypeOf<[TppMemRefInput, TppTensorInput, AnyFloat]>;
 def TppOutputOperand : AnyTypeOf<[TppMemRefOutput, TppTensorOutput]>;
 
-// Tpp operands for gemm and brgemm ops - rank 2, 3 or 4.
+// Tpp operands for gemm and brgemm ops.
 def TppGemmLikeOperand : AnyTypeOf<[TppGemmLikeMemRef, TppGemmLikeTensor]>;
 
 //===----------------------------------------------------------------------===//
