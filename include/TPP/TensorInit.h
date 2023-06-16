@@ -89,7 +89,7 @@ enum class TensorInitType {
 };
 
 // Unique pointer for tensor init to help with memory management
-using TensorInitPtr = std::unique_ptr<ITensorInit>;
+using TensorInitPtr = std::shared_ptr<ITensorInit>;
 
 // Parse init type string into TensorInitType
 TensorInitType parseTensorInitType(llvm::StringRef name);
