@@ -64,7 +64,7 @@
       "type": "MLIR",
       "benchmark": "mlp-bf16-10layers-3584.mlir",
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='-def-pack=0'" ],
+      "flags": [ "-n", "100" ],
       "extensions": [ "avx512.*" ]
     },
     "bf16_dp2_3x1024_mlir": {
