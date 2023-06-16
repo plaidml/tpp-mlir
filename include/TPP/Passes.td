@@ -224,6 +224,13 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
+def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
+                                      "func::FuncOp"> {
+  let summary = "Rewrite a linalg.batch_matmul to linalg.matmul.";
+  let constructor = "mlir::tpp::createRewriteBatchMatmulToMatmulPass()";
+  let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
+}
+
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let summary = "Collection of default TPP passes";
   let description = [{

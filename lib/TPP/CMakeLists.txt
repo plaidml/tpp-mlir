@@ -19,6 +19,7 @@ add_mlir_library(MLIRTPP
     ConvInitSimplify.cpp
     ConvertForAllToParallelOp.cpp
     CombineTpp.cpp
+    RewriteBatchMatmulToMatmul.cpp
 
   # Utils
     TensorInit.cpp
