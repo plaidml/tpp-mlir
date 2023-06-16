@@ -20,7 +20,7 @@ namespace {
 struct InitKey {
   InitKey() = default;
   explicit InitKey(TensorInitType type, mlir::Type elmType, int seed)
-      : type(type), elmType(elmType) {
+      : type(type) {
     // Seed only matters for randomized types.
     switch (type) {
     case TensorInitType::Random:
@@ -31,23 +31,29 @@ struct InitKey {
       this->seed = 0;
       break;
     }
+
+    floatType = TensorInitFloat::getTensorInitDataType(elmType);
+    intType = TensorInitInt::getTensorInitDataType(elmType);
   }
 
   bool operator==(const InitKey &ik) const {
-    return type == ik.type && elmType == ik.elmType && seed == ik.seed;
+    return type == ik.type && floatType == ik.floatType &&
+           intType == ik.intType && seed == ik.seed;
   }
 
   TensorInitType type;
-  mlir::Type elmType;
+  TensorInitFloat::DataType floatType;
+  TensorInitInt::DataType intType;
   int seed;
 };
 
 struct InitKeyHash_fn {
   std::size_t operator()(const InitKey &ik) const {
-    auto h1 = std::hash<TensorInitType>{}(ik.type);
-    auto h2 = std::hash<mlir::Type>{}(ik.elmType);
-    auto h3 = std::hash<int>{}(ik.seed);
-    return h1 ^ h2 ^ h3;
+    std::size_t h1 = std::hash<TensorInitType>{}(ik.type);
+    std::size_t h2 = std::hash<TensorInitFloat::DataType>{}(ik.floatType);
+    std::size_t h3 = std::hash<TensorInitInt::DataType>{}(ik.intType);
+    std::size_t h4 = std::hash<int>{}(ik.seed);
+    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
   }
 };
 
@@ -85,17 +91,22 @@ TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType, int seed) {
     auto dataType = TensorInitFloat::getTensorInitDataType(elmType);
     switch (type) {
     case TensorInitType::Constant:
-      initPtr = std::make_unique<ConstantTensorInitFloat>(dataType);
+      initPtr = std::make_shared<ConstantTensorInitFloat>(dataType);
+      break;
     case TensorInitType::Simple:
-      initPtr = std::make_unique<SimpleTensorInitFloat>(dataType);
+      initPtr = std::make_shared<SimpleTensorInitFloat>(dataType);
+      break;
     case TensorInitType::Continuous:
-      initPtr = std::make_unique<ContinuousTensorInitFloat>(dataType);
+      initPtr = std::make_shared<ContinuousTensorInitFloat>(dataType);
+      break;
     case TensorInitType::Random:
       assert(seed && "Can't call random initializers without seed");
-      initPtr = std::make_unique<RandomTensorInitFloat>(dataType, seed);
+      initPtr = std::make_shared<RandomTensorInitFloat>(dataType, seed);
+      break;
     case TensorInitType::Normal:
       assert(seed && "Can't call random initializers without seed");
-      initPtr = std::make_unique<NormalTensorInitFloat>(dataType, seed);
+      initPtr = std::make_shared<NormalTensorInitFloat>(dataType, seed);
+      break;
     default:
       assert(false && "Invalid tensor initializer type");
     }
@@ -105,17 +116,22 @@ TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType, int seed) {
     auto dataType = TensorInitInt::getTensorInitDataType(elmType);
     switch (type) {
     case TensorInitType::Constant:
-      initPtr = std::make_unique<ConstantTensorInitInt>(dataType);
+      initPtr = std::make_shared<ConstantTensorInitInt>(dataType);
+      break;
     case TensorInitType::Simple:
-      initPtr = std::make_unique<SimpleTensorInitInt>(dataType);
+      initPtr = std::make_shared<SimpleTensorInitInt>(dataType);
+      break;
     case TensorInitType::Continuous:
-      initPtr = std::make_unique<ContinuousTensorInitInt>(dataType);
+      initPtr = std::make_shared<ContinuousTensorInitInt>(dataType);
+      break;
     case TensorInitType::Random:
       assert(seed && "Can't call random initializers without seed");
-      initPtr = std::make_unique<RandomTensorInitInt>(dataType, seed);
+      initPtr = std::make_shared<RandomTensorInitInt>(dataType, seed);
+      break;
     case TensorInitType::Normal:
       assert(seed && "Can't call random initializers without seed");
-      initPtr = std::make_unique<NormalTensorInitInt>(dataType, seed);
+      initPtr = std::make_shared<NormalTensorInitInt>(dataType, seed);
+      break;
     default:
       assert(false && "Invalid tensor initializer type");
     }
