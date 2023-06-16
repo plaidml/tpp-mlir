@@ -41,6 +41,7 @@ template <typename T> struct TensorInit : public ITensorInit {
   // a reasonable distribution.
   virtual mlir::DenseElementsAttr get(mlir::ShapedType shape) override {
     buffer.clear();
+    size = 1;
     for (size_t dim = 0, rank = shape.getRank(); dim < rank; dim++)
       size *= shape.getDimSize(dim);
     fillData();
