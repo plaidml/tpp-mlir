@@ -3,8 +3,8 @@
 // RUN:  -e entry -entry-point-result=void
 
 // Total flops = matmul O(2*n*m*k) + BiasAdd (n*m) + ReLU (O(n*m) x 3
-// 2*256x1024x1024 (536870912) + 256x1024 (262144) + 256x1024 262144) x 3 = 1,072,168,960
-// BENCH_TOTAL_FLOPS: 1072168960
+// ( 2*256x1024x1024 (536870912) + 256x1024 (262144) + 256x1024 (262144) ) x 3 = 1,612,185,600
+// BENCH_TOTAL_FLOPS: 1612185600
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 4, d5, d3)>
