@@ -250,3 +250,63 @@ func.func @test_tpp_identity(%arg0: memref<3xf32>, %arg1: memref<5x3xf32>) {
   } 
   return
 }
+
+#map13 = affine_map<(d0, d1) -> (0)>
+#map14 = affine_map<(d0, d1) -> (d0, d1)>
+#map15 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map16 = affine_map<(d0, d1) -> ()>
+
+// CHECK-LABEL: test_rank
+func.func @test_rank(%arg0: memref<1xf32>, 
+                     %arg1: memref<4x4xf32>, %arg2: memref<4x4x4xf32>, 
+                     %arg3: f32) {
+  // CHECK: match rank 1
+  // CHECK-NOT: match rank 2
+  // CHECK-NOT: match scalar
+  linalg.generic {
+    indexing_maps = [#map13, #map14],
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0: memref<1xf32>)
+    outs(%arg1: memref<4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  // CHECK: match rank 2
+  // CHECK-NOT: match rank 1
+  // CHECK-NOT: match scalar
+  linalg.generic {
+    indexing_maps = [#map14, #map14],
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg1: memref<4x4xf32>)
+    outs(%arg1: memref<4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  // CHECK: match scalar
+  // CHECK-NOT: match rank 2
+  // CHECK-NOT: match rank 1
+  linalg.generic {
+    indexing_maps = [#map16, #map14],
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg3: f32)
+    outs(%arg1: memref<4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  // CHECK-NOT: match scalar
+  // CHECK-NOT: match rank 1
+  // CHECK-NOT: match rank 2
+  linalg.generic {
+    indexing_maps = [#map15, #map15],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg2: memref<4x4x4xf32>)
+    outs(%arg2: memref<4x4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } 
+  return
+}

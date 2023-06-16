@@ -132,6 +132,10 @@ static bool isTppBinaryOp(linalg::GenericOp linalgOp) {
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(_OR(EqualsTo(1), EqualsTo(2))))
+          .output(MatchAll(), HasRank({2}))
+          // TODO: (lorenzo) When we introduce broadcast op we
+          // will restrict the input to 2d tiles.
+          .input(MatchAll(), HasRank({HasRank::SCALAR, 1, 2}))
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
@@ -146,6 +150,11 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(_OR(EqualsTo(0), EqualsTo(1))))
+          // TODO: (lorenzo) When we introduce reduce operations
+          // we will relax this constraint, and allow SCALAR, 1d
+          // and 2d.
+          .output(MatchAll(), HasRank({2}))
+          .input(MatchAll(), HasRank({HasRank::SCALAR, 1, 2}))
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))

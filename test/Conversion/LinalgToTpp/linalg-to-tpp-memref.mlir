@@ -679,3 +679,23 @@ func.func @linalg_fill_3d(%arg0: memref<2x8x32xf32>) -> memref<2x8x32xf32> {
   linalg.fill ins(%cst : f32) outs(%arg0 : memref<2x8x32xf32>)
   return %arg0 : memref<2x8x32xf32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: scalar_input
+func.func @scalar_input(%arg0: memref<f32>, %arg1: memref<4x4xf32>) {
+  // CHECK-NOT: tpp.add
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0: memref<f32>)
+    outs(%arg1: memref<4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  }
+  return
+}

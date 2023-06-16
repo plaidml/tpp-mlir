@@ -58,7 +58,7 @@ struct MatchRange : public MatchSelector {
 // Callable object to check if the number of loops in `op` satisfies `fun`.
 struct NumOfLoops {
   NumOfLoops() = delete;
-  NumOfLoops(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumOfLoops(std::function<bool(size_t)> fun) : fun(fun){};
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
@@ -74,7 +74,7 @@ struct NumOfLoops {
 // `fun`.
 struct HasMap {
   HasMap() = delete;
-  HasMap(std::function<bool(AffineMap)> fun) : fun(fun){};
+  explicit HasMap(std::function<bool(AffineMap)> fun) : fun(fun){};
 
   bool operator()(OpOperand *operand, Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
@@ -113,6 +113,26 @@ struct HasStaticShape {
         return false;
     return true;
   }
+};
+
+// Callable object to verify `operand` to have a rank in `ranks`.
+struct HasRank {
+  HasRank() = delete;
+  explicit HasRank(std::initializer_list<int64_t> ranks) : ranks(ranks){};
+
+  bool operator()(OpOperand *operand, Operation *op) const {
+    auto operandType = operand->get().getType();
+    if (!isa<ShapedType>(operandType))
+      return llvm::is_contained(ranks, HasRank::SCALAR);
+    int64_t rank = operandType.cast<ShapedType>().getRank();
+    return llvm::any_of(
+        ranks, [=](int64_t expectedRank) { return expectedRank == rank; });
+  }
+
+  // There are multiple way to represent a scalar: f32, tensor<f32>.
+  // SCALAR means f32.
+  static constexpr int64_t SCALAR = -1;
+  std::vector<int64_t> ranks;
 };
 
 // Callable object to check if the input is equal to specified `value`.
