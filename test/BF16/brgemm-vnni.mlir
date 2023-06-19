@@ -1,8 +1,8 @@
 // RUN: tpp-opt -pack-vnni %s | FileCheck %s
 
 func.func @matmul(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
-  %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1:tensor<32x4x4xbf16>, tensor<32x4x4xbf16>) 
-                                  outs(%arg2:tensor<4x4xbf16>) -> tensor<4x4xbf16>
+  %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<32x4x4xbf16>, tensor<32x4x4xbf16>) 
+                                  outs(%arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>
   return %0: tensor<4x4xbf16>
 }
 
