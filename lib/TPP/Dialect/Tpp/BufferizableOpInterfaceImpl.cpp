@@ -402,13 +402,6 @@ static LogicalResult bufferizeTernaryOp(Operation *op, RewriterBase &rewriter,
 static bool bufferizesToMemoryReadTernaryImpl(Operation *op,
                                               OpOperand &opOperand,
                                               const AnalysisState &state) {
-  // If the third accumulation operand is zeroFilled, the access is not
-  // read/write but only write. This allows to avoid allocation for GEMM and
-  // BRGEMM if C is zero intialized.
-  if (opOperand.getOperandNumber() == 2 &&
-      tpp::utils::isZeroTensor(opOperand.get())) {
-    return false;
-  }
   return true;
 }
 
