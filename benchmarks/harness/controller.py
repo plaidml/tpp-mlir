@@ -137,9 +137,10 @@ class BenchmarkController(object):
                                              '-e', self.args.entry,
                                              '--entry-point-result=void',
                                              '--print=0',
-                                             '--seed=123',
-                                             '--splat-to-random',
+                                             '--seed', str(self.args.seed),
                   ]
+        if self.args.splat_to_random:
+            runCmd.append('--splat-to-random')
         if self.args.run_args:
             runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
@@ -212,6 +213,10 @@ if __name__ == '__main__':
                         help='Disable LSAN')
     parser.add_argument('--build', type=str, default="",
                         help='Path to the build dir')
+    parser.add_argument('--seed', type=int, default=123,
+                        help='Random seed (default: enabled)')
+    parser.add_argument('--splat-to-random', action='store_true', default=True,
+                        help='Replace splat dense tensors with random value (default: enabled)')
     args = parser.parse_args()
 
     # List of ASAN_OPTIONS
