@@ -215,7 +215,7 @@ if __name__ == '__main__':
                         help='Path to the build dir')
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed (default: enabled)')
-    parser.add_argument('--splat-to-random', action='store_true', default=True,
+    parser.add_argument('--splat-to-random', type=int, default=1,
                         help='Replace splat dense tensors with random value (default: enabled)')
     args = parser.parse_args()
 

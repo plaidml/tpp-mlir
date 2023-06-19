@@ -235,6 +235,16 @@ class MLIRRun(BaseRun):
                 command[command.index('-n')+1] = self.args.n
             else:
                 command.extend(["-n", self.args.n])
+        if self.args.seed:
+            if '--seed' in command:
+                command[command.index('--seed')+1] = self.args.seed
+            else:
+                command.extend(["--seed", self.args.seed])
+        if self.args.splat_to_random:
+            if '--splat-to-random' in command:
+                command[command.index('--splat-to-random')+1] = self.args.splat_to_random
+            else:
+                command.extend(["--splat-to-random", self.args.splat_to_random])
         command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
@@ -436,9 +446,9 @@ if __name__ == '__main__':
                         help='Suppress warnings')
     parser.add_argument('--ignore-errors', action='count', default=0,
                         help='Ignore errors and only show the results that work')
-    parser.add_argument('--seed', type=int, default=123,
+    parser.add_argument('--seed', type=str, default="",
                         help='Random seed (default: enabled)')
-    parser.add_argument('--splat-to-random', action='store_true', default=True,
+    parser.add_argument('--splat-to-random', type=str, default="",
                         help='Replace splat dense tensors with random value (default: enabled)')
     args = parser.parse_args()
 
