@@ -412,7 +412,8 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 //===----------------------------------------------------------------------===//
 // MatmulOp (VNNI packing)
 //===----------------------------------------------------------------------===//
-// Original layout: [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
+// Original layout:
+//      [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
 // New      layout:
 //      [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
 FailureOr<linalg::GenericOp>
