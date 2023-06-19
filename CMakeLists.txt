@@ -153,4 +153,11 @@ if (NOT TPP_INSIDE_IREE)
                     COMMENT Run Benchmarks)
 endif()
 
+# Clang format checks
+set(CI_DIR "${PROJECT_SOURCE_DIR}/scripts/ci")
+add_custom_target(clang-format ${CI_DIR}/clang-format.sh)
+
+# Check-all
+add_custom_target(check-all DEPENDS clang-format check)
+
 message(STATUS "TPP Project CMakeLists.txt END")

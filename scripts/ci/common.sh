@@ -3,6 +3,11 @@
 # Common functions to all scripts
 # Usage: source common.sh
 
+# Find the git root directory
+git_root() {
+  git rev-parse --show-toplevel
+}
+
 # Check if a program is in the PATH
 check_program() {
   PROG=$1
@@ -21,7 +26,7 @@ echo_run() {
 
 # Get the LLVM version for this build
 llvm_version() {
-  LLVM_VERSION_FILE=$(git rev-parse --show-toplevel)/build_tools/llvm_version.txt
+  LLVM_VERSION_FILE=$(git_root)/build_tools/llvm_version.txt
   if [ ! -f "${LLVM_VERSION_FILE}" ]; then
     echo "Cannot find LLVM version file in repo $PWD"
     exit 1
