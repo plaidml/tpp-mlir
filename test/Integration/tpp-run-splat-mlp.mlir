@@ -50,13 +50,13 @@ func.func @entry(%arg0: tensor<8x8xf32>, %output: tensor<8x8xf32>) -> tensor<8x8
   return %5 : tensor<8x8xf32>
 }
 
-// Ensure that each weight and bias gets their own global buffer
+// Ensure that each weight and bias gets their own global buffer.
 // CHECK-DAG: memref.global "private" constant @__constant_8x8xf32 : memref<8x8xf32>
 // CHECK-DAG: memref.global "private" constant @__constant_8x8xf32_0 : memref<8x8xf32>
 // CHECK-DAG: memref.global "private" constant @__constant_8xf32 : memref<8xf32>
 // CHECK-DAG: memref.global "private" constant @__constant_8xf32_0 : memref<8xf32>
 
-// Randomized input
+// Randomized input.
 // CHECK-DAG: memref.global "private" @__wrapper_0 : memref<8x8xf32>
 // CHECK-LABEL: @entry
 // CHECK: %[[input:.+]] = memref.get_global @__wrapper_0
