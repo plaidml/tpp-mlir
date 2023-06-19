@@ -24,6 +24,7 @@ class Conv2DNchwFchwOp;
 class Conv2DNhwcHwcfOp;
 class MatmulOp;
 class BatchReduceMatmulOp;
+class BatchMatmulOp;
 } // namespace linalg
 
 namespace tpp {
@@ -54,9 +55,12 @@ FailureOr<linalg::GenericOp>
 packConv2DNhwcHwcfOp(RewriterBase &rewriter, linalg::Conv2DNhwcHwcfOp linalgOp,
                      ArrayRef<OpFoldResult> tiles);
 
-// Attempt to block a MatmulOp.
+// Attempt to block a MatmulOp or a BatchMatmulOp.
 FailureOr<linalg::GenericOp> packMatmulOp(RewriterBase &rewriter,
                                           linalg::MatmulOp linalgOp,
+                                          ArrayRef<OpFoldResult> tiles);
+FailureOr<linalg::GenericOp> packMatmulOp(RewriterBase &rewriter,
+                                          linalg::BatchMatmulOp linalgOp,
                                           ArrayRef<OpFoldResult> tiles);
 
 // Attempt to block a MatmulOp to VNNI format.

@@ -120,3 +120,49 @@ func.func @block_linalg_matmul(
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 // CHECK: return %[[OUT]] : tensor<128x128xf32>
 // CHECK: }
+
+// -----
+
+func.func @batch_matmul_rewrite(%arg0: tensor<512x64x128xf32>, %arg1: tensor<512x128x64xf32>) -> tensor<512x64x64xf32> {
+  %0 = tensor.empty() : tensor<512x64x64xf32>
+  %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<512x64x128xf32>, tensor<512x128x64xf32>)
+                           outs(%0 : tensor<512x64x64xf32>) -> tensor<512x64x64xf32>
+  return %1 : tensor<512x64x64xf32>
+}
+
+// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4, d6)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d6, d5)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d5)>
+// CHECK-LABEL: batch_matmul_rewrite
+// CHECK-SAME: %[[ARG0:.+]]: tensor<512x64x128xf32>, %[[ARG1:.+]]: tensor<512x128x64xf32>
+// CHECK: %[[OUT:.+]] = tensor.empty() : tensor<512x64x64xf32>
+// CHECK: %[[ARG0_PACK_OUT:.+]] = tensor.empty() : tensor<512x2x4x32x32xf32>
+// CHECK: %[[ARG0_PACK:.+]] = tensor.pack %[[ARG0]] 
+// CHECK-SAME:  inner_dims_pos = [1, 2] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[ARG0_PACK_OUT]] : tensor<512x64x128xf32> -> tensor<512x2x4x32x32xf32>
+// CHECK: %[[ARG1_PACK_OUT:.+]] = tensor.empty() : tensor<512x2x4x32x32xf32>
+// CHECK: %[[ARG1_PACK:.+]] = tensor.pack %[[ARG1]] 
+// CHECK-SAME:  outer_dims_perm = [0, 2, 1] inner_dims_pos = [1, 2] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[ARG1_PACK_OUT]] : tensor<512x128x64xf32> -> tensor<512x2x4x32x32xf32>
+// CHECK: %[[OUT_PACK_OUT:.+]] = tensor.empty() : tensor<512x2x2x32x32xf32>
+// CHECK: %[[OUT_PACK:.+]] = tensor.pack %[[OUT]] 
+// CHECK-SAME:  inner_dims_pos = [1, 2] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[OUT_PACK_OUT]] : tensor<512x64x64xf32> -> tensor<512x2x2x32x32xf32>
+// CHECK: %[[GEN:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
+// CHECK: %[[UNPACK:.+]] = tensor.unpack %[[GEN]] 
+// CHECK-SAME:  inner_dims_pos = [1, 2] inner_tiles = [32, 32] 
+// CHECK-SAME:  into %[[OUT]] : tensor<512x2x2x32x32xf32> -> tensor<512x64x64xf32>
+
+// -----
+
+// CHECK-LABEL: batch_matmul_invalid_tiles
+func.func @batch_matmul_invalid_tiles(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tensor<5x5x5xf32> {
+  %0 = tensor.empty() : tensor<5x5x5xf32>
+  // CHECK: linalg.batch_matmul
+  // CHECK-NOT: linalg.generic
+  %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<5x5x5xf32>, tensor<5x5x5xf32>)
+                           outs(%0 : tensor<5x5x5xf32>) -> tensor<5x5x5xf32>
+  return %1 : tensor<5x5x5xf32>
+}

@@ -65,10 +65,16 @@ static Value toUnPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
                                           tiles, outerDimsPerm);
 }
 
-static Value handleLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
-                                 Value output, ArrayRef<OpFoldResult> tiles) {
+static Value handleLayoutNC_NCnc(OpBuilder &builder, linalg::LinalgOp matmulOp,
+                                 Value input, Value output,
+                                 ArrayRef<OpFoldResult> tiles) {
+  assert(isa<linalg::MatmulOp>(matmulOp) ||
+         isa<linalg::BatchMatmulOp>(matmulOp));
   assert(tiles.size() == 2 && "expect two tile sizes for NC_NCnc");
+  Location loc = matmulOp.getLoc();
   SmallVector<int64_t> innerDimPos = {0, 1};
+  if (isa<linalg::BatchMatmulOp>(matmulOp))
+    innerDimPos = {1, 2};
   if (!output)
     return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
                             /*outerDimsPerm=*/{});
@@ -93,10 +99,11 @@ static Value handleBRGemmLayout_VNNI(OpBuilder &builder, Location loc,
   return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
                           /*outerDimsPerm=*/{});
 }
+
 // Helper function to pack from NC to NCnc.
-static Value toPackLayoutNC_NCnc(OpBuilder &builder, Location loc, Value input,
-                                 ArrayRef<OpFoldResult> tiles) {
-  return handleLayoutNC_NCnc(builder, loc, input, nullptr, tiles);
+static Value toPackLayoutNC_NCnc(OpBuilder &builder, linalg::LinalgOp matmulOp,
+                                 Value input, ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNC_NCnc(builder, matmulOp, input, nullptr, tiles);
 }
 
 // Helper function to pack from NC to [N/2][C][2].
@@ -113,10 +120,10 @@ static Value toPackBRGemmLayout_VNNI(OpBuilder &builder, Location loc,
 }
 
 // Helper function to unpack from NCnc to NC.
-static Value fromPackLayoutNCnc_NC(OpBuilder &builder, Location loc,
-                                   Value input, Value output,
-                                   ArrayRef<OpFoldResult> tiles) {
-  return handleLayoutNC_NCnc(builder, loc, input, output, tiles);
+static Value fromPackLayoutNCnc_NC(OpBuilder &builder,
+                                   linalg::LinalgOp matmulOp, Value input,
+                                   Value output, ArrayRef<OpFoldResult> tiles) {
+  return handleLayoutNC_NCnc(builder, matmulOp, input, output, tiles);
 }
 
 static Value handleLayoutNCHW_NCHWc(OpBuilder &builder, Location loc,
@@ -145,12 +152,18 @@ static Value fromPackLayoutNCHWc_NCHW(OpBuilder &builder, Location loc,
 }
 
 // Helper function to pack from KC to CKkc.
-static Value toPackLayoutKC_CKkc(OpBuilder &builder, Location loc, Value input,
-                                 ArrayRef<OpFoldResult> tiles) {
+static Value toPackLayoutKC_CKkc(OpBuilder &builder, linalg::LinalgOp matmulOp,
+                                 Value input, ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 2 && "expect two tiles size for KC_CKkc");
+  assert(isa<linalg::MatmulOp>(matmulOp) ||
+         isa<linalg::BatchMatmulOp>(matmulOp));
   SmallVector<int64_t> innerDimPos = {0, 1};
   SmallVector<int64_t> outerDimPerm = {1, 0};
-  return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
+  if (isa<linalg::BatchMatmulOp>(matmulOp)) {
+    innerDimPos = {1, 2};
+    outerDimPerm = {0, 2, 1};
+  }
+  return toPackLayoutImpl(builder, matmulOp.getLoc(), input, tiles, innerDimPos,
                           outerDimPerm);
 }
 
@@ -324,9 +337,51 @@ mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
   return packConvolutions(rewriter, convOp, tiles);
 }
 
+template <typename OpTy>
+static std::pair<SmallVector<AffineMap>, SmallVector<utils::IteratorType>>
+getAffineMapsAndIteratorsForMatmuls(OpTy matmulOp) {
+  MLIRContext *ctx = matmulOp.getContext();
+  if (isa<linalg::MatmulOp>(matmulOp.getOperation())) {
+    AffineExpr p1, p2, r1, p3, p4, r2;
+    bindDims(ctx, p1, p2, r1, p3, p4, r2);
+    AffineMap mapA =
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
+    AffineMap mapB =
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {p2, r1, r2, p4}, ctx);
+    AffineMap mapC =
+        AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
+    SmallVector<utils::IteratorType> iterators = {
+        utils::IteratorType::parallel,  utils::IteratorType::parallel,
+        utils::IteratorType::reduction, utils::IteratorType::parallel,
+        utils::IteratorType::parallel,  utils::IteratorType::reduction};
+    return std::make_pair(SmallVector<AffineMap>{mapA, mapB, mapC}, iterators);
+  }
+  if (isa<linalg::BatchMatmulOp>(matmulOp.getOperation())) {
+    AffineExpr b, p1, p2, r1, p3, p4, r2;
+    bindDims(ctx, b, p1, p2, r1, p3, p4, r2);
+    AffineMap mapA =
+        AffineMap::get(/*dims=*/7, /*symbols=*/0, {b, p1, r1, p3, r2}, ctx);
+    AffineMap mapB =
+        AffineMap::get(/*dims=*/7, /*symbols=*/0, {b, p2, r1, r2, p4}, ctx);
+    AffineMap mapC =
+        AffineMap::get(/*dims=*/7, /*symbols=*/0, {b, p1, p2, p3, p4}, ctx);
+    SmallVector<utils::IteratorType> iterators = {
+        utils::IteratorType::parallel, utils::IteratorType::parallel,
+        utils::IteratorType::parallel, utils::IteratorType::reduction,
+        utils::IteratorType::parallel, utils::IteratorType::parallel,
+        utils::IteratorType::reduction};
+    return std::make_pair(SmallVector<AffineMap>{mapA, mapB, mapC}, iterators);
+  }
+  assert(false && "unsupported op");
+}
+
+template <typename OpTy>
 static FailureOr<linalg::GenericOp>
-packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+packMatmulOpImpl(RewriterBase &rewriter, OpTy matmulOp,
                  ArrayRef<OpFoldResult> tiles) {
+  static_assert(
+      llvm::is_one_of<OpTy, linalg::MatmulOp, linalg::BatchMatmulOp>::value,
+      "applies to only matmul or batch matmul operations");
 
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
@@ -337,9 +392,14 @@ packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   OpFoldResult tileOnI = tiles[0];
   OpFoldResult tileOnJ = tiles[1];
   OpFoldResult tileOnK = tiles[2];
+  bool isBatchMatmulOp = std::is_same_v<OpTy, linalg::BatchMatmulOp>;
+  size_t inc = isBatchMatmulOp ? 1 : 0;
+  size_t posI = 0 + inc;
+  size_t posJ = 1 + inc;
+  size_t posK = 2 + inc;
   if (!linalgx::utils::validateFullTilesOnDims(
           cast<TilingInterface>(matmulOp.getOperation()),
-          {tileOnI, tileOnJ, tileOnK}, {/*I=*/0, /*J=*/1, /*K=*/2}))
+          {tileOnI, tileOnJ, tileOnK}, {posI, posJ, posK}))
     return rewriter.notifyMatchFailure(matmulOp, "expect full tiles only");
   SmallVector<OpFoldResult, 2> tilesOnA = {tileOnI, tileOnK};
   SmallVector<OpFoldResult, 2> tilesOnB = {tileOnK, tileOnJ};
@@ -347,33 +407,21 @@ packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 
   Location loc = matmulOp.getLoc();
   // reshape input A and B.
-  Value packedMatrixA =
-      toPackLayoutNC_NCnc(rewriter, loc, matmulOp.getInputs()[0], tilesOnA);
-  Value packedMatrixB =
-      toPackLayoutKC_CKkc(rewriter, loc, matmulOp.getInputs()[1], tilesOnB);
+  Value packedMatrixA = toPackLayoutNC_NCnc(rewriter, matmulOp,
+                                            matmulOp.getInputs()[0], tilesOnA);
+  Value packedMatrixB = toPackLayoutKC_CKkc(rewriter, matmulOp,
+                                            matmulOp.getInputs()[1], tilesOnB);
   SmallVector<Value> packedInputs = {packedMatrixA, packedMatrixB};
 
   // reshape output C.
-  Value packMatrixC =
-      toPackLayoutNC_NCnc(rewriter, loc, matmulOp.getOutputs()[0], tilesOnC);
+  Value packedMatrixC = toPackLayoutNC_NCnc(rewriter, matmulOp,
+                                            matmulOp.getOutputs()[0], tilesOnC);
 
   // swap linalg.matmul with a linalg.generic.
-  MLIRContext *ctx = matmulOp.getContext();
-  AffineExpr p1, p2, r1, p3, p4, r2;
-  bindDims(ctx, p1, p2, r1, p3, p4, r2);
-  AffineMap mapA =
-      AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
-  AffineMap mapB =
-      AffineMap::get(/*dims=*/6, /*symbols=*/0, {p2, r1, r2, p4}, ctx);
-  AffineMap mapC =
-      AffineMap::get(/*dims=*/6, /*symbols=*/0, {p1, p2, p3, p4}, ctx);
+  auto newMapsAndIterators = getAffineMapsAndIteratorsForMatmuls(matmulOp);
   linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
-      loc, packMatrixC.getType(), packedInputs, ValueRange{packMatrixC},
-      ArrayRef<AffineMap>{mapA, mapB, mapC},
-      ArrayRef<utils::IteratorType>{
-          utils::IteratorType::parallel, utils::IteratorType::parallel,
-          utils::IteratorType::reduction, utils::IteratorType::parallel,
-          utils::IteratorType::parallel, utils::IteratorType::reduction},
+      loc, packedMatrixC.getType(), packedInputs, ValueRange{packedMatrixC},
+      newMapsAndIterators.first, newMapsAndIterators.second,
       /*doc=*/"", /*libraryCall=*/"");
   rewriter.inlineRegionBefore(matmulOp.getRegion(), replacementOp.getRegion(),
                               replacementOp.getRegion().begin());
@@ -381,8 +429,8 @@ packMatmulOpImpl(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   // convert back from pack layout.
   Value outPackTensor = replacementOp.getResult(0);
   Value outUnPackTensor = matmulOp.getOutputs()[0];
-  Value outReplacement = fromPackLayoutNCnc_NC(rewriter, loc, outPackTensor,
-                                               outUnPackTensor, tilesOnC);
+  Value outReplacement = fromPackLayoutNCnc_NC(
+      rewriter, matmulOp, outPackTensor, outUnPackTensor, tilesOnC);
   rewriter.replaceOp(matmulOp, outReplacement);
   return replacementOp;
 }
@@ -406,7 +454,24 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   if (tiles.size() != 3)
     return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
 
-  return packMatmulOpImpl(rewriter, matmulOp, tiles);
+  return packMatmulOpImpl<linalg::MatmulOp>(rewriter, matmulOp, tiles);
+}
+
+//===----------------------------------------------------------------------===//
+// BatchMatmulOp
+//===----------------------------------------------------------------------===//
+// Original layout:
+//  [B][I][J] += [B][I][K] * [B][K][J]
+// New layout:
+//  [B][IB][JB][ib][jb] += [B][IB][KB][ib][kb] * [B][JB][KB][kb][jb]
+FailureOr<linalg::GenericOp>
+mlir::linalgx::packMatmulOp(RewriterBase &rewriter,
+                            linalg::BatchMatmulOp matmulOp,
+                            ArrayRef<OpFoldResult> tiles) {
+  if (tiles.size() != 3)
+    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
+
+  return packMatmulOpImpl<linalg::BatchMatmulOp>(rewriter, matmulOp, tiles);
 }
 
 //===----------------------------------------------------------------------===//
@@ -568,14 +633,14 @@ struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
 // Passes
 //===----------------------------------------------------------------------===//
 
-// Pack MatmulOp.
-struct DoItOnMatmul : public OpRewritePattern<linalg::MatmulOp> {
-  DoItOnMatmul(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
-               PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
+// Pack MatmulOp and BatchMatmulOp.
+template <typename OpTy> struct PackMatmulImpl : public OpRewritePattern<OpTy> {
+  PackMatmulImpl(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
+                 PatternBenefit benefit = 1)
+      : OpRewritePattern<OpTy>(context, benefit),
         blockingFactors(blockingFactors) {}
 
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(OpTy matmulOp,
                                 PatternRewriter &rewriter) const override {
     FailureOr<linalg::GenericOp> packedMatmul = mlir::linalgx::packMatmulOp(
         rewriter, matmulOp,
@@ -629,6 +694,9 @@ struct DeGeneralizeBatchReduce : public OpRewritePattern<linalg::GenericOp> {
 // Pack MatmulOp as following:
 // [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
 // CB = batch reduce dimension.
+// Pack a BatchMatmulOp as following:
+// [B][IB][JB][ib][jb] += [B][IB][KB][ib][kb] * [B][JB][KB][kb][jb]
+// KB is the batch reduce dimension.
 struct PackMatmul : public PackMatmulBase<PackMatmul> {
   PackMatmul() = default;
   PackMatmul(ArrayRef<int64_t> blockingFactors) {
@@ -640,7 +708,8 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
       return;
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<DoItOnMatmul>(ctx, blockingFactors);
+    patterns.add<PackMatmulImpl<linalg::MatmulOp>,
+                 PackMatmulImpl<linalg::BatchMatmulOp>>(ctx, blockingFactors);
     patterns.add<DeGeneralizeMatmul>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
