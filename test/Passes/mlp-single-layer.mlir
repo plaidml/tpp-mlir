@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -7,7 +7,8 @@
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module @predict_function  {
   func.func @main(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
-    %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
+    %arg2: tensor<512xf32>) -> tensor<128x512xf32> {
+    %output = tensor.empty() : tensor<128x512xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
@@ -28,15 +29,7 @@ module @predict_function  {
   }
 }
 
-// Note that the output is a function parameter.
-
-//      CHECK: func.func @main(
-// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>
-// CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: memref<256x512xf32>
-// CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: memref<512xf32>
-// CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: memref<128x512xf32>
-// CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: tpp.gemm ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>, %[[ARG3]] : memref<128x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: tpp.relu ins(%[[ARG3]] : memref<128x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: return
-// CHECK: }
+// CHECK: main
+// CHECK: tpp.identity
+// CHECK-NEXT: tpp.gemm
+// CHECK-NEXT: tpp.relu

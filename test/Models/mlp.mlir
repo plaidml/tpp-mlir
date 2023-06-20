@@ -1,7 +1,5 @@
 // RUN: tpp-opt %s \
-// RUN: -bufferize \ 
-// RUN: -convert-linalg-to-tpp \
-// RUN: -convert-linalg-to-tpp | FileCheck %s
+// RUN: -convert-linalg-to-tpp -bufferize | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
