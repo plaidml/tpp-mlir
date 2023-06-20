@@ -122,6 +122,7 @@ static bool isTppOp(linalg::GenericOp linalgOp) {
           .output(MatchAll(), HasStaticShape())
           .input(MatchAll(), HasStaticShape())
           .operation(NumRegions(EqualsTo(1)))
+          .operation(HasTensorSemantics())
           .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
   return tppMatcher.match(linalgOp);
 }

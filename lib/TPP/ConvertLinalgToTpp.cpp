@@ -89,6 +89,9 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasTensorSemantics())
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Expect tensor type when mapping to tpp");
     if (linalgOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");
@@ -103,6 +106,9 @@ struct ConvertBrgemmToTpp
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
+    if (!brMatmulOp.hasTensorSemantics())
+      return rewriter.notifyMatchFailure(
+          brMatmulOp, "Expect tensor type when mapping to tpp");
     if (brMatmulOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
@@ -120,6 +126,9 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
+    if (!matmulOp.hasTensorSemantics())
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Expect tensor type when mapping to tpp");
     if (matmulOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");
@@ -137,6 +146,9 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
+    if (!fillOp.hasTensorSemantics())
+      return rewriter.notifyMatchFailure(
+          fillOp, "Expect tensor type when mapping to tpp");
     if (fillOp.hasDynamicShape())
       return rewriter.notifyMatchFailure(
           fillOp, "Expect static shape when mapping to tpp");
