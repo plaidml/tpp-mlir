@@ -49,7 +49,7 @@ CLANG_FORMAT=$(find_program clang-format-${CLANG_FORMAT_VERSION} )
 if [ ${CLANG_FORMAT} ]; then
   echo "Using ${CLANG_FORMAT}"
 else
-  CLANG_FORMAT=$(frind_program clang-format)
+  CLANG_FORMAT=$(find_program clang-format)
   if ${CLANG_FORMAT} --version | grep -q "${CLANG_FORMAT_VERSION}\.[0-9\.]\+"; then
     echo "Using ${CLANG_FORMAT}, as it has verison ${CLANG_FORMAT_VERSION}"
   else
