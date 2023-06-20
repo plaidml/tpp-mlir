@@ -1,5 +1,5 @@
 // This should really be in the passes directory, not here
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
