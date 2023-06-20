@@ -324,3 +324,159 @@ func.func @scalar_input(%arg0: tensor<f32>, %arg1: tensor<4x4xf32>) -> tensor<4x
   } -> tensor<4x4xf32>
   return %res : tensor<4x4xf32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+
+// CHECK-LABEL: func.func @linalg_bias_relu
+func.func @linalg_bias_relu(%arg0: tensor<4x4xf32>, %arg1: tensor<4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK: tpp.add
+  // CHECK: tpp.relu
+  %cst = arith.constant 0.0:f32
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4xf32>) outs(%arg2 : tensor<4x4xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %1 = arith.addf %in, %in_1 : f32
+    %2 = arith.maxf %1, %cst : f32
+    linalg.yield %2 : f32
+    } -> tensor<4x4xf32>
+  return %0 : tensor<4x4xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+
+// CHECK-LABEL: func.func @linalg_bias_relu
+func.func @linalg_bias_relu(%arg0: tensor<4x4xf32>, %arg1: tensor<4xf32>) -> tensor<4x4xf32> {
+  // CHECK: tpp.add
+  // CHECK: tpp.relu
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = linalg.generic {indexing_maps = [#map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<4xf32>) outs(%arg0 : tensor<4x4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    %2 = arith.maxf %1, %cst : f32
+    linalg.yield %2 : f32
+  } -> tensor<4x4xf32>
+  return %0 : tensor<4x4xf32>
+}
+
+// -----
+
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @linalg_zero_gemm_bias_relu
+func.func @linalg_zero_gemm_bias_relu(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %bias: tensor<128x512xf32>) -> tensor<128x512xf32> {
+  // Matmul
+  // CHECK: tpp.zero
+  // CHECK: tpp.gemm
+  %empty = tensor.empty() : tensor<128x512xf32>
+  %c0 = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<128x512xf32>) -> tensor<128x512xf32>
+  %0 = linalg.generic
+            {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]}
+            ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>)
+            outs(%fill : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
+    %16 = arith.mulf %arg9, %arg10 : f32
+    %17 = arith.addf %arg11, %16 : f32
+    linalg.yield %17 : f32
+  } -> tensor<128x512xf32>
+
+  // Bias Add
+  // CHECK: tpp.add
+  %1 = linalg.generic
+              {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]}
+              ins(%bias: tensor<128x512xf32>)
+              outs(%0 : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32, %arg10: f32):
+    %16 = arith.addf %arg9, %arg10 : f32
+    linalg.yield %16 : f32
+  } -> tensor<128x512xf32>
+
+  // Relu
+  // CHECK: tpp.relu
+  %2 = linalg.generic
+              {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]}
+              outs(%1 : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32):
+    %16 = arith.maxf %arg9, %c0 : f32
+    linalg.yield %16 : f32
+  } -> tensor<128x512xf32>
+
+  // Return
+  return %2 : tensor<128x512xf32>
+}
+
+// -----
+
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @linalg_zero_gemm_fused_bias_relu
+func.func @linalg_zero_gemm_fused_bias_relu(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %bias: tensor<128x512xf32>) -> tensor<128x512xf32> {
+  // Matmul
+  // CHECK: tpp.zero
+  // CHECK: tpp.gemm
+  %empty = tensor.empty() : tensor<128x512xf32>
+  %c0 = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<128x512xf32>) -> tensor<128x512xf32>
+  %0 = linalg.generic
+            {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]}
+            ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>)
+            outs(%fill : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
+    %16 = arith.mulf %arg9, %arg10 : f32
+    %17 = arith.addf %arg11, %16 : f32
+    linalg.yield %17 : f32
+  } -> tensor<128x512xf32>
+
+  // Bias Add and ReLU
+  // CHECK: tpp.add
+  // CHECK: tpp.relu
+  %1 = linalg.generic
+              {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]}
+              ins(%bias: tensor<128x512xf32>)
+              outs(%0 : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32, %arg10: f32):
+    %16 = arith.addf %arg9, %arg10 : f32
+    %17 = arith.maxf %16, %c0 : f32
+    linalg.yield %17 : f32
+  } -> tensor<128x512xf32>
+
+  // Return
+  return %1 : tensor<128x512xf32>
+}
+
+// -----
+
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @linalg_zero_gemm_fused_bias_relu_no_chain
+func.func @linalg_zero_gemm_fused_bias_relu_no_chain(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %bias: tensor<128x512xf32>, %external : f32) -> tensor<128x512xf32> {
+  %empty = tensor.empty() : tensor<128x512xf32>
+  %c0 = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<128x512xf32>) -> tensor<128x512xf32>
+  // CHECK-NOT: tpp.add
+  // CHECK-NOT: tpp.relu
+  %1 = linalg.generic
+              {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]}
+              ins(%bias: tensor<128x512xf32>)
+              outs(%fill : tensor<128x512xf32>) {
+  ^bb0(%arg9: f32, %arg10: f32):
+    %16 = arith.addf %arg9, %arg10 : f32
+    %17 = arith.maxf %external, %c0 : f32
+    linalg.yield %17 : f32
+  } -> tensor<128x512xf32>
+
+  // Return
+  return %1 : tensor<128x512xf32>
+}
+
