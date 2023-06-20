@@ -420,7 +420,7 @@ LogicalResult FusedBrgemmOp::verify() {
     return failure();
   Type biasType = getBiasOperand().getType();
   int64_t rank = biasType.cast<ShapedType>().getRank();
-  if (rank != 1 && rank != 2) 
+  if (rank != 1 && rank != 2)
     return emitOpError() << "expected shaped type with rank 1 or 2 for bias";
   return success();
 }

@@ -281,9 +281,9 @@ private:
 };
 
 // Implemenation to allow definition in cpp file
-using TypeCheckFunc = std::function<bool(Operation*)>;
+using TypeCheckFunc = std::function<bool(Operation *)>;
 bool withOpChainImpl(Region *region, Operation *op, SmallVectorImpl<Value> *,
-                     SmallVectorImpl<TypeCheckFunc>&);
+                     SmallVectorImpl<TypeCheckFunc> &);
 
 // Callable object to check the region for a chain of operations.
 template <typename... OpTy> struct WithOpChain {

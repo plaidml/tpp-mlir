@@ -1,4 +1,4 @@
-//===- MLIRGen.h MLIR Generator ---------------------------------------------===//
+//===- MLIRGen.h MLIR Generator -------------------------------------------===//
 //
 // Class that handles MLIR generation for the MLIR options.
 //
@@ -68,9 +68,9 @@ SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
 } // anonymous namespace
 
 MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
-                           StringRef layersStr, StringRef tilesStr,
-                           unsigned typeWidth, int seed, bool enableSoftmax,
-                           bool biasAcc, int vnniBlockingFactor)
+                             StringRef layersStr, StringRef tilesStr,
+                             unsigned typeWidth, int seed, bool enableSoftmax,
+                             bool biasAcc, int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), miniBatch(miniBatch),
       seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
       vnniFactor(vnniBlockingFactor) {

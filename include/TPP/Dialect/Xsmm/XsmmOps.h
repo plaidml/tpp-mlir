@@ -10,11 +10,11 @@
 #define TPP_DIALECT_XSMM_XSMMOPS_H
 
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "TPP/Dialect/Xsmm/XsmmEnum.h"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOps.h.inc"

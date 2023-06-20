@@ -89,6 +89,6 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR Generator");
 
   MLIRGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
-                   enableSoftmax, biasAcc, vnni);
+                    enableSoftmax, biasAcc, vnni);
   return gen.generate(filename);
 }
