@@ -68,6 +68,9 @@ clang_format "${ROOT}/tools"
 # Returning zero always means there were no changes
 # Returns non-zero to break CI if there are.
 if [ ${ERRORS} -gt 0 ]; then
-  echo "${ERRORS} files contain formatting errors"
+  echo "${ERRORS} files contain formatting errors."
   exit 1
+else
+  echo "All clear! No files need reformatting."
+  exit 0
 fi
