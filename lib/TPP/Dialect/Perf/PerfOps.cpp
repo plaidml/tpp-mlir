@@ -101,13 +101,15 @@ void BenchOp::print(OpAsmPrinter &printer) {
 
   {
     bool printTerminator = true;
-    if (auto *term = getRegion().empty() ? nullptr : getRegion().begin()->getTerminator()) {
+    if (auto *term = getRegion().empty()
+                         ? nullptr
+                         : getRegion().begin()->getTerminator()) {
       printTerminator = !term->getAttrDictionary().empty() ||
                         term->getNumOperands() != 0 ||
                         term->getNumResults() != 0;
     }
     printer.printRegion(getRegion(), /*printEntryBlockArgs=*/true,
-      /*printBlockTerminators=*/printTerminator);
+                        /*printBlockTerminators=*/printTerminator);
   }
   ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
   printer.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);

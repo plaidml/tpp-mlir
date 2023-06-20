@@ -27,8 +27,8 @@ namespace func {
 class FuncOp;
 } // namespace func
 
-/// MLIR Generator: produces MLIR linalg-on-tensor dialect for an MLIR mopdel with
-/// the appropriate number of hidden layers and other properties selected.
+/// MLIR Generator: produces MLIR linalg-on-tensor dialect for an MLIR mopdel
+/// with the appropriate number of hidden layers and other properties selected.
 class MLIRGenerator {
   /// MLIR Context
   MLIRContext context;
@@ -168,7 +168,7 @@ public:
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
   MLIRGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
-               bool, int);
+                bool, int);
 
   ~MLIRGenerator() { module->destroy(); }
 

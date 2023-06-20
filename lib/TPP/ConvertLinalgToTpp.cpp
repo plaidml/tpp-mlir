@@ -78,8 +78,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       rewriter.setInsertionPointAfter(linalgOp);
       auto add = rewriter.create<tpp::AddOp>(
           linalgOp.getLoc(), ValueRange{operands[0], operands[1]}, operands[2]);
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(
-          linalgOp, add.getResult(0), operands[2]);
+      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, add.getResult(0),
+                                               operands[2]);
       return success();
     }
 

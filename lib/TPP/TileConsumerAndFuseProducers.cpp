@@ -343,8 +343,8 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
         LLVM_DEBUG(llvm::dbgs()
                    << "WORKLIST INSERT PRODUCER: " << producer << "\n");
         LLVM_DEBUG(llvm::dbgs() << "=============================\n";
-            llvm::dbgs() << *producer << "\n";
-            llvm::dbgs() << "=============================\n";);
+                   llvm::dbgs() << *producer << "\n";
+                   llvm::dbgs() << "=============================\n";);
         nextProcessingQueue.push(producer);
         incDepthAndSwap(processingQueue, nextProcessingQueue, depth);
         worklist.insert(producer);

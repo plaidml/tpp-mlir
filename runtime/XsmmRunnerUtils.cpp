@@ -27,33 +27,33 @@ static void printXsmmStruct(const libxsmm_gemm_batch_reduce_config &brgemmShape,
 
 static bool hasImplicitComputeDtypeUnary(const libxsmm_meltw_unary_type dtype) {
   switch (dtype) {
-    // Zero
-    case LIBXSMM_MELTW_TYPE_UNARY_XOR:
-    // Copy
-    case LIBXSMM_MELTW_TYPE_UNARY_IDENTITY:
-    // Transpose
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT:
-    // VNNI2
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI2_TO_VNNI2T:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2T:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2_PAD:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD2:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD2:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD2:
-    // VNNI4
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI4T:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4T:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4_PAD:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD4:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD4:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD4:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_NORM:
-    case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI2:
-      return true;
-    default:
-      return false;
+  // Zero
+  case LIBXSMM_MELTW_TYPE_UNARY_XOR:
+  // Copy
+  case LIBXSMM_MELTW_TYPE_UNARY_IDENTITY:
+  // Transpose
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT:
+  // VNNI2
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI2_TO_VNNI2T:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2T:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI2_PAD:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD2:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD2:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD2:
+  // VNNI4
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI4T:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4T:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_VNNI4_PAD:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADM_MOD4:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADN_MOD4:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_PADNM_MOD4:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_NORM:
+  case LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_VNNI4_TO_VNNI2:
+    return true;
+  default:
+    return false;
   }
 }
 
@@ -168,8 +168,8 @@ xsmm_unary_dispatch(const libxsmm_meltw_unary_type op_type,
   unary_shape.in0_type = dtype;
   // Retarget computation type from bf16 to f32 due to missing hardware support.
   // Copy and Zero should remain in BF16 to avoid useless up/down casts
-  auto force_fp32 =
-      (dtype == LIBXSMM_DATATYPE_BF16 && !hasImplicitComputeDtypeUnary(op_type));
+  auto force_fp32 = (dtype == LIBXSMM_DATATYPE_BF16 &&
+                     !hasImplicitComputeDtypeUnary(op_type));
   unary_shape.comp_type = force_fp32 ? LIBXSMM_DATATYPE_F32 : dtype;
   unary_shape.out_type = dtype;
   unary_shape.ldi = static_cast<libxsmm_blasint>(ldi);
@@ -458,7 +458,7 @@ extern "C" int iree_xsmm_brgemm_dispatch(void *params, void *context,
     int64_t ldc;
     const libxsmm_gemm_flags flags;
   } xsmm_brgemm_dispatch_t;
-  xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *) params;
+  xsmm_brgemm_dispatch_t *p = (xsmm_brgemm_dispatch_t *)params;
   p->address = xsmm_brgemm_dispatch((libxsmm_datatype)p->dtype, p->m, p->n,
                                     p->k, p->lda, p->ldb, p->ldc, p->flags);
   return 0;
@@ -546,7 +546,7 @@ extern "C" int iree_xsmm_brgemm_invoke(void *params, void *context,
     mlir_memref_descriptor_t memrefDescC;
     int64_t numBatches;
   } xsmm_brgemm_invoke_t;
-  xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *) params;
+  xsmm_brgemm_invoke_t *p = (xsmm_brgemm_invoke_t *)params;
 
   xsmm_brgemm_invoke((libxsmm_datatype)p->dtype, p->function_address,
                      p->memrefDescA.alignedPtr, p->memrefDescA.offset,
@@ -591,8 +591,7 @@ extern "C" int iree_xsmm_unary_invoke(void *params, void *context,
 
   xsmm_unary_invoke((libxsmm_datatype)p->dtype, p->function_address,
                     p->inputMemrefDesc.alignedPtr, p->inputMemrefDesc.offset,
-                    p->outputMemrefDesc.alignedPtr,
-                    p->outputMemrefDesc.offset);
+                    p->outputMemrefDesc.alignedPtr, p->outputMemrefDesc.offset);
   return 0;
 }
 

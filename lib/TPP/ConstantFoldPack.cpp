@@ -83,73 +83,73 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
                << stride << " ";
                llvm::dbgs() << "\n";);
 
-    parallelFor(packOp.getContext(), 0, numberOfElements,
-                [&](size_t destLinearizedIdx) {
-                  // Step1. De-linearize destination index.
-                  // f(lin) = tmp[A][B][C]
-                  SmallVector<int64_t> delDestIndexes =
-                      delinearize(destLinearizedIdx, strides);
-                  assert(delDestIndexes.size() ==
-                         static_cast<size_t>(packOp.getDestType().getRank()));
+    parallelFor(
+        packOp.getContext(), 0, numberOfElements,
+        [&](size_t destLinearizedIdx) {
+          // Step1. De-linearize destination index.
+          // f(lin) = tmp[A][B][C]
+          SmallVector<int64_t> delDestIndexes =
+              delinearize(destLinearizedIdx, strides);
+          assert(delDestIndexes.size() ==
+                 static_cast<size_t>(packOp.getDestType().getRank()));
 
-                  // Step2. Arrange the indexes based on the packing
-                  // information. Step 2.1: Compute inverse of outerDimsPerm to
-                  // bring the loops into the canonical form tmp[A][B][a][b].
-                  if (!packOp.getOuterDimsPerm().empty()) {
-                    SmallVector<int64_t> inversePermutation =
-                        invertPermutationVector(packOp.getOuterDimsPerm());
-                    SmallVector<int64_t> tileLoops;
-                    for (auto i = 0; i < packOp.getSourceType().getRank(); i++)
-                      tileLoops.push_back(delDestIndexes[i]);
-                    applyPermutationToVector(tileLoops, inversePermutation);
-                    SmallVector<int64_t> pointLoops;
-                    for (size_t i = packOp.getSourceType().getRank();
-                         i < delDestIndexes.size(); i++)
-                      pointLoops.push_back(delDestIndexes[i]);
-                    delDestIndexes = tileLoops;
-                    delDestIndexes.append(pointLoops.begin(), pointLoops.end());
-                    assert(delDestIndexes.size() ==
-                           static_cast<size_t>(packOp.getDestType().getRank()));
-                  }
-                  // Step 2.2
-                  // After interchanging the outermost tiled loop we end up in
-                  // the canonical form tmp[A][B][a][b]. Squash the point loops
-                  // with the tiled ones.
-                  llvm::DenseSet<int64_t> tiledLoops(
-                      packOp.getInnerDimsPos().begin(),
-                      packOp.getInnerDimsPos().end());
-                  SmallVector<int64_t> delSourceIndexes;
-                  size_t tilePosIdx = 0;
-                  SmallVector<int64_t> tilesSizes = packOp.getStaticTiles();
-                  if (!areStaticValues(tilesSizes))
-                    return;
-                  for (int i = 0; i < packOp.getSourceType().getRank(); i++) {
-                    // Loop is not tiled.
-                    if (!tiledLoops.count(i)) {
-                      delSourceIndexes.push_back(delDestIndexes[i]);
-                      // Loop is tiled, the point loop is two hops away.
-                    } else {
-                      delSourceIndexes.push_back(delDestIndexes[i] *
-                                                     tilesSizes[tilePosIdx++] +
-                                                 delDestIndexes[i + 2]);
-                    }
-                  }
-                  assert(delSourceIndexes.size() ==
-                         static_cast<size_t>(packOp.getSourceType().getRank()));
-                  int64_t sourceLinearizedIdx = linearize(
-                      delSourceIndexes,
-                      computeStrides(packOp.getSourceType().getShape()));
-                  assert(sourceLinearizedIdx < numberOfElements);
-                  LLVM_DEBUG(llvm::dbgs() << "dest index: " << destLinearizedIdx
-                                          << " map to source index: "
-                                          << sourceLinearizedIdx << "\n");
+          // Step2. Arrange the indexes based on the packing
+          // information. Step 2.1: Compute inverse of outerDimsPerm to
+          // bring the loops into the canonical form tmp[A][B][a][b].
+          if (!packOp.getOuterDimsPerm().empty()) {
+            SmallVector<int64_t> inversePermutation =
+                invertPermutationVector(packOp.getOuterDimsPerm());
+            SmallVector<int64_t> tileLoops;
+            for (auto i = 0; i < packOp.getSourceType().getRank(); i++)
+              tileLoops.push_back(delDestIndexes[i]);
+            applyPermutationToVector(tileLoops, inversePermutation);
+            SmallVector<int64_t> pointLoops;
+            for (size_t i = packOp.getSourceType().getRank();
+                 i < delDestIndexes.size(); i++)
+              pointLoops.push_back(delDestIndexes[i]);
+            delDestIndexes = tileLoops;
+            delDestIndexes.append(pointLoops.begin(), pointLoops.end());
+            assert(delDestIndexes.size() ==
+                   static_cast<size_t>(packOp.getDestType().getRank()));
+          }
+          // Step 2.2
+          // After interchanging the outermost tiled loop we end up in
+          // the canonical form tmp[A][B][a][b]. Squash the point loops
+          // with the tiled ones.
+          llvm::DenseSet<int64_t> tiledLoops(packOp.getInnerDimsPos().begin(),
+                                             packOp.getInnerDimsPos().end());
+          SmallVector<int64_t> delSourceIndexes;
+          size_t tilePosIdx = 0;
+          SmallVector<int64_t> tilesSizes = packOp.getStaticTiles();
+          if (!areStaticValues(tilesSizes))
+            return;
+          for (int i = 0; i < packOp.getSourceType().getRank(); i++) {
+            // Loop is not tiled.
+            if (!tiledLoops.count(i)) {
+              delSourceIndexes.push_back(delDestIndexes[i]);
+              // Loop is tiled, the point loop is two hops away.
+            } else {
+              delSourceIndexes.push_back(delDestIndexes[i] *
+                                             tilesSizes[tilePosIdx++] +
+                                         delDestIndexes[i + 2]);
+            }
+          }
+          assert(delSourceIndexes.size() ==
+                 static_cast<size_t>(packOp.getSourceType().getRank()));
+          int64_t sourceLinearizedIdx =
+              linearize(delSourceIndexes,
+                        computeStrides(packOp.getSourceType().getShape()));
+          assert(sourceLinearizedIdx < numberOfElements);
+          LLVM_DEBUG(llvm::dbgs() << "dest index: " << destLinearizedIdx
+                                  << " map to source index: "
+                                  << sourceLinearizedIdx << "\n");
 
-                  // Step3. Do the packing.
-                  for (int j = 0; j < bytes; j++) {
-                    destRawData[destLinearizedIdx * bytes + j] =
-                        rawData[sourceLinearizedIdx * bytes + j];
-                  }
-                });
+          // Step3. Do the packing.
+          for (int j = 0; j < bytes; j++) {
+            destRawData[destLinearizedIdx * bytes + j] =
+                rawData[sourceLinearizedIdx * bytes + j];
+          }
+        });
 
     bool detectSpalt = false;
     assert(DenseElementsAttr::isValidRawBuffer(packOp.getDestType(),
