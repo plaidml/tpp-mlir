@@ -112,6 +112,26 @@ func.func @scalar_identity(%arg0: f32, %arg1: tensor<8x32xf32>) -> tensor<8x32xf
 
 // -----
 
+#map = affine_map<(d0, d1) -> (0, 0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @scalar_identity_ranked(%arg0: tensor<1x1xf32>, %arg1: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 :  tensor<1x1xf32>) outs(%arg1: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+  } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// CHECK-LABEL: scalar_identity
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x1xf32>, %[[ARG1:.+]]: tensor<8x32xf32>
+// CHECK: %{{.+}} = tpp.identity (%[[ARG0]] : tensor<1x1xf32>) -> (tensor<8x32xf32>)
+
+// -----
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 
