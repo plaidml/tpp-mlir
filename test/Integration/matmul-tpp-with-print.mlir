@@ -18,56 +18,51 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
 
- func.func @gemm_tpp(%A: memref<4x8xf32>,
-           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
+ func.func @gemm_tpp(%A: tensor<4x8xf32>,
+           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
     // TPP: tpp.gemm
-    linalg.generic {indexing_maps = [#map0, #map1, #map2],
+    %0 = linalg.generic {indexing_maps = [#map0, #map1, #map2],
                          iterator_types = ["parallel", "parallel", "reduction"]}
-    ins(%A, %B: memref<4x8xf32>, memref<8x4xf32>) outs(%C: memref<4x4xf32>) {
+    ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) {
       ^bb0(%a: f32, %b: f32, %c: f32):
         %0 = arith.mulf %a, %b : f32
         %1 = arith.addf %c, %0 : f32
         linalg.yield %1 : f32
-    }
-    return
+    } -> tensor<4x4xf32>
+    return %0 : tensor<4x4xf32>
   }
 
   func.func @entry() {
 
     // Initialize various matrices.
     %cst_one = arith.constant 1.0 : f32
-    %da = memref.alloc() : memref<4x8xf32>
-    linalg.fill ins(%cst_one : f32) outs(%da : memref<4x8xf32>)
+    %da = tensor.empty() : tensor<4x8xf32>
+    %0 = linalg.fill ins(%cst_one : f32) outs(%da : tensor<4x8xf32>) -> tensor<4x8xf32>
 
     %cst_two = arith.constant 2.0 : f32
-    %db = memref.alloc() : memref<8x4xf32>
-    linalg.fill ins(%cst_two : f32) outs(%db : memref<8x4xf32>)
+    %db = tensor.empty() : tensor<8x4xf32>
+    %1 = linalg.fill ins(%cst_two : f32) outs(%db : tensor<8x4xf32>) -> tensor<8x4xf32>
 
     %cst_zero = arith.constant 0.0 : f32
-    %C = memref.alloc() : memref<4x4xf32>
-    linalg.fill ins(%cst_zero : f32) outs(%C : memref<4x4xf32>)
+    %C = tensor.empty() : tensor<4x4xf32>
+    %2 = linalg.fill ins(%cst_zero : f32) outs(%C : tensor<4x4xf32>) -> tensor<4x4xf32>
 
     // Call kernel.
-    call @gemm_tpp(%da, %db, %C)
-       : (memref<4x8xf32>, memref<8x4xf32>, memref<4x4xf32>) -> ()
+    %res = call @gemm_tpp(%0, %1, %2)
+       : (tensor<4x8xf32>, tensor<8x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 
     // Print result.
-    %result = memref.cast %C : memref<4x4xf32> to memref<*xf32>
-
-
+    %zeroCst = arith.constant 0 : index
+    %d1 = arith.constant -1.0 : f32
+    %v0 = vector.transfer_read %res[%zeroCst, %zeroCst], %d1 : tensor<4x4xf32>, vector<4x4xf32>
+    vector.print %v0 : vector<4x4xf32>
     //
-    // CHECK:       [16,   16,   16,   16],
-    // CHECK-NEXT:  [16,   16,   16,   16],
-    // CHECK-NEXT:  [16,   16,   16,   16],
-    // CHECK-NEXT:  [16,   16,   16,   16]
+    // CHECK:       ( 16,   16,   16,   16 ),
+    // CHECK-SAME:  ( 16,   16,   16,   16 ),
+    // CHECK-SAME:  ( 16,   16,   16,   16 ),
+    // CHECK-SAME:  ( 16,   16,   16,   16 )
     //
-    call @printMemrefF32(%result) : (memref<*xf32>) -> ()
-
-    memref.dealloc %da : memref<4x8xf32>
-    memref.dealloc %db : memref<8x4xf32>
-    memref.dealloc %C : memref<4x4xf32>
 
     return
   }
-  func.func private @printMemrefF32(%ptr : memref<*xf32>) 
 }
