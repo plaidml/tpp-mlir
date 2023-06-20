@@ -25,9 +25,10 @@ _clang_format() {
       if [ $INPLACE ]; then
         ${CLANG_FORMAT} -i ${FILE}
         echo "File ${FILE} updated"
+      else
+        ERRORS=$((ERRORS+1))
+        echo "${OUT}"
       fi
-      ERRORS=$((ERRORS+1))
-      echo "${OUT}"
     fi
   done
 }
