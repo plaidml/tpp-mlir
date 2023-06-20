@@ -45,7 +45,6 @@ func.func @entry() {
   %b0 = linalg.broadcast ins(%cast_seed : tensor<32xf32>)
                    outs(%arg0 : tensor<56x32xf32>)
                    dimensions = [0]
-  %2 = linalg.fill ins(%c1_cst : f32) outs(%arg2 : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
   %out_shape = tensor.empty() : tensor<1x2x56x56x32xf32>
 
   %3, %5 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%ia1 = %out_shape, %iab0 = %b0) -> (tensor<1x2x56x56x32xf32>, tensor<56x32xf32>) {
