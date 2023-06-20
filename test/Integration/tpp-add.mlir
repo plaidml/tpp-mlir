@@ -47,15 +47,15 @@ func.func @entry() {
                    dimensions = [0]
   %out_shape = tensor.empty() : tensor<1x2x56x56x32xf32>
 
-  %3, %5 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%ia1 = %out_shape, %iab0 = %b0) -> (tensor<1x2x56x56x32xf32>, tensor<56x32xf32>) {
-    %4, %6 = scf.for %arg4 = %c0 to %c56 step %c1 iter_args(%ia2 = %ia1, %iab1 = %iab0) -> (tensor<1x2x56x56x32xf32>, tensor<56x32xf32>) {
+  %3 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%ia1 = %out_shape) -> (tensor<1x2x56x56x32xf32>) {
+    %4 = scf.for %arg4 = %c0 to %c56 step %c1 iter_args(%ia2 = %ia1) -> (tensor<1x2x56x56x32xf32>) {
       %out_slice = tensor.empty() : tensor<56x32xf32>
       // CHECK: tpp.add
       %res = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, 
                        affine_map<(d0, d1) -> (d0, d1)>], 
       iterator_types = ["parallel", "parallel"]}
-      ins(%iab1, %iab1 : tensor<56x32xf32>, tensor<56x32xf32>)
+      ins(%b0, %b0 : tensor<56x32xf32>, tensor<56x32xf32>)
       outs(%out_slice : tensor<56x32xf32>) {
         ^bb0(%in: f32, %in_0: f32, %out: f32):
           %0 = arith.addf %in, %in_0 : f32
@@ -63,9 +63,9 @@ func.func @entry() {
       } -> tensor<56x32xf32>
       %inserted_slice = tensor.insert_slice %res into %ia2 [0, %arg3, %arg4, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] 
         : tensor<56x32xf32> into tensor<1x2x56x56x32xf32>
-      scf.yield %inserted_slice, %iab1 : tensor<1x2x56x56x32xf32>, tensor<56x32xf32>
+      scf.yield %inserted_slice : tensor<1x2x56x56x32xf32>
     }
-    scf.yield %4, %6 : tensor<1x2x56x56x32xf32>, tensor<56x32xf32>
+    scf.yield %4 : tensor<1x2x56x56x32xf32>
   }
   %zeroCst = arith.constant 0 : index
   %d1 = arith.constant -1.0 : f32
