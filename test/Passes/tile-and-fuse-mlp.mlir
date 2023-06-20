@@ -29,9 +29,6 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
   return %3 : tensor<32x128x4x4xbf16>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1) -> (d1)>
 
@@ -42,9 +39,7 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %{{.+}} = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK: %{{.+}} = scf.for %[[J:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
-// CHECK: %{{.+}} = linalg.generic
-// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:  iterator_types = ["reduction", "parallel", "parallel", "reduction"]
+// CHECK: %{{.+}} = linalg.batch_reduce_matmul
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]]
 // CHECK-SAME:  iterator_types = ["parallel", "parallel"]

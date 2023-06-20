@@ -65,14 +65,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    if (linalgx::utils::isMatmulOp(linalgOp, &operands)) {
-      assert(operands.size() == 3 && "tpp.matmul expects three operands");
-      rewriter.replaceOpWithNewOp<tpp::GemmOp>(
-          linalgOp, ValueRange{operands[0], operands[1], operands[2]},
-          operands[2].getType());
-      return success();
-    }
-
     if (tpp::utils::isTppBiasRelu(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.add+tpp.relu expects three operands");
       OpBuilder::InsertionGuard g(rewriter);
@@ -178,6 +170,7 @@ struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
     RewritePatternSet patterns(ctx);
     tpp::populateConvertLinalgToTppPatterns(patterns);
     memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::populateLinalgDeGeneralizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

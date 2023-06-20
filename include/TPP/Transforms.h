@@ -86,6 +86,9 @@ void populateXsmmToFuncPatterns(RewritePatternSet &patterns);
 void populateCheckToFuncPatterns(RewritePatternSet &patterns);
 void populateSinkPackPatterns(RewritePatternSet &patterns);
 } // namespace tpp
+namespace linalg {
+void populateLinalgDeGeneralizationPatterns(RewritePatternSet &patterns);
+} // namespace linalg
 } // namespace mlir
 
 #endif

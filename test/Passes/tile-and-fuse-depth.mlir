@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=0 use-for-all=false" | FileCheck -check-prefix=DEPTH0 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=1 use-for-all=false" | FileCheck -check-prefix=DEPTH1 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=2 use-for-all=false" | FileCheck -check-prefix=DEPTH2 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 max-depth=3 use-for-all=false" | FileCheck -check-prefix=DEPTH3 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=0 use-for-all=false" | FileCheck -check-prefix=DEPTH0 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=1 use-for-all=false" | FileCheck -check-prefix=DEPTH1 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=2 use-for-all=false" | FileCheck -check-prefix=DEPTH2 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=3 use-for-all=false" | FileCheck -check-prefix=DEPTH3 %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
@@ -36,26 +36,26 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 // DEPTH1: func.func @matmul_sequence_fusion(
 // DEPTH1-DAG: %[[C0:.+]] = arith.constant 0 : index
 // DEPTH1-DAG: %[[C32:.+]] = arith.constant 32 : index
-// DEPTH1-DAG: %[[C1:.+]] = arith.constant 1 : index
-// DEPTH1: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// DEPTH1-DAG: %[[C2:.+]] = arith.constant 2 : index
+// DEPTH1: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
 // DEPTH1-COUNT-2: linalg.matmul
-// DEPTH1: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// DEPTH1: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
 // DEPTH1-COUNT-1: linalg.matmul
 // DEPTH1-COUNT-1: linalg.generic
 
 // DEPTH2: func.func @matmul_sequence_fusion(
 // DEPTH2-DAG: %[[C0:.+]] = arith.constant 0 : index
 // DEPTH2-DAG: %[[C32:.+]] = arith.constant 32 : index
-// DEPTH2-DAG: %[[C1:.+]] = arith.constant 1 : index
+// DEPTH2-DAG: %[[C2:.+]] = arith.constant 2 : index
 // DEPTH2-COUNT-1: linalg.matmul
-// DEPTH2: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// DEPTH2: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
 // DEPTH2-COUNT-2: linalg.matmul
 // DEPTH2-COUNT-1: linalg.generic
 
 // DEPTH3: func.func @matmul_sequence_fusion(
 // DEPTH3-DAG: %[[C0:.+]] = arith.constant 0 : index
 // DEPTH3-DAG: %[[C32:.+]] = arith.constant 32 : index
-// DEPTH3-DAG: %[[C1:.+]] = arith.constant 1 : index
-// DEPTH3: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// DEPTH3-DAG: %[[C2:.+]] = arith.constant 2 : index
+// DEPTH3: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
 // DEPTH3-COUNT-3: linalg.matmul
 // DEPTH3-COUNT-1: linalg.generic

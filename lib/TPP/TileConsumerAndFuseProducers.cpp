@@ -8,6 +8,7 @@
 
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
+#include "TPP/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
@@ -71,7 +72,7 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
 };
 
 static bool isMatmulLike(Operation *op) {
-  return linalgx::utils::isBlockedMatmul(op) || linalgx::utils::isMatmulOp(op);
+  return linalgx::utils::isBlockedMatmul(op) || isa<linalg::MatmulOp>(op);
 }
 
 static bool isConvolutionLike(Operation *op) {
@@ -489,7 +490,7 @@ static SmallVector<int64_t> getDefaultTileSizes(linalg::LinalgOp linalgOp) {
   if (linalgx::utils::isBlockedConvolution(linalgOp))
     return {1, 1, 1};
   // Matmuls are tiled and fused along i and j with 32.
-  if (linalgx::utils::isMatmulOp(linalgOp))
+  if (isa<linalg::MatmulOp>(linalgOp))
     return {32, 32};
   // Blocked matmuls are tiled and fused along the two outermost parallel loops
   // to expose a BRGEMM.
@@ -552,6 +553,15 @@ struct TileConsumerAndFuseProducers
     linalg::registerTilingInterfaceExternalModels(registry);
   }
   void runOnOperation() override {
+    auto &ctx = getContext();
+
+    {
+      // Attempt to recover named ops.
+      RewritePatternSet patterns(&ctx);
+      linalg::populateLinalgDeGeneralizationPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
+
     func::FuncOp func = getOperation();
     IRRewriter rewriter(&getContext());
 
@@ -578,7 +588,6 @@ struct TileConsumerAndFuseProducers
                                  ? getDefaultTileSizes(linalgOp)
                                  : llvm::to_vector(this->tileSizes);
     }
-
     LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
 
     SmallVector<Operation *> allLinalgOps;
@@ -606,7 +615,6 @@ struct TileConsumerAndFuseProducers
       }
     }
 
-    auto &ctx = getContext();
     {
       // Patterns for scf.for.
       RewritePatternSet patterns(&ctx);
@@ -619,9 +627,20 @@ struct TileConsumerAndFuseProducers
       RewritePatternSet patterns(&ctx);
       if (this->useForAll)
         linalgx::utils::populateScfForToForAllRewritePattern(patterns);
-      // Fold unit-extent dims for linalg on tensors.
+      // Fold unit-extent dims for linalg on tensors. Since
+      // `populateFoldUnitExtentDimsViaSlicesPatterns` works only with
+      // linalg.generic we need to generalize first using
+      // `populateLinalgNamedOpsGeneralizationPatterns`.
       linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
       tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
+
+    {
+      // Attempt to recover named ops.
+      RewritePatternSet patterns(&ctx);
+      linalg::populateLinalgDeGeneralizationPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
   }
