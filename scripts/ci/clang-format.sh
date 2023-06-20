@@ -6,11 +6,19 @@
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
-CLANG_FORMAT=$(which clang-format-16)
-if [ ! "${CLANG_FORMAT}" ]; then
-  echo "This script needs clang-format-16 to work"
-  echo "Please install the tool and run again"
-  exit 1
+CLANG_FORMAT_VERSION=16
+CLANG_FORMAT=$(which clang-format-${CLANG_FORMAT_VERSION})
+if [ ${CLANG_FORMAT} ]; then
+  echo "Using ${CLANG_FORMAT}"
+else
+  CLANG_FORMAT=$(which clang-format)
+  if ${CLANG_FORMAT} --version | grep -q "${CLANG_FORMAT_VERSION}\.[0-9\.]\+$"; then
+    echo "Using ${CLANG_FORMAT}, as it has verison ${CLANG_FORMAT_VERSION}"
+  else
+    echo "This script needs clang-format-16 to work"
+    echo "Please install the tool and run again"
+    exit 1
+  fi
 fi
 
 # If -i is passed, actually change the formatting in place
