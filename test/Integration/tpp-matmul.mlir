@@ -1,5 +1,5 @@
 // This should really be in the passes directory, not here
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -20,7 +20,7 @@
 // TPP-LABEL: gemm_tpp
 func.func @gemm_tpp(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // TPP: tpp.gemm ins({{.*}} : {{.*}}, {{.*}} : {{.*}}) outs({{.*}} : {{.*}})
+  // TPP: tpp.gemm
   %D = linalg.generic {indexing_maps = [#map0, #map1, #map2],
                          iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>) outs(%C: tensor<4x4xf32>) {

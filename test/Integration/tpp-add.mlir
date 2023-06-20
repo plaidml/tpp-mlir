@@ -50,15 +50,14 @@ func.func @entry() {
 
   %3, %5 = scf.for %arg3 = %c0 to %c2 step %c1 iter_args(%ia1 = %out_shape, %iab0 = %b0) -> (tensor<1x2x56x56x32xf32>, tensor<56x32xf32>) {
     %4, %6 = scf.for %arg4 = %c0 to %c56 step %c1 iter_args(%ia2 = %ia1, %iab1 = %iab0) -> (tensor<1x2x56x56x32xf32>, tensor<56x32xf32>) {
-      %extracted_slice = tensor.extract_slice %2 [0, %arg3, %arg4, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
-        : tensor<1x2x56x56x32xf32> to tensor<56x32xf32>
+      %out_slice = tensor.empty() : tensor<56x32xf32>
       // CHECK: tpp.add
       %res = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, 
                        affine_map<(d0, d1) -> (d0, d1)>], 
       iterator_types = ["parallel", "parallel"]}
       ins(%iab1, %iab1 : tensor<56x32xf32>, tensor<56x32xf32>)
-      outs(%extracted_slice : tensor<56x32xf32>) {
+      outs(%out_slice : tensor<56x32xf32>) {
         ^bb0(%in: f32, %in_0: f32, %out: f32):
           %0 = arith.addf %in, %in_0 : f32
           linalg.yield %0 : f32
