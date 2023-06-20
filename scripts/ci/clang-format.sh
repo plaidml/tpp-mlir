@@ -6,21 +6,6 @@
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
-CLANG_FORMAT_VERSION=16
-CLANG_FORMAT=$(which clang-format-${CLANG_FORMAT_VERSION})
-if [ ${CLANG_FORMAT} ]; then
-  echo "Using ${CLANG_FORMAT}"
-else
-  CLANG_FORMAT=$(which clang-format)
-  if ${CLANG_FORMAT} --version | grep -q "${CLANG_FORMAT_VERSION}\.[0-9\.]\+$"; then
-    echo "Using ${CLANG_FORMAT}, as it has verison ${CLANG_FORMAT_VERSION}"
-  else
-    echo "This script needs clang-format-16 to work"
-    echo "Please install the tool and run again"
-    exit 1
-  fi
-fi
-
 # If -i is passed, actually change the formatting in place
 # This should NEVER be used by CI, but by developers trying
 # to conform to the CI checks.
@@ -52,6 +37,27 @@ clang_format() {
   _clang_format ${DIR} "*.cpp"
   _clang_format ${DIR} "*.h"
 }
+
+find_program() {
+  NAME="$1"
+  which $NAME 2> /dev/null
+}
+
+# First, we check to make sure there is support for the right clang-format
+CLANG_FORMAT_VERSION=16
+CLANG_FORMAT=$(find_program clang-format-${CLANG_FORMAT_VERSION} )
+if [ ${CLANG_FORMAT} ]; then
+  echo "Using ${CLANG_FORMAT}"
+else
+  CLANG_FORMAT=$(frind_program clang-format)
+  if ${CLANG_FORMAT} --version | grep -q "${CLANG_FORMAT_VERSION}\.[0-9\.]\+"; then
+    echo "Using ${CLANG_FORMAT}, as it has verison ${CLANG_FORMAT_VERSION}"
+  else
+    echo "This script needs clang-format-16 to work"
+    echo "Please install the tool and run again"
+    exit 1
+  fi
+fi
 
 ROOT=$(git_root)
 clang_format "${ROOT}/lib"
