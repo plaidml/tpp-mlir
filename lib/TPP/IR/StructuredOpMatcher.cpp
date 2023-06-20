@@ -201,14 +201,14 @@ bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
   return true;
 }
 
-// FIXME: This is a generalization of the method above and will eventually replace
-// the matcher for both no-op (yield) and one op (add, max).
+// FIXME: This is a generalization of the method above and will eventually
+// replace the matcher for both no-op (yield) and one op (add, max).
 bool tpp::structured_match::withOpChainImpl(
     Region *region, Operation *op, SmallVectorImpl<Value> *capturedOperands,
-    SmallVectorImpl<TypeCheckFunc>& typeChecks) {
+    SmallVectorImpl<TypeCheckFunc> &typeChecks) {
 
-  // Numer of ops includes yield
-  ptrdiff_t numOps = typeChecks.size();
+  // Number of ops includes yield
+  ptrdiff_t numOps = typeChecks.size() + 1;
 
   // Basic checks
   if (!isa<linalg::GenericOp>(op))
@@ -216,42 +216,39 @@ bool tpp::structured_match::withOpChainImpl(
   auto linalgOp = cast<linalg::GenericOp>(op);
   if (!region->hasOneBlock())
     return false;
-  auto& block = region->front();
-  if (std::distance(block.begin(), block.end()) != (numOps + 1))
+  auto &block = region->front();
+  if (std::distance(block.begin(), block.end()) != numOps)
     return false;
   if (linalgOp.getNumDpsInits() != 1)
     return false;
 
   // Add generic arguments to the list of chained values
   llvm::SmallSetVector<Value, 4> chainedValues;
-  for (auto arg: block.getArguments()) {
+  for (auto arg : block.getArguments()) {
     chainedValues.insert(arg);
   }
 
   // Check on the inner chain of operations in the right order.
   // Make sure all operands are used and chained
-  for (auto [check, innerOp]: llvm::zip_first(typeChecks, block.getOperations())) {
+  for (auto [check, innerOp] :
+       llvm::zip_first(typeChecks, block.getOperations())) {
     // Must be right op in right order
     if (!check(&innerOp))
       return false;
 
     // At least one operand must come from args or a previous op
     bool consumesValueFromChain = false;
-    for (auto operand: innerOp.getOperands()) {
-      if (chainedValues.contains(operand)) {
+    for (auto operand : innerOp.getOperands()) {
+      if (chainedValues.contains(operand) && capturedOperands) {
         // First add to the captured
-        if (capturedOperands) {
-          if (auto ba = dyn_cast<BlockArgument>(operand)) {
-            if (ba.getParentBlock() == linalgOp.getBlock()) {
-              capturedOperands->push_back(
-                  linalgOp.getMatchingOpOperand(ba)->get());
-            }
-          }
+        auto ba = dyn_cast<BlockArgument>(operand);
+        if (ba && ba.getParentBlock() == linalgOp.getBlock()) {
+          capturedOperands->push_back(linalgOp.getMatchingOpOperand(ba)->get());
         }
-        // Then erase from the set
-        chainedValues.remove(operand);
-        consumesValueFromChain = true;
       }
+      // Then erase from the set
+      chainedValues.remove(operand);
+      consumesValueFromChain = true;
     }
 
     // Operation isn't in the chain
@@ -259,7 +256,7 @@ bool tpp::structured_match::withOpChainImpl(
       return false;
 
     // Add return value to the list of chained values
-    for (auto ret: innerOp.getResults()) {
+    for (auto ret : innerOp.getResults()) {
       chainedValues.insert(ret);
     }
   }
@@ -267,7 +264,7 @@ bool tpp::structured_match::withOpChainImpl(
   // Last op must be a chained yield.
   Operation *yieldOp = linalgOp.getBlock()->getTerminator();
   assert(isa<linalg::YieldOp>(yieldOp) && "Wrong terminator");
-  for (auto op: yieldOp->getOperands()) {
+  for (auto op : yieldOp->getOperands()) {
     if (!chainedValues.contains(op))
       return false;
   }

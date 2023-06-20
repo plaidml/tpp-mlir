@@ -381,8 +381,7 @@ func.func @linalg_zero_gemm_bias_relu(%arg0: tensor<128x256xf32>, %arg1: tensor<
   %0 = linalg.generic
             {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>)
-            outs(%fill : tensor<128x512xf32>)
-            attrs =  {iterator_ranges = [128, 512, 256]} {
+            outs(%fill : tensor<128x512xf32>) {
   ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
     %16 = arith.mulf %arg9, %arg10 : f32
     %17 = arith.addf %arg11, %16 : f32
@@ -432,8 +431,7 @@ func.func @linalg_zero_gemm_fused_bias_relu(%arg0: tensor<128x256xf32>, %arg1: t
   %0 = linalg.generic
             {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>)
-            outs(%fill : tensor<128x512xf32>)
-            attrs =  {iterator_ranges = [128, 512, 256]} {
+            outs(%fill : tensor<128x512xf32>) {
   ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
     %16 = arith.mulf %arg9, %arg10 : f32
     %17 = arith.addf %arg11, %16 : f32
