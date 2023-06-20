@@ -239,16 +239,17 @@ bool tpp::structured_match::withOpChainImpl(
     // At least one operand must come from args or a previous op
     bool consumesValueFromChain = false;
     for (auto operand : innerOp.getOperands()) {
-      if (chainedValues.contains(operand) && capturedOperands) {
+      if (chainedValues.contains(operand)) {
         // First add to the captured
         auto ba = dyn_cast<BlockArgument>(operand);
-        if (ba && ba.getParentBlock() == linalgOp.getBlock()) {
+        if (capturedOperands && ba &&
+            ba.getParentBlock() == linalgOp.getBlock()) {
           capturedOperands->push_back(linalgOp.getMatchingOpOperand(ba)->get());
         }
+        // Then erase from the set
+        chainedValues.remove(operand);
+        consumesValueFromChain = true;
       }
-      // Then erase from the set
-      chainedValues.remove(operand);
-      consumesValueFromChain = true;
     }
 
     // Operation isn't in the chain
