@@ -14,6 +14,7 @@ if [ "$1" == "-i" ]; then
 fi
 
 ERRORS=0
+CHANGED=0
 
 _clang_format() {
   DIR="$1"
@@ -24,10 +25,12 @@ _clang_format() {
     if [ "${OUT}" ]; then
       if [ $INPLACE ]; then
         ${CLANG_FORMAT} -i ${FILE}
+        CHANGED=$((CHANGED+1))
         echo "File ${FILE} updated"
+      else
+        ERRORS=$((ERRORS+1))
+        echo "${OUT}"
       fi
-      ERRORS=$((ERRORS+1))
-      echo "${OUT}"
     fi
   done
 }
@@ -65,12 +68,15 @@ clang_format "${ROOT}/include"
 clang_format "${ROOT}/runtime"
 clang_format "${ROOT}/tools"
 
-# Returning zero always means there were no changes
-# Returns non-zero to break CI if there are.
+# Returns non-zero to break CI if there are any errors.
 if [ ${ERRORS} -gt 0 ]; then
   echo "${ERRORS} files contain formatting errors."
   exit 1
+fi
+
+if [ ${CHANGED} -gt 0 ]; then
+  echo "${CHANGED} files were reformatted"
 else
   echo "All clear! No files need reformatting."
-  exit 0
 fi
+exit 0
