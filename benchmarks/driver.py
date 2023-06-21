@@ -294,6 +294,16 @@ class IrGeneratorRun(BaseRun):
                 command[command.index('-n')+1] = self.args.n
             else:
                 command.extend(["-n", self.args.n])
+        if self.args.seed:
+            if '--seed' in command:
+                command[command.index('--seed')+1] = self.args.seed
+            else:
+                command.extend(["--seed", self.args.seed])
+        if self.args.splat_to_random:
+            if '--splat-to-random' in command:
+                command[command.index('--splat-to-random')+1] = self.args.splat_to_random
+            else:
+                command.extend(["--splat-to-random", self.args.splat_to_random])
         res = self.runner.run(command, input=irContents)
         self.stdout = res.stdout
         self.stderr = res.stderr
