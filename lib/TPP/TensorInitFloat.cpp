@@ -18,7 +18,7 @@ TensorInitFloat::getTensorInitDataType(mlir::Type type) {
     return DataType::FP32;
   if (type.isF64())
     return DataType::FP64;
-  assert(false && "Invalid tensor init data type (only FP32, FP64, BF16)");
+  return DataType::AUTO;
 }
 
 void TensorInitFloat::insert(size_t index, float value) {
@@ -39,6 +39,9 @@ void TensorInitFloat::convertType(llvm::APFloat &value) {
     break;
   case DataType::BF16:
     toBF16(value);
+    break;
+  case DataType::AUTO:
+    toFP32(value);
     break;
   }
 }

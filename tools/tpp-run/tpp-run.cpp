@@ -156,14 +156,16 @@ MLIRBench::PrintStage parsePrintStage(StringRef stage) {
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
+  auto tensorInitType = parseTensorInitType(initType);
+
   // Randon options need seed
-  if (!seed && (splatRandom || initType == "random" || initType == "normal")) {
+  if (!seed && (splatRandom || tensorInitType == TensorInitType::Random ||
+                tensorInitType == TensorInitType::Normal)) {
     seed = std::time(0);
   }
 
   // Benchmark object
-  MLIRBenchConfig config(seed, tppToLoops, linalgToLoops,
-                         parseTensorInitType(initType));
+  MLIRBenchConfig config(seed, tppToLoops, linalgToLoops, tensorInitType);
   MLIRBench bench(op, config);
 
   // Basic checks

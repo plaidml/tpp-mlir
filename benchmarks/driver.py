@@ -164,6 +164,31 @@ class BaseRun(object):
             self.logger.debug(f"export {key}={value}")
             os.environ[key] = value
 
+    def extendHarnessCmd(self, cmd):
+        command = cmd
+        # N in MLIR is an optional -n argument
+        if self.args.n:
+            if '-n' in command:
+                command[command.index('-n')+1] = self.args.n
+            else:
+                command.extend(["-n", self.args.n])
+        if self.args.seed:
+            if '--seed' in command:
+                command[command.index('--seed')+1] = self.args.seed
+            else:
+                command.extend(["--seed", self.args.seed])
+        if self.args.splat_to_random is not None:
+            if '--splat-to-random' in command:
+                command[command.index('--splat-to-random')+1] = self.args.splat_to_random
+            else:
+                command.extend(["--splat-to-random", self.args.splat_to_random])
+        if self.args.init_type:
+            if '--init-type' in command:
+                command[command.index('--init-type')+1] = self.args.init_type
+            else:
+                command.extend(["--init-type", self.args.init_type])
+        return command
+
     def run(self):
         # This is mandatory
         return False
@@ -229,12 +254,7 @@ class MLIRRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
-        # N in MLIR is an optional -n argument
-        if self.args.n:
-            if '-n' in command:
-                command[command.index('-n')+1] = self.args.n
-            else:
-                command.extend(["-n", self.args.n])
+        command = self.extendHarnessCmd(command)
         command.append(self.benchmark)
         res = self.runner.run(command)
         self.stdout = res.stdout
@@ -278,12 +298,7 @@ class IrGeneratorRun(BaseRun):
             command.extend(self.flags)
         if self.env.extra_args:
             command.extend(self.env.extra_args)
-        # N in MLIR is an optional -n argument
-        if self.args.n:
-            if '-n' in command:
-                command[command.index('-n')+1] = self.args.n
-            else:
-                command.extend(["-n", self.args.n])
+        command = self.extendHarnessCmd(command)
         res = self.runner.run(command, input=irContents)
         self.stdout = res.stdout
         self.stderr = res.stderr
@@ -436,6 +451,12 @@ if __name__ == '__main__':
                         help='Suppress warnings')
     parser.add_argument('--ignore-errors', action='count', default=0,
                         help='Ignore errors and only show the results that work')
+    parser.add_argument('--seed', type=str,
+                        help='Random seed')
+    parser.add_argument('--splat-to-random', type=str,
+                        help='Replace splat dense tensors with random value')
+    parser.add_argument('--init-type', type=str,
+                        help='Random initializer type')
     args = parser.parse_args()
 
     # Creates the logger object

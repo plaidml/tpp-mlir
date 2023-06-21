@@ -19,7 +19,7 @@ TensorInitInt::DataType TensorInitInt::getTensorInitDataType(mlir::Type type) {
     return DataType::I32;
   if (type.isSignlessInteger(64))
     return DataType::I64;
-  assert(false && "Invalid tensor init data type (only I8, I16, I32, I64)");
+  return DataType::AUTO;
 }
 
 unsigned TensorInitInt::getDataTypeBitWidth(TensorInitInt::DataType type) {
@@ -32,6 +32,8 @@ unsigned TensorInitInt::getDataTypeBitWidth(TensorInitInt::DataType type) {
     return 32;
   case DataType::I64:
     return 64;
+  case DataType::AUTO:
+    return 32;
   }
 }
 
@@ -41,6 +43,7 @@ bool TensorInitInt::isDataTypeSigned(TensorInitInt::DataType type) {
   case DataType::I16:
   case DataType::I32:
   case DataType::I64:
+  case DataType::AUTO:
     return true;
   }
 }

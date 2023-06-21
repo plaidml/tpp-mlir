@@ -41,6 +41,7 @@ template <typename T> struct TensorInit : public ITensorInit {
   // a reasonable distribution.
   virtual mlir::DenseElementsAttr get(mlir::ShapedType shape) override {
     buffer.clear();
+    size = 1;
     for (size_t dim = 0, rank = shape.getRank(); dim < rank; dim++)
       size *= shape.getDimSize(dim);
     fillData();
@@ -88,8 +89,8 @@ enum class TensorInitType {
   Invalid
 };
 
-// Unique pointer for tensor init to help with memory management
-using TensorInitPtr = std::unique_ptr<ITensorInit>;
+// Smart pointer for tensor init to help with memory management
+using TensorInitPtr = std::shared_ptr<ITensorInit>;
 
 // Parse init type string into TensorInitType
 TensorInitType parseTensorInitType(llvm::StringRef name);

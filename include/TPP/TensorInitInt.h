@@ -27,7 +27,7 @@
 struct TensorInitInt : public TensorInit<llvm::APInt> {
   // Supported data types.
   // TODO: Support signed (si32) and unsinged (ui32) integers
-  enum class DataType { I8, I16, I32, I64 };
+  enum class DataType { AUTO, I8, I16, I32, I64 };
 
   static bool isTypeSupported(const mlir::Type &type) {
     return type.isSignlessInteger(8) || type.isSignlessInteger(16) ||

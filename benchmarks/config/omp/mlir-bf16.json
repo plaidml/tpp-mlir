@@ -26,7 +26,7 @@
       "type": "MLIR",
       "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
       "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
-      "flags": [ "-n", "100", "-run-args=-def-parallel -seed=123 -splat-to-random" ],
+      "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     }
   }},
