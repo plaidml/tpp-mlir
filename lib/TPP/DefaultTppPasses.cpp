@@ -274,6 +274,7 @@ struct TppConversionPass : public TppConversionBase<TppConversionPass>,
     // clang-format off
     registry
         .insert<linalg::LinalgDialect,
+                scf::SCFDialect,
                 tpp::TppDialect>();
     // clang-format on
   }
@@ -296,6 +297,8 @@ private:
 
     // Convert generics to BRGEMM.
     pm.addPass(createRewriteToBatchReduceGemmPass());
+    // Convert batch matmul to matmul.
+    pm.addPass(createRewriteBatchMatmulToMatmulPass());
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
