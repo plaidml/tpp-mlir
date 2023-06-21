@@ -62,18 +62,8 @@ else
   fi
 fi
 
-# Try to get the root dir. If this isn't a git repo, make sure the dirs exist
-ROOT=$(git_root)
-if [ ! ${ROOT} ]; then
-  ROOT=$PWD
-fi
-if [ ! -d "${ROOT}/lib" ] ||
-   [ ! -d "${ROOT}/include" ] ||
-   [ ! -d "${ROOT}/runtime" ] ||
-   [ ! -d "${ROOT}/tools" ]; then
-  echo "ERROR: Not in a tpp-mlir reposiroty"
-  exit 1
-fi
+# Try to get the root dir, relative to the script's path in the repo
+ROOT=$(realpath $(dirname $0)/../..)
 
 # Action! Run the formatting checker / changer on our source dirs
 clang_format "${ROOT}/lib"
