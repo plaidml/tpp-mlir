@@ -12,6 +12,6 @@ func.func @entry(%arg0: memref<64x4x4xf32>, %arg1: memref<64x2x4x2xf32>, %arg2: 
   %trueOut = memref.alloc(): memref<4x4xf32>
   linalg.fill ins(%outVal : f32) outs(%trueOut : memref<4x4xf32>)
   check.expect_almost_eq(%trueOut, %arg2, %threshold): memref<4x4xf32>, memref<4x4xf32>, f32
-
+  memref.dealloc %trueOut : memref<4x4xf32>
   return
 }
