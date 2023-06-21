@@ -89,7 +89,7 @@ enum class TensorInitType {
   Invalid
 };
 
-// Unique pointer for tensor init to help with memory management
+// Smart pointer for tensor init to help with memory management
 using TensorInitPtr = std::shared_ptr<ITensorInit>;
 
 // Parse init type string into TensorInitType
