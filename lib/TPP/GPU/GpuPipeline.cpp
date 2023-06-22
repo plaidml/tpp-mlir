@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -25,8 +26,14 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Check/CheckDialect.h"
+#include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
+#include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -69,6 +76,17 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
     registry.insert<LLVM::LLVMDialect>();
     registry.insert<NVVM::NVVMDialect>();
     registry.insert<nvgpu::NVGPUDialect>();
+    registry.insert<bufferization::BufferizationDialect>();
+    bufferization::registerAllocationOpInterfaceExternalModels(registry);
+    linalgx::registerTransformDialectExtension(registry);
+    check::registerBufferizableOpInterfaceExternalModels(registry);
+    perf::registerBufferizableOpInterfaceExternalModels(registry);
+    tpp::registerBufferizableOpInterfaceExternalModels(registry);
+
+    // Add all core MLIR dialects to make the pipeline more robust with respect
+    // to accepted input IR by preventing cryptic runtime crashes due to missing
+    // dialect registrations.
+    registerAllDialects(registry);
   }
 
   void runOnOperation() override {
@@ -91,6 +109,7 @@ private:
     // abstraction.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
     pm.addPass(createBufferizePass());
+    pm.addPass(createConvertForAllToParallelOpPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.

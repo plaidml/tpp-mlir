@@ -50,6 +50,8 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     registry.insert<gpu::GPUDialect>();
     registry.insert<NVVM::NVVMDialect>();
     registry.insert<nvgpu::NVGPUDialect>();
+    registry.insert<memref::MemRefDialect>();
+    registry.insert<affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -70,6 +72,7 @@ private:
 
 #ifdef TPP_GPU_ENABLE
     // Preprocess and lower standard ops.
+    pm.addPass(memref::createExpandStridedMetadataPass());
     pm.addPass(arith::createArithExpandOpsPass());
     pm.addPass(createLowerAffinePass());
     pm.addPass(createConvertSCFToCFPass());
