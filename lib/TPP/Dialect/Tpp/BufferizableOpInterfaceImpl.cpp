@@ -15,20 +15,87 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace mlir::bufferization;
+
+#define DEBUG_TYPE "tpp-bufferize"
 
 namespace mlir {
 namespace tpp {
 namespace {
 
-FailureOr<Value> getBufferOrScalar(RewriterBase &rewriter, Value toBufferize,
-                                   BufferizationOptions const &options) {
+static FailureOr<Value> getBufferOrScalar(RewriterBase &rewriter,
+                                          Value toBufferize,
+                                          BufferizationOptions const &options) {
   // nothing to bufferize.
   if (!isa<ShapedType>(toBufferize.getType()))
     return toBufferize;
   return getBuffer(rewriter, toBufferize, options);
+}
+
+// Return true if `op` and the definition for `operand` are in the
+// same repetitive region.
+static bool isInSameRepetitveRegion(Operation *op, Value operand,
+                                    const AnalysisState &state) {
+  const SetVector<Value> &definitions = state.findDefinitions(operand);
+  if (definitions.empty()) {
+    // Happy path, it is already an allocation.
+    return true;
+  }
+  assert(definitions.size() == 1);
+  Region *opRegion = getEnclosingRepetitiveRegion(op);
+  Region *defRegion = getEnclosingRepetitiveRegion(definitions[0]);
+  return opRegion == defRegion;
+}
+
+// Return true if `val` is a constant.
+static bool isConstantVal(Value val) {
+  auto toTensorOp = val.getDefiningOp<bufferization::ToTensorOp>();
+  if (!toTensorOp)
+    return matchPattern(val, m_Constant());
+
+  Value memrefVal = toTensorOp.getMemref();
+  if (auto getGlobalOp = memrefVal.getDefiningOp<memref::GetGlobalOp>()) {
+    auto *symbolTableOp =
+        getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
+    if (!symbolTableOp)
+      return false;
+    auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
+        SymbolTable::lookupSymbolIn(symbolTableOp, getGlobalOp.getNameAttr()));
+    if (!globalOp)
+      return false;
+    if (globalOp.getConstantInitValue())
+      return true;
+  }
+  return false;
+}
+
+// Return true if `operand` can be used as a buffer. The following conditions
+// need to hold:
+// a) is non constant.
+// b) the definition of the operand is in the same repetitive region of the
+// operation.
+// c) the type are compatible.
+static bool canBufferizeOnOperandImpl(Operation *op, Value operand,
+                                      const AnalysisState &state) {
+  auto tppOp = cast<tpp::TppOp>(op);
+  assert(tppOp);
+  if (isConstantVal(operand) || !isInSameRepetitveRegion(op, operand, state))
+    return false;
+  return tppOp.getResultType() == operand.getType();
+}
+
+static bool canBufferizeOnOperand(Operation *op, Value operand,
+                                  const AnalysisState &state) {
+  return canBufferizeOnOperandImpl(op, operand, state);
+}
+
+static bool canBufferizeOnOperand(Operation *op, Value operand,
+                                  const BufferizationOptions &options) {
+  AnalysisState state(options);
+  return canBufferizeOnOperandImpl(op, operand, state);
 }
 
 //===----------------------------------------------------------------------===//
@@ -46,7 +113,7 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
   if (failed(buffer))
     return failure();
   // Out-of-place bufferization.
-  if (unaryOp.getInputs()[0].getType() != unaryOp.getResultType()) {
+  if (!canBufferizeOnOperand(op, unaryOp.getInputs()[0], options)) {
     AnalysisState analysisState(options);
     bool dealloc = shouldDeallocateOpResult(
         unaryOp.getResult(0).template cast<OpResult>(), options);
@@ -80,14 +147,14 @@ static bool bufferizesToMemoryReadUnaryImpl(Operation *op, OpOperand &opOperand,
 static bool bufferizesToMemoryWriteUnaryImpl(Operation *op,
                                              OpOperand &opOperand,
                                              const AnalysisState &state) {
-  return opOperand.get().getType() == op->getResult(0).getType();
+  return canBufferizeOnOperand(op, opOperand.get(), state);
 }
 
 static AliasingOpResultList
 getAliasingOpResultsUnaryImpl(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) {
   // The result alias with the opOperand only if we can bufferize in place.
-  if (opOperand.get().getType() == op->getResult(0).getType())
+  if (canBufferizeOnOperand(op, opOperand.get(), state))
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
   return {};
@@ -99,7 +166,11 @@ getAliasingOpResultsUnaryImpl(Operation *op, OpOperand &opOperand,
 static bool bufferizesToAllocationUnaryImpl(Operation *op, OpResult opResult) {
   auto unaryOp = cast<tpp::TppOp>(op);
   assert(unaryOp && unaryOp.isUnary());
-  return unaryOp.getInputs()[0].getType() != opResult.getType();
+  Value input = unaryOp.getInputs()[0];
+  // TODO: Use the state when available in upstream method
+  // `bufferizesToAllocation`.
+  BufferizationOptions options;
+  return !canBufferizeOnOperand(op, input, options);
 }
 
 struct ReluBufferizationInterface
@@ -192,27 +263,6 @@ struct ZeroBufferizationInterface
 // Binary
 //===----------------------------------------------------------------------===//
 
-static bool isConstantVal(Value val) {
-  auto toTensorOp = val.getDefiningOp<bufferization::ToTensorOp>();
-  if (!toTensorOp)
-    return matchPattern(val, m_Constant());
-
-  Value memrefVal = toTensorOp.getMemref();
-  if (auto getGlobalOp = memrefVal.getDefiningOp<memref::GetGlobalOp>()) {
-    auto *symbolTableOp =
-        getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
-    if (!symbolTableOp)
-      return false;
-    auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
-        SymbolTable::lookupSymbolIn(symbolTableOp, getGlobalOp.getNameAttr()));
-    if (!globalOp)
-      return false;
-    if (globalOp.getConstantInitValue())
-      return true;
-  }
-  return false;
-}
-
 // Helper function to bufferize a binary op.
 template <typename OpTy>
 static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
@@ -227,12 +277,13 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
       getBufferOrScalar(rewriter, binaryOp.getInputs()[1], options);
   if (failed(rhsBuffer))
     return failure();
+
   // Out-of-place bufferization.
-  auto outType = binaryOp.getResultType();
-  auto lhsType = binaryOp.getInputs()[0].getType();
-  auto rhsVal = binaryOp.getInputs()[1];
-  auto rhsType = rhsVal.getType();
-  if ((outType != lhsType) && (outType != rhsType)) {
+  auto lhs = binaryOp.getInputs()[0];
+  auto rhs = binaryOp.getInputs()[1];
+  if (!canBufferizeOnOperand(op, lhs, options) &&
+      !canBufferizeOnOperand(op, rhs, options)) {
+    LLVM_DEBUG(llvm::dbgs() << "BINARY: bufferize out of place\n");
     bool dealloc = shouldDeallocateOpResult(
         binaryOp.getResult(0).template cast<OpResult>(), options);
     FailureOr<Value> alloc = allocateTensorForShapedValue(
@@ -249,12 +300,14 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
     return success();
   }
   // In-place bufferization on rhs. If the rhs is not a constant like.
-  if (outType == rhsType && !isConstantVal(rhsVal)) {
+  if (canBufferizeOnOperand(op, rhs, options)) {
+    LLVM_DEBUG(llvm::dbgs() << "BINARY: bufferize on rhs\n");
     rewriter.create<OpTy>(loc, ValueRange{*lhsBuffer, *rhsBuffer}, *rhsBuffer);
     replaceOpWithBufferizedValues(rewriter, op, *rhsBuffer);
     return success();
   }
   // In-place bufferization on lhs.
+  LLVM_DEBUG(llvm::dbgs() << "BINARY: bufferize on lhs\n");
   rewriter.create<OpTy>(loc, ValueRange{*lhsBuffer, *rhsBuffer}, *lhsBuffer);
   replaceOpWithBufferizedValues(rewriter, op, *lhsBuffer);
   return success();
@@ -273,20 +326,21 @@ static bool bufferizesToMemoryWriteBinaryImpl(Operation *op,
                                               const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return true.
   if (opOperand.getOperandNumber() == 1 &&
-      opOperand.get().getType() == op->getResult(0).getType() &&
-      !isConstantVal(opOperand.get())) {
+      canBufferizeOnOperand(op, opOperand.get(), state)) {
+    LLVM_DEBUG(llvm::dbgs() << "BINARY: rhs bufferize to memory write\n");
     return true;
   }
 
   // If the lhs can bufferize in place with the result return true. Note that
   // if both can bufferize with the result we select the rhs first.
   if (opOperand.getOperandNumber() == 0) {
-    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType() &&
-        !isConstantVal(op->getOpOperand(1).get())) {
+    if (canBufferizeOnOperand(op, op->getOpOperand(1).get(), state)) {
       return false;
     }
-    if (opOperand.get().getType() == op->getResult(0).getType())
+    if (canBufferizeOnOperand(op, opOperand.get(), state)) {
+      LLVM_DEBUG(llvm::dbgs() << "BINARY: lhs bufferize to memory write\n");
       return true;
+    }
   }
   return false;
 }
@@ -296,8 +350,8 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return the rhs.
   if (opOperand.getOperandNumber() == 1 &&
-      opOperand.get().getType() == op->getResult(0).getType() &&
-      !isConstantVal(opOperand.get())) {
+      canBufferizeOnOperand(op, opOperand.get(), state)) {
+    LLVM_DEBUG(llvm::dbgs() << "BINARY: rhs alias with result\n");
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
   }
@@ -305,12 +359,12 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
   // that if both can bufferize with the result we select the rhs first.
   if (opOperand.getOperandNumber() == 0) {
     // The lhs does not alias with op result if we can bufferize on the rhs.
-    if (op->getOpOperand(1).get().getType() == op->getResult(0).getType() &&
-        !isConstantVal(op->getOpOperand(1).get())) {
+    if (canBufferizeOnOperand(op, op->getOpOperand(1).get(), state)) {
       return {};
     }
     // We cannot bufferize on rhs, lhs alias opResult.
-    if (opOperand.get().getType() == op->getResult(0).getType()) {
+    if (canBufferizeOnOperand(op, opOperand.get(), state)) {
+      LLVM_DEBUG(llvm::dbgs() << "BINARY: lhs alias with result\n");
       return {{op->getOpResult(0), BufferRelation::Equivalent,
                /*isDefinite=*/true}};
     }
@@ -324,8 +378,13 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
 static bool bufferizesToAllocationBinaryImpl(Operation *op, OpResult opResult) {
   auto binaryOp = cast<tpp::TppOp>(op);
   assert(binaryOp && binaryOp.isBinary());
-  return binaryOp.getInputs()[0].getType() != opResult.getType() &&
-         binaryOp.getInputs()[1].getType() != opResult.getType();
+  auto lhs = binaryOp.getInputs()[0];
+  auto rhs = binaryOp.getInputs()[1];
+  // TODO: Use the state when available in upstream method
+  // `bufferizesToAllocation`.
+  BufferizationOptions options;
+  return !canBufferizeOnOperand(op, lhs, options) &&
+         !canBufferizeOnOperand(op, rhs, options);
 }
 
 struct AddBufferizationInterface
