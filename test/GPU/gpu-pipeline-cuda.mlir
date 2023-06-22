@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s --check-prefix=CUDA
+// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s
 
 func.func @linalg_matmul() {
   %0 = memref.alloc() : memref<8x8xf32>
@@ -23,22 +23,22 @@ func.func @linalg_matmul() {
 
 func.func private @printMemrefF32(memref<*xf32>)
 
-// CUDA: module attributes {gpu.container_module}
-// CUDA-LABEL: func.func @linalg_matmul
-// CUDA:         %[[C1:.*]] = memref.cast
-// CUDA:         gpu.host_register %[[C1]]
-// CUDA:         %[[C2:.*]] = memref.cast
-// CUDA:         gpu.host_register %[[C2]]
-// CUDA:         %[[C3:.*]] = memref.cast
-// CUDA:         gpu.host_register %[[C3]]
-// CUDA:         gpu.launch_func  @linalg_matmul_kernel::@linalg_matmul_kernel
-// CUDA:         call @printMemrefF32
-// CUDA:       }
-// CUDA: gpu.module @linalg_matmul_kernel attributes {gpu.binary = "
-// CUDA-LABEL: llvm.func @linalg_matmul_kernel
-// CUDA-DAG:     nvvm.read
-// CUDA-DAG:     llvm.mul
-// CUDA-DAG:     llvm.add
+// CHECK: module attributes {gpu.container_module}
+// CHECK-LABEL: func.func @linalg_matmul
+// CHECK:         %[[C1:.*]] = memref.cast
+// CHECK:         gpu.host_register %[[C1]]
+// CHECK:         %[[C2:.*]] = memref.cast
+// CHECK:         gpu.host_register %[[C2]]
+// CHECK:         %[[C3:.*]] = memref.cast
+// CHECK:         gpu.host_register %[[C3]]
+// CHECK:         gpu.launch_func  @linalg_matmul_kernel::@linalg_matmul_kernel
+// CHECK:         call @printMemrefF32
+// CHECK:       }
+// CHECK: gpu.module @linalg_matmul_kernel attributes {gpu.binary = "
+// CHECK-LABEL: llvm.func @linalg_matmul_kernel
+// CHECK-DAG:     nvvm.read
+// CHECK-DAG:     llvm.mul
+// CHECK-DAG:     llvm.add
 
 // -----
 
@@ -48,14 +48,14 @@ func.func @tpp_gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memr
   return
 }
 
-// CUDA: module attributes {gpu.container_module}
-// CUDA-LABEL: func.func @tpp_gemm
-// CUDA:         gpu.launch_func  @tpp_gemm_kernel::@tpp_gemm_kernel
-// CUDA: gpu.module @tpp_gemm_kernel attributes {gpu.binary = "
-// CUDA-LABEL: llvm.func @tpp_gemm_kernel
-// CUDA-DAG:     nvvm.read
-// CUDA-DAG:     llvm.mul
-// CUDA-DAG:     llvm.add
+// CHECK: module attributes {gpu.container_module}
+// CHECK-LABEL: func.func @tpp_gemm
+// CHECK:         gpu.launch_func  @tpp_gemm_kernel::@tpp_gemm_kernel
+// CHECK: gpu.module @tpp_gemm_kernel attributes {gpu.binary = "
+// CHECK-LABEL: llvm.func @tpp_gemm_kernel
+// CHECK-DAG:     nvvm.read
+// CHECK-DAG:     llvm.mul
+// CHECK-DAG:     llvm.add
 
 // -----
 
@@ -74,15 +74,15 @@ func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x6
   return
 }
 
-// CUDA: module attributes {gpu.container_module}
-// CUDA-LABEL: func.func @packed_brgemm
-// CUDA-NOT:     scf.parallel
-// CUDA:         gpu.launch_func  @packed_brgemm_kernel::@packed_brgemm_kernel
-// CUDA: gpu.module @packed_brgemm_kernel attributes {gpu.binary = "
-// CUDA-LABEL: llvm.func @packed_brgemm_kernel
-// CUDA-DAG:     nvvm.read
-// CUDA-DAG:     llvm.mul
-// CUDA-DAG:     llvm.add
+// CHECK: module attributes {gpu.container_module}
+// CHECK-LABEL: func.func @packed_brgemm
+// CHECK-NOT:     scf.parallel
+// CHECK:         gpu.launch_func  @packed_brgemm_kernel::@packed_brgemm_kernel
+// CHECK: gpu.module @packed_brgemm_kernel attributes {gpu.binary = "
+// CHECK-LABEL: llvm.func @packed_brgemm_kernel
+// CHECK-DAG:     nvvm.read
+// CHECK-DAG:     llvm.mul
+// CHECK-DAG:     llvm.add
 
 // -----
 
@@ -96,12 +96,12 @@ func.func @forall_loop(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64x
   return
 }
 
-// CUDA: module attributes {gpu.container_module}
-// CUDA-LABEL: func.func @forall_loop
-// CUDA-NOT:     scf.forall
-// CUDA:         gpu.launch_func  @forall_loop_kernel::@forall_loop_kernel
-// CUDA: gpu.module @forall_loop_kernel attributes {gpu.binary = "
-// CUDA-LABEL: llvm.func @forall_loop_kernel
-// CUDA-DAG:     nvvm.read
-// CUDA-DAG:     llvm.mul
-// CUDA-DAG:     llvm.add
+// CHECK: module attributes {gpu.container_module}
+// CHECK-LABEL: func.func @forall_loop
+// CHECK-NOT:     scf.forall
+// CHECK:         gpu.launch_func  @forall_loop_kernel::@forall_loop_kernel
+// CHECK: gpu.module @forall_loop_kernel attributes {gpu.binary = "
+// CHECK-LABEL: llvm.func @forall_loop_kernel
+// CHECK-DAG:     nvvm.read
+// CHECK-DAG:     llvm.mul
+// CHECK-DAG:     llvm.add
