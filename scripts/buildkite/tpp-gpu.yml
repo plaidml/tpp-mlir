@@ -8,9 +8,6 @@ env:
   NPROCS_LIMIT_LINK: "8"
   #LIBXSMM_VERBOSE: 4
   #LIBXSMMFETCH: 1
-  TPP_CLANGVER: "16.0.4"
-  TPP_GCCVER: "9.5.0" # Use an older version to match CUDA requirements
-  TPP_CUDAVER: "11.5"
   # ASAN flags required due to incompatibility with CUDA
   # See: https://github.com/google/sanitizers/issues/629
   ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
@@ -20,7 +17,20 @@ steps:
     command: "${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/check_llvm.sh"
   - wait
 
-  - label: "TPP-MLIR-clang"
+  - label: "TPP-MLIR-nvidia"
     command: "${SRUN} --partition=nv-v100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=1 SANITIZERS=1 CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
+    env:
+      TPP_CLANGVER: "16.0.4"
+      TPP_GCCVER: "9.5.0" # Use an older version to match CUDA requirements
+      TPP_CUDAVER: "11.5"
+
+  - label: "TPP-MLIR-intel"
+    command: "${SRUN} -- \
+              'KIND=Debug COMPILER=clang LINKER=lld GPU=1 CHECK=1 \
+              $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
+    env:
+      TPP_LAUNCH_NODE: "pcl-adl01"
+      TPP_PROXY_ENABLE: 1
+      TPP_ENV_EXPORT: 1
