@@ -83,8 +83,9 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
     perf::registerBufferizableOpInterfaceExternalModels(registry);
     tpp::registerBufferizableOpInterfaceExternalModels(registry);
 
-    // Add all core MLIR dialects as the default TPP passes may contain any
-    // combination of other passes.
+    // Add all core MLIR dialects to make the pipeline more robust with respect
+    // to accepted input IR by preventing cryptic runtime crashes due to missing
+    // dialect registrations.
     registerAllDialects(registry);
   }
 
