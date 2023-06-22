@@ -406,6 +406,7 @@ bool isBlockedMatmul(Operation *op) {
   // - I loop: present in C and A but not in B. I must be parallel.
   // - J loop: present in C and B but not in A. J must be parallel.
   // - K loop: present in A and B but not in C. K must be reduction.
+  // - B loop: present in A and B and C. B must be parallel.
   llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(indexingMaps.back());
   llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(indexingMaps.front());
   llvm::SmallDenseSet<unsigned> allLoopDims;
@@ -425,6 +426,13 @@ bool isBlockedMatmul(Operation *op) {
       allLoopDims.insert(cDim);
       continue;
     }
+    // B loop (batch)
+    if (operandBWalker.bDims.count(cDim) && aDims.count(cDim)) {
+      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
+        return false;
+      allLoopDims.insert(cDim);
+      continue;
+    }
     return false;
   }
 
@@ -432,6 +440,11 @@ bool isBlockedMatmul(Operation *op) {
     unsigned aDim = aExpr.cast<AffineDimExpr>().getPosition();
     // I loop
     if (cDims.count(aDim) && !operandBWalker.bDims.count(aDim)) {
+      // Already seen.
+      continue;
+    }
+    // B loop
+    if (cDims.count(aDim) && operandBWalker.bDims.count(aDim)) {
       // Already seen.
       continue;
     }
