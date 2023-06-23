@@ -528,15 +528,18 @@ func.func @add_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
 
 // -----
 
-// CHECK-LABEL: add_in_place_cst
 func.func @add_in_place_cst() -> tensor<3x3xf32> {
-  // CHECK: memref.get_global
-  // CHECK: memref.alloc
-  // CHECK: memref.copy
   %cst = arith.constant dense<0.0> : tensor<3x3xf32>
   %0 = tpp.add(%cst: tensor<3x3xf32>, %cst: tensor<3x3xf32>) -> tensor<3x3xf32>
   return %0 : tensor<3x3xf32>
 }
+
+// CHECK-LABEL: add_in_place_cst
+// CHECK: %[[GB:.+]] = memref.get_global @__constant_3x3xf32 : memref<3x3xf32>
+// CHECK-NEXT: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
+// CHECK-NEXT: tpp.add ins(%[[GB]] : memref<3x3xf32>, %[[GB]] : memref<3x3xf32>) 
+// CHECK-SAME:  outs(%[[ALLOC]] : memref<3x3xf32>)
+// CHECK: return %[[ALLOC]] : memref<3x3xf32>
 
 // -----
 
@@ -878,3 +881,116 @@ func.func @gemms(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>,
 // CHECK: memref.copy %[[ALLOC]], %[[ALLOC_1]] : memref<10x10xf32> to memref<10x10xf32>
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %[[ARG1]] : memref<10x10xf32>, %[[ALLOC_1]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG2]] : memref<10x10xf32>, %[[ARG3]] : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
+
+// -----
+
+func.func @not_same_repetitive_region_rhs(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %0 = tensor.empty() : tensor<10x10xf32>
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x10xf32>) -> tensor<10x10xf32>
+  %2 = scf.for %arg1 = %c0 to %c2 step %c1 iter_args(%arg2 = %arg0) -> tensor<10x10xf32> {
+    %3 = tpp.add (%arg2: tensor<10x10xf32>, %1: tensor<10x10xf32>) -> tensor<10x10xf32>
+    scf.yield %3 : tensor<10x10xf32>
+  }
+  return %2 : tensor<10x10xf32>
+}
+
+// CHECK-LABEL: not_same_repetitive_region_rhs
+// CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+// CHECK: linalg.fill ins(%[[CST]] : f32) outs(%[[ALLOC]] : memref<10x10xf32>)
+// CHECK: scf.for %{{.+}} = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK: tpp.add ins(%[[ARG0]] : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) 
+// CHECK-SAME:    outs(%[[ARG0]] : memref<10x10xf32>)
+
+// -----
+
+func.func @not_same_repetitive_region_lhs(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %0 = tensor.empty() : tensor<10x10xf32>
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x10xf32>) -> tensor<10x10xf32>
+  %2 = scf.for %arg1 = %c0 to %c2 step %c1 iter_args(%arg2 = %arg0) -> tensor<10x10xf32> {
+    %3 = tpp.add (%1: tensor<10x10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32>
+    scf.yield %3 : tensor<10x10xf32>
+  }
+  return %2 : tensor<10x10xf32>
+}
+
+// CHECK-LABEL: not_same_repetitive_region
+// CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+// CHECK: linalg.fill ins(%[[CST]] : f32) outs(%[[ALLOC]] : memref<10x10xf32>)
+// CHECK: scf.for %{{.+}} = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK: tpp.add ins(%[[ALLOC]] : memref<10x10xf32>, %[[ARG0]] : memref<10x10xf32>)
+// CHECK-SAME:    outs(%[[ARG0]] : memref<10x10xf32>)
+
+// -----
+
+func.func @same_repetitive_region_but_cst() -> tensor<10x10xf32> {
+  %0 = tensor.empty() : tensor<10x10xf32>
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %cst_vec = arith.constant dense<0.000000e+00> : tensor<10x10xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x10xf32>) -> tensor<10x10xf32> 
+  %2 = scf.for %arg1 = %c0 to %c2 step %c1 iter_args(%arg2 = %cst_vec) -> tensor<10x10xf32> {
+    %3 = tpp.add (%1: tensor<10x10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32>
+    scf.yield %3 : tensor<10x10xf32>
+  }
+  return %2 : tensor<10x10xf32>
+}
+
+// CHECK-LABEL: same_repetitive_region_but_cst
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[GB:.+]] = memref.get_global @__constant_10x10xf32 : memref<10x10xf32>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+// CHECK: linalg.fill ins(%[[CST]] : f32) outs(%[[ALLOC]] : memref<10x10xf32>)
+// CHECK: %[[ALLOC_0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+// CHECK: memref.copy %[[GB]], %[[ALLOC_0]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: scf.for %{{.+}} = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK: tpp.add ins(%[[ALLOC]] : memref<10x10xf32>, %[[ALLOC_0]] : memref<10x10xf32>) 
+// CHECK-SAME:  outs(%[[ALLOC_0]] : memref<10x10xf32>)
+
+// -----
+
+// CHECK-LABEL: not_same_repetitive_region_both
+// CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>
+func.func @not_same_repetitive_region_both(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %0 = tensor.empty() : tensor<10x10xf32>
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x10xf32>) -> tensor<10x10xf32>
+  // CHECK: %[[OUTER_ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+  // CHECK-NEXT: linalg.fill ins(%{{.+}} : f32) outs(%[[OUTER_ALLOC]] : memref<10x10xf32>)
+  %2 = scf.for %arg1 = %c0 to %c2 step %c1 iter_args(%arg2 = %arg0) -> tensor<10x10xf32> {
+    // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
+    %3 = tpp.add (%1: tensor<10x10xf32>, %1: tensor<10x10xf32>) -> tensor<10x10xf32>
+    // CHECK-NEXT: tpp.add ins(%[[OUTER_ALLOC]] : memref<10x10xf32>, %[[OUTER_ALLOC]] : memref<10x10xf32>) 
+    // CHECK-SAME:         outs(%[[ALLOC]] : memref<10x10xf32>)
+    %4 = tpp.add (%3: tensor<10x10xf32>, %arg2: tensor<10x10xf32>) -> tensor<10x10xf32>
+    // CHECK: tpp.add ins(%[[ALLOC]] : memref<10x10xf32>, %[[ARG0]] : memref<10x10xf32>) 
+    // CHECK-SAME:    outs(%[[ARG0]] : memref<10x10xf32>)
+    scf.yield %4 : tensor<10x10xf32>
+  }
+  return %2 : tensor<10x10xf32>
+}
