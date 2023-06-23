@@ -15,7 +15,7 @@ steps:
   - wait
 
   - label: "TPP-MLIR-nvidia"
-    command: "${SRUN} --partition=nv-v100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=nv-v100,nv-a100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=1 SANITIZERS=1 CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
     env:
