@@ -14,10 +14,6 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
 
-// XFAIL:*
-// Invalid tpp.add bufferization.
-// TODO remove once the problem is fixed.
-
 func.func private @generate_1D_source(%init_source : tensor<?xf32>) -> tensor<?xf32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
