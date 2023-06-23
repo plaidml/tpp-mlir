@@ -31,7 +31,6 @@ steps:
               'KIND=Debug COMPILER=clang LINKER=lld GPU=1 CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
     env:
-      # TPP_ENV_REPLACE implies TPP_ENV_EXPORT=1
-      TPP_ENV_REPLACE: "/data/nfs_home/buildkite-slurm:/Users/buildkite"
       TPP_LAUNCH_NODE: "pcl-adl01"
       TPP_PROXY_ENABLE: "1"
+      TPP_ENV_EXPORT: "1"
