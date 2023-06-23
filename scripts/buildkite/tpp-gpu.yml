@@ -32,5 +32,4 @@ steps:
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
     env:
       TPP_LAUNCH_NODE: "pcl-adl01"
-      TPP_PROXY_ENABLE: "1"
-      TPP_ENV_EXPORT: "1"
+      TPP_ENV_STRICT: "1"
