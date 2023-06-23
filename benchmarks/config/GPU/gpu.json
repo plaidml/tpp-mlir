@@ -8,16 +8,9 @@
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_1024_tpp_conv_mlir": {
+    "fp32_1024_tpp_mlir": {
       "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-tpp-conv.mlir",
-      "environment": {},
-      "flags": [ "-n", "100" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp32_1024_tpp_mapConv_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-tpp-mapConv.mlir",
+      "benchmark": "GPU/gemm-fp32-1024-tpp.mlir",
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
@@ -29,9 +22,16 @@
       "flags": [ "-n", "100"],
       "extensions": [ "avx2" ]
     },
-    "fp32_1024_unp_tpp_mlir": {
+    "fp32_1024_unp_tpp_conv_mlir": {
       "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-unpacked-tpp.mlir",
+      "benchmark": "GPU/gemm-fp32-1024-unpacked-tpp-conv.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "avx2" ]
+    },
+    "fp32_1024_unp_tpp_mapConv_mlir": {
+      "type": "MLIR",
+      "benchmark": "GPU/gemm-fp32-1024-unpacked-tpp-mapConv.mlir",
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "avx2" ]
