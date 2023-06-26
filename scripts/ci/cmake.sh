@@ -23,7 +23,7 @@ die_syntax() {
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
+while getopts "s:b:i:m:t:c:g:l:n:RSG" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
