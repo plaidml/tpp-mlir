@@ -54,7 +54,7 @@ fi
 BLD_DIR="${BUILD_DIR}-${COMPILER}"
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
-  -b ${BLD_DIR} \
+  -b ${BLD_DIR} -R \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
