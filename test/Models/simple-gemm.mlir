@@ -1,6 +1,5 @@
 // RUN: tpp-opt %s \
-// RUN: -bufferize  \
-// RUN: -convert-linalg-to-tpp | FileCheck %s
+// RUN: -convert-linalg-to-tpp -bufferize | FileCheck %s
 
 func.func @entry(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {

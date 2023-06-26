@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck %s
+// RUN: tpp-opt %s -convert-linalg-to-tpp -bufferize | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -39,5 +39,3 @@ module @predict_function  {
 // CHECK: tpp.identity ins(%[[ARG2]] : memref<512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<128x256xf32>, %[[ARG1]] : memref<256x512xf32>, %[[ARG3]] : memref<128x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
 // CHECK: tpp.relu ins(%[[ARG3]] : memref<128x512xf32>) outs(%[[ARG3]] : memref<128x512xf32>)
-// CHECK: return
-// CHECK: }

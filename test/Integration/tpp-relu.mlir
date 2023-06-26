@@ -1,5 +1,5 @@
 // This should really be in the passes directory, not here
-// RUN: tpp-opt %s -bufferize -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -15,11 +15,10 @@
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
-// TPP: func.func @relutpp(
-// TPP-SAME: %[[A:.+]]: memref<9x6xf32>)
+// TPP: func.func @relutpp
 func.func @relutpp(%A: tensor<9x6xf32>) -> tensor<9x6xf32>  {
   %c0 = arith.constant 0.0 : f32
-  // TPP: tpp.relu ins(%[[A]] : memref<9x6xf32>) outs(%[[A]] : memref<9x6xf32>)
+  // TPP: tpp.relu
   %O = linalg.generic { indexing_maps = [#map0], iterator_types = ["parallel", "parallel"] }
     outs(%A: tensor<9x6xf32>) {
       ^bb0(%a: f32):

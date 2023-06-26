@@ -9,8 +9,8 @@ func.func @brgemm_lowering(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
 
 // CHECK-LABEL: brgemm_lowering
 // CHECK-SAME: %[[ARG0:.+]]: tensor<3x5x4xf32>, %[[ARG1:.+]]: tensor<3x4x5xf32>, %[[ARG2:.+]]: tensor<5x5xf32>
-// CHECK: %{{.+}} = tpp.brgemm 
-// CHECK-SAME:  (%[[ARG0]] : tensor<3x5x4xf32>, %[[ARG1]] : tensor<3x4x5xf32>, %[[ARG2]] : tensor<5x5xf32>) 
+// CHECK: %{{.+}} = tpp.brgemm
+// CHECK-SAME:  (%[[ARG0]] : tensor<3x5x4xf32>, %[[ARG1]] : tensor<3x4x5xf32>, %[[ARG2]] : tensor<5x5xf32>)
 // CHECK-SAME:  -> (tensor<5x5xf32>)
 
 // -----
@@ -25,7 +25,7 @@ func.func @gemm_lowering(%arg0: tensor<8x9xf32>,
 // CHECK-LABEL: gemm_lowering
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x9xf32>, %[[ARG1:.+]]: tensor<9x8xf32>, %[[ARG2:.+]]: tensor<8x8xf32>
 // CHECK: %{{.+}} = tpp.gemm
-// CHECK-SAME: (%[[ARG0]] : tensor<8x9xf32>, %[[ARG1]] : tensor<9x8xf32>, %[[ARG2]] : tensor<8x8xf32>) 
+// CHECK-SAME: (%[[ARG0]] : tensor<8x9xf32>, %[[ARG1]] : tensor<9x8xf32>, %[[ARG2]] : tensor<8x8xf32>)
 // CHECK-SAME:  -> (tensor<8x8xf32>)
 
 // -----
@@ -47,6 +47,259 @@ func.func @add_mapping(%arg0: tensor<5x5xf32>, %arg1: tensor<5x5xf32>) -> tensor
 // CHECK-LABEL: add_mapping
 // CHECK-SAME: %[[ARG0:.+]]: tensor<5x5xf32>, %[[ARG1:.+]]: tensor<5x5xf32>
 // CHECK: %{{.+}} = tpp.add (%[[ARG0]] : tensor<5x5xf32>, %[[ARG1]] : tensor<5x5xf32>) -> (tensor<5x5xf32>)
+
+// -----
+
+// Expect not to map. TPP ops require rank 2 on output.
+#map = affine_map<(d0) -> (d0)>
+// CHECK-LABEL: add_mapping_1d_output
+func.func @add_mapping_1d_output(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  // CHECK-NOT: tpp-add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel"]}
+    ins(%arg0: tensor<1xf32>) outs(%arg1: tensor<1xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// -----
+
+// tpp have 2d rank.
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @add_mapping_3d(%arg0: tensor<1x1x1xf32>, %arg1: tensor<1x1x1xf32>) -> tensor<1x1x1xf32> {
+  // CHECK-NOT: tpp.add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg0: tensor<1x1x1xf32>) outs(%arg1: tensor<1x1x1xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<1x1x1xf32>
+  return %0 : tensor<1x1x1xf32>
+}
+
+// -----
+
+// The output is not an identity map. We should not map this.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+func.func @add_mapping_not_identity(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-NOT: tpp.add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0: tensor<4x4xf32>) outs(%arg1: tensor<4x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<4x4xf32>
+  return %0 : tensor<4x4xf32>
+}
+
+// -----
+
+// Output affine map is not an identity.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (0, d1)>
+func.func @add_mapping_brcst(%arg0: tensor<3x3xf32>, %arg1: tensor<1x3xf32>) -> tensor<1x3xf32> {
+  // CHECK-NOT: tpp.add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0: tensor<3x3xf32>) outs(%arg1: tensor<1x3xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<1x3xf32>
+  return %0 : tensor<1x3xf32>
+}
+
+// -----
+
+// Scalar operands we don't expect any mapping to tpp.
+#map = affine_map<() -> ()>
+func.func @add_mapping_scalar(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
+  // CHECK-NOT: tpp.add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = []} ins(%arg0: tensor<f32>)
+    outs(%arg1: tensor<f32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.addf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// Expect not to match as the input/output are not use in the computation.
+// CHECK-LABEL: func.func @add_mapping_no_match
+func.func @add_mapping_no_match(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>, %c0 : f32) -> tensor<3x3xf32> {
+  %c1 = arith.constant 1.0 : f32
+  // CHECK-NOT: tpp.add
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0: tensor<3x3xf32>) outs(%arg1: tensor<3x3xf32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %0 = arith.addf %c0, %c1 : f32
+        linalg.yield %0 : f32
+    } -> tensor<3x3xf32>
+  return %0 : tensor<3x3xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @matmul_mapping(%arg0 : tensor<28x55xf32>, %arg1 : tensor<55x32xf32>) -> tensor<28x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %out_shape = tensor.empty() : tensor<28x32xf32>
+
+  // CHECK-NOT: tpp.gemm
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<28x55xf32>, tensor<55x32xf32>) outs(%out_shape : tensor<28x32xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %0 = arith.mulf %in, %in_2 : f32
+      %1 = arith.addf %out, %0 : f32
+      %2 = arith.maxf %1, %cst : f32
+      linalg.yield %2 : f32
+  } -> tensor<28x32xf32>
+
+  return %0 : tensor<28x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @relu_mapping(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %c0 = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg0: tensor<10x10xf32>) {
+      ^bb0(%out : f32):
+        %0 = arith.maxf %out, %c0 : f32
+        linalg.yield %0 : f32
+  } -> tensor<10x10xf32>
+  return %0 : tensor<10x10xf32>
+}
+
+// CHECK: func.func @relu_mapping(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<10x10xf32>)
+// CHECK: tpp.relu (%[[ARG0]] : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @relu_mapping(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  %c0 = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<10x10xf32>) outs(%arg0: tensor<10x10xf32>) {
+      ^bb0(%in : f32, %out : f32):
+        %0 = arith.maxf %in, %c0 : f32
+        linalg.yield %0 : f32
+  } -> tensor<10x10xf32>
+  return %0 : tensor<10x10xf32>
+}
+
+// CHECK: func.func @relu_mapping(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<10x10xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<10x10xf32>)
+// CHECK: tpp.relu (%[[ARG1]] : tensor<10x10xf32>) -> (tensor<10x10xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+// Expect not to map as the operation is not a relu see: arith.maxf %in %out.
+// CHECK-LABEL: func.func @relu_max_with_no_zero
+func.func @relu_max_with_no_zero(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>) -> tensor<10x10xf32> {
+  // CHECK-NOT: tpp.relu
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<10x10xf32>) outs(%arg0: tensor<10x10xf32>) {
+      ^bb0(%in : f32, %out : f32):
+        %0 = arith.maxf %in, %out : f32
+        linalg.yield %0 : f32
+  } -> tensor<10x10xf32>
+  return %0 : tensor<10x10xf32>
+}
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+// Expect not to map as not a relu see: arith.maxf %c0 %c0.
+// CHECK-LABEL: func.func @relu_max_with_only_zeros
+func.func @relu_max_with_only_zeros(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
+  %c0 = arith.constant 0.0 : f32
+  // CHECK-NOT: tpp.relu
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel"]}
+    ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %0 = arith.maxf %c0, %c0 : f32
+        linalg.yield %0 : f32
+    } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+// CHECK-LABEL: func.func @relu_mapping_1d_output
+// CHECK-SAME: %[[ARG0:.+]]: tensor<3xf32>, %[[ARG1:.+]]: tensor<3xf32>
+func.func @relu_mapping_1d_output(%arg0: tensor<3xf32>,
+                                  %arg1: tensor<3xf32>) -> tensor<3xf32> {
+  %c0 = arith.constant 0.0 : f32
+  // CHECK-NOT: tpp.relu
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel"]}
+    ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %0 = arith.maxf %arg3, %c0 : f32
+        linalg.yield %0 : f32
+    } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+// Expect not to map as the operation is not a relu see: arith.maxf %arg3 %arg3.
+// CHECK-LABEL: func.func @relu_max_with_no_zero2
+func.func @relu_max_with_no_zero2(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
+  %c0 = arith.constant 0.0 : f32
+  // CHECK-NOT: tpp.relu
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel"]}
+    ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %0 = arith.maxf %arg3, %arg3 : f32
+        linalg.yield %0 : f32
+    } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
 
 // -----
 
@@ -133,6 +386,79 @@ func.func @scalar_identity_ranked(%arg0: tensor<1x1xf32>, %arg1: tensor<8x32xf32
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+
+// CHECK-LABEL: func.func @transpose
+func.func @transpose(%arg0: tensor<8x32xf32>, %arg1: tensor<32x8xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.identity
+  %0 = linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<32x8xf32>) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @transpose_no_output_identity
+func.func @transpose_no_output_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<32x8xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.identity
+  %0 = linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<32x8xf32>) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @empty_map_identity
+// CHECK-SAME: %[[ARG0:.+]]: f32, %[[ARG1:.+]]: tensor<8x32xf32>
+func.func @empty_map_identity(%arg0: f32, %arg1: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.identity (%[[ARG0]] : f32) -> (tensor<8x32xf32>)
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : f32) outs(%arg1: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (5, 5)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: func.func @non_zero_constant_identity
+func.func @non_zero_constant_identity(%arg0 : tensor<8x32xf32>, %arg1: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.identity
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<8x32xf32>) outs(%arg1: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 
 func.func @broadcast_row_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<1x32xf32>) -> tensor<8x32xf32> {
@@ -153,6 +479,43 @@ func.func @broadcast_row_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<1x32xf3
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+
+// CHECK-LABEL: func.func @broadcast_row_identity
+// CHECK-SAME: %[[ARG0:.+]]: tensor<8x32xf32>, %[[ARG1:.+]]: tensor<32xf32>
+func.func @broadcast_row_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<32xf32>) -> tensor<8x32xf32> {
+  // CHECK: tpp.identity (%[[ARG1]] : tensor<32xf32>) -> (tensor<8x32xf32>)
+  %0 = linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<32xf32>) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: func.func @transpose_4d
+func.func @transpose_4d(%arg0: tensor<32x8x2x64xf32>, %arg1: tensor<32x2x64x8xf32>) -> tensor<32x2x64x8xf32> {
+  // CHECK-NOT: tpp.identity
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%arg0: tensor<32x8x2x64xf32>) outs(%arg1: tensor<32x2x64x8xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<32x2x64x8xf32>
+  return %0 : tensor<32x2x64x8xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, 0)>
 
 func.func @broadcast_col_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<8x1xf32>) -> tensor<8x32xf32> {
@@ -169,6 +532,26 @@ func.func @broadcast_col_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<8x1xf32
 // CHECK-LABEL: broadcast_col_identity
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x32xf32>, %[[ARG1]]: tensor<8x1xf32>
 // CHECK: %{{.+}} = tpp.identity (%[[ARG1]] : tensor<8x1xf32>) -> (tensor<8x32xf32>)
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+
+// This should be fixed, as this op is a valid tpp.identity.
+// Currently, it fails broadcasting rules.
+// CHECK-LABEL: func.func @broadcast_col_identity
+func.func @broadcast_col_identity(%arg0: tensor<8x32xf32>, %arg1: tensor<8xf32>) -> tensor<8x32xf32> {
+  // CHECK-NOT: tpp.identity
+  %0 = linalg.generic {
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1: tensor<8xf32>) outs(%arg0: tensor<8x32xf32>) {
+      ^bb0(%in: f32, %out:f32):
+        linalg.yield %in : f32
+    } -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
 
 // -----
 
@@ -315,7 +698,7 @@ func.func @scalar_input(%arg0: tensor<f32>, %arg1: tensor<4x4xf32>) -> tensor<4x
   // CHECK-NOT: tpp.add
   %res = linalg.generic {
     indexing_maps = [#map, #map1],
-    iterator_types = ["parallel", "parallel"]} 
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0: tensor<f32>)
     outs(%arg1: tensor<4x4xf32>) {
       ^bb0(%in: f32, %out: f32):
