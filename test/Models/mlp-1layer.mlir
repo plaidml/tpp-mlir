@@ -4,7 +4,7 @@
 #map0 = affine_map<(d0, d1) -> (0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @entry(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: tensor<1x512xf32>, %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
+func.func @mlp_1layer(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: tensor<1x512xf32>, %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<1x512xf32>) outs(%output : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
@@ -18,7 +18,7 @@ func.func @entry(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: 
   } -> tensor<128x512xf32>
   return %3 : tensor<128x512xf32>
 }
-// CHECK: func.func @entry(
+// CHECK: func.func @mlp_1layer(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<128x256xf32>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<256x512xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<1x512xf32>,
