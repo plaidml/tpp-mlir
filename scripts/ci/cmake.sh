@@ -6,16 +6,16 @@
 source $(realpath $(dirname $0))/common.sh
 
 die_syntax() {
-  echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR] [-y THIRD_PARTY_DIR]"
+  echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR]"
   echo "          [-t (Release|Debug|RelWithDebInfo)] [-c (clang|gcc)] [-g (gcc toolchain)]"
-  echo "          [-l (ld|lld|gold|mold)] [-S] [-n N]"
+  echo "          [-l (ld|lld|gold|mold)] [-R] [-S] [-n N]"
   echo ""
-  echo "  -y: Optional 3rd party dir, defaults to MLIR_DIR/../../../third_party"
   echo "  -i: Optional install dir, defaults to system"
   echo "  -t: Optional build type flag, defaults to Release"
   echo "  -c: Optional compiler flag, defaults to clang"
   echo "  -g: Optional gcc toolchain flag, may be needed by clang"
   echo "  -l: Optional linker flag, defaults to system linker"
+  echo "  -R: Optional request to remove BLD_DIR before CMake"
   echo "  -S: Optional sanitizer flag, defaults to none"
   echo "  -G: Optional GPU support flag, defaults to none"
   echo "  -n: Optional link job flag, defaults to nproc"
@@ -52,9 +52,6 @@ while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
         echo "MLIR '${OPTARG}' not a CMake directory"
         die_syntax
       fi
-      ;;
-    y)
-      THIRD_PARTY_DIR=$(realpath ${OPTARG})
       ;;
     g)
       GCC_DIR=$(realpath ${OPTARG})
@@ -106,6 +103,9 @@ while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
         die_syntax
       fi
       ;;
+    R)
+      REMOVE_BLD_DIR=1
+      ;;
     S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
@@ -133,10 +133,6 @@ if [ ! "${BLD_DIR}" ] || [ ! "${SRC_DIR}" ] || [ ! "${MLIR_DIR}" ]; then
   die_syntax
 fi
 
-if [ ! "${THIRD_PARTY_DIR}" ]; then
-  THIRD_PARTY_DIR=$(realpath ${MLIR_DIR}/../../../third_party)
-fi
-
 if [ ! "${BUILD_OPTIONS}" ]; then
   BUILD_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
 fi
@@ -158,13 +154,17 @@ pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
 
 TPP_LIT=$(which lit)
 
+# Consider to remove BLD_DIR shortly before running CMake
+if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
+  echo_run rm -rf ${BLD_DIR}
+fi
+
 # CMake
 echo_run cmake -Wno-dev -G Ninja \
     -B${BLD_DIR} -S${SRC_DIR} \
     -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} \
     -DCMAKE_INSTALL_PREFIX=${INST_DIR} \
     -DMLIR_DIR=${MLIR_DIR} \
-    -DTHIRD_PARTY_DIR=${THIRD_PARTY_DIR} \
     -DLLVM_EXTERNAL_LIT=${TPP_LIT} \
     ${BUILD_OPTIONS} \
     ${GCC_TOOLCHAIN_OPTIONS} \
