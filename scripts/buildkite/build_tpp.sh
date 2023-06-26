@@ -79,6 +79,7 @@ if [ ! -f "${CUDA_DRIVER}" ]; then
     echo "Creating links to CUDA stubs"
     ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
     ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
+    export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
   fi
 fi
 
