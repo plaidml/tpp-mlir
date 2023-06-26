@@ -133,24 +133,24 @@ static void printTppOp(OpAsmPrinter &printer, ValueRange operands,
       /*elidedAttrs=*/{OPERAND_SEGMENT_SIZE, UNARY_KIND, BINARY_KIND});
 }
 
-static void tppOpBuilder(OpBuilder &builder, OperationState &state,
-                         ValueRange inputs, ValueRange outputs) {
-  assert(outputs.size() >= 1);
+static void tppOpBuilderMemRef(OpBuilder &builder, OperationState &state,
+                               ValueRange inputs, Value output) {
+  assert(output.getType().isa<MemRefType>());
   state.addOperands(inputs);
-  if (auto rankedOutput =
-          outputs[0].getType().dyn_cast_or_null<RankedTensorType>()) {
-    state.addTypes(outputs.getTypes());
-    state.addAttribute(
-        OPERAND_SEGMENT_SIZE,
-        builder.getDenseI32ArrayAttr(
-            {static_cast<int>(inputs.size()), /*numOutputs=*/0}));
-  } else {
-    state.addOperands(outputs);
-    state.addAttribute(
-        OPERAND_SEGMENT_SIZE,
-        builder.getDenseI32ArrayAttr({static_cast<int>(inputs.size()),
-                                      static_cast<int>(outputs.size())}));
-  }
+  state.addOperands(output);
+  state.addAttribute(OPERAND_SEGMENT_SIZE, builder.getDenseI32ArrayAttr(
+                                               {static_cast<int>(inputs.size()),
+                                                /*numOutputs=*/1}));
+}
+
+static void tppOpBuilderTensor(OpBuilder &builder, OperationState &state,
+                               ValueRange inputs, Type outputType) {
+  assert(outputType.isa<RankedTensorType>());
+  state.addOperands(inputs);
+  state.addTypes(outputType);
+  state.addAttribute(OPERAND_SEGMENT_SIZE,
+                     builder.getDenseI32ArrayAttr(
+                         {static_cast<int>(inputs.size()), /*numOutputs=*/0}));
 }
 
 static void getEffectsImpl(
@@ -175,7 +175,12 @@ static void getEffectsImpl(
 
 void IdentityOp::build(OpBuilder &builder, OperationState &state, Value input,
                        Value output) {
-  tppOpBuilder(builder, state, input, output);
+  tppOpBuilderMemRef(builder, state, input, output);
+}
+
+void IdentityOp::build(OpBuilder &builder, OperationState &state, Value input,
+                       Type outputType) {
+  tppOpBuilderTensor(builder, state, input, outputType);
 }
 
 void IdentityOp::print(OpAsmPrinter &printer) {
@@ -196,9 +201,16 @@ void IdentityOp::getEffects(
 // ReluOp
 //===----------------------------------------------------------------------===//
 
+// Builder for memref abstraction.
 void ReluOp::build(OpBuilder &builder, OperationState &state, Value input,
                    Value output) {
-  tppOpBuilder(builder, state, input, output);
+  tppOpBuilderMemRef(builder, state, input, output);
+}
+
+// Builder for tensor abstraction.
+void ReluOp::build(OpBuilder &builder, OperationState &state, Value input,
+                   Type outputType) {
+  tppOpBuilderTensor(builder, state, input, outputType);
 }
 
 void ReluOp::print(OpAsmPrinter &printer) {
@@ -219,9 +231,16 @@ void ReluOp::getEffects(
 // ZeroOp
 //===----------------------------------------------------------------------===//
 
+// Builder for memref abstraction.
 void ZeroOp::build(OpBuilder &builder, OperationState &state, Value input,
                    Value output) {
-  tppOpBuilder(builder, state, input, output);
+  tppOpBuilderMemRef(builder, state, input, output);
+}
+
+// Builder for tensor abstraction.
+void ZeroOp::build(OpBuilder &builder, OperationState &state, Value input,
+                   Type outputType) {
+  tppOpBuilderTensor(builder, state, input, outputType);
 }
 
 void ZeroOp::print(OpAsmPrinter &printer) {
@@ -257,9 +276,16 @@ void ZeroOp::getEffects(
 // AddOp
 //===----------------------------------------------------------------------===//
 
+// Builder for memref abstraction.
 void AddOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
                   Value output) {
-  tppOpBuilder(builder, state, inputs, output);
+  tppOpBuilderMemRef(builder, state, inputs, output);
+}
+
+// Builder for tensor abstraction.
+void AddOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
+                  Type outputType) {
+  tppOpBuilderTensor(builder, state, inputs, outputType);
 }
 
 void AddOp::print(OpAsmPrinter &printer) {
@@ -367,9 +393,16 @@ static LogicalResult verifyGemmLikeOperands(OpTy operation) {
 // Verify gemm operation.
 LogicalResult GemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
+// Builder for memref abstraction.
 void GemmOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
                    Value output) {
-  tppOpBuilder(builder, state, inputs, output);
+  tppOpBuilderMemRef(builder, state, inputs, output);
+}
+
+// Builder for tensor abstraction.
+void GemmOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
+                   Type outputType) {
+  tppOpBuilderTensor(builder, state, inputs, outputType);
 }
 
 ParseResult GemmOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -392,9 +425,16 @@ void GemmOp::getEffects(
 
 LogicalResult BrgemmOp::verify() { return verifyGemmLikeOperands(*this); }
 
+// Builder for memref abstraction.
 void BrgemmOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange inputs, Value output) {
-  tppOpBuilder(builder, state, inputs, output);
+  tppOpBuilderMemRef(builder, state, inputs, output);
+}
+
+// Builder for tensor abstraction.
+void BrgemmOp::build(OpBuilder &builder, OperationState &state,
+                     ValueRange inputs, Type outputType) {
+  tppOpBuilderTensor(builder, state, inputs, outputType);
 }
 
 ParseResult BrgemmOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -425,16 +465,40 @@ LogicalResult FusedBrgemmOp::verify() {
   return success();
 }
 
+static void FusedBrgemmOpBuilder(OpBuilder &builder, OperationState &state,
+                                 ValueRange inputs, Value output,
+                                 Type outputType, Value bias,
+                                 FusedUnaryOpKindAttr unaryKind,
+                                 FusedBinaryOpKindAttr binaryKind) {
+  assert(inputs.size() == 3);
+  auto allInputs = llvm::to_vector(inputs);
+  allInputs.emplace_back(bias);
+  if (output)
+    tppOpBuilderMemRef(builder, state, allInputs, output);
+  else
+    tppOpBuilderTensor(builder, state, allInputs, outputType);
+  state.addAttribute(UNARY_KIND, unaryKind);
+  state.addAttribute(BINARY_KIND, binaryKind);
+}
+
+// Builder for memref abstraction.
 void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
                           ValueRange inputs, Value output, Value bias,
                           FusedUnaryOpKindAttr unaryKind,
                           FusedBinaryOpKindAttr binaryKind) {
-  assert(inputs.size() == 3);
-  auto allInputs = llvm::to_vector(inputs);
-  allInputs.emplace_back(bias);
-  tppOpBuilder(builder, state, allInputs, output);
-  state.addAttribute(UNARY_KIND, unaryKind);
-  state.addAttribute(BINARY_KIND, binaryKind);
+  assert(output.getType().isa<MemRefType>());
+  FusedBrgemmOpBuilder(builder, state, inputs, output, output.getType(), bias,
+                       unaryKind, binaryKind);
+}
+
+// Builder for tensor abstraction.
+void FusedBrgemmOp::build(OpBuilder &builder, OperationState &state,
+                          ValueRange inputs, Type outputType, Value bias,
+                          FusedUnaryOpKindAttr unaryKind,
+                          FusedBinaryOpKindAttr binaryKind) {
+  assert(outputType.isa<RankedTensorType>());
+  FusedBrgemmOpBuilder(builder, state, inputs, /*output=*/nullptr, outputType,
+                       bias, unaryKind, binaryKind);
 }
 
 template <typename EnumClass>

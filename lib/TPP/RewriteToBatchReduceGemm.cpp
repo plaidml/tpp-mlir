@@ -368,10 +368,18 @@ rewriteToBrGemmVnniOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
     }
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
-    auto brgemm = builder.create<tpp::BrgemmOp>(
-        loc,
-        ValueRange{slicedOperands[0], slicedOperands[1], slicedOperands[2]},
-        slicedOperands[2]);
+    Operation *brgemm = nullptr;
+    if (linalgOp.hasBufferSemantics()) {
+      brgemm = builder.create<tpp::BrgemmOp>(
+          loc,
+          ValueRange{slicedOperands[0], slicedOperands[1], slicedOperands[2]},
+          slicedOperands[2]);
+    } else {
+      brgemm = brgemm = builder.create<tpp::BrgemmOp>(
+          loc,
+          ValueRange{slicedOperands[0], slicedOperands[1], slicedOperands[2]},
+          slicedOperands[2].getType());
+    }
     tensorResults =
         (loopRanges.empty())
             ? brgemm->getResults()
