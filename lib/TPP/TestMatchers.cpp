@@ -201,6 +201,20 @@ void testCaptureAffineMapsExpectToFail(FunctionOpInterface funcOp) {
   });
 }
 
+void testNumberOfAffineMaps(FunctionOpInterface funcOp) {
+  // clang-format off
+  auto matcher =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+    .operation(NumAffineMaps(EqualsTo(3)));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcher.match(linalgOp))
+      llvm::outs() << "match\n";
+    else
+      llvm::outs() << "not a match\n";
+  });
+}
+
 void testTppRank(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcherRank1 =
@@ -246,6 +260,8 @@ void TestStructuralMatchers::runOnOperation() {
     testCaptureAffineMaps(f);
   if (f.getName() == "test_capture_affine_maps_expect_to_fail")
     testCaptureAffineMapsExpectToFail(f);
+  if (f.getName() == "test_number_of_affine_maps")
+    testNumberOfAffineMaps(f);
 }
 
 namespace mlir {
