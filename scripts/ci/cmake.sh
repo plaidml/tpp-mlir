@@ -153,6 +153,10 @@ check_program lit
 pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
 
 TPP_LIT=$(which lit)
+# patch incorrect interpreter
+if [ "${TPP_LIT}" ] && [ "$(command -v sed)" ]; then
+  sed -i 's/#!\/usr\/bin\/python3/#!\/usr\/bin\/env python3/' ${TPP_LIT}
+fi
 
 # Consider to remove BLD_DIR shortly before running CMake
 if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
