@@ -60,7 +60,8 @@ class Tpp_UnaryOp<string mnemonic, list<Trait> traits = []> :
   let skipDefaultBuilders = 1; 
 
   let builders = [
-    OpBuilder<(ins "Value":$input, "Value":$output)>
+    OpBuilder<(ins "Value":$input, "Value":$output)>,
+    OpBuilder<(ins "Value":$input, "Type":$output)>
   ]; 
 }
 
@@ -162,7 +163,8 @@ class Tpp_BinaryOp<string mnemonic, list<Trait> traits = []> :
   let skipDefaultBuilders = 1;
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$out)>
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>,
+    OpBuilder<(ins "ValueRange":$inputs, "Type":$output)>
   ];
 }
 
@@ -222,7 +224,8 @@ class Tpp_TernaryOp<string mnemonic, list<Trait> traits = []> :
   let skipDefaultBuilders = 1;
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
+    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>,
+    OpBuilder<(ins "ValueRange":$inputs, "Type":$output_type)>
   ]; 
 }
 
@@ -296,11 +299,7 @@ class Tpp_QuaternaryOp<string mnemonic, list<Trait> traits = []> :
   let results = (outs Variadic<TppGemmLikeOperand>:$results);
 
   let hasCustomAssemblyFormat = 1;
-  let skipDefaultBuilders = 1;
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "Value":$output)>
-  ]; 
+  let skipDefaultBuilders = 1; 
 }
 
 //===----------------------------------------------------------------------===//
@@ -337,12 +336,17 @@ def Tpp_FusedBrgemmOp : Tpp_QuaternaryOp<"fused_brgemm"> {
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "Value":$output, "Value":$bias, 
                    "FusedUnaryOpKindAttr":$unary_kind,
+                   "FusedBinaryOpKindAttr":$binary_kind)>,
+    OpBuilder<(ins "ValueRange":$inputs, "Type":$output_type, "Value":$bias,
+                   "FusedUnaryOpKindAttr":$unary_kind,
                    "FusedBinaryOpKindAttr":$binary_kind)>
   ];
   let extraClassDeclaration = [{
     // Get the operand to be used as input to the binary operation.
     Value getBiasOperand() { return getInputs()[3]; };
   }];
+
+  let skipDefaultBuilders = 1;
   let hasVerifier = 1;
 }
 

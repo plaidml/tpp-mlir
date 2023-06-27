@@ -39,28 +39,29 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
     if (tpp::utils::isTppZero(linalgOp, &operands)) {
       assert(operands.size() == 1 && "tpp.zero expects one operand");
       rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp, operands[0],
-                                               operands[0]);
+                                               operands[0].getType());
       return success();
     }
 
     if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
       assert(operands.size() == 2 && "tpp.identity expects two operands");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
-                                                   operands[1]);
+                                                   operands[1].getType());
       return success();
     }
 
     if (tpp::utils::isTppRelu(linalgOp, &operands)) {
       assert(operands.size() == 2 && "tpp.relu expects two operands");
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
-                                               operands[1]);
+                                               operands[1].getType());
       return success();
     }
 
     if (tpp::utils::isTppAdd(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.add expects three operands");
       rewriter.replaceOpWithNewOp<tpp::AddOp>(
-          linalgOp, ValueRange{operands[0], operands[1]}, operands[2]);
+          linalgOp, ValueRange{operands[0], operands[1]},
+          operands[2].getType());
       return success();
     }
 
@@ -68,7 +69,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       assert(operands.size() == 3 && "tpp.matmul expects three operands");
       rewriter.replaceOpWithNewOp<tpp::GemmOp>(
           linalgOp, ValueRange{operands[0], operands[1], operands[2]},
-          operands[2]);
+          operands[2].getType());
       return success();
     }
 
@@ -77,9 +78,10 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointAfter(linalgOp);
       auto add = rewriter.create<tpp::AddOp>(
-          linalgOp.getLoc(), ValueRange{operands[0], operands[1]}, operands[2]);
+          linalgOp.getLoc(), ValueRange{operands[0], operands[1]},
+          operands[2].getType());
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, add.getResult(0),
-                                               operands[2]);
+                                               operands[2].getType());
       return success();
     }
 
@@ -115,7 +117,8 @@ struct ConvertBrgemmToTpp
     SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
     inputs.push_back(brMatmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outputs[0]);
+    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs,
+                                               outputs[0].getType());
     return success();
   }
 };
@@ -135,7 +138,8 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
     inputs.push_back(matmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs, outputs[0]);
+    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs,
+                                             outputs[0].getType());
     return success();
   }
 };
@@ -162,7 +166,7 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
     if (outputRank != 2)
       return rewriter.notifyMatchFailure(fillOp, "Expect output rank 2");
 
-    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, output);
+    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, output.getType());
     return success();
   }
 };

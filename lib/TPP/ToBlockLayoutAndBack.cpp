@@ -579,7 +579,7 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
       loc,
       ValueRange{brgemmOp.getInputs()[0], packedMatrixB,
                  brgemmOp.getOutputs()[0]},
-      brgemmOp.getOutputs()[0]);
+      brgemmOp.getOutputs()[0].getType());
   rewriter.replaceOp(brgemmOp, replacementOp.getResult(0));
   return replacementOp;
 }
