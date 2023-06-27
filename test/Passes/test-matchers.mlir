@@ -357,3 +357,34 @@ func.func @test_capture_affine_maps_expect_to_fail(
   } -> tensor<4x8x32x32xf32>
   return %0 : tensor<4x8x32x32xf32>
 }
+
+#map20 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: test_number_of_affine_maps
+func.func @test_number_of_affine_maps(%arg0: tensor<4x16x32x32xf32>,
+                                    %arg1: tensor<8x16x32x32xf32>,
+                                    %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: match
+  %0 = linalg.generic {
+    indexing_maps = [#map17, #map18, #map19], 
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) 
+    outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  } -> tensor<4x8x32x32xf32>
+
+  // CHECK: not a match
+  %1 = linalg.generic {
+    indexing_maps = [#map20, #map20],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%0 : tensor<4x8x32x32xf32>) outs(%0 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg5: f32, %arg6: f32):
+      %10 = arith.addf %arg5, %arg6 : f32
+      linalg.yield %10 : f32
+  } -> tensor<4x8x32x32xf32> 
+
+  return %1 : tensor<4x8x32x32xf32>
+}

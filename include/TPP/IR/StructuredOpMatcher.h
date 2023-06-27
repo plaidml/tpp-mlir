@@ -111,6 +111,13 @@ struct Identity {
   bool operator()(AffineMap map) const { return map.isIdentity(); }
 };
 
+// Callable object to capture any map.
+struct Any {
+  Any() = default;
+
+  bool operator()(AffineMap map) const { return true; }
+};
+
 // Callable object to verify if `operand` has static shape.
 struct HasStaticShape {
   HasStaticShape() = default;
@@ -205,6 +212,20 @@ struct NumDpsInits {
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
       return fun(linalgOp.getNumDpsInits());
+    return false;
+  }
+
+  std::function<bool(size_t)> fun;
+};
+
+// Callable object to check the number of affine map for `op`.
+struct NumAffineMaps {
+  NumAffineMaps() = delete;
+  explicit NumAffineMaps(std::function<bool(size_t)> fun) : fun(fun){};
+
+  bool operator()(Operation *op) const {
+    if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
+      return fun(linalgOp.getIndexingMapsArray().size());
     return false;
   }
 
