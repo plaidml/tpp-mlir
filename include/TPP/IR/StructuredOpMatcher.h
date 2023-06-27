@@ -76,15 +76,23 @@ struct NumOfLoops {
 struct HasMap {
   HasMap() = delete;
   explicit HasMap(std::function<bool(AffineMap)> fun) : fun(fun){};
+  explicit HasMap(std::function<bool(AffineMap)> fun, AffineMap *ptrMap)
+      : fun(fun), ptrMap(ptrMap){};
 
   bool operator()(OpOperand *operand, Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
       auto map = linalgOp.getMatchingIndexingMap(operand);
-      return fun(map);
+      assert(fun && "must be a callable target");
+      if (!fun(map))
+        return false;
+      if (ptrMap)
+        *ptrMap = std::move(map);
+      return true;
     }
     return false;
   }
   std::function<bool(AffineMap map)> fun;
+  AffineMap *ptrMap = nullptr;
 };
 
 // Callble object to verify if `map` is a projected permutation map.

@@ -310,3 +310,50 @@ func.func @test_rank(%arg0: memref<1xf32>,
   } 
   return
 }
+
+#map17 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map18 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map19 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+
+// CHECK-LABEL: test_capture_affine_maps
+func.func @test_capture_affine_maps(%arg0: tensor<4x16x32x32xf32>,
+                                    %arg1: tensor<8x16x32x32xf32>,
+                                    %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK-NOT: not a match
+  // CHECK-DAG: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)
+  // CHECK-DAG: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)
+  // CHECK-DAG: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)
+  %0 = linalg.generic {
+    indexing_maps = [#map17, #map18, #map19], 
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) 
+    outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  } -> tensor<4x8x32x32xf32>
+  return %0 : tensor<4x8x32x32xf32>
+}
+
+// CHECK-LABEL: test_capture_affine_maps_expect_to_fail
+func.func @test_capture_affine_maps_expect_to_fail(
+                                    %arg0: tensor<4x16x32x32xf32>,
+                                    %arg1: tensor<8x16x32x32xf32>,
+                                    %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK-NOT: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)
+  // CHECK-NOT: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)
+  // CHECK-NOT: match operation with affine map: (d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)
+  // CHECK: not a match
+  %0 = linalg.generic {
+    indexing_maps = [#map17, #map18, #map19],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>)
+    outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  } -> tensor<4x8x32x32xf32>
+  return %0 : tensor<4x8x32x32xf32>
+}

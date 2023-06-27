@@ -159,6 +159,48 @@ void testTppIdentity(FunctionOpInterface funcOp) {
   });
 }
 
+void testCaptureAffineMaps(FunctionOpInterface funcOp) {
+  // clang-format off
+  AffineMap aMap, bMap, cMap;
+  auto matcher =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .operation(NumDpsInits(EqualsTo(1)))
+      .operation(NumDpsInputs(EqualsTo(2)))
+      .input(MatchOne(0), HasMap(ProjectedPermutation(), &aMap))
+      .input(MatchOne(1), HasMap(ProjectedPermutation(), &bMap))
+      .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcher.match(linalgOp)) {
+      llvm::outs() << "match operation with affine map: " << aMap << "\n";
+      llvm::outs() << "match operation with affine map: " << bMap << "\n";
+      llvm::outs() << "match operation with affine map: " << cMap << "\n";
+    } else
+      llvm::outs() << "not a match\n";
+  });
+}
+
+void testCaptureAffineMapsExpectToFail(FunctionOpInterface funcOp) {
+  // clang-format off
+  AffineMap aMap, bMap, cMap;
+  auto matcher =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .operation(NumDpsInits(EqualsTo(1)))
+      .operation(NumDpsInputs(EqualsTo(2)))
+      .input(MatchOne(0), HasMap(Identity(), &aMap))
+      .input(MatchOne(1), HasMap(ProjectedPermutation(), &bMap))
+      .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcher.match(linalgOp)) {
+      llvm::outs() << "match operation with affine map: " << aMap << "\n";
+      llvm::outs() << "match operation with affine map: " << bMap << "\n";
+      llvm::outs() << "match operation with affine map: " << cMap << "\n";
+    } else
+      llvm::outs() << "not a match\n";
+  });
+}
+
 void testTppRank(FunctionOpInterface funcOp) {
   // clang-format off
   auto matcherRank1 =
@@ -200,6 +242,10 @@ void TestStructuralMatchers::runOnOperation() {
     testTppIdentity(f);
   if (f.getName() == "test_rank")
     testTppRank(f);
+  if (f.getName() == "test_capture_affine_maps")
+    testCaptureAffineMaps(f);
+  if (f.getName() == "test_capture_affine_maps_expect_to_fail")
+    testCaptureAffineMapsExpectToFail(f);
 }
 
 namespace mlir {
