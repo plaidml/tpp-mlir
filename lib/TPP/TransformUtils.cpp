@@ -324,7 +324,7 @@ namespace {
 struct OperandBExprWalker
     : public AffineExprVisitor<OperandBExprWalker, LogicalResult> {
   OperandBExprWalker() = delete;
-  OperandBExprWalker(ArrayRef<mlir::utils::IteratorType> iteratorTypes)
+  explicit OperandBExprWalker(ArrayRef<mlir::utils::IteratorType> iteratorTypes)
       : iteratorTypes(iteratorTypes) {}
   llvm::SmallDenseSet<unsigned> bDims;
 
