@@ -378,27 +378,32 @@ bool isBlockedMatmul(Operation *op) {
   if (!linalgOp)
     return false;
 
-  if (linalgOp.getNumDpsInputs() != 2 || linalgOp.getNumDpsInits() != 1)
+  using namespace mlir::tpp::structured_match;
+  AffineMap aMap, bMap, cMap;
+  // clang-format off
+  auto maybeBlockMatmul = 
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+    .operation(NumDpsInits(EqualsTo(1)))
+    .operation(NumDpsInputs(EqualsTo(2)))
+    .operation(NumAffineMaps(EqualsTo(3)))
+    .input(MatchOne(0), HasMap(ProjectedPermutation(), &aMap))
+    .input(MatchOne(1), HasMap(Any(), &bMap))
+    .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap))
+    .region(MatchOne(0), 
+            WithOpChain<arith::MulFOp, 
+                        arith::AddFOp>(/*captures=*/nullptr));
+  // clang-format on
+  if (!maybeBlockMatmul.match(linalgOp))
     return false;
+  assert(aMap && bMap && cMap);
 
-  if (!hasMulAddBody(linalgOp, /*captures=*/nullptr))
-    return false;
-
-  // Check the input indexing map has the right form.
-  auto indexingMaps = linalgOp.getIndexingMapsArray();
-  if (indexingMaps.size() != 3)
-    return false;
-  if ((!indexingMaps.back().isProjectedPermutation()) ||
-      (!indexingMaps.front().isProjectedPermutation()))
-    return false;
   // Walk the expressions for the B operand. The affine map may not be a
   // projected permutation if the blocked matmul is in VNNI format.
   auto iteratorTypes = linalgOp.getIteratorTypesArray();
   OperandBExprWalker operandBWalker(iteratorTypes);
-  if (llvm::any_of(indexingMaps[1].getResults(),
-                   [&operandBWalker](AffineExpr expr) {
-                     return failed(operandBWalker.visit(expr));
-                   })) {
+  if (llvm::any_of(bMap.getResults(), [&operandBWalker](AffineExpr expr) {
+        return failed(operandBWalker.visit(expr));
+      })) {
     return false;
   }
 
@@ -407,10 +412,10 @@ bool isBlockedMatmul(Operation *op) {
   // - J loop: present in C and B but not in A. J must be parallel.
   // - K loop: present in A and B but not in C. K must be reduction.
   // - B loop: present in A and B and C. B must be parallel.
-  llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(indexingMaps.back());
-  llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(indexingMaps.front());
+  llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(cMap);
+  llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(aMap);
   llvm::SmallDenseSet<unsigned> allLoopDims;
-  for (auto cExpr : indexingMaps.back().getResults()) {
+  for (auto cExpr : cMap.getResults()) {
     unsigned cDim = cExpr.cast<AffineDimExpr>().getPosition();
     // I loop
     if (aDims.count(cDim) && !operandBWalker.bDims.count(cDim)) {
@@ -436,7 +441,7 @@ bool isBlockedMatmul(Operation *op) {
     return false;
   }
 
-  for (auto aExpr : indexingMaps.front().getResults()) {
+  for (auto aExpr : aMap.getResults()) {
     unsigned aDim = aExpr.cast<AffineDimExpr>().getPosition();
     // I loop
     if (cDims.count(aDim) && !operandBWalker.bDims.count(aDim)) {
