@@ -165,7 +165,7 @@ echo_run cmake -Wno-dev -G Ninja \
     -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} \
     -DCMAKE_INSTALL_PREFIX=${INST_DIR} \
     -DMLIR_DIR=${MLIR_DIR} \
-    -DLLVM_EXTERNAL_LIT=\"python3 ${TPP_LIT}\" \
+    -DLLVM_EXTERNAL_LIT=${TPP_LIT} \
     ${BUILD_OPTIONS} \
     ${GCC_TOOLCHAIN_OPTIONS} \
     ${LINKER_OPTIONS} \
