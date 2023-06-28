@@ -1,6 +1,6 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,1 use-for-all=false" | FileCheck -check-prefix=CONF1 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=1,0 use-for-all=false" | FileCheck -check-prefix=CONF2 %s
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=0,1 use-for-all=false" | FileCheck -check-prefix=CONF3 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,2 use-for-all=false" | FileCheck -check-prefix=CONF1 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 use-for-all=false" | FileCheck -check-prefix=CONF2 %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=0,2 use-for-all=false" | FileCheck -check-prefix=CONF3 %s
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=0,0 use-for-all=false" | FileCheck -check-prefix=CONF4 %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -25,76 +25,70 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   return %3 : tensor<32x32xf32>
 }
 
-// CONF1: #[[MAP:.+]] = affine_map<() -> ()>
+// CONF1: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CONF1: func.func @matmul_sequence_fusion(
 // CONF1-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CONF1-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CONF1-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CONF1-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CONF1: %{{.+}} = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x64xf32>, tensor<64x32xf32>)
 // CONF1-SAME:  outs(%{{.+}} : tensor<32x32xf32>)
 // CONF1: %{{.+}} = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x32xf32>, tensor<32x64xf32>) 
 // CONF1-SAME:  outs({{.+}} : tensor<32x64xf32>)
-// CONF1: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
-// CONF1-NEXT: %{{.+}} = scf.for %[[ARG8:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
-// CONF1: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [1, 64] [1, 1] 
-// CONF1-SAME       : tensor<32x64xf32> to tensor<1x64xf32>
-// CONF1: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG8]]] [64, 1] [1, 1] 
-// CONF1-SAME:      : tensor<64x32xf32> to tensor<64x1xf32>
-// CONF1: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<1x64xf32>, tensor<64x1xf32>) 
-// CONF1-SAME:  outs(%{{.+}} : tensor<1x1xf32>)
-// CONF1: %[[MUL_EXT:.+]] = tensor.extract_slice %[[MUL]][0, 0] [1, 1] [1, 1] 
-// CONF1-SAME               : tensor<1x1xf32> to tensor<f32>
+// CONF1: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
+// CONF1-NEXT: %{{.+}} = scf.for %[[ARG8:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
+// CONF1: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [2, 64] [1, 1] 
+// CONF1-SAME       : tensor<32x64xf32> to tensor<2x64xf32>
+// CONF1: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG8]]] [64, 2] [1, 1] 
+// CONF1-SAME:      : tensor<64x32xf32> to tensor<64x2xf32>
+// CONF1: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<2x64xf32>, tensor<64x2xf32>) 
+// CONF1-SAME:  outs(%{{.+}} : tensor<2x2xf32>)
 // CONF1: %{{.+}} = linalg.generic 
 // CONF1-SAME:  indexing_maps = [#[[MAP]]]
-// CONF1-SAME:  outs(%[[MUL_EXT]]
+// CONF1-SAME:  outs(%[[MUL]]
 
-// CONF2: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CONF2: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CONF2: func.func @matmul_sequence_fusion(
 // CONF2-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CONF2-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CONF2-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CONF2: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
-// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [1, 64] [1, 1] 
-// CONF2-SAME       : tensor<32x64xf32> to tensor<1x64xf32>
-// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [1, 32] [1, 1] 
-// CONF2-SAME:      : tensor<32x32xf32> to tensor<1x32xf32>
-// CONF2: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<1x64xf32>, tensor<64x32xf32>) 
-// CONF2-SAME:          outs(%{{.+}} : tensor<1x32xf32>)
-// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [1, 64] [1, 1] 
-// CONF2-SAME       : tensor<32x64xf32> to tensor<1x64xf32>
-// CONF2: %[[MUL2:.+]] = linalg.matmul ins(%[[MUL]], %{{.+}} : tensor<1x32xf32>, tensor<32x64xf32>) 
-// CONF2-SAME:           outs(%{{.+}} : tensor<1x64xf32>)
-// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [1, 32] [1, 1] 
-// CONF2-SAME:      : tensor<32x32xf32> to tensor<1x32xf32>
-// CONF2: %[[MUL3:.+]] = linalg.matmul ins(%[[MUL2]], %{{.+}} : tensor<1x64xf32>, tensor<64x32xf32>) 
-// CONF2-SAME:           outs(%{{.+}} : tensor<1x32xf32>)
-// CONF2: %[[MUL_EXT:.+]] = tensor.extract_slice %[[MUL3]][0, 0] [1, 32] [1, 1] 
-// CONF2-SAME:      : tensor<1x32xf32> to tensor<32xf32>
+// CONF2-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CONF2: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
+// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [2, 64] [1, 1] 
+// CONF2-SAME       : tensor<32x64xf32> to tensor<2x64xf32>
+// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [2, 32] [1, 1] 
+// CONF2-SAME:      : tensor<32x32xf32> to tensor<2x32xf32>
+// CONF2: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<2x64xf32>, tensor<64x32xf32>) 
+// CONF2-SAME:          outs(%{{.+}} : tensor<2x32xf32>)
+// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [2, 64] [1, 1] 
+// CONF2-SAME       : tensor<32x64xf32> to tensor<2x64xf32>
+// CONF2: %[[MUL2:.+]] = linalg.matmul ins(%[[MUL]], %{{.+}} : tensor<2x32xf32>, tensor<32x64xf32>) 
+// CONF2-SAME:           outs(%{{.+}} : tensor<2x64xf32>)
+// CONF2: %{{.+}} = tensor.extract_slice %{{.+}}[%[[ARG7]], 0] [2, 32] [1, 1] 
+// CONF2-SAME:      : tensor<32x32xf32> to tensor<2x32xf32>
+// CONF2: %[[MUL3:.+]] = linalg.matmul ins(%[[MUL2]], %{{.+}} : tensor<2x64xf32>, tensor<64x32xf32>) 
+// CONF2-SAME:           outs(%{{.+}} : tensor<2x32xf32>)
 // CONF2: %{{.+}} = linalg.generic
 // CONF2-SAME:  indexing_maps = [#[[MAP]]]
-// CONF2-SAME:  outs(%[[MUL_EXT]]
+// CONF2-SAME:  outs(%[[MUL3]]
 
-// CONF3: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CONF3: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CONF3: func.func @matmul_sequence_fusion(
 // CONF3-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CONF3-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CONF3-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CONF3-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CONF3: %{{.+}} = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x64xf32>, tensor<64x32xf32>)
 // CONF3-SAME:  outs(%{{.+}} : tensor<32x32xf32>)
 // CONF3: %{{.+}} = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x32xf32>, tensor<32x64xf32>)
 // CONF3-SAME:  outs({{.+}} : tensor<32x64xf32>)
-// CONF3: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
-// CONF3: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG7]]] [64, 1] [1, 1] 
-// CONF3-SAME:      : tensor<64x32xf32> to tensor<64x1xf32>
-// CONF3: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG7]]] [32, 1] [1, 1] 
-// CONF3-SAME:      : tensor<32x32xf32> to tensor<32x1xf32>
-// CONF3: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x64xf32>, tensor<64x1xf32>) 
-// CONF3-SAME:          outs(%{{.+}} : tensor<32x1xf32>)
-// CONF3: %[[MUL_EXT:.+]] = tensor.extract_slice %[[MUL]][0, 0] [32, 1] [1, 1] 
-// CONF3-SAME:              : tensor<32x1xf32> to tensor<32xf32>
+// CONF3: %{{.+}} = scf.for %[[ARG7:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
+// CONF3: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG7]]] [64, 2] [1, 1] 
+// CONF3-SAME:      : tensor<64x32xf32> to tensor<64x2xf32>
+// CONF3: %{{.+}} = tensor.extract_slice %{{.+}}[0, %[[ARG7]]] [32, 2] [1, 1] 
+// CONF3-SAME:      : tensor<32x32xf32> to tensor<32x2xf32>
+// CONF3: %[[MUL:.+]] = linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<32x64xf32>, tensor<64x2xf32>) 
+// CONF3-SAME:          outs(%{{.+}} : tensor<32x2xf32>)
 // CONF3: %{{.+}} = linalg.generic
 // CONF3-SAME:  indexing_maps = [#[[MAP]]]
-// CONF3-SAME:  outs(%[[MUL_EXT]]
+// CONF3-SAME:  outs(%[[MUL]]
 
 // CONF4: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CONF4: func.func @matmul_sequence_fusion(

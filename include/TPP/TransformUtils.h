@@ -70,14 +70,6 @@ bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
                              ArrayRef<size_t> dims = {});
 
-// Return true if `op` is a linalg.matmul
-bool isMatmulOp(Operation *op,
-                SmallVectorImpl<Value> *capturedOperands = nullptr);
-
-// Return true if the `op` is a linalg.batch_reduce_matmul.
-bool isBrgemmOp(Operation *op,
-                SmallVectorImpl<Value> *capturedOperands = nullptr);
-
 // Returns true if the linalg operation has a MulAdd region.
 bool hasMulAddBody(linalg::LinalgOp linalgOp,
                    SmallVectorImpl<Value> *capturedOperands = nullptr);

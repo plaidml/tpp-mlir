@@ -147,6 +147,9 @@ void registerTestStructuralMatchers();
 void registerTestForToForAllRewrite();
 
 } // namespace tpp
+namespace linalg {
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgDeGeneralizationPass();
+} // namespace linalg
 } // namespace mlir
 
 #define GEN_PASS_REGISTRATION

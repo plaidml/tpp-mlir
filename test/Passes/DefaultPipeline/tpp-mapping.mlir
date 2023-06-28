@@ -309,9 +309,7 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<2x2x32x32xf32>
 // Fused matmul and relu
 // CHECK: scf.forall
-// CHECK: linalg.generic{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
+// CHECK: linalg.batch_reduce_matmul{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.maxf

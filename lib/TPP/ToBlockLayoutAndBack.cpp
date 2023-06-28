@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Traits.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -654,42 +655,6 @@ private:
   ArrayRef<int64_t> blockingFactors;
 };
 
-// From linalg.generic to linalg.matmul.
-struct DeGeneralizeMatmul : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasTensorSemantics())
-      return failure();
-    if (!linalgx::utils::isMatmulOp(linalgOp))
-      return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
-        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
-    return success();
-  }
-};
-
-// From linalg.generic to linalg.batch_reduce_matmul.
-struct DeGeneralizeBatchReduce : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasTensorSemantics())
-      return failure();
-    if (!linalgx::utils::isBrgemmOp(linalgOp))
-      return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
-    rewriter.replaceOpWithNewOp<linalg::BatchReduceMatmulOp>(
-        linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
-    return success();
-  }
-};
-
 // Entry point for packing a matmul operation.
 // Pack MatmulOp as following:
 // [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
@@ -710,7 +675,7 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
     RewritePatternSet patterns(ctx);
     patterns.add<PackMatmulImpl<linalg::MatmulOp>,
                  PackMatmulImpl<linalg::BatchMatmulOp>>(ctx, blockingFactors);
-    patterns.add<DeGeneralizeMatmul>(ctx);
+    linalg::populateLinalgDeGeneralizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -826,7 +791,8 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<VNNIOnMatmul, DeGeneralizeBatchReduce, VNNIOnBRGemm>(ctx);
+    linalg::populateLinalgDeGeneralizationPatterns(patterns);
+    patterns.add<VNNIOnMatmul, VNNIOnBRGemm>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

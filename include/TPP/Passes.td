@@ -412,4 +412,10 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
   ];
 }
 
+def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
+  let summary = "Convert generic ops into named ops";
+  let constructor = "mlir::linalg::createLinalgDeGeneralizationPass()";
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

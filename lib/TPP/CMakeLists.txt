@@ -20,6 +20,7 @@ add_mlir_library(MLIRTPP
     ConvertForAllToParallelOp.cpp
     CombineTpp.cpp
     RewriteBatchMatmulToMatmul.cpp
+    LinalgDeGeneralize.cpp
 
   # Utils
     TensorInit.cpp
