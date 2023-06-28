@@ -89,7 +89,7 @@ public:
   /// Get RO data
   const T *getData() {
     // unique_ptr -> vector.data
-    return data->data;
+    return data;
   }
 
   /// RW access to a single element
