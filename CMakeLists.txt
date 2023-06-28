@@ -155,7 +155,7 @@ if (NOT TPP_INSIDE_IREE)
 
   # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
   add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-  -c ${CONFIG_DIR}/GPU/gpu.json
+  -c ${CONFIG_DIR}/GPU/cuda.json
   DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
   WORKING_DIRECTORY ${BENCHMARK_DIR}
   COMMENT Run Quick GPU Benchmarks)
