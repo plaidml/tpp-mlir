@@ -1,6 +1,13 @@
 [
   {
   "gpu_gemm": {
+    "fp32_1024_ref_cuda": {
+      "type": "GENERIC",
+      "benchmark": [ "bench_cuda_matmul", "--input=256x1024x1024 --iter=100" ],
+      "environment": {},
+      "flags": {},
+      "extensions": [ "(avx2|asimd)" ]
+    },
     "fp32_1024_base_mlir": {
       "type": "MLIR",
       "benchmark": "GPU/gemm-fp32-1024-base.mlir",
