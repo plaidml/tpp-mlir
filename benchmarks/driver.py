@@ -305,6 +305,30 @@ class IrGeneratorRun(BaseRun):
         self.teardown()
         return True
 
+class GenericRun(BaseRun):
+    """ Generic cli runs """
+
+    def __init__(self, name, args, env, json, loglevel):
+        self.logger = Logger("driver.generic", loglevel)
+        BaseRun.__init__(self, name, args, env, json, loglevel)
+        cmd = list()
+        cmd.append(os.path.join(env.bin_dir, self.benchmark[0]))
+        # Split all extra arguments into separate items
+        for val in self.benchmark[1:]:
+            cmd.extend(val.split(" "))
+        self.benchmark = cmd
+
+    def run(self):
+        self.setup()
+        gen_cmd = list()
+        # Generate benchmarking code
+        gen_cmd.extend(self.benchmark)
+        res = self.runner.run(gen_cmd)
+        self.stdout = res.stdout
+        self.stderr = res.stderr
+        self.teardown()
+        return True
+
 class Benchmark(object):
     """ A collection of runs """
 
@@ -324,6 +348,8 @@ class Benchmark(object):
             self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
         elif runType == "IR-GEN":
             self.runs.append(IrGeneratorRun(name, self.args, self.env, json, loglevel))
+        elif runType == "GENERIC":
+            self.runs.append(GenericRun(name, self.args, self.env, json, loglevel))
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False
