@@ -81,6 +81,7 @@ add_subdirectory(runtime)
 if (NOT TPP_INSIDE_IREE)
   add_subdirectory(tools)
   add_subdirectory(test)
+  add_subdirectory(benchmarks)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
   set(CONFIG_DIR "${BENCHMARK_DIR}/config")
