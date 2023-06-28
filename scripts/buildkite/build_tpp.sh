@@ -69,7 +69,7 @@ then
 fi
 
 echo "Configuring CUDA"
-CUDA_DRIVER=/usr/lib64/libcuda.so.1
+CUDA_DRIVER=/usr/lib64/libcuda.so
 if [ ! -f "${CUDA_DRIVER}" ]; then
   if [ "${GPU}" ]; then
     echo "GPU support requires full CUDA driver to be present"
