@@ -256,6 +256,9 @@ private:
     pm.addPass(createConstantFoldPackPass());
     pm.addPass(createSimplifyAndCanonicalizePackPass());
 
+    // Looks like we want to agressively remove tensor.empty before fusion.
+    // See: `test/Passes/tile-and-fuse-with-cse.mlir`.
+    pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
 
