@@ -39,21 +39,24 @@ func.func @conv(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<8xf32>, %conv_out: ten
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
-    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] 
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
+    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op 
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
     // Propagate all the packs
-    transform.structured.packing_propagation %2
+    transform.structured.packing_propagation %2 : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Here we match the generic ops in the entire module. The conv is the last one.
-    %generic:3 = split_handles %3 in [3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
+    %generic:3 = split_handle %3 : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     %4 = transform.structured.collapse %generic#2 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
+      : !transform.any_op -> !transform.any_op
     %5 = transform.structured.collapse %4 [[0], [1], [2, 3], [4], [5], [6]]
+      : !transform.any_op -> !transform.any_op
     %6 = transform.structured.interchange %5 iterator_interchange = [0, 1, 4, 2, 3, 5] 
-    transform.structured.rewrite_to_brgemm %6
+      : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %6 : !transform.any_op
 }
 
 func.func @entry() {

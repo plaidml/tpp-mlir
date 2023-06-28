@@ -8,7 +8,7 @@ add_mlir_library(TPPGPU
     ${PROJECT_SOURCE_DIR}/include/TPP
 
   LINK_LIBS PUBLIC
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUTransforms
     MLIRSCFToGPU
     MLIRGPUToNVVMTransforms

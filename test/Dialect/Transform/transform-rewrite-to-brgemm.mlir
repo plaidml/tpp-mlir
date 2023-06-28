@@ -5,9 +5,9 @@
 #map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
@@ -47,9 +47,9 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 #map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
@@ -84,9 +84,9 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
 #map7 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
@@ -110,9 +110,9 @@ func.func @blocked_matmul(%arg0: tensor<8x32x32xf32>, %arg1: tensor<8x32x32xf32>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
@@ -149,9 +149,9 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d4)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 // CHECK-LABEL: func.func @blocked_matmul(
@@ -191,9 +191,9 @@ func.func @blocked_matmul(%arg0: tensor<4x8x32x32xf32>, %arg1: tensor<16x8x32x32
 #map7 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %0
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %0 : !transform.any_op
 }
 
 func.func @blocked_matmul(%arg0: tensor<?x32x32xf32>, %arg1: tensor<?x32x32xf32>, %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {

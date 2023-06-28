@@ -52,58 +52,61 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: te
 }
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  ^bb0(%arg1: !transform.any_op):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Block matmul i, j and k
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32]
+      : !transform.any_op -> !transform.any_op 
     // Get the parent op (func.func)
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
     // Propagate packing
-    transform.structured.packing_propagation %2
+    transform.structured.packing_propagation %2 : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
-      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+      : (!transform.any_op) -> (!transform.op<"linalg.generic">)
 
     // Get the last one, and fuse the outermost dimensions with all the producers
-    %blocked_matmuls:4 = split_handles %4 in [4] 
-      : (!transform.op<"linalg.generic">) 
-      -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+    %blocked_matmuls:4 = split_handle %4 : (!transform.op<"linalg.generic">) 
+      -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     %relu = transform.get_consumers_of_result %blocked_matmuls#3[0]
-      : (!pdl.operation) -> (!pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op)
     %5, %loop = transform.structured.fuse %relu { tile_sizes = [1, 0, 0, 0] }
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
     %6 = transform.structured.match ops{["func.func"]} in %arg1 
-      : (!pdl.operation) -> !pdl.operation
-    transform.structured.fold_unit_extent_dims %6
+      : (!transform.any_op) -> !transform.any_op
+    transform.structured.fold_unit_extent_dims %6 : !transform.any_op
     %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
-      : (!pdl.operation) -> !pdl.operation
+      : (!transform.any_op) -> !transform.any_op
     %8 = transform.structured.get_blocked_matmuls %7
-      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
-    %rematch_blocked_matmuls:4 = split_handles %8 in [4]
+      : (!transform.any_op) -> (!transform.op<"linalg.generic">)
+    %rematch_blocked_matmuls:4 = split_handle %8
       : (!transform.op<"linalg.generic">)
-      -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+      -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     
     %first_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#0[0]
-      : (!pdl.operation) -> (!pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op)
     %second_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#1[0]
-      : (!pdl.operation) -> (!pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op)
     %third_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#2[0]
-      : (!pdl.operation) -> (!pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op)
     %fourth_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#3[0]
-      : (!pdl.operation) -> (!pdl.operation)
-    %first_second = transform.merge_handles %first_relu, %second_relu : !pdl.operation
-    %third_fourth = transform.merge_handles %third_relu, %fourth_relu : !pdl.operation
+      : (!transform.any_op) -> (!transform.any_op)
+    %first_second = transform.merge_handles %first_relu, %second_relu : !transform.any_op
+    %third_fourth = transform.merge_handles %third_relu, %fourth_relu : !transform.any_op
 
     // Fuse matmul + relu and map the matmul to BRGEMM
     %9, %loop1 = transform.structured.fuse %first_second { tile_sizes = [1, 0, 0] }
-    %10 = get_producer_of_operand %9[0] : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %10
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %10 = get_producer_of_operand %9[0] : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %10 : !transform.any_op
 
     %11, %loop2 = transform.structured.fuse %third_fourth { tile_sizes = [1, 0, 0] }
-    %12 = get_producer_of_operand %11[0] : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %12
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %12 = get_producer_of_operand %11[0] : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %12 : !transform.any_op
 }
 
 // We have 4 layers. 1 loop for each layer and 1 outermost loop for all the layers
@@ -120,30 +123,32 @@ transform.sequence failures(propagate) {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 transform.sequence failures(propagate) {
-  ^bb0(%arg1: !pdl.operation):
+  ^bb0(%arg1: !transform.any_op):
     // Pack matmul
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0  blocking_factors = [32, 32, 32]
-    %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.packing_propagation %2
+      : !transform.any_op -> !transform.any_op
+    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %2 : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
-      : (!pdl.operation) -> (!transform.op<"linalg.generic">)
+      : (!transform.any_op) -> (!transform.op<"linalg.generic">)
     %relu = transform.get_consumers_of_result %4[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
-    %casted_relu = transform.cast %relu : !transform.op<"linalg.generic"> to !pdl.operation
+    %casted_relu = transform.cast %relu : !transform.op<"linalg.generic"> to !transform.any_op
 
     // Fuse relu with matmul
     %5, %loop:2 = transform.structured.fuse %casted_relu { tile_sizes = [1, 1, 0, 0] }
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // clean-up IR after fusion
-    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !pdl.operation
     transform.structured.canonicalize %6
 
     // map a packed matmul to a brgemm
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.rewrite_to_brgemm %7
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    transform.structured.rewrite_to_brgemm %7 : !transform.any_op
 }
 
 func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %Bias: !Bias_tensor_t) -> !C_tensor_t {

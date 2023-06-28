@@ -10,6 +10,7 @@
 #define TPP_DIALECT_PERF_PERFOPS_H
 
 #include "TPP/Dialect/Perf/PerfTypes.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

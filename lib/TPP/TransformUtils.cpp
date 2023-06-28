@@ -144,7 +144,8 @@ getInvolvedLocalDimsForOperand(OpBuilder &builder, Location loc,
         return failure();
       }
       ivsResult.push_back(
-          affine::makeComposedAffineApply(builder, loc, resMap, touchedIvs)
+          affine::makeComposedAffineApply(builder, loc, resMap,
+                                          getAsOpFoldResult(touchedIvs))
               .getResult());
     } else
       // single dimension touched just return it.

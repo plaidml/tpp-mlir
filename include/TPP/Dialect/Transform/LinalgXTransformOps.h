@@ -9,6 +9,7 @@
 #ifndef MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H
 #define MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
