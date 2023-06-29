@@ -72,7 +72,7 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     cudaError_t syncStatus = cudaDeviceSynchronize();
     if (syncStatus != cudaSuccess) {
       std::cerr << "cudaDeviceSynchronize error : cuda code=" << syncStatus
-                << " - " << cudaGetErrorString(syncStatus);
+                << " - " << cudaGetErrorString(syncStatus) << "\n";
     }
   }
 
