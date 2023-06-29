@@ -14,7 +14,7 @@
 #include <iostream>
 
 template <class T> struct MatmulKernelCUBLAS : public KernelInterface<T> {
-  void runRef(std::vector<Tensor<T>> &args) override {
+  void runRef(std::vector<T> &args) override {
     assert(args.size() == 3 && "wrong rank for MLP");
     auto &a = args[0];
     auto &b = args[1];
@@ -32,10 +32,6 @@ template <class T> struct MatmulKernelCUBLAS : public KernelInterface<T> {
         }
       }
     }
-  }
-
-  void runXSMM(std::vector<Tensor<T>> &args) override {
-    assert(0 && "XSMM GPU kernel not supported");
   }
 };
 
@@ -60,8 +56,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (config.verbose) {
-    std::cerr << "Kernel version: " << ((config.xsmm) ? "xsmm" : "ref")
-              << std::endl;
+    std::cerr << "Kernel version: "
+              << "ref" << std::endl;
     std::cerr << "[ " << m << ", " << n << " ] = "
               << "[ " << m << ", " << k << " ] * "
               << "[ " << k << ", " << n << " ] X " << config.iter << std::endl;
@@ -69,8 +65,8 @@ int main(int argc, char *argv[]) {
 
   // Init benchmark (TODO: support BF16)
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
-  auto bench = Benchmark<MatmulKernelCUBLAS<float>, float>(config.iter, gflops,
-                                                           config.xsmm);
+  auto bench = Benchmark<MatmulKernelCUBLAS<Tensor<float>>, Tensor<float>>(
+      config.iter, gflops);
   bench.setArg({ConstantTensor<float>({m, k}), ConstantTensor<float>({k, n}),
                 EmptyTensor<float>({m, n})});
 

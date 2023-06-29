@@ -22,12 +22,7 @@ template <typename T> struct KernelInterface {
   /// Runs the reference kernel with the list of arguments.
   /// Output needs to be passed in the args list and is up to the user to
   /// implement the correct logic.
-  virtual void runRef(std::vector<Tensor<T>> &args) = 0;
-
-  /// Runs the XSMM kernel with the list of arguments.
-  /// Output needs to be passed in the args list and is up to the user to
-  /// implement the correct logic.
-  virtual void runXSMM(std::vector<Tensor<T>> &args) = 0;
+  virtual void runRef(std::vector<T> &args) = 0;
 };
 
 /// Benchmark: runs a kernel multiple times, takes timings, return avg.
@@ -44,32 +39,26 @@ template <class Kernel, class T> class Benchmark {
   /// The kernel to execute, must implement KernelInterface
   Kernel kernel;
   /// Cached arguments (and output) for the kernel call
-  std::vector<Tensor<T>> args;
+  std::vector<T> args;
   /// Number of times to run
   size_t iter;
   /// Expected number of Giga FP ops in the kernel (for flops reporting)
   double gflops;
-  /// Runs XSMM kernel or not.
-  bool xsmm;
 
 public:
-  Benchmark(size_t iter, double gflops = 0.0, bool xsmm = false)
-      : iter(iter), gflops(gflops), xsmm(xsmm) {}
+  Benchmark(size_t iter, double gflops = 0.0) : iter(iter), gflops(gflops) {}
 
   /// Sets argument (input/output) list.
-  void setArg(std::vector<Tensor<T>> &&arg) { args = std::move(arg); }
+  void setArg(std::vector<T> &&arg) { args = std::move(arg); }
 
   /// Inspects the tensors
-  const Tensor<T> &getArg(size_t index) {
+  const T &getArg(size_t index) {
     assert(index < args.size() && "Invalid index for arguments");
     return args[index];
   }
 
   /// Warms up the kernel and populates the output (inside the args vector).
   void warmup() {
-    if (xsmm)
-      kernel.runXSMM(args);
-    else
       kernel.runRef(args);
   }
 
@@ -78,10 +67,7 @@ public:
     // Easier to optimize / inline a branchless loop
     for (size_t i = 0; i < iter; i++) {
       perf.startTimer();
-      if (xsmm)
-        kernel.runXSMM(args);
-      else
-        kernel.runRef(args);
+      kernel.runRef(args);
       perf.stopTimer();
     }
   }

@@ -25,7 +25,7 @@ using InitArg = std::initializer_list<unsigned>;
 
 /// Tensor: represents a tensor in memory, basically a pointer to data plus
 /// rank and dimension.
-template <class T> class Tensor {
+template <typename T> class Tensor {
 protected:
   /// Dimensions
   ListArg dims;
@@ -86,17 +86,20 @@ public:
       free(data);
   }
 
+  /// Get number of elements
+  size_t getSize() const { return size; }
+
   /// Get RO data
-  const T *getData() {
-    // unique_ptr -> vector.data
-    return data;
-  }
+  const T *getData() const { return data; }
+
+  /// Get data size in bytes
+  size_t getDataSize() const { return dataSize; }
 
   /// RW access to a single element
   T &operator[](size_t index) { return data[index]; }
 
   /// Get dimensions
-  const ListArg &getDims() { return dims; }
+  const ListArg &getDims() const { return dims; }
 
   /// Get specific dimension
   unsigned getDim(unsigned i) const { return dims[i]; }
@@ -150,7 +153,7 @@ public:
 };
 
 /// Empty tensor of type T, initialized with zeroes.
-template <class T> struct EmptyTensor : public Tensor<T> {
+template <typename T> struct EmptyTensor : public Tensor<T> {
   EmptyTensor(InitArg dims) : Tensor<T>(dims) { this->clear(); }
   std::ostream &operator<<(std::ostream &out) {
     return out << static_cast<Tensor<T>>(this);
@@ -158,7 +161,7 @@ template <class T> struct EmptyTensor : public Tensor<T> {
 };
 
 /// Constant tensor of type T, initialized with incremental values.
-template <class T> struct ConstantTensor : public Tensor<T> {
+template <typename T> struct ConstantTensor : public Tensor<T> {
   ConstantTensor(InitArg dims) : Tensor<T>(dims) {
     T datum = 1; // Cast to right numeric type on assignment
     for (size_t i = 0; i < this->size; i++)
@@ -170,7 +173,7 @@ template <class T> struct ConstantTensor : public Tensor<T> {
 };
 
 /// Splat tensor of type T, initialized with the same fixed values.
-template <class T> struct SplatTensor : public Tensor<T> {
+template <typename T> struct SplatTensor : public Tensor<T> {
   SplatTensor(InitArg dims, T value) : Tensor<T>(dims) {
     memset(this->data, value, this->dataSize);
   }

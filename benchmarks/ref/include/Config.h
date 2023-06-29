@@ -21,8 +21,6 @@ struct BenchOptions {
   llvm::cl::opt<std::string> inputDims{
       "input", llvm::cl::desc("Input dimensions, 1/2/3/4D"),
       llvm::cl::value_desc("MxNxKxB"), llvm::cl::init("")};
-  llvm::cl::opt<bool> xsmm{"xsmm", llvm::cl::desc("Run XSMM optimized version"),
-                           llvm::cl::init(false)};
   llvm::cl::opt<int> iter{
       "iter",
       llvm::cl::desc("Number of iterations (default based on input size)"),
@@ -62,8 +60,6 @@ struct BenchConfig {
 
   /// Input dimensions
   std::vector<size_t> dims;
-  /// True if run is XSMM
-  bool xsmm;
   /// Number of iterations
   int iter;
   /// True if input is random
@@ -80,7 +76,6 @@ struct BenchConfig {
     llvm::cl::ParseCommandLineOptions(argc, argv, "TPP-MLIR C++ Benchmark\n");
 
     // Simple settings
-    xsmm = options.xsmm;
     random = options.random;
     verbose = options.verbose;
     gflops = options.gflops;
