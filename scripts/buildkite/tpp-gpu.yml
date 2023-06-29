@@ -28,7 +28,7 @@ steps:
 
   - label: "TPP-MLIR-intel"
     command: "${SRUN} -- \
-              'KIND=Debug COMPILER=clang LINKER=lld CHECK=1 \
+              'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 \
               $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
     env:
       TPP_LAUNCH_NODE: "pcl-adl01"
