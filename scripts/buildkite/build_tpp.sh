@@ -47,20 +47,25 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
+
 if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) ]]; then
   if [ "0" != "${GPU}" ]; then GPU_OPTION="-G"; fi
 elif [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
 fi
 
-# Defaults for lacking CI environment
+if [ "${CLEAN}" ] && [ "0" != "${CLEAN}" ]; then
+  BLD_DIR_RM=-R
+fi
+
+# Defaults when lacking CI environment
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
 BUILD_DIR=${BUILD_DIR:-build}
 
 BLD_DIR=${BUILD_DIR}-${COMPILER}
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
-  -b ${BLD_DIR} \
+  -b ${BLD_DIR} ${BLD_DIR_RM} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
