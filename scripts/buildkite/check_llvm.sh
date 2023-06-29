@@ -14,6 +14,7 @@ if [ ! -f ${TPPROOT}/enable ]; then
   echo "'${OPTARG}' not a TPPROOT directory"
   exit 1
 fi
+
 LLVMROOT=$(realpath ${LLVMROOT})
 if [ ! -d ${LLVMROOT} ]; then
   echo "'${OPTARG}' not a LLVMROOT directory"

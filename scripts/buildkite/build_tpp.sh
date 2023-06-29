@@ -9,7 +9,7 @@
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
-LLVMROOT=$(realpath ${LLVMROOT})
+LLVMROOT=$(realpath ${LLVMROOT:-${TPP_LLVM}})
 if [ ! -d ${LLVMROOT} ]; then
   echo "'${OPTARG}' not a LLVMROOT directory"
   exit 1
