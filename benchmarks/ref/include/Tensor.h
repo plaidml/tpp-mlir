@@ -181,5 +181,3 @@ template <typename T> struct SplatTensor : public Tensor<T> {
     return out << static_cast<Tensor<T>>(this);
   }
 };
-
-// TODO: Create random init
