@@ -109,8 +109,8 @@ int main(int argc, char *argv[]) {
               << "[ " << k << ", " << n << " ] X " << config.iter << std::endl;
   }
 
-  CudaTensor<float> gpuA(std::move(ConstantTensor<float>{m, k}));
-  CudaTensor<float> gpuB(std::move(ConstantTensor<float>{k, n}));
+  CudaTensor<float> gpuA(std::move(SplatTensor<float>{{m, k}, 1}));
+  CudaTensor<float> gpuB(std::move(SplatTensor<float>{{k, n}, 1}));
   CudaTensor<float> gpuC(std::move(EmptyTensor<float>{m, n}));
 
   if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu())
