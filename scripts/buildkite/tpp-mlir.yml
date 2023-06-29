@@ -13,7 +13,7 @@ env:
 
 steps:
   - label: "LLVM"
-    command: "${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/check_llvm.sh"
+    command: "scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-gcc"
