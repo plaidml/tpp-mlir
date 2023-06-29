@@ -8,6 +8,7 @@
 
 #include "Bench.h"
 #include "Config.h"
+#include "CudaTensor.h"
 #include "Tensor.h"
 
 #include <iomanip>
@@ -20,15 +21,16 @@ template <class T> struct MatmulKernelCUBLAS : public KernelInterface<T> {
     auto &b = args[1];
     auto &o = args[2];
 
-    int m = o.getDim(0);
-    int n = o.getDim(1);
-    int k = a.getDim(1);
+    int m = o.tensor.getDim(0);
+    int n = o.tensor.getDim(1);
+    int k = a.tensor.getDim(1);
 
     // MATMUL O += A x B
     for (int mi = 0; mi < m; ++mi) {
       for (int ni = 0; ni < n; ++ni) {
         for (int ki = 0; ki < k; ++ki) {
-          o[mi * n + ni] += a[mi * k + ki] * b[ki * n + ni];
+          o.tensor[mi * n + ni] +=
+              a.tensor[mi * k + ki] * b.tensor[ki * n + ni];
         }
       }
     }
@@ -63,12 +65,22 @@ int main(int argc, char *argv[]) {
               << "[ " << k << ", " << n << " ] X " << config.iter << std::endl;
   }
 
-  // Init benchmark (TODO: support BF16)
+  ConstantTensor<float> matA({m, k});
+  ConstantTensor<float> matB({k, n});
+  EmptyTensor<float> matC({m, n});
+
+  CudaTensor<float> gpuA(std::move(matA));
+  CudaTensor<float> gpuB(std::move(matB));
+  CudaTensor<float> gpuC(std::move(matC));
+
+  if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu())
+    return 1;
+
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
-  auto bench = Benchmark<MatmulKernelCUBLAS<Tensor<float>>, Tensor<float>>(
-      config.iter, gflops);
-  bench.setArg({ConstantTensor<float>({m, k}), ConstantTensor<float>({k, n}),
-                EmptyTensor<float>({m, n})});
+  auto bench =
+      Benchmark<MatmulKernelCUBLAS<CudaTensor<float>>, CudaTensor<float>>(
+          config.iter, gflops);
+  bench.setArg({gpuA, gpuB, gpuC});
 
   // Warmup (TODO: Check output)
   bench.warmup();

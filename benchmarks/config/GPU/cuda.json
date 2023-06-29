@@ -4,7 +4,7 @@
     "fp32_1024_ref_cuda": {
       "type": "GENERIC",
       "benchmark": [ "bench_cuda_matmul", "--input=256x1024x1024 --iter=100" ],
-      "environment": {},
+      "environment": { "ASAN_OPTIONS" : "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0" },
       "flags": {},
       "extensions": [ "(avx2|asimd)" ]
     },
