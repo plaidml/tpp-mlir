@@ -65,13 +65,9 @@ int main(int argc, char *argv[]) {
               << "[ " << k << ", " << n << " ] X " << config.iter << std::endl;
   }
 
-  ConstantTensor<float> matA({m, k});
-  ConstantTensor<float> matB({k, n});
-  EmptyTensor<float> matC({m, n});
-
-  CudaTensor<float> gpuA(std::move(matA));
-  CudaTensor<float> gpuB(std::move(matB));
-  CudaTensor<float> gpuC(std::move(matC));
+  CudaTensor<float> gpuA(std::move(ConstantTensor<float>{m, k}));
+  CudaTensor<float> gpuB(std::move(ConstantTensor<float>{k, n}));
+  CudaTensor<float> gpuC(std::move(EmptyTensor<float>{m, n}));
 
   if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu())
     return 1;
