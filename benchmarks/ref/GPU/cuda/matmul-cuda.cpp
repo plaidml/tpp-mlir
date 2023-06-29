@@ -14,8 +14,8 @@
 #include <iomanip>
 #include <iostream>
 
-template <class T> struct MatmulKernelCUBLAS : public KernelInterface<T> {
-  void runRef(std::vector<T> &args) override {
+struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
+  void runRef(std::vector<CudaTensor<float>> &args) override {
     assert(args.size() == 3 && "wrong rank for MLP");
     auto &a = args[0];
     auto &b = args[1];
@@ -74,8 +74,7 @@ int main(int argc, char *argv[]) {
 
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
   auto bench =
-      Benchmark<MatmulKernelCUBLAS<CudaTensor<float>>, CudaTensor<float>>(
-          config.iter, gflops);
+      Benchmark<MatmulKernelCUBLAS, CudaTensor<float>>(config.iter, gflops);
   bench.setArg({gpuA, gpuB, gpuC});
 
   // Warmup (TODO: Check output)
