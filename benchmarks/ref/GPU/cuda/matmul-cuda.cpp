@@ -14,27 +14,71 @@
 #include <iomanip>
 #include <iostream>
 
+#include <cublas_v2.h>
+
 struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
+  MatmulKernelCUBLAS() {
+    isInit = cublasCreate(&handle) == CUBLAS_STATUS_SUCCESS;
+    if (!isInit)
+      std::cerr << "CUBLAS initialization failed!\n";
+
+    cublasSetStream(handle, stream);
+  }
+
+  ~MatmulKernelCUBLAS() { cublasDestroy(handle); }
+
   void runRef(std::vector<CudaTensor<float>> &args) override {
     assert(args.size() == 3 && "wrong rank for MLP");
+
+    if (!isInit)
+      return;
+
     auto &a = args[0];
     auto &b = args[1];
     auto &o = args[2];
 
+    // MATMUL O += A x B
     int m = o.tensor.getDim(0);
     int n = o.tensor.getDim(1);
     int k = a.tensor.getDim(1);
 
-    // MATMUL O += A x B
-    for (int mi = 0; mi < m; ++mi) {
-      for (int ni = 0; ni < n; ++ni) {
-        for (int ki = 0; ki < k; ++ki) {
-          o.tensor[mi * n + ni] +=
-              a.tensor[mi * k + ki] * b.tensor[ki * n + ni];
-        }
-      }
+    auto transa = CUBLAS_OP_N;
+    auto transb = CUBLAS_OP_N;
+    float alpha = 1.0f;
+    float beta = 1.0f;
+
+    // See:
+    // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
+    // Swap A and B, and col-major change m with n.
+    float *A = b.gpuData;
+    float *B = a.gpuData;
+    float *C = o.gpuData;
+    int lda = n;
+    int ldb = k;
+    int ldc = n;
+
+    // printf("m=%d, n=%d, k=%d\n", n, m, k);
+    // printf("lda=%d, ldb=%d, ldc=%d\n", lda, ldb, ldc);
+
+    cublasStatus_t gemmStatus = cublasSgemm(
+        handle, transa, transb, n, m, k, &alpha, A, lda, B, ldb, &beta, C, ldc);
+    if (gemmStatus != CUBLAS_STATUS_SUCCESS) {
+      cudaError_t cudaStatus = cudaGetLastError();
+      std::cerr << "cublasSgemm error : cublas code=" << gemmStatus
+                << " cuda code=" << cudaStatus << " - "
+                << cudaGetErrorString(cudaStatus) << "\n";
+    }
+
+    cudaError_t syncStatus = cudaDeviceSynchronize();
+    if (syncStatus != cudaSuccess) {
+      std::cerr << "cudaDeviceSynchronize error : cuda code=" << syncStatus
+                << " - " << cudaGetErrorString(syncStatus);
     }
   }
+
+  cublasHandle_t handle;
+  cudaStream_t stream = 0;
+  bool isInit = false;
 };
 
 int main(int argc, char *argv[]) {
