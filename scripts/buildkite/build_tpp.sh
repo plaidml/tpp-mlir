@@ -53,7 +53,8 @@ elif [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
 fi
 
-BLD_DIR="${BUILD_DIR}-${COMPILER}"
+BUILD_DIR=${BUILD_DIR:-build}
+BLD_DIR=${BUILD_DIR}-${COMPILER}
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
   -b ${BLD_DIR} -R \
