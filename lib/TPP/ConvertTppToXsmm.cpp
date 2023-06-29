@@ -35,7 +35,11 @@ namespace {
 // Utils
 //===----------------------------------------------------------------------===//
 
-static FailureOr<int64_t> getLeadingDim(MemRefType memref, size_t pos = 0) {
+static FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0) {
+  // Not shaped type, the leading dimension is the single scalar.
+  if (!isa<ShapedType>(type))
+    return 1;
+  MemRefType memref = type.cast<MemRefType>();
   // For 1d memref we cannot use the stride as leading dimension, but the
   // leading dimension is the dimension itself.
   if (memref.getRank() == 1)
@@ -343,11 +347,11 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
 
 template <class OpKind, class OpFlags, class KindAttr, class FlagsAttr,
           class DispatchOp, class Op>
-static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
+static LogicalResult lowerTPPtoXSMM(tpp::TppOp op, PatternRewriter &rewriter,
                                     Type elmTy, OpKind kind, OpFlags flags,
                                     ArrayRef<int64_t> dims) {
-  auto *ctx = op->getContext();
-  auto loc = op->getLoc();
+  auto *ctx = op.getContext();
+  auto loc = op.getLoc();
 
   KindAttr kindAttr = KindAttr::get(ctx, kind);
   DenseI64ArrayAttr dimsAttr =
@@ -366,22 +370,70 @@ static LogicalResult lowerTPPtoXSMM(Operation *op, PatternRewriter &rewriter,
       rewriter.create<DispatchOp>(loc, integer64, kindAttr, dimsAttr,
                                   rewriter.getArrayAttr(flagsAttr), dtype);
 
-  SmallVector<Value, 6> invokeOperands;
+  SmallVector<Value> invokeOperands;
   invokeOperands.push_back(dispatched);
-  invokeOperands.append(op->getOperands().begin(), op->getOperands().end());
+  invokeOperands.append(op.getInputs().begin(), op.getInputs().end());
+  invokeOperands.push_back(op.getOutput());
 
   rewriter.replaceOpWithNewOp<Op>(op, dtype, kindAttr, invokeOperands);
   return success();
 }
 
-static LogicalResult lowerUnaryTPPtoXSMM(Operation *op,
-                                         PatternRewriter &rewriter, Type elmTy,
-                                         xsmm::UnaryKind kind,
-                                         xsmm::UnaryFlags flags,
-                                         ArrayRef<int64_t> dims) {
+static xsmm::UnaryFlags getUnaryFlags(tpp::TppOp tppOp) {
+  Type inputType = tppOp.getInputs()[0].getType();
+
+  // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
+  // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
+  // in tpp at the moment.
+  if (!inputType.isa<ShapedType>())
+    return xsmm::UnaryFlags::BCAST_SCALAR;
+  ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
+  auto isOne = [](int64_t val) { return val == 1; };
+  if (llvm::all_of(shapeInput, isOne))
+    return xsmm::UnaryFlags::BCAST_SCALAR;
+
+  Type outputType = tppOp.getOutputType();
+  ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
+  assert(shapeOutput.size() >= shapeInput.size() &&
+         "output rank must be >= input rank");
+  SmallVector<int64_t> bShapeInput;
+  computeBcastShapeInput(shapeOutput, shapeInput, bShapeInput);
+  assert(shapeOutput.size() == bShapeInput.size());
+  shapeInput = bShapeInput;
+
+  if (shapeInput[1] == 1 && shapeOutput[1] > 1)
+    return xsmm::UnaryFlags::BCAST_ROW;
+
+  if (shapeInput[0] == 1 && shapeOutput[0] > 1)
+    return xsmm::UnaryFlags::BCAST_COL;
+
+  if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1])
+    return xsmm::UnaryFlags::NONE;
+
+  assert(false && "failed to get bCast for tpp op");
+}
+
+static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
+                                         Operation *op, xsmm::UnaryKind kind) {
+  auto tppOp = cast<tpp::TppOp>(op);
+  if (!tppOp.hasBufferSemantics())
+    return rewriter.notifyMatchFailure(tppOp, "xsmm expects a memref type");
+
+  MemRefType outputMemRef = tppOp.getOutputType();
+  int64_t m = outputMemRef.getShape()[0];
+  int64_t n = outputMemRef.getShape()[1];
+  auto ldo = getLeadingDim(outputMemRef);
+  if (failed(ldo))
+    return rewriter.notifyMatchFailure(tppOp, "cannot compute ldo");
+  auto ldi = getLeadingDim(tppOp.getInputs()[0].getType());
+  if (failed(ldi))
+    return failure();
+  xsmm::UnaryFlags flags = getUnaryFlags(tppOp);
   return lowerTPPtoXSMM<xsmm::UnaryKind, xsmm::UnaryFlags, xsmm::UnaryKindAttr,
                         xsmm::UnaryFlagsAttr, xsmm::UnaryDispatchOp,
-                        xsmm::UnaryOp>(op, rewriter, elmTy, kind, flags, dims);
+                        xsmm::UnaryOp>(tppOp, rewriter,
+                                       outputMemRef.getElementType(), kind,
+                                       flags, {m, n, *ldi, *ldo});
 }
 
 static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
@@ -389,94 +441,19 @@ static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
                                           xsmm::BinaryKind kind,
                                           xsmm::BinaryFlags flags,
                                           ArrayRef<int64_t> dims) {
+  assert(isa<tpp::TppOp>(op));
   return lowerTPPtoXSMM<xsmm::BinaryKind, xsmm::BinaryFlags,
                         xsmm::BinaryKindAttr, xsmm::BinaryFlagsAttr,
                         xsmm::BinaryDispatchOp, xsmm::BinaryOp>(
-      op, rewriter, elmTy, kind, flags, dims);
+      cast<tpp::TppOp>(op), rewriter, elmTy, kind, flags, dims);
 }
 
 struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   using OpRewritePattern<tpp::IdentityOp>::OpRewritePattern;
 
-  // Return ldi and bCast.
-  std::pair<int64_t, xsmm::UnaryFlags>
-  getLdiAndBCast(tpp::IdentityOp identityOp, int64_t ldo) const {
-    Type inputType = identityOp.getInputs()[0].getType();
-
-    // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
-    // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
-    // in tpp at the moment.
-    if (!inputType.isa<ShapedType>()) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
-      int64_t ldi = 1;
-      return {ldi, bCast};
-    }
-    ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
-    auto isOne = [](int64_t val) { return val == 1; };
-    if (llvm::all_of(shapeInput, isOne)) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_SCALAR;
-      int64_t ldi = 1;
-      return {ldi, bCast};
-    }
-
-    Type outputType = identityOp.getOutput().getType();
-
-    ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
-    assert(shapeOutput.size() >= shapeInput.size() &&
-           "output rank must be >= input rank");
-    SmallVector<int64_t, 4> bShapeInput;
-    computeBcastShapeInput(shapeOutput, shapeInput, bShapeInput);
-    assert(shapeOutput.size() == bShapeInput.size());
-    shapeInput = bShapeInput;
-
-    if (shapeInput[1] == 1 && shapeOutput[1] > 1) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_ROW;
-      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>(), 1);
-      return {ldi, bCast};
-    }
-
-    if (shapeInput[0] == 1 && shapeOutput[0] > 1) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::BCAST_COL;
-      int64_t ldi = *getLeadingDim(outputType.cast<MemRefType>());
-      return {ldi, bCast};
-    }
-
-    if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1]) {
-      xsmm::UnaryFlags bCast = xsmm::UnaryFlags::NONE;
-      int64_t ldi = *getLeadingDim(inputType.cast<MemRefType>());
-      return {ldi, bCast};
-    }
-    assert(false && "failed to get ldi and bCast for identity");
-  }
-
   LogicalResult matchAndRewrite(tpp::IdentityOp identityOp,
                                 PatternRewriter &rewriter) const override {
-    if (!identityOp.hasBufferSemantics()) {
-      return rewriter.notifyMatchFailure(identityOp,
-                                         "xsmm expects a memref type");
-    }
-
-    MemRefType outputMemRef = identityOp.getOutputType();
-    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
-
-    int64_t outputOffset;
-    SmallVector<int64_t> outputStrides;
-    if (failed(getStridesAndOffset(outputMemRef, outputStrides, outputOffset)))
-      return rewriter.notifyMatchFailure(identityOp, "not a strided memref");
-    if (outputStrides.back() != 1)
-      return rewriter.notifyMatchFailure(identityOp,
-                                         "most minor stride is != 1");
-
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-    int64_t ldo = outputStrides.front();
-    std::pair<int64_t, xsmm::UnaryFlags> ldiAndBCast =
-        getLdiAndBCast(identityOp, ldo);
-    int64_t ldi = ldiAndBCast.first;
-
-    return lowerUnaryTPPtoXSMM(
-        identityOp, rewriter, outputMemRef.getElementType(),
-        xsmm::UnaryKind::IDENTITY, ldiAndBCast.second, {m, n, ldi, ldo});
+    return lowerUnaryTPPtoXSMM(rewriter, identityOp, xsmm::UnaryKind::IDENTITY);
   }
 };
 
@@ -485,24 +462,7 @@ struct ConvertTppReluOp : public OpRewritePattern<tpp::ReluOp> {
 
   LogicalResult matchAndRewrite(tpp::ReluOp reluOp,
                                 PatternRewriter &rewriter) const override {
-    if (!reluOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(reluOp, "xsmm expects a memref type");
-
-    MemRefType outputMemRef = reluOp.getOutputType();
-    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
-
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-
-    auto leadDim = getLeadingDim(outputMemRef);
-    if (failed(leadDim))
-      return rewriter.notifyMatchFailure(reluOp, "Cannot compute ldo/ldi");
-    int64_t ldo = *leadDim;
-    int64_t ldi = *leadDim;
-
-    return lowerUnaryTPPtoXSMM(reluOp, rewriter, outputMemRef.getElementType(),
-                               xsmm::UnaryKind::RELU, xsmm::UnaryFlags::NONE,
-                               {m, n, ldi, ldo});
+    return lowerUnaryTPPtoXSMM(rewriter, reluOp, xsmm::UnaryKind::RELU);
   }
 };
 
@@ -511,24 +471,7 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
 
   LogicalResult matchAndRewrite(tpp::ZeroOp zeroOp,
                                 PatternRewriter &rewriter) const override {
-    if (!zeroOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(zeroOp, "xsmm expects a memref type");
-
-    MemRefType outputMemRef = zeroOp.getOutputType();
-    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
-
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-
-    auto leadDim = getLeadingDim(outputMemRef);
-    if (failed(leadDim))
-      return rewriter.notifyMatchFailure(zeroOp, "Cannot compute ldo/ldi");
-    int64_t ldo = *leadDim;
-    int64_t ldi = *leadDim;
-
-    return lowerUnaryTPPtoXSMM(zeroOp, rewriter, outputMemRef.getElementType(),
-                               xsmm::UnaryKind::ZERO, xsmm::UnaryFlags::NONE,
-                               {m, n, ldi, ldo});
+    return lowerUnaryTPPtoXSMM(rewriter, zeroOp, xsmm::UnaryKind::ZERO);
   }
 };
 
