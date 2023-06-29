@@ -15,6 +15,7 @@ llvm_update_compile_flags(bench_cuda_matmul)
 
 find_package(CUDA)
 
+target_link_directories(bench_cuda_matmul PRIVATE /usr/local/cuda/lib64)
 set(CUDA_LIBS
   ${CUDA_LIBRARIES}
   cublas
