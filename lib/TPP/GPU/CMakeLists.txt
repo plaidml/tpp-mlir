@@ -14,7 +14,7 @@ add_mlir_library(TPPGPU
     MLIRGPUToNVVMTransforms
 )
 
-if (TPP_GPU)
+if (NOT TPP_GPU STREQUAL "")
   target_compile_definitions(obj.TPPGPU
     PRIVATE
     TPP_GPU_ENABLE=1

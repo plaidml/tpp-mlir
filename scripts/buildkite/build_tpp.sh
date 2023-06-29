@@ -68,18 +68,21 @@ then
   exit 1
 fi
 
-echo "Configuring CUDA"
+echo "Configuring support for GPUs"
 CUDA_DRIVER=/usr/lib64/libcuda.so
 if [ ! -f "${CUDA_DRIVER}" ]; then
-  if [ "${GPU}" ]; then
+  # GPU originally had boolean semantic, i.e, "cuda"
+  if [ "0" != "${GPU}" ] && [[ ${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$ ]]; then
     echo "GPU support requires full CUDA driver to be present"
     exit 1
-  else
+  elif [ "cuda" != "${GPU}" ]; then
     # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
     echo "Creating links to CUDA stubs"
     ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
     ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
     export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+  else  # more detailed support for different runtimes
+    echo "Enable general support for GPUs"
   fi
 fi
 
