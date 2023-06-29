@@ -110,7 +110,11 @@ while getopts "s:b:i:m:t:c:g:l:n:RSG" arg; do
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
     G)
-      ENABLE_GPU="-DTPP_GPU=ON"
+      if [[ "${OPTARG}" != "-"* ]]; then
+        ENABLE_GPU="-DTPP_GPU=${OPTARG}"
+      else  # legacy
+        ENABLE_GPU="-DTPP_GPU=cuda"
+      fi
       ;;
     n)
       PROCS=$(nproc)
