@@ -110,7 +110,7 @@ while getopts "s:b:i:m:t:c:g:l:n:RSG" arg; do
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
     G)
-      if [[ "${OPTARG}" != "-"* ]]; then
+      if [ "${OPTARG}" ] && [[ "${OPTARG}" != "-"* ]]; then
         ENABLE_GPU="-DTPP_GPU=${OPTARG}"
       else  # legacy
         ENABLE_GPU="-DTPP_GPU=cuda"
@@ -165,6 +165,19 @@ fi
 # Consider to remove BLD_DIR shortly before running CMake
 if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
   echo_run rm -rf ${BLD_DIR}
+fi
+
+# CXX: simple check for external toolchain argument
+read -ra CMAKE_CXX <<<"${CXX}"
+if [[ "${CMAKE_CXX[@]:1}" == "--gcc-toolchain="* ]]; then
+  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CXX[@]:1}")"
+  CXX=${CMAKE_CXX[0]}
+fi
+# CC: simple check for external toolchain argument
+read -ra CMAKE_CC <<<"${CC}"
+if [[ "${CMAKE_CC[@]:1}" == "--gcc-toolchain="* ]]; then
+  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CC_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CC[@]:1}")"
+  CC=${CMAKE_CC[0]}
 fi
 
 # CMake
