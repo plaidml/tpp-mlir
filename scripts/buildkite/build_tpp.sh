@@ -9,7 +9,7 @@
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
-LLVMROOT=$(realpath ${LLVMROOT})
+LLVMROOT=$(realpath ${LLVMROOT:-${TPP_LLVM}})
 if [ ! -d ${LLVMROOT} ]; then
   echo "'${OPTARG}' not a LLVMROOT directory"
   exit 1
@@ -47,14 +47,25 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
-if [ "${GPU}" ]; then
-  GPU_OPTION="-G"
+
+if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) ]]; then
+  if [ "0" != "${GPU}" ]; then GPU_OPTION="-G"; fi
+elif [ "${GPU}" ]; then
+  GPU_OPTION="-G ${GPU}"
 fi
 
-BLD_DIR="${BUILD_DIR}-${COMPILER}"
+if [ "${CLEAN}" ] && [ "0" != "${CLEAN}" ]; then
+  BLD_DIR_RM=-R
+fi
+
+# Defaults when lacking CI environment
+PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
+BUILD_DIR=${BUILD_DIR:-build}
+
+BLD_DIR=${BUILD_DIR}-${COMPILER}
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
-  -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
-  -b ${BLD_DIR} \
+  -s ${PROJECT_DIR} \
+  -b ${BLD_DIR} ${BLD_DIR_RM} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
@@ -63,22 +74,30 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -c ${COMPILER} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
-  -n ${NPROCS_LIMIT_LINK}
+  -n ${NPROCS_LIMIT_LINK:-1}
 then
   exit 1
 fi
 
-echo "Configuring CUDA"
-CUDA_DRIVER=/usr/lib64/libcuda.so.1
-if [ ! -f "${CUDA_DRIVER}" ]; then
-  if [ "${GPU}" ]; then
-    echo "GPU support requires full CUDA driver to be present"
+echo "Configuring runtime for GPUs"
+CUDA_DRIVER=/usr/lib64/libcuda.so
+# CUDA: original GPU setting had boolean semantic (true implies "cuda")
+if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" = "${GPU}" ]; then
+  if [ ! -f "${CUDA_DRIVER}" ]; then
+    echo "CUDA support requires GPU driver to be present"
     exit 1
-  else
-    # When GPU is not used, create link to CUDA stubs to satify dynamic linker.
+  fi
+else
+  # create link to CUDA stubs (CUDA incorporated by default)
+  if [ ! -f "${CUDA_DRIVER}" ]; then
     echo "Creating links to CUDA stubs"
     ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
     ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
+    export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+  fi
+  # more detailed support for GPU runtime, e.g., "vulkan"
+  if [ "${GPU}" ]; then
+    echo "Enable general support for GPUs"
   fi
 fi
 

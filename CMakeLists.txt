@@ -14,7 +14,8 @@ set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 option(TPP_INSIDE_IREE "Enables being built inside IREE" OFF)
 
-option(TPP_GPU "Enables GPU support" OFF)
+set(TPP_GPU "" CACHE STRING "Enables GPU runtime (default: '')")
+set_property(CACHE TPP_GPU PROPERTY STRINGS "" "cuda" "vulkan")
 
 if (NOT TPP_INSIDE_IREE)
   find_package(MLIR REQUIRED CONFIG)

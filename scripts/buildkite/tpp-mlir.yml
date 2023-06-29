@@ -13,15 +13,15 @@ env:
 
 steps:
   - label: "LLVM"
-    command: "${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/check_llvm.sh"
+    command: "scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-gcc"
     command: "${SRUN} --partition=clxtrb,clxaptrb --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=gcc CHECK=1 \
-              $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
+              scripts/buildkite/build_tpp.sh'"
 
   - label: "TPP-MLIR-clang"
     command: "${SRUN} --partition=clxtrb,clxaptrb --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 \
-              $${BUILDKITE_BUILD_CHECKOUT_PATH}/scripts/buildkite/build_tpp.sh'"
+              scripts/buildkite/build_tpp.sh'"

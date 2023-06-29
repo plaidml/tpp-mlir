@@ -6,21 +6,24 @@
 source $(realpath $(dirname $0))/common.sh
 
 die_syntax() {
-  echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR] [-t (Release|Debug|RelWithDebInfo)] [-c (clang|gcc)] [-g (gcc toolchain)] [-l (ld|lld|gold|mold)] [-S] [-n N]"
+  echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR]"
+  echo "          [-t (Release|Debug|RelWithDebInfo)] [-c (clang|gcc)] [-g (gcc toolchain)]"
+  echo "          [-l (ld|lld|gold|mold)] [-R] [-S] [-n N]"
   echo ""
-  echo "  -i: Optional install dir, default to system"
-  echo "  -t: Optional build type flag, default to Release"
-  echo "  -c: Optional compiler flag, default to clang"
+  echo "  -i: Optional install dir, defaults to system"
+  echo "  -t: Optional build type flag, defaults to Release"
+  echo "  -c: Optional compiler flag, defaults to clang"
   echo "  -g: Optional gcc toolchain flag, may be needed by clang"
-  echo "  -l: Optional linker flag, default to system linker"
-  echo "  -S: Optional sanitizer flag, default to none"
-  echo "  -G: Optional GPU support flag, default to none"
-  echo "  -n: Optional link jobs flag, default same as CPUs"
+  echo "  -l: Optional linker flag, defaults to system linker"
+  echo "  -R: Optional request to remove BLD_DIR before CMake"
+  echo "  -S: Optional sanitizer flag, defaults to none"
+  echo "  -G: Optional GPU support flag, defaults to none"
+  echo "  -n: Optional link job flag, defaults to nproc"
   exit 1
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
+while getopts "s:b:i:m:t:c:g:l:n:G:RS" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -85,26 +88,26 @@ while getopts "s:b:i:m:t:c:g:l:n:SG" arg; do
     l)
       if [ "${OPTARG}" == "ld" ]; then
         check_program ld
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "lld" ]; then
         check_program lld
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "gold" ]; then
         check_program gold
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       elif [ "${OPTARG}" == "mold" ]; then
         check_program mold
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       else
         echo "Linker "${OPTARG}" not recognized"
         die_syntax
       fi
+      LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
+      ;;
+    R)
+      REMOVE_BLD_DIR=1
       ;;
     S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
       ;;
     G)
-      ENABLE_GPU="-DTPP_GPU=ON"
+      ENABLE_GPU="-DTPP_GPU=${OPTARG}"
       ;;
     n)
       PROCS=$(nproc)
@@ -147,6 +150,28 @@ check_program lit
 pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
 
 TPP_LIT=$(which lit)
+# patch incorrect interpreter
+if [ "${TPP_LIT}" ] && [ "$(command -v sed)" ]; then
+  sed -i 's/#!\/usr\/bin\/python3/#!\/usr\/bin\/env python3/' ${TPP_LIT}
+fi
+
+# Consider to remove BLD_DIR shortly before running CMake
+if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
+  echo_run rm -rf ${BLD_DIR}
+fi
+
+# CXX: simple check for external toolchain argument
+read -ra CMAKE_CXX <<<"${CXX}"
+if [[ "${CMAKE_CXX[@]:1}" == "--gcc-toolchain="* ]]; then
+  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CXX[@]:1}")"
+  CXX=${CMAKE_CXX[0]}
+fi
+# CC: simple check for external toolchain argument
+read -ra CMAKE_CC <<<"${CC}"
+if [[ "${CMAKE_CC[@]:1}" == "--gcc-toolchain="* ]]; then
+  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CC_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CC[@]:1}")"
+  CC=${CMAKE_CC[0]}
+fi
 
 # CMake
 echo_run cmake -Wno-dev -G Ninja \

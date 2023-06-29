@@ -2,7 +2,7 @@
 
 Experimental support for GPU code generation within TPP-MLIR.
 
-_Note: the GPU support is disabled by default. It is an opt-in feature which can be enabled with CMake flag `-DTPP_GPU=ON`._
+_Note: the GPU support is disabled by default. It is an opt-in feature which can be enabled with CMake flag `-DTPP_GPU=cuda|vulkan`._
 
 ## LLVM with GPU support
 Build LLVM with GPU support:
@@ -27,7 +27,7 @@ cmake -G Ninja ../llvm \
 ## TPP MLIR with GPU support
 This setup assumes that the LLVM with GPU support is set as `$CUSTOM_LLVM_ROOT`.
 
-The GPU support is disabled by default and can be enabled with the CMake flag `-DTPP_GPU=ON`.
+The GPU support is disabled by default and can be enabled with the CMake flag `-DTPP_GPU=cuda|vulkan`.
 
 ```sh
 cd tpp-mlir/build
@@ -38,7 +38,7 @@ cmake -G Ninja .. \
    -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit \
    -DCMAKE_C_COMPILER=clang \
    -DCMAKE_CXX_COMPILER=clang++ \
-   -DTPP_GPU=ON
+   -DTPP_GPU=cuda
 ```
 
 ## CUDA setup
