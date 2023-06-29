@@ -60,7 +60,7 @@ BUILD_DIR=${BUILD_DIR:-build}
 BLD_DIR=${BUILD_DIR}-${COMPILER}
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
-  -b ${BLD_DIR} -R \
+  -b ${BLD_DIR} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
