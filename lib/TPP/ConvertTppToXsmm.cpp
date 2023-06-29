@@ -427,7 +427,7 @@ static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(tppOp, "cannot compute ldo");
   auto ldi = getLeadingDim(tppOp.getInputs()[0].getType());
   if (failed(ldi))
-    return failure();
+    return rewriter.notifyMatchFailure(tppOp, "cannot compute ldi");
   xsmm::UnaryFlags flags = getUnaryFlags(tppOp);
   return lowerTPPtoXSMM<xsmm::UnaryKind, xsmm::UnaryFlags, xsmm::UnaryKindAttr,
                         xsmm::UnaryFlagsAttr, xsmm::UnaryDispatchOp,
@@ -442,10 +442,13 @@ static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
                                           xsmm::BinaryFlags flags,
                                           ArrayRef<int64_t> dims) {
   assert(isa<tpp::TppOp>(op));
+  auto tppOp = cast<tpp::TppOp>(op);
+  if (!tppOp.hasBufferSemantics())
+    return rewriter.notifyMatchFailure(tppOp, "xsmm expects a memref type");
   return lowerTPPtoXSMM<xsmm::BinaryKind, xsmm::BinaryFlags,
                         xsmm::BinaryKindAttr, xsmm::BinaryFlagsAttr,
                         xsmm::BinaryDispatchOp, xsmm::BinaryOp>(
-      cast<tpp::TppOp>(op), rewriter, elmTy, kind, flags, dims);
+      tppOp, rewriter, elmTy, kind, flags, dims);
 }
 
 struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
