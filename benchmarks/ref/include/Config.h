@@ -15,8 +15,8 @@
 #include <vector>
 
 namespace {
-/// Command line options in a struct, to prevent the need for global static
-/// initializer, used by the ArgParser, when invoked.
+// Command line options in a struct, to prevent the need for global static
+// initializer, used by the ArgParser, when invoked.
 struct BenchOptions {
   llvm::cl::opt<std::string> inputDims{
       "input", llvm::cl::desc("Input dimensions, 1/2/3/4D"),
@@ -39,36 +39,36 @@ struct BenchOptions {
 };
 } // namespace
 
-/// Argument parser and configuration for benchmarks. Sets the variables to the
-/// defaults, overridden from the command line and potential internal logic
-/// later on.
-///
-/// Defaults overriden:
-///  * input: convert string format to array of integers.
-///  * iter: if 0, calculate in terms of MxNxKxB.
-///  * seed: if 0, take localtime as integer.
-///
-/// Number of iterations will be calculated per matmul, so if a kernel has
-/// many matmuls (multiple layers), then it should divide that number by the
-/// number of layers.
+// Argument parser and configuration for benchmarks. Sets the variables to the
+// defaults, overridden from the command line and potential internal logic
+// later on.
+//
+// Defaults overriden:
+//  * input: convert string format to array of integers.
+//  * iter: if 0, calculate in terms of MxNxKxB.
+//  * seed: if 0, take localtime as integer.
+//
+// Number of iterations will be calculated per matmul, so if a kernel has
+// many matmuls (multiple layers), then it should divide that number by the
+// number of layers.
 struct BenchConfig {
-  /// Define what an "average" matrix size is (fiddle for best default iter)
+  // Define what an "average" matrix size is (fiddle for best default iter)
   const size_t averageMatrixSize = 128 * 256 * 512;
-  /// Default number of iterations if nothing else is available
-  /// This is for a single layer, larger kernels need to divide this
+  // Default number of iterations if nothing else is available
+  // This is for a single layer, larger kernels need to divide this
   const size_t defaultIter = 100;
 
-  /// Input dimensions
+  // Input dimensions
   std::vector<size_t> dims;
-  /// Number of iterations
+  // Number of iterations
   int iter;
-  /// True if input is random
+  // True if input is random
   bool random;
-  /// Random seed
+  // Random seed
   size_t seed;
-  /// Verbose run info
+  // Verbose run info
   bool verbose;
-  /// GFLOPs results
+  // GFLOPs results
   bool gflops;
 
   BenchConfig(int argc, char **argv) {

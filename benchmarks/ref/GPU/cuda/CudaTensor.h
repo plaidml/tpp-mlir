@@ -26,8 +26,8 @@ using ListArg = std::vector<unsigned>;
 using InitArg = std::initializer_list<unsigned>;
 } // namespace
 
-/// Tensor: represents a tensor in memory, basically a pointer to data plus
-/// rank and dimension.
+// CudaTensor: represents a tensor in GPU memory using CUDA.
+// A wrapper around existing tensor on host.
 template <typename T> struct CudaTensor {
   CudaTensor() = delete;
   CudaTensor(Tensor<T> &&tensor) : tensor(std::move(tensor)) {}

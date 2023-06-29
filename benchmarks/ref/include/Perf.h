@@ -12,22 +12,22 @@
 #include <ctime>
 #include <vector>
 
-/// Class to keep the results and stats of each measurement
+// Class to keep the results and stats of each measurement
 class PerfResults {
-  /// Mean
+  // Mean
   double mean = 0.0;
-  /// Standard deviation
+  // Standard deviation
   double stdev = 0.0;
-  /// Start (reset by accumulate)
+  // Start (reset by accumulate)
   std::chrono::high_resolution_clock::time_point start;
-  /// Stop (reset by accumulate)
+  // Stop (reset by accumulate)
   std::chrono::high_resolution_clock::time_point stop;
-  /// Vector with the timings
+  // Vector with the timings
   std::vector<double> timings;
-  /// Locked timings
+  // Locked timings
   bool locked = false;
 
-  /// Generate stats, locks the struct, can't collect stats any more
+  // Generate stats, locks the struct, can't collect stats any more
   void stats() {
     auto size = timings.size();
     // Mean
@@ -45,25 +45,25 @@ class PerfResults {
     locked = true;
   }
 
-  /// Return true if time_point hasn't been used yet
+  // Return true if time_point hasn't been used yet
   bool isZero(std::chrono::high_resolution_clock::time_point point) {
     return point.time_since_epoch().count() == 0;
   }
 
-  /// Zero a time_point
+  // Zero a time_point
   void zero(std::chrono::high_resolution_clock::time_point &point) {
     point = std::chrono::high_resolution_clock::time_point();
   }
 
 public:
-  /// Starts the timer
+  // Starts the timer
   void startTimer() {
     assert(!locked && "Start called after stats produced");
     assert(isZero(start) && "Start called twice");
     start = std::chrono::high_resolution_clock::now();
   }
 
-  /// Stops the timer, accumulates, clears state
+  // Stops the timer, accumulates, clears state
   void stopTimer() {
     assert(!locked && "Stop called after stats produced");
     assert(!isZero(start) && "Stop called before start");
@@ -77,7 +77,7 @@ public:
     zero(stop);
   }
 
-  /// Get mean of timings. Locks the timer, only calculate stats once.
+  // Get mean of timings. Locks the timer, only calculate stats once.
   double getMean() {
     if (!locked) {
       assert(isZero(start) && isZero(stop) && "Mismatch call to start/stop");
@@ -86,7 +86,7 @@ public:
     return mean;
   }
 
-  /// Get stdev of timings. Locks the timer, only calculate stats once.
+  // Get stdev of timings. Locks the timer, only calculate stats once.
   double getStdev() {
     if (!locked) {
       assert(isZero(start) && isZero(stop) && "Mismatch call to start/stop");

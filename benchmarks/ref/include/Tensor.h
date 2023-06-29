@@ -23,17 +23,17 @@ using ListArg = std::vector<unsigned>;
 using InitArg = std::initializer_list<unsigned>;
 } // namespace
 
-/// Tensor: represents a tensor in memory, basically a pointer to data plus
-/// rank and dimension.
+// Tensor: represents a tensor in memory, basically a pointer to data plus
+// rank and dimension.
 template <typename T> class Tensor {
 protected:
-  /// Dimensions
+  // Dimensions
   ListArg dims;
-  /// Size (dim0 x dim1 x ...)
+  // Size (dim0 x dim1 x ...)
   size_t size;
-  /// Pointer to data
+  // Pointer to data
   T *data;
-  /// Data size in bytes
+  // Data size in bytes
   size_t dataSize;
 
   void alloc() {
@@ -42,36 +42,36 @@ protected:
   }
 
 public:
-  /// Empty constructor, from dims vector
+  // Empty constructor, from dims vector
   Tensor(ListArg &dims) : dims(dims) {
     size = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
     alloc();
   }
 
-  /// Empty constructor, from dims list
+  // Empty constructor, from dims list
   Tensor(InitArg dims) : dims(dims) {
     size = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
     alloc();
   }
 
-  /// Move constructor
+  // Move constructor
   Tensor(Tensor<T> &&other)
       : dims(std::move(other.dims)), size(std::exchange(other.size, 0)),
         data(std::exchange(other.data, nullptr)),
         dataSize(std::exchange(other.dataSize, 0)) {}
 
-  /// Copy constructor
+  // Copy constructor
   Tensor(const Tensor<T> &other) : dims(other.dims), size(other.size) {
 
     alloc();
     std::memcpy(data, other.data, dataSize);
   }
 
-  /// Assignment operator
+  // Assignment operator
   Tensor<T> &operator=(const Tensor<T> &other) {
     dims = other.dims;
     size = other.size;
-    /// Release current data before copying a new buffer
+    // Release current data before copying a new buffer
     if (data)
       free(data);
     alloc();
@@ -79,38 +79,38 @@ public:
     return *this;
   }
 
-  /// Destructor
+  // Destructor
   ~Tensor<T>() {
     // Data may have been moved elsewhere
     if (data)
       free(data);
   }
 
-  /// Get number of elements
+  // Get number of elements
   size_t getSize() const { return size; }
 
-  /// Get RO data
+  // Get RO data
   const T *getData() const { return data; }
 
-  /// Get data size in bytes
+  // Get data size in bytes
   size_t getDataSize() const { return dataSize; }
 
-  /// RW access to a single element
+  // RW access to a single element
   T &operator[](size_t index) { return data[index]; }
 
-  /// Get dimensions
+  // Get dimensions
   const ListArg &getDims() const { return dims; }
 
-  /// Get specific dimension
+  // Get specific dimension
   unsigned getDim(unsigned i) const { return dims[i]; }
 
-  /// Get rank
+  // Get rank
   unsigned getRank() const { return dims.size(); }
 
-  /// Zeroes the tensor
+  // Zeroes the tensor
   void clear() { memset(&data[0], 0, size * sizeof(T)); }
 
-  /// Compares two tensors with an epsilon
+  // Compares two tensors with an epsilon
   bool compareAlmostEq(Tensor &other, T epsilon) const {
     if (size != other.size || dims == other.dims)
       return false;
@@ -122,16 +122,16 @@ public:
     return true;
   }
 
-  /// Compares two tensors
+  // Compares two tensors
   bool operator==(const Tensor &other) const {
     return size == other.size && dims == other.dims &&
            memcmp(data, other.data, dataSize) == 0;
   }
 
-  /// Compares two tensors
+  // Compares two tensors
   bool operator!=(const Tensor &other) const { return !(*this == other); }
 
-  /// Output the tensor
+  // Output the tensor
   friend std::ostream &operator<<(std::ostream &out, const Tensor<T> &t) {
     out << "tensor<";
     bool first = true;
@@ -152,7 +152,7 @@ public:
   }
 };
 
-/// Empty tensor of type T, initialized with zeroes.
+// Empty tensor of type T, initialized with zeroes.
 template <typename T> struct EmptyTensor : public Tensor<T> {
   EmptyTensor(InitArg dims) : Tensor<T>(dims) { this->clear(); }
   std::ostream &operator<<(std::ostream &out) {
@@ -160,7 +160,7 @@ template <typename T> struct EmptyTensor : public Tensor<T> {
   }
 };
 
-/// Constant tensor of type T, initialized with incremental values.
+// Constant tensor of type T, initialized with incremental values.
 template <typename T> struct ConstantTensor : public Tensor<T> {
   ConstantTensor(InitArg dims) : Tensor<T>(dims) {
     T datum = 1; // Cast to right numeric type on assignment
@@ -172,7 +172,7 @@ template <typename T> struct ConstantTensor : public Tensor<T> {
   }
 };
 
-/// Splat tensor of type T, initialized with the same fixed values.
+// Splat tensor of type T, initialized with the same fixed values.
 template <typename T> struct SplatTensor : public Tensor<T> {
   SplatTensor(InitArg dims, T value) : Tensor<T>(dims) {
     memset(this->data, value, this->dataSize);
