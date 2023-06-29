@@ -1,0 +1,12 @@
+[
+  {
+  "mha": {
+    "self_attention_full_mlir": {
+      "type": "MLIR",
+      "benchmark": "Models/self-attention-full.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    }
+  }}
+]

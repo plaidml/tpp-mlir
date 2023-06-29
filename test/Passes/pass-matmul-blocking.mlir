@@ -166,3 +166,59 @@ func.func @batch_matmul_invalid_tiles(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x
                            outs(%0 : tensor<5x5x5xf32>) -> tensor<5x5x5xf32>
   return %1 : tensor<5x5x5xf32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: move_expand_shape
+func.func @move_expand_shape(%arg0: tensor<2048x512xf32>) -> tensor<64x32x8x64xf32> {
+  %cst = arith.constant dense<1.250000e-01> : tensor<64x32x8x64xf32>
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3]] : tensor<2048x512xf32> into tensor<64x32x8x64xf32>
+  %empty = tensor.empty() : tensor<64x32x8x64xf32>
+  %add = linalg.generic {
+    indexing_maps = [#map, #map, #map],   
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+    ins(%expanded, %cst : tensor<64x32x8x64xf32>, tensor<64x32x8x64xf32>) 
+  outs(%empty : tensor<64x32x8x64xf32>) {
+    ^bb0(%in: f32, %in_21: f32, %out: f32):
+      %46 = arith.addf %in, %in_21 : f32
+      linalg.yield %46 : f32
+  } -> tensor<64x32x8x64xf32>
+  // CHECK: %[[GEN:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
+  // CHECK-SAME: iterator_types = ["parallel", "parallel"]
+  // CHECK: %{{.+}} = tensor.expand_shape %[[GEN]] {{\[}}[0, 1], [2, 3]]
+  // CHECK-SAME: : tensor<2048x512xf32> into tensor<64x32x8x64xf32>
+  return %add : tensor<64x32x8x64xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+
+// CHECK-LABEL: do_not_move_expand_shape
+func.func @do_not_move_expand_shape(%arg0: tensor<2048x512xf32>) -> tensor<32x8x64xf32> {
+  %cst = arith.constant dense<1.250000e-01> : tensor<64x32x8x64xf32>
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3]] : tensor<2048x512xf32> into tensor<64x32x8x64xf32>
+  %empty = tensor.empty() : tensor<32x8x64xf32>
+  %add = linalg.generic {
+    indexing_maps = [#map, #map, #map1],   
+    iterator_types = ["reduction", "parallel", "parallel", "parallel"]} 
+    ins(%expanded, %cst : tensor<64x32x8x64xf32>, tensor<64x32x8x64xf32>) 
+  outs(%empty : tensor<32x8x64xf32>) {
+    ^bb0(%in: f32, %in_21: f32, %out: f32):
+      %46 = arith.addf %in, %in_21 : f32
+      linalg.yield %46 : f32
+  } -> tensor<32x8x64xf32>
+  // CHECK: linalg.generic
+  // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP1]]] 
+  // CHECK-SAME: iterator_types = ["reduction", "parallel", "parallel", "parallel"]
+  // CHECK-NOT: tensor.expand_shape
+  return %add : tensor<32x8x64xf32>
+}

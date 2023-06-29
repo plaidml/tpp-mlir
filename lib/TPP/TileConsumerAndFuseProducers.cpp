@@ -535,6 +535,11 @@ getLastFusableConsumer(linalg::LinalgOp linalgOp,
     Value resNextConsumer = nextConsumer->getResult(0);
     currentConsumer = nextConsumer;
     visitedConsumers.insert(currentConsumer);
+    // Require each eltwise to have a single user.
+    if (std::distance(resNextConsumer.getUsers().begin(),
+                      resNextConsumer.getUsers().end()) != 1) {
+      break;
+    }
     nextConsumer = *(resNextConsumer.getUsers().begin());
   }
   LLVM_DEBUG(llvm::dbgs() << "LAST FUSABLE CONSUMER: " << currentConsumer

@@ -85,6 +85,9 @@ benchmark fc/1024x1024x512.json "FC 1024x1024x512"
 benchmark fc/1024x352x512.json "FC 1024x352x512"
 benchmark fc/1024x512x256.json "FC 1024x512x256"
 
+# Models Benchmarks
+benchmark models/models.json "MHA self attention full"
+
 # Summary report for all benchmarks
 echo "+++ REPORT"
 if [ "main" = "${BUILDKITE_BRANCH}" ]; then

@@ -131,9 +131,18 @@ if (NOT TPP_INSIDE_IREE)
     ${CONFIG_DIR}/fc/1024x352x512.json
     ${CONFIG_DIR}/fc/1024x512x256.json
   )
-  string(JOIN ',' PERF_CFGS_STR ${MATMUL_PERF_CFGS} ${FC_PERF_CFGS})
+  set(MODELS_PERF_CFGS
+    ${CONFIG_DIR}/models/models.json
+  )
+  string(JOIN ',' PERF_CFGS_STR ${MATMUL_PERF_CFGS} ${FC_PERF_CFGS} ${MODELS_PERF_CFGS})
   add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
     -c ${PERF_CFGS_STR}
+                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                    WORKING_DIRECTORY ${BENCHMARK_DIR}
+                    COMMENT Run Quick Performance Benchmarks)
+
+  add_custom_target(quick-models-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+    -c ${MODELS_PERF_CFGS}
                     DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Quick Performance Benchmarks)

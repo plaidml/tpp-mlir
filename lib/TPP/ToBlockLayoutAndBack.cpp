@@ -675,6 +675,13 @@ struct PackMatmul : public PackMatmulBase<PackMatmul> {
     RewritePatternSet patterns(ctx);
     patterns.add<PackMatmulImpl<linalg::MatmulOp>,
                  PackMatmulImpl<linalg::BatchMatmulOp>>(ctx, blockingFactors);
+    // Fold collapse shape with elt-wise consumer.
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(
+        patterns, [](OpOperand *operand) {
+          Operation *op = operand->getOwner();
+          return (isa<linalg::LinalgOp>(op) &&
+                  linalg::isElementwise(cast<linalg::LinalgOp>(op)));
+        });
     linalg::populateLinalgDeGeneralizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

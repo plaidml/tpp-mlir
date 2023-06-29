@@ -313,3 +313,98 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.maxf
+
+// -----
+
+func.func @mha_projection(%arg0: tensor<64x32x512xf32>) -> tensor<64x32x8x64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant dense <1.0> : tensor<512x512xf32>
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<64x32x512xf32> into tensor<2048x512xf32>
+  %0 = tensor.empty() : tensor<2048x512xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+  %2 = linalg.matmul ins(%collapsed, %cst_0 : tensor<2048x512xf32>, tensor<512x512xf32>) outs(%1 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+  %expanded = tensor.expand_shape %2 [[0, 1], [2, 3]] : tensor<2048x512xf32> into tensor<64x32x8x64xf32>
+  return %expanded : tensor<64x32x8x64xf32>
+}
+
+// CHECK-LABEL: mha_projection
+// CHECK: %[[SPLAT:.+]] = arith.constant dense<1.000000e+00> : tensor<16x32x32xf32>
+// CHECK: %{{.+}} = scf.forall (%[[ARG3:.+]], %[[ARG4:.+]]) in (64, 16) shared_outs(%[[ARG5:.+]] = %{{.+}})
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG3]], %[[ARG4]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<64x16x32x32xf32> to tensor<32x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %{{.+}}[%[[ARG3]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<64x16x32x32xf32> to tensor<16x32x32xf32>
+// CHECK: {{.+}} = linalg.batch_reduce_matmul ins(%[[SLICE1]], %[[SPLAT]] : tensor<16x32x32xf32>, tensor<16x32x32xf32>) 
+// CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+func.func @mha_projection_with_mul(%arg0: tensor<64x32x512xf32>) -> tensor<64x32x8x64xf32> {
+  %cst_1 = arith.constant 0.000000e+00 : f32
+  %cst_6 = arith.constant dense<1.250000e-01> : tensor<64x32x8x64xf32>
+  %cst_3 = arith.constant dense<1.0> : tensor<512x512xf32>
+  %collapsed_7 = tensor.collapse_shape %arg0 [[0, 1], [2]] : tensor<64x32x512xf32> into tensor<2048x512xf32>
+  %3 = tensor.empty() : tensor<2048x512xf32>
+  %4 = linalg.fill ins(%cst_1 : f32) outs(%3 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+  %5 = linalg.matmul ins(%collapsed_7, %cst_3 : tensor<2048x512xf32>, tensor<512x512xf32>) outs(%4 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+  %expanded_8 = tensor.expand_shape %5 [[0, 1], [2, 3]] : tensor<2048x512xf32> into tensor<64x32x8x64xf32>
+  %6 = tensor.empty() : tensor<64x32x8x64xf32>
+  %7 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_8, %cst_6 : tensor<64x32x8x64xf32>, tensor<64x32x8x64xf32>) outs(%6 : tensor<64x32x8x64xf32>) {
+    ^bb0(%in: f32, %in_21: f32, %out: f32):
+      %46 = arith.mulf %in, %in_21 : f32
+      linalg.yield %46 : f32
+  } -> tensor<64x32x8x64xf32>
+  return %7 : tensor<64x32x8x64xf32>
+}
+
+// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: mha_projection_with_mul
+// CHECK: %[[SPLAT:.+]] = arith.constant dense<1.000000e+00> : tensor<16x32x32xf32>
+// CHECK: %[[SPLAT1:.+]] = arith.constant dense<1.250000e-01> : tensor<32x32xf32>
+// CHECK: %{{.+}} = scf.forall (%[[ARG1:.+]], %[[ARG2:.+]]) in (64, 16) shared_outs(%[[ARG3:.+]] = %{{.+}})
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<32x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %{{.+}}[%[[ARG1]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<64x16x32x32xf32> to tensor<16x32x32xf32>
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE]], %[[SPLAT]] : tensor<16x32x32xf32>, tensor<16x32x32xf32>) 
+// CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[SLICE3:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG1]], %[[ARG2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<64x16x32x32xf32> to tensor<32x32xf32>
+// CHECK: %[[MUL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:  iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:  ins(%[[GEMM]], %[[SPLAT1]] : tensor<32x32xf32>, tensor<32x32xf32>)
+// CHECK-SAME:  outs(%[[SLICE3]] : tensor<32x32xf32>
+// CHECK: arith.mulf
+// CHECK: tensor.parallel_insert_slice %[[MUL]] 
+// CHECK-SAME:  into %[[ARG3]][%[[ARG1]], %[[ARG2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<32x32xf32> into tensor<64x16x32x32xf32>
+
+// -----
+
+func.func @mha_mul(%arg0: tensor<64x8x32x64xf32>, %arg1: tensor<64x8x64x32xf32>) -> tensor<64x8x32x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1], [2], [3]] : tensor<64x8x32x64xf32> into tensor<512x32x64xf32>
+  %collapsed_0 = tensor.collapse_shape %arg1 [[0, 1], [2], [3]] : tensor<64x8x64x32xf32> into tensor<512x64x32xf32>
+  %0 = tensor.empty() : tensor<512x32x32xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
+  %2 = linalg.batch_matmul ins(%collapsed, %collapsed_0 : tensor<512x32x64xf32>, tensor<512x64x32xf32>) outs(%1 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
+  %expanded = tensor.expand_shape %2 [[0, 1], [2], [3]] : tensor<512x32x32xf32> into tensor<64x8x32x32xf32>
+  return %expanded : tensor<64x8x32x32xf32>
+}
+
+// CHECK-LABEL: mha_mul
+// CHECK-SAME: %[[ARG0:.+]]: tensor<64x8x32x64xf32>, %[[ARG1:.+]]: tensor<64x8x64x32xf32>
+// CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]]) in (512) shared_outs(%[[ARG3:.+]] = %{{.+}})
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG2]], 0, 0, 0, 0] [1, 1, 1, 32, 32] [1, 1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<512x1x1x32x32xf32> to tensor<32x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %{{.+}}[%[[ARG2]], 0, 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<512x1x2x32x32xf32> to tensor<2x32x32xf32>
+// CHECK: %[[SLICE2:.+]] = tensor.extract_slice %{{.+}}[%[[ARG2]], 0, 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<512x1x2x32x32xf32> to tensor<2x32x32xf32>
+// CHECK: %{{.+}} = linalg.batch_reduce_matmul ins(%[[SLICE1]], %[[SLICE2]] : tensor<2x32x32xf32>, tensor<2x32x32xf32>) 
+// CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>

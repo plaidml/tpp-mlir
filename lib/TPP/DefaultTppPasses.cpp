@@ -263,6 +263,8 @@ private:
     pm.addPass(createCleanupPass());
 
     // Generalize tensor.pack and tensor.unpack.
+    // Tile and fuse can create more opportunities to simplify pack/unpack.
+    pm.addPass(createSimplifyAndCanonicalizePackPass());
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
 
     // Final clenaup after all the mapping.
