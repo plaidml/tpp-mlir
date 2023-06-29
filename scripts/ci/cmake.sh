@@ -23,112 +23,111 @@ die_syntax() {
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:RSG" arg; do
-  case ${arg} in
-    s)
-      SRC_DIR=$(realpath ${OPTARG})
+while test $# -gt 0; do
+  case "$1" in
+    -s)
+      SRC_DIR=$(realpath $2)
       if [ ! -d ${SRC_DIR}/.git ]; then
-        echo "Source '${OPTARG}' not a Git directory"
+        echo "Source '$2' not a Git directory"
         die_syntax
       fi
-      ;;
-    b)
-      BLD_DIR=$(realpath ${OPTARG})
+      shift 2;;
+    -b)
+      BLD_DIR=$(realpath $2)
       if ! mkdir -p ${BLD_DIR}; then
-        echo "Error creating build directory '${OPTARG}'"
+        echo "Error creating build directory '$2'"
         die_syntax
       fi
-      ;;
-    i)
-      INST_DIR=$(realpath ${OPTARG})
+      shift 2;;
+    -i)
+      INST_DIR=$(realpath $2)
       if ! mkdir -p ${INST_DIR}; then
-        echo "Error creating install directory '${OPTARG}'"
+        echo "Error creating install directory '$2'"
         die_syntax
       fi
-      ;;
-    m)
-      MLIR_DIR=$(realpath ${OPTARG})
+      shift 2;;
+    -m)
+      MLIR_DIR=$(realpath $2)
       if [ ! -f ${MLIR_DIR}/MLIRConfig.cmake ]; then
-        echo "MLIR '${OPTARG}' not a CMake directory"
+        echo "MLIR '$2' not a CMake directory"
         die_syntax
       fi
-      ;;
-    g)
-      GCC_DIR=$(realpath ${OPTARG})
+      shift 2;;
+    -g)
+      GCC_DIR=$(realpath $2)
       GCC_TOOLCHAIN_OPTIONS="-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN=${GCC_DIR} -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=${GCC_DIR}"
-      ;;
-    c)
-      if [ "${OPTARG}" == "clang" ]; then
+      shift 2;;
+    -c)
+      if [ "$2" == "clang" ]; then
         check_program clang
         check_program clang++
         CC=clang
         CXX=clang++
-      elif [ "${OPTARG}" == "gcc" ]; then
+      elif [ "$2" == "gcc" ]; then
         check_program gcc
         check_program g++
         CC=gcc
         CXX=g++
       else
-        echo "Compiler "${OPTARG}" not recognized"
+        echo "Compiler "$2" not recognized"
         die_syntax
       fi
-      ;;
-    t)
-      if [ "${OPTARG}" == "Release" ]; then
-        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=${OPTARG}"
-      elif [ "${OPTARG}" == "Debug" ]; then
-        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=${OPTARG}"
-      elif [ "${OPTARG}" == "RelWithDebInfo" ]; then
-        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=${OPTARG}"
+      shift 2;;
+    -t)
+      if [ "$2" == "Release" ]; then
+        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=$2"
+      elif [ "$2" == "Debug" ]; then
+        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=$2"
+      elif [ "$2" == "RelWithDebInfo" ]; then
+        BUILD_OPTIONS="${BUILD_OPTIONS} -DCMAKE_BUILD_TYPE=$2"
       else
-        echo "Build type "${OPTARG}" not recognized"
+        echo "Build type "$2" not recognized"
         die_syntax
       fi
-      ;;
-    l)
-      if [ "${OPTARG}" == "ld" ]; then
+      shift 2;;
+    -l)
+      if [ "$2" == "ld" ]; then
         check_program ld
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
-      elif [ "${OPTARG}" == "lld" ]; then
+      elif [ "$2" == "lld" ]; then
         check_program lld
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
-      elif [ "${OPTARG}" == "gold" ]; then
+      elif [ "$2" == "gold" ]; then
         check_program gold
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
-      elif [ "${OPTARG}" == "mold" ]; then
+      elif [ "$2" == "mold" ]; then
         check_program mold
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=${OPTARG}"
       else
-        echo "Linker "${OPTARG}" not recognized"
+        echo "Linker "$2" not recognized"
         die_syntax
       fi
-      ;;
-    R)
+      LINKER_OPTIONS="${LINKER_OPTIONS} -DLLVM_USE_LINKER=$2"
+      shift 2;;
+    -R)
       REMOVE_BLD_DIR=1
-      ;;
-    S)
+      shift;;
+    -S)
       SAN_OPTIONS="-DUSE_SANITIZER=\"Address;Memory;Leak;Undefined\""
-      ;;
-    G)
-      if [ "${OPTARG}" ] && [[ "${OPTARG}" != "-"* ]]; then
-        ENABLE_GPU="-DTPP_GPU=${OPTARG}"
+      shift;;
+    -G)
+      if [ "$2" ] && [[ "$2" != "-"* ]]; then
+        ENABLE_GPU="-DTPP_GPU=$2"
+        shift 2
       else  # legacy
         ENABLE_GPU="-DTPP_GPU=cuda"
+        shift
       fi
       ;;
-    n)
+    -n)
       PROCS=$(nproc)
-      if [ "${OPTARG}" -gt "0" ] && [ "${OPTARG}" -lt "${PROCS}" ]; then
-        LINKER_OPTIONS="${LINKER_OPTIONS} -DCMAKE_JOB_POOL_LINK=link -DCMAKE_JOB_POOLS=link=${OPTARG}"
+      if [ "$2" -gt "0" ] && [ "$2" -lt "${PROCS}" ]; then
+        LINKER_OPTIONS="${LINKER_OPTIONS} -DCMAKE_JOB_POOL_LINK=link -DCMAKE_JOB_POOLS=link=$2"
       else
-        echo "Invalid value for number of linker jobs '${OPTARG}'"
+        echo "Invalid value for number of linker jobs '$2'"
         die_syntax
       fi
-      ;;
-    ?)
-      echo "Invalid option: ${OPTARG}"
+      shift 2;;
+    *)
+      echo "Invalid option: $2"
       die_syntax
-      ;;
+      shift;;
   esac
 done
 
