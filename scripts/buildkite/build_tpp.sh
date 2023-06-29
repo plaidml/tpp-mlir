@@ -53,10 +53,13 @@ elif [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
 fi
 
+# Defaults for lacking CI environment
+PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
 BUILD_DIR=${BUILD_DIR:-build}
+
 BLD_DIR=${BUILD_DIR}-${COMPILER}
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
-  -s ${BUILDKITE_BUILD_CHECKOUT_PATH} \
+  -s ${PROJECT_DIR} \
   -b ${BLD_DIR} -R \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
@@ -66,7 +69,7 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -c ${COMPILER} \
   ${GCC_COMPAT_OPTION} \
   -l ${LINKER} \
-  -n ${NPROCS_LIMIT_LINK}
+  -n ${NPROCS_LIMIT_LINK:-1}
 then
   exit 1
 fi
