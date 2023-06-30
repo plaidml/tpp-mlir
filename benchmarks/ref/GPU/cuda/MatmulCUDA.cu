@@ -20,7 +20,7 @@ __global__ void matmulKernel(float *A, float *B, float *C, int m, int n,
 
   float sum = 0;
   for (int i = 0; i < k; ++i) {
-    sum += A[row * n + i] * B[i * n + col];
+    sum += A[row * k + i] * B[i * n + col];
   }
 
   C[row * n + col] = sum;
