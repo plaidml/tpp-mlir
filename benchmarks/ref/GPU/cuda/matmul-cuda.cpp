@@ -55,9 +55,6 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     int ldb = k;
     int ldc = n;
 
-    // printf("m=%d, n=%d, k=%d\n", n, m, k);
-    // printf("lda=%d, ldb=%d, ldc=%d\n", lda, ldb, ldc);
-
     cublasStatus_t gemmStatus =
         cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, A, lda,
                     B, ldb, &beta, C, ldc);
@@ -118,9 +115,13 @@ int main(int argc, char *argv[]) {
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
   auto bench =
       Benchmark<MatmulKernelCUBLAS, CudaTensor<float>>(config.iter, gflops);
-  bench.setArg({gpuA, gpuB, gpuC});
+  std::vector<CudaTensor<float>> args;
+  args.push_back(std::move(gpuA));
+  args.push_back(std::move(gpuB));
+  args.push_back(std::move(gpuC));
+  bench.setArg(std::move(args));
 
-  // Warmup (TODO: Check output)
+  // Warmup
   bench.warmup();
 
   // Run the reference benchmark
