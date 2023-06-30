@@ -32,6 +32,14 @@ template <typename T> struct CudaTensor {
   CudaTensor() = delete;
   CudaTensor(Tensor<T> &&tensor) : tensor(std::move(tensor)) {}
 
+  // Move constructor
+  CudaTensor(CudaTensor<T> &&other)
+      : gpuData(std::exchange(other.gpuData, nullptr)),
+        tensor(std::move(other.tensor)) {}
+
+  // Copy constructor
+  CudaTensor(const CudaTensor<T> &other) = delete;
+
   virtual ~CudaTensor() {
     if (gpuData)
       cudaFree(gpuData);
