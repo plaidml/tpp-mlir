@@ -175,7 +175,8 @@ template <typename T> struct ConstantTensor : public Tensor<T> {
 // Splat tensor of type T, initialized with the same fixed values.
 template <typename T> struct SplatTensor : public Tensor<T> {
   SplatTensor(InitArg dims, T value) : Tensor<T>(dims) {
-    memset(this->data, value, this->dataSize);
+    for (size_t i = 0; i < this->size; i++)
+      this->data[i] = value;
   }
   std::ostream &operator<<(std::ostream &out) {
     return out << static_cast<Tensor<T>>(this);
