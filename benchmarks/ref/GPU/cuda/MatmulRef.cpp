@@ -17,6 +17,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <optional>
 
 #include <cublas_v2.h>
 
@@ -40,32 +41,6 @@ KernelType parseKernelOption(llvm::StringRef opt) {
   return *type;
 }
 } // namespace
-
-struct MatmulKernelCUDA : public KernelInterface<CudaTensor<float>> {
-  void runRef(std::vector<CudaTensor<float>> &args) override {
-    assert(args.size() == 3 && "wrong rank for MLP");
-
-    auto &a = args[0];
-    auto &b = args[1];
-    auto &o = args[2];
-
-    // MATMUL O += A x B
-    int m = o.tensor.getDim(0);
-    int n = o.tensor.getDim(1);
-    int k = a.tensor.getDim(1);
-
-    float *A = a.gpuData;
-    float *B = b.gpuData;
-    float *C = o.gpuData;
-
-    matmulCUDA(A, B, C, m, n, k);
-    cudaError_t syncStatus = cudaDeviceSynchronize();
-    if (syncStatus != cudaSuccess) {
-      std::cerr << "cudaDeviceSynchronize error : cuda code=" << syncStatus
-                << " - " << cudaGetErrorString(syncStatus) << "\n";
-    }
-  }
-};
 
 struct MatmulKernelGpu : public KernelInterface<CudaTensor<float>> {
   MatmulKernelGpu() : kernel(parseKernelOption(kernelType)) {
