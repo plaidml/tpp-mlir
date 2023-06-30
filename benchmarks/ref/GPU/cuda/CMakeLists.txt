@@ -18,7 +18,7 @@ set(LLVM_LINK_COMPONENTS
 
 # Standard compilation
 add_llvm_executable(bench_cuda_matmul
-  MatmulTest.cpp
+  MatmulRef.cpp
 )
 
 llvm_update_compile_flags(bench_cuda_matmul)
