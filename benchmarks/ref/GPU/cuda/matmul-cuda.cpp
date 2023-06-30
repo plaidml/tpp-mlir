@@ -42,8 +42,6 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     int n = o.tensor.getDim(1);
     int k = a.tensor.getDim(1);
 
-    auto transa = CUBLAS_OP_N;
-    auto transb = CUBLAS_OP_N;
     float alpha = 1.0f;
     float beta = 1.0f;
 
@@ -60,8 +58,9 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     // printf("m=%d, n=%d, k=%d\n", n, m, k);
     // printf("lda=%d, ldb=%d, ldc=%d\n", lda, ldb, ldc);
 
-    cublasStatus_t gemmStatus = cublasSgemm(
-        handle, transa, transb, n, m, k, &alpha, A, lda, B, ldb, &beta, C, ldc);
+    cublasStatus_t gemmStatus =
+        cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, A, lda,
+                    B, ldb, &beta, C, ldc);
     if (gemmStatus != CUBLAS_STATUS_SUCCESS) {
       cudaError_t cudaStatus = cudaGetLastError();
       std::cerr << "cublasSgemm error : cublas code=" << gemmStatus
