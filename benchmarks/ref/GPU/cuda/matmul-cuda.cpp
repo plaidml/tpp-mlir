@@ -29,6 +29,7 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
 
   void runRef(std::vector<CudaTensor<float>> &args) override {
     assert(args.size() == 3 && "wrong rank for MLP");
+    assert(isInit && "Kernel failed initialization");
 
     if (!isInit)
       return;
