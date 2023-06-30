@@ -9,30 +9,41 @@
 #include "Bench.h"
 #include "Config.h"
 #include "CudaTensor.h"
+#include "MatmulCUDA.h"
 #include "Tensor.h"
+
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CommandLine.h"
 
 #include <iomanip>
 #include <iostream>
 
 #include <cublas_v2.h>
 
-struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
-  MatmulKernelCUBLAS() {
-    isInit = cublasCreate(&handle) == CUBLAS_STATUS_SUCCESS;
-    if (!isInit)
-      std::cerr << "CUBLAS initialization failed!\n";
+namespace {
+llvm::cl::opt<std::string> kernelType{
+    "kernel", llvm::cl::desc("Kernel type (cuda, cublas)"),
+    llvm::cl::init("cublas")};
 
-    cublasSetStream(handle, stream);
-  }
+enum class KernelType {
+  Cuda,
+  Cublas,
+};
 
-  ~MatmulKernelCUBLAS() { cublasDestroy(handle); }
+KernelType parseKernelOption(llvm::StringRef opt) {
+  auto type = llvm::StringSwitch<std::optional<KernelType>>(opt)
+                  .CaseLower("cuda", KernelType::Cuda)
+                  .CaseLower("cublas", KernelType::Cublas)
+                  .Default(std::nullopt);
+  assert(type && "Invalid kernel type");
 
+  return *type;
+}
+} // namespace
+
+struct MatmulKernelCUDA : public KernelInterface<CudaTensor<float>> {
   void runRef(std::vector<CudaTensor<float>> &args) override {
     assert(args.size() == 3 && "wrong rank for MLP");
-    assert(isInit && "Kernel failed initialization");
-
-    if (!isInit)
-      return;
 
     auto &a = args[0];
     auto &b = args[1];
@@ -43,18 +54,46 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     int n = o.tensor.getDim(1);
     int k = a.tensor.getDim(1);
 
-    float alpha = 1.0f;
-    float beta = 1.0f;
-
-    // See:
-    // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
-    // Swap A and B, and col-major change m with n.
-    float *A = b.gpuData;
-    float *B = a.gpuData;
+    float *A = a.gpuData;
+    float *B = b.gpuData;
     float *C = o.gpuData;
+
+    matmulCUDA(A, B, C, m, n, k);
+    cudaError_t syncStatus = cudaDeviceSynchronize();
+    if (syncStatus != cudaSuccess) {
+      std::cerr << "cudaDeviceSynchronize error : cuda code=" << syncStatus
+                << " - " << cudaGetErrorString(syncStatus) << "\n";
+    }
+  }
+};
+
+struct MatmulKernelGpu : public KernelInterface<CudaTensor<float>> {
+  MatmulKernelGpu() : kernel(parseKernelOption(kernelType)) {
+    isInit = cublasCreate(&handle) == CUBLAS_STATUS_SUCCESS;
+    if (!isInit)
+      std::cerr << "CUBLAS initialization failed!\n";
+
+    cublasSetStream(handle, stream);
+  }
+
+  ~MatmulKernelGpu() { cublasDestroy(handle); }
+
+  void runCUDA(float *A, float *B, float *C, int m, int n, int k) {
+    matmulCUDA(A, B, C, m, n, k);
+    cudaError_t syncStatus = cudaDeviceSynchronize();
+    if (syncStatus != cudaSuccess) {
+      std::cerr << "cudaDeviceSynchronize error : cuda code=" << syncStatus
+                << " - " << cudaGetErrorString(syncStatus) << "\n";
+    }
+  }
+
+  void runCUBLAS(float *A, float *B, float *C, int m, int n, int k) {
     int lda = n;
     int ldb = k;
     int ldc = n;
+
+    float alpha = 1.0f;
+    float beta = 1.0f;
 
     cublasStatus_t gemmStatus =
         cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, A, lda,
@@ -73,9 +112,47 @@ struct MatmulKernelCUBLAS : public KernelInterface<CudaTensor<float>> {
     }
   }
 
+  void runRef(std::vector<CudaTensor<float>> &args) override {
+    assert(args.size() == 3 && "wrong rank for MLP");
+    assert(isInit && "Kernel failed initialization");
+
+    if (!isInit)
+      return;
+
+    auto &a = args[0];
+    auto &b = args[1];
+    auto &o = args[2];
+
+    // MATMUL O += A x B
+    int m = o.tensor.getDim(0);
+    int n = o.tensor.getDim(1);
+    int k = a.tensor.getDim(1);
+
+    switch (kernel) {
+    case KernelType::Cuda: {
+      float *A = a.gpuData;
+      float *B = b.gpuData;
+      float *C = o.gpuData;
+      runCUDA(A, B, C, m, n, k);
+      break;
+    }
+    case KernelType::Cublas: {
+      // See:
+      // https://stackoverflow.com/questions/56043539/cublassgemm-row-major-multiplication
+      // Swap A and B, and col-major change m with n.
+      float *A = b.gpuData;
+      float *B = a.gpuData;
+      float *C = o.gpuData;
+      runCUBLAS(A, B, C, m, n, k);
+      break;
+    }
+    }
+  }
+
   cublasHandle_t handle;
   cudaStream_t stream = 0;
   bool isInit = false;
+  KernelType kernel;
 };
 
 int main(int argc, char *argv[]) {
@@ -117,7 +194,7 @@ int main(int argc, char *argv[]) {
 
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
   auto bench =
-      Benchmark<MatmulKernelCUBLAS, CudaTensor<float>>(config.iter, gflops);
+      Benchmark<MatmulKernelGpu, CudaTensor<float>>(config.iter, gflops);
   std::vector<CudaTensor<float>> args;
   args.push_back(std::move(gpuA));
   args.push_back(std::move(gpuB));
