@@ -23,7 +23,7 @@ __global__ void matmulKernel(float *A, float *B, float *C, int m, int n,
     sum += A[row * k + i] * B[i * n + col];
   }
 
-  C[row * n + col] = sum;
+  C[row * n + col] += sum;
 }
 
 void matmulCUDA(float *A, float *B, float *C, int m, int n, int k) {
