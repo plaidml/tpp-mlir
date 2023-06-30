@@ -109,8 +109,10 @@ int main(int argc, char *argv[]) {
   CudaTensor<float> gpuB(std::move(SplatTensor<float>{{k, n}, 1}));
   CudaTensor<float> gpuC(std::move(EmptyTensor<float>{m, n}));
 
-  if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu())
+  if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu()) {
+    std::cerr << "Failed GPU tensor initialization\n";
     return 1;
+  }
 
   double gflops = static_cast<double>(2 * n * m * k) / 1e9;
   auto bench =
