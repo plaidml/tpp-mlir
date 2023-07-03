@@ -30,3 +30,10 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // LOOPS: scf.for
 // LOOPS:   arith.mulf
 // LOOPS:   arith.addf
+
+// CHECK-LABEL: copy
+func.func @copy(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) {
+  // CHECK: tpp.identity
+  memref.copy %arg0, %arg1 : memref<2x2xf32> to memref<2x2xf32>
+  return
+}
