@@ -14,7 +14,7 @@ add_mlir_library(TPPGPU
     MLIRGPUToNVVMTransforms
 )
 
-if (NOT TPP_GPU STREQUAL "")
+if (TPP_GPU MATCHES "cuda")
   target_compile_definitions(obj.TPPGPU
     PRIVATE
     TPP_GPU_ENABLE=1
