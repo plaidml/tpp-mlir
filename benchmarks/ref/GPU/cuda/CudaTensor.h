@@ -50,16 +50,21 @@ template <typename T> struct CudaTensor {
       cudaFree(gpuData);
 
     auto dataSize = tensor.getDataSize();
-    auto allocErr = cudaMalloc(&gpuData, dataSize);
+    cudaError_t allocErr = cudaMalloc(&gpuData, dataSize);
     if (allocErr != cudaSuccess) {
       std::cerr << "GPU allocation error\n";
+      std::cerr << "cudaMalloc error : cuda code=" << allocErr << " - "
+                << cudaGetErrorString(allocErr) << "\n";
       return false;
     }
 
     auto data = tensor.getData();
-    auto cpyErr = cudaMemcpy(gpuData, data, dataSize, cudaMemcpyHostToDevice);
+    cudaError_t cpyErr =
+        cudaMemcpy(gpuData, data, dataSize, cudaMemcpyHostToDevice);
     if (cpyErr != cudaSuccess) {
       std::cerr << "GPU memcpy error\n";
+      std::cerr << "cudaMemcpy error : cuda code=" << cpyErr << " - "
+                << cudaGetErrorString(cpyErr) << "\n";
       return false;
     }
 
