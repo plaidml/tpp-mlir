@@ -14,11 +14,21 @@ include "mlir/Pass/PassBase.td"
 def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let summary = "Convert linalg to tpp.";
   let description = [{
-    Convert linalg.generic (or named) operations to tpp operations. Linalg generic
-    operations are converted using simple pattern matching (i.e., see `isTppAdd`).
+    Convert linalg.generic (or named) operations to tpp operations. 
+    Linalg generic operations are converted using simple pattern 
+    matching (i.e., see `isTppAdd`).
   }];
   let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
+}
+
+def ConvertMemRefToTpp : Pass<"convert-memref-to-tpp", "func::FuncOp"> {
+  let summary = "Convert memref ops to tpp.";
+  let description = [{
+    Convert memref operations (i.e., memref.copy) to tpp operations.
+  }];
+  let constructor = "mlir::tpp::createConvertMemRefToTppPass()";
+  let dependentDialects = ["memref::MemRefDialect", "tpp::TppDialect"];
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {

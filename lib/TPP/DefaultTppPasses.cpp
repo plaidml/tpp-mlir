@@ -344,8 +344,12 @@ private:
     // Lower all TPP ops.
     if (tppToLoops)
       pm.addPass(createConvertTppToLoopsPass());
-    else
+    else {
+      // Memref to tpp conversion patterns.
+      pm.addNestedPass<func::FuncOp>(createConvertMemRefToTppPass());
+      // Tpp to Xsmm conversion patterns.
       pm.addPass(createConvertTppToXsmmPass());
+    }
   }
 };
 

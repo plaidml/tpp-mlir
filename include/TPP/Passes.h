@@ -141,6 +141,7 @@ createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
                     StringRef gpuFeatures = "+ptx60");
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteBatchMatmulToMatmulPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertMemRefToTppPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();

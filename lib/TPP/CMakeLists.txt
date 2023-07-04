@@ -21,6 +21,7 @@ add_mlir_library(MLIRTPP
     CombineTpp.cpp
     RewriteBatchMatmulToMatmul.cpp
     LinalgDeGeneralize.cpp
+    ConvertMemRefToTpp.cpp
 
   # Utils
     TensorInit.cpp
