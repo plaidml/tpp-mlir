@@ -16,12 +16,12 @@ namespace mlir {
 namespace tpp {
 
 void initializeGpuTargets() {
-#ifdef TPP_GPU_ENABLE
+#ifdef TPP_CUDA_ENABLE
   LLVMInitializeNVPTXTarget();
   LLVMInitializeNVPTXTargetInfo();
   LLVMInitializeNVPTXTargetMC();
   LLVMInitializeNVPTXAsmPrinter();
-#endif // TPP_GPU_ENABLE
+#endif // TPP_CUDA_ENABLE
 }
 
 } // namespace tpp
