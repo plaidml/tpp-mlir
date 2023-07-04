@@ -123,6 +123,9 @@ class MLIRBench {
   /// Gets main wrappers's block
   Block &getMainBlock();
 
+  // Expose memref buffer to GPU
+  void registerOnGpu(Value buf, MemRefType memRefTy);
+
 public:
   /// Creates context, builder
   MLIRBench(Operation *op, const MLIRBenchConfig &config);

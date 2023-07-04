@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -71,6 +72,7 @@ MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
   ctx->getOrLoadDialect<math::MathDialect>();
   ctx->getOrLoadDialect<bufferization::BufferizationDialect>();
   ctx->getOrLoadDialect<perf::PerfDialect>();
+  ctx->getOrLoadDialect<gpu::GPUDialect>();
 }
 
 LogicalResult MLIRBench::findKernel(StringRef name) {
@@ -182,6 +184,13 @@ LogicalResult MLIRBench::renameKernel() {
   return success();
 }
 
+void MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
+  auto unrankedType = UnrankedMemRefType::get(memRefTy.getElementType(),
+                                              memRefTy.getMemorySpace());
+  auto cast = builder.create<memref::CastOp>(unkLoc, unrankedType, buf);
+  builder.create<gpu::HostRegisterOp>(unkLoc, cast);
+}
+
 LogicalResult MLIRBench::createKernelArgs() {
   // Clear current args and rebuild them from scratch
   kernelArgs.clear();
@@ -194,8 +203,11 @@ LogicalResult MLIRBench::createKernelArgs() {
     auto arg = TypeSwitch<Type, std::optional<Value>>(ty)
                    .Case<MemRefType>([&](auto memRefTy) {
                      // Create a memref global
-                     return createDenseMemref(builder, module, initType,
-                                              memRefTy, seed);
+                     Value data = createDenseMemref(builder, module, initType,
+                                                    memRefTy, seed);
+                     if (!defGpuBackend.empty())
+                       registerOnGpu(data, memRefTy);
+                     return data;
                    })
                    .Case<TensorType>([&](auto tensorTy) {
                      // Create a memref global and cast it to a tensor
@@ -206,6 +218,8 @@ LogicalResult MLIRBench::createKernelArgs() {
                          tensorTy.getShape(), tensorTy.getElementType());
                      auto data = createDenseMemref(builder, module, initType,
                                                    memrefType, seed);
+                     if (!defGpuBackend.empty())
+                       registerOnGpu(data, memrefType);
                      return builder.create<bufferization::ToTensorOp>(
                          unkLoc, data, /*restrict=*/true, /*writable=*/true);
                    })
