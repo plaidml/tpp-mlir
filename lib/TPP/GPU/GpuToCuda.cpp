@@ -70,7 +70,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-#ifdef TPP_GPU_ENABLE
+#ifdef TPP_CUDA_ENABLE
     // Preprocess and lower standard ops.
     pm.addPass(memref::createExpandStridedMetadataPass());
     pm.addPass(arith::createArithExpandOpsPass());
@@ -86,7 +86,7 @@ private:
     // Cleanup IR.
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-#endif // TPP_GPU_ENABLE
+#endif // TPP_CUDA_ENABLE
   }
 };
 
