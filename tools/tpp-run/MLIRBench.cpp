@@ -286,8 +286,13 @@ Value MLIRBench::getTimerStats(Value accBuf) {
   auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
   auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
   auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
-  auto acc = builder.create<memref::SubViewOp>(
+  auto subview = builder.create<memref::SubViewOp>(
       unkLoc, accBuf, ValueRange{offset}, ValueRange{size}, ValueRange{stride});
+
+  auto accType =
+      MemRefType::get({mlir::ShapedType::kDynamic}, builder.getF64Type());
+  auto acc = builder.create<memref::AllocOp>(unkLoc, accType, ValueRange{size});
+  builder.create<memref::CopyOp>(unkLoc, subview, acc);
 
   auto callMean =
       builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
@@ -314,6 +319,7 @@ Value MLIRBench::getTimerStats(Value accBuf) {
       builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
 
   // Clean up results buffer
+  builder.create<memref::DeallocOp>(unkLoc, accBuf);
   builder.create<memref::DeallocOp>(unkLoc, acc);
 
   return insDev;

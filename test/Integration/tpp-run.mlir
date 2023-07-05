@@ -149,11 +149,16 @@ func.func @entry(%A: tensor<4x8xf32>,
 
 // BENCH_STATS-LABEL: @entry
 // BENCH_STATS-NOT: call @_entry
-// BENCH_STATS: %[[deltas:.+]] = memref.alloc() : memref<11xf64>
+// BENCH_STATS: %[[deltas:.+]] = memref.alloc() : memref<15xf64>
 // BENCH_STATS: perf.bench
 // BENCH_STATS: call @_entry
 // BENCH_STATS-NOT: call @_entry
 // BENCH_STATS: %[[subview:.+]] = memref.subview %[[deltas]]
-// BENCH_STATS: perf.mean(%[[subview]]
+// BENCH_STATS: %[[subDeltas:.+]] = memref.alloc
+// BENCH_STATS: memref.copy %[[subview]], %[[subDeltas]]
+// BENCH_STATS: perf.mean(%[[subDeltas]]
+// BENCH_STATS: perf.stdev(%[[subDeltas]]
 // BENCH_STATS-NOT: call @_entry
+// BENCH_STATS-DAG: memref.dealloc %[[deltas]]
+// BENCH_STATS-DAG: memref.dealloc %[[subDeltas]]
 // BENCH_STATS: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
