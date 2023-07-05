@@ -311,7 +311,7 @@ Value MLIRBench::getTimerStats(Value accBuf) {
   // The offset is slightly inaccurate as the buffer lenght already includes
   // the warmup iters. However, the difference is negligible for the chosen
   // max iters and only a few more deltas will be skipped in the worst case
-  // does not impact the overall stats.
+  // which does not impact the overall stats.
   auto offset = getNumWarmupIters(len);
   auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
   auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
