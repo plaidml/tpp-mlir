@@ -258,7 +258,9 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
                                        : kernelCall->getOpResult(0);
 }
 
-Value MLIRBench::createTimerLoop(unsigned n) {
+Value MLIRBench::createTimerLoop(unsigned iters) {
+  int n = iters + MLIRBench::numWarmupLoops;
+
   // Allocates buffer for results
   auto count = getConstInt(builder, n, 64);
   auto memrefType = MemRefType::get({n}, builder.getF64Type());
@@ -269,14 +271,24 @@ Value MLIRBench::createTimerLoop(unsigned n) {
   builder.setInsertionPointToStart(loop.getBody());
 
   // Call the kernel, ignore output
-  callKernel();
+  auto *call = callKernel();
+  assert(call && "Failed to generate a kernel call");
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
   return acc;
 }
 
-Value MLIRBench::getTimerStats(Value acc) {
+Value MLIRBench::getTimerStats(Value accBuf) {
+  auto offset =
+      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::numWarmupLoops);
+  auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
+  auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
+  auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
+  auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
+  auto acc = builder.create<memref::SubViewOp>(
+      unkLoc, accBuf, ValueRange{offset}, ValueRange{size}, ValueRange{stride});
+
   auto callMean =
       builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
   auto mean = callMean.getMean();

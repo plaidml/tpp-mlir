@@ -1,9 +1,9 @@
 // RUN: tpp-run %s -linalg-to-loops \
-// RUN:         -n 10 -print -e multi_head_attention -entry-point-result=void | \
+// RUN:         -print -e multi_head_attention -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXEC
 
 // RUN: tpp-run %s \
-// RUN:         -n 10 -print -e multi_head_attention -entry-point-result=void | \
+// RUN:         -print -e multi_head_attention -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXEC
 
 //////////////////////////////////////////////////////////////////////////////
@@ -263,6 +263,3 @@ func.func @multi_head_attention(
 // Output
 // EXEC:      ( 35651.7, 35651.7, 35651.7, 35651.7,
 // EXEC-SAME:   35651.7, 35651.7, 35651.7, 35651.7 )
-//
-// Stats
-// EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )

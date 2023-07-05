@@ -51,6 +51,8 @@ struct MLIRBenchConfig {
 /// inteface is a bit weird, but it will get better once we clear the
 /// API design, with time.
 class MLIRBench {
+  static constexpr int numWarmupLoops = 1;
+
   /// MLIR OpBulder
   OpBuilder builder;
 

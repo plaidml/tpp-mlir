@@ -196,17 +196,16 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.createKernelArgs()))
     return bench.emitError("Cannot create kernel inputs");
 
-  // Call kernel once, to bootstrap (JIT compile, warm up caches)
-  auto *call = bench.callKernel();
-  if (!call)
-    return bench.emitError("Cannot generate a call to the kernel");
-
-  // Print the result of the warming up, should be the same as any other
-  if (printKernelResult && failed(bench.printResult(call)))
-    return bench.emitError("Cannot print result memref");
-
-  // This is the main loop, if N > 1
-  if (benchNumLoops > 1) {
+  if (benchNumLoops == 1) {
+    // Call kernel once
+    auto *call = bench.callKernel();
+    if (!call)
+      return bench.emitError("Cannot generate a call to the kernel");
+    // Print the result
+    if (printKernelResult && failed(bench.printResult(call)))
+      return bench.emitError("Cannot print result memref");
+  } else {
+    // This is the main loop, if N > 1
     auto acc = bench.createTimerLoop(benchNumLoops);
     if (!acc)
       return bench.emitError("Cannot create timer loop");

@@ -9,8 +9,8 @@
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -linalg-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
 
 // Benchmark options
-// RUN: tpp-run %s -e entry -entry-point-result=void -print 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
-// RUN: tpp-run %s -e entry -entry-point-result=void -n 10  2>&1 | FileCheck %s --check-prefix=BENCH_STATS
+// RUN: tpp-run %s -e entry -entry-point-result=void -print -print-mlir=early 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 10 -print-mlir=early 2>&1 | FileCheck %s --check-prefix=BENCH_STATS
 
 // CPU options can't be tested as even the LLVM IR is identical
 // Splat and init options in tpp-run-splat-* tests
@@ -139,11 +139,21 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LOOPS-LABEL: @entry
 // LOOPS:   call @_entry({{.*}}) : (memref<4x8xf32>, memref<4x4xf32>, memref<f32>) -> ()
 
-
+// BENCH_PRINT-LABEL: @entry
+// BENCH_PRINT: call @_entry
+// BENCH_PRINT: print
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 
-
+// BENCH_STATS-LABEL: @entry
+// BENCH_STATS-NOT: call @_entry
+// BENCH_STATS: %[[deltas:.+]] = memref.alloc() : memref<11xf64>
+// BENCH_STATS: perf.bench
+// BENCH_STATS: call @_entry
+// BENCH_STATS-NOT: call @_entry
+// BENCH_STATS: %[[subview:.+]] = memref.subview %[[deltas]]
+// BENCH_STATS: perf.mean(%[[subview]]
+// BENCH_STATS-NOT: call @_entry
 // BENCH_STATS: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
