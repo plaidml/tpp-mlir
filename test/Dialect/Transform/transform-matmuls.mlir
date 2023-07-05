@@ -96,7 +96,7 @@ transform.sequence failures(propagate) {
     // Pack the matmul with blocking factors of 32 along i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
     // Get parent operation (aka func.func)
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     // Propagate the packing down through the relu
     transform.structured.packing_propagation %2 : !transform.any_op
 

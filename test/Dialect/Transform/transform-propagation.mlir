@@ -45,7 +45,7 @@ func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64x
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = get_closest_isolated_parent %0 : (!transform.any_op) -> !transform.any_op
+    %1 = get_parent_op %0 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %1 : !transform.any_op
 }
 
@@ -99,7 +99,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -141,7 +141,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -186,7 +186,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -227,7 +227,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -272,7 +272,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -319,7 +319,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 
@@ -371,7 +371,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
 

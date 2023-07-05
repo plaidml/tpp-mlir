@@ -147,7 +147,13 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
   tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+  // TODO: (lorenzo): Use `transform.apply_patterns` so that we can avoi
+  // all this tracking issues. See `ApplyCastAwayVectorLeadingOneDimPatternsOp`
+  // in `VectorTransformOps.td`.
+  TrackingListener listener(state, *this);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
     return emitDefaultDefiniteFailure(target);
 
   return DiagnosedSilenceableFailure::success();
@@ -169,7 +175,10 @@ DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
   RewritePatternSet patterns(ctx);
   mlir::linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+  TrackingListener listener(state, *this);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
     return emitDefaultDefiniteFailure(target);
 
   return DiagnosedSilenceableFailure::success();
@@ -198,7 +207,10 @@ DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
   if (getMergeTensorSlices())
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+  TrackingListener listener(state, *this);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
     return emitDefaultDefiniteFailure(target);
 
   return DiagnosedSilenceableFailure::success();
@@ -220,7 +232,10 @@ DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
   RewritePatternSet patterns(ctx);
   mlir::tpp::populateConvertLinalgToTppPatterns(patterns);
 
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+  TrackingListener listener(state, *this);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
     return emitDefaultDefiniteFailure(target);
 
   return DiagnosedSilenceableFailure::success();
