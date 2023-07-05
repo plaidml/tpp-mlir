@@ -12,7 +12,7 @@ if [ "${TPP_LLVM}" ]; then
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/ci/common.sh"
 
   # LLVM version used to build TPP-mlir
-  if [ ! "${TPP_LLVM_VERSION}" ]; then
+  if [ ! "${TPP_LLVM_VERSION}" ] || [ ! -d "${TPP_LLVM}/${TPP_LLVM_VERSION}" ]; then
     TPP_LLVM_VERSION=$(llvm_version)
     if [ "${TPP_LLVM_VERSION}" ]; then
       export TPP_LLVM_VERSION;
