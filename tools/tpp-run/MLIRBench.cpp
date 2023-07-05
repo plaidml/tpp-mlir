@@ -280,6 +280,7 @@ Value MLIRBench::createTimerLoop(unsigned iters) {
 }
 
 Value MLIRBench::getTimerStats(Value accBuf) {
+  // Skip the warmup loops in stats calculation
   auto offset =
       builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::numWarmupLoops);
   auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
@@ -289,11 +290,14 @@ Value MLIRBench::getTimerStats(Value accBuf) {
   auto subview = builder.create<memref::SubViewOp>(
       unkLoc, accBuf, ValueRange{offset}, ValueRange{size}, ValueRange{stride});
 
+  // Copy the deltas into an separate smaller buffer to ensure
+  // that perf functions do not read the warmup loop deltas
   auto accType =
       MemRefType::get({mlir::ShapedType::kDynamic}, builder.getF64Type());
   auto acc = builder.create<memref::AllocOp>(unkLoc, accType, ValueRange{size});
   builder.create<memref::CopyOp>(unkLoc, subview, acc);
 
+  // Compute timer stats
   auto callMean =
       builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
   auto mean = callMean.getMean();
