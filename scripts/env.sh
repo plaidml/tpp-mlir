@@ -3,7 +3,7 @@
 #
 # Setup runtime environment based on build_tools/llvm_version.txt
 
-if [ ! "${TPP_LLVM}" ] && [ -d /nfs_home/buildkite-slurm/builds/tpp ]; then
+if [ ! "${TPPROOT}" ] && [ -d /nfs_home/buildkite-slurm/builds/tpp ]; then
   source /nfs_home/buildkite-slurm/builds/tpp/enable-tpp
 fi
 
@@ -12,11 +12,15 @@ if [ "${TPP_LLVM}" ]; then
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/ci/common.sh"
 
   # LLVM version used to build TPP-mlir
-  TPP_LLVM_VERSION=$(llvm_version)
+  if [ ! "${TPP_LLVM_VERSION}" ]; then
+    TPP_LLVM_VERSION=$(llvm_version)
+    if [ "${TPP_LLVM_VERSION}" ]; then
+      export TPP_LLVM_VERSION;
+    fi
+  fi
 
   if [ "${TPP_LLVM_VERSION}" ]; then
     # setup environment
-    export TPP_LLVM_VERSION
     export TPP_LLVM_DIR=${TPP_LLVM}/${TPP_LLVM_VERSION}
     # avoid overriding PATH/LD_LIBRARY_PATH of initial environment (append)
     export PATH=${PATH}:${TPP_LLVM_DIR}/bin
