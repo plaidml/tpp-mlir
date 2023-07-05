@@ -40,6 +40,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include <string>
+#include <algorithm>
 
 using namespace mlir;
 
@@ -258,8 +259,31 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
                                        : kernelCall->getOpResult(0);
 }
 
+unsigned MLIRBench::getNumWarmupIters(unsigned iters) {
+  return std::max(MLIRBench::minIters, std::min(iters / MLIRBench::warmupRatio,
+                                                MLIRBench::maxIters));
+}
+
+Value MLIRBench::getNumWarmupIters(Value iters) {
+  assert(isa<IndexType>(iters.getType()) && "Expected index value");
+  auto minIters =
+      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::minIters);
+  auto maxIters =
+      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::maxIters);
+  auto warmupRatio =
+      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::warmupRatio);
+
+  auto targetWarmup =
+      builder.create<arith::DivUIOp>(unkLoc, iters, warmupRatio);
+  auto iterCeil =
+      builder.create<arith::MinUIOp>(unkLoc, targetWarmup, maxIters);
+  auto iterFloor = builder.create<arith::MaxUIOp>(unkLoc, minIters, iterCeil);
+
+  return iterFloor;
+}
+
 Value MLIRBench::createTimerLoop(unsigned iters) {
-  int n = iters + MLIRBench::numWarmupLoops;
+  int n = iters + getNumWarmupIters(iters);
 
   // Allocates buffer for results
   auto count = getConstInt(builder, n, 64);
@@ -281,10 +305,14 @@ Value MLIRBench::createTimerLoop(unsigned iters) {
 
 Value MLIRBench::getTimerStats(Value accBuf) {
   // Skip the warmup loops in stats calculation
-  auto offset =
-      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::numWarmupLoops);
   auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
   auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
+
+  // The offset is slightly inaccurate as the buffer lenght already includes
+  // the warmup iters. However, the difference is negligible for the chosen
+  // max iters and only a few more deltas will be skipped in the worst case
+  // does not impact the overall stats.
+  auto offset = getNumWarmupIters(len);
   auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
   auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
   auto subview = builder.create<memref::SubViewOp>(

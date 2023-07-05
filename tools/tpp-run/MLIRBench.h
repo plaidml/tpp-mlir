@@ -51,7 +51,14 @@ struct MLIRBenchConfig {
 /// inteface is a bit weird, but it will get better once we clear the
 /// API design, with time.
 class MLIRBench {
-  static constexpr int numWarmupLoops = 5;
+  /// Min number of warmup loops
+  static unsigned constexpr minIters = 1;
+
+  /// Max number of warmup loops
+  static unsigned constexpr maxIters = 100;
+
+  /// Target ratio of warmup loops: ( total iterations / warmupRatio )
+  static unsigned constexpr warmupRatio = 10;
 
   /// MLIR OpBulder
   OpBuilder builder;
@@ -125,6 +132,12 @@ public:
   /// Returns the result of a kernel call, which is either
   /// the return value (if any) or the last argument (outs).
   Value getKernelResult(Operation *kernelCall);
+
+  /// Computes compile-time number of warmup iters
+  unsigned getNumWarmupIters(unsigned iters);
+
+  /// Computes runtime number of warmup iters
+  Value getNumWarmupIters(Value iters);
 
   /// Create a benchmarking region around the kernel call
   /// Returns the memref containing measured time deltas

@@ -149,7 +149,7 @@ func.func @entry(%A: tensor<4x8xf32>,
 
 // BENCH_STATS-LABEL: @entry
 // BENCH_STATS-NOT: call @_entry
-// BENCH_STATS: %[[deltas:.+]] = memref.alloc() : memref<15xf64>
+// BENCH_STATS: %[[deltas:.+]] = memref.alloc()
 // BENCH_STATS: perf.bench
 // BENCH_STATS: call @_entry
 // BENCH_STATS-NOT: call @_entry
