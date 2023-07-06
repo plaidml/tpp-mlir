@@ -35,7 +35,14 @@ target_link_libraries(tpp-run PRIVATE ${LIBS})
 
 if (TPP_GPU MATCHES "cuda")
   set(TPP_GPU_LINK_FLAGS
+      ${TPP_GPU_LINK_FLAGS}
       -lmlir_cuda_runtime
+    )
+endif()
+
+if (TPP_GPU MATCHES "vulkan")
+  set(TPP_GPU_LINK_FLAGS
+      ${TPP_GPU_LINK_FLAGS}
       -lvulkan-runtime-wrappers
     )
 endif()

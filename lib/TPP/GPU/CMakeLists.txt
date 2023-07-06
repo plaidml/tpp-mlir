@@ -25,3 +25,10 @@ if (TPP_GPU MATCHES "cuda")
     TPP_CUDA_ENABLE=1
   )
 endif()
+
+if (TPP_GPU MATCHES "vulkan")
+  target_compile_definitions(obj.TPPGPU
+    PRIVATE
+    TPP_VULKAN_ENABLE=1
+  )
+endif()

@@ -59,7 +59,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-#ifdef TPP_GPU_ENABLE
+#ifdef TPP_VULKAN_ENABLE
     // Create SPIRV kernels.
     pm.addPass(createConvertGPUToSPIRVPass());
     pm.addNestedPass<spirv::ModuleOp>(
@@ -73,7 +73,7 @@ private:
     // Cleanup IR.
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-#endif // TPP_GPU_ENABLE
+#endif // TPP_VULKAN_ENABLE
   }
 };
 
