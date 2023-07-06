@@ -22,11 +22,21 @@ if [ "${TPP_LLVM}" ]; then
   if [ "${TPP_LLVM_VERSION}" ]; then
     # setup environment
     export TPP_LLVM_DIR=${TPP_LLVM}/${TPP_LLVM_VERSION}
-    # avoid overriding PATH/LD_LIBRARY_PATH of initial environment (append)
-    export PATH=${PATH}:${TPP_LLVM_DIR}/bin
-    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${TPP_LLVM_DIR}/lib
 
-    # setup additional/legacy envronment variables
+    # avoid overriding LD_LIBRARY_PATH of initial environment (append)
+    if [[ "${LD_LIBRARY_PATH}" != *":${TPP_LLVM}"* ]]; then
+      export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${TPP_LLVM_DIR}/lib
+    else
+      echo "WARNING: LD_LIBRARY_PATH already refers to ${TPP_LLVM}!"
+    fi
+    # avoid overriding PATH of initial environment (append)
+    if [[ "${PATH}" != *":${TPP_LLVM}"* ]]; then
+      export PATH=${PATH}:${TPP_LLVM_DIR}/bin
+    else
+      echo "WARNING: PATH already refers to ${TPP_LLVM}!"
+    fi
+
+    # setup additional/legacy environment variables
     export CUSTOM_LLVM_ROOT=${TPP_LLVM_DIR}
     export LLVM_VERSION=${TPP_LLVM_VERSION}
   else
