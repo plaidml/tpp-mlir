@@ -9,6 +9,8 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -52,6 +54,7 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     registry.insert<nvgpu::NVGPUDialect>();
     registry.insert<memref::MemRefDialect>();
     registry.insert<affine::AffineDialect>();
+    registry.insert<arith::ArithDialect>();
   }
 
   void runOnOperation() override {
