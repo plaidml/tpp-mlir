@@ -12,11 +12,6 @@ add_mlir_library(TPPGPU
     MLIRGPUDialect
     MLIRGPUTransforms
     MLIRSCFToGPU
-    MLIRGPUToNVVMTransforms
-    MLIRSPIRVDialect
-    MLIRSPIRVTransforms
-    MLIRGPUToVulkanTransforms
-    MLIRGPUToSPIRV
 )
 
 if (TPP_GPU MATCHES "cuda")
@@ -24,11 +19,24 @@ if (TPP_GPU MATCHES "cuda")
     PRIVATE
     TPP_CUDA_ENABLE=1
   )
+
+  target_link_libraries(TPPGPU
+    PUBLIC
+    MLIRGPUToNVVMTransforms
+  )
 endif()
 
 if (TPP_GPU MATCHES "vulkan")
   target_compile_definitions(obj.TPPGPU
     PRIVATE
     TPP_VULKAN_ENABLE=1
+  )
+
+  target_link_libraries(TPPGPU
+    PUBLIC
+    MLIRSPIRVDialect
+    MLIRSPIRVTransforms
+    MLIRGPUToVulkanTransforms
+    MLIRGPUToSPIRV
   )
 endif()
