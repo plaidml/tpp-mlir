@@ -432,8 +432,7 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   passManager.addPass(createConvertMathToLLVMPass());
   passManager.addPass(createConvertFuncToLLVMPass());
 
-  if (defGpuBackend.getValue() == "cuda")
-    passManager.addPass(createGpuToLLVMConversionPass());
+  passManager.addPass(createGpuToLLVMConversionPass());
 
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
