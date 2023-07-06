@@ -122,7 +122,7 @@ private:
     // Lower GPU ops to the chosen GPU backend.
     switch (parseGpuOption(this->gpuBackend)) {
     case GpuType::Cuda:
-      pm.addNestedPass<gpu::GPUModuleOp>(createGpuToCudaPass());
+      pm.addPass(createGpuToCudaPass());
       break;
     case GpuType::Vulkan:
       pm.addPass(createGpuToVulkanPass());

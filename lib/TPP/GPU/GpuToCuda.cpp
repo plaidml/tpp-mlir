@@ -62,7 +62,14 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     if (pm.empty())
       constructPipeline();
 
-    if (failed(runPipeline(pm, module)))
+    // Process GPU modules sequentially to avoid CUDA errors that
+    // appear during parallel compilation.
+    auto walkRes = module->walk([&](gpu::GPUModuleOp gpuModule) {
+      if (failed(runPipeline(pm, gpuModule)))
+        return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (walkRes.wasInterrupted())
       return signalPassFailure();
   }
 
@@ -92,7 +99,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
                                StringRef gpuFeatures) {
   return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);

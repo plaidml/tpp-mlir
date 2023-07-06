@@ -406,7 +406,7 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let constructor = "mlir::tpp::createGpuConversionPass()";
 }
 
-def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
+def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
   let summary = "Lower generic GPU operations to CUDA backend";
   let constructor = "mlir::tpp::createGpuToCudaPass()";
   let options = [
