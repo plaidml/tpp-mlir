@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline=gpu=vulkan -split-input-file | FileCheck %s
 
 func.func @linalg_matmul() {
   %0 = memref.alloc() : memref<8x8xf32>

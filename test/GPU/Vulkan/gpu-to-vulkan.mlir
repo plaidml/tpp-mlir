@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-opt %s -gpu-to-cuda -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -gpu-to-vulkan -split-input-file | FileCheck %s
 
 #map = affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>
 
