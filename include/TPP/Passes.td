@@ -406,7 +406,7 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let constructor = "mlir::tpp::createGpuConversionPass()";
 }
 
-def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
+def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
   let summary = "Lower generic GPU operations to CUDA backend";
   let constructor = "mlir::tpp::createGpuToCudaPass()";
   let options = [
@@ -420,6 +420,11 @@ def GpuToCuda : Pass<"gpu-to-cuda", "gpu::GPUModuleOp"> {
             /*default=*/"\"+ptx60\"",
            "GPU target features.">,
   ];
+}
+
+def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
+  let summary = "Lower generic GPU operations to Vulkan backend";
+  let constructor = "mlir::tpp::createGpuToVulkanPass()";
 }
 
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {

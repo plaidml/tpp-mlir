@@ -38,7 +38,7 @@ cmake -G Ninja .. \
    -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit \
    -DCMAKE_C_COMPILER=clang \
    -DCMAKE_CXX_COMPILER=clang++ \
-   -DTPP_GPU=cuda
+   -DTPP_GPU="cuda;vulkan"
 ```
 
 ## CUDA setup

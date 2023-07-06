@@ -1,5 +1,8 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline=gpu=vulkan -split-input-file | FileCheck %s
+
+// TODO enable when SPIRV annotations can be automatically applied
+// XFAIL:*
 
 func.func @linalg_matmul() {
   %0 = memref.alloc() : memref<8x8xf32>
@@ -17,6 +20,10 @@ func.func @linalg_matmul() {
                 outs(%2 : memref<8x8xf32>)
 
   call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
+
+  memref.dealloc %0 : memref<8x8xf32>
+  memref.dealloc %1 : memref<8x8xf32>
+  memref.dealloc %2 : memref<8x8xf32>
 
   return
 }

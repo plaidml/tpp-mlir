@@ -1,12 +1,4 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: mlir-opt %s -convert-linalg-to-parallel-loops -gpu-map-parallel-loops \
-// RUN:   -convert-parallel-loops-to-gpu -gpu-kernel-outlining \
-// RUN:   -canonicalize -cse \
-// RUN: | mlir-opt -pass-pipeline='builtin.module(gpu.module(strip-debuginfo,convert-gpu-to-nvvm,reconcile-unrealized-casts,gpu-to-cubin))' \
-// RUN: | mlir-opt -canonicalize -cse \
-// RUN: | FileCheck %s
-
-// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda | FileCheck %s
 
 // Original test from: llvm-project/mlir/test/Integration/GPU/CUDA/all-reduce-max.mlir
@@ -64,6 +56,9 @@ func.func @main() {
   }
 
   call @printMemrefI32(%cast_sum) : (memref<*xi32>) -> ()
+
+  memref.dealloc %data : memref<2x6xi32>
+  memref.dealloc %sum : memref<2xi32>
 
   return
 }

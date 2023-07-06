@@ -9,6 +9,8 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -52,6 +54,7 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     registry.insert<nvgpu::NVGPUDialect>();
     registry.insert<memref::MemRefDialect>();
     registry.insert<affine::AffineDialect>();
+    registry.insert<arith::ArithDialect>();
   }
 
   void runOnOperation() override {
@@ -62,7 +65,14 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     if (pm.empty())
       constructPipeline();
 
-    if (failed(runPipeline(pm, module)))
+    // Process GPU modules sequentially to avoid CUDA errors that
+    // appear during parallel compilation.
+    auto walkRes = module->walk([&](gpu::GPUModuleOp gpuModule) {
+      if (failed(runPipeline(pm, gpuModule)))
+        return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (walkRes.wasInterrupted())
       return signalPassFailure();
   }
 
@@ -77,7 +87,7 @@ private:
     pm.addPass(createLowerAffinePass());
     pm.addPass(createConvertSCFToCFPass());
 
-    // Create GPU kernels.
+    // Create CUDA kernels.
     pm.addPass(createStripDebugInfoPass());
     pm.addPass(createLowerGpuOpsToNVVMOpsPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
@@ -92,7 +102,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
                                StringRef gpuFeatures) {
   return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
