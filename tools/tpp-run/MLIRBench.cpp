@@ -264,26 +264,9 @@ unsigned MLIRBench::getNumWarmupIters(unsigned iters) {
                                                 MLIRBench::maxIters));
 }
 
-Value MLIRBench::getNumWarmupIters(Value iters) {
-  assert(isa<IndexType>(iters.getType()) && "Expected index value");
-  auto minIters =
-      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::minIters);
-  auto maxIters =
-      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::maxIters);
-  auto warmupRatio =
-      builder.create<arith::ConstantIndexOp>(unkLoc, MLIRBench::warmupRatio);
-
-  auto targetWarmup =
-      builder.create<arith::DivUIOp>(unkLoc, iters, warmupRatio);
-  auto iterCeil =
-      builder.create<arith::MinUIOp>(unkLoc, targetWarmup, maxIters);
-  auto iterFloor = builder.create<arith::MaxUIOp>(unkLoc, minIters, iterCeil);
-
-  return iterFloor;
-}
-
-Value MLIRBench::createTimerLoop(unsigned iters) {
-  int n = iters + getNumWarmupIters(iters);
+unsigned MLIRBench::createTimerLoop(unsigned iters) {
+  const int warmupIters = getNumWarmupIters(iters);
+  const int n = iters + warmupIters;
 
   // Allocates buffer for results
   auto count = getConstInt(builder, n, 64);
@@ -300,19 +283,27 @@ Value MLIRBench::createTimerLoop(unsigned iters) {
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
-  return acc;
+
+  // Store benchmarking loop
+  MLIRBenchTimerLoop benchLoop(acc, iters, warmupIters);
+  benchLoops.push_back(benchLoop);
+
+  return benchLoops.size() - 1;
 }
 
-Value MLIRBench::getTimerStats(Value accBuf) {
+Value MLIRBench::getTimerStats(unsigned loopId) {
+  assert(loopId < benchLoops.size() && "Invalid bench loop ID");
+
+  auto &benchLoop = benchLoops[loopId];
+  assert(benchLoop.valid && "Bench loop already invalidated");
+
+  Value accBuf = benchLoop.deltas;
+
   // Skip the warmup loops in stats calculation
   auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
   auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
-
-  // The offset is slightly inaccurate as the buffer lenght already includes
-  // the warmup iters. However, the difference is negligible for the chosen
-  // max iters and only a few more deltas will be skipped in the worst case
-  // which does not impact the overall stats.
-  auto offset = getNumWarmupIters(len);
+  auto offset =
+      builder.create<arith::ConstantIndexOp>(unkLoc, benchLoop.numWarmupIters);
   auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
   auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
   auto subview = builder.create<memref::SubViewOp>(
@@ -353,6 +344,9 @@ Value MLIRBench::getTimerStats(Value accBuf) {
   // Clean up results buffer
   builder.create<memref::DeallocOp>(unkLoc, accBuf);
   builder.create<memref::DeallocOp>(unkLoc, acc);
+
+  // Invalidate the bench loop
+  benchLoop.valid = false;
 
   return insDev;
 }

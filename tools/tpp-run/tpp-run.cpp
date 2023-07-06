@@ -207,8 +207,6 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   } else {
     // This is the main loop, if N > 1
     auto acc = bench.createTimerLoop(benchNumLoops);
-    if (!acc)
-      return bench.emitError("Cannot create timer loop");
     auto stats = bench.getTimerStats(acc);
     if (!stats)
       return bench.emitError("Cannot get timer stats");
