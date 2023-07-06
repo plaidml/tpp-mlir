@@ -44,6 +44,11 @@ module attributes {
         args(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
     %arg6 = memref.cast %arg5 : memref<?xf32> to memref<*xf32>
     call @printMemrefF32(%arg6) : (memref<*xf32>) -> ()
+
+    memref.dealloc %arg0 : memref<8xf32>
+    memref.dealloc %arg1 : memref<8xf32>
+    memref.dealloc %arg2 : memref<8xf32>
+
     return
   }
   func.func private @fillResource1DFloat(%0 : memref<?xf32>, %1 : f32)

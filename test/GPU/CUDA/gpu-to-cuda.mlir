@@ -19,6 +19,9 @@ module attributes {gpu.container_module} {
     gpu.host_register %cast_3 : memref<*xf32>
     gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c8, %c8, %c1) threads in (%c1, %c1, %c1) args(%c1 : index, %c0 : index, %alloc : memref<8x8xf32>, %alloc_0 : memref<8x8xf32>, %alloc_1 : memref<8x8xf32>, %c8 : index)
     call @printMemrefF32(%cast_3) : (memref<*xf32>) -> ()
+    memref.dealloc %alloc : memref<8x8xf32>
+    memref.dealloc %alloc_0 : memref<8x8xf32>
+    memref.dealloc %alloc_1 : memref<8x8xf32>
     return
   }
 

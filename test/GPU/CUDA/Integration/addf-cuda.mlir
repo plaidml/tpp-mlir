@@ -37,6 +37,11 @@ module attributes {gpu.container_module} {
         args(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
     %arg6 = memref.cast %arg2 : memref<8xf32> to memref<*xf32>
     call @printMemrefF32(%arg6) : (memref<*xf32>) -> ()
+
+    memref.dealloc %arg0 : memref<8xf32>
+    memref.dealloc %arg1 : memref<8xf32>
+    memref.dealloc %arg2 : memref<8xf32>
+
     return
   }
   func.func private @printMemrefF32(%ptr : memref<*xf32>)

@@ -65,6 +65,9 @@ func.func @main() {
 
   call @printMemrefI32(%cast_sum) : (memref<*xi32>) -> ()
 
+  memref.dealloc %data : memref<2x6xi32>
+  memref.dealloc %sum : memref<2xi32>
+
   return
 }
 

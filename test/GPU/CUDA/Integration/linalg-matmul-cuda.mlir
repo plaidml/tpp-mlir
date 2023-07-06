@@ -28,6 +28,10 @@ func.func @entry() {
 
   call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
 
+  memref.dealloc %0 : memref<8x8xf32>
+  memref.dealloc %1 : memref<8x8xf32>
+  memref.dealloc %2 : memref<8x8xf32>
+
   return
 }
 
