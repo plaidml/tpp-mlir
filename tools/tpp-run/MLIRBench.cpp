@@ -39,8 +39,8 @@
 #include "TPP/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
 
-#include <string>
 #include <algorithm>
+#include <string>
 
 using namespace mlir;
 
