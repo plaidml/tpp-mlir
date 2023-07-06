@@ -80,7 +80,7 @@ func.func @block_linalg_matmul(
 // CHECK-SAME:  into %[[EMPTY_FILL]] : tensor<128x128xf32> -> tensor<4x4x32x32xf32>
 // CHECK: %[[RES:.+]] = linalg.generic
 // CHECK: %{{.+}} = tensor.unpack %[[RES]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] 
-// CHECK-SAME:  into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
+// CHECK-SAME:  into %[[FILL]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 
 // -----
 
@@ -119,7 +119,6 @@ func.func @block_linalg_matmul(
 // CHECK: %[[VAL:.+]] = linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP5]]], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%[[PACK0]], %[[PACK1]] : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>) outs(%[[PACK2]] : tensor<4x4x32x32xf32>)
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x4x32x32xf32> -> tensor<128x128xf32>
 // CHECK: return %[[OUT]] : tensor<128x128xf32>
-// CHECK: }
 
 // -----
 
