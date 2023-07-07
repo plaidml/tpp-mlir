@@ -40,7 +40,14 @@
                  "environment": { "OMP_NUM_THREADS": "32" },
                  "flags": [ "-n", "100" ],
                  "extensions": [ "(avx2|asimd)" ]
-             }
+             },
+             "generic": {
+                 "type": "GENERIC",
+                 "benchmark": [ "binary", "--flag1 --flag2=value -n 100" ],
+                 "environment": {},
+                 "flags": {},
+                 "extensions": [ "(avx2|asimd)" ]
+             },
          },
          "128x256x512":  {
              ...
@@ -321,7 +328,6 @@ class GenericRun(BaseRun):
     def run(self):
         self.setup()
         gen_cmd = list()
-        # Generate benchmarking code
         gen_cmd.extend(self.benchmark)
         res = self.runner.run(gen_cmd)
         self.stdout = res.stdout
