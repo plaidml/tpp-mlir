@@ -39,6 +39,7 @@
 #include "TPP/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
 
+#include <algorithm>
 #include <string>
 
 using namespace mlir;
@@ -258,7 +259,15 @@ Value MLIRBench::getKernelResult(Operation *kernelCall) {
                                        : kernelCall->getOpResult(0);
 }
 
-Value MLIRBench::createTimerLoop(unsigned n) {
+unsigned MLIRBench::getNumWarmupIters(unsigned iters) {
+  return std::max(MLIRBench::minIters, std::min(iters / MLIRBench::warmupRatio,
+                                                MLIRBench::maxIters));
+}
+
+unsigned MLIRBench::createTimerLoop(unsigned iters) {
+  const int warmupIters = getNumWarmupIters(iters);
+  const int n = iters + warmupIters;
+
   // Allocates buffer for results
   auto count = getConstInt(builder, n, 64);
   auto memrefType = MemRefType::get({n}, builder.getF64Type());
@@ -269,14 +278,45 @@ Value MLIRBench::createTimerLoop(unsigned n) {
   builder.setInsertionPointToStart(loop.getBody());
 
   // Call the kernel, ignore output
-  callKernel();
+  auto *call = callKernel();
+  assert(call && "Failed to generate a kernel call");
 
   // Revert insertion point and return the accumulation ID
   builder.setInsertionPointAfter(loop);
-  return acc;
+
+  // Store benchmarking loop
+  MLIRBenchTimerLoop benchLoop(acc, iters, warmupIters);
+  benchLoops.push_back(benchLoop);
+
+  return benchLoops.size() - 1;
 }
 
-Value MLIRBench::getTimerStats(Value acc) {
+Value MLIRBench::getTimerStats(unsigned loopId) {
+  assert(loopId < benchLoops.size() && "Invalid bench loop ID");
+
+  auto &benchLoop = benchLoops[loopId];
+  assert(benchLoop.valid && "Bench loop already invalidated");
+
+  Value accBuf = benchLoop.deltas;
+
+  // Skip the warmup loops in stats calculation
+  auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
+  auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
+  auto offset =
+      builder.create<arith::ConstantIndexOp>(unkLoc, benchLoop.numWarmupIters);
+  auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
+  auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
+  auto subview = builder.create<memref::SubViewOp>(
+      unkLoc, accBuf, ValueRange{offset}, ValueRange{size}, ValueRange{stride});
+
+  // Copy the deltas into an separate smaller buffer to ensure
+  // that perf functions do not read the warmup loop deltas
+  auto accType =
+      MemRefType::get({mlir::ShapedType::kDynamic}, builder.getF64Type());
+  auto acc = builder.create<memref::AllocOp>(unkLoc, accType, ValueRange{size});
+  builder.create<memref::CopyOp>(unkLoc, subview, acc);
+
+  // Compute timer stats
   auto callMean =
       builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
   auto mean = callMean.getMean();
@@ -302,7 +342,11 @@ Value MLIRBench::getTimerStats(Value acc) {
       builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
 
   // Clean up results buffer
+  builder.create<memref::DeallocOp>(unkLoc, accBuf);
   builder.create<memref::DeallocOp>(unkLoc, acc);
+
+  // Invalidate the bench loop
+  benchLoop.valid = false;
 
   return insDev;
 }

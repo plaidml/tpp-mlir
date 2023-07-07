@@ -1,4 +1,4 @@
-// RUN: tpp-run %s -n 10 \
+// RUN: tpp-run %s \
 // RUN:         -print -e resnet50_bottleneck_block -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXEC
 
@@ -278,6 +278,3 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
 
 // Output
 // EXEC: ( 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923, 75.2923 )
-//
-// Stats
-// EXEC: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )

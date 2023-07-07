@@ -9,8 +9,11 @@
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -linalg-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
 
 // Benchmark options
-// RUN: tpp-run %s -e entry -entry-point-result=void -print 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
-// RUN: tpp-run %s -e entry -entry-point-result=void -n 10  2>&1 | FileCheck %s --check-prefix=BENCH_STATS
+// RUN: tpp-run %s -e entry -entry-point-result=void -print -print-mlir=early 2>&1 | FileCheck %s --check-prefix=BENCH_PRINT
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 10 -print-mlir=late 2>&1 | FileCheck %s --check-prefix=BENCH_STATS
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 2 -print-mlir=late 2>&1 | FileCheck %s --check-prefix=BENCH_STATS_2
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 100 -print-mlir=late 2>&1 | FileCheck %s --check-prefix=BENCH_STATS_100
+// RUN: tpp-run %s -e entry -entry-point-result=void -n 2000 -print-mlir=late 2>&1 | FileCheck %s --check-prefix=BENCH_STATS_2000
 
 // CPU options can't be tested as even the LLVM IR is identical
 // Splat and init options in tpp-run-splat-* tests
@@ -139,11 +142,82 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LOOPS-LABEL: @entry
 // LOOPS:   call @_entry({{.*}}) : (memref<4x8xf32>, memref<4x4xf32>, memref<f32>) -> ()
 
-
+// BENCH_PRINT-LABEL: @entry
+// BENCH_PRINT: call @_entry
+// BENCH_PRINT: print
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 // BENCH_PRINT: ( 10, 10, 10, 10 )
 
-
+// BENCH_STATS-LABEL: @entry
+// BENCH_STATS-DAG: %[[c11:.+]] = arith.constant 11 : index
+// BENCH_STATS-NOT: call @_entry
+// BENCH_STATS: %[[deltas:.+]] = memref.alloc() : memref<11xf64>
+// BENCH_STATS: scf.for{{.*}}to %[[c11]]
+// BENCH_STATS: call @_entry
+// BENCH_STATS-NOT: call @_entry
+// BENCH_STATS: %[[subview:.+]] = memref.reinterpret_cast %[[deltas]] to offset: [1], sizes: [10], strides: [1]
+// BENCH_STATS: %[[subDeltas:.+]] = memref.alloc() : memref<10xf64>
+// BENCH_STATS: memref.copy %[[subview]], %[[subDeltas]]
+// BENCH_STATS: %[[viewCast:.+]] = memref.cast %[[subDeltas]]
+// BENCH_STATS: call @perf_mean(%[[viewCast]]
+// BENCH_STATS: call @perf_stdev(%[[viewCast]]
+// BENCH_STATS-NOT: call @_entry
+// BENCH_STATS-DAG: memref.dealloc %[[deltas]]
+// BENCH_STATS-DAG: memref.dealloc %[[subDeltas]]
 // BENCH_STATS: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
+
+// BENCH_STATS_2-LABEL: @entry
+// BENCH_STATS_2-DAG: %[[c3:.+]] = arith.constant 3 : index
+// BENCH_STATS_2-NOT: call @_entry
+// BENCH_STATS_2: %[[deltas:.+]] = memref.alloc() : memref<3xf64>
+// BENCH_STATS_2: scf.for{{.*}}to %[[c3]]
+// BENCH_STATS_2: call @_entry
+// BENCH_STATS_2-NOT: call @_entry
+// BENCH_STATS_2: %[[subview:.+]] = memref.reinterpret_cast %[[deltas]] to offset: [1], sizes: [2], strides: [1]
+// BENCH_STATS_2: %[[subDeltas:.+]] = memref.alloc() : memref<2xf64>
+// BENCH_STATS_2: memref.copy %[[subview]], %[[subDeltas]]
+// BENCH_STATS_2: %[[viewCast:.+]] = memref.cast %[[subDeltas]]
+// BENCH_STATS_2: call @perf_mean(%[[viewCast]]
+// BENCH_STATS_2: call @perf_stdev(%[[viewCast]]
+// BENCH_STATS_2-NOT: call @_entry
+// BENCH_STATS_2-DAG: memref.dealloc %[[deltas]]
+// BENCH_STATS_2-DAG: memref.dealloc %[[subDeltas]]
+// BENCH_STATS_2: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
+
+// BENCH_STATS_100-LABEL: @entry
+// BENCH_STATS_100-DAG: %[[c110:.+]] = arith.constant 110 : index
+// BENCH_STATS_100-NOT: call @_entry
+// BENCH_STATS_100: %[[deltas:.+]] = memref.alloc() : memref<110xf64>
+// BENCH_STATS_100: scf.for{{.*}}to %[[c110]]
+// BENCH_STATS_100: call @_entry
+// BENCH_STATS_100-NOT: call @_entry
+// BENCH_STATS_100: %[[subview:.+]] = memref.reinterpret_cast %[[deltas]] to offset: [10], sizes: [100], strides: [1]
+// BENCH_STATS_100: %[[subDeltas:.+]] = memref.alloc() : memref<100xf64>
+// BENCH_STATS_100: memref.copy %[[subview]], %[[subDeltas]]
+// BENCH_STATS_100: %[[viewCast:.+]] = memref.cast %[[subDeltas]]
+// BENCH_STATS_100: call @perf_mean(%[[viewCast]]
+// BENCH_STATS_100: call @perf_stdev(%[[viewCast]]
+// BENCH_STATS_100-NOT: call @_entry
+// BENCH_STATS_100-DAG: memref.dealloc %[[deltas]]
+// BENCH_STATS_100-DAG: memref.dealloc %[[subDeltas]]
+// BENCH_STATS_100: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )
+
+// BENCH_STATS_2000-LABEL: @entry
+// BENCH_STATS_2000-DAG: %[[c2100:.+]] = arith.constant 2100 : index
+// BENCH_STATS_2000-NOT: call @_entry
+// BENCH_STATS_2000: %[[deltas:.+]] = memref.alloc() : memref<2100xf64>
+// BENCH_STATS_2000: scf.for{{.*}}to %[[c2100]]
+// BENCH_STATS_2000: call @_entry
+// BENCH_STATS_2000-NOT: call @_entry
+// BENCH_STATS_2000: %[[subview:.+]] = memref.reinterpret_cast %[[deltas]] to offset: [100], sizes: [2000], strides: [1]
+// BENCH_STATS_2000: %[[subDeltas:.+]] = memref.alloc() : memref<2000xf64>
+// BENCH_STATS_2000: memref.copy %[[subview]], %[[subDeltas]]
+// BENCH_STATS_2000: %[[viewCast:.+]] = memref.cast %[[subDeltas]]
+// BENCH_STATS_2000: call @perf_mean(%[[viewCast]]
+// BENCH_STATS_2000: call @perf_stdev(%[[viewCast]]
+// BENCH_STATS_2000-NOT: call @_entry
+// BENCH_STATS_2000-DAG: memref.dealloc %[[deltas]]
+// BENCH_STATS_2000-DAG: memref.dealloc %[[subDeltas]]
+// BENCH_STATS_2000: ( {{[0-9]+}}{{.?}}{{[0-9e-]+}}, {{[0-9]+}}{{.?}}{{[0-9e-]+}} )

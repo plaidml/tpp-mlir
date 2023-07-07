@@ -44,6 +44,24 @@ struct MLIRBenchConfig {
   TensorInitType initType = TensorInitType::Auto;
 };
 
+struct MLIRBenchTimerLoop {
+  MLIRBenchTimerLoop(Value deltas, int numBenchIters, int numWarmupIters)
+      : deltas(deltas), numBenchIters(numBenchIters),
+        numWarmupIters(numWarmupIters), valid(true) {}
+
+  /// Buffer that holds measured time deltas
+  Value deltas;
+
+  /// Number of benchmark iterations
+  int numBenchIters;
+
+  /// Number of warmup iterations
+  int numWarmupIters;
+
+  /// True if the stored buffer is accessible.
+  bool valid;
+};
+
 /// MLIRBench - Creates wrapper for calling kernel methods.
 ///
 /// Note: This class is a mix between a utility class and a driver
@@ -51,6 +69,15 @@ struct MLIRBenchConfig {
 /// inteface is a bit weird, but it will get better once we clear the
 /// API design, with time.
 class MLIRBench {
+  /// Min number of warmup loops
+  static unsigned constexpr minIters = 1;
+
+  /// Max number of warmup loops
+  static unsigned constexpr maxIters = 100;
+
+  /// Target ratio of warmup loops: ( total iterations / warmupRatio )
+  static unsigned constexpr warmupRatio = 10;
+
   /// MLIR OpBulder
   OpBuilder builder;
 
@@ -74,6 +101,9 @@ class MLIRBench {
 
   /// Global variables for all arguments (in order)
   llvm::SmallVector<llvm::StringRef> globals;
+
+  /// Benchmarking loops
+  llvm::SmallVector<MLIRBenchTimerLoop> benchLoops;
 
   /// Seed for the random tensor filling
   int seed;
@@ -124,12 +154,16 @@ public:
   /// the return value (if any) or the last argument (outs).
   Value getKernelResult(Operation *kernelCall);
 
-  /// Create a benchmarking region around the kernel call
-  /// Returns the memref containing measured time deltas
-  Value createTimerLoop(unsigned);
+  /// Computes compile-time number of warmup iters
+  unsigned getNumWarmupIters(unsigned iters);
 
-  /// Get the timer average/deviation
-  Value getTimerStats(Value);
+  /// Create a benchmarking region around the kernel call
+  /// Returns the ID of the created benchmarking loop
+  unsigned createTimerLoop(unsigned);
+
+  /// Get the timer average/deviation of the specified benchmarking loop
+  /// The stored deltas get invalidated afterwards
+  Value getTimerStats(unsigned);
 
   /// Prints a float value (used for mean/dev)
   void printVector(Value);
