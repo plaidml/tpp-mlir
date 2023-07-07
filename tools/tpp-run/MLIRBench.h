@@ -124,7 +124,8 @@ class MLIRBench {
   Block &getMainBlock();
 
   // Expose memref buffer to GPU
-  void registerOnGpu(Value buf, MemRefType memRefTy);
+  // Returns registered buffer
+  Value registerOnGpu(Value buf, MemRefType memRefTy);
 
 public:
   /// Creates context, builder

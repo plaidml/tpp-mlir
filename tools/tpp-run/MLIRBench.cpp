@@ -184,11 +184,29 @@ LogicalResult MLIRBench::renameKernel() {
   return success();
 }
 
-void MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
+Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
+  OpBuilder::InsertionGuard guard(builder);
+
+  // Do nothing when not using GPU
+  if (defGpuBackend.empty())
+    return buf;
+
+  if (defGpuBackend == "vulkan") {
+    // Copy to heap as global memory is not shared between host and device
+    auto localBuf = builder.create<memref::AllocOp>(unkLoc, memRefTy);
+    builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
+
+    builder.setInsertionPointToEnd(&getMainBlock());
+    builder.create<memref::DeallocOp>(unkLoc, localBuf);
+
+    return localBuf;
+  }
+
   auto unrankedType = UnrankedMemRefType::get(memRefTy.getElementType(),
                                               memRefTy.getMemorySpace());
   auto cast = builder.create<memref::CastOp>(unkLoc, unrankedType, buf);
   builder.create<gpu::HostRegisterOp>(unkLoc, cast);
+  return buf;
 }
 
 LogicalResult MLIRBench::createKernelArgs() {
@@ -205,8 +223,7 @@ LogicalResult MLIRBench::createKernelArgs() {
                      // Create a memref global
                      Value data = createDenseMemref(builder, module, initType,
                                                     memRefTy, seed);
-                     if (!defGpuBackend.empty())
-                       registerOnGpu(data, memRefTy);
+                     data = registerOnGpu(data, memRefTy);
                      return data;
                    })
                    .Case<TensorType>([&](auto tensorTy) {
@@ -218,8 +235,7 @@ LogicalResult MLIRBench::createKernelArgs() {
                          tensorTy.getShape(), tensorTy.getElementType());
                      auto data = createDenseMemref(builder, module, initType,
                                                    memrefType, seed);
-                     if (!defGpuBackend.empty())
-                       registerOnGpu(data, memrefType);
+                     data = registerOnGpu(data, memrefType);
                      return builder.create<bufferization::ToTensorOp>(
                          unkLoc, data, /*restrict=*/true, /*writable=*/true);
                    })
@@ -231,7 +247,7 @@ LogicalResult MLIRBench::createKernelArgs() {
     kernelArgs.push_back(*arg);
   }
 
-  builder.setInsertionPointToEnd(&mainBody);
+  // builder.setInsertionPointAfter(kernelArgs.back().getDefiningOp());
 
   return success();
 }
@@ -444,6 +460,8 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToEnd(&getMainBlock());
     builder.create<func::ReturnOp>(unkLoc);
   }
 
