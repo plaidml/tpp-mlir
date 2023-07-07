@@ -313,7 +313,7 @@ class IrGeneratorRun(BaseRun):
         return True
 
 class GenericRun(BaseRun):
-    """ Generic cli runs """
+    """ Generic cli runs - NOTE: user must ensure output correctness """
 
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.generic", loglevel)
