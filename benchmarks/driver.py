@@ -47,7 +47,7 @@
                  "environment": {},
                  "flags": {},
                  "extensions": [ "(avx2|asimd)" ]
-             },
+             }
          },
          "128x256x512":  {
              ...
@@ -329,6 +329,7 @@ class GenericRun(BaseRun):
         self.setup()
         gen_cmd = list()
         gen_cmd.extend(self.benchmark)
+        # Expects the command to produce correctly formatted output
         res = self.runner.run(gen_cmd)
         self.stdout = res.stdout
         self.stderr = res.stderr
