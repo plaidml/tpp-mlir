@@ -15,26 +15,27 @@ import argparse
 
 from Logger import Logger
 
+
 class TPPHelper(object):
-    """ Detects paths, libraries, executables, LLVM variables, etc. """
+    """Detects paths, libraries, executables, LLVM variables, etc."""
 
     def __init__(self, loglevel):
         self.logger = Logger("tpp.helper", loglevel)
 
     def findGitRoot(self, path):
-        """ Find the git root directory, if any, or return the input """
+        """Find the git root directory, if any, or return the input"""
 
         temp = path
         while temp:
-            if (os.path.exists(os.path.join(temp, ".git"))):
+            if os.path.exists(os.path.join(temp, ".git")):
                 return temp
             temp = os.path.abspath(os.path.join(temp, os.pardir))
         return path
 
     def findTPPProgs(self, baseDir):
-        """ Find the necessary TPP programs to run the benchmarks """
+        """Find the necessary TPP programs to run the benchmarks"""
 
-        programs = { 'tpp-opt': '', 'tpp-run': '' }
+        programs = {"tpp-opt": "", "tpp-run": ""}
         found = 0
         maxProgs = len(programs.keys())
         for root, dirs, files in os.walk(baseDir, followlinks=True):
@@ -51,4 +52,3 @@ class TPPHelper(object):
             self.logger.error(f"Found: {programs}")
             return {}
         return programs
-

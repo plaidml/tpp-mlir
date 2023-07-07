@@ -37,8 +37,9 @@ from Execute import Execute
 from FileCheckParser import FileCheckParser
 from TPPHelper import TPPHelper
 
+
 class BenchmarkController(object):
-    """ Entry point of the benchmark harness"""
+    """Entry point of the benchmark harness"""
 
     def __init__(self, args, loglevel):
         self.args = args
@@ -52,11 +53,11 @@ class BenchmarkController(object):
         if not self.build_dir:
             self.build_dir = self.baseDir
         self.programs = self.helper.findTPPProgs(self.build_dir)
-        self.output = ''
+        self.output = ""
         self.mean = 0.0
         self.stdev = 0.0
         # Output is always in seconds, we need to convert anyway
-        self.unit = "ms" # or 'gflops'
+        self.unit = "ms"  # or 'gflops'
         self.benchmark = self._read_input(args.benchmark)
 
     def _read_input(self, input):
@@ -74,43 +75,45 @@ class BenchmarkController(object):
             self.logger.error("Cannot open file '{input}': {err.strerror}")
             return {}
         except Exception as err:
-            self.logger.error("Uncaught error while parsing file: {err.strerror}")
+            self.logger.error(
+                "Uncaught error while parsing file: {err.strerror}"
+            )
             return {}
 
     def verifyArgs(self):
-        """ Verify cmd-line and IR file arguments, update defaults, etc """
+        """Verify cmd-line and IR file arguments, update defaults, etc"""
 
         # Parse the IR file for user arguments
         self.logger.info("Parsing FileCheck lines, updating arguments")
         fileArgs = FileCheckParser(self.loglevel).parse(self.benchmark)
 
         # Command line arguments have preference
-        if (not self.args.n and 'iters' in fileArgs):
-            self.args.n = fileArgs['iters']
-        if (not self.args.entry and 'entry' in fileArgs):
-            self.args.entry = fileArgs['entry']
-        if (not self.args.flops and 'flops' in fileArgs):
-            self.args.flops = fileArgs['flops']
+        if not self.args.n and "iters" in fileArgs:
+            self.args.n = fileArgs["iters"]
+        if not self.args.entry and "entry" in fileArgs:
+            self.args.entry = fileArgs["entry"]
+        if not self.args.flops and "flops" in fileArgs:
+            self.args.flops = fileArgs["flops"]
             self.unit = "gflops"
-        if (not self.args.opt_args and 'opt-args' in fileArgs):
-            self.args.opt_args = fileArgs['opt-args']
-        if (not self.args.run_args and 'run-args' in fileArgs):
-            self.args.run_args = fileArgs['run-args']
+        if not self.args.opt_args and "opt-args" in fileArgs:
+            self.args.opt_args = fileArgs["opt-args"]
+        if not self.args.run_args and "run-args" in fileArgs:
+            self.args.run_args = fileArgs["run-args"]
 
         # Make sure we get all we need
         self.logger.info("Validating arguments")
-        if (not self.args.n):
+        if not self.args.n:
             logger.warning("Number of iterations not found, default to 1000")
             self.args.n = 1000
 
-        if (not self.args.entry):
+        if not self.args.entry:
             logger.error("No entry point defined, bailing")
             return False
 
         return True
 
     def run(self):
-        """ Run tpp-opt and tpp-run to get the timings """
+        """Run tpp-opt and tpp-run to get the timings"""
 
         irContents = ""
         executor = Execute(self.loglevel)
@@ -118,13 +121,15 @@ class BenchmarkController(object):
         # Only run tpp-opt if we have the arguments
         if self.args.opt_args:
             self.logger.info("Running optimiser, to prepare the IR file")
-            optCmd = [ self.programs['tpp-opt'] ]
+            optCmd = [self.programs["tpp-opt"]]
             optCmd.extend(shlex.split(self.args.opt_args))
 
             # Run tpp-opt and capture the output IR
             optResult = executor.run(optCmd, input=self.benchmark)
             if 0 != optResult.returncode:
-                self.logger.error(f"Error executing tpp-opt: {optResult.stderr}")
+                self.logger.error(
+                    f"Error executing tpp-opt: {optResult.stderr}"
+                )
                 return False
             irContents = optResult.stdout
         else:
@@ -133,17 +138,21 @@ class BenchmarkController(object):
 
         # Actually run the file in benchmark mode, no output
         self.logger.info("Running the kernel with the arguments provided")
-        runCmd = [ self.programs['tpp-run'], '-n', str(self.args.n),
-                                             '-e', self.args.entry,
-                                             '--entry-point-result=void',
-                                             '--print=0',
-                  ]
+        runCmd = [
+            self.programs["tpp-run"],
+            "-n",
+            str(self.args.n),
+            "-e",
+            self.args.entry,
+            "--entry-point-result=void",
+            "--print=0",
+        ]
         if self.args.seed is not None:
-            runCmd.extend(['--seed', str(self.args.seed)])
+            runCmd.extend(["--seed", str(self.args.seed)])
         if self.args.splat_to_random != 0:
-            runCmd.append('--splat-to-random')
+            runCmd.append("--splat-to-random")
         if self.args.init_type:
-            runCmd.extend(['--init-type', self.args.init_type])
+            runCmd.extend(["--init-type", self.args.init_type])
         if self.args.run_args:
             runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
@@ -155,10 +164,12 @@ class BenchmarkController(object):
         return True
 
     def verifyStats(self):
-        """ Verify the results, should be in format '( mean, stdev )' """
+        """Verify the results, should be in format '( mean, stdev )'"""
 
         if not self.output:
-            self.logger.error("Benchmark produced no output, can't verify results")
+            self.logger.error(
+                "Benchmark produced no output, can't verify results"
+            )
             return False
 
         # Parse results (always in seconds, as per timer)
@@ -166,7 +177,9 @@ class BenchmarkController(object):
         if m:
             self.mean = float(m.group(1))
             self.stdev = float(m.group(2))
-            self.logger.info(f"Mean time: {self.mean*1000} ms +- {self.stdev*1000} ms")
+            self.logger.info(
+                f"Mean time: {self.mean*1000} ms +- {self.stdev*1000} ms"
+            )
         else:
             self.logger.error("Cannot find mean/stdev in output")
             return False
@@ -187,45 +200,79 @@ class BenchmarkController(object):
 
         return True
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='TPP-MLIR Benchmark Harness')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="TPP-MLIR Benchmark Harness")
 
     # Required argument: benchmark name (can be a file, a directory, or stdin)
-    parser.add_argument('benchmark', nargs='?', type=argparse.FileType('r'),
-                        default=sys.stdin,
-                        help='MLIR file or directory containing MLIR files')
+    parser.add_argument(
+        "benchmark",
+        nargs="?",
+        type=argparse.FileType("r"),
+        default=sys.stdin,
+        help="MLIR file or directory containing MLIR files",
+    )
 
     # Required, but auto-detected if omitted
-    parser.add_argument('-n', type=int,
-                        help='Number of times to execute the kernel (checks RUN line)')
-    parser.add_argument('-flops', type=float,
-                        help='Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)')
-    parser.add_argument('-entry', type=str,
-                        help='Name of the entry point (checks RUN line)')
-    parser.add_argument('-opt-args', type=str,
-                        help='tpp-opt arguments (checks RUN line)')
-    parser.add_argument('-run-args', type=str,
-                        help='tpp-run arguments')
-    parser.add_argument('-v', '--verbose', action='count', default=0,
-                        help='The verbosity of logging output')
-    parser.add_argument('-q', '--quiet', action='count', default=0,
-                        help='Suppress warnings')
-    parser.add_argument('-x', '--xsmm', action='count', default=1,
-                        help='Turn on TPP optimizations (default)')
-    parser.add_argument('--disable-lsan', action='count', default=0,
-                        help='Disable LSAN')
-    parser.add_argument('--build', type=str, default="",
-                        help='Path to the build dir')
-    parser.add_argument('--seed', type=int,
-                        help='Random seed')
-    parser.add_argument('--splat-to-random', type=int, default=1,
-                        help='Replace splat dense tensors with random value (default: enabled)')
-    parser.add_argument('--init-type', type=str, default="normal",
-                        help='Random initializer type (default: normal)')
+    parser.add_argument(
+        "-n",
+        type=int,
+        help="Number of times to execute the kernel (checks RUN line)",
+    )
+    parser.add_argument(
+        "-flops",
+        type=float,
+        help="Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)",
+    )
+    parser.add_argument(
+        "-entry", type=str, help="Name of the entry point (checks RUN line)"
+    )
+    parser.add_argument(
+        "-opt-args", type=str, help="tpp-opt arguments (checks RUN line)"
+    )
+    parser.add_argument("-run-args", type=str, help="tpp-run arguments")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="The verbosity of logging output",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="count", default=0, help="Suppress warnings"
+    )
+    parser.add_argument(
+        "-x",
+        "--xsmm",
+        action="count",
+        default=1,
+        help="Turn on TPP optimizations (default)",
+    )
+    parser.add_argument(
+        "--disable-lsan", action="count", default=0, help="Disable LSAN"
+    )
+    parser.add_argument(
+        "--build", type=str, default="", help="Path to the build dir"
+    )
+    parser.add_argument("--seed", type=int, help="Random seed")
+    parser.add_argument(
+        "--splat-to-random",
+        type=int,
+        default=1,
+        help="Replace splat dense tensors with random value (default: enabled)",
+    )
+    parser.add_argument(
+        "--init-type",
+        type=str,
+        default="normal",
+        help="Random initializer type (default: normal)",
+    )
     args = parser.parse_args()
 
     # List of ASAN_OPTIONS
-    asan_options = [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+    asan_options = (
+        [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+    )
 
     # Some tensors may not be freed but we still want numbers
     if args.disable_lsan:
@@ -243,24 +290,28 @@ if __name__ == '__main__':
     controller = BenchmarkController(args, loglevel)
 
     # Checks all parameters are good
-    if (not controller.verifyArgs()):
+    if not controller.verifyArgs():
         logger.error("Argument verification error")
-        print('\n\n')
+        print("\n\n")
         parser.print_help()
         sys.exit(1)
 
     # Runs the benchmark
-    if (not controller.run()):
+    if not controller.run():
         logger.error("Error executing the benchmark")
         sys.exit(1)
 
     # Checks stats
-    if (not controller.verifyStats()):
+    if not controller.verifyStats():
         logger.error("Error verifying the statistics")
         sys.exit(1)
 
     # Success prints basic stats
     if args.flops:
-        print(f'{(controller.mean):9.3f} +- {(controller.stdev):9.3f} {controller.unit}')
+        print(
+            f"{(controller.mean):9.3f} +- {(controller.stdev):9.3f} {controller.unit}"
+        )
     else:
-        print(f'{(controller.mean):3.9f} +- {(controller.stdev):3.9f} {controller.unit}')
+        print(
+            f"{(controller.mean):3.9f} +- {(controller.stdev):3.9f} {controller.unit}"
+        )

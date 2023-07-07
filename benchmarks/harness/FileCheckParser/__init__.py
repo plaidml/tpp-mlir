@@ -16,14 +16,15 @@ import re
 
 from Logger import Logger
 
+
 class FileCheckParser(object):
     """Parsers IR files for FileCheck lines to extract informatio
-       about the execution of the kernel"""
+    about the execution of the kernel"""
 
     def __init__(self, loglevel):
         self.logger = Logger("filecheck.parser", loglevel)
         # FileCheck line style
-        self.runRE = re.compile("^\/\/\s*RUN: (.*)$");
+        self.runRE = re.compile("^\/\/\s*RUN: (.*)$")
         self.flopsRE = re.compile("^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")
         # Arguments in the RUN lines for tpp-opt
         self.optArgs = re.compile("tpp-opt (%\w+)\s+(.*?)\s*\|")
@@ -35,7 +36,7 @@ class FileCheckParser(object):
         self.result = {}
 
     def _parseLines(self, file):
-        """ Scan the file for FileCheck lines and update the results cache """
+        """Scan the file for FileCheck lines and update the results cache"""
 
         runLine = ""
         for line in file:
@@ -43,9 +44,11 @@ class FileCheckParser(object):
             m = self.flopsRE.match(line)
             if m:
                 self.logger.debug(f"FLOPS line detected: {m.group(1)}")
-                if 'flops' in self.result:
-                    self.logger.warning("Multiple flops lines detected, using last one")
-                self.result['flops'] = float(m.group(1))
+                if "flops" in self.result:
+                    self.logger.warning(
+                        "Multiple flops lines detected, using last one"
+                    )
+                self.result["flops"] = float(m.group(1))
                 continue
 
             # Now, concatenate all RUN lines, to make sure we can match
@@ -56,7 +59,7 @@ class FileCheckParser(object):
 
         # If we found any RUN line, clean it up
         if runLine:
-            runLine = re.sub('\\\\', '', runLine)
+            runLine = re.sub("\\\\", "", runLine)
             self.logger.debug(f"RUN line detected: {runLine}")
         else:
             self.logger.warning("No RUN line detected")
@@ -64,26 +67,30 @@ class FileCheckParser(object):
         # Now we match the remaining args in the RUN lines
         m = self.optArgs.search(runLine)
         if m:
-            self.result['opt-args'] = m.group(2)
+            self.result["opt-args"] = m.group(2)
             self.logger.debug(f"Opt args detected: {m.group(2)}")
 
         m = self.entryRE.search(runLine)
         if m:
-            self.result['entry'] = m.group(1)
+            self.result["entry"] = m.group(1)
             self.logger.debug(f"Entry point detected: {m.group(1)}")
         else:
-            self.logger.info("Did not find the entry point argument in RUN lines")
+            self.logger.info(
+                "Did not find the entry point argument in RUN lines"
+            )
 
         m = self.itersRE.search(runLine)
         if m:
-            self.result['iters'] = int(m.group(1))
+            self.result["iters"] = int(m.group(1))
             self.logger.debug(f"Number of iterations detected: {m.group(1)}")
         else:
-            self.logger.info("Did not find the iterations argument in RUN lines")
+            self.logger.info(
+                "Did not find the iterations argument in RUN lines"
+            )
 
         m = self.libsRE.search(runLine)
         if m:
-            self.result['shared-libs'] = m.group(1)
+            self.result["shared-libs"] = m.group(1)
             self.logger.debug(f"Shared libraries detected: {m.group(1)}")
 
     def parse(self, input):
@@ -91,7 +98,7 @@ class FileCheckParser(object):
 
         try:
             if len(input) > 1:
-                self._parseLines(input.split('\n'))
+                self._parseLines(input.split("\n"))
             else:
                 with open(input) as file:
                     self._parseLines(file)
@@ -99,13 +106,17 @@ class FileCheckParser(object):
             self.logger.error("Cannot open file '{filename}': {err.strerror}")
             return {}
         except ValueError as err:
-            self.logger.error("Cannot convert string into int/float: {err.strerror}")
+            self.logger.error(
+                "Cannot convert string into int/float: {err.strerror}"
+            )
             return {}
         except NameError as err:
             self.logger.error("Name error while parsing IR file: {err.args}")
             return {}
         except Exception as err:
-            self.logger.error("Uncaught error while parsing IR file: {err.strerror}")
+            self.logger.error(
+                "Uncaught error while parsing IR file: {err.strerror}"
+            )
             return {}
 
         # Return
