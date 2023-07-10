@@ -90,10 +90,15 @@ if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" 
 else
   # create link to CUDA stubs (CUDA incorporated by default)
   if [ ! -f "${CUDA_DRIVER}" ]; then
-    echo "Creating links to CUDA stubs"
-    ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
-    ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
-    export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+    if [ "${CUDATOOLKIT_HOME}" ]; then
+      echo "Creating links to CUDA stubs"
+      ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+      ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
+      export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+    else
+      echo "CUDA stubs are needed but CUDATOOLKIT_HOME not set"
+      exit 1
+    fi
   fi
   # more detailed support for GPU runtime, e.g., "vulkan"
   if [ "${GPU}" ]; then
