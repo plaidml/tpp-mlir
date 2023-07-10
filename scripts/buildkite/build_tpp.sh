@@ -62,7 +62,7 @@ fi
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
 BUILD_DIR=${BUILD_DIR:-build}
 
-BLD_DIR=${BUILD_DIR}-${COMPILER}
+BLD_DIR=$(realpath ${BUILD_DIR}-${COMPILER})
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
   -b ${BLD_DIR} ${BLD_DIR_RM} \
@@ -96,7 +96,7 @@ else
       ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
       export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
     else
-      echo "CUDA stubs are needed but CUDATOOLKIT_HOME not set"
+      echo "CUDA stub libraries are needed but CUDATOOLKIT_HOME is not set"
       exit 1
     fi
   fi
