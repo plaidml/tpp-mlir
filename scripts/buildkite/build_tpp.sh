@@ -60,9 +60,9 @@ fi
 
 # Defaults when lacking CI environment
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
-BUILD_DIR=${BUILD_DIR:-build}
+BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}
 
-BLD_DIR=$(realpath ${BUILD_DIR}-${COMPILER})
+BLD_DIR=$(realpath ${BUILD_DIR})
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
   -b ${BLD_DIR} ${BLD_DIR_RM} \
