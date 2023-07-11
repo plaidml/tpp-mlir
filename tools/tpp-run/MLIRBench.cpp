@@ -185,8 +185,6 @@ LogicalResult MLIRBench::renameKernel() {
 }
 
 Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
-  OpBuilder::InsertionGuard guard(builder);
-
   // Do nothing when not using GPU
   if (defGpuBackend.empty())
     return buf;
@@ -194,10 +192,14 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   if (defGpuBackend == "vulkan") {
     // Copy to heap as global memory is not shared between host and device
     auto localBuf = builder.create<memref::AllocOp>(unkLoc, memRefTy);
-    builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
+    auto copy = builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
 
+    // Dealloc the args at the end of program
     builder.setInsertionPointToEnd(&getMainBlock());
     builder.create<memref::DeallocOp>(unkLoc, localBuf);
+
+    // Continue inserting ops after the created kernel arg
+    builder.setInsertionPointAfter(copy);
 
     return localBuf;
   }
@@ -246,8 +248,6 @@ LogicalResult MLIRBench::createKernelArgs() {
 
     kernelArgs.push_back(*arg);
   }
-
-  // builder.setInsertionPointAfter(kernelArgs.back().getDefiningOp());
 
   return success();
 }
