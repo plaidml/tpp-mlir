@@ -17,8 +17,7 @@ steps:
   - wait
 
   - label: "TPP-MLIR-performance"
-    command: "${SRUN} --partition=clxtrb --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'; \
-        buildkite-agent artifact upload \"$(cd \"$${BUILDKITE_BUILD_PATH}/../artifacts/${BUILDKITE_PIPELINE_SLUG}/$${BUILDKITE_BUILD_NUMBER}\" && pwd)/*\""
+    command: "${SRUN} --partition=clxtrb --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'"
     env:
       LOGRPTSUM: "mlir"
       LOGRPTBND: "-"
