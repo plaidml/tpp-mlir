@@ -60,9 +60,9 @@ fi
 
 # Defaults when lacking CI environment
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
-BUILD_DIR=${BUILD_DIR:-build}
+BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}
 
-BLD_DIR=${BUILD_DIR}-${COMPILER}
+BLD_DIR=$(realpath ${BUILD_DIR})
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
   -b ${BLD_DIR} ${BLD_DIR_RM} \
@@ -90,10 +90,15 @@ if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" 
 else
   # create link to CUDA stubs (CUDA incorporated by default)
   if [ ! -f "${CUDA_DRIVER}" ]; then
-    echo "Creating links to CUDA stubs"
-    ln -s ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
-    ln -s ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
-    export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+    if [ "${CUDATOOLKIT_HOME}" ]; then
+      echo "Creating links to CUDA stubs"
+      ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+      ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
+      export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+    else
+      echo "CUDA stub libraries are needed but CUDATOOLKIT_HOME is not set"
+      exit 1
+    fi
   fi
   # more detailed support for GPU runtime, e.g., "vulkan"
   if [ "${GPU}" ]; then

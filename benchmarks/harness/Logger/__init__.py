@@ -16,14 +16,15 @@
 import logging
 import coloredlogs
 
+
 class Logger(object):
     def __init__(self, name, verbosity):
         self.logger = logging.getLogger(name)
 
         # Default level is WARNING (no output other than warnings and errors)
         start = logging.WARNING
-        silent = min(verbosity*10, logging.INFO)
-        coloredlogs.install(level=start-silent, logger=self.logger)
+        silent = min(verbosity * 10, logging.INFO)
+        coloredlogs.install(level=start - silent, logger=self.logger)
 
     def error(self, err):
         self.logger.error(err)

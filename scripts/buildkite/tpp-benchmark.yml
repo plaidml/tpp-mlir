@@ -22,5 +22,6 @@ steps:
     env:
       LOGRPTSUM: "mlir"
       LOGRPTFMT: "svg pdf"
+      LOGRPTSEP: "-1"
       LOGRPTBND: "-"
       LOGRPTQRY: ""

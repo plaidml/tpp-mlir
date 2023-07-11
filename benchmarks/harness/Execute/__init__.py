@@ -10,13 +10,14 @@ import subprocess
 
 from Logger import Logger
 
+
 class Execute(object):
     """Executes commands, returns out/err"""
 
     def __init__(self, loglevel):
         self.logger = Logger("execute", loglevel)
 
-    def run(self, program, input=''):
+    def run(self, program, input=""):
         """Execute Commands, return out/err"""
 
         if program and not isinstance(program, list):
@@ -28,10 +29,12 @@ class Execute(object):
             self.logger.debug(f"Executing: {' '.join(program)}")
 
         # Call the program, capturing stdout/stderr
-        result = subprocess.run(program,
-                                input=input if input else None,
-                                capture_output=True,
-                                encoding="utf-8")
+        result = subprocess.run(
+            program,
+            input=input if input else None,
+            capture_output=True,
+            encoding="utf-8",
+        )
 
         # Collect stdout, stderr as UTF-8 strings
         result.stdout = str(result.stdout)

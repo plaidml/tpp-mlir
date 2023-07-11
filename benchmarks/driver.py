@@ -63,19 +63,20 @@ import json
 import shlex
 import shutil
 
-sys.path.append('harness')
+sys.path.append("harness")
 
 from Logger import Logger
 from Execute import Execute
 from TPPHelper import TPPHelper
 
+
 class ExtensionFlags(object):
     def __init__(self, loglevel):
         self.logger = Logger("driver.flags", loglevel)
         self.flags = None
-        self._getFlags("flags") # x86
+        self._getFlags("flags")  # x86
         if self.flags is None:
-            self._getFlags("Features") # Arm
+            self._getFlags("Features")  # Arm
         self.logger.debug(f"CPU flags: {self.flags}")
 
     def _getFlags(self, keyword):
@@ -116,7 +117,7 @@ class Environment(object):
                 self.build_dir = os.path.realpath(parent)
                 self.lib_dir = os.path.join(self.build_dir, "lib")
                 break
-        assert(self.build_dir != self.root_dir)
+        assert self.build_dir != self.root_dir
         self.bench_dir = os.path.join(self.root_dir, "benchmarks")
         self.harness = os.path.join(self.bench_dir, "harness", "controller.py")
         self.test_dir = os.path.join(self.bench_dir, "mlir")
@@ -135,18 +136,19 @@ class Environment(object):
         self.cpu_pinning = None
         taskset = shutil.which("taskset")
         if taskset:
-            self.cpu_pinning = [ taskset, "-c", "3" ]
+            self.cpu_pinning = [taskset, "-c", "3"]
 
     def pin_task(self, command):
-        """ Adds taskset if not forced through other means """
+        """Adds taskset if not forced through other means"""
         if not self.cpu_pinning:
             return
         if "KMP_AFFINITY" in os.environ:
             return
         command.extend(self.cpu_pinning)
 
+
 class BaseRun(object):
-    """ Base class for all runs """
+    """Base class for all runs"""
 
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.baserun", loglevel)
@@ -175,23 +177,27 @@ class BaseRun(object):
         command = cmd
         # N in MLIR is an optional -n argument
         if self.args.n:
-            if '-n' in command:
-                command[command.index('-n')+1] = self.args.n
+            if "-n" in command:
+                command[command.index("-n") + 1] = self.args.n
             else:
                 command.extend(["-n", self.args.n])
         if self.args.seed:
-            if '--seed' in command:
-                command[command.index('--seed')+1] = self.args.seed
+            if "--seed" in command:
+                command[command.index("--seed") + 1] = self.args.seed
             else:
                 command.extend(["--seed", self.args.seed])
         if self.args.splat_to_random is not None:
-            if '--splat-to-random' in command:
-                command[command.index('--splat-to-random')+1] = self.args.splat_to_random
+            if "--splat-to-random" in command:
+                command[
+                    command.index("--splat-to-random") + 1
+                ] = self.args.splat_to_random
             else:
-                command.extend(["--splat-to-random", self.args.splat_to_random])
+                command.extend(
+                    ["--splat-to-random", self.args.splat_to_random]
+                )
         if self.args.init_type:
-            if '--init-type' in command:
-                command[command.index('--init-type')+1] = self.args.init_type
+            if "--init-type" in command:
+                command[command.index("--init-type") + 1] = self.args.init_type
             else:
                 command.extend(["--init-type", self.args.init_type])
         return command
@@ -206,8 +212,9 @@ class BaseRun(object):
             self.logger.debug(f"revert {key}={value}")
             os.environ[key] = value
 
+
 class XSMMDNNRun(BaseRun):
-    """ XSMM-DNN runs """
+    """XSMM-DNN runs"""
 
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.xsmm-dnn", loglevel)
@@ -225,7 +232,7 @@ class XSMMDNNRun(BaseRun):
             command.extend(self.env.extra_args)
         # N in XSMM-DNN is the first argument after the program name
         if self.args.n:
-            command[command.index(self.benchmark)+1] = self.args.n
+            command[command.index(self.benchmark) + 1] = self.args.n
         res = self.runner.run(command)
         self.stdout = res.stdout
         self.stderr = res.stderr
@@ -237,14 +244,18 @@ class XSMMDNNRun(BaseRun):
             return False
         match = re.search(r"GFLOPS  = (.+)", self.stdout)
         if not match:
-            self.logger.error(f"Cannot match to XSMM-DNN output: {self.stdout}")
+            self.logger.error(
+                f"Cannot match to XSMM-DNN output: {self.stdout}"
+            )
             return False
 
         self.stdout = match.group(1) + " +- 0.00 gflops"
         return True
 
+
 class MLIRRun(BaseRun):
-    """ MLIR runs """
+    """MLIR runs"""
+
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.mlirrun", loglevel)
         BaseRun.__init__(self, name, args, env, json, loglevel)
@@ -269,8 +280,9 @@ class MLIRRun(BaseRun):
         self.teardown()
         return True
 
+
 class IrGeneratorRun(BaseRun):
-    """ Generic IR generator runs """
+    """Generic IR generator runs"""
 
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.ir-gen", loglevel)
@@ -312,8 +324,9 @@ class IrGeneratorRun(BaseRun):
         self.teardown()
         return True
 
+
 class GenericRun(BaseRun):
-    """ Generic cli runs - NOTE: user must ensure output correctness """
+    """Generic cli runs - NOTE: user must ensure output correctness"""
 
     def __init__(self, name, args, env, json, loglevel):
         self.logger = Logger("driver.generic", loglevel)
@@ -336,8 +349,9 @@ class GenericRun(BaseRun):
         self.teardown()
         return True
 
+
 class Benchmark(object):
-    """ A collection of runs """
+    """A collection of runs"""
 
     def __init__(self, name, args, env, loglevel):
         self.name = name
@@ -350,13 +364,21 @@ class Benchmark(object):
         runType = json["type"]
         self.logger.debug(f"Adding {runType} run {name} for {self.name}")
         if runType == "MLIR":
-            self.runs.append(MLIRRun(name, self.args, self.env, json, loglevel))
+            self.runs.append(
+                MLIRRun(name, self.args, self.env, json, loglevel)
+            )
         elif runType == "XSMM-DNN":
-            self.runs.append(XSMMDNNRun(name, self.args, self.env, json, loglevel))
+            self.runs.append(
+                XSMMDNNRun(name, self.args, self.env, json, loglevel)
+            )
         elif runType == "IR-GEN":
-            self.runs.append(IrGeneratorRun(name, self.args, self.env, json, loglevel))
+            self.runs.append(
+                IrGeneratorRun(name, self.args, self.env, json, loglevel)
+            )
         elif runType == "GENERIC":
-            self.runs.append(GenericRun(name, self.args, self.env, json, loglevel))
+            self.runs.append(
+                GenericRun(name, self.args, self.env, json, loglevel)
+            )
         else:
             self.logger.error(f"Unknown runner type '{runType}'")
             return False
@@ -373,8 +395,9 @@ class Benchmark(object):
     def getRuns(self):
         return self.runs
 
+
 class BenchmarkDriver(object):
-    """ Detects and runs benchmarks based on JSON configurations """
+    """Detects and runs benchmarks based on JSON configurations"""
 
     def __init__(self, args, loglevel):
         self.logger = Logger("driver.bench.driver", loglevel)
@@ -385,14 +408,16 @@ class BenchmarkDriver(object):
         self.exts = ExtensionFlags(loglevel)
 
     def scanBenchmarks(self):
-        """ Reads each JSON file and create a list with all runs """
+        """Reads each JSON file and create a list with all runs"""
 
         # Find and read the JSON file
         configs = self.args.config.split(",")
         for config in configs:
             # Error on specific files when invalid
             if not os.path.exists(config):
-                self.logger.error(f"JSON config '{self.args.config}' does not exist")
+                self.logger.error(
+                    f"JSON config '{self.args.config}' does not exist"
+                )
                 raise SyntaxError("Cannot find JSON config")
 
             self.logger.info(f"Reading up '{config}'")
@@ -402,7 +427,9 @@ class BenchmarkDriver(object):
             # Parse and add all runs
             for cfg in jsonCfg:
                 if len(cfg.keys()) > 1:
-                    self.logger.error("List of dict with a single element expected")
+                    self.logger.error(
+                        "List of dict with a single element expected"
+                    )
                     return False
 
                 name = list(cfg.keys())[0]
@@ -418,14 +445,20 @@ class BenchmarkDriver(object):
                         # List of possible supported (ex. avx512 OR sve2)
                         for ext in run["extensions"]:
                             if self.exts.hasFlag(ext):
-                                self.logger.debug(f"{key} extension {ext} supported")
+                                self.logger.debug(
+                                    f"{key} extension {ext} supported"
+                                )
                                 supported = True
                                 break
                     if not supported:
-                        self.logger.warning(f"Skipping {key} as extension {ext} not supported")
+                        self.logger.warning(
+                            f"Skipping {key} as extension {ext} not supported"
+                        )
                         continue
                     if not benchs.addRun(key, run):
-                        self.logger.error(f"Error adding benchmark run {key} in {name}")
+                        self.logger.error(
+                            f"Error adding benchmark run {key} in {name}"
+                        )
                         return False
 
                 # Append to the benchmarks
@@ -434,7 +467,7 @@ class BenchmarkDriver(object):
         return True
 
     def run(self):
-        """ Run tpp-opt and tpp-run to get the timings """
+        """Run tpp-opt and tpp-run to get the timings"""
 
         # Actually run the file in benchmark mode, no output
         self.logger.info("Running the kernels with the arguments provided")
@@ -448,13 +481,15 @@ class BenchmarkDriver(object):
         return True
 
     def verifyStats(self):
-        """ Verify the results, should be in format '( mean, stdev )' """
+        """Verify the results, should be in format '( mean, stdev )'"""
 
         for bench in self.benchs:
             print(f"Benchmark: {bench.name}")
             for run in bench.getRuns():
                 if not run.stdout:
-                    self.logger.error(f"Benchmark {bench.name}, run {run.name} produced no output, can't verify results")
+                    self.logger.error(
+                        f"Benchmark {bench.name}, run {run.name} produced no output, can't verify results"
+                    )
                     self.logger.error(f"Error: {run.stderr}")
                     if not self.args.ignore_errors:
                         return False
@@ -466,30 +501,54 @@ class BenchmarkDriver(object):
 
         return True
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='TPP-MLIR Benchmark Harness')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="TPP-MLIR Benchmark Harness")
 
     # Required argument: baseDir name (directory)
-    parser.add_argument('-c', '--config', type=str, default="benchmarks.json",
-                        help='JSON file containing benchmark configuration')
-    parser.add_argument('-n', type=str, default="",
-                        help='Force number of iterations on all benchmarks')
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default="benchmarks.json",
+        help="JSON file containing benchmark configuration",
+    )
+    parser.add_argument(
+        "-n",
+        type=str,
+        default="",
+        help="Force number of iterations on all benchmarks",
+    )
 
     # Optional
-    parser.add_argument('--build', type=str, default="",
-                        help='Path to the build dir')
-    parser.add_argument('-v', '--verbose', action='count', default=0,
-                        help='The verbosity of logging output')
-    parser.add_argument('-q', '--quiet', action='count', default=0,
-                        help='Suppress warnings')
-    parser.add_argument('--ignore-errors', action='count', default=0,
-                        help='Ignore errors and only show the results that work')
-    parser.add_argument('--seed', type=str,
-                        help='Random seed')
-    parser.add_argument('--splat-to-random', type=str,
-                        help='Replace splat dense tensors with random value')
-    parser.add_argument('--init-type', type=str,
-                        help='Random initializer type')
+    parser.add_argument(
+        "--build", type=str, default="", help="Path to the build dir"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="The verbosity of logging output",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="count", default=0, help="Suppress warnings"
+    )
+    parser.add_argument(
+        "--ignore-errors",
+        action="count",
+        default=0,
+        help="Ignore errors and only show the results that work",
+    )
+    parser.add_argument("--seed", type=str, help="Random seed")
+    parser.add_argument(
+        "--splat-to-random",
+        type=str,
+        help="Replace splat dense tensors with random value",
+    )
+    parser.add_argument(
+        "--init-type", type=str, help="Random initializer type"
+    )
     args = parser.parse_args()
 
     # Creates the logger object
@@ -500,23 +559,25 @@ if __name__ == '__main__':
     driver = BenchmarkDriver(args, loglevel)
 
     # Detects all benchmarks to run, validates files / args
-    if (not driver.scanBenchmarks()):
+    if not driver.scanBenchmarks():
         logger.error("Error finding benchmarks")
-        print('\n\n')
+        print("\n\n")
         parser.print_help()
         sys.exit(1)
 
     # Always disable leak santizier
-    asan_options = [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+    asan_options = (
+        [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
+    )
     asan_options.append("detect_leaks=0")
     os.environ["ASAN_OPTIONS"] = ":".join(asan_options)
 
     # Runs all benchmarks
-    if (not driver.run()):
+    if not driver.run():
         logger.error("Error executing the benchmarks")
         sys.exit(1)
 
     # Verify results
-    if (not driver.verifyStats()):
+    if not driver.verifyStats():
         logger.error("Error verifying stats")
         sys.exit(1)
