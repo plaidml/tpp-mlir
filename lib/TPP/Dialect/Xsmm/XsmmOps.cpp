@@ -309,8 +309,12 @@ static LogicalResult verifyInputs(OpTy op, size_t expected) {
 }
 
 template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
-  // 'inputs' = [m, n, k, lda, ldb, ldc]
-  if (failed(verifyInputs(op, /*expected=*/6)))
+  // 'inputs' = [m, n, k, lda, ldb, ldc] for GEMM.
+  // 'inputs' = [m, n, k, lda, ldb, ldc, stride_a, stride_b] for BRGEMM.
+  bool isBrgemm = isa<BrgemmDispatchOp>(op.getOperation()) ||
+                  isa<FusedBrgemmDispatchOp>(op.getOperation());
+  size_t expected = (isBrgemm) ? 8 : 6;
+  if (failed(verifyInputs(op, expected)))
     return failure();
   return verifyGemmFlags(op.getFlags(), op.getDataType(), op, FLAGS_NAME);
 }

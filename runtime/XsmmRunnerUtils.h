@@ -31,13 +31,14 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_binary_dispatch(
     const libxsmm_meltw_binary_type, const libxsmm_datatype, int64_t, int64_t,
     int64_t, int64_t, int64_t, const libxsmm_meltw_binary_flags);
 
-extern "C" MLIR_RUNNERUTILS_EXPORT int64_t
-xsmm_brgemm_dispatch(const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t,
-                     int64_t, int64_t, const libxsmm_gemm_flags);
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_brgemm_dispatch(
+    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, int64_t, int64_t, const libxsmm_gemm_flags);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_fused_brgemm_dispatch(
     const libxsmm_datatype data_type, int64_t m, int64_t n, int64_t k,
-    int64_t lda, int64_t ldb, int64_t ldc, const libxsmm_gemm_flags gemm_flags,
+    int64_t lda, int64_t ldb, int64_t ldc, int64_t stride_a, int64_t stride_b,
+    const libxsmm_gemm_flags gemm_flags,
     const libxsmm_meltw_unary_flags unary_flags,
     const libxsmm_meltw_unary_type unary_op_type,
     const libxsmm_meltw_binary_flags binary_flags,

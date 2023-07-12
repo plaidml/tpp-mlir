@@ -16,7 +16,7 @@ func.func @dispatch_unary() -> i64 {
 
 // CHECK-LABEL: dispatch_brgemm
 func.func @dispatch_brgemm() -> i64 {
-  %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5] flags = (none) data_type = f32
+  %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5, 5, 5] flags = (none) data_type = f32
   return %0 : i64
 }
 
@@ -24,7 +24,7 @@ func.func @dispatch_brgemm() -> i64 {
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
-// CHECK: call @xsmm_brgemm_dispatch(%[[C1]], %[[C5]], %[[C5]], %[[C4]], %[[C4]], %[[C5]], %[[C5]], %[[C0]])
+// CHECK: call @xsmm_brgemm_dispatch(%[[C1]], %[[C5]], %[[C5]], %[[C4]], %[[C4]], %[[C5]], %[[C5]], %[[C5]], %[[C5]], %[[C0]])
 
 // -----
 
@@ -119,7 +119,7 @@ func.func @dispatch_gemm() -> i64 {
 
 func.func @invoke_brgemm(%arg0: memref<2x5x4xf32>, %arg1: memref<2x4x5xf32>,
                            %arg2: memref<4x4xf32>) -> memref<4x4xf32> {
-  %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5] flags = (none) data_type = f32
+  %0 = xsmm.brgemm.dispatch [5, 5, 4, 4, 5, 5, 5, 5] flags = (none) data_type = f32
   %c2_i64 = arith.constant 2 : i64
   xsmm.brgemm(data_type = f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
     : (i64, memref<2x5x4xf32>, memref<2x4x5xf32>, memref<4x4xf32>, i64) -> ()
@@ -226,7 +226,7 @@ func.func @invoke_inplace_relu(%arg0: memref<128x512xbf16>) {
 // -----
 
 func.func @dispatch_fused_brgemm() -> i64 { 
-  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, relu]
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13, 13, 13] [add, relu]
     flags = (vnni_a) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
   return %0 : i64
 }
@@ -239,7 +239,7 @@ func.func @dispatch_fused_brgemm() -> i64 {
 // CHECK-DAG: %[[UNARY_KIND:.+]] = arith.constant 5 : i64
 // CHECK-DAG: %[[BINARY_FLAGS:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[BINARY_KIND:.+]] = arith.constant 1 : i64
-// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[DATA_TYPE]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[GEMM_FLAGS]], %[[UNARY_FLAGS]], %[[UNARY_KIND]], %[[BINARY_FLAGS]], %[[BINARY_KIND]])
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[DATA_TYPE]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[DIM]], %[[GEMM_FLAGS]], %[[UNARY_FLAGS]], %[[UNARY_KIND]], %[[BINARY_FLAGS]], %[[BINARY_KIND]])
 
 // -----
 
@@ -248,7 +248,7 @@ func.func @dispatch_fused_brgemm() -> i64 {
 // CHECK-LABEL: dispatch_fused_brgemm
 func.func @dispatch_fused_brgemm() -> i64 {
   // CHECK-NOT: xsmm_fused_brgemm.dispatch 
-  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, relu]
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13, 13, 13] [add, relu]
     flags = (vnni_a) binary_flags = (none) unary_flags = (none) data_type = bf16
   return %0 : i64
 }
@@ -256,7 +256,7 @@ func.func @dispatch_fused_brgemm() -> i64 {
 // -----
 
 func.func @dispatch_fused_brgemm() -> i64 { 
-  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, none]
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13, 13, 13] [add, none]
     flags = (vnni_a) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
   return %0 : i64
 }
@@ -268,12 +268,12 @@ func.func @dispatch_fused_brgemm() -> i64 {
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
-// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C4096]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C4096]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
 
 // -----
 
 func.func @multiple_gemm_flags_fused_brgemm() -> i64 {
-  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13] [add, none]
+  %0 = xsmm.fused_brgemm.dispatch [13, 13, 13, 13, 13, 13, 13, 13] [add, none]
     flags = (vnni_a, vnni_b, vnni_c) binary_flags = (bcast_col_in0) unary_flags = (none) data_type = bf16
   return %0 : i64
 }
@@ -286,4 +286,4 @@ func.func @multiple_gemm_flags_fused_brgemm() -> i64 {
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
-// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C14336]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
+// CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C14336]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
