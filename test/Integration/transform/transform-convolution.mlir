@@ -43,7 +43,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
     %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     // Propagate all the packs
     transform.structured.packing_propagation %2 : !transform.any_op
 

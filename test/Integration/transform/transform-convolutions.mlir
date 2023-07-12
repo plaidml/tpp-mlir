@@ -71,9 +71,11 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
     %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op 
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    
     // Propagate all the packs
-    transform.structured.packing_propagation %2 : !transform.any_op
+    %f = transform.structured.match ops{["func.func"]} in %arg1
+      : (!transform.any_op) -> !transform.any_op 
+    transform.structured.packing_propagation %f : !transform.any_op
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
       : (!transform.any_op) -> !transform.any_op
