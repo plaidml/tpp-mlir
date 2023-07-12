@@ -1,7 +1,12 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-run %s -gpu=vulkan \
-// RUN:  -entry-point-result=void -e entry 2>&1 | \
-// RUN: FileCheck %s
+// RUN:  -entry-point-result=void -e entry -print-mlir=early 2>&1 | \
+// RUN: FileCheck %s --check-prefix=SINGLE
+
+// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
+// RUN: tpp-run %s -gpu=vulkan -n 2 \
+// RUN:  -entry-point-result=void -e entry -print-mlir=early 2>&1 | \
+// RUN: FileCheck %s --check-prefix=BENCH
 
 module attributes {
   gpu.container_module,
@@ -21,28 +26,44 @@ module attributes {
   }
 
   func.func @entry(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>) {
-    %value0 = arith.constant 0.0 : f32
-    %value1 = arith.constant 1.1 : f32
-    %value2 = arith.constant 2.2 : f32
-    %arg3 = memref.cast %arg0 : memref<8xf32> to memref<?xf32>
-    %arg4 = memref.cast %arg1 : memref<8xf32> to memref<?xf32>
-    %arg5 = memref.cast %arg2 : memref<8xf32> to memref<?xf32>
-    call @fillResource1DFloat(%arg3, %value1) : (memref<?xf32>, f32) -> ()
-    call @fillResource1DFloat(%arg4, %value2) : (memref<?xf32>, f32) -> ()
-    call @fillResource1DFloat(%arg5, %value0) : (memref<?xf32>, f32) -> ()
-
     %cst1 = arith.constant 1 : index
     %cst8 = arith.constant 8 : index
     gpu.launch_func @kernels::@kernel_add
         blocks in (%cst8, %cst1, %cst1) threads in (%cst1, %cst1, %cst1)
         args(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
-    %arg6 = memref.cast %arg5 : memref<?xf32> to memref<*xf32>
-    call @printMemrefF32(%arg6) : (memref<*xf32>) -> ()
 
     return
   }
-  func.func private @fillResource1DFloat(%0 : memref<?xf32>, %1 : f32)
-  func.func private @printMemrefF32(%ptr : memref<*xf32>)
 }
 
-// CHECK: [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
+// SINGLE-LABEL: func.func @entry
+// SINGLE: %[[ARG0:.+]] = memref.get_global @__wrapper_0
+// SINGLE: %[[alloc0:.+]] = memref.alloc
+// SINGLE: memref.copy %[[ARG0]], %[[alloc0]]
+// SINGLE: %[[ARG1:.+]] = memref.get_global @__wrapper_1
+// SINGLE: %[[alloc1:.+]] = memref.alloc
+// SINGLE: memref.copy %[[ARG1]], %[[alloc1]]
+// SINGLE: %[[ARG2:.+]] = memref.get_global @__wrapper_2
+// SINGLE: %[[alloc2:.+]] = memref.alloc
+// SINGLE: memref.copy %[[ARG2]], %[[alloc2]]
+// SINGLE: call @_entry(%[[alloc0]], %[[alloc1]], %[[alloc2]])
+// SINGLE-DAG: memref.dealloc %[[alloc0]]
+// SINGLE-DAG: memref.dealloc %[[alloc1]]
+// SINGLE-DAG: memref.dealloc %[[alloc2]]
+
+// BENCH-LABEL: func.func @entry
+// BENCH: %[[ARG0:.+]] = memref.get_global @__wrapper_0
+// BENCH: %[[alloc0:.+]] = memref.alloc
+// BENCH: memref.copy %[[ARG0]], %[[alloc0]]
+// BENCH: %[[ARG1:.+]] = memref.get_global @__wrapper_1
+// BENCH: %[[alloc1:.+]] = memref.alloc
+// BENCH: memref.copy %[[ARG1]], %[[alloc1]]
+// BENCH: %[[ARG2:.+]] = memref.get_global @__wrapper_2
+// BENCH: %[[alloc2:.+]] = memref.alloc
+// BENCH: memref.copy %[[ARG2]], %[[alloc2]]
+// BENCH: perf.bench{{.*}}{
+// BENCH:   call @_entry(%[[alloc0]], %[[alloc1]], %[[alloc2]])
+// BENCH: }
+// BENCH-DAG: memref.dealloc %[[alloc0]]
+// BENCH-DAG: memref.dealloc %[[alloc1]]
+// BENCH-DAG: memref.dealloc %[[alloc2]]
