@@ -57,10 +57,11 @@ transform.sequence failures(propagate) {
     // Block matmul i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32]
       : !transform.any_op -> !transform.any_op 
-    // Get the parent op (func.func)
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
+    
+    %f = transform.structured.match ops{["func.func"]} in %arg1
+      : (!transform.any_op) -> !transform.any_op
     // Propagate packing
-    transform.structured.packing_propagation %2 : !transform.any_op
+    transform.structured.packing_propagation %f : !transform.any_op
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
@@ -128,8 +129,10 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0  blocking_factors = [32, 32, 32]
       : !transform.any_op -> !transform.any_op
-    %2 = get_closest_isolated_parent %1 : (!transform.any_op) -> !transform.any_op
-    transform.structured.packing_propagation %2 : !transform.any_op
+    
+    %f = transform.structured.match ops{["func.func"]} in %arg1
+      : (!transform.any_op) -> !transform.any_op
+    transform.structured.packing_propagation %f : !transform.any_op
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
