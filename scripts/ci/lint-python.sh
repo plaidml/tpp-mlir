@@ -8,22 +8,19 @@
 # Additionally, there can be secondary Linters
 # used to raise warnings, e.g., Flake8
 
-# include common utils
-SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
-source "${SCRIPT_DIR}/ci/common.sh"
-
+REPOROOT=$(realpath "$(dirname "$0")/../..")
 PATTERN="./*.py"
-MAXLINELENGTH=79  # suit Flake8-default
 LINTER=$(command -v black)
 
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
   FLAKE8_IGNORE="--ignore=E501,F821"
-  REPOROOT=$(git_root)
-  cd "${REPOROOT}" || exit 1
+
   echo -n "Linting Python files... "
+  cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
-    ${LINTER} -l ${MAXLINELENGTH} "${FILE}" -q
+    # Flake8: line-length limit of 79 characters (default)
+    ${LINTER} -q -l 79 "${FILE}"
     if [ "${FLAKE8}" ]; then  # optional
       # no error raised for Flake8 issues
       WARNING=$(flake8 ${FLAKE8_IGNORE} "${FILE}")

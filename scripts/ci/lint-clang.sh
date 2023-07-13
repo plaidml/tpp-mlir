@@ -8,10 +8,7 @@
 # Additionally, there can be secondary Linters
 # used to raise warnings.
 
-# include common utils
-SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
-source "${SCRIPT_DIR}/ci/common.sh"
-
+REPOROOT=$(realpath "$(dirname "$0")/../..")
 PATTERN="./*.h ./*.cpp ./*.c"
 VERSION=16
 for V in $(seq $((VERSION+10)) -1 ${VERSION}); do
@@ -24,9 +21,9 @@ fi
 
 if [ "${LINTER}" ]; then
   #OTHER=$(command -v other)
-  REPOROOT=$(git_root)
-  cd "${REPOROOT}" || exit 1
+
   echo -n "Linting C/C++ files... "
+  cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
     ${LINTER} -i "${FILE}"
     if [ "${OTHER}" ]; then  # optional
