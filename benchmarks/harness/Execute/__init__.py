@@ -8,7 +8,7 @@
 
 import subprocess
 
-from Logger import Logger
+from harness.Logger import Logger
 
 
 class Execute(object):

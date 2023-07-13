@@ -14,7 +14,7 @@
 
 import re
 
-from Logger import Logger
+from harness.Logger import Logger
 
 
 class FileCheckParser(object):

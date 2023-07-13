@@ -9,7 +9,7 @@
 
 import os
 
-from Logger import Logger
+from harness.Logger import Logger
 
 
 class TPPHelper(object):
