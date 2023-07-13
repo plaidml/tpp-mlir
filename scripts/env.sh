@@ -41,8 +41,9 @@ if [ "${TPP_LLVM}" ]; then
     export LLVM_VERSION=${TPP_LLVM_VERSION}
 
     # pickup runtime environment that is to be built
-    export BUILD_DIR=$(git_root)/build
+    BUILD_DIR=$(git_root)/build
     export LD_LIBRARY_PATH=${BUILD_DIR}/lib:${LD_LIBRARY_PATH}
+    export BUILD_DIR
   else
     echo "ERROR: Cannot determine LLVM-version!"
   fi
