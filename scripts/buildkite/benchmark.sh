@@ -9,7 +9,7 @@
 SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
 source "${SCRIPT_DIR}/ci/common.sh"
 
-BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH}/benchmarks
+BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
 CONFIG_DIR=${BENCH_DIR}/config
 
 LOGFILE=$(mktemp)
