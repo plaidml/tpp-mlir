@@ -37,6 +37,6 @@ if [ "${LINTER}" ]; then
   else
     echo "OK (${COUNT} files)"
   fi
-else
-  echo "WARNING: missing C/C++-linter (${LINTER})."
+else  # soft error (exit normally)
+  echo "ERROR: missing C/C++-linter (${LINTER})."
 fi

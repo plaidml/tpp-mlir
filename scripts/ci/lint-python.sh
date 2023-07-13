@@ -54,6 +54,6 @@ if [ "${LINTER}" ]; then
   else
     echo "OK (${COUNT} files)"
   fi
-else
-  echo "WARNING: missing Python-linter (${LINTER})."
+else  # soft error (exit normally)
+  echo "ERROR: missing Python-linter (${LINTER})."
 fi
