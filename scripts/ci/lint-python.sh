@@ -15,12 +15,13 @@ LINTER=$(command -v black)
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
   FLAKE8_IGNORE="--ignore=E501,F821"
+  COUNT=0
 
   echo -n "Linting Python files... "
   cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
     # Flake8: line-length limit of 79 characters (default)
-    ${LINTER} -q -l 79 "${FILE}"
+    if ${LINTER} -q -l 79 "${FILE}"; then COUNT=$((COUNT+1)); fi
     if [ "${FLAKE8}" ]; then  # optional
       # no error raised for Flake8 issues
       WARNING=$(flake8 ${FLAKE8_IGNORE} "${FILE}")
@@ -51,7 +52,7 @@ if [ "${LINTER}" ]; then
     echo "${WARNINGS}"
     echo
   else
-    echo "OK"
+    echo "OK (${COUNT} files)"
   fi
 else
   echo "WARNING: missing Python-linter (${LINTER})."

@@ -21,11 +21,12 @@ fi
 
 if [ "${LINTER}" ]; then
   #OTHER=$(command -v other)
+  COUNT=0
 
   echo -n "Linting C/C++ files... "
   cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
-    ${LINTER} -i "${FILE}"
+    if ${LINTER} -i "${FILE}"; then COUNT=$((COUNT+1)); fi
     if [ "${OTHER}" ]; then  # optional
       # no error raised for other issues
       WARNING=$(other "${FILE}")
@@ -56,7 +57,7 @@ if [ "${LINTER}" ]; then
     echo "${WARNINGS}"
     echo
   else
-    echo "OK"
+    echo "OK (${COUNT} files)"
   fi
 else
   echo "WARNING: missing C/C++-linter (${LINTER})."
