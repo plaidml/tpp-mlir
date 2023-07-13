@@ -102,7 +102,7 @@ else
   fi
   # more detailed support for GPU runtime, e.g., "vulkan"
   if [ "${GPU}" ]; then
-    echo "Enable general support for GPUs"
+    echo "Enabled GPU backend (${GPU})"
   fi
 fi
 
