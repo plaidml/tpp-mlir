@@ -156,10 +156,10 @@ endif()
 
 # Clang format checks
 set(CI_DIR "${PROJECT_SOURCE_DIR}/scripts/ci")
-add_custom_target(clang-format ${CI_DIR}/clang-format.sh)
-add_custom_target(reformat ${CI_DIR}/clang-format.sh -i)
+add_custom_target(lint-clang ${CI_DIR}/lint-clang.sh)
+add_custom_target(reformat ${CI_DIR}/lint-clang.sh -i)
 
 # Check-all
-add_custom_target(check-all DEPENDS clang-format check)
+add_custom_target(check-all DEPENDS lint-clang check)
 
 message(STATUS "TPP Project CMakeLists.txt END")
