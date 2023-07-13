@@ -5,8 +5,6 @@
 # The primary Linter with support for reformatting
 # files is clang-format. Any reformatted code causes
 # non-zero exit code (CI failure).
-# Additionally, there can be secondary Linters
-# used to raise warnings.
 
 REPOROOT=$(realpath "$(dirname "$0")/../..")
 PATTERN="./*.h ./*.cpp ./*.c"
@@ -20,24 +18,12 @@ if [ ! "${LINTER}" ]; then
 fi
 
 if [ "${LINTER}" ]; then
-  #OTHER=$(command -v other)
   COUNT=0
 
   echo -n "Linting C/C++ files... "
   cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
     if ${LINTER} -i "${FILE}"; then COUNT=$((COUNT+1)); fi
-    if [ "${OTHER}" ]; then  # optional
-      # no error raised for other issues
-      WARNING=$(other "${FILE}")
-      if [ "${WARNING}" ]; then
-        if [ "${WARNINGS}" ]; then
-          WARNINGS+=$'\n'"${WARNING}"
-        else
-          WARNINGS="${WARNING}"
-        fi
-      fi
-    fi
   done
 
   # any modified file (Git) raises and error
@@ -48,14 +34,6 @@ if [ "${LINTER}" ]; then
     echo "The following files are modified ($(${LINTER} --version)):"
     echo "${MODIFIED}"
     exit 1
-  fi
-  # optional warnings
-  if [ "${WARNINGS}" ]; then
-    echo "WARNING"
-    echo
-    echo "The following issues were found:"
-    echo "${WARNINGS}"
-    echo
   else
     echo "OK (${COUNT} files)"
   fi
