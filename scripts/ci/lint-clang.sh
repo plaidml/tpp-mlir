@@ -26,7 +26,7 @@ if [ "${LINTER}" ]; then
   #OTHER=$(command -v other)
   REPOROOT=$(git_root)
   cd "${REPOROOT}" || exit 1
-  echo -n "Checking C/C++ files... "
+  echo -n "Linting C/C++ files... "
   for FILE in $(eval "git ls-files ${PATTERN}"); do
     ${LINTER} -i "${FILE}"
     if [ "${OTHER}" ]; then  # optional

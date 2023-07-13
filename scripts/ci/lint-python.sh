@@ -21,7 +21,7 @@ if [ "${LINTER}" ]; then
   FLAKE8_IGNORE="--ignore=E501,F821"
   REPOROOT=$(git_root)
   cd "${REPOROOT}" || exit 1
-  echo -n "Checking Python files... "
+  echo -n "Linting Python files... "
   for FILE in $(eval "git ls-files ${PATTERN}"); do
     ${LINTER} -l ${MAXLINELENGTH} "${FILE}" -q
     if [ "${FLAKE8}" ]; then  # optional
