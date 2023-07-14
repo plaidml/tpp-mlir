@@ -549,6 +549,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--init-type", type=str, help="Random initializer type"
     )
+    parser.add_argument(
+        "--gpu",
+        type=str,
+        help="Target GPU backend for lowering (cuda,vulkan)",
+    )
     args = parser.parse_args()
 
     # Creates the logger object

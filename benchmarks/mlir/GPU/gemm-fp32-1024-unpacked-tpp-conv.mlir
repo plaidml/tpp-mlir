@@ -1,6 +1,5 @@
-// RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -tpp-conversion -cleanup \
-// RUN: tpp-run -gpu=cuda -n 10 \
+// RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void
 
 // BENCH_TOTAL_FLOPS: 536870912
