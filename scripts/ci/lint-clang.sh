@@ -8,13 +8,15 @@
 
 REPOROOT=$(realpath "$(dirname "$0")/../..")
 PATTERN="./*.h ./*.cpp ./*.c"
-VERSION=16
-for V in $(seq $((VERSION+10)) -1 ${VERSION}); do
-  LINTER=$(command -v "clang-format-${V}")
-  if [ "${LINTER}" ]; then break; fi
-done
+
+TPP_CLANGFORMATVER=${TPP_CLANGFORMATVER:-16}
+LINTER=$(command -v "clang-format-${TPP_CLANGFORMATVER}")
 if [ ! "${LINTER}" ]; then
   LINTER=$(command -v clang-format)
+  if ! ${LINTER} --version | grep -q "${TPP_CLANGFORMATVER}\.[0-9\.]\+"; then
+    echo "ERROR: clang-format v${TPP_CLANGFORMATVER} is missing!"
+    exit 1
+  fi
 fi
 
 if [ "${LINTER}" ]; then
