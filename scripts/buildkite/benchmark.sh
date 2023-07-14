@@ -10,8 +10,8 @@ SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
 source "${SCRIPT_DIR}/ci/common.sh"
 
 BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
-BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}
-CONFIG_DIR=${BENCH_DIR}/config
+BUILD_DIR=$(realpath "${BUILD_DIR:-build-${COMPILER}}")
+CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
 
 LOGFILE=$(mktemp)
 trap 'rm ${LOGFILE}' EXIT
@@ -37,7 +37,7 @@ benchmark () {
   echo_run ./driver.py -v \
            -n 1000 \
            -c "${CONFIG_DIR}/${JSON}" \
-           --build "$(realpath ${BUILD_DIR})" \
+           --build "${BUILD_DIR}" \
            | tee -a "${LOGFILE}"
   popd || exit 1
 }
