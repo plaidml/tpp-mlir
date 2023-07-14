@@ -64,9 +64,9 @@ import shlex
 import shutil
 
 # sys.path.append("harness")
-from harness.Logger import Logger
-from harness.Execute import Execute
-from harness.TPPHelper import TPPHelper
+from .harness.Logger import Logger
+from .harness.Execute import Execute
+from .harness.TPPHelper import TPPHelper
 
 
 class ExtensionFlags(object):
