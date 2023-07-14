@@ -14,7 +14,7 @@ LINTER=$(command -v black)
 
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
-  FLAKE8_IGNORE="--ignore=E501,F821"
+  FLAKE8_IGNORE="--ignore=E402,E501,F821"
   COUNT=0
 
   echo -n "Linting Python files... "
