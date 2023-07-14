@@ -270,9 +270,7 @@ if __name__ == "__main__":
         help="Random initializer type (default: normal)",
     )
     parser.add_argument(
-        "--gpu",
-        type=str,
-        help="Target GPU backend for lowering (cuda,vulkan)",
+        "--gpu", type=str, help="Target GPU backend for lowering (cuda,vulkan)"
     )
     args = parser.parse_args()
 
@@ -288,7 +286,9 @@ if __name__ == "__main__":
     # GPU tests require extra ASAN flags due to incompatibility with CUDA
     # See: https://github.com/google/sanitizers/issues/629
     if args.gpu is not None:
-        asan_options.extend(["protect_shadow_gap=0", "replace_intrin=0", "detect_leaks=0"])
+        asan_options.extend(
+            ["protect_shadow_gap=0", "replace_intrin=0", "detect_leaks=0"]
+        )
 
     # Apply ASAN_OPTIONS to environment
     if asan_options:
