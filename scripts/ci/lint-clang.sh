@@ -22,9 +22,17 @@ fi
 if [ "${LINTER}" ]; then
   COUNT=0
 
+  # If -i is passed, format all files according to type/pattern.
+  if [ "-i" != "$1" ]; then
+    # list files matching PATTERN and which are part of HEAD's changeset
+    LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r"
+  else
+    LISTFILES="git ls-files"
+  fi
+
   echo -n "Linting C/C++ files... "
   cd "${REPOROOT}" || exit 1
-  for FILE in $(eval "git ls-files ${PATTERN}"); do
+  for FILE in $(eval "${LISTFILES} ${PATTERN}"); do
     if ${LINTER} -i "${FILE}"; then COUNT=$((COUNT+1)); fi
   done
 

@@ -17,9 +17,18 @@ if [ "${LINTER}" ]; then
   FLAKE8_IGNORE="--ignore=E402,E501,F821"
   COUNT=0
 
+  # If -i is passed, format all files according to type/pattern.
+  if [ "-i" != "$1" ]; then
+    # list files matching PATTERN and which are part of HEAD's changeset
+    LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r"
+  else
+    LISTFILES="git ls-files"
+  fi
+
   echo -n "Linting Python files... "
   cd "${REPOROOT}" || exit 1
-  for FILE in $(eval "git ls-files ${PATTERN}"); do
+  # list files matching PATTERN and which are part of HEAD's changeset
+  for FILE in $(eval "${LISTFILES} ${PATTERN}"); do
     # Flake8: line-length limit of 79 characters (default)
     if ${LINTER} -q -l 79 "${FILE}"; then COUNT=$((COUNT+1)); fi
     if [ "${FLAKE8}" ]; then  # optional
