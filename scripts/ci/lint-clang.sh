@@ -25,7 +25,7 @@ if [ "${LINTER}" ]; then
   # If -i is passed, format all files according to type/pattern.
   if [ "-i" != "$1" ]; then
     # list files matching PATTERN and which are part of HEAD's changeset
-    LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r"
+    LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r --"
   else
     LISTFILES="git ls-files"
   fi
