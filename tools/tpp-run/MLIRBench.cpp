@@ -9,6 +9,7 @@
 #include "MLIRBench.h"
 
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -73,6 +74,7 @@ MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
   ctx->getOrLoadDialect<bufferization::BufferizationDialect>();
   ctx->getOrLoadDialect<perf::PerfDialect>();
   ctx->getOrLoadDialect<gpu::GPUDialect>();
+  ctx->getOrLoadDialect<async::AsyncDialect>();
 }
 
 LogicalResult MLIRBench::findKernel(StringRef name) {
@@ -506,9 +508,14 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   if (defParallel)
     passManager.addPass(createConvertOpenMPToLLVMPass());
   passManager.addPass(createConvertMathToLLVMPass());
-  passManager.addPass(createConvertFuncToLLVMPass());
 
+  passManager.addNestedPass<func::FuncOp>(createGpuAsyncRegionPass());
   passManager.addPass(createGpuToLLVMConversionPass());
+  passManager.addPass(createAsyncToAsyncRuntimePass());
+  passManager.addPass(createAsyncRuntimeRefCountingPass());
+  passManager.addPass(createConvertAsyncToLLVMPass());
+
+  passManager.addPass(createConvertFuncToLLVMPass());
 
   passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
