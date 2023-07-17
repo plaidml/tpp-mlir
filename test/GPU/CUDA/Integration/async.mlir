@@ -46,11 +46,11 @@ func.func @entry() {
   }
 
   // h0 = b1 + b2 (join).
-  %t4, %f4 = async.execute [%t1, %t2, %t3] (
+  %t4 = async.execute [%t1, %t2, %t3] (
     %f1 as %b1 : !async.value<memref<?xi32>>,
     %f2 as %b2 : !async.value<memref<?xi32>>,
     %f3 as %b3 : !async.value<memref<?xi32>>
-  ) -> !async.value<memref<?xi32>> {
+  ) {
     gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
                threads(%tx, %ty, %tz) in (%block_x = %count, %block_y = %c1, %block_z = %c1) {
       %v1 = memref.load %b1[%tx] : memref<?xi32>
@@ -59,19 +59,36 @@ func.func @entry() {
       memref.store %sum, %b3[%tx] : memref<?xi32>
       gpu.terminator
     }
-    async.yield %b3 : memref<?xi32>
+    async.yield
   }
 
   %t5 = async.execute [%t4] (
-    %f4 as %b4 : !async.value<memref<?xi32>>
+    %f3 as %b3 : !async.value<memref<?xi32>>
   ) {
-    gpu.memcpy %h0, %b4 : memref<?xi32>, memref<?xi32>
+    gpu.memcpy %h0, %b3 : memref<?xi32>, memref<?xi32>
     async.yield
   }
 
   async.await %t5 : !async.token
   %h0_unranked = memref.cast %h0 : memref<?xi32> to memref<*xi32>
   call @printMemrefI32(%h0_unranked) : (memref<*xi32>) -> ()
+
+  %t6 = async.execute (
+    %f0 as %b0 : !async.value<memref<?xi32>>,
+    %f1 as %b1 : !async.value<memref<?xi32>>,
+    %f2 as %b2 : !async.value<memref<?xi32>>,
+    %f3 as %b3 : !async.value<memref<?xi32>>
+  ) {
+    gpu.dealloc %b0 : memref<?xi32>
+    gpu.dealloc %b1 : memref<?xi32>
+    gpu.dealloc %b2 : memref<?xi32>
+    gpu.dealloc %b3 : memref<?xi32>
+    async.yield
+  }
+  async.await %t6 : !async.token
+
+  memref.dealloc %h0 : memref<?xi32>
+
   return
 }
 
