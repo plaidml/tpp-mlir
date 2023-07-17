@@ -57,6 +57,7 @@ target_link_options(tpp-run PRIVATE
   -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
+  -lmlir_async_runtime
   ${TPP_GPU_LINK_FLAGS}
   -lomp
   -Wl,--as-needed
