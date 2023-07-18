@@ -53,6 +53,13 @@
       "flags": [ "-n", "100", "--gpu=cuda" ],
       "extensions": [ "(avx2|asimd)" ]
     },
+    "fp32_1024_manual_kernel_mlir": {
+      "type": "MLIR",
+      "benchmark": "GPU/gemm-fp32-1024-manual-kernel.mlir",
+      "environment": {},
+      "flags": [ "-n", "100", "--gpu=cuda" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
     "fp32_1024_unp_base_mlir": {
       "type": "MLIR",
       "benchmark": "GPU/gemm-fp32-1024-unpacked-base.mlir",
