@@ -143,6 +143,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createGpuToVulkanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteBatchMatmulToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertMemRefToTppPass();
+std::unique_ptr<OperationPass<ModuleOp>>
+createDefaultPipelinePass(StringRef gpuBackend = "");
 
 // Testing passes.
 void registerTestStructuralMatchers();

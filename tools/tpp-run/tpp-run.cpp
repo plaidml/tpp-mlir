@@ -62,16 +62,6 @@ llvm::cl::opt<bool> printKernelResult("print",
                                       llvm::cl::desc("Print kernel result"),
                                       llvm::cl::init(false));
 
-// Lower TPP to loops (for validation purposes)
-llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
-                               llvm::cl::desc("Lower TPP to loops"),
-                               llvm::cl::init(false));
-
-// Lower Linalg directly to loops without TPP (for validation purposes)
-llvm::cl::opt<bool> linalgToLoops("linalg-to-loops",
-                                  llvm::cl::desc("Lower linalg to loops"),
-                                  llvm::cl::init(false));
-
 // Replace dense splat tensors with random dense
 llvm::cl::opt<bool>
     splatRandom("splat-to-random",
@@ -130,27 +120,10 @@ llvm::cl::opt<std::string> initType(
     llvm::cl::desc("Initializer type (const, simple, cont, rand, normal)"),
     llvm::cl::init(""));
 
-// Print MLIR before lowering
-llvm::cl::opt<std::string>
-    printMLIR("print-mlir",
-              llvm::cl::desc("Print MLIR to stdout (early, mid, late, llvm)"),
-              llvm::cl::init(""));
-
 // Print LLVM IR before lowering
 llvm::cl::opt<bool> printLLVM("print-llvm",
                               llvm::cl::desc("print LLVM IR before lowering"),
                               llvm::cl::init(false));
-
-// Parses MLIR print stage
-MLIRBench::PrintStage parsePrintStage(StringRef stage) {
-  return StringSwitch<MLIRBench::PrintStage>(stage)
-      .Case("", MLIRBench::PrintStage::None)
-      .Case("early", MLIRBench::PrintStage::Early)
-      .Case("mid", MLIRBench::PrintStage::Mid)
-      .Case("late", MLIRBench::PrintStage::Late)
-      .Case("llvm", MLIRBench::PrintStage::LLVM)
-      .Default(MLIRBench::PrintStage::Invalid);
-}
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
@@ -165,7 +138,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   }
 
   // Benchmark object
-  MLIRBenchConfig config(seed, tppToLoops, linalgToLoops, tensorInitType);
+  MLIRBenchConfig config(seed, tensorInitType);
   MLIRBench bench(op, config);
 
   // Basic checks
@@ -178,7 +151,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
     return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
 
   if (failed(bench.checkKernelSignature()))
-    return bench.finalize(parsePrintStage(printMLIR));
+    return bench.finalize();
 
   if (splatRandom && failed(bench.replaceSplatWithRandom()))
     return bench.emitError("Error converting splat tensors with random values");
@@ -214,7 +187,7 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   }
 
   // Finally lower to LLVM Dialect
-  return bench.finalize(parsePrintStage(printMLIR));
+  return bench.finalize();
 }
 
 std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
@@ -290,11 +263,6 @@ LogicalResult validateInput() {
   auto init = parseTensorInitType(initType);
   if (init == TensorInitType::Invalid)
     return emitError("Invalid tensor init " + initType);
-
-  // Parse print MLIR stage
-  auto stage = parsePrintStage(printMLIR);
-  if (stage == MLIRBench::PrintStage::Invalid)
-    return emitError("Invalid print MLIR stage " + printMLIR);
 
   return success();
 }
