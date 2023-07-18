@@ -12,8 +12,8 @@
 
 __global__ void matmulKernel(float *A, float *B, float *C, int m, int n,
                              int k) {
-  int row = blockIdx.y * blockDim.y + threadIdx.y;
-  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  int col = blockIdx.y * blockDim.y + threadIdx.y;
 
   if (row >= m || col >= n)
     return;
