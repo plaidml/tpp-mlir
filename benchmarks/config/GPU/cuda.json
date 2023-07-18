@@ -1,5 +1,29 @@
 [
   {
+  "cpu_gemm": {
+    "fp32_1024_base_loops": {
+      "type": "MLIR",
+      "benchmark": "GPU/gemm-fp32-1024-base.mlir",
+      "environment": {},
+      "flags": [ "-n", "100", "-run-args=-tpp-to-loops" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "fp32_1024_base_tpp": {
+      "type": "MLIR",
+      "benchmark": "GPU/gemm-fp32-1024-base.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "fp32_1024_unp_base_tpp": {
+      "type": "MLIR",
+      "benchmark": "GPU/gemm-fp32-1024-unpacked-base.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    }
+  }},
+  {
   "gpu_gemm": {
     "fp32_1024_cuda_ref": {
       "type": "GENERIC",
