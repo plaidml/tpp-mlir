@@ -128,7 +128,7 @@ To enable experimental GPU support see: [GPU/README.md](lib/TPP/GPU/README.md)
 
 ## License
 
-This dialect template is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
+This project is made available under the Apache License 2.0 with LLVM Exceptions. See the `LICENSE.txt` file for more details.
 
 ## References
 
