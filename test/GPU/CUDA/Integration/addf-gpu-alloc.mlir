@@ -24,9 +24,6 @@ module attributes {gpu.container_module} {
     %arg2, %t2 = gpu.alloc async () : memref<8xf32>
     gpu.wait [%t2]
 
-    %0 = arith.constant 0 : i32
-    %1 = arith.constant 1 : i32
-    %2 = arith.constant 2 : i32
     %value0 = arith.constant 0.0 : f32
     %value1 = arith.constant 1.1 : f32
     %value2 = arith.constant 2.2 : f32

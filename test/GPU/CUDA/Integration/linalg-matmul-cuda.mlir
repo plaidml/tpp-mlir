@@ -4,20 +4,16 @@
 // RUN: FileCheck %s
 
 func.func @entry() {
-  %0 = memref.alloc() : memref<8x8xf32>
-  %1 = memref.alloc() : memref<8x8xf32>
-  %2 = memref.alloc() : memref<8x8xf32>
+  %0, %t0 = gpu.alloc async () : memref<8x8xf32>
+  gpu.wait [%t0]
+  %1, %t1 = gpu.alloc async () : memref<8x8xf32>
+  gpu.wait [%t1]
+  %2, %t2 = gpu.alloc async () : memref<8x8xf32>
+  gpu.wait [%t2]
 
   %cst0 = arith.constant 0.0 : f32
   %cst1 = arith.constant 1.0 : f32
   %cst2 = arith.constant 2.0 : f32
-
-  %cast_a = memref.cast %0 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_a : memref<*xf32>
-  %cast_b = memref.cast %1 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_b : memref<*xf32>
-  %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_c : memref<*xf32>
 
   linalg.fill ins(%cst1 : f32) outs(%0 : memref<8x8xf32>)
   linalg.fill ins(%cst2 : f32) outs(%1 : memref<8x8xf32>)
@@ -26,16 +22,24 @@ func.func @entry() {
   linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
                 outs(%2 : memref<8x8xf32>)
 
-  call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
+  %out = memref.alloc() : memref<8x8xf32>
+  %tOut = gpu.memcpy async %out, %2 : memref<8x8xf32>, memref<8x8xf32>
+  gpu.wait [%tOut]
+  %cast = memref.cast %out : memref<8x8xf32> to memref<*xf32>
+  call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
 
-  memref.dealloc %0 : memref<8x8xf32>
-  memref.dealloc %1 : memref<8x8xf32>
-  memref.dealloc %2 : memref<8x8xf32>
+  %tD0 = gpu.dealloc async %0 : memref<8x8xf32>
+  gpu.wait [%tD0]
+  %tD1 = gpu.dealloc async %1 : memref<8x8xf32>
+  gpu.wait [%tD1]
+  %tD2 = gpu.dealloc async %2 : memref<8x8xf32>
+  gpu.wait [%tD2]
+
+  memref.dealloc %out : memref<8x8xf32>
 
   return
 }
 
 func.func private @printMemrefF32(memref<*xf32>)
 
-// TODO check real values when 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
-// CHECK-COUNT-8: {{\[}}{{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}, {{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}
+// CHECK-COUNT-8: [16, 16, 16, 16, 16, 16, 16, 16]

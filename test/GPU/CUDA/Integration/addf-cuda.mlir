@@ -20,9 +20,14 @@ module attributes {gpu.container_module} {
     %arg0 = memref.alloc() : memref<8xf32>
     %arg1 = memref.alloc() : memref<8xf32>
     %arg2 = memref.alloc() : memref<8xf32>
-    %0 = arith.constant 0 : i32
-    %1 = arith.constant 1 : i32
-    %2 = arith.constant 2 : i32
+
+    %cast_a = memref.cast %arg0 : memref<8xf32> to memref<*xf32>
+    gpu.host_register %cast_a : memref<*xf32>
+    %cast_b = memref.cast %arg1 : memref<8xf32> to memref<*xf32>
+    gpu.host_register %cast_b : memref<*xf32>
+    %cast_c = memref.cast %arg2 :memref<8xf32> to memref<*xf32>
+    gpu.host_register %cast_c : memref<*xf32>
+
     %value0 = arith.constant 0.0 : f32
     %value1 = arith.constant 1.1 : f32
     %value2 = arith.constant 2.2 : f32
@@ -47,6 +52,6 @@ module attributes {gpu.container_module} {
   func.func private @printMemrefF32(%ptr : memref<*xf32>)
 }
 
-// TODO check real values when 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
+// TODO check real values when host_register 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
 // [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
 // CHECK: {{\[}}{{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}, {{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}
