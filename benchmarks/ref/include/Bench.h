@@ -58,9 +58,7 @@ public:
   }
 
   // Warms up the kernel and populates the output (inside the args vector).
-  void warmup() {
-      kernel.runRef(args);
-  }
+  void warmup() { kernel.runRef(args); }
 
   // Runs the benchmark `iter` times and take timings
   void run() {
