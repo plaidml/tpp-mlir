@@ -22,4 +22,4 @@ steps:
       LOGRPTSUM: "mlir"
       LOGRPTBND: "-"
       LOGRPTQRY: ""
-      LOGRPTSEP: -1
+      LOGRPTSEP: 1

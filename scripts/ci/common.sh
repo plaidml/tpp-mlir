@@ -5,19 +5,14 @@
 
 # Find the git root directory
 git_root() {
-  if [ "$(command -v git)" ]; then
-    git rev-parse --show-toplevel
-  else
-    echo "ERROR: missing prerequisites!"
-    exit 1
-  fi
+  git rev-parse --show-toplevel
 }
 
 # Check if a program is in the PATH
 check_program() {
   PROG=$1
   if ! which $PROG > /dev/null; then
-    echo "ERROR: '$PROG' not found!"
+    echo "Required program '$PROG' not found"
     exit 1
   fi
 }
@@ -25,7 +20,7 @@ check_program() {
 # Echoes and runs a program
 echo_run() {
   PROGRAM=$*
-  echo "${PROGRAM}"
+  echo ${PROGRAM}
   ${PROGRAM}
 }
 
@@ -33,13 +28,13 @@ echo_run() {
 llvm_version() {
   LLVM_VERSION_FILE=$(git_root)/build_tools/llvm_version.txt
   if [ ! -f "${LLVM_VERSION_FILE}" ]; then
-    echo "ERROR: cannot find ${LLVM_VERSION_FILE} for ${PWD}!"
+    echo "Cannot find LLVM version file in repo $PWD"
     exit 1
   fi
-  LLVM_VERSION=$(cat "${LLVM_VERSION_FILE}")
+  LLVM_VERSION=$(cat ${LLVM_VERSION_FILE})
   if [ ! "${LLVM_VERSION}" ]; then
-    echo "ERROR: cannot find LLVM version in ${LLVM_VERSION_FILE}!"
+    echo "Cannot find LLVM version on current repository"
     exit 1
   fi
-  echo "${LLVM_VERSION}"
+  echo ${LLVM_VERSION}
 }

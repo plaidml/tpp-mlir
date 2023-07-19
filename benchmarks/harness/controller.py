@@ -72,11 +72,11 @@ class BenchmarkController(object):
             with open(input) as file:
                 return file.read()
         except IOError as err:
-            self.logger.error(f"Cannot open file '{input}': {err.strerror}")
+            self.logger.error("Cannot open file '{input}': {err.strerror}")
             return {}
         except Exception as err:
             self.logger.error(
-                f"Uncaught error while parsing file: {err.strerror}"
+                "Uncaught error while parsing file: {err.strerror}"
             )
             return {}
 
@@ -173,7 +173,7 @@ class BenchmarkController(object):
             return False
 
         # Parse results (always in seconds, as per timer)
-        m = re.search(r"([\d\.\-e]+), ([\d\.\-e]+)", self.output)
+        m = re.search("([\d\.\-e]+), ([\d\.\-e]+)", self.output)
         if m:
             self.mean = float(m.group(1))
             self.stdev = float(m.group(2))

@@ -79,12 +79,11 @@ then
   exit 1
 fi
 
+echo "Configuring runtime for GPUs"
 CUDA_DRIVER=/usr/lib64/libcuda.so
-# CUDA: original GPU setting had boolean semantic (true/non-zero implies "cuda")
+# CUDA: original GPU setting had boolean semantic (true implies "cuda")
 if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" = "${GPU}" ]; then
-  if [ "${CUDA_DRIVER}" ]; then
-    echo "Enabled GPU backend (cuda)"
-  else
+  if [ ! -f "${CUDA_DRIVER}" ]; then
     echo "CUDA support requires GPU driver to be present"
     exit 1
   fi
@@ -101,8 +100,9 @@ else
       exit 1
     fi
   fi
+  # more detailed support for GPU runtime, e.g., "vulkan"
   if [ "${GPU}" ]; then
-    echo "Enabled GPU backend (${GPU})"
+    echo "Enable general support for GPUs"
   fi
 fi
 
