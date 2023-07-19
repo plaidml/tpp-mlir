@@ -154,13 +154,18 @@ if (NOT TPP_INSIDE_IREE)
                     COMMENT Run Benchmarks)
 endif()
 
-# Code format checks
+# Code reformat
 set(CI_DIR "${PROJECT_SOURCE_DIR}/scripts/ci")
-add_custom_target(lint-python ${CI_DIR}/lint-python.sh)
-add_custom_target(lint-clang  ${CI_DIR}/lint-clang.sh)
-add_custom_target(reformat DEPENDS lint-clang lint-python)
+add_custom_target(reformat-python ${CI_DIR}/lint-python.sh -i)
+add_custom_target(reformat-clang  ${CI_DIR}/lint-clang.sh -i)
+add_custom_target(reformat DEPENDS reformat-clang reformat-python)
+
+# Code format checks
+add_custom_target(check-python ${CI_DIR}/lint-python.sh)
+add_custom_target(check-clang  ${CI_DIR}/lint-clang.sh)
+add_custom_target(check-format DEPENDS check-clang check-python)
 
 # Check-all
-add_custom_target(check-all DEPENDS reformat check)
+add_custom_target(check-all DEPENDS check check-format)
 
 message(STATUS "TPP Project CMakeLists.txt END")

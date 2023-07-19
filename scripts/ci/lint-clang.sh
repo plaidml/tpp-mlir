@@ -19,29 +19,24 @@ if [ ! "${LINTER}" ]; then
   fi
 fi
 
-if [ "${LINTER}" ]; then
-  COUNT=0
-
-  # LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r --"
-  LISTFILES="git ls-files"
-
-  echo -n "Linting C/C++ files... "
-  cd "${REPOROOT}" || exit 1
-  for FILE in $(eval "${LISTFILES} ${PATTERN}"); do
-    if ${LINTER} -i "${FILE}"; then COUNT=$((COUNT+1)); fi
-  done
-
-  # any modified file (Git) raises and error
-  MODIFIED=$(eval "git ls-files -m ${PATTERN}")
-  if [ "${MODIFIED}" ]; then
-    echo "ERROR"
-    echo
-    echo "The following files are modified ($(${LINTER} --version)):"
-    echo "${MODIFIED}"
-    exit 1
-  else
-    echo "OK (${COUNT} files)"
-  fi
-else  # soft error (exit normally)
-  echo "ERROR: missing C/C++-linter (${LINTER})."
+# If -i is passed, format all files according to type/pattern.
+if [ "-i" != "$1" ]; then
+  LINTER_FLAGS="-Werror --dry-run"
+else
+  LINTER_FLAGS="-Werror -i"
 fi
+
+COUNT=0; OK=0
+echo -n "Linting C/C++ files... "
+cd "${REPOROOT}" || exit 1
+for FILE in $(eval "git ls-files ${PATTERN}"); do
+  if eval "${LINTER} 2>/dev/null ${LINTER_FLAGS} ${FILE}"; then OK=$((OK+1)); fi
+  COUNT=$((COUNT+1))
+done
+
+if [ "${COUNT}" != "${OK}" ]; then
+  echo "ERROR ($((COUNT-OK)) of ${COUNT} files)"
+  exit 1
+fi
+
+echo "OK (${COUNT} files processed)"
