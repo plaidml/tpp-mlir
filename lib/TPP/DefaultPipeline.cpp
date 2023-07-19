@@ -78,13 +78,6 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
-// Kernel buffers - arguments and return values - are expected to be allocated
-// on GPU.
-llvm::cl::opt<bool>
-    defGpuArgs("gpu-args",
-               llvm::cl::desc("Kernel buffers are allocated on GPU"),
-               llvm::cl::init(true));
-
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
