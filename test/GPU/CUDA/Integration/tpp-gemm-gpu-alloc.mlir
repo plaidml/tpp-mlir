@@ -19,8 +19,8 @@ func.func @entry() {
   linalg.fill ins(%cst2 : f32) outs(%1 : memref<8x8xf32>)
   linalg.fill ins(%cst0 : f32) outs(%2 : memref<8x8xf32>)
 
-  linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-                outs(%2 : memref<8x8xf32>)
+  tpp.gemm ins(%0 : memref<8x8xf32>, %1 : memref<8x8xf32>, %2: memref<8x8xf32>)
+           outs(%2: memref<8x8xf32>)
 
   %out = memref.alloc() : memref<8x8xf32>
   %tOut = gpu.memcpy async %out, %2 : memref<8x8xf32>, memref<8x8xf32>
@@ -42,4 +42,4 @@ func.func @entry() {
 
 func.func private @printMemrefF32(memref<*xf32>)
 
-// CHECK-COUNT-8: [16, 16, 16, 16, 16, 16, 16, 16]
+// CHECK-COUNT-8: [16,   16,   16,   16,   16,   16,   16,   16]

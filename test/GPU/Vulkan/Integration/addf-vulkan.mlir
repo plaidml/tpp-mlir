@@ -42,8 +42,8 @@ module attributes {
     gpu.launch_func @kernels::@kernel_add
         blocks in (%cst8, %cst1, %cst1) threads in (%cst1, %cst1, %cst1)
         args(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
-    %arg6 = memref.cast %arg5 : memref<?xf32> to memref<*xf32>
-    call @printMemrefF32(%arg6) : (memref<*xf32>) -> ()
+    %castOut = memref.cast %arg5 : memref<?xf32> to memref<*xf32>
+    call @printMemrefF32(%castOut) : (memref<*xf32>) -> ()
 
     memref.dealloc %arg0 : memref<8xf32>
     memref.dealloc %arg1 : memref<8xf32>

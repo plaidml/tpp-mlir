@@ -51,6 +51,13 @@ llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
                   llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
 
+// Kernel buffers - arguments and return values - are expected to be allocated
+// on GPU.
+llvm::cl::opt<bool>
+    defGpuArgs("gpu-args",
+               llvm::cl::desc("Kernel buffers are allocated on GPU"),
+               llvm::cl::init(true));
+
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
   seed = config.seed;
@@ -180,7 +187,7 @@ LogicalResult MLIRBench::renameKernel() {
 
 Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   // Do nothing when not using GPU
-  if (defGpuBackend.empty())
+  if (defGpuBackend.empty() || !defGpuArgs)
     return buf;
 
   if (defGpuBackend == "vulkan") {
@@ -188,7 +195,7 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
     auto localBuf = builder.create<memref::AllocOp>(unkLoc, memRefTy);
     auto copy = builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
 
-    // Dealloc the args at the end of program
+    // Dealloc the arg buffer at the end of program
     builder.setInsertionPointToEnd(&getMainBlock());
     builder.create<memref::DeallocOp>(unkLoc, localBuf);
 
@@ -198,11 +205,26 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
     return localBuf;
   }
 
-  auto unrankedType = UnrankedMemRefType::get(memRefTy.getElementType(),
-                                              memRefTy.getMemorySpace());
-  auto cast = builder.create<memref::CastOp>(unkLoc, unrankedType, buf);
-  builder.create<gpu::HostRegisterOp>(unkLoc, cast);
-  return buf;
+  // Allocate an arg buffer on device and copy data from host
+  auto tokenType = builder.getType<gpu::AsyncTokenType>();
+  auto gpuAlloc = builder.create<gpu::AllocOp>(
+      unkLoc, memRefTy, tokenType, ValueRange(), ValueRange(), ValueRange());
+  auto gpuBuf = gpuAlloc.getResult(0);
+  auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
+      unkLoc, TypeRange{tokenType}, gpuAlloc.getAsyncToken(), gpuBuf, buf);
+  auto gpuSync =
+      builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
+
+  // Dealloc the arg buffer at the end of program
+  builder.setInsertionPointToEnd(&getMainBlock());
+  auto gpuDealloc =
+      builder.create<gpu::DeallocOp>(unkLoc, TypeRange{tokenType}, gpuBuf);
+  builder.create<gpu::WaitOp>(unkLoc, Type(), gpuDealloc.getAsyncToken());
+
+  // Continue inserting ops after the created kernel arg
+  builder.setInsertionPointAfter(gpuSync);
+
+  return gpuBuf;
 }
 
 LogicalResult MLIRBench::createKernelArgs() {
@@ -447,7 +469,35 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   // Build print logic directly after the kernel call.
   builder.setInsertionPointAfter(kernelCall);
 
-  return printShapedType(getKernelResult(kernelCall));
+  Value result = getKernelResult(kernelCall);
+  if (!defGpuBackend.empty() && defGpuArgs) {
+    auto resType = cast<ShapedType>(result.getType());
+    auto memrefType =
+        MemRefType::get(resType.getShape(), resType.getElementType());
+
+    if (result.getType().isa<TensorType>()) {
+      result =
+          builder.create<bufferization::ToMemrefOp>(unkLoc, memrefType, result);
+    }
+
+    auto outBuf = builder.create<memref::AllocOp>(unkLoc, memrefType);
+    auto tokenType = builder.getType<gpu::AsyncTokenType>();
+    auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
+        unkLoc, TypeRange{tokenType}, ValueRange(), outBuf, result);
+    auto gpuSync =
+        builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
+
+    // Dealloc the output buffer at the end of program
+    builder.setInsertionPointToEnd(&getMainBlock());
+    builder.create<memref::DeallocOp>(unkLoc, outBuf);
+
+    // Restore insertion point
+    builder.setInsertionPointAfter(gpuSync);
+
+    result = outBuf;
+  }
+
+  return printShapedType(result);
 }
 
 LogicalResult MLIRBench::finalize() {

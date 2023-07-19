@@ -12,8 +12,6 @@ func.func @entry() {
 
   // initialize h0 on host
   %h0 = memref.alloc(%count) : memref<?xi32>
-  %h0_unranked = memref.cast %h0 : memref<?xi32> to memref<*xi32>
-  gpu.host_register %h0_unranked : memref<*xi32>
 
   %v0 = arith.constant 42 : i32
   memref.store %v0, %h0[%c0] : memref<?xi32>
@@ -42,29 +40,58 @@ func.func @entry() {
     async.yield %b2 : memref<?xi32>
   }
 
+  %t3, %f3 = async.execute () -> !async.value<memref<?xi32>> {
+    %b3 = gpu.alloc(%count) : memref<?xi32>
+    async.yield %b3 : memref<?xi32>
+  }
+
   // h0 = b1 + b2 (join).
-  %t3 = async.execute [%t1, %t2] (
+  %t4 = async.execute [%t1, %t2, %t3] (
     %f1 as %b1 : !async.value<memref<?xi32>>,
-    %f2 as %b2 : !async.value<memref<?xi32>>
+    %f2 as %b2 : !async.value<memref<?xi32>>,
+    %f3 as %b3 : !async.value<memref<?xi32>>
   ) {
     gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
                threads(%tx, %ty, %tz) in (%block_x = %count, %block_y = %c1, %block_z = %c1) {
       %v1 = memref.load %b1[%tx] : memref<?xi32>
       %v2 = memref.load %b2[%tx] : memref<?xi32>
       %sum = arith.addi %v1, %v2 : i32
-      memref.store %sum, %h0[%tx] : memref<?xi32>
+      memref.store %sum, %b3[%tx] : memref<?xi32>
       gpu.terminator
     }
     async.yield
   }
 
-  async.await %t3 : !async.token
+  %t5 = async.execute [%t4] (
+    %f3 as %b3 : !async.value<memref<?xi32>>
+  ) {
+    gpu.memcpy %h0, %b3 : memref<?xi32>, memref<?xi32>
+    async.yield
+  }
+
+  async.await %t5 : !async.token
+  %h0_unranked = memref.cast %h0 : memref<?xi32> to memref<*xi32>
   call @printMemrefI32(%h0_unranked) : (memref<*xi32>) -> ()
+
+  %t6 = async.execute (
+    %f0 as %b0 : !async.value<memref<?xi32>>,
+    %f1 as %b1 : !async.value<memref<?xi32>>,
+    %f2 as %b2 : !async.value<memref<?xi32>>,
+    %f3 as %b3 : !async.value<memref<?xi32>>
+  ) {
+    gpu.dealloc %b0 : memref<?xi32>
+    gpu.dealloc %b1 : memref<?xi32>
+    gpu.dealloc %b2 : memref<?xi32>
+    gpu.dealloc %b3 : memref<?xi32>
+    async.yield
+  }
+  async.await %t6 : !async.token
+
+  memref.dealloc %h0 : memref<?xi32>
+
   return
 }
 
 func.func private @printMemrefI32(memref<*xi32>)
 
-// TODO check real values when 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
-// [84, 84]
-// CHECK: {{\[}}{{-?}}{{[0-9]+}}, {{-?}}{{[0-9]+}}
+// CHECK: [84, 84]
