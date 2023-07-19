@@ -24,14 +24,14 @@ class FileCheckParser(object):
     def __init__(self, loglevel):
         self.logger = Logger("filecheck.parser", loglevel)
         # FileCheck line style
-        self.runRE = re.compile("^\/\/\s*RUN: (.*)$")
-        self.flopsRE = re.compile("^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")
+        self.runRE = re.compile(r"^\/\/\s*RUN: (.*)$")
+        self.flopsRE = re.compile(r"^\/\/\s*BENCH_TOTAL_FLOPS: ([\d\.\-e]+)")
         # Arguments in the RUN lines for tpp-opt
-        self.optArgs = re.compile("tpp-opt (%\w+)\s+(.*?)\s*\|")
+        self.optArgs = re.compile(r"tpp-opt (%\w+)\s+(.*?)\s*\|")
         # Arguments in the RUN lines for tpp-run
-        self.entryRE = re.compile("-e\s+(\w+)\s")
-        self.itersRE = re.compile("-n\s+(\d+)\s")
-        self.libsRE = re.compile("-shared-libs=([^\s]+)")
+        self.entryRE = re.compile(r"-e\s+(\w+)\s")
+        self.itersRE = re.compile(r"-n\s+(\d+)\s")
+        self.libsRE = re.compile(r"-shared-libs=([^\s]+)")
         # All matches
         self.result = {}
 
@@ -103,19 +103,19 @@ class FileCheckParser(object):
                 with open(input) as file:
                     self._parseLines(file)
         except IOError as err:
-            self.logger.error("Cannot open file '{filename}': {err.strerror}")
+            self.logger.error(f"Cannot open file '{input}': {err.strerror}")
             return {}
         except ValueError as err:
             self.logger.error(
-                "Cannot convert string into int/float: {err.strerror}"
+                f"Cannot convert string into int/float: {err.strerror}"
             )
             return {}
         except NameError as err:
-            self.logger.error("Name error while parsing IR file: {err.args}")
+            self.logger.error(f"Name error while parsing IR file: {err.args}")
             return {}
         except Exception as err:
             self.logger.error(
-                "Uncaught error while parsing IR file: {err.strerror}"
+                f"Uncaught error while parsing IR file: {err.strerror}"
             )
             return {}
 
