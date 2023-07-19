@@ -45,6 +45,5 @@ steps:
     env:
       TPP_LAUNCH_NODE: "pcl-adl01"
       TPP_PROXY_ENABLE: "1"
-      TPP_ENV_STRICT: "1"
       TPP_CLANGVER: "16.0.4"
       TPP_GCCVER: "12.3.0"
