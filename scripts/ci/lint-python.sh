@@ -15,22 +15,20 @@ LINTER=$(command -v black)
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
   FLAKE8_IGNORE="--ignore=E402,E501,F821"
-  COUNT=0
+  COUNT=0; OK=0
 
   # If -i is passed, format all files according to type/pattern.
   if [ "-i" != "$1" ]; then
-    # list files matching PATTERN and which are part of HEAD's changeset
-    LISTFILES="git diff-tree --no-commit-id --name-only HEAD -r --"
+    LINTER_FLAGS="-l 79 -q --check"
   else
-    LISTFILES="git ls-files"
+    LINTER_FLAGS="-l 79 -q"
   fi
 
   echo -n "Linting Python files... "
   cd "${REPOROOT}" || exit 1
-  # list files matching PATTERN and which are part of HEAD's changeset
-  for FILE in $(eval "${LISTFILES} ${PATTERN}"); do
+  for FILE in $(eval "git ls-files ${PATTERN}"); do
     # Flake8: line-length limit of 79 characters (default)
-    if ${LINTER} -q -l 79 "${FILE}"; then COUNT=$((COUNT+1)); fi
+    if eval "${LINTER} ${LINTER_FLAGS} ${FILE}"; then OK=$((OK+1)); fi
     if [ "${FLAKE8}" ]; then  # optional
       # no error raised for Flake8 issues
       WARNING=$(flake8 ${FLAKE8_IGNORE} "${FILE}")
@@ -42,15 +40,12 @@ if [ "${LINTER}" ]; then
         fi
       fi
     fi
+    COUNT=$((COUNT+1))
   done
 
-  # any modified file (Git) raises and error
-  MODIFIED=$(eval "git ls-files -m ${PATTERN}")
-  if [ "${MODIFIED}" ]; then
-    echo "ERROR"
-    echo
-    echo "The following files are modified ($(${LINTER} --version)):"
-    echo "${MODIFIED}"
+  # mandatory checks
+  if [ "${COUNT}" != "${OK}" ]; then
+    echo "ERROR ($((COUNT-OK)) of ${COUNT} files)"
     exit 1
   fi
   # optional warnings
@@ -61,7 +56,7 @@ if [ "${LINTER}" ]; then
     echo "${WARNINGS}"
     echo
   else
-    echo "OK (${COUNT} files)"
+    echo "OK (${OK} files)"
   fi
 else  # soft error (exit normally)
   echo "ERROR: missing Python-linter (${LINTER})."
