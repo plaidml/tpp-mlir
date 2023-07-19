@@ -66,7 +66,7 @@ private:
 
 #ifdef TPP_VULKAN_ENABLE
     // Create SPIRV kernels.
-    pm.addPass(createConvertGPUToSPIRVPass());
+    pm.addPass(tpp::createConvertGPUToSPIRVPass());
     pm.addNestedPass<spirv::ModuleOp>(
         spirv::createSPIRVLowerABIAttributesPass());
     pm.addNestedPass<spirv::ModuleOp>(spirv::createSPIRVUpdateVCEPass());
