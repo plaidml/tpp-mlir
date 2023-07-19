@@ -136,9 +136,18 @@ getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
   }
   int64_t ldc = *ldcDim;
 
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
-  return dims;
+  // If we are dealing with a BRGEMM we need to pass two extra dimensions:
+  // - strideA and strideB that represent the stride between different GEMM
+  // in BRGEMM.
+  if (isBrgemm) {
+    int64_t strideA = lda * m;
+    int64_t strideB = ldb * k;
+    return DenseI64ArrayAttr::get(
+        rewriter.getContext(),
+        ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
+  }
+  return DenseI64ArrayAttr::get(rewriter.getContext(),
+                                ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
 }
 
 template <typename OpTy>

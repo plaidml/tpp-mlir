@@ -202,7 +202,7 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
  
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   %c2_i64 = arith.constant 2 : i64
-  %0 = xsmm.brgemm.dispatch [3, 3, 4, 4, 3, 3] flags = (none) data_type = f32
+  %0 = xsmm.brgemm.dispatch [3, 3, 4, 4, 3, 3, 12, 12] flags = (none) data_type = f32
   xsmm.brgemm(data_type = f32, %0, %arg0, %arg1, %arg2, %c2_i64) 
     : (i64, memref<2x3x4xf32>, memref<2x4x3xf32>, memref<3x3xf32>, i64) -> ()
 
@@ -234,7 +234,7 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
 
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
   %c64_i64 = arith.constant 64 : i64
-  %0 = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4] flags = (vnni_b) data_type = bf16
+  %0 = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4, 16, 16] flags = (vnni_b) data_type = bf16
   xsmm.brgemm(data_type = bf16, %0, %arg0, %arg1, %arg2, %c64_i64) 
     : (i64, memref<64x4x4xbf16>, memref<64x2x4x2xbf16>, memref<4x4xbf16>, i64) -> ()
 
@@ -323,7 +323,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-    %0 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32] flags = (none) data_type = f32
+    %0 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (none) data_type = f32
     xsmm.brgemm(data_type = f32, %0, %subview, %subview_0, %subview_1, %c16_i64) 
       : (i64, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
          memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
