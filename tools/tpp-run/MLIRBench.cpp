@@ -46,12 +46,6 @@
 
 using namespace mlir;
 
-// Control parallelism.
-llvm::cl::opt<bool>
-    defParallel("def-parallel",
-                llvm::cl::desc("Default pipeline - enable parallel execution"),
-                llvm::cl::init(false));
-
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
@@ -60,8 +54,6 @@ llvm::cl::opt<std::string>
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
   seed = config.seed;
-  tppToLoops = config.tppToLoops;
-  linalgToLoops = config.linalgToLoops;
   initType = config.initType;
 
   module = dyn_cast<ModuleOp>(op);
@@ -458,7 +450,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(getKernelResult(kernelCall));
 }
 
-LogicalResult MLIRBench::finalize(PrintStage print) {
+LogicalResult MLIRBench::finalize() {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
@@ -470,63 +462,7 @@ LogicalResult MLIRBench::finalize(PrintStage print) {
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
 
-  // Print IR of unoptimized kernel and main
-  if (print == PrintStage::Early)
-    passManager.addPass(createPrintIRPass());
-
-  if (!defGpuBackend.empty()) {
-    // Apply the custom GPU lowering pipeline
-    passManager.addPass(tpp::createGpuPipelinePass(defGpuBackend));
-  } else {
-    // Apply the default preprocessing pass
-    passManager.addPass(tpp::createDefaultTppPass(tppToLoops, linalgToLoops));
-  }
-
-  if (print == PrintStage::Mid)
-    passManager.addPass(createPrintIRPass());
-
-  // Partial Lowering
-  passManager.addPass(memref::createExpandStridedMetadataPass());
-  passManager.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoopsPass());
-  passManager.addPass(tpp::createConvertPerfToFuncPass());
-  passManager.addPass(createConvertTensorToLinalgPass());
-  passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  if (defParallel)
-    passManager.addPass(createConvertSCFToOpenMPPass());
-  passManager.addPass(createConvertVectorToSCFPass());
-  passManager.addPass(arith::createArithExpandOpsPass());
-  passManager.addPass(createLowerAffinePass());
-
-  // Print IR of optimized kernel and main
-  if (print == PrintStage::Late)
-    passManager.addPass(createPrintIRPass());
-
-  // Lower to LLVM
-  passManager.addPass(createConvertVectorToLLVMPass());
-  passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
-  passManager.addPass(createConvertSCFToCFPass());
-  if (defParallel)
-    passManager.addPass(createConvertOpenMPToLLVMPass());
-  passManager.addPass(createConvertMathToLLVMPass());
-
-  passManager.addNestedPass<func::FuncOp>(createGpuAsyncRegionPass());
-  passManager.addPass(createGpuToLLVMConversionPass());
-  passManager.addPass(createAsyncToAsyncRuntimePass());
-  passManager.addPass(createAsyncRuntimeRefCountingPass());
-  passManager.addPass(createConvertAsyncToLLVMPass());
-
-  passManager.addPass(createConvertFuncToLLVMPass());
-
-  passManager.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCSEPass());
-  passManager.addPass(createReconcileUnrealizedCastsPass());
-
-  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
-
-  // Print IR of kernel and main in LLVM dialect
-  if (print == PrintStage::LLVM)
-    passManager.addPass(createPrintIRPass());
+  passManager.addPass(tpp::createDefaultPipelinePass(defGpuBackend));
 
   auto result = passManager.run(module);
   if (failed(result)) {

@@ -33,14 +33,10 @@ class FuncOp;
 // pipeline.
 struct MLIRBenchConfig {
   MLIRBenchConfig() = default;
-  MLIRBenchConfig(int seed, bool tppToLoops, bool linalgToLoops,
-                  TensorInitType initType)
-      : seed(seed), tppToLoops(tppToLoops), linalgToLoops(linalgToLoops),
-        initType(initType) {}
+  MLIRBenchConfig(int seed, TensorInitType initType)
+      : seed(seed), initType(initType) {}
 
   int seed = 0;
-  bool tppToLoops = false;
-  bool linalgToLoops = false;
   TensorInitType initType = TensorInitType::Auto;
 };
 
@@ -108,12 +104,6 @@ class MLIRBench {
   /// Seed for the random tensor filling
   int seed;
 
-  /// Lower TPP to loops for validation purposes
-  bool tppToLoops;
-
-  /// Lower linalg to loops for validation purposes
-  bool linalgToLoops;
-
   /// Tensor init type
   TensorInitType initType;
 
@@ -178,18 +168,8 @@ public:
   /// Prints the result of a kernel call
   LogicalResult printResult(Operation *kernelCall);
 
-  /// Enum to control what to dump when
-  enum class PrintStage {
-    None,
-    Early, // After main generation, before optimization
-    Mid,   // After initial TPP-related optimizations
-    Late,  // After optimizaiton, before LLVM dialect
-    LLVM,  // Final MLIR, in LLVM dialect
-    Invalid,
-  };
-
   /// Terminates the function, issuing a return, lower to LLVM
-  LogicalResult finalize(PrintStage dump);
+  LogicalResult finalize();
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);

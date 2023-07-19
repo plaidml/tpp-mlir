@@ -433,4 +433,17 @@ def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp">
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
+  let summary = "The default compiler lowering pipeline";
+  let description = [{
+    A collection of passes that lower everything to MLIR LLVM IR.
+  }];
+  let constructor = "mlir::tpp::createDefaultPipelinePass()";
+  let options = [
+    Option<"gpuBackend", "gpu", "std::string",
+            /*default=*/"\"\"",
+           "Optional target GPU backend.">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
