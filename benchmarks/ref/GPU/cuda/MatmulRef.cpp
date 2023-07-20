@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
 
   CudaTensor<float> gpuA(std::move(SplatTensor<float>{{m, k}, 1}));
   CudaTensor<float> gpuB(std::move(SplatTensor<float>{{k, n}, 1}));
-  CudaTensor<float> gpuC(std::move(EmptyTensor<float>{m, n}));
+  CudaTensor<float> gpuC(std::move(SplatTensor<float>{{m, n}, 0}));
 
   if (!gpuA.initGpu() || !gpuB.initGpu() || !gpuC.initGpu()) {
     std::cerr << "Failed GPU tensor initialization\n";
