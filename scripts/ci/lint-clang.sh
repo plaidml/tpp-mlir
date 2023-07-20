@@ -26,16 +26,22 @@ else
   LINTER_FLAGS="-Werror -i"
 fi
 
-COUNT=0; OK=0
+COUNT=0; OK=0; FILES=""
 echo -n "Linting C/C++ files... "
 cd "${REPOROOT}" || exit 1
 for FILE in $(eval "git ls-files ${PATTERN}"); do
-  if eval "${LINTER} 2>/dev/null ${LINTER_FLAGS} ${FILE}"; then OK=$((OK+1)); fi
+  if eval "${LINTER} 2>/dev/null ${LINTER_FLAGS} ${FILE}"; then
+    OK=$((OK+1))
+  else
+    FILES="${FILES} * ${FILE}\n"
+  fi
   COUNT=$((COUNT+1))
 done
 
 if [ "${COUNT}" != "${OK}" ]; then
   echo "ERROR ($((COUNT-OK)) of ${COUNT} files)"
+  echo -e "\nFiles with formatting errors:"
+  echo -e "${FILES}"
   exit 1
 fi
 
