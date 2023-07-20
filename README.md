@@ -51,6 +51,19 @@ eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
 conda activate
 ```
 
+### Formatting Tools
+
+Our project requires Python and C++ source format to be consistent on every commit.
+For that, we use two tools on the `check-all` Ninja target to verify the formatting:
+ * `clang-format` version 16
+ * Python's `black` lint checker
+
+Due to `clang-format`'s instability and non-backwards compatibility, we require that the version used be 16.
+If you have another version of `clang` installed, make sure you install `clang-format-16` on your system.
+
+Our CI will fail if these tools find formatting checks, as it uses the target `check-all`.
+Having those tools locally will make it easier to have PRs passing CI and being merged.
+
 ## How to build LLVM
 
 ```sh
