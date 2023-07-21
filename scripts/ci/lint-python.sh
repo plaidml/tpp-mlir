@@ -56,7 +56,7 @@ if [ "${LINTER}" ]; then
     echo "${WARNINGS}"
     echo
   else
-    echo "OK (${OK} files)"
+    echo "OK (${OK} files processed)"
   fi
 else  # soft error (exit normally)
   echo "ERROR: missing Python-linter (${LINTER})."
