@@ -763,7 +763,10 @@ struct TileConsumerAndFuseProducers
       // `populateFoldUnitExtentDimsViaSlicesPatterns` works only with
       // linalg.generic we need to generalize first using
       // `populateLinalgNamedOpsGeneralizationPatterns`.
-      linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+      linalg::ControlDropUnitDims options;
+      options.rankReductionStrategy = linalg::ControlDropUnitDims::
+          RankReductionStrategy::ExtractInsertSlice;
+      linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
       tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
       linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));

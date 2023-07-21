@@ -267,31 +267,11 @@ func.func @tpp_and_linalg(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> ten
 // CHECK-LABEL: func.func @tpp_and_linalg
 // CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>
 // CHECK: tpp.add ins(%[[ARG0:.+]] : memref<3x3xf32>, %[[ARG1:.+]] : memref<3x3xf32>) outs(%[[ARG1:.+]] : memref<3x3xf32>)
-// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
 // CHECK-SAME:  iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:  ins(%[[ARG1]], %[[ARG0]]
-// CHECK-SAME:  outs(%[[ALLOC]]
-
-// -----
-
-// This test only to show that we already have the alloc for the linalg
-// operation. Thus it does not come from our bufferization see above.
-#map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @simple_linalg(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
-  // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
-  %0 = linalg.generic {
-    indexing_maps = [#map, #map, #map],
-    iterator_types = ["parallel", "parallel"]}
-    ins(%arg1, %arg0: tensor<3x3xf32>, tensor<3x3xf32>)
-    outs(%arg0: tensor<3x3xf32>) {
-      ^bb0(%in: f32, %in_1: f32, %out: f32):
-        %add = arith.addf %in, %in_1 : f32
-        linalg.yield %add : f32
-    } -> tensor<3x3xf32>
-  return %0 : tensor<3x3xf32>
-}
+// CHECK-SAME:  outs(%[[ARG0]]
 
 // -----
 
