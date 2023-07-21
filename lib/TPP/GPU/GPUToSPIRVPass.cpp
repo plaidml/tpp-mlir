@@ -59,29 +59,36 @@ private:
 };
 } // namespace
 
+// Returns SPIRV compatible wrapper type for a given input type.
 static Type getSPIRVTypeWrapper(Type type,
                                 const SPIRVTypeConverter &typeConverter,
                                 RewriterBase &rewriter) {
-  // Buffers are already SPIRV compatible
+  // Buffers are already SPIRV compatible.
   if (type.isa<ShapedType>())
     return type;
 
-  // Index has to be converted to a fixed-size integer
+  // Index has to be converted to a fixed-size integer.
   if (type.isa<IndexType>()) {
     auto spirvIndex = typeConverter.getIndexType().cast<spirv::SPIRVType>();
     type = rewriter.getIntegerType(*(spirvIndex.getSizeInBytes()) * 8);
   }
 
-  // Wrap the basic type in a buffer
+  // Wrap the basic type in a buffer.
   auto typeWrapper = MemRefType::get({1}, type);
   return typeWrapper;
 };
 
+// Rewrites GPU function to have SPIRV compatible signature.
+// Replaces the original kernel with an adapted empty kernel.
 static void adaptGPUFuncToSPIRVABI(gpu::GPUFuncOp &gpuFuncOp,
                                    const SPIRVTypeConverter &typeConverter,
                                    RewriterBase &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(gpuFuncOp.getOperation());
+
+  // Create a temporary empty GPU kernel.
+  // The kernel module is still needed by corresponding GPU launch op
+  // but empty body ensures that kernel argument can be easily modified.
   auto funcOp = rewriter.cloneWithoutRegions(gpuFuncOp);
   {
     OpBuilder::InsertionGuard guard(rewriter);
@@ -89,6 +96,8 @@ static void adaptGPUFuncToSPIRVABI(gpu::GPUFuncOp &gpuFuncOp,
     rewriter.create<gpu::ReturnOp>(gpuFuncOp.getLoc());
   }
 
+  // Scalars cannot be passed directly to a SPIRV kernels.
+  // Wrap them into SPIRV compatible buffers.
   auto funcType = funcOp.getFunctionType();
   SmallVector<Type> inputs;
   for (Type input : funcType.getInputs()) {
@@ -97,27 +106,35 @@ static void adaptGPUFuncToSPIRVABI(gpu::GPUFuncOp &gpuFuncOp,
     else
       inputs.push_back(getSPIRVTypeWrapper(input, typeConverter, rewriter));
   }
+
+  // Change the kernel arguments.
   auto newFuncType = funcType.clone(inputs, funcType.getResults());
   funcOp.setFunctionType(newFuncType);
 
+  // Add block arguments that correspond to the new argument types.
   auto &block = funcOp.getRegion().front();
   for (auto type : inputs) {
     block.addArgument(type, funcOp.getLoc());
   }
 
+  // Remove the original kernel.
   rewriter.eraseOp(gpuFuncOp.getOperation());
 }
 
+// Adapts GPU function launch to SPIRV calling convention.
+// Scalar values are wrapped into SPIRV compatible buffers.
 static void
 adaptGPULaunchFuncToSPIRVABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
                              const SPIRVTypeConverter &typeConverter,
                              RewriterBase &rewriter) {
   auto loc = gpuLaunchFuncOp.getLoc();
+
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(gpuLaunchFuncOp.getOperation());
 
   SmallVector<Value> newOperands;
   for (Value operand : gpuLaunchFuncOp.getKernelOperands()) {
+    // Buffers are already SPIRV compatible.
     auto type = operand.getType();
     if (type.isa<ShapedType>()) {
       newOperands.push_back(operand);
@@ -126,17 +143,22 @@ adaptGPULaunchFuncToSPIRVABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
 
     auto wrapperType =
         getSPIRVTypeWrapper(type, typeConverter, rewriter).cast<MemRefType>();
+
+    // Cast index to a fixed-size integer.
     if (type.isa<IndexType>()) {
       auto castType = wrapperType.getElementType();
       operand =
           rewriter.create<arith::IndexCastOp>(loc, castType, operand).getOut();
     }
+
+    // Scalar values are small so put them on stack.
     auto wrapper = rewriter.create<memref::AllocaOp>(loc, wrapperType);
     auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     rewriter.create<memref::StoreOp>(loc, operand, wrapper, ValueRange{zero});
     newOperands.push_back(wrapper);
   }
 
+  // Update function launch arguments.
   gpuLaunchFuncOp.getKernelOperandsMutable().assign(newOperands);
 }
 
