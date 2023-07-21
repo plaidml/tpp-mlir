@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda \
+// RUN: tpp-run %s -gpu=vulkan \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
@@ -37,7 +37,5 @@ module attributes {
 
   func.func private @printMemrefF32(memref<*xf32>)
 }
-
-
 
 // CHECK-COUNT-8: [9, 9, 9, 9, 9, 9, 9, 9]
