@@ -15,7 +15,11 @@ LINTER=$(command -v black)
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
   FLAKE8_IGNORE="--ignore=E402,E501,F821"
-  COUNT=0; OK=0
+
+  # Check if Flake8 actually works
+  if [ "${FLAKE8}" ] && ! ${FLAKE8} 2>/dev/null; then
+    unset FLAKE8
+  fi
 
   # If -i is passed, format all files according to type/pattern.
   if [ "-i" != "$1" ]; then
@@ -24,6 +28,7 @@ if [ "${LINTER}" ]; then
     LINTER_FLAGS="-l 79 -q"
   fi
 
+  COUNT=0; OK=0
   echo -n "Linting Python files... "
   cd "${REPOROOT}" || exit 1
   for FILE in $(eval "git ls-files ${PATTERN}"); do
