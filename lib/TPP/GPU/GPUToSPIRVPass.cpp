@@ -19,7 +19,9 @@
 #include "mlir/Conversion/FuncToSPIRV/FuncToSPIRV.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
@@ -60,15 +62,113 @@ private:
 void GPUToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp module = getOperation();
+  IRRewriter rewriter(context);
+
+  SPIRVConversionOptions options;
+  options.use64bitIndex = this->use64bitIndex;
+
+  auto getSPIRVTypeWrapper = [&](const SPIRVTypeConverter &typeConverter,
+                                 Type type) -> Type {
+    // Buffers are already SPIRV compatible
+    if (type.isa<ShapedType>())
+      return type;
+
+    // Index has to be converted to a fixed-size integer
+    if (type.isa<IndexType>()) {
+      auto spirvIndex = typeConverter.getIndexType().cast<spirv::SPIRVType>();
+      type = rewriter.getIntegerType(*(spirvIndex.getSizeInBytes()) * 8);
+    }
+
+    // Wrap the basic type in a buffer
+    auto typeWrapper = MemRefType::get({1}, type);
+    return typeWrapper;
+  };
 
   SmallVector<Operation *, 1> gpuModules;
-  OpBuilder builder(context);
   module.walk([&](gpu::GPUModuleOp moduleOp) {
     // Clone each GPU kernel module for conversion, given that the GPU
     // launch op still needs the original GPU kernel module.
-    builder.setInsertionPoint(moduleOp.getOperation());
-    gpuModules.push_back(builder.clone(*moduleOp.getOperation()));
+    rewriter.setInsertionPoint(moduleOp.getOperation());
+    gpuModules.push_back(rewriter.clone(*moduleOp.getOperation()));
+
+    auto targetAttr = spirv::lookupTargetEnvOrDefault(moduleOp);
+    std::unique_ptr<ConversionTarget> target =
+        SPIRVConversionTarget::get(targetAttr);
+    SPIRVTypeConverter typeConverter(targetAttr, options);
+
+    SmallVector<gpu::GPUFuncOp, 1> gpuFuncs;
+    moduleOp.walk([&](gpu::GPUFuncOp gpuFuncOp) {
+      // Only gather GPU kernel functions
+      if (gpuFuncOp.isKernel())
+        gpuFuncs.push_back(gpuFuncOp);
+    });
+    for (auto &gpuFuncOp : gpuFuncs) {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPoint(gpuFuncOp.getOperation());
+      auto funcOp = rewriter.cloneWithoutRegions(gpuFuncOp);
+      {
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(&funcOp.getRegion().emplaceBlock());
+        rewriter.create<gpu::ReturnOp>(gpuFuncOp.getLoc());
+      }
+
+      auto funcType = funcOp.getFunctionType();
+      SmallVector<Type> inputs;
+      for (Type input : funcType.getInputs()) {
+        if (input.isa<ShapedType>())
+          inputs.push_back(input);
+        else
+          inputs.push_back(getSPIRVTypeWrapper(typeConverter, input));
+      }
+      auto newFuncType = funcType.clone(inputs, funcType.getResults());
+      funcOp.setFunctionType(newFuncType);
+
+      auto &block = funcOp.getRegion().front();
+      for (auto type : inputs) {
+        block.addArgument(type, funcOp.getLoc());
+      }
+
+      rewriter.eraseOp(gpuFuncOp.getOperation());
+    }
   });
+
+  SmallVector<gpu::LaunchFuncOp, 1> gpuLaunches;
+  module.walk([&](gpu::LaunchFuncOp gpuLaunchOp) {
+    gpuLaunches.push_back(gpuLaunchOp);
+  });
+  for (auto &launchOp : gpuLaunches) {
+    auto loc = launchOp.getLoc();
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(launchOp.getOperation());
+
+    auto targetAttr = spirv::lookupTargetEnvOrDefault(launchOp.getOperation());
+    std::unique_ptr<ConversionTarget> target =
+        SPIRVConversionTarget::get(targetAttr);
+    SPIRVTypeConverter typeConverter(targetAttr, options);
+
+    SmallVector<Value> newOperands;
+    for (Value operand : launchOp.getKernelOperands()) {
+      auto type = operand.getType();
+      if (type.isa<ShapedType>()) {
+        newOperands.push_back(operand);
+        continue;
+      }
+
+      auto wrapperType =
+          getSPIRVTypeWrapper(typeConverter, type).cast<MemRefType>();
+      if (type.isa<IndexType>()) {
+        auto castType = wrapperType.getElementType();
+        operand = rewriter.create<arith::IndexCastOp>(loc, castType, operand)
+                      .getOut();
+      }
+      auto wrapper = rewriter.create<memref::AllocaOp>(loc, wrapperType);
+      auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      rewriter.create<memref::StoreOp>(loc, operand, wrapper, ValueRange{zero});
+      newOperands.push_back(wrapper);
+    }
+
+    launchOp.getKernelOperandsMutable().assign(newOperands);
+  }
 
   // Run conversion for each module independently as they can have different
   // TargetEnv attributes.
@@ -92,8 +192,6 @@ void GPUToSPIRVPass::runOnOperation() {
     std::unique_ptr<ConversionTarget> target =
         SPIRVConversionTarget::get(targetAttr);
 
-    SPIRVConversionOptions options;
-    options.use64bitIndex = this->use64bitIndex;
     SPIRVTypeConverter typeConverter(targetAttr, options);
     typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
       return convertMMAToSPIRVType(type);
