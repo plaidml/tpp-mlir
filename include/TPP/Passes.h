@@ -149,6 +149,8 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultPipelinePass(StringRef gpuBackend = "");
 std::unique_ptr<OperationPass<ModuleOp>>
 createConvertGPUToSPIRVPass(bool mapMemorySpace = true);
+std::unique_ptr<OperationPass<ModuleOp>>
+createSetSPIRVCapabilitiesPass(StringRef api = "vulkan");
 
 // Testing passes.
 void registerTestStructuralMatchers();

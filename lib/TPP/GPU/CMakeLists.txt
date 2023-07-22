@@ -5,6 +5,7 @@ add_mlir_library(TPPGPU
   GpuToCuda.cpp
   GpuToVulkan.cpp
   GPUToSPIRVPass.cpp
+  SetSPIRVCapabilities.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

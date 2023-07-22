@@ -454,4 +454,14 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
   ];
 }
 
+def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
+  let summary = "Set SPIRV capabilities.";
+  let constructor = "mlir::tpp::createSetSPIRVCapabilitiesPass()";
+  let options = [
+    Option<"clientAPI", "client-api", "std::string",
+            /*default=*/"\"vulkan\"",
+           "The client API to use for capabilities">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
