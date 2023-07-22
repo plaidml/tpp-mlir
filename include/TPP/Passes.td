@@ -464,4 +464,14 @@ def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
   ];
 }
 
+def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "ModuleOp"> {
+  let summary = "Set SPIRV ABI attribute.";
+  let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
+  let options = [
+    Option<"clientAPI", "client-api", "std::string",
+            /*default=*/"\"vulkan\"",
+           "The client API to use for ABI attribute">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
