@@ -34,13 +34,10 @@ set(XSMM_INCLUDE_DIRS ${LIBXSMMROOT}/include)
 
 add_library(xsmm STATIC ${XSMM_SRCS})
 target_include_directories(xsmm PUBLIC ${XSMM_INCLUDE_DIRS})
-target_compile_definitions(xsmm PUBLIC
-  LIBXSMM_DEFAULT_CONFIG
-)
 target_compile_definitions(xsmm PRIVATE
   __BLAS=0
 )
-add_definitions(-U_DEBUG)
+add_definitions(-DLIBXSMM_DEFAULT_CONFIG -U_DEBUG)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
