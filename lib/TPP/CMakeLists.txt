@@ -25,6 +25,7 @@ add_mlir_library(MLIRTPP
     ConvertMemRefToTpp.cpp
     DefaultPipeline.cpp
     ConvertLinalgToXsmm.cpp
+    DecomposeAggregatedOps.cpp
 
   # Utils
     MatcherUtils.cpp

@@ -310,44 +310,42 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
 // CHECK-SAME:  %[[ARG1:.+]]: memref<256x512xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<512xf32>,
 // CHECK-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
-module @predict_function  {
-  func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
-    %arg2: memref<512xf32>,  %arg3: memref<128x512xf32>) {
+func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
+  %arg2: memref<512xf32>,  %arg3: memref<128x512xf32>) {
 
-    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
 
-    // Identity
-    // CHECK: call @xsmm_unary_dispatch
-    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
-    // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
-    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
+  // Identity
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
 
-    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
-    // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
-    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
+  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
 
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-    tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
+  tpp.identity ins(%arg2 : memref<512xf32>) outs(%arg3 : memref<128x512xf32>)
 
-    // Matmul
-    // CHECK: call @xsmm_gemm_dispatch
-    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
-    // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
-    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
+  // Matmul
+  // CHECK: call @xsmm_gemm_dispatch
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
     
-    // CHECK: %[[ptr3:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
-    // CHECK-NEXT: %[[ptr_cast3:.*]] = arith.index_cast %[[ptr3]] : index to i64
-    // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr_cast3]] : i64 to !llvm.ptr<f32>
+  // CHECK: %[[ptr3:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK-NEXT: %[[ptr_cast3:.*]] = arith.index_cast %[[ptr3]] : index to i64
+  // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr_cast3]] : i64 to !llvm.ptr<f32>
 
-    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-    tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>) 
-               outs(%arg3 : memref<128x512xf32>)
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
+  tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>) 
+           outs(%arg3 : memref<128x512xf32>)
 
-    // Relu
-    // CHECK: call @xsmm_unary_dispatch
-    // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr1]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-    tpp.relu ins(%arg3 : memref<128x512xf32>) outs(%arg3 : memref<128x512xf32>)
+  // Relu
+  // CHECK: call @xsmm_unary_dispatch
+  // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr1]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
+  tpp.relu ins(%arg3 : memref<128x512xf32>) outs(%arg3 : memref<128x512xf32>)
 
-    return
-  }
+  return
 }
