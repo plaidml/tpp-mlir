@@ -151,7 +151,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createConvertGPUToSPIRVPass(bool mapMemorySpace = true);
 std::unique_ptr<OperationPass<ModuleOp>>
 createSetSPIRVCapabilitiesPass(StringRef api = "vulkan");
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createSetSPIRVAbiAttributePass(StringRef api = "vulkan");
 
 // Testing passes.

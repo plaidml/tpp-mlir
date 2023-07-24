@@ -464,7 +464,7 @@ def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
   ];
 }
 
-def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "ModuleOp"> {
+def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
   let summary = "Set SPIRV ABI attribute.";
   let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
   let options = [

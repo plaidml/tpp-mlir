@@ -40,23 +40,30 @@ public:
   void runOnOperation() override {
     auto gpuModule = getOperation();
     auto *context = &getContext();
-    auto attrName =
-        mlir::StringAttr::get(context, mlir::spirv::getEntryPointABIAttrName());
+    auto attrName = StringAttr::get(context, spirv::getEntryPointABIAttrName());
     if (clientAPI == "opencl") {
-      auto abi = mlir::spirv::getEntryPointABIAttr(context);
-      for (const auto &gpuFunc : gpuModule.getOps<mlir::gpu::GPUFuncOp>()) {
-        if (!mlir::gpu::GPUDialect::isKernel(gpuFunc) ||
-            gpuFunc->getAttr(attrName))
+      auto abi = spirv::getEntryPointABIAttr(context);
+      for (const auto &gpuFunc : gpuModule.getOps<gpu::GPUFuncOp>()) {
+        if (!gpu::GPUDialect::isKernel(gpuFunc) || gpuFunc->getAttr(attrName))
           continue;
 
         gpuFunc->setAttr(attrName, abi);
       }
     } else if (clientAPI == "vulkan") {
-      auto abi = mlir::spirv::getEntryPointABIAttr(context, {1, 1, 1});
-      for (const auto &gpuFunc : gpuModule.getOps<mlir::gpu::GPUFuncOp>()) {
-        if (!mlir::gpu::GPUDialect::isKernel(gpuFunc) ||
-            gpuFunc->getAttr(attrName))
+      const SmallVector<gpu::Dimension> dims = {
+          gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
+
+      for (Operation *gpuFunc : gpuModule.getOps<gpu::GPUFuncOp>()) {
+        if (!gpu::GPUDialect::isKernel(gpuFunc) || gpuFunc->getAttr(attrName))
           continue;
+
+        SmallVector<int32_t> dimSizes;
+        for (auto &dim : dims) {
+          auto blockSize = cast<gpu::GPUFuncOp>(gpuFunc).getKnownBlockSize(dim);
+          uint32_t size = blockSize ? *blockSize : 1;
+          dimSizes.push_back(size);
+        }
+        auto abi = spirv::getEntryPointABIAttr(context, dimSizes);
 
         gpuFunc->setAttr(attrName, abi);
       }
@@ -66,7 +73,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 mlir::tpp::createSetSPIRVAbiAttributePass(StringRef api) {
   return std::make_unique<SetSPIRVAbiAttributePass>(api);
 }
