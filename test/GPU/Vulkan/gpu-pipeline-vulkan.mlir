@@ -1,24 +1,15 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=vulkan -split-input-file | FileCheck %s
 
-// TODO enable when SPIRV annotations can be automatically applied
-// XFAIL:*
-
 func.func @linalg_matmul() {
   %0 = memref.alloc() : memref<8x8xf32>
   %1 = memref.alloc() : memref<8x8xf32>
   %2 = memref.alloc() : memref<8x8xf32>
 
-  %cast_a = memref.cast %0 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_a : memref<*xf32>
-  %cast_b = memref.cast %1 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_b : memref<*xf32>
-  %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_c : memref<*xf32>
-
   linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
                 outs(%2 : memref<8x8xf32>)
 
+  %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
   call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
 
   memref.dealloc %0 : memref<8x8xf32>
@@ -32,20 +23,13 @@ func.func private @printMemrefF32(memref<*xf32>)
 
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @linalg_matmul
-// CHECK:         %[[C1:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C1]]
-// CHECK:         %[[C2:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C2]]
-// CHECK:         %[[C3:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C3]]
-// CHECK:         gpu.launch_func  @linalg_matmul_kernel::@linalg_matmul_kernel
+// CHECK:         %[[C1:.*]] = memref.collapse_shape
+// CHECK:         %[[C2:.*]] = memref.collapse_shape
+// CHECK:         %[[C3:.*]] = memref.collapse_shape
+// CHECK:         call @vulkanLaunch({{.*}}%[[C1]], %[[C2]], %[[C3]]{{.*}}spirv_blob = "
 // CHECK:         call @printMemrefF32
 // CHECK:       }
-// CHECK: gpu.module @linalg_matmul_kernel attributes {gpu.binary = "
-// CHECK-LABEL: llvm.func @linalg_matmul_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
+// CHECK: func.func private @vulkanLaunch
 
 // -----
 
@@ -57,12 +41,12 @@ func.func @tpp_gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memr
 
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @tpp_gemm
-// CHECK:         gpu.launch_func  @tpp_gemm_kernel::@tpp_gemm_kernel
-// CHECK: gpu.module @tpp_gemm_kernel attributes {gpu.binary = "
-// CHECK-LABEL: llvm.func @tpp_gemm_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
+// CHECK:         %[[C1:.*]] = memref.collapse_shape
+// CHECK:         %[[C2:.*]] = memref.collapse_shape
+// CHECK:         %[[C3:.*]] = memref.collapse_shape
+// CHECK:         call @vulkanLaunch({{.*}}%[[C1]], %[[C2]], %[[C3]]{{.*}}spirv_blob = "
+// CHECK:       }
+// CHECK: func.func private @vulkanLaunch
 
 // -----
 
@@ -83,13 +67,12 @@ func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x6
 
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @packed_brgemm
-// CHECK-NOT:     scf.parallel
-// CHECK:         gpu.launch_func  @packed_brgemm_kernel::@packed_brgemm_kernel
-// CHECK: gpu.module @packed_brgemm_kernel attributes {gpu.binary = "
-// CHECK-LABEL: llvm.func @packed_brgemm_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
+// CHECK:         %[[C1:.*]] = memref.collapse_shape
+// CHECK:         %[[C2:.*]] = memref.collapse_shape
+// CHECK:         %[[C3:.*]] = memref.collapse_shape
+// CHECK:         call @vulkanLaunch({{.*}}%[[C1]], %[[C2]], %[[C3]]{{.*}}spirv_blob = "
+// CHECK:       }
+// CHECK: func.func private @vulkanLaunch
 
 // -----
 
@@ -105,10 +88,9 @@ func.func @forall_loop(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64x
 
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @forall_loop
-// CHECK-NOT:     scf.forall
-// CHECK:         gpu.launch_func  @forall_loop_kernel::@forall_loop_kernel
-// CHECK: gpu.module @forall_loop_kernel attributes {gpu.binary = "
-// CHECK-LABEL: llvm.func @forall_loop_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
+// CHECK:         %[[C1:.*]] = memref.collapse_shape
+// CHECK:         %[[C2:.*]] = memref.collapse_shape
+// CHECK:         %[[C3:.*]] = memref.collapse_shape
+// CHECK:         call @vulkanLaunch({{.*}}%[[C1]], %[[C2]], %[[C3]]{{.*}}spirv_blob = "
+// CHECK:       }
+// CHECK: func.func private @vulkanLaunch
