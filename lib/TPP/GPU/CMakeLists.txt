@@ -7,6 +7,7 @@ add_mlir_library(TPPGPU
   GPUToSPIRVPass.cpp
   SetSPIRVCapabilities.cpp
   SetSPIRVAbiAttribute.cpp
+  GpuFlatArgs.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

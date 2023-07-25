@@ -474,4 +474,9 @@ def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
   ];
 }
 
+def GpuFlatArgs : Pass<"gpu-flat-args", "ModuleOp"> {
+  let summary = "Flatten GPU kernel arguments to 1D.";
+  let constructor = "mlir::tpp::createGpuFlatArgsPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

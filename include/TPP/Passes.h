@@ -153,6 +153,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createSetSPIRVCapabilitiesPass(StringRef api = "vulkan");
 std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createSetSPIRVAbiAttributePass(StringRef api = "vulkan");
+std::unique_ptr<OperationPass<ModuleOp>> createGpuFlatArgsPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();
