@@ -85,7 +85,31 @@ void FlattenArgsGpuFunc(gpu::GPUFuncOp gpuFunc, RewriterBase &rewriter) {
 
 void FlattenArgsGpuLaunchFunc(gpu::LaunchFuncOp launchFuncOp,
                               RewriterBase &rewriter) {
-  return;
+  auto loc = launchFuncOp.getLoc();
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(launchFuncOp.getOperation());
+
+  SmallVector<Value> newOperands;
+  for (Value operand : launchFuncOp.getKernelOperands()) {
+    auto memrefType = operand.getType().dyn_cast<MemRefType>();
+
+    if (!memrefType || memrefType.getRank() <= 1) {
+      newOperands.push_back(operand);
+      continue;
+    }
+
+    ReassociationIndices reassociation;
+    for (unsigned i = 0; i < memrefType.getShape().size(); i++)
+      reassociation.push_back(i);
+
+    auto collapseOp = rewriter.create<memref::CollapseShapeOp>(
+        loc, operand, SmallVector<ReassociationIndices>{reassociation});
+    newOperands.push_back(collapseOp.getResult());
+  }
+
+  // Update function launch arguments.
+  launchFuncOp.getKernelOperandsMutable().assign(newOperands);
 }
 
 class GpuFlatArgs : public GpuFlatArgsBase<GpuFlatArgs> {
