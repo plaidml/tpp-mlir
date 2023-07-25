@@ -49,27 +49,31 @@ void FlattenArgsGpuFunc(gpu::GPUFuncOp gpuFunc, RewriterBase &rewriter) {
     rewriter.create<gpu::ReturnOp>(gpuFunc.getLoc());
   }
 
+  // Flatten memref arguments into 1D type.
   auto funcType = funcOp.getFunctionType();
   SmallVector<Type> inputs;
   for (Type input : funcType.getInputs()) {
     auto memrefType = input.dyn_cast<MemRefType>();
 
+    // Ignore non-memref types.
     if (!memrefType) {
       inputs.push_back(input);
       continue;
     }
 
+    // If the shape is not static, replace memref with a fully dynamic 1D shape.
+    // Otherwise, compute new flat size.
     int64_t flatSize = ShapedType::kDynamic;
     if (memrefType.hasStaticShape()) {
       auto shape = memrefType.getShape();
       flatSize = std::accumulate(shape.begin(), shape.end(), 1,
                                  std::multiplies<int64_t>());
     }
-
     auto flatType = MemRefType::get({flatSize}, memrefType.getElementType());
     inputs.push_back(flatType);
   }
 
+  // Change the function input types.
   auto newFuncType = funcType.clone(inputs, funcType.getResults());
   funcOp.setFunctionType(newFuncType);
 
@@ -79,7 +83,7 @@ void FlattenArgsGpuFunc(gpu::GPUFuncOp gpuFunc, RewriterBase &rewriter) {
     block.addArgument(type, funcOp.getLoc());
   }
 
-  // Remove the original kernel.
+  // Remove the original non-flat function.
   rewriter.eraseOp(gpuFunc.getOperation());
 }
 
@@ -94,11 +98,13 @@ void FlattenArgsGpuLaunchFunc(gpu::LaunchFuncOp launchFuncOp,
   for (Value operand : launchFuncOp.getKernelOperands()) {
     auto memrefType = operand.getType().dyn_cast<MemRefType>();
 
+    // Ignore non-memref types and 1D buffers.
     if (!memrefType || memrefType.getRank() <= 1) {
       newOperands.push_back(operand);
       continue;
     }
 
+    // Collapse all dimensions into a 1D shape.
     ReassociationIndices reassociation;
     for (unsigned i = 0; i < memrefType.getShape().size(); i++)
       reassociation.push_back(i);
@@ -126,8 +132,11 @@ public:
     IRRewriter rewriter(&getContext());
 
     SmallVector<gpu::GPUFuncOp, 1> gpuFuncs;
-    module.walk(
-        [&](gpu::GPUFuncOp gpuFuncOp) { gpuFuncs.push_back(gpuFuncOp); });
+    module.walk([&](gpu::GPUFuncOp gpuFuncOp) {
+      // Only gather GPU kernel functions.
+      if (gpuFuncOp.isKernel())
+        gpuFuncs.push_back(gpuFuncOp);
+    });
     for (auto &gpuFunc : gpuFuncs) {
       FlattenArgsGpuFunc(gpuFunc, rewriter);
     }
