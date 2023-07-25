@@ -24,8 +24,8 @@
 // CHECK-DAG: #[[MAP8:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 // CHECK-DAG: #[[MAP9:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
 
-// CHECK-LABEL: mha_projections
-func.func @mha_projections(%arg1: tensor<64x32x8x64xf32>,
+// CHECK-LABEL: mha_tensorflow
+func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
                            %arg0: tensor<64x32x8x64xf32>,
                            %arg2: tensor<64x32x8x64xf32>) -> tensor<64x32x512xf32> {
   // CHECK: %[[C64:.+]] = arith.constant 64 : index
