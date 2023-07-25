@@ -100,11 +100,21 @@ public:
   void runOnOperation() override {
     auto module = getOperation();
     IRRewriter rewriter(&getContext());
-    module->walk(
-        [&](gpu::GPUFuncOp gpuFunc) { FlattenArgsGpuFunc(gpuFunc, rewriter); });
-    module->walk([&](gpu::LaunchFuncOp launchFuncOp) {
-      FlattenArgsGpuLaunchFunc(launchFuncOp, rewriter);
+
+    SmallVector<gpu::GPUFuncOp, 1> gpuFuncs;
+    module.walk(
+        [&](gpu::GPUFuncOp gpuFuncOp) { gpuFuncs.push_back(gpuFuncOp); });
+    for (auto &gpuFunc : gpuFuncs) {
+      FlattenArgsGpuFunc(gpuFunc, rewriter);
+    }
+
+    SmallVector<gpu::LaunchFuncOp, 1> gpuLaunches;
+    module.walk([&](gpu::LaunchFuncOp gpuLaunchOp) {
+      gpuLaunches.push_back(gpuLaunchOp);
     });
+    for (auto &launchFuncOp : gpuLaunches) {
+      FlattenArgsGpuLaunchFunc(launchFuncOp, rewriter);
+    }
   }
 };
 
