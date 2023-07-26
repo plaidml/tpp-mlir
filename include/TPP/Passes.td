@@ -455,7 +455,7 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
 }
 
 def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
-  let summary = "Set SPIRV capabilities.";
+  let summary = "Set SPIR-V capabilities.";
   let constructor = "mlir::tpp::createSetSPIRVCapabilitiesPass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
@@ -465,7 +465,7 @@ def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
 }
 
 def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
-  let summary = "Set SPIRV ABI attribute.";
+  let summary = "Set SPIR-V ABI attribute.";
   let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
@@ -475,7 +475,17 @@ def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
 }
 
 def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
-  let summary = "Rewrite GPU kernels to follow Vulkan ABI.";
+  let summary = "Rewrite GPU kernels to comply with Vulkan ABI.";
+  let description = [{
+    This pass rewrites GPU kernels and the GPU function launches
+    to be compatible with Vulkan calling convention.
+
+    The rewrite is focused only on ensuring GPU kernel prototype
+    compatibility with Vulkan ABI.Thus, it is assumed that the kernel
+    operations have been already preserved in a separate SPIR-V module.
+    The original GPU kernel logic is thrown away to make interface
+    adaptation easier.
+  }];
   let constructor = "mlir::tpp::createGpuVulkanAbiPass()";
   let options = [
     Option<"use64bitIndex", "use-64bit-index",

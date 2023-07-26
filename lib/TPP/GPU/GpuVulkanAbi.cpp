@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -194,6 +195,7 @@ public:
     registry.insert<gpu::GPUDialect>();
     registry.insert<spirv::SPIRVDialect>();
     registry.insert<memref::MemRefDialect>();
+    registry.insert<arith::ArithDialect>();
   }
 
   void runOnOperation() override {
