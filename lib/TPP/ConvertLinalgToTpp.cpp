@@ -83,12 +83,14 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasTensorSemantics())
+    if (!linalgOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect tensor type when mapping to tpp");
-    if (linalgOp.hasDynamicShape())
+    }
+    if (linalgOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           linalgOp, "Expect static shape when mapping to tpp");
+    }
     return rewriteToTppOp(linalgOp, rewriter);
   }
 };
@@ -100,12 +102,14 @@ struct ConvertBrgemmToTpp
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!brMatmulOp.hasTensorSemantics())
+    if (!brMatmulOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect tensor type when mapping to tpp");
-    if (brMatmulOp.hasDynamicShape())
+    }
+    if (brMatmulOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
+    }
     SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
     inputs.push_back(brMatmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
@@ -121,12 +125,14 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics())
+    if (!matmulOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect tensor type when mapping to tpp");
-    if (matmulOp.hasDynamicShape())
+    }
+    if (matmulOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");
+    }
     SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
     inputs.push_back(matmulOp.getDpsInitOperands()[0]->get());
     SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
@@ -142,12 +148,14 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    if (!fillOp.hasTensorSemantics())
+    if (!fillOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
           fillOp, "Expect tensor type when mapping to tpp");
-    if (fillOp.hasDynamicShape())
+    }
+    if (fillOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           fillOp, "Expect static shape when mapping to tpp");
+    }
 
     auto inputs = fillOp.getInputs();
     if (!tpp::utils::isZeroTensor(inputs[0]))
