@@ -78,8 +78,8 @@ private:
         spirv::createSPIRVLowerABIAttributesPass());
     pm.addNestedPass<spirv::ModuleOp>(spirv::createSPIRVUpdateVCEPass());
 
-    // Flatten GPU kernel inputs to be compliant with Vulkan.
-    pm.addPass(tpp::createGpuFlatArgsPass());
+    // Adapt GPU kernel to be compliant with Vulkan ABI.
+    pm.addPass(tpp::createGpuVulkanAbiPass());
 
     // Create Vulkan dispatch.
     pm.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());

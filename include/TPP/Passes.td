@@ -474,9 +474,14 @@ def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
   ];
 }
 
-def GpuFlatArgs : Pass<"gpu-flat-args", "ModuleOp"> {
-  let summary = "Flatten GPU kernel arguments to 1D.";
-  let constructor = "mlir::tpp::createGpuFlatArgsPass()";
+def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
+  let summary = "Rewrite GPU kernels to follow Vulkan ABI.";
+  let constructor = "mlir::tpp::createGpuVulkanAbiPass()";
+  let options = [
+    Option<"use64bitIndex", "use-64bit-index",
+           "bool", /*default=*/"false",
+           "Use 64-bit integers to convert index types">
+  ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
