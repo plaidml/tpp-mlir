@@ -38,21 +38,6 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   %0 = tensor.empty() : tensor<64x32x8x64xf32>
   
   // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C64]])
-  %fill = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
-  %2 = linalg.generic {
-    "__projection_V__",
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel"]}
-    ins(%arg2, %cst_3 : tensor<64x32x8x64xf32>, tensor<8x64x8x64xf32>) outs(%fill : tensor<64x32x8x64xf32>) {
-    ^bb0(%in: f32, %in_8: f32, %out: f32):
-      %23 = arith.mulf %in, %in_8 : f32
-      %24 = arith.addf %out, %23 : f32
-      linalg.yield %24 : f32
-  } -> tensor<64x32x8x64xf32>
-  // CHECK: %{{.+}} = linalg.generic 
-  // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], 
-  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"]
-
   %fill_1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %3 = linalg.generic {
     "__projection_Q__",
@@ -79,10 +64,9 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
       %24 = arith.addf %out, %23 : f32
       linalg.yield %24 : f32
   } -> tensor<64x32x8x64xf32>
-  // This is __Q_times_K__
   // CHECK: %{{.+}} = linalg.generic
-  // CHECK-SAME: indexing_maps =  [#[[MAP3]], #[[MAP4]], #[[MAP5]]]
-  // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel"]
+  // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"]
 
   %6 = tensor.empty() : tensor<64x8x32x32xf32>
   %7 = linalg.fill ins(%cst_1 : f32) outs(%6 : tensor<64x8x32x32xf32>) -> tensor<64x8x32x32xf32>
@@ -96,6 +80,21 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
       %24 = arith.addf %out, %23 : f32
       linalg.yield %24 : f32
   } -> tensor<64x8x32x32xf32>
+  // CHECK: %{{.+}} = linalg.generic
+  // CHECK-SAME: indexing_maps =  [#[[MAP3]], #[[MAP4]], #[[MAP5]]]
+  // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel"]
+ 
+  %fill = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
+  %2 = linalg.generic {
+    "__projection_V__",
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel"]}
+    ins(%arg2, %cst_3 : tensor<64x32x8x64xf32>, tensor<8x64x8x64xf32>) outs(%fill : tensor<64x32x8x64xf32>) {
+    ^bb0(%in: f32, %in_8: f32, %out: f32):
+      %23 = arith.mulf %in, %in_8 : f32
+      %24 = arith.addf %out, %23 : f32
+      linalg.yield %24 : f32
+  } -> tensor<64x32x8x64xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"] 
