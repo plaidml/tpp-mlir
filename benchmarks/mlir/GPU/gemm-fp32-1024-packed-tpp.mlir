@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -tpp-mapping -cleanup -tpp-conversion -cleanup | \
+// RUN: tpp-opt %s -tpp-conversion -cleanup | \
 // RUN: tpp-run -n 10 \
 // RUN:  -e entry -entry-point-result=void
 

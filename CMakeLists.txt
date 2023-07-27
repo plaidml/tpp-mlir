@@ -81,7 +81,6 @@ add_subdirectory(runtime)
 if (NOT TPP_INSIDE_IREE)
   add_subdirectory(tools)
   add_subdirectory(test)
-  add_subdirectory(benchmarks)
 
   set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
   set(CONFIG_DIR "${BENCHMARK_DIR}/config")
@@ -165,12 +164,11 @@ if (NOT TPP_INSIDE_IREE)
     endif()
 
     string(JOIN ',' BENCH_GPU_CFGS_STR ${BENCH_CUDA_CFGS})
-    string(JOIN ' ' BENCH_GPU_DEPS_STR ${BENCH_CUDA_DEPS})
 
     # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
     add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
     -c ${BENCH_GPU_CFGS_STR}
-    DEPENDS tpp-opt tpp-run ${BENCH_GPU_DEPS_STR}
+    DEPENDS tpp-opt tpp-run ${BENCH_CUDA_DEPS}
     WORKING_DIRECTORY ${BENCHMARK_DIR}
     COMMENT Run Quick GPU Benchmarks)
   endif()
