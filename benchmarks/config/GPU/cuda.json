@@ -4,15 +4,15 @@
     "fp32_1024_cuda_ref": {
       "type": "GENERIC",
       "benchmark": [ "bench_cuda_matmul", "--input=256x1024x1024 --iter=100 --kernel=cuda" ],
-      "environment": { "ASAN_OPTIONS" : "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0" },
-      "flags": {},
+      "environment": {},
+      "flags": [ "--gpu=cuda" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_1024_cublas_ref": {
       "type": "GENERIC",
       "benchmark": [ "bench_cuda_matmul", "--input=256x1024x1024 --iter=100 --kernel=cublas" ],
-      "environment": { "ASAN_OPTIONS" : "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0" },
-      "flags": {},
+      "environment": {},
+      "flags": [ "--gpu=cuda" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_1024_manual_kernel_mlir": {

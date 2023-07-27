@@ -121,16 +121,19 @@ class Environment(object):
         self.bench_dir = os.path.join(self.root_dir, "benchmarks")
         self.harness = os.path.join(self.bench_dir, "harness", "controller.py")
         self.test_dir = os.path.join(self.bench_dir, "mlir")
+
         # Pass arguments down to benchmarks, if known
         self.extra_args = list()
         if args.verbose > 0:
             for v in range(args.verbose - args.quiet):
                 self.extra_args.append("-v")
+
         # Set environment variables for dynamic loading (Linux and Mac)
         for path in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
             environ = [os.getenv(path)] if os.getenv(path) else []
             environ.insert(0, self.lib_dir)  # prepend
             os.environ[path] = ":".join(environ)
+
         # Check if taskset is available
         # (every CPU we care about has at least 4 cores)
         self.cpu_pinning = None
@@ -172,6 +175,21 @@ class BaseRun(object):
             self.original_env[key] = old_value
             self.logger.debug(f"export {key}={value}")
             os.environ[key] = value
+        # Configure sanitizer options
+        asan_key = "ASAN_OPTIONS"
+        asan_options = (
+            [os.getenv(asan_key)] if os.getenv(asan_key) else []
+        )
+        self.original_env[asan_key] = ":".join(asan_options)
+        # Always disable leak santizier
+        asan_options.append("detect_leaks=0")
+        # GPU tests require extra ASAN flags due to incompatibility with CUDA
+        # See: https://github.com/google/sanitizers/issues/629
+        if "--gpu" in " ".join(self.flags):
+            asan_options.extend(
+                ["protect_shadow_gap=0", "replace_intrin=0"]
+            )
+        os.environ[asan_key] = ":".join(asan_options)
 
     def extendHarnessCmd(self, cmd):
         command = cmd
@@ -567,13 +585,6 @@ if __name__ == "__main__":
         print("\n\n")
         parser.print_help()
         sys.exit(1)
-
-    # Always disable leak santizier
-    asan_options = (
-        [os.getenv("ASAN_OPTIONS")] if os.getenv("ASAN_OPTIONS") else []
-    )
-    asan_options.append("detect_leaks=0")
-    os.environ["ASAN_OPTIONS"] = ":".join(asan_options)
 
     # Runs all benchmarks
     if not driver.run():
