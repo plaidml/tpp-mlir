@@ -31,24 +31,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-// Returns Vulkan compatible wrapper type for a given input type.
-Type getVulkanTypeWrapper(Type type, const SPIRVTypeConverter &typeConverter,
-                          RewriterBase &rewriter) {
-  // Buffers are already Vulkan compatible.
-  if (type.isa<ShapedType>())
-    return type;
-
-  // Index has to be converted to a fixed-size integer.
-  if (type.isa<IndexType>()) {
-    auto spirvIndex = typeConverter.getIndexType().cast<spirv::SPIRVType>();
-    type = rewriter.getIntegerType(*(spirvIndex.getSizeInBytes()) * 8);
-  }
-
-  // Wrap the basic type in a buffer.
-  auto typeWrapper = MemRefType::get({1}, type);
-  return typeWrapper;
-};
-
 // Flatten memref type into 1D shape.
 Type FlattenMemrefType(MemRefType memrefType) {
   if (memrefType.getRank() <= 1)
@@ -66,6 +48,26 @@ Type FlattenMemrefType(MemRefType memrefType) {
 
   return flatMemref;
 }
+
+// Returns Vulkan compatible wrapper type for a given input type.
+Type getVulkanTypeWrapper(Type type, const SPIRVTypeConverter &typeConverter,
+                          RewriterBase &rewriter) {
+  assert(!type.isa<TensorType>() && "Tensors are not supported by Vulkan");
+
+  // Buffers are already Vulkan compatible.
+  if (auto memrefType = type.dyn_cast<MemRefType>())
+    return FlattenMemrefType(memrefType);
+
+  // Index has to be converted to a fixed-size integer.
+  if (type.isa<IndexType>()) {
+    auto spirvIndex = typeConverter.getIndexType().cast<spirv::SPIRVType>();
+    type = rewriter.getIntegerType(*(spirvIndex.getSizeInBytes()) * 8);
+  }
+
+  // Wrap the basic type in a buffer.
+  auto typeWrapper = MemRefType::get({1}, type);
+  return typeWrapper;
+};
 
 // Rewrites GPU function to have Vulkan compatible signature.
 // Replaces the original kernel with an adapted empty kernel.
@@ -91,12 +93,8 @@ static void adaptGPUFuncToVulkanABI(gpu::GPUFuncOp &gpuFuncOp,
   // Wrap them into Vulkan compatible buffers.
   auto funcType = funcOp.getFunctionType();
   SmallVector<Type> inputs;
-  for (Type input : funcType.getInputs()) {
-    if (auto memrefType = input.dyn_cast<MemRefType>())
-      inputs.push_back(FlattenMemrefType(memrefType));
-    else
-      inputs.push_back(getVulkanTypeWrapper(input, typeConverter, rewriter));
-  }
+  for (Type input : funcType.getInputs())
+    inputs.push_back(getVulkanTypeWrapper(input, typeConverter, rewriter));
 
   // Change the function input types.
   auto newFuncType = funcType.clone(inputs, funcType.getResults());
@@ -110,35 +108,6 @@ static void adaptGPUFuncToVulkanABI(gpu::GPUFuncOp &gpuFuncOp,
 
   // Remove the original kernel.
   rewriter.eraseOp(gpuFuncOp.getOperation());
-}
-
-// Returns Vulkan compatible wrapper value for a given input operand.
-Value getVulkanOperandWrapper(Value operand,
-                              const SPIRVTypeConverter &typeConverter,
-                              RewriterBase &rewriter) {
-  auto loc = operand.getLoc();
-  auto type = operand.getType();
-
-  // Buffers are Vulkan compatible but need to be min 1D and max 3D shaped.
-  if (auto memrefType = type.dyn_cast<MemRefType>())
-    return operand;
-
-  auto wrapperType =
-      getVulkanTypeWrapper(type, typeConverter, rewriter).cast<MemRefType>();
-
-  // Cast index to a fixed-size integer.
-  if (type.isa<IndexType>()) {
-    auto castType = wrapperType.getElementType();
-    operand =
-        rewriter.create<arith::IndexCastOp>(loc, castType, operand).getOut();
-  }
-
-  // Scalar values are small so put them on stack.
-  auto wrapper = rewriter.create<memref::AllocaOp>(loc, wrapperType);
-  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  rewriter.create<memref::StoreOp>(loc, operand, wrapper, ValueRange{zero});
-
-  return wrapper;
 }
 
 // Flatten memref buffer into 1D shape.
@@ -161,6 +130,37 @@ Value FlattenMemrefOperand(Value operand, RewriterBase &rewriter) {
   return collapseOp.getResult();
 }
 
+// Returns Vulkan compatible wrapper value for a given input operand.
+Value getVulkanOperandWrapper(Value operand,
+                              const SPIRVTypeConverter &typeConverter,
+                              RewriterBase &rewriter) {
+  auto loc = operand.getLoc();
+  auto type = operand.getType();
+
+  assert(!type.isa<TensorType>() && "Tensors are not supported by Vulkan");
+
+  // Buffers are Vulkan compatible but need to be min 1D and max 3D shaped.
+  if (type.isa<MemRefType>())
+    return FlattenMemrefOperand(operand, rewriter);
+
+  auto wrapperType =
+      getVulkanTypeWrapper(type, typeConverter, rewriter).cast<MemRefType>();
+
+  // Cast index to a fixed-size integer.
+  if (type.isa<IndexType>()) {
+    auto castType = wrapperType.getElementType();
+    operand =
+        rewriter.create<arith::IndexCastOp>(loc, castType, operand).getOut();
+  }
+
+  // Scalar values are small so put them on stack.
+  auto wrapper = rewriter.create<memref::AllocaOp>(loc, wrapperType);
+  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  rewriter.create<memref::StoreOp>(loc, operand, wrapper, ValueRange{zero});
+
+  return wrapper;
+}
+
 // Adapts GPU function launch to Vulkan calling convention.
 // Scalar values are wrapped into Vulkan compatible buffers.
 void adaptGPULaunchFuncToVulkanABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
@@ -174,12 +174,8 @@ void adaptGPULaunchFuncToVulkanABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
   // Wrap them into Vulkan compatible buffers.
   SmallVector<Value> newOperands;
   for (Value operand : gpuLaunchFuncOp.getKernelOperands()) {
-    if (operand.getType().isa<MemRefType>()) {
-      newOperands.push_back(FlattenMemrefOperand(operand, rewriter));
-    } else {
-      newOperands.push_back(
-          getVulkanOperandWrapper(operand, typeConverter, rewriter));
-    }
+    newOperands.push_back(
+        getVulkanOperandWrapper(operand, typeConverter, rewriter));
   }
 
   // Update function launch arguments.
