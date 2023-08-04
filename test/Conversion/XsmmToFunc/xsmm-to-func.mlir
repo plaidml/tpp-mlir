@@ -287,3 +287,17 @@ func.func @multiple_gemm_flags_fused_brgemm() -> i64 {
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
 // CHECK: %{{.+}} = call @xsmm_fused_brgemm_dispatch(%[[C2]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C13]], %[[C14336]], %[[C0]], %[[C0]], %[[C4]], %[[C1]])
+
+// -----
+
+// CHECK-LABEL: transpose
+func.func @transpose() -> i64 {
+  // CHECK-DAG: %[[C29:.+]] = arith.constant 29 : i64
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
+  // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : i64
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
+  // CHECK: %{{.+}} = call @xsmm_unary_dispatch(%[[C29]], %[[C1]], %[[C3]], %[[C2]], %[[C3]], %[[C2]], %[[C0]])
+  %0 = xsmm.unary.dispatch transpose [3, 2, 3, 2] flags = (none) data_type = f32
+  return %0 : i64
+}
