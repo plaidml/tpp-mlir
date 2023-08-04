@@ -71,10 +71,6 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
   }
 };
 
-static bool isMatmulLike(Operation *op) {
-  return linalgx::utils::isBlockedMatmul(op) || isa<linalg::MatmulOp>(op);
-}
-
 static bool isConvolutionLike(Operation *op) {
   if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
     return linalgx::utils::isBlockedConvolution(op);
@@ -694,7 +690,8 @@ struct TileConsumerAndFuseProducers
 
     SmallVector<linalg::LinalgOp> linalgContractionOperations;
     func->walk([&](linalg::LinalgOp linalgOp) {
-      if ((isConvolutionLike(linalgOp) || isMatmulLike(linalgOp)) &&
+      if ((isConvolutionLike(linalgOp) ||
+           succeeded(linalgx::utils::isContraction(linalgOp))) &&
           linalgOp.hasTensorSemantics())
         linalgContractionOperations.push_back(linalgOp);
     });

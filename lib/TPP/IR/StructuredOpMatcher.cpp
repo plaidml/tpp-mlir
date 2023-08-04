@@ -211,9 +211,9 @@ bool tpp::structured_match::withOpChainImpl(
   ptrdiff_t numOps = typeChecks.size() + 1;
 
   // Basic checks
-  if (!isa<linalg::GenericOp>(op))
+  if (!isa<linalg::LinalgOp>(op))
     return false;
-  auto linalgOp = cast<linalg::GenericOp>(op);
+  auto linalgOp = cast<linalg::LinalgOp>(op);
   if (!region->hasOneBlock())
     return false;
   auto &block = region->front();
