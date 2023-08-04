@@ -105,8 +105,9 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
             applyPermutationToVector(tileLoops, inversePermutation);
             SmallVector<int64_t> pointLoops;
             for (size_t i = packOp.getSourceType().getRank();
-                 i < delDestIndexes.size(); i++)
+                 i < delDestIndexes.size(); i++) {
               pointLoops.push_back(delDestIndexes[i]);
+            }
             delDestIndexes = tileLoops;
             delDestIndexes.append(pointLoops.begin(), pointLoops.end());
             assert(delDestIndexes.size() ==
@@ -118,20 +119,34 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
           // with the tiled ones.
           llvm::DenseSet<int64_t> tiledLoops(packOp.getInnerDimsPos().begin(),
                                              packOp.getInnerDimsPos().end());
+          llvm::DenseMap<int64_t, int64_t> mappingTileToPointLoops;
+          // Map the position of the tiled loops with the point one. Example:
+          // [A][B] -> [A][B][a][b]
+          // entry: [A : 0] [a : 2]
+          // entry: [B : 1] [b : 3]
+          // [A][B] -> [A][B][b]
+          // entry: [B : 1] [b : 2]
+          for (auto tileLoop : llvm::enumerate(packOp.getInnerDimsPos()))
+            mappingTileToPointLoops[tileLoop.value()] = tileLoop.index();
+
           SmallVector<int64_t> delSourceIndexes;
           size_t tilePosIdx = 0;
           SmallVector<int64_t> tilesSizes = packOp.getStaticTiles();
           if (!areStaticValues(tilesSizes))
             return;
-          for (int i = 0; i < packOp.getSourceType().getRank(); i++) {
+          int numberOfTileLoops = packOp.getSourceType().getRank();
+          for (int i = 0; i < numberOfTileLoops; i++) {
             // Loop is not tiled.
             if (!tiledLoops.count(i)) {
               delSourceIndexes.push_back(delDestIndexes[i]);
-              // Loop is tiled, the point loop is two hops away.
+              // Loop is tiled, the point loop is at distance:
+              // numberOfTileLoops + mappingTileToPointLoops[i].
             } else {
-              delSourceIndexes.push_back(delDestIndexes[i] *
-                                             tilesSizes[tilePosIdx++] +
-                                         delDestIndexes[i + 2]);
+              delSourceIndexes.push_back(
+                  delDestIndexes[i] * tilesSizes[tilePosIdx] +
+                  delDestIndexes[numberOfTileLoops +
+                                 mappingTileToPointLoops[i]]);
+              tilePosIdx++;
             }
           }
           assert(delSourceIndexes.size() ==
