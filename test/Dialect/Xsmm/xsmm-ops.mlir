@@ -4,18 +4,26 @@
 func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
                         %arg1: memref<2x2xf32>, %arg2: memref<2x2xf32>) {
 
-  // CHECK: xsmm.binary
+  // CHECK: xsmm.binary add
   xsmm.binary add(data_type = f32, %arg0, %arg1)
     : (memref<2x2xf32>, memref<2x2xf32>) -> ()
 
-  // CHECK: xsmm.unary
+  // CHECK: xsmm.binary sub
+  xsmm.binary sub(data_type = f32, %arg0, %arg1)
+    : (memref<2x2xf32>, memref<2x2xf32>) -> ()
+  
+  // CHECK: xsmm.binary div
+  xsmm.binary div(data_type = f32, %arg0, %arg1)
+    : (memref<2x2xf32>, memref<2x2xf32>) -> ()
+
+  // CHECK: xsmm.unary relu
   xsmm.unary relu(data_type = f32, %arg0)
     : (memref<2x2xf32>) -> ()
 
-  // CHECK: xsmm.binary.dispatch
+  // CHECK: xsmm.binary.dispatch add
   %0 = xsmm.binary.dispatch add [3, 2, 1, 3, 2] flags = (none) data_type = f32
 
-  // CHECK: xsmm.unary.dispatch
+  // CHECK: xsmm.unary.dispatch identity
   %1 = xsmm.unary.dispatch identity [3, 2, 1, 3] flags = (bcast_row) data_type = f32
 
   // CHECK: xsmm.gemm
@@ -53,7 +61,14 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
     flags = (beta_0) binary_flags = (none) unary_flags = (none) data_type = f32
 
   // CHECK: xsmm.unary zero
-  xsmm.unary zero(data_type = f32, %11, %arg0, %arg0) : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
+  xsmm.unary zero(data_type = f32, %11, %arg0, %arg0) 
+    : (i64, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
+  // CHECK: xsmm.binary.dispatch sub
+  %13 = xsmm.binary.dispatch sub [3, 2, 1, 3, 2] flags = (none) data_type = f32
+
+  // CHECK: xsmm.binary.dispatch div
+  %14 = xsmm.binary.dispatch div [3, 2, 1, 3, 2] flags = (none) data_type = f32
+  
   return
 }
