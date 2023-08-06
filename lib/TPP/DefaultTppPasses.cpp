@@ -298,8 +298,6 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    pm.addPass(createRewriteBatchMatmulToMatmulPass());
-
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
     pm.addPass(createCombineTppPass());
@@ -398,8 +396,6 @@ private:
     // Default pipeline does not support transforms yet
     pm.addPass(createTransformDropSchedulePass());
 
-    // TODO: Add here propagation, constant fold and blocking.
-
     if (linalgToLoops) {
       // Lower linalg directly to loops.
       // Skip all TPP transformations.
@@ -422,7 +418,10 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     } else {
-      // Lower IR through TPP operations.
+      // Convert linalg.batch_matmul to linalg.matmul.
+      pm.addPass(createRewriteBatchMatmulToMatmulPass());
+
+      // Applies a set of passes at the linalg level to fuse and pack.
       pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
@@ -431,7 +430,7 @@ private:
       // bufferization.
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
 
-      // Lower operations to TPP.
+      // Lower linalg operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
