@@ -163,6 +163,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeAggregatedOpsPass();
 
 // Testing passes.
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertPackOptimization();
 void registerTestStructuralMatchers();
 void registerTestForToForAllRewrite();
 

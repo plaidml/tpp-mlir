@@ -238,6 +238,13 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
+def ConvertPackOptimization : Pass<"pack-optimization", "func::FuncOp"> {
+  let summary = "Optimize certain pack patterns into faster implementation";
+  let description =
+      [{Optimize certain pack pack patterns into faster implementation.}];
+  let constructor = "mlir::tpp::createConvertPackOptimization()";
+}
+
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let summary = "Collection of default TPP passes";
   let description = [{
