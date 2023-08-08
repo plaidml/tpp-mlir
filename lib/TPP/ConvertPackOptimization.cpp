@@ -28,6 +28,9 @@ struct MatchResult {
   int index;
 };
 
+/*
+ * Returns a list of indices that match the inner dimensions' position
+ */
 SmallVector<MatchResult> innerDimMatchesIndex(tensor::PackOp packOp) {
   SmallVector<MatchResult> result;
   int innerTiles = 0;
