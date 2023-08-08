@@ -239,12 +239,12 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
 }
 
 def ConvertPackOptimization : Pass<"pack-optimization", "func::FuncOp"> {
-  let summary = "Optimize certain pack patterns into faster implementation";
+  let summary = "Optimize non-transpose pack patterns into faster implementation";
   let description =
-      [{Optimize certain pack patterns into faster implementation.}];
+      [{Optimize non-transpose pack patterns into faster implementation.}];
   let constructor = "mlir::tpp::createConvertPackOptimization()";
 
-  let dependentDialects = ["scf::SCFDialect"];
+  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {

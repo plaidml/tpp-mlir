@@ -1,4 +1,4 @@
-////===ConvertPackOptimization.cpp ----------------------------*---- C++-*-===//
+//===ConvertPackOptimization.cpp -------------------------------*----C++-*-===//
 ////
 //// Part of the LLVM Project, under the Apache License v2.0 with LLVM
 /// Exceptions. / See https://llvm.org/LICENSE.txt for license information. /
@@ -96,17 +96,11 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
       }
     }
 
-    SmallVector<Value> reduc = {
-        packOp.getDest(),
-    };
-
     auto loopNest = mlir::scf::buildLoopNest(
-        rewriter, packOp.getLoc(), lbs, ubs, steps, reduc,
-        [&reduc, &packOp, &numLoops](OpBuilder &rewriter, Location loc,
-                                     ValueRange localIvs,
-                                     ValueRange iterArgs) -> scf::ValueVector {
-          reduc.assign(iterArgs.begin(), iterArgs.end());
-
+        rewriter, packOp.getLoc(), lbs, ubs, steps, packOp.getDest(),
+        [&packOp, &numLoops](OpBuilder &rewriter, Location loc,
+                             ValueRange localIvs,
+                             ValueRange iterArgs) -> scf::ValueVector {
           SmallVector<OpFoldResult> offsets;
 
           SmallVector<MatchResult> haveMatched = innerDimMatchesIndex(packOp);
