@@ -1,5 +1,4 @@
-//===ConvertPackOptimization.cpp --------------------------------*-----
-//C++-*-===//
+////===ConvertPackOptimization.cpp ----------------------------*---- C++-*-===//
 ////
 //// Part of the LLVM Project, under the Apache License v2.0 with LLVM
 /// Exceptions. / See https://llvm.org/LICENSE.txt for license information. /
@@ -77,14 +76,9 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
     auto zero = getConstIndex(rewriter, 0);
     auto one = getConstIndex(rewriter, 1);
 
-    SmallVector<Value> lbs;
+    SmallVector<Value> lbs(numLoops, zero);
     SmallVector<Value> ubs;
-    SmallVector<Value> steps;
-
-    for (int i = 0; i < numLoops; i++) {
-      lbs.push_back(zero);
-      steps.push_back(one);
-    }
+    SmallVector<Value> steps(numLoops, one);
 
     for (int i = 0; i < numLoops; i++) {
       if (haveMatched[i].haveMatch && shape[i] != ShapedType::kDynamic &&
@@ -111,9 +105,9 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
           reduc.assign(iterArgs.begin(), iterArgs.end());
 
           SmallVector<OpFoldResult> offsets;
+
           SmallVector<MatchResult> haveMatched = innerDimMatchesIndex(packOp);
           for (int i = 0; i < numLoops; i++) {
-
             if (haveMatched[i].haveMatch) {
               Value muliOp = rewriter.create<arith::MulIOp>(
                   loc, localIvs[i],
@@ -125,10 +119,7 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
               offsets.push_back(localIvs[i]);
             }
           }
-          SmallVector<OpFoldResult> strides;
-          for (int i = 0; i < numLoops; i++) {
-            strides.push_back(rewriter.getIndexAttr(1));
-          }
+          SmallVector<OpFoldResult> strides(numLoops, rewriter.getIndexAttr(1));
 
           SmallVector<OpFoldResult> sizes;
 
@@ -162,10 +153,9 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
           for (size_t i = numLoops; i < packOp.getDestRank(); i++) {
             insertSliceOffsets.push_back(rewriter.getIndexAttr(0));
           }
-          SmallVector<OpFoldResult> insertSliceSizes;
-          for (int i = 0; i < numLoops; i++) {
-            insertSliceSizes.push_back(rewriter.getIndexAttr(1));
-          }
+          SmallVector<OpFoldResult> insertSliceSizes(numLoops,
+                                                     rewriter.getIndexAttr(1));
+
           for (size_t i = numLoops; i < packOp.getDestRank(); i++) {
             insertSliceSizes.push_back(rewriter.getIndexAttr(
                 packOp.getStaticInnerTiles()[i - numLoops]));
@@ -195,7 +185,6 @@ struct ConvertPackOptimization
     RewritePatternSet patterns(&getContext());
     populatePackOptimizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    return;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect>();
