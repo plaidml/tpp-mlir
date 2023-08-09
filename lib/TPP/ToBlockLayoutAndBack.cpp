@@ -409,7 +409,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   if (matmulOp.hasBufferSemantics())
     return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
-  if (!linalgx::utils::isBlockedMatmul(matmulOp))
+  if (failed(linalgx::utils::isContraction(matmulOp)))
     return rewriter.notifyMatchFailure(matmulOp, "require matmul semantics");
 
   Value operandB = matmulOp.getInputs()[1];

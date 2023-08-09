@@ -22,6 +22,7 @@ class TilingInterface;
 
 namespace linalg {
 class LinalgOp;
+struct ContractionDimensions;
 } // namespace linalg
 
 namespace linalgx {
@@ -61,6 +62,17 @@ bool isBlockedConvolution(Operation *op);
 
 // Return true if `op` is a blocked matmul.
 bool isBlockedMatmul(Operation *op);
+
+// Return true if the `op` is a contraction defined as:
+// - 2 input operands (LHS and RHS), and 1 output operand OUT.
+// - The body is matmul-like
+// - We have at least 1 m dimension involved in an outer-product along LHS.
+// - We have at lest 1 n dimension involved in an outer-product along RHS.
+// - We have at least 1 k dimension as a permutation on LHS and RHS.
+// - The output map is a permutation map, while not gurantee is given on the
+// input maps.
+FailureOr<linalg::ContractionDimensions>
+isContraction(linalg::LinalgOp linalgOp);
 
 // Validate a tile configuration for a linalgOp when we can statically do that.
 // Specific dims can be passed using 'dims'. If dims is empty the validation

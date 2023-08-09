@@ -270,8 +270,10 @@ transform::GetBlockedMatmuls::apply(transform::TransformRewriter &rewriter,
   SmallVector<Operation *> res;
   auto payloadOps = state.getPayloadOps(getTarget());
   for (Operation *op : payloadOps) {
-    if (linalgx::utils::isBlockedMatmul(op))
+    if (isa<linalg::LinalgOp>(op) &&
+        succeeded(linalgx::utils::isContraction(cast<linalg::LinalgOp>(op)))) {
       res.push_back(op);
+    }
   }
   results.set(getResult().cast<OpResult>(), res);
   return DiagnosedSilenceableFailure::success();

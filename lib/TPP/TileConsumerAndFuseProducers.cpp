@@ -71,10 +71,6 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
   }
 };
 
-static bool isMatmulLike(Operation *op) {
-  return linalgx::utils::isBlockedMatmul(op) || isa<linalg::MatmulOp>(op);
-}
-
 static bool isConvolutionLike(Operation *op) {
   if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
     return linalgx::utils::isBlockedConvolution(op);
@@ -93,14 +89,27 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   if (tileSizes.size() > loopIteratorTypes.size())
     return false;
 
-  if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
-                                               tileSizes))
+  // Validate tiles:
+  // - All zeros, nothing to do.
+  // - Each tile must be statically known and perfectly divides the dimension.
+  // - Require tiling on parallel dimensions only.
+  if (llvm::all_of(tileSizes, [](OpFoldResult tile) {
+        return isConstantIntValue(tile, 0);
+      })) {
     return false;
+  }
 
-  // Require tiling on parallel dimensions only.
-  for (auto tileIdx : llvm::seq<size_t>(0, tileSizes.size()))
+  if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
+                                               tileSizes)) {
+    return false;
+  }
+
+  for (auto tileIdx : llvm::seq<size_t>(0, tileSizes.size())) {
+    if (isConstantIntValue(tileSizes[tileIdx], 0))
+      continue;
     if (!linalg::isParallelIterator(loopIteratorTypes[tileIdx]))
       return false;
+  }
 
   // Candidate op is good to go.
   return true;
@@ -119,7 +128,7 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
     if (iteratorType.value() != utils::IteratorType::parallel)
-      break;
+      continue;
     parallelLoops.set(iteratorType.index());
   }
   return parallelLoops;
@@ -176,87 +185,110 @@ static void printBitVector(std::string banner,
   os << "\n";
 }
 
-// Return true if the candidate is as parallel as the root.
-static bool
-matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
-                   const llvm::SmallBitVector &candidateOuterParallelLoop) {
-  if (candidateOuterParallelLoop.size() < rootOuterParallelLoop.size())
-    return false;
-  assert(candidateOuterParallelLoop.size() >= rootOuterParallelLoop.size());
-  for (size_t idx : llvm::seq<size_t>(0, rootOuterParallelLoop.size()))
-    if (rootOuterParallelLoop.test(idx) &&
-        !candidateOuterParallelLoop.test(idx))
-      return false;
-  return true;
+static FailureOr<AffineMap> getProducerOutputMap(Operation *producer) {
+  assert(producer->getNumResults() == 1);
+  if (auto linalgProducer = dyn_cast_or_null<linalg::LinalgOp>(producer)) {
+    return linalgProducer.getIndexingMapMatchingResult(
+        linalgProducer.getTiedOpResult(linalgProducer.getDpsInitOperands()[0]));
+  }
+  return failure();
 }
 
-// Return true if the producer and the current consumer have compatible parallel
-// dimension with the root consumer.
-static bool hasCompatibleOuterParallelLoops(OpOperand &operand,
-                                            Operation *producer,
-                                            Operation *rootConsumer,
-                                            ArrayRef<OpFoldResult> tileSizes) {
+static FailureOr<AffineMap> getConsumerOperandMap(Operation *consumer,
+                                                  OpOperand &operand) {
+  if (auto linalgConsumer = dyn_cast_or_null<linalg::LinalgOp>(consumer))
+    return linalgConsumer.getMatchingIndexingMap(&operand);
+  return failure();
+}
+
+static FailureOr<llvm::SmallBitVector> getTileConfigProducer(
+    OpOperand &operand, Operation *producer, size_t numLoopsProd,
+    llvm::SmallBitVector tileSpecConsumer,
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tileSizes) {
+
+  // Happy path, we already have a tile configuration.
+  if (tileSizes.count(producer)) {
+    return getTileBitVectorConfig(tileSizes.at(producer), numLoopsProd);
+  }
+  Operation *consumer = operand.getOwner();
+
+  auto producerOutputMap = getProducerOutputMap(producer);
+  auto consumerOperandMap = getConsumerOperandMap(consumer, operand);
+  if (failed(producerOutputMap) || failed(consumerOperandMap))
+    return failure();
+  if (!producerOutputMap->isProjectedPermutation() ||
+      !consumerOperandMap->isProjectedPermutation()) {
+    return failure();
+  }
+
+  assert(consumerOperandMap->getNumResults() == numLoopsProd);
+  llvm::SmallBitVector tileConfigProducer(numLoopsProd);
+  SmallVector<OpFoldResult> tileProducer(numLoopsProd);
+  for (auto expr : llvm::enumerate(consumerOperandMap->getResults())) {
+    auto dim = expr.value().cast<AffineDimExpr>();
+    tileConfigProducer[expr.index()] = tileSpecConsumer[dim.getPosition()];
+    tileProducer[expr.index()] = tileSizes.at(consumer)[dim.getPosition()];
+  }
+  // Insert the tile configuration in the map.
+  tileSizes[producer] = tileProducer;
+  return tileConfigProducer;
+}
+
+// Check if the the tile specification for the consumer (operand's owner)
+// is compatible with the producer. If the producer is not yet visited (i.e., it
+// does not have a tile specification attempt to infer it using
+// `getTileConfigProducer`).
+static bool hasCompatibleParallelLoops(
+    OpOperand &operand, Operation *producer,
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tileSizes) {
   assert(operand.get().getDefiningOp() == producer);
   Operation *consumer = operand.getOwner();
-  assert(isa<linalg::LinalgOp>(producer) && "producer must be a linalgOp");
-  assert(isa<linalg::LinalgOp>(consumer) && "consumer must be a linalgOp");
-  linalg::LinalgOp linalgProducer = cast<linalg::LinalgOp>(producer);
-  linalg::LinalgOp linalgConsumer = cast<linalg::LinalgOp>(consumer);
+
+  if (tileSizes.find(consumer) == tileSizes.end())
+    return false;
 
   llvm::SmallBitVector producerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(producer));
   llvm::SmallBitVector consumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(consumer));
-  llvm::SmallBitVector rootConsumerParallelLoops =
-      getOuterParallelLoops(cast<TilingInterface>(rootConsumer));
-  llvm::SmallBitVector tileConfig =
-      getTileBitVectorConfig(tileSizes, rootConsumerParallelLoops.size());
 
-  LLVM_DEBUG(printBitVector("PRODUCER LOOP CONFIG", producerParallelLoops,
-                            llvm::dbgs());
-             printBitVector("CONSUMER LOOP CONFIG", consumerParallelLoops,
-                            llvm::dbgs());
-             printBitVector("ROOT CONSUMER LOOP CONFIG",
-                            rootConsumerParallelLoops, llvm::dbgs());
-             printBitVector("TILE CONFIG", tileConfig, llvm::dbgs()));
-
-  producerParallelLoops &= tileConfig;
-  consumerParallelLoops &= tileConfig;
-  rootConsumerParallelLoops &= tileConfig;
-
-  if (!matchIteratorTypes(rootConsumerParallelLoops, producerParallelLoops) ||
-      !matchIteratorTypes(rootConsumerParallelLoops, consumerParallelLoops))
-    return false;
-
-  LLVM_DEBUG(printBitVector("PRODUCER LOOP TILE CONFIG", producerParallelLoops,
-                            llvm::dbgs());
-             printBitVector("CONSUMER LOOP TILE CONFIG", consumerParallelLoops,
-                            llvm::dbgs());
-             printBitVector("ROOT CONSUMER TILE LOOP CONFIG",
-                            rootConsumerParallelLoops, llvm::dbgs()));
-
-  auto producerIndexingMap = linalgProducer.getIndexingMapMatchingResult(
-      operand.get().cast<OpResult>());
-  auto consumerIndexingMap = linalgConsumer.getMatchingIndexingMap(&operand);
-  if (!producerIndexingMap.isProjectedPermutation() ||
-      !consumerIndexingMap.isProjectedPermutation()) {
+  llvm::SmallBitVector tileSpecConsumer = getTileBitVectorConfig(
+      tileSizes.at(consumer), consumerParallelLoops.size());
+  auto tileSpecProducer =
+      getTileConfigProducer(operand, producer, producerParallelLoops.size(),
+                            tileSpecConsumer, tileSizes);
+  if (failed(tileSpecProducer)) {
     return false;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "PRODUCER MAP: " << producerIndexingMap << "\n";
-             llvm::dbgs() << "CONSUMER MAP: " << consumerIndexingMap << "\n";);
+  auto producerOutputMap = getProducerOutputMap(producer);
+  auto consumerOperandMap = getConsumerOperandMap(consumer, operand);
 
+  producerParallelLoops &= *tileSpecProducer;
   producerParallelLoops.flip();
   auto producerProjectedMap =
-      getProjectedMap(producerIndexingMap, producerParallelLoops);
+      getProjectedMap(*producerOutputMap, producerParallelLoops);
 
+  consumerParallelLoops &= tileSpecConsumer;
   consumerParallelLoops.flip();
   auto consumerProjectedMap =
-      getProjectedMap(consumerIndexingMap, consumerParallelLoops);
+      getProjectedMap(*consumerOperandMap, consumerParallelLoops);
 
   LLVM_DEBUG(
-      llvm::dbgs() << "PRODUCER PROJ MAP: " << producerProjectedMap << "\n";
-      llvm::dbgs() << "CONSUMER PROJ MAP: " << consumerProjectedMap << "\n";);
+      llvm::dbgs() << "Producer: " << *producer << "\n";
+      llvm::dbgs() << "Consumer: " << *consumer << "\n"; printBitVector(
+          "PRODUCER LOOPS      ", producerParallelLoops, llvm::dbgs());
+      printBitVector("CONSUMER LOOPS      ", consumerParallelLoops,
+                     llvm::dbgs());
+      printBitVector("TILE CONFIG CONSUMER", tileSpecConsumer, llvm::dbgs());
+      printBitVector("TILE CONFIG PRODUCER", *tileSpecProducer, llvm::dbgs());
+
+      llvm::dbgs() << "Producer output  map: " << *producerOutputMap << "\n";
+      llvm::dbgs() << "Consumer operand map: " << *consumerOperandMap << "\n";
+      llvm::dbgs() << "Producer projected map: " << producerProjectedMap
+                   << "\n";
+      llvm::dbgs() << "Consumer projected map: " << consumerProjectedMap
+                   << "\n";);
 
   return isIdentityMapWithZeros(producerProjectedMap) &&
          isIdentityMapWithZeros(consumerProjectedMap);
@@ -307,11 +339,10 @@ void incDepthAndSwap(std::queue<Operation *> &frontier,
 // Return a list of producers op that can be fused together based on what has
 // already been fused and the current tile specification.
 static llvm::SmallDenseSet<Operation *> collectFusableProducers(
-    TilingInterface rootConsumer, ArrayRef<OpFoldResult> tileSizes,
+    TilingInterface rootConsumer,
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tileSizes,
     const llvm::SmallDenseSet<Operation *> &alreadyFusedOps, int64_t maxDepth) {
   if (alreadyFusedOps.count(rootConsumer.getOperation()))
-    return {};
-  if (!canBeTiledWithCurrentSpec(rootConsumer, tileSizes))
     return {};
 
   llvm::SmallDenseSet<Operation *> worklist;
@@ -335,11 +366,10 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
     processingQueue.pop();
     for (OpOperand &operand : currentOp->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
-      if (producer && isa<linalg::LinalgOp>(producer) &&
+      if (producer && isa<TilingInterface>(producer) &&
           !worklist.count(producer) && producer->getNumResults() == 1 &&
           !alreadyFusedOps.count(producer) &&
-          hasCompatibleOuterParallelLoops(operand, producer, rootConsumer,
-                                          tileSizes) &&
+          hasCompatibleParallelLoops(operand, producer, tileSizes) &&
           hasAllUsersInWorklist(producer, worklist)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "WORKLIST INSERT PRODUCER: " << producer << "\n");
@@ -371,13 +401,12 @@ getUntiledProducerFromSliceSource(OpOperand *source,
 }
 
 // Entry point for fusion.
-static FailureOr<scf::SCFTileAndFuseResult>
-fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
-                ArrayRef<OpFoldResult> tileSizes,
-                llvm::SmallDenseSet<Operation *> &alreadyFusedOps,
-                int64_t maxDepth) {
+static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
+    RewriterBase &rewriter, TilingInterface consumer,
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tileSizes,
+    llvm::SmallDenseSet<Operation *> &alreadyFusedOps, int64_t maxDepth) {
   // Step 0. Early exit if tileSizes are empty.
-  if (tileSizes.empty()) {
+  if (tileSizes.empty() || !tileSizes.count(consumer)) {
     LLVM_DEBUG(llvm::dbgs() << "EMPTY TILE SIZES\n");
     return failure();
   }
@@ -390,7 +419,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   }
 
   // Step 2. Check if the tile configuration fits the consumer.
-  if (!canBeTiledWithCurrentSpec(consumer, tileSizes)) {
+  if (!canBeTiledWithCurrentSpec(consumer, tileSizes.at(consumer))) {
     LLVM_DEBUG(llvm::dbgs() << "CONSUMER: " << consumer
                             << "\nCANNOT BE TILED WITH CURRENT CONFIG\n");
     return failure();
@@ -406,7 +435,7 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   // Step 4. Tile the consumer.
   scf::SCFTileAndFuseResult tileAndFuseResult;
   FailureOr<scf::SCFTilingResult> tilingResult =
-      tileConsumer(rewriter, consumer, tileSizes);
+      tileConsumer(rewriter, consumer, tileSizes.at(consumer));
   if (failed(tilingResult)) {
     return rewriter.notifyMatchFailure(consumer,
                                        "failed to tile base operation");
@@ -484,24 +513,108 @@ fuseWithEltwise(RewriterBase &rewriter, TilingInterface consumer,
   return tileAndFuseResult;
 }
 
-static SmallVector<int64_t> getDefaultTileSizes(linalg::LinalgOp linalgOp) {
-  // Blocked convolutions are tiled and fused along the three outermost parallel
-  // loops to expose a BRGEMM.
-  if (linalgx::utils::isBlockedConvolution(linalgOp))
-    return {1, 1, 1};
-  // Matmuls are tiled and fused along i and j with 32.
-  if (isa<linalg::MatmulOp>(linalgOp))
-    return {32, 32};
-  // Blocked matmuls are tiled and fused along the two outermost parallel loops
-  // to expose a BRGEMM.
-  if (linalgx::utils::isBlockedMatmul(linalgOp))
-    return {1, 1};
-  return {32, 32};
+// Return tile sizes for `linalgOp`.
+// - For linalg.matmul -> {32, 32}
+// - For all other matmul-like contractions: tile fully all the parallel loops
+// that are not involved in a GEMM computation.
+static FailureOr<SmallVector<int64_t>>
+getDefaultTileSizesForMatmulLikeOp(linalg::LinalgOp linalgOp) {
+  SmallVector<int64_t> tiles(linalgOp.getNumLoops(), 0);
+  if (isa<linalg::MatmulOp>(linalgOp)) {
+    tiles[0] = 32; // i loop
+    tiles[1] = 32; // j loop
+    return tiles;
+  }
+
+  auto contractionDims = linalgx::utils::isContraction(linalgOp);
+  if (failed(contractionDims))
+    return failure();
+
+  SmallVector<unsigned, 2> mDims = contractionDims->m;
+  SmallVector<unsigned, 2> nDims = contractionDims->n;
+  SmallVector<unsigned, 2> batchDims = contractionDims->batch;
+  // Drop the minor dimensions on m and n. These dimensions are part of the
+  // GEMM computation and should not be tiled.
+  mDims.pop_back();
+  nDims.pop_back();
+
+  llvm::DenseSet<unsigned> otherParallelDims(mDims.begin(), mDims.end());
+  otherParallelDims.insert(nDims.begin(), nDims.end());
+  otherParallelDims.insert(batchDims.begin(), batchDims.end());
+
+  int64_t constexpr tileFactor = 1;
+  for (auto dim : mDims)
+    tiles[dim] = tileFactor;
+  for (auto dim : nDims)
+    tiles[dim] = tileFactor;
+  for (auto dim : batchDims)
+    tiles[dim] = tileFactor;
+
+  LLVM_DEBUG(llvm::dbgs() << "+++++++++++ TILES +++++++++++\n");
+  LLVM_DEBUG(llvm::dbgs() << "Tile sizes for op: " << linalgOp << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Parallal dims:\n");
+  LLVM_DEBUG(llvm::interleaveComma(contractionDims->m, llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::interleaveComma(contractionDims->n, llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Tile selected on domanin:\n");
+  LLVM_DEBUG(llvm::interleaveComma(tiles, llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n\n");
+  LLVM_DEBUG(llvm::dbgs() << "+++++++++ END TILES +++++++++\n");
+
+  return tiles;
 }
 
-static Operation *
-getLastFusableConsumer(linalg::LinalgOp linalgOp,
-                       llvm::SmallDenseSet<Operation *> &visitedConsumers) {
+static FailureOr<SmallVector<int64_t>>
+getDefaultTileSizes(linalg::LinalgOp linalgOp,
+                    ArrayRef<int64_t> userProvidedTiles) {
+  // The user-provided tiles are considered from the outer
+  // most loop. If not enough tiles are provided we pad with
+  // zeros.
+  if (!userProvidedTiles.empty()) {
+    size_t numParallelLoops = linalgOp.getNumParallelLoops();
+    size_t nonZeros = 0;
+    for (auto tile : userProvidedTiles)
+      if (tile != 0)
+        nonZeros++;
+    if (nonZeros > numParallelLoops ||
+        userProvidedTiles.size() > linalgOp.getNumLoops()) {
+      return failure();
+    }
+
+    SmallVector<int64_t> userTiles(linalgOp.getNumLoops(), 0);
+    for (auto tile : llvm::enumerate(userProvidedTiles))
+      userTiles[tile.index()] = tile.value();
+    return userTiles;
+  }
+  // Blocked convolutions are tiled and fused along the three outermost parallel
+  // loops to expose a BRGEMM.
+  // TODO: this should merge with `getDefaultTileSizesForMatmulLikeOp`.
+  if (linalgx::utils::isBlockedConvolution(linalgOp))
+    return SmallVector<int64_t>{1, 1, 1, 0, 0};
+  return getDefaultTileSizesForMatmulLikeOp(linalgOp);
+}
+
+static SmallVector<OpFoldResult>
+getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
+                          SmallVector<OpFoldResult> tilesProducer) {
+  assert(consumer && producer);
+  if (consumer == producer)
+    return tilesProducer;
+  assert(isa<linalg::LinalgOp>(consumer) &&
+         linalg::isElementwise(cast<linalg::LinalgOp>(consumer)));
+  linalg::LinalgOp consumerOp = cast<linalg::LinalgOp>(consumer);
+  auto numParallelLoops = consumerOp.getNumParallelLoops();
+  assert(numParallelLoops <= tilesProducer.size());
+  SmallVector<OpFoldResult> eltWiseTiles(
+      tilesProducer.begin(), tilesProducer.begin() + numParallelLoops);
+  return eltWiseTiles;
+}
+
+static Operation *getLastFusableEltWiseConsumer(
+    linalg::LinalgOp linalgOp,
+    llvm::SmallDenseSet<Operation *> &visitedConsumers,
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tiles) {
   assert(linalgOp->getNumResults() == 1 && "Expect single result operation");
   Value linalgOpRes = linalgOp->getResult(0);
   // If we allow use, we may end up doing recomputation. Unclear if it is
@@ -534,7 +647,14 @@ getLastFusableConsumer(linalg::LinalgOp linalgOp,
   while (isValidEltWiseConsumer(nextConsumer)) {
     Value resNextConsumer = nextConsumer->getResult(0);
     currentConsumer = nextConsumer;
+    tiles[currentConsumer] =
+        getTileForEltWiseConsumer(currentConsumer, linalgOp, tiles[linalgOp]);
     visitedConsumers.insert(currentConsumer);
+    // Require each eltwise to have a single user.
+    if (std::distance(resNextConsumer.getUsers().begin(),
+                      resNextConsumer.getUsers().end()) != 1) {
+      break;
+    }
     nextConsumer = *(resNextConsumer.getUsers().begin());
   }
   LLVM_DEBUG(llvm::dbgs() << "LAST FUSABLE CONSUMER: " << currentConsumer
@@ -568,25 +688,41 @@ struct TileConsumerAndFuseProducers
     // Set to keep track of fused ops.
     llvm::SmallDenseSet<Operation *> fusedOps;
 
-    SmallVector<linalg::LinalgOp> linalgOperations;
+    SmallVector<linalg::LinalgOp> linalgContractionOperations;
     func->walk([&](linalg::LinalgOp linalgOp) {
-      if ((isConvolutionLike(linalgOp) || isMatmulLike(linalgOp)) &&
+      if ((isConvolutionLike(linalgOp) ||
+           succeeded(linalgx::utils::isContraction(linalgOp))) &&
           linalgOp.hasTensorSemantics())
-        linalgOperations.push_back(linalgOp);
+        linalgContractionOperations.push_back(linalgOp);
     });
 
-    std::reverse(linalgOperations.begin(), linalgOperations.end());
+    // Reverse the ops. Start from the bottom to increase
+    // the fusion boundaries.
+    std::reverse(linalgContractionOperations.begin(),
+                 linalgContractionOperations.end());
     llvm::SmallDenseSet<Operation *> visitedConsumers;
     llvm::SmallDenseSet<Operation *> fusionRoots;
-    DenseMap<Operation *, SmallVector<int64_t>> defaultTiles;
-    for (linalg::LinalgOp linalgOp : linalgOperations) {
-      Operation *rootOp = linalgOp.getOperation();
+
+    // Compute the tile sizes for each contraction operations or
+    // use the default one.
+    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> defaultTiles;
+    for (auto contractionOp : linalgContractionOperations) {
+      auto tiles = getDefaultTileSizes(contractionOp, this->tileSizes);
+      if (failed(tiles)) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to compute default tile sizes for: "
+                                << contractionOp << "\n");
+        return;
+      }
+      defaultTiles[contractionOp] =
+          getAsOpFoldResult(rewriter.getI64ArrayAttr(*tiles));
+    }
+
+    for (linalg::LinalgOp contractionOp : linalgContractionOperations) {
+      Operation *consumerOp = contractionOp.getOperation();
       if (this->startFromLastFusableConsumer)
-        rootOp = getLastFusableConsumer(linalgOp, visitedConsumers);
-      fusionRoots.insert(rootOp);
-      defaultTiles[rootOp] = (this->tileSizes.empty())
-                                 ? getDefaultTileSizes(linalgOp)
-                                 : llvm::to_vector(this->tileSizes);
+        consumerOp = getLastFusableEltWiseConsumer(
+            contractionOp, visitedConsumers, defaultTiles);
+      fusionRoots.insert(consumerOp);
     }
     LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
 
@@ -603,9 +739,7 @@ struct TileConsumerAndFuseProducers
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
             fuseWithEltwise(rewriter, cast<TilingInterface>(linalgOp),
-                            getAsOpFoldResult(rewriter.getI64ArrayAttr(
-                                defaultTiles[linalgOp])),
-                            fusedOps, this->maxDepth);
+                            defaultTiles, fusedOps, this->maxDepth);
         LLVM_DEBUG(llvm::dbgs() << "\n\n");
         if (succeeded(fuseAndTileResult)) {
           rewriter.replaceOp(

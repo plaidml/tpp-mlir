@@ -305,177 +305,29 @@ bool isBlockedConvolution(Operation *op) {
   return hasMulAddBody(linalgOp, /*captures=*/nullptr);
 }
 
-static llvm::SmallDenseSet<unsigned> getPreservedDims(AffineMap map) {
-  assert(map.isProjectedPermutation() &&
-         "expected map to have projected permutations");
-  llvm::SmallDenseSet<unsigned> preservedDims;
-  for (auto expr : map.getResults())
-    preservedDims.insert(expr.cast<AffineDimExpr>().getPosition());
-  return preservedDims;
-}
-
-namespace {
-
-// Walk the indexing expressions for the B operand in a blocked matmul and
-// verify it is in the right form, either:
-// - AffineDimExpr
-// - AffineDimExpr floorDiv constant.
-// Each dimension occurs only once.
-struct OperandBExprWalker
-    : public AffineExprVisitor<OperandBExprWalker, LogicalResult> {
-  OperandBExprWalker() = delete;
-  explicit OperandBExprWalker(ArrayRef<mlir::utils::IteratorType> iteratorTypes)
-      : iteratorTypes(iteratorTypes) {}
-  llvm::SmallDenseSet<unsigned> bDims;
-
-  LogicalResult visitDimExpr(AffineDimExpr dimExpr) {
-    unsigned position = dimExpr.getPosition();
-    if (bDims.count(position))
-      return failure();
-    bDims.insert(position);
-    return success();
-  }
-
-  LogicalResult visitSymbolExpr(AffineSymbolExpr expr) { return failure(); }
-
-  LogicalResult visitConstantExpr(AffineConstantExpr expr) { return failure(); }
-
-  LogicalResult visitAffineBinaryOpExpr(AffineBinaryOpExpr binaryExpr) {
-    if (binaryExpr.getKind() != AffineExprKind::FloorDiv)
-      return failure();
-    return success(succeeded(isDimExprOrCstExpr(binaryExpr.getLHS())) &&
-                   succeeded(isDimExprOrCstExpr(binaryExpr.getRHS())));
-  }
-
-  LogicalResult isDimExprOrCstExpr(AffineExpr expr) {
-
-    auto isReductionDim =
-        [](unsigned position,
-           ArrayRef<mlir::utils::IteratorType> iteratorTypes) -> bool {
-      return iteratorTypes[position] == mlir::utils::IteratorType::reduction;
-    };
-
-    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-      unsigned position = dimExpr.getPosition();
-      if (bDims.count(position) || !isReductionDim(position, iteratorTypes))
-        return failure();
-      bDims.insert(position);
-      return success();
-    }
-    if (auto cstExpr = expr.dyn_cast<AffineConstantExpr>())
-      return success();
-    return failure();
-  }
-
-private:
-  ArrayRef<mlir::utils::IteratorType> iteratorTypes;
-};
-
-} // namespace
-
-bool isBlockedMatmul(Operation *op) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp)
-    return false;
-
+FailureOr<linalg::ContractionDimensions>
+isContraction(linalg::LinalgOp linalgOp) {
   using namespace mlir::tpp::structured_match;
-  AffineMap aMap, bMap, cMap;
+
   // clang-format off
-  auto maybeBlockMatmul = 
+  auto maybeContraction =
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .operation(NumDpsInits(EqualsTo(1)))
     .operation(NumDpsInputs(EqualsTo(2)))
     .operation(NumAffineMaps(EqualsTo(3)))
-    .input(MatchOne(0), HasMap(ProjectedPermutation(), &aMap))
-    .input(MatchOne(1), HasMap(Any(), &bMap))
-    .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap))
-    .region(MatchOne(0), 
-            WithOpChain<arith::MulFOp, 
+    .region(MatchOne(0),
+            WithOpChain<arith::MulFOp,
                         arith::AddFOp>(/*captures=*/nullptr));
   // clang-format on
-  if (!maybeBlockMatmul.match(linalgOp))
-    return false;
-  assert(aMap && bMap && cMap);
+  if (!maybeContraction.match(linalgOp))
+    return failure();
 
-  // Walk the expressions for the B operand. The affine map may not be a
-  // projected permutation if the blocked matmul is in VNNI format.
-  auto iteratorTypes = linalgOp.getIteratorTypesArray();
-  OperandBExprWalker operandBWalker(iteratorTypes);
-  if (llvm::any_of(bMap.getResults(), [&operandBWalker](AffineExpr expr) {
-        return failed(operandBWalker.visit(expr));
-      })) {
-    return false;
+  auto dims = linalg::inferContractionDims(linalgOp);
+  if (failed(dims) ||
+      (dims->m.size() < 1 || dims->n.size() < 1 || dims->k.size() < 1)) {
+    return failure();
   }
-
-  // Make sure all loops are characterized as one of:
-  // - I loop: present in C and A but not in B. I must be parallel.
-  // - J loop: present in C and B but not in A. J must be parallel.
-  // - K loop: present in A and B but not in C. K must be reduction.
-  // - B loop: present in A and B and C. B must be parallel.
-  llvm::SmallDenseSet<unsigned> cDims = getPreservedDims(cMap);
-  llvm::SmallDenseSet<unsigned> aDims = getPreservedDims(aMap);
-  llvm::SmallDenseSet<unsigned> allLoopDims;
-  for (auto cExpr : cMap.getResults()) {
-    unsigned cDim = cExpr.cast<AffineDimExpr>().getPosition();
-    // I loop
-    if (aDims.count(cDim) && !operandBWalker.bDims.count(cDim)) {
-      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
-        return false;
-      allLoopDims.insert(cDim);
-      continue;
-    }
-    // J loop
-    if (operandBWalker.bDims.count(cDim) && !aDims.count(cDim)) {
-      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
-        return false;
-      allLoopDims.insert(cDim);
-      continue;
-    }
-    // B loop (batch)
-    if (operandBWalker.bDims.count(cDim) && aDims.count(cDim)) {
-      if (iteratorTypes[cDim] != mlir::utils::IteratorType::parallel)
-        return false;
-      allLoopDims.insert(cDim);
-      continue;
-    }
-    return false;
-  }
-
-  for (auto aExpr : aMap.getResults()) {
-    unsigned aDim = aExpr.cast<AffineDimExpr>().getPosition();
-    // I loop
-    if (cDims.count(aDim) && !operandBWalker.bDims.count(aDim)) {
-      // Already seen.
-      continue;
-    }
-    // B loop
-    if (cDims.count(aDim) && operandBWalker.bDims.count(aDim)) {
-      // Already seen.
-      continue;
-    }
-    // K loop
-    if (operandBWalker.bDims.count(aDim) && !cDims.count(aDim)) {
-      if (iteratorTypes[aDim] != mlir::utils::IteratorType::reduction)
-        return false;
-      allLoopDims.insert(aDim);
-      continue;
-    }
-    return false;
-  }
-
-  // We may have an extra reduction in the B operand (i.e., VNNI).
-  for (auto bDim : operandBWalker.bDims) {
-    if (!allLoopDims.count(bDim)) {
-      if (aDims.count(bDim) || cDims.count(bDim) ||
-          iteratorTypes[bDim] != mlir::utils::IteratorType::reduction)
-        return false;
-      allLoopDims.insert(bDim);
-    }
-    continue;
-  }
-
-  // At this point we must have covered all the loops.
-  return allLoopDims.size() == linalgOp.getNumLoops();
+  return dims;
 }
 
 static std::optional<int64_t> getConstantRange(const Range &range) {
