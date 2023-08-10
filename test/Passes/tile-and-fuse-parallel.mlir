@@ -268,7 +268,7 @@ func.func @matmul_sequence_fusion_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x3
   return %2 : tensor<32x32xf32>
 }
 
-// C_HECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: func.func @matmul_sequence_fusion_1(
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
