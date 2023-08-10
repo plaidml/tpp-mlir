@@ -180,23 +180,6 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
   let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
 }
 
-def RewriteToBatchReduceGemm : Pass<"rewrite-to-brgemm", "func::FuncOp"> {
-  let summary = "Rewrite a linalg.generic to BRGemm";
-  let description = [{
-    Rewrite a linalg.generic to a linalg.batch_reduce_matmul.
-    Example: Given a Gemm in block layout: [NB][KB][nb][kb] += [NB][CB][nb][cb] *
-    [KB][CB][cb][kb] map it to a batch-reduce Gemm by splitting out the two
-    outermost parallel dimensions (as scf.for or scf.parallel at buffer level)
-    and rewrite the body to a linalg.batch_reduce_matmul. 
-
-    The pass works on any linalg.generic and attempts to map the innermost
-    loops to BRGemm.  It works both a memref and tensor level. When the element
-    type is bf16 the VNNI layout is used.
-  }];
-  let constructor = "mlir::tpp::createRewriteToBatchReduceGemmPass()";
-  let dependentDialects = ["scf::SCFDialect", "tpp::TppDialect"];
-}
-
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
                                         "func::FuncOp"> {
   let summary = "Tile consumers and fuse producers";
@@ -219,7 +202,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     Option<"useForAll", "use-for-all", "bool", "true", "Use parallel forAll">
   ];
   let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect",
-                           "tensor::TensorDialect"];
+                           "tensor::TensorDialect", "tpp::TppDialect"];
 }
 
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 

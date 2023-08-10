@@ -13,7 +13,12 @@ func.func @matmul_sequence_fusion_expect_no_fusion(%arg0: tensor<32x64xf32>, %ar
   return %2 : tensor<32x32xf32>
 }
 
-// CHECK-NOT: scf.for
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
 
 // -----
 
@@ -183,8 +188,10 @@ func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: 
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-COUNT-2: scf.for
 // CHECK: linalg.matmul
-// CHECK-NEXT: linalg.matmul
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
 // CHECK: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK-NEXT: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK: linalg.matmul
@@ -206,7 +213,7 @@ func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 // Note that %2 has two users, and we cannot fuse across fusion groups. Thus
-// we expect not to fuse this matmul.
+// we expect to only tile the matmuls.
 func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
     %arg2: tensor<32x32xf32>, %arg3: tensor<32x64xf32>, %arg4: tensor<32x64xf32>,
     %arg5: tensor<64x32xf32>, %arg6: tensor<32x32xf32>) -> tensor<32x32xf32> {
@@ -242,7 +249,14 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 }
 
 // CHECK: func.func @matmul_sequence_fusion(
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
+// CHECK-COUNT-2: scf.for
+// CHECK: linalg.matmul
 // CHECK-NOT: scf.for
+// CHECK-COUNT-3: linalg.generic
 
 // -----
 

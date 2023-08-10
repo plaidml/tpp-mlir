@@ -1,4 +1,3 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=0 use-for-all=false" | FileCheck -check-prefix=DEPTH0 %s
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=1 use-for-all=false" | FileCheck -check-prefix=DEPTH1 %s
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=2 use-for-all=false" | FileCheck -check-prefix=DEPTH2 %s
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers="tile-sizes=2,0 max-depth=3 use-for-all=false" | FileCheck -check-prefix=DEPTH3 %s
@@ -24,14 +23,6 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
   } -> tensor<32x32xf32>
   return %3 : tensor<32x32xf32>
 }
-
-// The fusion cost-fuction requires to have at least 2 fusion candidates.
-// Using depth 0 will always force a single candidate in the worklist, expect
-// no fusion.
-// DEPTH0: func.func @matmul_sequence_fusion(
-// DEPTH0-NOT: scf.for
-// DEPTH0-COUNT-3: linalg.matmul
-// DEPTH0-COUNT-1: linalg.generic
 
 // DEPTH1: func.func @matmul_sequence_fusion(
 // DEPTH1-DAG: %[[C0:.+]] = arith.constant 0 : index

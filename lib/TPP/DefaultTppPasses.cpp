@@ -298,11 +298,6 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Convert generics to BRGEMM.
-    pm.addPass(createRewriteToBatchReduceGemmPass());
-    // Convert batch matmul to matmul.
-    pm.addPass(createRewriteBatchMatmulToMatmulPass());
-
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTppPass());
     pm.addPass(createCombineTppPass());
