@@ -54,6 +54,18 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
                            "xsmm::XsmmDialect"];
 }
 
+def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
+  let summary = "Convert linalg to xsmm";
+  let constructor = "mlir::tpp::createConvertLinalgToXsmmPass()";
+  let description = [{
+    Convert linalg operations to XSMM operations.
+  }];
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "linalg::LinalgDialect",
+                           "xsmm::XsmmDialect"];
+}
+
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
@@ -234,11 +246,14 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   }];
   let options= [
     Option<"tppToLoops", "tpp-to-loops",
-           "bool", /*default=*/"0",
+           "bool", /*default=*/"false",
            "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
     Option<"linalgToLoops", "linalg-to-loops",
-           "bool", /*default=*/"0",
+           "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
+    Option<"linalgToXsmm", "linalg-to-xsmm",
+           "bool", /*default=*/"false",
+           "Skip all TPP transformations. Lower lianalg directly to xsmm.">
   ];
   let constructor = "mlir::tpp::createDefaultTppPass()";
 }

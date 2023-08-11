@@ -24,6 +24,7 @@ add_mlir_library(MLIRTPP
     LinalgDeGeneralize.cpp
     ConvertMemRefToTpp.cpp
     DefaultPipeline.cpp
+    ConvertLinalgToXsmm.cpp
 
   # Utils
     TensorInit.cpp
