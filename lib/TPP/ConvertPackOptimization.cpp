@@ -1,11 +1,10 @@
 //===ConvertPackOptimization.cpp -------------------------------*----C++-*-===//
-////
-//// Part of the LLVM Project, under the Apache License v2.0 with LLVM
-/// Exceptions. / See https://llvm.org/LICENSE.txt for license information. /
-/// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-////
-////===----------------------------------------------------------------------===//
 //
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM
+// Exceptions. / See https://llvm.org/LICENSE.txt for license information. /
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 
 #include "TPP/BuilderUtils.h"
@@ -23,41 +22,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-struct MatchResult {
-  bool haveMatch;
-  int index;
-};
-
-/*
- * Returns a list of indices that match the inner dimensions' position
- */
-SmallVector<MatchResult> innerDimMatchesIndex(tensor::PackOp packOp) {
-  SmallVector<MatchResult> result;
-  int innerTiles = 0;
-  for (size_t i = 0; i < packOp.getSourceType().getShape().size(); i++) {
-    if (packOp.getInnerDimsPos().size() > 0) {
-      bool haveMatch = false;
-      for (size_t j = 0; j < packOp.getInnerDimsPos().size(); j++) {
-        if (i == (size_t)packOp.getInnerDimsPos()[j]) {
-          MatchResult tempResult;
-          tempResult.haveMatch = true;
-          haveMatch = true;
-          tempResult.index = innerTiles++;
-          result.push_back(tempResult);
-          break;
-        }
-      }
-      if (!haveMatch) {
-        MatchResult tempResult;
-        tempResult.haveMatch = false;
-        tempResult.index = -1;
-        result.push_back(tempResult);
-      }
-    }
-  }
-  return result;
-}
-
 struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::PackOp packOp,
@@ -67,10 +31,14 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
     auto shape = packOp.getSourceType().getShape();
     int numLoops = shape.size();
 
-    SmallVector<MatchResult> haveMatched = innerDimMatchesIndex(packOp);
+    std::map<int, int> tiledDims;
+    for (auto tiledDim : llvm::enumerate(packOp.getInnerDimsPos())) {
+      tiledDims[tiledDim.value()] = tiledDim.index();
+    }
+
     for (int i = 0; i < numLoops; i++) {
-      if (haveMatched[i].haveMatch) {
-        if (shape[i] < packOp.getStaticInnerTiles()[haveMatched[i].index]) {
+      if (tiledDims.count(i)) {
+        if (i < (numLoops - 1) && shape[i] >= shape[i + 1]) {
           return failure();
         }
       }
@@ -84,12 +52,10 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
     SmallVector<Value> steps(numLoops, one);
 
     for (int i = 0; i < numLoops; i++) {
-      if (haveMatched[i].haveMatch && shape[i] != ShapedType::kDynamic &&
-          packOp.getStaticInnerTiles()[haveMatched[i].index] !=
-              ShapedType::kDynamic) {
+      if (tiledDims.count(i) && shape[i] != ShapedType::kDynamic &&
+          packOp.getStaticInnerTiles()[tiledDims[i]] != ShapedType::kDynamic) {
         ubs.push_back(getConstIndex(
-            rewriter,
-            shape[i] / packOp.getStaticInnerTiles()[haveMatched[i].index]));
+            rewriter, shape[i] / packOp.getStaticInnerTiles()[tiledDims[i]]));
 
       } else {
         ubs.push_back(getConstIndex(rewriter, shape[i]));
@@ -98,19 +64,17 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
 
     auto loopNest = mlir::scf::buildLoopNest(
         rewriter, packOp.getLoc(), lbs, ubs, steps, packOp.getDest(),
-        [&packOp, &numLoops](OpBuilder &rewriter, Location loc,
-                             ValueRange localIvs,
-                             ValueRange iterArgs) -> scf::ValueVector {
+        [&packOp, &numLoops,
+         &tiledDims](OpBuilder &rewriter, Location loc, ValueRange localIvs,
+                     ValueRange iterArgs) -> scf::ValueVector {
           SmallVector<OpFoldResult> offsets;
 
-          SmallVector<MatchResult> haveMatched = innerDimMatchesIndex(packOp);
           for (int i = 0; i < numLoops; i++) {
-            if (haveMatched[i].haveMatch) {
+            if (tiledDims.count(i)) {
               Value muliOp = rewriter.create<arith::MulIOp>(
                   loc, localIvs[i],
-                  getConstIndex(
-                      rewriter,
-                      packOp.getStaticInnerTiles()[haveMatched[i].index]));
+                  getConstIndex(rewriter,
+                                packOp.getStaticInnerTiles()[tiledDims[i]]));
               offsets.push_back(muliOp);
             } else {
               offsets.push_back(localIvs[i]);
@@ -121,9 +85,9 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
           SmallVector<OpFoldResult> sizes;
 
           for (int i = 0; i < numLoops; i++) {
-            if (haveMatched[i].haveMatch) {
+            if (tiledDims.count(i)) {
               sizes.push_back(rewriter.getIndexAttr(
-                  packOp.getStaticInnerTiles()[haveMatched[i].index]));
+                  packOp.getStaticInnerTiles()[tiledDims[i]]));
             } else {
               sizes.push_back(rewriter.getIndexAttr(1));
             }
