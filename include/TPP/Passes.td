@@ -218,6 +218,8 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
            "true", "Fuse from the last fusable consumer of the current target">,
     Option<"useForAll", "use-for-all", "bool", "true", "Use parallel forAll">
   ];
+  let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect",
+                           "tensor::TensorDialect"];
 }
 
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 

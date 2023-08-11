@@ -668,10 +668,6 @@ struct TileConsumerAndFuseProducers
   TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
     this->tileSizes = tileSizes;
   }
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect>();
-    linalg::registerTilingInterfaceExternalModels(registry);
-  }
   void runOnOperation() override {
     auto &ctx = getContext();
 

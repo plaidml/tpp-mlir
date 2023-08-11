@@ -10,6 +10,7 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
 #include "TPP/VNNIUtils.h"
@@ -162,22 +163,6 @@ static ArrayAttr getGemmFlags(RewriterBase &rewriter, OpTy opTy) {
   return rewriter.getArrayAttr(gemmFlag);
 }
 
-template <typename OpTy>
-static xsmm::DataTypeAttr getDataType(RewriterBase &rewriter, OpTy opTy) {
-  xsmm::DataTypeAttr dtype;
-  auto memrefC = opTy.getOutputType();
-
-  if (memrefC.getElementType().isBF16()) {
-    dtype =
-        xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::BF16);
-  } else {
-    assert(memrefC.getElementType().isF32() &&
-           "Element type neither bf16 nor f32");
-    dtype = xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::F32);
-  }
-  return dtype;
-}
-
 struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
   using OpRewritePattern<tpp::GemmOp>::OpRewritePattern;
 
@@ -195,7 +180,7 @@ struct ConvertTppGemmOp : public OpRewritePattern<tpp::GemmOp> {
           matmulOp, "Cannot compute leading dims or sizes");
     }
 
-    auto dtype = getDataType(rewriter, matmulOp);
+    auto dtype = xsmm::utils::getDataType(rewriter, matmulOp.getOutputType());
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
     Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, *dims, getGemmFlags(rewriter, matmulOp), dtype);
@@ -230,7 +215,7 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
     auto memrefB = brgemmOp.getMemRefInputType(1);
     int64_t batchSize = memrefB.getShape()[0];
 
-    auto dtype = getDataType(rewriter, brgemmOp);
+    auto dtype = xsmm::utils::getDataType(rewriter, brgemmOp.getOutputType());
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
@@ -328,7 +313,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
     auto memrefB = brgemmOp.getMemRefInputType(1);
     int64_t batchSize = memrefB.getShape()[0];
 
-    auto dtype = getDataType(rewriter, brgemmOp);
+    auto dtype = xsmm::utils::getDataType(rewriter, brgemmOp.getOutputType());
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
@@ -367,13 +352,8 @@ static LogicalResult lowerTPPtoXSMM(tpp::TppOp op, PatternRewriter &rewriter,
       DenseI64ArrayAttr::get(rewriter.getContext(), dims);
   auto flagsAttr = FlagsAttr::get(ctx, flags);
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-  xsmm::DataTypeAttr dtype;
-  if (elmTy.isBF16()) {
-    dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::BF16);
-  } else {
-    assert(elmTy.isF32() && "Element type neither bf16 nor f32");
-    dtype = xsmm::DataTypeAttr::get(ctx, xsmm::DataType::F32);
-  }
+  xsmm::DataTypeAttr dtype =
+      xsmm::utils::getDataType(rewriter, op.getOutputType());
 
   Value dispatched =
       rewriter.create<DispatchOp>(loc, integer64, kindAttr, dimsAttr,

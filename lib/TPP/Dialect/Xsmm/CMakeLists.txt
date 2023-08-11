@@ -3,6 +3,7 @@ add_mlir_dialect_library(TPPXsmmDialect
     XsmmEnum.cpp
     XsmmDialect.cpp
     XsmmOps.cpp
+    XsmmUtils.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
