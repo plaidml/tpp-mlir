@@ -12,7 +12,6 @@
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
-#include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -161,41 +160,9 @@ struct TppBrgemmDeGeneralizationPattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  bool isTppVnniOp(linalg::GenericOp linalgOp) const {
-    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-    AffineExpr r1, p4, p5, r2, r3;
-    bindDims(linalgOp.getContext(), r1, r2, p4, p5, r3);
-    auto blockingFactor = vnni::utils::getVnniBlockingFactor(
-        linalgOp->getOperands()[0].getType());
-    if (!blockingFactor)
-      return false;
-    SmallVector<AffineMap> mapList;
-    mapList = infer(
-        {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
-
-    using namespace tpp::structured_match;
-    auto matmulMatcher =
-        StructuredOpMatcher::make<linalg::GenericOp>()
-            .operation(NumDpsInits(EqualsTo(1)))
-            .operation(NumDpsInputs(EqualsTo(2)))
-            .operation(NumRegions(EqualsTo(1)))
-            .dim(MatchAll(), {mlir::utils::IteratorType::reduction,
-                              mlir::utils::IteratorType::parallel,
-                              mlir::utils::IteratorType::parallel,
-                              mlir::utils::IteratorType::reduction,
-                              mlir::utils::IteratorType::reduction})
-            .input(MatchOne(0), HasMap(EqualsTo(mapList[0])))
-            .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
-            .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
-            .region(MatchOne(0), WithOpChain<arith::MulFOp, arith::AddFOp>(
-                                     /*captures=*/nullptr));
-    return matmulMatcher.match(linalgOp);
-  }
-
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!isTppVnniOp(linalgOp))
+    if (!tpp::utils::isTppVnniOp(linalgOp, /*captures=*/nullptr))
       return failure();
     SmallVector<Value> operands = linalgOp.getDpsInputOperands();
     SmallVector<Value> initOperands = linalgOp.getDpsInitOperands();

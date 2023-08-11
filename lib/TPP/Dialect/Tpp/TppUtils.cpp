@@ -10,6 +10,7 @@
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
+#include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -170,6 +171,40 @@ bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
       MatchOne(0), WithSingleOp<arith::AddFOp>(operands));
   return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
+}
+
+// Return true if the linalg.generic an be mapped to a tpp.brgemm in VNNI
+// format.
+bool isTppVnniOp(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr r1, p4, p5, r2, r3;
+  bindDims(linalgOp.getContext(), r1, r2, p4, p5, r3);
+  auto blockingFactor =
+      vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
+  if (!blockingFactor)
+    return false;
+  SmallVector<AffineMap> mapList;
+  mapList = infer(
+      {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
+
+  using namespace tpp::structured_match;
+  auto matmulMatcher =
+      StructuredOpMatcher::make<linalg::GenericOp>()
+          .operation(NumDpsInits(EqualsTo(1)))
+          .operation(NumDpsInputs(EqualsTo(2)))
+          .operation(NumRegions(EqualsTo(1)))
+          .dim(MatchAll(), {mlir::utils::IteratorType::reduction,
+                            mlir::utils::IteratorType::parallel,
+                            mlir::utils::IteratorType::parallel,
+                            mlir::utils::IteratorType::reduction,
+                            mlir::utils::IteratorType::reduction})
+          .input(MatchOne(0), HasMap(EqualsTo(mapList[0])))
+          .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
+          .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
+          .region(MatchOne(0),
+                  WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
+  return matmulMatcher.match(linalgOp);
 }
 
 static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
