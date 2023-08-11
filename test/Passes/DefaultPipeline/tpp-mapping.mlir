@@ -161,12 +161,8 @@ func.func @pack_matmul(
 // CHECK:     linalg.transpose
 // CHECK:     tensor.insert_slice{{[^:]+}}: tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Packed matmul
-// CHECK: linalg.generic
-// CHECK-SAME: {{.*}}iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-// CHECK-SAME: ins({{.*}}: tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>)
-// CHECK-SAME: outs({{.*}}: tensor<4x4x32x32xf32>)
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
+// CHECK: scf.forall
+// CHECK: linalg.batch_reduce_matmul 
 
 // -----
 

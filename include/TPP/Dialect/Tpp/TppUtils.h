@@ -56,6 +56,10 @@ bool isTppRelu(linalg::GenericOp linalgOp,
 bool isTppBiasRelu(linalg::GenericOp linalgOp,
                    SmallVectorImpl<Value> *capturedOperands = nullptr);
 
+// Return true if the linalg.generic can convert to a tpp.brgemm in VNNI format.
+bool isTppVnniOp(linalg::GenericOp linalgOp,
+                 SmallVectorImpl<Value> *capturedOperands = nullptr);
+
 // Returns true if: 1) the region has a single block. 2) The block has a single
 // operation `OP`. 3) The operation result types are int or float.
 template <typename OP> static bool hasOnlyOp(Region &region) {

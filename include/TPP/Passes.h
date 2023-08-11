@@ -106,8 +106,6 @@ createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
 createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
-createRewriteToBatchReduceGemmPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
 createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();

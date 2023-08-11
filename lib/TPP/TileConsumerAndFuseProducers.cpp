@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
@@ -429,7 +430,7 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
   llvm::SmallDenseSet<Operation *> worklist =
       collectFusableProducers(consumer, tileSizes, alreadyFusedOps, maxDepth);
   LLVM_DEBUG(llvm::dbgs() << "#WORKLIST: " << worklist.size() << "\n");
-  if (worklist.size() < 2)
+  if (worklist.size() < 1)
     return failure();
 
   // Step 4. Tile the consumer.
@@ -668,6 +669,7 @@ struct TileConsumerAndFuseProducers
   TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
     this->tileSizes = tileSizes;
   }
+
   void runOnOperation() override {
     auto &ctx = getContext();
 
@@ -771,6 +773,7 @@ struct TileConsumerAndFuseProducers
       // Attempt to recover named ops.
       RewritePatternSet patterns(&ctx);
       linalg::populateLinalgDeGeneralizationPatterns(patterns);
+      tpp::populateTppDeGeneralizationPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
   }

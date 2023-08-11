@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Passes.h"
@@ -14,6 +15,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -28,6 +30,7 @@ struct LinalgDeGeneralize : LinalgDeGeneralizeBase<LinalgDeGeneralize> {
     func::FuncOp func = getOperation();
     RewritePatternSet patterns(&getContext());
     linalg::populateLinalgDeGeneralizationPatterns(patterns);
+    tpp::populateTppDeGeneralizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(func.getBody(), std::move(patterns));
   }
 };
@@ -152,12 +155,35 @@ struct FillOpDeGeneralizationPattern
   }
 };
 
+// From linalg.generic to TPP brgemm (VNNI).
+struct TppBrgemmDeGeneralizationPattern
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tpp::utils::isTppVnniOp(linalgOp, /*captures=*/nullptr))
+      return failure();
+    SmallVector<Value> operands = linalgOp.getDpsInputOperands();
+    SmallVector<Value> initOperands = linalgOp.getDpsInitOperands();
+    operands.append(initOperands.begin(), initOperands.end());
+    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(linalgOp, operands,
+                                               operands.back().getType());
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::linalg::populateLinalgDeGeneralizationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FillOpDeGeneralizationPattern, MatmulOpDeGeneralizationPattern,
                BatchReduceOpDeGeneralizationPattern>(patterns.getContext());
+}
+
+void mlir::tpp::populateTppDeGeneralizationPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<TppBrgemmDeGeneralizationPattern>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
