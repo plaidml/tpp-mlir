@@ -68,6 +68,10 @@ static FailureOr<SmallVector<int64_t>> verifyStrides(Type operandType) {
   return strides;
 }
 
+static FailureOr<SmallVector<int64_t>> verifyStrides(OpOperand *operand) {
+  return verifyStrides(operand->get().getType());
+}
+
 // Return true if all the operand have the same type. No implicit conversion in
 // the linalgOp.
 static bool hasEqualTypes(linalg::LinalgOp linalgOp) {
@@ -151,6 +155,47 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
   }
 };
 
+// Convert a linalg.transpose to a XSMM unary transpose.
+struct ConvertTransposeOpToUnaryTranspose
+    : public OpRewritePattern<linalg::TransposeOp> {
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!transposeOp.hasBufferSemantics() || transposeOp.hasDynamicShape() ||
+        !hasEqualTypes(transposeOp))
+      return failure();
+    auto input = transposeOp.getDpsInputOperands()[0];
+    auto output = transposeOp.getDpsInitOperands()[0];
+    ShapedType inputType = input->get().getType().cast<ShapedType>();
+    ShapedType outputType = output->get().getType().cast<ShapedType>();
+    auto inputRank = inputType.getRank();
+    auto outputRank = outputType.getRank();
+    if (inputRank != 2 || outputRank != 2)
+      return failure();
+
+    auto stridesOnInput = verifyStrides(input);
+    auto stridesOnOutput = verifyStrides(output);
+    if (failed(stridesOnInput) || failed(stridesOnOutput))
+      return failure();
+
+    // This looks wired. We should look for m and n on the output
+    // buffer, but for transpose it seems not the case.
+    UnaryInfo unaryInfo;
+    unaryInfo.m = inputType.getShape()[0];
+    unaryInfo.n = inputType.getShape()[1];
+    unaryInfo.ldi = stridesOnInput->front();
+    unaryInfo.ldo = stridesOnOutput->front();
+
+    auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
+        rewriter.getContext(), xsmm::UnaryFlags::NONE));
+    xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
+        rewriter.getContext(), xsmm::UnaryKind::TRANSPOSE);
+    replaceOpWithUnary(rewriter, transposeOp, unaryInfo, flags, kind);
+    return success();
+  }
+};
+
 void ConvertLinalgToXsmm::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
@@ -161,7 +206,8 @@ void ConvertLinalgToXsmm::runOnOperation() {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertFillOpToUnaryZero>(patterns.getContext());
+  patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

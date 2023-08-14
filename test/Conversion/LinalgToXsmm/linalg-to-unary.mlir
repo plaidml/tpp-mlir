@@ -48,3 +48,26 @@ func.func @fill_op(%arg0: memref<32xf32>) {
 // CHECK-LABEL: fill_op
 // CHECK: linalg.fill
 // CHECK-NOT: xsmm.unary
+
+// -----
+
+func.func @transpose_op(%arg0: memref<3x5xf32>, %arg1: memref<5x3xf32>) {
+  linalg.transpose ins(%arg0: memref<3x5xf32>) outs(%arg1: memref<5x3xf32>) permutation = [1, 0]
+  return
+}
+
+// CHECK-LABEL: transpose_op
+// CHECK-SAME: %[[ARG0:.+]]: memref<3x5xf32>, %[[ARG1:.+]]: memref<5x3xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch transpose [3, 5, 5, 3] flags = (none) data_type = f32
+// CHECK: xsmm.unary transpose(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @transpose_op(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
+  linalg.transpose ins(%arg0: memref<5x3x5xf32>) outs(%arg1: memref<5x5x3xf32>) permutation = [0, 2, 1]
+  return
+}
+
+// CHECK-LABEL: transpose_op
+// CHECK-NOT: xsmm.unary transpose
+// CHECK: linalg.transpose
