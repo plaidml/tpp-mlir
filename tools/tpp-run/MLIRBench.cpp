@@ -470,7 +470,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   builder.setInsertionPointAfter(kernelCall);
 
   Value result = getKernelResult(kernelCall);
-  if (!defGpuBackend.empty() && defGpuArgs) {
+  if (defGpuBackend == "cuda" && defGpuArgs) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());

@@ -76,6 +76,10 @@ class GPUModuleOp;
 class GpuDialect;
 } // namespace gpu
 
+namespace spirv {
+class SPIRVDialect;
+} // namespace spirv
+
 namespace tpp {
 class TppDialect;
 
@@ -143,6 +147,14 @@ createRewriteBatchMatmulToMatmulPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertMemRefToTppPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultPipelinePass(StringRef gpuBackend = "");
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertGPUToSPIRVPass(bool mapMemorySpace = true);
+std::unique_ptr<OperationPass<ModuleOp>>
+createSetSPIRVCapabilitiesPass(StringRef api = "vulkan");
+std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
+createSetSPIRVAbiAttributePass(StringRef api = "vulkan");
+std::unique_ptr<OperationPass<ModuleOp>>
+createGpuVulkanAbiPass(bool use64bitIndex = false);
 
 // Testing passes.
 void registerTestStructuralMatchers();

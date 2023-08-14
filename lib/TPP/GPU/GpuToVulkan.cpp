@@ -46,6 +46,7 @@ struct GpuToVulkan : public GpuToVulkanBase<GpuToVulkan>,
     registry.insert<spirv::SPIRVDialect>();
     registry.insert<memref::MemRefDialect>();
     registry.insert<arith::ArithDialect>();
+    registry.insert<func::FuncDialect>();
   }
 
   void runOnOperation() override {
@@ -65,11 +66,20 @@ private:
     pm.clear();
 
 #ifdef TPP_VULKAN_ENABLE
+    // Preprocess
+    // Subviews are not supported by SPIRV ops
+    pm.addPass(memref::createFoldMemRefAliasOpsPass());
+
     // Create SPIRV kernels.
-    pm.addPass(createConvertGPUToSPIRVPass());
+    pm.addPass(tpp::createSetSPIRVCapabilitiesPass());
+    pm.addPass(tpp::createSetSPIRVAbiAttributePass());
+    pm.addPass(tpp::createConvertGPUToSPIRVPass());
     pm.addNestedPass<spirv::ModuleOp>(
         spirv::createSPIRVLowerABIAttributesPass());
     pm.addNestedPass<spirv::ModuleOp>(spirv::createSPIRVUpdateVCEPass());
+
+    // Adapt GPU kernel to be compliant with Vulkan ABI.
+    pm.addPass(tpp::createGpuVulkanAbiPass());
 
     // Create Vulkan dispatch.
     pm.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());

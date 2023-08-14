@@ -431,4 +431,67 @@ def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   ];
 }
 
+def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
+  let summary = "Convert GPU dialect to SPIR-V dialect";
+  let description = [{
+    This pass converts supported GPU device ops to SPIR-V ops. It does not
+    handle GPU host ops.
+
+    A `gpu.func` op can have parameters to pass in resources. But in SPIR-V
+    entry functions cannot take parameters; they use descriptors to access
+    resources. By default, parameters to a `gpu.func` op will be converted to
+    global variables. These global variables will be assigned sequential binding
+    numbers following their order in the original `gpu.func` op, starting from
+    0, in set 0. One can attach `spirv.interface_var_abi` to those parameters
+    to control the set and binding if wanted.
+  }];
+  let constructor = "mlir::tpp::createConvertGPUToSPIRVPass()";
+  let dependentDialects = ["spirv::SPIRVDialect"];
+  let options = [
+    Option<"use64bitIndex", "use-64bit-index",
+           "bool", /*default=*/"false",
+           "Use 64-bit integers to convert index types">
+  ];
+}
+
+def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
+  let summary = "Set SPIR-V capabilities.";
+  let constructor = "mlir::tpp::createSetSPIRVCapabilitiesPass()";
+  let options = [
+    Option<"clientAPI", "client-api", "std::string",
+            /*default=*/"\"vulkan\"",
+           "The client API to use for capabilities">,
+  ];
+}
+
+def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
+  let summary = "Set SPIR-V ABI attribute.";
+  let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
+  let options = [
+    Option<"clientAPI", "client-api", "std::string",
+            /*default=*/"\"vulkan\"",
+           "The client API to use for ABI attribute">,
+  ];
+}
+
+def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
+  let summary = "Rewrite GPU kernels to comply with Vulkan ABI.";
+  let description = [{
+    This pass rewrites GPU kernels and the GPU function launches
+    to be compatible with Vulkan calling convention.
+
+    The rewrite is focused only on ensuring GPU kernel prototype
+    compatibility with Vulkan ABI.Thus, it is assumed that the kernel
+    operations have been already preserved in a separate SPIR-V module.
+    The original GPU kernel logic is thrown away to make interface
+    adaptation easier.
+  }];
+  let constructor = "mlir::tpp::createGpuVulkanAbiPass()";
+  let options = [
+    Option<"use64bitIndex", "use-64bit-index",
+           "bool", /*default=*/"false",
+           "Use 64-bit integers to convert index types">
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
