@@ -32,6 +32,7 @@ add_mlir_library(MLIRTPP
     TensorInitInt.cpp
     BuilderUtils.cpp
     TransformUtils.cpp
+    ValueUtils.cpp
     VNNIUtils.cpp
 
   # Conversions

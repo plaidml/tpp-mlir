@@ -11,6 +11,7 @@
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -158,7 +159,7 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
     }
 
     auto inputs = fillOp.getInputs();
-    if (!tpp::utils::isZeroTensor(inputs[0]))
+    if (!utils::isZeroTensor(inputs[0]))
       return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
 
     auto output = fillOp.getOutputs()[0];

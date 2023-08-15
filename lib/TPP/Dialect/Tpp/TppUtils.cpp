@@ -11,16 +11,14 @@
 #include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/VNNIUtils.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 namespace mlir {
 namespace tpp {
@@ -30,90 +28,6 @@ namespace utils {
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
   return isa<linalg::GenericOp>(linalgOp) &&
          linalgOp.getLibraryCallName() == target;
-}
-
-// Returns true if the value is a constant float or integer.
-bool isValConstZero(Value val) {
-  return matchPattern(val, m_AnyZeroFloat()) || matchPattern(val, m_Zero());
-}
-
-// Prototypes
-static bool isZeroOp(Operation *);
-
-// Returns true if the value represents a zero filled tensor.
-// Recurse into isZeroOp for defining ops if not immediately obvious
-// Looks past linalg generic's argument (which don't have defining ops)
-bool isZeroTensor(Value val) {
-  if (!val)
-    return false;
-  if (isValConstZero(val))
-    return true;
-
-  Operation *defOp = nullptr;
-
-  // Block arguments don't have a defining op, but they do have an op arg
-  if (auto arg = dyn_cast<BlockArgument>(val)) {
-    // We need to find the argument to the linalg on the same order as this one
-    auto *linalgOp = arg.getParentRegion()->getParentOp();
-    if (!isa<linalg::GenericOp>(linalgOp))
-      return false;
-    auto index = arg.getArgNumber();
-    auto linalgArg = linalgOp->getOperand(index);
-    defOp = linalgArg.getDefiningOp();
-  } else {
-    defOp = val.getDefiningOp();
-  }
-
-  return isZeroOp(defOp);
-}
-
-// Returns true if the attribute represent "all zeros"
-bool isZeroAttr(Attribute attribute) {
-  return TypeSwitch<Attribute, bool>(attribute)
-      .Case<FloatAttr>([](auto attr) { return attr.getValueAsDouble() == 0.0; })
-      .Case<IntegerAttr>([](auto attr) { return attr.getInt() == 0; })
-      .Case<DenseElementsAttr>([](auto attr) {
-        if (!attr.getElementType().isIntOrFloat())
-          return false;
-        if (!attr.isSplat())
-          return false;
-        auto splat = attr.template getSplatValue<Attribute>();
-        return isZeroAttr(splat);
-      })
-      .Default([](auto attr) { return false; });
-}
-
-// Returns true if the operation represents a zero filled tensor
-// Recurses into isZeroTensor for operands and isZeroAttr for attributes
-static bool isZeroOp(Operation *defOp) {
-  if (!defOp)
-    return false;
-
-  if (isa_and_nonnull<tpp::ZeroOp>(defOp))
-    return true;
-
-  return TypeSwitch<Operation *, bool>(defOp)
-      .Case<arith::ConstantOp>([&](auto op) {
-        // Dense attributes don't match APFloat.isZero()
-        auto attr = op.getValue();
-        return isZeroAttr(attr);
-      })
-      .Case<linalg::FillOp, linalg::CopyOp>([&](auto op) {
-        if (op.getInputs().size() != 1)
-          return false;
-        return isZeroTensor(op.getInputs()[0]);
-      })
-      .Case<memref::CopyOp, memref::SubViewOp, tensor::CastOp,
-            tensor::ExtractSliceOp>(
-          [&](auto op) { return isZeroTensor(op.getSource()); })
-      .Case<memref::GetGlobalOp>([&](auto op) {
-        auto name = op.getName();
-        auto module = defOp->getParentOfType<ModuleOp>();
-        auto global = module.lookupSymbol<memref::GlobalOp>(name);
-        auto attr = global.getInitialValueAttr();
-        return isZeroAttr(attr);
-      })
-      .Default([&](Operation *op) { return false; });
 }
 
 static bool isTppOp(linalg::GenericOp linalgOp) {
@@ -230,7 +144,7 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   // If lhs is a zero get rhs as input for the relu if it is a block argument,
   // return false otherwise.
   auto getOperand = [&](Value lhs, Value rhs) -> bool {
-    if (tpp::utils::isZeroTensor(lhs)) {
+    if (mlir::utils::isZeroTensor(lhs)) {
       auto blockArg = dyn_cast<BlockArgument>(rhs);
       if (!blockArg || blockArg.getParentBlock() != linalgOp.getBlock())
         return false;
@@ -302,7 +216,7 @@ bool isTppZero(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
     return false;
 
   Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-  if (!isZeroTensor(yieldOp->getOperand(0)))
+  if (!mlir::utils::isZeroTensor(yieldOp->getOperand(0)))
     return false;
 
   // Only take the output as tpp.zero is an in-place operation.

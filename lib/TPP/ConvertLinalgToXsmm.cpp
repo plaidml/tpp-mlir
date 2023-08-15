@@ -13,6 +13,7 @@
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -129,7 +130,7 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
       return failure();
     }
     auto input = fillOp.getDpsInputOperands()[0];
-    if (!tpp::utils::isZeroTensor(input->get()))
+    if (!utils::isZeroTensor(input->get()))
       return failure();
 
     auto output = fillOp.getDpsInitOperands()[0];
