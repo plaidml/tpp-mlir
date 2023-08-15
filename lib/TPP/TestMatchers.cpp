@@ -252,6 +252,21 @@ void testCaptureShape(FunctionOpInterface funcOp) {
   });
 }
 
+void testStrides(FunctionOpInterface funcOp) {
+  // clang-format off
+  SmallVector<int64_t> strides;
+  auto matcherStaticStrides =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchOne(0), HasStaticStrides(&strides));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcherStaticStrides.match(linalgOp)) {
+      llvm::interleaveComma(strides, llvm::outs() << "\nStrides: ");
+      llvm::outs() << "\n";
+    }
+  });
+}
+
 void TestStructuralMatchers::runOnOperation() {
   auto f = getOperation();
   llvm::outs() << f.getName() << "\n";
@@ -279,6 +294,11 @@ void TestStructuralMatchers::runOnOperation() {
     testNumberOfAffineMaps(f);
   if (f.getName() == "test_capture_shape")
     testCaptureShape(f);
+  if (f.getName() == "test_strides_memref" ||
+      f.getName() == "test_strides_tensor" ||
+      f.getName() == "test_strides_dyn") {
+    testStrides(f);
+  }
 }
 
 namespace mlir {

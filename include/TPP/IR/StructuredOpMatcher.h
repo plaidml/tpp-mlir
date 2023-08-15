@@ -138,6 +138,32 @@ struct HasStaticShape {
   SmallVectorImpl<int64_t> *shape = nullptr;
 };
 
+// Callable object to verify if `operand` has static strides.
+// If `operand` is a tensor type or a scalar, return true.
+struct HasStaticStrides {
+  HasStaticStrides() = default;
+  HasStaticStrides(SmallVector<int64_t> *strides) : strides(strides){};
+
+  bool operator()(OpOperand *operand, Operation *op) const {
+    auto operandType = operand->get().getType();
+    SmallVector<int64_t> strides;
+    if (auto memRefType = operandType.dyn_cast_or_null<MemRefType>()) {
+      int64_t offset;
+      if (failed(getStridesAndOffset(memRefType, strides, offset)))
+        return false;
+      if (llvm::any_of(strides, [](int64_t stride) {
+            return stride == ShapedType::kDynamic;
+          })) {
+        return false;
+      }
+      if (this->strides)
+        this->strides->append(strides.begin(), strides.end());
+    }
+    return true;
+  }
+  SmallVectorImpl<int64_t> *strides = nullptr;
+};
+
 // Callable object to verify `operand` to have a rank in `ranks`.
 struct HasRank {
   HasRank() = delete;
