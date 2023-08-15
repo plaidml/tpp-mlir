@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
@@ -69,14 +70,12 @@ static FailureOr<SmallVector<int64_t>> verifyStrides(Type operandType) {
   return strides;
 }
 
-static FailureOr<SmallVector<int64_t>> verifyStrides(OpOperand *operand) {
-  return verifyStrides(operand->get().getType());
-}
-
 // Return true if all the operand have the same type. No implicit conversion in
 // the linalgOp.
-static bool hasEqualTypes(linalg::LinalgOp linalgOp) {
-  // assert(linalgOp.getNumInitOperands > 0);
+static LogicalResult hasEqualOperandTypes(Operation *operation) {
+  if (!isa<linalg::LinalgOp>(operation))
+    return failure();
+  auto linalgOp = cast<linalg::LinalgOp>(operation);
   OpOperand *outputOperand = linalgOp.getDpsInitOperands().back();
   auto elemType = getElementTypeOrSelf(outputOperand->get().getType());
 
@@ -85,13 +84,17 @@ static bool hasEqualTypes(linalg::LinalgOp linalgOp) {
             getElementTypeOrSelf(operand->get().getType());
         return currentOperandType == elemType;
       })) {
-    return false;
+    return failure();
   }
 
-  return llvm::all_of(linalgOp.getDpsInputOperands(), [&](OpOperand *operand) {
-    auto currentOperandType = getElementTypeOrSelf(operand->get().getType());
-    return currentOperandType == elemType;
-  });
+  if (!llvm::all_of(linalgOp.getDpsInputOperands(), [&](OpOperand *operand) {
+        auto currentOperandType =
+            getElementTypeOrSelf(operand->get().getType());
+        return currentOperandType == elemType;
+      })) {
+    return failure();
+  }
+  return success();
 }
 
 // Replace `linalgOp` with a unary dispatch plus invoke.
@@ -122,7 +125,7 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     if (!fillOp.hasBufferSemantics() || fillOp.hasDynamicShape() ||
-        !hasEqualTypes(fillOp)) {
+        failed(hasEqualOperandTypes(fillOp))) {
       return failure();
     }
     auto input = fillOp.getDpsInputOperands()[0];
@@ -163,30 +166,28 @@ struct ConvertTransposeOpToUnaryTranspose
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
-    if (!transposeOp.hasBufferSemantics() || transposeOp.hasDynamicShape() ||
-        !hasEqualTypes(transposeOp))
-      return failure();
-    auto input = transposeOp.getDpsInputOperands()[0];
-    auto output = transposeOp.getDpsInitOperands()[0];
-    ShapedType inputType = input->get().getType().cast<ShapedType>();
-    ShapedType outputType = output->get().getType().cast<ShapedType>();
-    auto inputRank = inputType.getRank();
-    auto outputRank = outputType.getRank();
-    if (inputRank != 2 || outputRank != 2)
+
+    using namespace tpp::structured_match;
+    // clang-format on
+    SmallVector<int64_t> shapeInput, stridesInput, stridesOutput;
+    auto transposeOpMatcher =
+        StructuredOpMatcher::make<linalg::TransposeOp>()
+            .output(MatchAll(), HasRank({2}))
+            .output(MatchAll(), HasStaticShape())
+            .output(MatchAll(), HasStaticStrides(&stridesOutput))
+            .input(MatchAll(), HasStaticShape(&shapeInput))
+            .input(MatchAll(), HasStaticStrides(&stridesInput))
+            .operation(HasBufferSemantics())
+            .operation(VerifyOpProperty(hasEqualOperandTypes));
+    // clang-format off
+    if (!transposeOpMatcher.match(transposeOp))
       return failure();
 
-    auto stridesOnInput = verifyStrides(input);
-    auto stridesOnOutput = verifyStrides(output);
-    if (failed(stridesOnInput) || failed(stridesOnOutput))
-      return failure();
-
-    // This looks wired. We should look for m and n on the output
-    // buffer, but for transpose it seems not the case.
     UnaryInfo unaryInfo;
-    unaryInfo.m = inputType.getShape()[0];
-    unaryInfo.n = inputType.getShape()[1];
-    unaryInfo.ldi = stridesOnInput->front();
-    unaryInfo.ldo = stridesOnOutput->front();
+    unaryInfo.m = shapeInput[0];
+    unaryInfo.n = shapeInput[1];
+    unaryInfo.ldi = stridesInput.front();
+    unaryInfo.ldo = stridesOutput.front();
 
     auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
@@ -282,7 +283,7 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!genericOp.hasBufferSemantics() || genericOp.hasDynamicShape() ||
-        !hasEqualTypes(genericOp) || !linalg::isElementwise(genericOp)) {
+        failed(hasEqualOperandTypes(genericOp)) || !linalg::isElementwise(genericOp)) {
       return failure();
     }
     SmallVector<Value> operands;
