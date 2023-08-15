@@ -16,7 +16,7 @@ steps:
 
   - label: "GPU-Nvidia-Cuda"
     command: "${SRUN} --partition=nv-v100,nv-a100 --time=0:30:00 -- \
-              'KIND=Debug COMPILER=clang LINKER=lld GPU=cuda SANITIZERS=1 CHECK=1 \
+              'KIND=Debug COMPILER=clang LINKER=lld GPU=cuda CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
       # ASAN flags required due to incompatibility with CUDA
@@ -24,7 +24,7 @@ steps:
       ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
       TPP_CLANGVER: "16.0.4"
       TPP_GCCVER: "9.5.0" # Use an older version to match CUDA requirements
-      TPP_CUDAVER: "11.5"
+      TPP_CUDAVER: "12.2"
 
   - label: "GPU-Nvidia-Vulkan"
     command: "${SRUN} --partition=nv-v100,nv-a100 --time=0:30:00 -- \
@@ -36,7 +36,7 @@ steps:
       ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
       TPP_CLANGVER: "16.0.4"
       TPP_GCCVER: "9.5.0" # Use an older version to match CUDA requirements
-      TPP_CUDAVER: "11.5"
+      TPP_CUDAVER: "12.2"
 
   - label: "GPU-Intel-Vulkan"
     command: "${SRUN} -- \

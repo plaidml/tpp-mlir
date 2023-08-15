@@ -173,7 +173,10 @@ DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
   }
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
-  mlir::linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+  linalg::ControlDropUnitDims options;
+  options.rankReductionStrategy =
+      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
+  linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
 
   TrackingListener listener(state, *this);
   GreedyRewriteConfig config;
