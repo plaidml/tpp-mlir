@@ -32,17 +32,21 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
 
 static bool isTppOp(linalg::GenericOp linalgOp) {
   using namespace tpp::structured_match;
-  auto tppMatcher =
-      StructuredOpMatcher::make<linalg::GenericOp>()
-          .output(MatchAll(), HasStaticShape())
-          .input(MatchAll(), HasStaticShape())
-          .operation(NumRegions(EqualsTo(1)))
-          .operation(VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop));
+  // clang-format off
+  auto tppMatcher = 
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .output(MatchAll(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape())
+      .operation(NumRegions(EqualsTo(1)))
+      .output(MatchAll(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape());
+  // clang-format on
   return tppMatcher.match(linalgOp);
 }
 
 static bool isTppBinaryOp(linalg::GenericOp linalgOp) {
   using namespace tpp::structured_match;
+  // clang-format off
   auto binaryMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumDpsInits(EqualsTo(1)))
@@ -56,11 +60,13 @@ static bool isTppBinaryOp(linalg::GenericOp linalgOp) {
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
           .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+  // clang-format off
   return isTppOp(linalgOp) && binaryMatcher.match(linalgOp);
 }
 
 static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
   using namespace tpp::structured_match;
+  // clang-format off
   auto unaryMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumDpsInits(EqualsTo(1)))
@@ -75,14 +81,18 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
           .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+  // clang-format on
   return isTppOp(linalgOp) && unaryMatcher.match(linalgOp);
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.add.
 bool isTppAdd(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  auto addMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+  // clang-format off
+  auto addMatcher = 
+    StructuredOpMatcher::make<linalg::GenericOp>().region(
       MatchOne(0), WithSingleOp<arith::AddFOp>(operands));
+  // clang-format on
   return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
 }
 
@@ -102,6 +112,7 @@ bool isTppVnniOp(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
       {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
 
   using namespace tpp::structured_match;
+  // clang-format off
   auto matmulMatcher =
       StructuredOpMatcher::make<linalg::GenericOp>()
           .operation(NumDpsInits(EqualsTo(1)))
@@ -117,6 +128,7 @@ bool isTppVnniOp(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
           .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
           .region(MatchOne(0),
                   WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
+  // clang-format on
   return matmulMatcher.match(linalgOp);
 }
 
@@ -183,8 +195,11 @@ private:
 // Return true if the linalg.generic can be mapped to a tpp.relu.
 bool isTppRelu(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
   using namespace tpp::structured_match;
-  auto reluMatcher = StructuredOpMatcher::make<linalg::GenericOp>().region(
+  // clang-format off
+  auto reluMatcher = 
+    StructuredOpMatcher::make<linalg::GenericOp>().region(
       MatchOne(0), WithReluBody(operands));
+  // clang-format on
   return isTppUnaryOp(linalgOp) && reluMatcher.match(linalgOp);
 }
 
