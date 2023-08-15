@@ -125,29 +125,35 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
 
   LogicalResult matchAndRewrite(linalg::FillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    if (!fillOp.hasBufferSemantics() || fillOp.hasDynamicShape() ||
-        failed(hasEqualOperandTypes(fillOp))) {
-      return failure();
-    }
-    auto input = fillOp.getDpsInputOperands()[0];
-    if (!utils::isZeroTensor(input->get()))
-      return failure();
 
-    auto output = fillOp.getDpsInitOperands()[0];
-    ShapedType outputType = output->get().getType().cast<ShapedType>();
-    auto outputRank = outputType.getRank();
-    if (outputRank != 2)
-      return failure();
+    struct IsZeroValue {
+      IsZeroValue() = default;
+      bool operator()(OpOperand *operand, Operation *operation) {
+        return utils::isZeroTensor(operand->get());
+      }
+    };
 
-    // Verify strides and minor dimensions.
-    auto stridesOnOutput = verifyStrides(outputType);
-    if (failed(stridesOnOutput))
+    using namespace tpp::structured_match;
+    // clang-format off
+    SmallVector<int64_t> stridesOutput, shapeOutput;
+    auto fillOpMatcher =
+      StructuredOpMatcher::make<linalg::FillOp>()
+        .output(MatchAll(), HasRank({2}))
+        .output(MatchAll(), HasStaticShape(&shapeOutput))
+        .output(MatchAll(), HasStaticStrides(&stridesOutput))
+        .input(MatchAll(), HasStaticShape())
+        .input(MatchAll(), HasStaticStrides())
+        .input(MatchAll(), IsZeroValue())
+        .operation(HasBufferSemantics())
+        .operation(VerifyOpProperty(hasEqualOperandTypes));
+    // clang-format on
+    if (!fillOpMatcher.match(fillOp))
       return failure();
 
     UnaryInfo unaryInfo;
-    unaryInfo.m = outputType.getShape()[0];
-    unaryInfo.n = outputType.getShape()[1];
-    unaryInfo.ldo = stridesOnOutput->front();
+    unaryInfo.m = shapeOutput[0];
+    unaryInfo.n = shapeOutput[1];
+    unaryInfo.ldo = stridesOutput.front();
     // fillOp has a scalar input.
     unaryInfo.ldi = 1;
 
