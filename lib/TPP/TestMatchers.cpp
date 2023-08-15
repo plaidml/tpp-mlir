@@ -121,7 +121,7 @@ void testInterfaces(FunctionOpInterface funcOp) {
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
       .operation(
-        VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
+        VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -146,8 +146,8 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasMap(Identity()))
       .input(MatchAll(), HasMap(ProjectedPermutation()))
-      .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop))
-      .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape))
+      .operation(VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop))
+      .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape))
       .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&operands));
   // clang-format on
 

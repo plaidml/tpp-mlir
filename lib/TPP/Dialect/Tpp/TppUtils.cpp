@@ -123,7 +123,7 @@ static bool isTppOp(linalg::GenericOp linalgOp) {
           .output(MatchAll(), HasStaticShape())
           .input(MatchAll(), HasStaticShape())
           .operation(NumRegions(EqualsTo(1)))
-          .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
+          .operation(VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop));
   return tppMatcher.match(linalgOp);
 }
 
@@ -141,7 +141,7 @@ static bool isTppBinaryOp(linalg::GenericOp linalgOp) {
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
-          .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape));
+          .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
   return isTppOp(linalgOp) && binaryMatcher.match(linalgOp);
 }
 
@@ -160,7 +160,7 @@ static bool isTppUnaryOp(linalg::GenericOp linalgOp) {
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
           .input(MatchAll(), HasMap(ProjectedPermutation()))
-          .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape));
+          .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
   return isTppOp(linalgOp) && unaryMatcher.match(linalgOp);
 }
 

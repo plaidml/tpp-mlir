@@ -305,10 +305,11 @@ struct _OR {
   std::function<bool(size_t)> rhs;
 };
 
-// Callable object to check if `op` adheres to a given interface.
-struct VerifyInterface {
-  VerifyInterface() = delete;
-  explicit VerifyInterface(std::function<LogicalResult(Operation *op)> fun)
+// Callable object to check if `op` adheres to a given property passed
+// as an std::function object.
+struct VerifyOpProperty {
+  VerifyOpProperty() = delete;
+  explicit VerifyOpProperty(std::function<LogicalResult(Operation *op)> fun)
       : fun(fun){};
 
   bool operator()(Operation *op) {
