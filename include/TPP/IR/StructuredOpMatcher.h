@@ -16,7 +16,6 @@
 
 namespace mlir {
 class Operation;
-namespace tpp {
 namespace structured_match {
 
 // Base class for the matcher predicates selection tag.
@@ -407,7 +406,6 @@ private:
 };
 
 } // namespace structured_match
-} // namespace tpp
 } // namespace mlir
 
 #endif // TPP_STRUCTUREDOPMATCHERS_H

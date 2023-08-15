@@ -12,7 +12,6 @@
 #define DEBUG_TYPE "structured-matchers"
 
 using namespace mlir;
-using namespace mlir::tpp;
 
 // Entry point.
 bool structured_match::StructuredOpMatcher::match(Operation *op) {
@@ -145,7 +144,7 @@ structured_match::StructuredOpMatcher::dim(MatchSelector range,
 // Region predicates.
 //===---------------------------------------------------------------------===//
 
-bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
+bool mlir::structured_match::WithSingleOpImpl::withSingleOpImpl(
     StringRef operationName, Region *region, Operation *op,
     SmallVectorImpl<Value> *capturedOperands) {
   if (!isa<linalg::LinalgOp>(op))
@@ -203,7 +202,7 @@ bool tpp::structured_match::WithSingleOpImpl::withSingleOpImpl(
 
 // FIXME: This is a generalization of the method above and will eventually
 // replace the matcher for both no-op (yield) and one op (add, max).
-bool tpp::structured_match::withOpChainImpl(
+bool mlir::structured_match::withOpChainImpl(
     Region *region, Operation *op, SmallVectorImpl<Value> *capturedOperands,
     SmallVectorImpl<TypeCheckFunc> &typeChecks) {
 

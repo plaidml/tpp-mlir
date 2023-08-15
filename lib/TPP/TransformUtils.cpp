@@ -307,7 +307,7 @@ bool isBlockedConvolution(Operation *op) {
 
 FailureOr<linalg::ContractionDimensions>
 isContraction(linalg::LinalgOp linalgOp) {
-  using namespace mlir::tpp::structured_match;
+  using namespace structured_match;
 
   // clang-format off
   auto maybeContraction =

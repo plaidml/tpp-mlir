@@ -19,6 +19,11 @@ bool isValConstZero(Value val);
 // Returns true if the op defining `val` represents a zero filled tensor.
 bool isZeroTensor(Value val);
 
+// Returns the strides of `val`. The method returns something usefull
+// only if the `val` type is a strided memref and the strides are statically
+// known.
+FailureOr<SmallVector<int64_t>> getStaticStrides(Value val);
+
 } // namespace utils
 } // namespace mlir
 

@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/MatcherUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
@@ -37,28 +38,28 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
                                PatternRewriter &rewriter) const {
     SmallVector<Value> operands;
-    if (tpp::utils::isTppZero(linalgOp, &operands)) {
+    if (structured_match::utils::isTwoDZeroOp(linalgOp, &operands)) {
       assert(operands.size() == 1 && "tpp.zero expects one operand");
       rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp, operands[0],
                                                operands[0].getType());
       return success();
     }
 
-    if (tpp::utils::isTppIdentity(linalgOp, &operands)) {
+    if (structured_match::utils::isTwoDIdentityOp(linalgOp, &operands)) {
       assert(operands.size() == 2 && "tpp.identity expects two operands");
       rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
                                                    operands[1].getType());
       return success();
     }
 
-    if (tpp::utils::isTppRelu(linalgOp, &operands)) {
+    if (structured_match::utils::isTwoDReluOp(linalgOp, &operands)) {
       assert(operands.size() == 2 && "tpp.relu expects two operands");
       rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
                                                operands[1].getType());
       return success();
     }
 
-    if (tpp::utils::isTppAdd(linalgOp, &operands)) {
+    if (structured_match::utils::isTwoDAddOp(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.add expects three operands");
       rewriter.replaceOpWithNewOp<tpp::AddOp>(
           linalgOp, ValueRange{operands[0], operands[1]},
@@ -66,7 +67,7 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    if (tpp::utils::isTppBiasRelu(linalgOp, &operands)) {
+    if (structured_match::utils::isTwoDBiasReluOp(linalgOp, &operands)) {
       assert(operands.size() == 3 && "tpp.add+tpp.relu expects three operands");
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointAfter(linalgOp);

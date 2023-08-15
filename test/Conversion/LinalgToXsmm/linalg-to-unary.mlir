@@ -14,6 +14,30 @@ func.func @fill_op(%arg0: memref<32x32xf32>) {
 
 // -----
 
+func.func @fill_op(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
+
+// CHECK-LABEL: fill_op
+// CHECK: linalg.fill
+// CHECK-NOT: xsmm.unary
+
+// -----
+
+func.func @fill_op(%arg0: memref<32x32xf32, strided<[32, 2], offset: ?>>) {
+  %cst = arith.constant 0.0 : f32
+  linalg.fill ins(%cst : f32) outs(%arg0 : memref<32x32xf32, strided<[32, 2], offset: ?>>)
+  return
+}
+
+// CHECK-LABEL: fill_op
+// CHECK: linalg.fill
+// CHECK-NOT: xsmm.unary
+
+// -----
+
 func.func @fill_op(%arg0: memref<32x32xf32>, %cst: f32) {
   linalg.fill ins(%cst : f32) outs(%arg0 : memref<32x32xf32>)
   return

@@ -27,6 +27,7 @@ add_mlir_library(MLIRTPP
     ConvertLinalgToXsmm.cpp
 
   # Utils
+    MatcherUtils.cpp
     TensorInit.cpp
     TensorInitFloat.cpp
     TensorInitInt.cpp

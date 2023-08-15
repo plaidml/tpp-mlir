@@ -13,7 +13,7 @@
 #include "mlir/Pass/Pass.h"
 
 using namespace mlir;
-using namespace mlir::tpp::structured_match;
+using namespace mlir::structured_match;
 
 namespace {
 // This is a test pass for verifying matchers.
