@@ -121,14 +121,21 @@ struct Any {
 // Callable object to verify if `operand` has static shape.
 struct HasStaticShape {
   HasStaticShape() = default;
+  HasStaticShape(SmallVectorImpl<int64_t> *shape) : shape(shape){};
 
   bool operator()(OpOperand *operand, Operation *op) const {
     auto operandType = operand->get().getType();
-    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
+    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>()) {
       if (!shapedType.hasStaticShape())
         return false;
+      if (shape) {
+        for (int64_t shapeOnDim : shapedType.getShape())
+          shape->push_back(shapeOnDim);
+      }
+    }
     return true;
   }
+  SmallVectorImpl<int64_t> *shape = nullptr;
 };
 
 // Callable object to verify `operand` to have a rank in `ranks`.

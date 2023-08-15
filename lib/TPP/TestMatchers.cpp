@@ -237,6 +237,21 @@ void testTppRank(FunctionOpInterface funcOp) {
   });
 }
 
+void testCaptureShape(FunctionOpInterface funcOp) {
+  // clang-format off
+  SmallVector<int64_t> shape;
+  auto matcherCaptureShape =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchOne(0), HasStaticShape(&shape));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcherCaptureShape.match(linalgOp)) {
+      llvm::interleaveComma(shape, llvm::outs() << "\nShape: ");
+      llvm::outs() << "\n";
+    }
+  });
+}
+
 void TestStructuralMatchers::runOnOperation() {
   auto f = getOperation();
   llvm::outs() << f.getName() << "\n";
@@ -262,6 +277,8 @@ void TestStructuralMatchers::runOnOperation() {
     testCaptureAffineMapsExpectToFail(f);
   if (f.getName() == "test_number_of_affine_maps")
     testNumberOfAffineMaps(f);
+  if (f.getName() == "test_capture_shape")
+    testCaptureShape(f);
 }
 
 namespace mlir {
