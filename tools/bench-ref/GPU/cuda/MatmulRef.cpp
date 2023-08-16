@@ -53,7 +53,7 @@ struct MatmulKernelGpu : public KernelInterface<CudaTensor<float>> {
 
   ~MatmulKernelGpu() { cublasDestroy(handle); }
 
-  void runCUDA(float *A, float *B, float *C, int m, int n, int k) {
+  void runCUDA(const float *A, const float *B, float *C, int m, int n, int k) {
     matmulCUDA(A, B, C, m, n, k);
     cudaError_t syncStatus = cudaDeviceSynchronize();
     if (syncStatus != cudaSuccess) {

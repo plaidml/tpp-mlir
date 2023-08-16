@@ -10,8 +10,8 @@
 
 #include <cuda_runtime.h>
 
-__global__ void matmulKernel(float *A, float *B, float *C, int m, int n,
-                             int k) {
+__global__ void matmulKernel(const float *A, const float *B, float *C, int m,
+                             int n, int k) {
   int row = blockIdx.x * blockDim.x + threadIdx.x;
   int col = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -26,7 +26,7 @@ __global__ void matmulKernel(float *A, float *B, float *C, int m, int n,
   C[row * n + col] += sum;
 }
 
-void matmulCUDA(float *A, float *B, float *C, int m, int n, int k) {
+void matmulCUDA(const float *A, const float *B, float *C, int m, int n, int k) {
   // Max thread per block: 1024 = 32 * 32
   const int maxThreadDim = 32;
   dim3 numThreads(m > maxThreadDim ? maxThreadDim : m,
