@@ -25,8 +25,6 @@ struct DecomposeAggregateOpsImpl : public OpRewritePattern<linalg::SoftmaxOp> {
                                 PatternRewriter &rewriter) const override {
     auto decomposableOp =
         cast<linalg::AggregatedOpInterface>(softmaxOp.getOperation());
-    if (!decomposableOp)
-      return failure();
     FailureOr<SmallVector<Value>> maybeNewResult =
         decomposableOp.decomposeOperation(rewriter);
     if (failed(maybeNewResult))
