@@ -160,66 +160,6 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
 }
 
 //===----------------------------------------------------------------------===//
-// FoldUnitExtentDimsOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure transform::FoldUnitExtentDimsOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    ApplyToEachResultList &results, TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
-  }
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  linalg::ControlDropUnitDims options;
-  options.rankReductionStrategy =
-      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
-  linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
-
-  TrackingListener listener(state, *this);
-  GreedyRewriteConfig config;
-  config.listener = &listener;
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
-    return emitDefaultDefiniteFailure(target);
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
-// CanonicalizeOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure transform::CanonicalizeOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    ApplyToEachResultList &results, TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
-  }
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  for (Dialect *dialect : ctx->getLoadedDialects())
-    dialect->getCanonicalizationPatterns(patterns);
-  for (RegisteredOperationName op : ctx->getRegisteredOperations())
-    op.getCanonicalizationPatterns(patterns, ctx);
-
-  // Process canonicalization options
-  if (getMergeTensorSlices())
-    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-
-  TrackingListener listener(state, *this);
-  GreedyRewriteConfig config;
-  config.listener = &listener;
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
-    return emitDefaultDefiniteFailure(target);
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
 // ConvertLinalgToTpp
 //===----------------------------------------------------------------------===//
 

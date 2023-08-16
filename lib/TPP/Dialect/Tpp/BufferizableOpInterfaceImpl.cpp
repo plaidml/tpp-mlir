@@ -150,9 +150,9 @@ static bool bufferizesToMemoryWriteUnaryImpl(Operation *op,
   return canBufferizeOnOperand(op, opOperand.get(), state);
 }
 
-static AliasingOpResultList
-getAliasingOpResultsUnaryImpl(Operation *op, OpOperand &opOperand,
-                              const AnalysisState &state) {
+static AliasingValueList
+getAliasingValuesUnaryImpl(Operation *op, OpOperand &opOperand,
+                           const AnalysisState &state) {
   // The result alias with the opOperand only if we can bufferize in place.
   if (canBufferizeOnOperand(op, opOperand.get(), state))
     return {{op->getOpResult(0), BufferRelation::Equivalent,
@@ -163,7 +163,7 @@ getAliasingOpResultsUnaryImpl(Operation *op, OpOperand &opOperand,
 // Return true if the opResult bufferize out of place. Unary operations
 // bufferize out of place when the type of the result does not match the type of
 // the input.
-static bool bufferizesToAllocationUnaryImpl(Operation *op, OpResult opResult) {
+static bool bufferizesToAllocationUnaryImpl(Operation *op, Value value) {
   auto unaryOp = cast<tpp::TppOp>(op);
   assert(unaryOp && unaryOp.isUnary());
   Value input = unaryOp.getInputs()[0];
@@ -186,9 +186,9 @@ struct ReluBufferizationInterface
     return bufferizesToMemoryWriteUnaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsUnaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesUnaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -196,8 +196,8 @@ struct ReluBufferizationInterface
     return bufferizeUnaryOp<tpp::ReluOp>(op, rewriter, options);
   }
 
-  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
-    return bufferizesToAllocationUnaryImpl(op, opResult);
+  bool bufferizesToAllocation(Operation *op, Value value) const {
+    return bufferizesToAllocationUnaryImpl(op, value);
   }
 };
 
@@ -214,9 +214,9 @@ struct IdentityBufferizationInterface
     return bufferizesToMemoryWriteUnaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsUnaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesUnaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -224,8 +224,8 @@ struct IdentityBufferizationInterface
     return bufferizeUnaryOp<tpp::IdentityOp>(op, rewriter, options);
   }
 
-  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
-    return bufferizesToAllocationUnaryImpl(op, opResult);
+  bool bufferizesToAllocation(Operation *op, Value value) const {
+    return bufferizesToAllocationUnaryImpl(op, value);
   }
 };
 
@@ -243,9 +243,9 @@ struct ZeroBufferizationInterface
     return bufferizesToMemoryWriteUnaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsUnaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesUnaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -253,7 +253,7 @@ struct ZeroBufferizationInterface
     return bufferizeUnaryOp<tpp::ZeroOp>(op, rewriter, options);
   }
 
-  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
+  bool bufferizesToAllocation(Operation *op, Value value) const {
     // tpp.zero is by construction always in place.
     return false;
   }
@@ -345,9 +345,9 @@ static bool bufferizesToMemoryWriteBinaryImpl(Operation *op,
   return false;
 }
 
-static AliasingOpResultList
-getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
-                               const AnalysisState &state) {
+static AliasingValueList
+getAliasingValuesBinaryImpl(Operation *op, OpOperand &opOperand,
+                            const AnalysisState &state) {
   // If the rhs can bufferize in place with the result return the rhs.
   if (opOperand.getOperandNumber() == 1 &&
       canBufferizeOnOperand(op, opOperand.get(), state)) {
@@ -375,7 +375,7 @@ getAliasingOpResultsBinaryImpl(Operation *op, OpOperand &opOperand,
 // Return true if the opResult bufferize out of place. Binary operations
 // bufferize out of place when the type of the result does not match the type of
 // any of the inputs.
-static bool bufferizesToAllocationBinaryImpl(Operation *op, OpResult opResult) {
+static bool bufferizesToAllocationBinaryImpl(Operation *op, Value value) {
   auto binaryOp = cast<tpp::TppOp>(op);
   assert(binaryOp && binaryOp.isBinary());
   auto lhs = binaryOp.getInputs()[0];
@@ -415,9 +415,9 @@ struct AddBufferizationInterface
     return liveness.isDeadAfter(uRead->get(), op);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsBinaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesBinaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -425,8 +425,8 @@ struct AddBufferizationInterface
     return bufferizeBinaryOp<tpp::AddOp>(op, rewriter, options);
   }
 
-  bool bufferizesToAllocation(Operation *op, OpResult opResult) const {
-    return bufferizesToAllocationBinaryImpl(op, opResult);
+  bool bufferizesToAllocation(Operation *op, Value value) const {
+    return bufferizesToAllocationBinaryImpl(op, value);
   }
 };
 
@@ -475,9 +475,9 @@ static bool bufferizesToMemoryWriteTernaryImpl(Operation *op,
 
 // Helper function to bufferize ternay operations.
 // The third operand alias with the result.
-static AliasingOpResultList
-getAliasingOpResultsTernaryImpl(Operation *op, OpOperand &opOperand,
-                                const AnalysisState &state) {
+static AliasingValueList
+getAliasingValuesTernaryImpl(Operation *op, OpOperand &opOperand,
+                             const AnalysisState &state) {
   if (opOperand.getOperandNumber() == 2) {
     return {{op->getOpResult(0), BufferRelation::Equivalent,
              /*isDefinite=*/true}};
@@ -537,10 +537,10 @@ static bool bufferizesToMemoryWriteQuaternaryImpl(Operation *op,
 
 // Helper function to bufferize quaternary operations. The result alias
 // with the third operand, reuse the same logic as ternary.
-static AliasingOpResultList
-getAliasingOpResultsQuaternaryImpl(Operation *op, OpOperand &opOperand,
-                                   const AnalysisState &state) {
-  return getAliasingOpResultsTernaryImpl(op, opOperand, state);
+static AliasingValueList
+getAliasingValuesQuaternaryImpl(Operation *op, OpOperand &opOperand,
+                                const AnalysisState &state) {
+  return getAliasingValuesTernaryImpl(op, opOperand, state);
 }
 
 struct GemmBufferizationInterface
@@ -556,9 +556,9 @@ struct GemmBufferizationInterface
     return bufferizesToMemoryWriteTernaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsTernaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesTernaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -580,9 +580,9 @@ struct BrgemmBufferizationInterface
     return bufferizesToMemoryWriteTernaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsTernaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesTernaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -605,9 +605,9 @@ struct FusedBrgemmBufferizationInterface
     return bufferizesToMemoryWriteQuaternaryImpl(op, opOperand, state);
   }
 
-  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
-    return getAliasingOpResultsQuaternaryImpl(op, opOperand, state);
+  AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
+                                      const AnalysisState &state) const {
+    return getAliasingValuesQuaternaryImpl(op, opOperand, state);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
