@@ -62,7 +62,8 @@ struct MatmulKernelGpu : public KernelInterface<CudaTensor<float>> {
     }
   }
 
-  void runCUBLAS(float *A, float *B, float *C, int m, int n, int k) {
+  void runCUBLAS(const float *A, const float *B, float *C, int m, int n,
+                 int k) {
     int lda = n;
     int ldb = k;
     int ldc = n;
