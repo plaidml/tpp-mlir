@@ -44,6 +44,15 @@ struct UnaryInfo {
   int64_t ldi;
   int64_t ldo;
 };
+
+struct BinaryInfo {
+  unsigned m;
+  unsigned n;
+
+  int64_t ldiLhs;
+  int64_t ldiRhs;
+  int64_t ldo;
+};
 } // namespace
 
 // Get UnaryInfo from input and output. The output must be of rank 2, while
@@ -63,12 +72,12 @@ static FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
 
   int64_t ldi = 1;
   if (isa<ShapedType>(input.getType())) {
-    auto stridesOnInput = mlir::utils::getStaticStrides(input);
+    auto stridesOnInput = utils::getStaticStrides(input);
     if (failed(stridesOnInput) || stridesOnInput->back() != 1)
       return failure();
     ldi = stridesOnInput->front();
   }
-  auto stridesOnOutput = mlir::utils::getStaticStrides(output);
+  auto stridesOnOutput = utils::getStaticStrides(output);
   if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
     return failure();
 
@@ -96,6 +105,29 @@ static void replaceOpWithUnary(RewriterBase &rewriter,
                         linalgOp->getOperands().end());
   rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(linalgOp, dtype, kind,
                                              invokeOperands);
+}
+
+// Replace `linalgOp` with a binary dispatch plus invoke.
+static void replaceOpWithBinary(RewriterBase &rewriter,
+                                linalg::LinalgOp linalgOp,
+                                BinaryInfo binaryInfo, ArrayAttr flags,
+                                xsmm::BinaryKindAttr kind) {
+  Location loc = linalgOp.getLoc();
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+      rewriter.getContext(),
+      ArrayRef<int64_t>{binaryInfo.m, binaryInfo.n, binaryInfo.ldiLhs,
+                        binaryInfo.ldiRhs, binaryInfo.ldo});
+  auto dtype = xsmm::utils::getDataType(
+      rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
+  Value dispatched = rewriter.create<xsmm::BinaryDispatchOp>(
+      loc, integer64, kind, dims, flags, dtype);
+  SmallVector<Value> invokeOperands;
+  invokeOperands.push_back(dispatched);
+  invokeOperands.append(linalgOp->getOperands().begin(),
+                        linalgOp->getOperands().end());
+  rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(linalgOp, dtype, kind,
+                                              invokeOperands);
 }
 
 // Convert a linalg.fill to XSMM zero, if the fill fills with zeros.
@@ -182,6 +214,15 @@ static FailureOr<BroadCastType> getBroadCastFromMap(AffineMap map) {
   if (map.getNumResults() == 0)
     return BroadCastType::SCALAR;
 
+  if (llvm::all_of(map.getResults(), [](AffineExpr expr) {
+        auto cstExpr = expr.dyn_cast_or_null<AffineConstantExpr>();
+        if (!cstExpr)
+          return false;
+        return cstExpr.getValue() == 0;
+      })) {
+    return BroadCastType::SCALAR;
+  }
+
   // Extend the maps with leading zeros.
   // Example,
   // (d0, d1) -> (d1) --> (d0, d1) -> (0, d1)
@@ -260,6 +301,101 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+static FailureOr<xsmm::BinaryFlags>
+getBroadCastBinaryFlagFromMap(AffineMap map, unsigned operandIdx) {
+  auto broadCastType = getBroadCastFromMap(map);
+  if (failed(broadCastType))
+    return failure();
+
+  assert(operandIdx == 0 || operandIdx == 1);
+  switch (*broadCastType) {
+  case BroadCastType::SCALAR:
+    return (operandIdx == 0) ? xsmm::BinaryFlags::BCAST_SCALAR_IN_0
+                             : xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
+  case BroadCastType::ROW:
+    return (operandIdx == 0) ? xsmm::BinaryFlags::BCAST_ROW_IN_0
+                             : xsmm::BinaryFlags::BCAST_ROW_IN_1;
+  case BroadCastType::COL:
+    return (operandIdx == 0) ? xsmm::BinaryFlags::BCAST_COL_IN_0
+                             : xsmm::BinaryFlags::BCAST_COL_IN_1;
+  default:
+    return xsmm::BinaryFlags::NONE;
+  }
+}
+
+// Convert linalg.generic to xsmm binary add op.
+struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    if (!genericOp.hasBufferSemantics() ||
+        !structured_match::utils::isTwoDAddOp(genericOp, &operands) ||
+        operands.size() != 3) {
+      return failure();
+    }
+
+    auto lhs = operands[0];
+    auto rhs = operands[1];
+    auto output = operands[2];
+    Type outputType = output.getType();
+
+    auto stridesOnLhs = utils::getStaticStrides(lhs);
+    auto stridesOnRhs = utils::getStaticStrides(rhs);
+    auto stridesOnOutput = utils::getStaticStrides(output);
+
+    if (failed(stridesOnLhs) || failed(stridesOnRhs) || failed(stridesOnOutput))
+      return failure();
+    if (stridesOnLhs->back() != 1 || stridesOnRhs->back() != 1 ||
+        stridesOnOutput->back() != 1) {
+      return failure();
+    }
+
+    BinaryInfo binaryInfo;
+    binaryInfo.m = outputType.cast<ShapedType>().getShape()[0];
+    binaryInfo.n = outputType.cast<ShapedType>().getShape()[1];
+    binaryInfo.ldiLhs = stridesOnLhs->front();
+    binaryInfo.ldiRhs = stridesOnRhs->front();
+    binaryInfo.ldo = stridesOnOutput->front();
+
+    OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
+    auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
+        genericOp.getMatchingIndexingMap(lhsOperand), /*operandIdx=*/0);
+    if (failed(broadCastFlagLhs))
+      return failure();
+
+    OpOperand *rhsOperand = getOperandFromValue(genericOp, rhs);
+    auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
+        genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
+    if (failed(broadCastFlagRhs))
+      return failure();
+
+    auto flagLhs =
+        xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagLhs);
+    auto flagRhs =
+        xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagRhs);
+
+    // Spaghetti code to handle 'NONE' as it conflicts with other flags; we
+    // cannot add it if at least the RHS or the LHS is not 'NONE'. Maybe the
+    // best solution is to get rid of it.
+    ArrayAttr flags;
+    if (flagLhs.getValue() != xsmm::BinaryFlags::NONE &&
+        flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
+      flags = rewriter.getArrayAttr({flagLhs, flagRhs});
+    } else if (flagLhs.getValue() != xsmm::BinaryFlags::NONE) {
+      flags = rewriter.getArrayAttr({flagLhs});
+    } else if (flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
+      flags = rewriter.getArrayAttr({flagRhs});
+    }
+
+    xsmm::BinaryKindAttr kind =
+        xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD);
+    replaceOpWithBinary(rewriter, genericOp, binaryInfo, flags, kind);
+    return failure();
+  }
+};
+
 void ConvertLinalgToXsmm::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
@@ -271,7 +407,8 @@ void ConvertLinalgToXsmm::runOnOperation() {
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-               ConvertGenericToUnaryRelu>(patterns.getContext());
+               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
