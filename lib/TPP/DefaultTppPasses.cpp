@@ -426,14 +426,14 @@ private:
       pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
-      // Lower operations to TPP.
-      pm.addNestedPass<func::FuncOp>(createTppConversionPass());
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
-
       // Decompose Aggregated operations. These ops currently do not
       // bufferize. Once this is possible we can move this pass after
       // bufferization.
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
+
+      // Lower operations to TPP.
+      pm.addNestedPass<func::FuncOp>(createTppConversionPass());
+      pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       // Bufferize: tensor->memref.
       pm.addPass(createBufferizePass());
