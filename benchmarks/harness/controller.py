@@ -153,6 +153,8 @@ class BenchmarkController(object):
             runCmd.append("--splat-to-random")
         if self.args.init_type:
             runCmd.extend(["--init-type", self.args.init_type])
+        if self.args.gpu is not None:
+            runCmd.extend(["--gpu", self.args.gpu])
         if self.args.run_args:
             runCmd.extend(shlex.split(self.args.run_args))
         runResult = executor.run(runCmd, irContents)
@@ -267,6 +269,9 @@ if __name__ == "__main__":
         default="normal",
         help="Random initializer type (default: normal)",
     )
+    parser.add_argument(
+        "--gpu", type=str, help="Target GPU backend for lowering (cuda,vulkan)"
+    )
     args = parser.parse_args()
 
     # List of ASAN_OPTIONS
@@ -277,6 +282,13 @@ if __name__ == "__main__":
     # Some tensors may not be freed but we still want numbers
     if args.disable_lsan:
         asan_options.append("detect_leaks=0")
+
+    # GPU tests require extra ASAN flags due to incompatibility with CUDA
+    # See: https://github.com/google/sanitizers/issues/629
+    if args.gpu is not None:
+        asan_options.extend(
+            ["protect_shadow_gap=0", "replace_intrin=0", "detect_leaks=0"]
+        )
 
     # Apply ASAN_OPTIONS to environment
     if asan_options:

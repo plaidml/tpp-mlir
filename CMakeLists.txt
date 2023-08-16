@@ -152,6 +152,26 @@ if (NOT TPP_INSIDE_IREE)
                     DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                     WORKING_DIRECTORY ${BENCHMARK_DIR}
                     COMMENT Run Benchmarks)
+
+  if (TPP_GPU)
+    if (TPP_GPU MATCHES "cuda")
+      set(BENCH_CUDA_CFGS
+        ${CONFIG_DIR}/GPU/cuda.json
+      )
+      set(BENCH_CUDA_DEPS
+        bench_cuda_matmul
+      )
+    endif()
+
+    string(JOIN ',' BENCH_GPU_CFGS_STR ${BENCH_CUDA_CFGS})
+
+    # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
+    add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+    -c ${BENCH_GPU_CFGS_STR}
+    DEPENDS tpp-opt tpp-run ${BENCH_CUDA_DEPS}
+    WORKING_DIRECTORY ${BENCHMARK_DIR}
+    COMMENT Run Quick GPU Benchmarks)
+  endif()
 endif()
 
 # Code reformat
