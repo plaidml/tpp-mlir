@@ -8,6 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -63,7 +64,7 @@ struct EliminateZeroInitAndAddBiasToInit
     auto convProducer = lhs->get().getDefiningOp<linalg::Conv2DNhwcHwcfOp>();
     auto broadCastProducer = getBroadCastProdcuer(rhs);
     if (!convProducer || !broadCastProducer ||
-        !tpp::utils::isZeroTensor(convProducer.getDpsInitOperand(0)->get()) ||
+        !utils::isZeroTensor(convProducer.getDpsInitOperand(0)->get()) ||
         !convProducer.getTiedOpResult(convProducer.getDpsInitOperand(0)))
       return failure();
 

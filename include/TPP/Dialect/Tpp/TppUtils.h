@@ -14,8 +14,6 @@
 #include <string>
 
 namespace mlir {
-class TypeRange;
-class Value;
 class PatternRewriter;
 
 namespace linalg {
@@ -35,26 +33,6 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
 // Returns true if the linalg operation has copy semantics.
 bool hasCopySemantics(linalg::LinalgOp linalgOp);
-
-// Returns true if the linalg operation can convert to a tpp.add.
-bool isTppAdd(linalg::GenericOp linalgOp,
-              SmallVectorImpl<Value> *capturedOperands = nullptr);
-
-// Returns true if the linalg.generic can convert to a tpp.identity.
-bool isTppIdentity(linalg::GenericOp linalgOp,
-                   SmallVectorImpl<Value> *capturedOperands = nullptr);
-
-// Returns true if the linalg.generic can convert to a tpp.zero.
-bool isTppZero(linalg::GenericOp linalgOp,
-               SmallVectorImpl<Value> *capturedOperands = nullptr);
-
-// Returns true if the linalg.generic can convert to a tpp.relu.
-bool isTppRelu(linalg::GenericOp linalgOp,
-               SmallVectorImpl<Value> *capturedOperands = nullptr);
-
-// Returns true if the linalg.generic can convert to a tpp.add + tpp.relu.
-bool isTppBiasRelu(linalg::GenericOp linalgOp,
-                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Return true if the linalg.generic can convert to a tpp.brgemm in VNNI format.
 bool isTppVnniOp(linalg::GenericOp linalgOp,
@@ -79,12 +57,6 @@ template <typename OP> static bool hasOnlyOp(Region &region) {
   }
   return true;
 }
-
-// Returns true if the value is a constant float or integer.
-bool isValConstZero(Value val);
-
-// Returns true if the op defining `val` represents a zero filled tensor.
-bool isZeroTensor(Value val);
 
 // Splits and replaces fused op with its individual components.
 // Temporary workaround for:

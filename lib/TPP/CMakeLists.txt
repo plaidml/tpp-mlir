@@ -24,13 +24,16 @@ add_mlir_library(MLIRTPP
     LinalgDeGeneralize.cpp
     ConvertMemRefToTpp.cpp
     DefaultPipeline.cpp
+    ConvertLinalgToXsmm.cpp
 
   # Utils
+    MatcherUtils.cpp
     TensorInit.cpp
     TensorInitFloat.cpp
     TensorInitInt.cpp
     BuilderUtils.cpp
     TransformUtils.cpp
+    ValueUtils.cpp
     VNNIUtils.cpp
 
   # Conversions

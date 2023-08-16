@@ -16,7 +16,6 @@
 
 namespace mlir {
 class Operation;
-namespace tpp {
 namespace structured_match {
 
 // Base class for the matcher predicates selection tag.
@@ -121,14 +120,47 @@ struct Any {
 // Callable object to verify if `operand` has static shape.
 struct HasStaticShape {
   HasStaticShape() = default;
+  HasStaticShape(SmallVectorImpl<int64_t> *shape) : shape(shape){};
 
   bool operator()(OpOperand *operand, Operation *op) const {
     auto operandType = operand->get().getType();
-    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>())
+    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>()) {
       if (!shapedType.hasStaticShape())
         return false;
+      if (shape) {
+        for (int64_t shapeOnDim : shapedType.getShape())
+          shape->push_back(shapeOnDim);
+      }
+    }
     return true;
   }
+  SmallVectorImpl<int64_t> *shape = nullptr;
+};
+
+// Callable object to verify if `operand` has static strides.
+// If `operand` is a tensor type or a scalar, return true.
+struct HasStaticStrides {
+  HasStaticStrides() = default;
+  HasStaticStrides(SmallVector<int64_t> *strides) : strides(strides){};
+
+  bool operator()(OpOperand *operand, Operation *op) const {
+    auto operandType = operand->get().getType();
+    SmallVector<int64_t> strides;
+    if (auto memRefType = operandType.dyn_cast_or_null<MemRefType>()) {
+      int64_t offset;
+      if (failed(getStridesAndOffset(memRefType, strides, offset)))
+        return false;
+      if (llvm::any_of(strides, [](int64_t stride) {
+            return stride == ShapedType::kDynamic;
+          })) {
+        return false;
+      }
+      if (this->strides)
+        this->strides->append(strides.begin(), strides.end());
+    }
+    return true;
+  }
+  SmallVectorImpl<int64_t> *strides = nullptr;
 };
 
 // Callable object to verify `operand` to have a rank in `ranks`.
@@ -272,10 +304,11 @@ struct _OR {
   std::function<bool(size_t)> rhs;
 };
 
-// Callable object to check if `op` adheres to a given interface.
-struct VerifyInterface {
-  VerifyInterface() = delete;
-  explicit VerifyInterface(std::function<LogicalResult(Operation *op)> fun)
+// Callable object to check if `op` adheres to a given property passed
+// as an std::function object.
+struct VerifyOpProperty {
+  VerifyOpProperty() = delete;
+  explicit VerifyOpProperty(std::function<LogicalResult(Operation *op)> fun)
       : fun(fun){};
 
   bool operator()(Operation *op) {
@@ -373,7 +406,6 @@ private:
 };
 
 } // namespace structured_match
-} // namespace tpp
 } // namespace mlir
 
 #endif // TPP_STRUCTUREDOPMATCHERS_H

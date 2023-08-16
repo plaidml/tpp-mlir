@@ -388,3 +388,75 @@ func.func @test_number_of_affine_maps(%arg0: tensor<4x16x32x32xf32>,
 
   return %1 : tensor<4x8x32x32xf32>
 }
+
+// CHECK-LABEL: test_capture_shape
+func.func @test_capture_shape(%arg0: tensor<4x16x32x32xf32>,
+                              %arg1: tensor<8x16x32x32xf32>,
+                              %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: Shape: 4, 16, 32, 32
+  %0 = linalg.generic {
+    indexing_maps = [#map17, #map18, #map19],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>)
+    outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  } -> tensor<4x8x32x32xf32>
+  return %0 : tensor<4x8x32x32xf32>
+}
+
+// CHECK-LABEL: test_strides_tensor
+func.func @test_strides_tensor(%arg0: tensor<4x16x32x32xf32>,
+                               %arg1: tensor<8x16x32x32xf32>,
+                               %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  // CHECK: Strides:
+  %0 = linalg.generic {
+    indexing_maps = [#map17, #map18, #map19],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>)
+    outs(%arg2 : tensor<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  } -> tensor<4x8x32x32xf32>
+  return %0 : tensor<4x8x32x32xf32>
+}
+
+// CHECK-LABEL: test_strides_memref
+func.func @test_strides_memref(%arg0: memref<4x16x32x32xf32>,
+                               %arg1: memref<8x16x32x32xf32>,
+                               %arg2: memref<4x8x32x32xf32>) {
+  // CHECK: Strides: 16384, 1024, 32, 1
+  linalg.generic {
+    indexing_maps = [#map17, #map18, #map19],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : memref<4x16x32x32xf32>, memref<8x16x32x32xf32>)
+    outs(%arg2 : memref<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: test_strides_dyn
+func.func @test_strides_dyn(%arg0: memref<4x16x32x32xf32, strided<[?, ?, ?, ?], offset: ?>>,
+                            %arg1: memref<8x16x32x32xf32>,
+                            %arg2: memref<4x8x32x32xf32>) {
+  // CHECK-NOT: Strides:
+  linalg.generic {
+    indexing_maps = [#map17, #map18, #map19],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : memref<4x16x32x32xf32, strided<[?, ?, ?, ?], offset: ?>>, memref<8x16x32x32xf32>)
+    outs(%arg2 : memref<4x8x32x32xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %8 = arith.mulf %arg3, %arg4 : f32
+      %9 = arith.addf %arg5, %8 : f32
+      linalg.yield %9 : f32
+  }
+  return
+}

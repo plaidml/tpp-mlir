@@ -114,7 +114,8 @@ createTileConsumerAndFuseProducersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
-createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false);
+createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
+                     bool linalgToXsmm = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGeneralizeTensorPackAndUnPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
@@ -155,6 +156,7 @@ std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
 createSetSPIRVAbiAttributePass(StringRef api = "vulkan");
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuVulkanAbiPass(bool use64bitIndex = false);
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToXsmmPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();

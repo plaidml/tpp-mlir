@@ -13,7 +13,7 @@
 #include "mlir/Pass/Pass.h"
 
 using namespace mlir;
-using namespace mlir::tpp::structured_match;
+using namespace mlir::structured_match;
 
 namespace {
 // This is a test pass for verifying matchers.
@@ -121,7 +121,7 @@ void testInterfaces(FunctionOpInterface funcOp) {
   auto matcher =
     StructuredOpMatcher::make<linalg::GenericOp>()
       .operation(
-        VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop));
+        VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop));
   // clang-format on
 
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -146,8 +146,8 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasMap(Identity()))
       .input(MatchAll(), HasMap(ProjectedPermutation()))
-      .operation(VerifyInterface(OpTrait::tpp::checkUnitStrideInnerLoop))
-      .operation(VerifyInterface(OpTrait::tpp::checkBroadcastableShape))
+      .operation(VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop))
+      .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape))
       .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&operands));
   // clang-format on
 
@@ -237,6 +237,36 @@ void testTppRank(FunctionOpInterface funcOp) {
   });
 }
 
+void testCaptureShape(FunctionOpInterface funcOp) {
+  // clang-format off
+  SmallVector<int64_t> shape;
+  auto matcherCaptureShape =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchOne(0), HasStaticShape(&shape));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcherCaptureShape.match(linalgOp)) {
+      llvm::interleaveComma(shape, llvm::outs() << "\nShape: ");
+      llvm::outs() << "\n";
+    }
+  });
+}
+
+void testStrides(FunctionOpInterface funcOp) {
+  // clang-format off
+  SmallVector<int64_t> strides;
+  auto matcherStaticStrides =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .input(MatchOne(0), HasStaticStrides(&strides));
+  // clang-format on
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    if (matcherStaticStrides.match(linalgOp)) {
+      llvm::interleaveComma(strides, llvm::outs() << "\nStrides: ");
+      llvm::outs() << "\n";
+    }
+  });
+}
+
 void TestStructuralMatchers::runOnOperation() {
   auto f = getOperation();
   llvm::outs() << f.getName() << "\n";
@@ -262,6 +292,13 @@ void TestStructuralMatchers::runOnOperation() {
     testCaptureAffineMapsExpectToFail(f);
   if (f.getName() == "test_number_of_affine_maps")
     testNumberOfAffineMaps(f);
+  if (f.getName() == "test_capture_shape")
+    testCaptureShape(f);
+  if (f.getName() == "test_strides_memref" ||
+      f.getName() == "test_strides_tensor" ||
+      f.getName() == "test_strides_dyn") {
+    testStrides(f);
+  }
 }
 
 namespace mlir {
