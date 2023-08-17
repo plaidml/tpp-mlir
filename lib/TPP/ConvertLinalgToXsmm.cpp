@@ -37,6 +37,19 @@ struct ConvertLinalgToXsmm
 };
 
 namespace {
+struct BrgemmInfo {
+  unsigned m;
+  unsigned n;
+  unsigned k;
+  unsigned batch;
+
+  int64_t lda;
+  int64_t ldb;
+  int64_t ldc;
+  int64_t strideA;
+  int64_t strideB;
+};
+
 struct UnaryInfo {
   unsigned m;
   unsigned n;
@@ -54,6 +67,14 @@ struct BinaryInfo {
   int64_t ldo;
 };
 } // namespace
+
+// Return the position of `dim` in the codomain of `operand`.
+std::optional<unsigned> getPosInCodomain(unsigned dim, OpOperand *operand,
+                                         linalg::LinalgOp linalgOp) {
+  assert(operand->getOwner() == linalgOp);
+  return linalgOp.getMatchingIndexingMap(operand).getResultPosition(
+      getAffineDimExpr(dim, linalgOp.getContext()));
+}
 
 // Get UnaryInfo from input and output. The output must be of rank 2, while
 // the input can be constant, 1d or 2d. Additionally verify that the innermost
@@ -399,6 +420,190 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+static void replaceOpWithBrgemm(RewriterBase &rewriter,
+                                linalg::LinalgOp linalgOp,
+                                BrgemmInfo brgemmInfo) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  auto loops = linalgOp.computeStaticLoopSizes();
+  unsigned m = brgemmInfo.m;
+  unsigned n = brgemmInfo.n;
+  unsigned k = brgemmInfo.k;
+  unsigned batch = brgemmInfo.batch;
+  int64_t lda = brgemmInfo.lda;
+  int64_t ldb = brgemmInfo.ldb;
+  int64_t ldc = brgemmInfo.ldc;
+  int64_t strideA = brgemmInfo.strideA;
+  int64_t strideB = brgemmInfo.strideB;
+
+  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+      rewriter.getContext(),
+      ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
+                        strideB});
+  auto dtype = xsmm::utils::getDataType(
+      rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  Location loc = linalgOp.getLoc();
+  auto flags = rewriter.getArrayAttr(
+      xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+  Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
+      loc, integer64, dims, flags, dtype);
+
+  unsigned batchVal = 1;
+  if (batch != std::numeric_limits<unsigned>::max())
+    batchVal = loops[batch];
+  Value batchDim = rewriter.create<arith::ConstantOp>(
+      loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
+  SmallVector<Value> invokeOperands;
+  invokeOperands.push_back(dispatched);
+  invokeOperands.append(linalgOp->getOperands().begin(),
+                        linalgOp->getOperands().end());
+  invokeOperands.push_back(batchDim);
+  rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype, invokeOperands);
+}
+
+// Structural matcher.
+static FailureOr<linalg::ContractionDimensions>
+checkStructure(linalg::LinalgOp linalgOp) {
+  // clang-format off
+  using namespace structured_match;
+  auto maybeBrgemmMatcher =
+    StructuredOpMatcher::make<linalg::GenericOp>()
+      .output(MatchAll(), HasStaticShape())
+      .input(MatchAll(), HasStaticShape())
+      .output(MatchAll(), HasStaticStrides())
+      .input(MatchAll(), HasStaticStrides())
+      .operation(NumOfLoops(GreaterThanOrEqualTo(3)));
+  // clang-format on
+  if (!maybeBrgemmMatcher.match(linalgOp))
+    return failure();
+
+  auto contractionDims = linalgx::utils::isContraction(linalgOp);
+  if (failed(contractionDims)) {
+    LLVM_DEBUG(llvm::dbgs() << "[checkStructure] Not a contraction\n");
+    return failure();
+  }
+  if (contractionDims->m.size() != 1 || contractionDims->n.size() != 1 ||
+      (contractionDims->k.size() != 2 && contractionDims->k.size() != 1) ||
+      contractionDims->batch.size() != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "[checkStructure] Wrong dimensions\n");
+    return failure();
+  }
+  unsigned classifiedLoops =
+      contractionDims->m.size() + contractionDims->n.size() +
+      contractionDims->k.size() + contractionDims->batch.size();
+  if (linalgOp.getNumLoops() != classifiedLoops) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[checkStructure] Not all loops are classified\n");
+    return failure();
+  }
+  return contractionDims;
+}
+
+// Access matcher.
+static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
+                                         unsigned n, unsigned k,
+                                         unsigned batch) {
+  assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
+  OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
+  OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
+  OpOperand *operandC = linalgOp.getDpsInitOperands()[0];
+
+  auto checkStridesAndGetLda = [&](unsigned minorDim, unsigned majorDim,
+                                   OpOperand *operand) -> FailureOr<int64_t> {
+    auto minorDimPosInCodomain = getPosInCodomain(minorDim, operand, linalgOp);
+    auto majorDimPosInCodomain = getPosInCodomain(majorDim, operand, linalgOp);
+    if (!minorDimPosInCodomain || !majorDimPosInCodomain)
+      return failure();
+    auto stridesOnOperand = utils::getStaticStrides(operand->get());
+    if (failed(stridesOnOperand) ||
+        (*stridesOnOperand)[*minorDimPosInCodomain] != 1)
+      return failure();
+    return (*stridesOnOperand)[*majorDimPosInCodomain];
+  };
+
+  // A(m, k)
+  auto lda = checkStridesAndGetLda(k, m, operandA);
+  if (failed(lda))
+    return failure();
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on A: OK\n");
+
+  // B(k, n)
+  auto ldb = checkStridesAndGetLda(n, k, operandB);
+  if (failed(ldb))
+    return failure();
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on B: OK\n");
+
+  // C(m, n)
+  auto ldc = checkStridesAndGetLda(n, m, operandC);
+  if (failed(ldc))
+    return failure();
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on C: OK\n");
+
+  auto batchPosCodomainA = getPosInCodomain(batch, operandA, linalgOp);
+  auto batchPosCodomainB = getPosInCodomain(batch, operandB, linalgOp);
+  int64_t strideA = 1;
+  if (batchPosCodomainA) {
+    auto stridesOnA = utils::getStaticStrides(operandA->get());
+    strideA = (*stridesOnA)[*batchPosCodomainA];
+  }
+  int64_t strideB = 1;
+  if (batchPosCodomainB) {
+    auto stridesOnB = utils::getStaticStrides(operandB->get());
+    strideB = (*stridesOnB)[*batchPosCodomainB];
+  }
+
+  BrgemmInfo info{m, n, k, batch, *lda, *ldb, *ldc, strideA, strideB};
+  return info;
+}
+
+// Check if the given generic is mappable to a brgemm xsmm op.
+// - It is a contraction, with:
+// -- 1 m and 1 n and 2 k dimensions.
+// -- m appears on the LHS and OUT but not in RHS.
+// -- n appears on the RHS and OUT but not in LHS.
+// -- k and k' appear on the RHS and LHS but not OUT.
+// -- the stride of the minor dimension for A, k is 1.
+// -- the stride of the minor dimension for B, j is 1.
+// -- the stride of the minor dimension for C, j is 1.
+static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
+  auto contractionDims = checkStructure(linalgOp);
+  if (failed(contractionDims)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[isMappableToBrgemm] Failed on checkStructure\n");
+    return failure();
+  }
+
+  unsigned m = contractionDims->m[0];
+  unsigned n = contractionDims->n[0];
+  unsigned k = contractionDims->k.back();
+  unsigned batch = (contractionDims->k.size() == 2)
+                       ? contractionDims->k.front()
+                       : std::numeric_limits<unsigned>::max();
+
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Candidate dims: "
+                          << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] m: " << m << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] n: " << n << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] k: " << k << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] batch: " << batch << "\n");
+
+  return checkAccess(linalgOp, m, n, k, batch);
+}
+
+// Check if we can map `genericOp` to a BRGEMM and rewrite it to XSMM brgemm op.
+struct ConvertGenericToBrgemm : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    auto brgemmInfo = isMappableToBrgemm(genericOp);
+    if (failed(brgemmInfo))
+      return failure();
+    replaceOpWithBrgemm(rewriter, genericOp, *brgemmInfo);
+    return success();
+  }
+};
+
 void ConvertLinalgToXsmm::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
@@ -410,8 +615,8 @@ void ConvertLinalgToXsmm::runOnOperation() {
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd>(
-      patterns.getContext());
+               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
+               ConvertGenericToBrgemm>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
