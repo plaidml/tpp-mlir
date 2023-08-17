@@ -387,6 +387,9 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
       flags = rewriter.getArrayAttr({flagLhs});
     } else if (flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
       flags = rewriter.getArrayAttr({flagRhs});
+    } else {
+      flags = rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
+          rewriter.getContext(), xsmm::BinaryFlags::NONE));
     }
 
     xsmm::BinaryKindAttr kind =
