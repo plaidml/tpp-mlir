@@ -392,7 +392,7 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
     xsmm::BinaryKindAttr kind =
         xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD);
     replaceOpWithBinary(rewriter, genericOp, binaryInfo, flags, kind);
-    return failure();
+    return success();
   }
 };
 
