@@ -666,8 +666,13 @@ static Operation *getLastFusableEltWiseConsumer(
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
   TileConsumerAndFuseProducers() = default;
-  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
+  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes, int maxDepth,
+                               bool startFromLastFusableConsumer,
+                               bool useForAll) {
     this->tileSizes = tileSizes;
+    this->maxDepth = maxDepth;
+    this->startFromLastFusableConsumer = startFromLastFusableConsumer;
+    this->useForAll = useForAll;
   }
 
   void runOnOperation() override {
@@ -815,8 +820,11 @@ struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTileConsumerAndFuseProducersPass() {
-  return std::make_unique<TileConsumerAndFuseProducers>();
+mlir::tpp::createTileConsumerAndFuseProducersPass(
+    ArrayRef<int64_t> tileSizes, int maxDepth,
+    bool startFromLastFusableConsumer, bool useForAll) {
+  return std::make_unique<TileConsumerAndFuseProducers>(
+      tileSizes, maxDepth, startFromLastFusableConsumer, useForAll);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
