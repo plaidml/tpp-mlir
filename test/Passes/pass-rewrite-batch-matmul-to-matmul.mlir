@@ -53,6 +53,8 @@ func.func @batch_matmul_rewrite(%arg0: tensor<512x?x?xf32>,
 
 // -----
 
+// TODO: tiling using scf.forall introduces the affine.min that prevents 
+// rank reducing the tensor and map to brgemm. See: #676
 func.func @batch_matmul_rewrite(%arg0: tensor<?x?x?xf32>, 
   %arg1: tensor<?x?x?xf32>, %dim0: index, %dim1: index, %bacth: index) -> tensor<?x?x?xf32> {
   %0 = tensor.empty(%bacth, %dim0, %dim1) : tensor<?x?x?xf32>
