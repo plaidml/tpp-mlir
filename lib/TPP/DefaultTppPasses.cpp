@@ -405,6 +405,7 @@ private:
       // Skip all TPP transformations.
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createGeneralizeTensorPackAndUnPackPass());
+      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
       pm.addPass(createBufferizePass());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
@@ -425,10 +426,16 @@ private:
       pm.addPass(createTppMappingPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
+      // Decompose Aggregated operations. These ops currently do not
+      // bufferize. Once this is possible we can move this pass after
+      // bufferization.
+      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
+
       // Lower operations to TPP.
       pm.addNestedPass<func::FuncOp>(createTppConversionPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
+      // Bufferize: tensor->memref.
       pm.addPass(createBufferizePass());
 
       // Convert forAll to parallel loops should run after bufferization

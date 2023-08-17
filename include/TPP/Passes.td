@@ -509,4 +509,12 @@ def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
   ];
 }
 
+def DecomposeAggregatedOps : Pass<"decompose-aggregated-ops", "func::FuncOp"> {
+  let summary = "Decompose aggregated operations.";
+  let description = [{
+    Decompose operations that implement the `AggregatedOpInterface`.
+  }];
+  let constructor = "mlir::tpp::createDecomposeAggregatedOpsPass()";
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
