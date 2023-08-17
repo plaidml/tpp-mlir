@@ -345,3 +345,88 @@ func.func @dispatch_binary() -> i64 {
 // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
 // CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C4]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C0]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_col_in0) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C4]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_col_in1) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C8]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_col_in0, bcast_col_in1) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C12:.+]] = arith.constant 12 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C12]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_scalar_in0, bcast_col_in1) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C24:.+]] = arith.constant 24 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C24]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_scalar_in0) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C16]])
+
+// -----
+
+// CHECK-LABEL: dispatch_binary
+func.func @dispatch_binary() -> i64 {
+  %0 = xsmm.binary.dispatch add [5, 6, 5, 6, 5] flags = (bcast_scalar_in1) data_type = f32
+  return %0 : i64
+}
+
+// CHECK: %[[C1:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : i64
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : i64
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : i64
+// CHECK: %{{.+}} = call @xsmm_binary_dispatch(%[[C1]], %[[C1]], %[[C5]], %[[C6]], %[[C5]], %[[C6]], %[[C5]], %[[C32]])
+
