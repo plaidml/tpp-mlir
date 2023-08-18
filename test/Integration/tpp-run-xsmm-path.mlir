@@ -37,8 +37,5 @@ func.func @entry() {
   %v1 = vector.transfer_read %added[%c0, %c0], %d1 : tensor<2x2xf32>, vector<2x2xf32>
   vector.print %v1 : vector<2x2xf32>
   
-  bufferization.dealloc_tensor %arg0 : tensor<2x2xf32>
-  bufferization.dealloc_tensor %arg1 : tensor<2x2xf32>
-
   return
 }
