@@ -554,3 +554,64 @@ func.func @Wo_projection_mha(%arg0: tensor<64x32x8x64xf32>, %cst_6: tensor<8x64x
 // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "parallel"]
 // CHECK-SAME: ins(%[[SLICE_0]], %[[ARG1]]
 // CHECK-SAME: outs(%[[FILL]]
+
+// -----
+
+
+#map = affine_map<(i, ii, k, kk, j, jj) -> (i, ii, k, kk)>
+#map1 = affine_map<(i, ii, k, kk, j, jj) -> (k, kk, j, jj)>
+#map2 = affine_map<(i, ii, k, kk, j, jj) -> (i, ii, j, jj)>
+#map3 = affine_map<(i, ii, j, jj) -> (i, ii, j, jj)>
+
+func.func @check_tile_propagation_to_eltwise_consumer(%arg0: tensor<2x2x2x4xf32>,
+  %arg1: tensor<2x4x8x2xf32>, %arg2: tensor<2x2x8x2xf32>, %arg3: tensor<2x2x8x2xf32>) -> tensor<2x2x8x2xf32> {
+  %gemm = linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel"]}
+    ins(%arg0, %arg1 : tensor<2x2x2x4xf32>, tensor<2x4x8x2xf32>)
+    outs(%arg2 : tensor<2x2x8x2xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %4 = arith.mulf %in, %in_2 : f32
+      %5 = arith.addf %out, %4 : f32
+      linalg.yield %5 : f32
+  } -> tensor<2x2x8x2xf32>
+  %bias = linalg.generic {
+    indexing_maps = [#map3, #map3],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%gemm : tensor<2x2x8x2xf32>)
+    outs(%arg3 : tensor<2x2x8x2xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+  } -> tensor<2x2x8x2xf32>
+  return %bias : tensor<2x2x8x2xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL: check_tile_propagation_to_eltwise_consumer
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<2x2x2x4xf32>, %[[ARG1:.+]]: tensor<2x4x8x2xf32>, 
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<2x2x8x2xf32>, %[[ARG3:.+]]: tensor<2x2x8x2xf32>
+// CHECK: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
+// CHECK: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C8]] step %[[C1]] iter_args(%[[ARG7:.+]] = %[[ARG5]])
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0, 0, 0] [1, 2, 2, 4] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<2x2x2x4xf32> to tensor<2x2x4xf32>
+// CHECK: %[[SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][0, 0, %[[ARG6]], 0] [2, 4, 1, 2] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<2x4x8x2xf32> to tensor<2x4x2xf32>
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG4]], 0, %[[ARG6]], 0] [1, 2, 1, 2] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<2x2x8x2xf32> to tensor<2x2xf32>
+// CHECK: %[[MUL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#map, #map1, #map2]
+// CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel"]
+// CHECK: %[[SLICE_2:.+]] = tensor.extract_slice %[[ARG7]][%[[ARG4]], 0, %[[ARG6]], 0] [1, 2, 1, 2] [1, 1, 1, 1] 
+// CHECK-SAME:  : tensor<2x2x8x2xf32> to tensor<2x2xf32>
+// CHECK: %[[ADD:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [#map3, #map3]
+// CHECK-SAME: iterator_types = ["parallel", "parallel"]

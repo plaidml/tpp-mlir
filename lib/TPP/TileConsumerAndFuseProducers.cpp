@@ -592,23 +592,42 @@ getDefaultTileSizes(linalg::LinalgOp linalgOp,
   // loops to expose a BRGEMM.
   // TODO: this should merge with `getDefaultTileSizesForMatmulLikeOp`.
   if (linalgx::utils::isBlockedConvolution(linalgOp))
-    return SmallVector<int64_t>{1, 1, 1, 0, 0};
+    return SmallVector<int64_t>{1, 1, 1, 0, 0, 0, 0, 0, 0};
   return getDefaultTileSizesForMatmulLikeOp(linalgOp);
 }
 
+// Propagate the tile specification from producer to consumer. Example,
+// Tile spec producer:  (1,  0, 0,  0, 1,  0)
+// Output map producer: (i, ii, k, kk, j, jj) -> (i, ii, j, jj)
+// Assuming an eltwise consumer, with map:
+// (i, ii, j, jj) -> (i, ii, j, jj) the tiling specification will be:
+// (1, 0, 1, 0).
 static SmallVector<OpFoldResult>
 getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
                           SmallVector<OpFoldResult> tilesProducer) {
   assert(consumer && producer);
   if (consumer == producer)
     return tilesProducer;
-  assert(isa<linalg::LinalgOp>(consumer) &&
+
+  assert(isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer) &&
          linalg::isElementwise(cast<linalg::LinalgOp>(consumer)));
-  linalg::LinalgOp consumerOp = cast<linalg::LinalgOp>(consumer);
-  auto numParallelLoops = consumerOp.getNumParallelLoops();
-  assert(numParallelLoops <= tilesProducer.size());
-  SmallVector<OpFoldResult> eltWiseTiles(
-      tilesProducer.begin(), tilesProducer.begin() + numParallelLoops);
+
+  // Case 1. producer and consumer are eltwise.
+  if (linalg::isElementwise(cast<linalg::LinalgOp>(producer)))
+    return tilesProducer;
+
+  // Case 2. producer is not an eltwise.
+  linalg::LinalgOp producerOp = cast<linalg::LinalgOp>(producer);
+  assert(producerOp.getNumDpsInits() == 1);
+  AffineMap outputMap =
+      producerOp.getMatchingIndexingMap(producerOp.getDpsInitOperands()[0]);
+  assert(outputMap.isProjectedPermutation());
+  assert(outputMap.getNumDims() == tilesProducer.size());
+  SmallVector<OpFoldResult> eltWiseTiles;
+  for (auto expr : outputMap.getResults()) {
+    eltWiseTiles.push_back(
+        tilesProducer[expr.cast<AffineDimExpr>().getPosition()]);
+  }
   return eltWiseTiles;
 }
 
