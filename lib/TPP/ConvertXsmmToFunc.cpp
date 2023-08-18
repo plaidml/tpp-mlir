@@ -272,6 +272,22 @@ void addKindOperand(RewriterBase &rewriter, FusedBrgemmDispatchOp dispatchOp,
   /* do nothing */
 }
 
+static int64_t getOredFlags(ArrayAttr flags) {
+  int64_t oredFlag = 0;
+  for (auto flag : flags) {
+    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
+    // LIBXSMM is col-major, swap A and B flags.
+    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
+      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
+      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
+    }
+    oredFlag |= intAttr;
+  }
+  return oredFlag;
+}
+
 // Fused brgemm requires additional flags:
 // 1. Unary flags.
 // 2. Type of the unary operation (i.e., relu).
@@ -284,11 +300,7 @@ void addUnaryAndBinaryFlags(RewriterBase &rewriter,
   Location loc = dispatchOp.getLoc();
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
-  int64_t oredFlag = 0;
-  for (auto flag : dispatchOp.getUnaryFlags()) {
-    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
-    oredFlag |= intAttr;
-  }
+  int64_t oredFlag = getOredFlags(dispatchOp.getUnaryFlags());
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
@@ -297,11 +309,7 @@ void addUnaryAndBinaryFlags(RewriterBase &rewriter,
       loc, integer64, cast<TypedAttr>(dispatchOp.getUnaryKindAttr())));
   dispatchOperandTypes.push_back(integer64);
 
-  oredFlag = 0;
-  for (auto flag : dispatchOp.getBinaryFlags()) {
-    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
-    oredFlag |= intAttr;
-  }
+  oredFlag = getOredFlags(dispatchOp.getBinaryFlags());
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
@@ -350,18 +358,8 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
   // Dispatch the flags. Pass to the library the already ored-flag to
   // avoid changing the interface every time we add a new flag. Flags
   // are assumed to be verified before (i.e., op verifier).
-  int64_t oredFlag = 0;
-  for (auto flag : dispatchOp.getFlagsAttr()) {
-    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
-    // LIBXSMM is col-major, swap A and B flags.
-    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
-      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
-        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
-      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
-        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
-    }
-    oredFlag |= intAttr;
-  }
+  int64_t oredFlag = getOredFlags(dispatchOp.getFlagsAttr());
+
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
