@@ -22,7 +22,7 @@ func.func @add(%arg0: tensor<2x2xf32>, %arg1: tensor<2x2xf32>) -> tensor<2x2xf32
 
 func.func @entry() {
   %cst_one = arith.constant 1.0 : f32
-  %arg0 = bufferization.alloc_tensor() : tensor<2x2xf32>
+  %arg0 = tensor.empty() : tensor<2x2xf32>
   %fill = linalg.fill ins(%cst_one : f32) outs(%arg0 : tensor<2x2xf32>) -> tensor<2x2xf32>
   
   %cst_two = arith.constant 2.0 : f32
