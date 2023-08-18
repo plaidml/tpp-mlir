@@ -19,7 +19,7 @@ using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
-
+#include <iostream>
 namespace {
 
 struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
@@ -31,16 +31,9 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
     auto shape = packOp.getSourceType().getShape();
     int numLoops = shape.size();
 
-    std::map<int, int> tiledDims;
-    for (auto tiledDim : llvm::enumerate(packOp.getInnerDimsPos())) {
-      tiledDims[tiledDim.value()] = tiledDim.index();
-    }
-
-    for (int i = 0; i < numLoops; i++) {
-      if (tiledDims.count(i)) {
-        if (i < (numLoops - 1) && shape[i] >= shape[i + 1]) {
-          return failure();
-        }
+    for (size_t i = 0; i < packOp.getInnerDimsPos().size() - 1; i++) {
+      if (packOp.getInnerDimsPos()[i] >= packOp.getInnerDimsPos()[i + 1]) {
+        return failure();
       }
     }
 
@@ -50,6 +43,11 @@ struct ConvertPackOptimizationOp : public OpRewritePattern<tensor::PackOp> {
     SmallVector<Value> lbs(numLoops, zero);
     SmallVector<Value> ubs;
     SmallVector<Value> steps(numLoops, one);
+
+    std::map<int, int> tiledDims;
+    for (auto tiledDim : llvm::enumerate(packOp.getInnerDimsPos())) {
+      tiledDims[tiledDim.value()] = tiledDim.index();
+    }
 
     for (int i = 0; i < numLoops; i++) {
       if (tiledDims.count(i) && shape[i] != ShapedType::kDynamic &&
