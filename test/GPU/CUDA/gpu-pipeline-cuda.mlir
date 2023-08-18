@@ -109,3 +109,25 @@ func.func @forall_loop(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64x
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
+
+// -----
+
+func.func @matmul_blocks_threads(
+    %arg0: tensor<256x2048xf32>,
+    %arg1: tensor<2048x2048xf32>,
+    %arg2: tensor<256x2048xf32>) -> tensor<256x2048xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<256x2048xf32>, tensor<2048x2048xf32>)
+                      outs(%arg2 : tensor<256x2048xf32>) -> tensor<256x2048xf32>
+  return %0 : tensor<256x2048xf32>
+}
+
+// CHECK: module attributes {gpu.container_module}
+// CHECK-LABEL: func.func @matmul_blocks_threads
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
+// CHECK-NOT:     linalg.matmul
+// CHECK:         gpu.launch_func  @matmul_blocks_threads_kernel::@matmul_blocks_threads_kernel
+// CHECK-SAME:    blocks in (%[[C8]], %[[C64]], %[[C1]]) threads in (%[[C32]], %[[C32]], %[[C1]])
+// CHECK: gpu.module @matmul_blocks_threads_kernel attributes {gpu.binary = "
