@@ -88,7 +88,8 @@ static FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
 
 // Replace `linalgOp` with a unary dispatch plus invoke.
 static void replaceOpWithUnary(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp, UnaryInfo unaryInfo,
+                               linalg::LinalgOp linalgOp,
+                               ArrayRef<Value> operands, UnaryInfo unaryInfo,
                                ArrayAttr flags, xsmm::UnaryKindAttr kind) {
   Location loc = linalgOp.getLoc();
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -101,8 +102,7 @@ static void replaceOpWithUnary(RewriterBase &rewriter,
       loc, integer64, kind, dims, flags, dtype);
   SmallVector<Value> invokeOperands;
   invokeOperands.push_back(dispatched);
-  invokeOperands.append(linalgOp->getOperands().begin(),
-                        linalgOp->getOperands().end());
+  invokeOperands.append(operands.begin(), operands.end());
   rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(linalgOp, dtype, kind,
                                              invokeOperands);
 }
@@ -110,8 +110,8 @@ static void replaceOpWithUnary(RewriterBase &rewriter,
 // Replace `linalgOp` with a binary dispatch plus invoke.
 static void replaceOpWithBinary(RewriterBase &rewriter,
                                 linalg::LinalgOp linalgOp,
-                                BinaryInfo binaryInfo, ArrayAttr flags,
-                                xsmm::BinaryKindAttr kind) {
+                                ArrayRef<Value> operands, BinaryInfo binaryInfo,
+                                ArrayAttr flags, xsmm::BinaryKindAttr kind) {
   Location loc = linalgOp.getLoc();
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
@@ -124,8 +124,7 @@ static void replaceOpWithBinary(RewriterBase &rewriter,
       loc, integer64, kind, dims, flags, dtype);
   SmallVector<Value> invokeOperands;
   invokeOperands.push_back(dispatched);
-  invokeOperands.append(linalgOp->getOperands().begin(),
-                        linalgOp->getOperands().end());
+  invokeOperands.append(operands.begin(), operands.end());
   rewriter.replaceOpWithNewOp<xsmm::BinaryOp>(linalgOp, dtype, kind,
                                               invokeOperands);
 }
@@ -150,7 +149,7 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
         rewriter.getContext(), xsmm::UnaryFlags::BCAST_SCALAR));
     xsmm::UnaryKindAttr kind =
         xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::ZERO);
-    replaceOpWithUnary(rewriter, fillOp, *unaryInfo, flags, kind);
+    replaceOpWithUnary(rewriter, fillOp, operands, *unaryInfo, flags, kind);
     return success();
   }
 };
@@ -179,7 +178,8 @@ struct ConvertTransposeOpToUnaryTranspose
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
     xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
         rewriter.getContext(), xsmm::UnaryKind::TRANSPOSE);
-    replaceOpWithUnary(rewriter, transposeOp, *unaryInfo, flags, kind);
+    replaceOpWithUnary(rewriter, transposeOp, operands, *unaryInfo, flags,
+                       kind);
     return success();
   }
 };
@@ -296,7 +296,7 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
         xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
     xsmm::UnaryKindAttr kind =
         xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::RELU);
-    replaceOpWithUnary(rewriter, genericOp, *unaryInfo, flags, kind);
+    replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo, flags, kind);
     return success();
   }
 };
@@ -394,7 +394,7 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
 
     xsmm::BinaryKindAttr kind =
         xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD);
-    replaceOpWithBinary(rewriter, genericOp, binaryInfo, flags, kind);
+    replaceOpWithBinary(rewriter, genericOp, operands, binaryInfo, flags, kind);
     return success();
   }
 };
