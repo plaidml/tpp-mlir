@@ -66,14 +66,3 @@ func.func @linalg_dialect_expect_fused_brgemm(
 // CHECK: %{{.+}} = tpp.fused_brgemm [unary = relu, binary = add] 
 // CHECK-SAME:  (%[[ARG0]] : tensor<1x3x2xf32>, %[[ARG1]] : tensor<1x2x3xf32>, %[[ARG2]] : tensor<3x3xf32>, %[[ARG3]] : tensor<1x3xf32>) -> (tensor<3x3xf32>)
 
-// -----
-
-// CHECK-LABEL: batch_matmul_rewrite
-func.func @batch_matmul_rewrite(%arg0: tensor<512x32x64xf32>, %arg1: tensor<512x64x32xf32>) -> tensor<512x32x32xf32> {
-  %0 = tensor.empty() : tensor<512x32x32xf32>
-  // CHECK: scf.forall
-  // CHECK: tpp.gemm
-  %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<512x32x64xf32>, tensor<512x64x32xf32>) 
-                           outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
-  return %1 : tensor<512x32x32xf32>
-}

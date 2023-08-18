@@ -59,41 +59,6 @@ struct RankReducedExtractSliceOp
   }
 };
 
-struct RankReducedParallelInsertSliceOp
-    : public OpRewritePattern<tensor::ParallelInsertSliceOp> {
-  using OpRewritePattern<tensor::ParallelInsertSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ParallelInsertSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    // Limit the replacement to sliceOp with batch matmul as users.
-    if (!llvm::all_of(sliceOp->getUsers(), [](Operation *user) {
-          return isa<linalg::BatchMatmulOp>(user);
-        })) {
-      return failure();
-    }
-    RankedTensorType sourceType = sliceOp.getSourceType();
-    SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
-    SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
-    SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
-    auto reassociation = linalg::getReassociationMapForFoldingUnitDims(sizes);
-    if (!reassociation ||
-        reassociation->size() == static_cast<size_t>(sourceType.getRank()))
-      return failure();
-    Location loc = sliceOp.getLoc();
-    tensor::CollapseShapeOp reshapedSource;
-    {
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(sliceOp->getParentOp());
-      reshapedSource = rewriter.create<tensor::CollapseShapeOp>(
-          loc, sliceOp.getSource(), *reassociation);
-    }
-    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
-        sliceOp, reshapedSource, sliceOp.getDest(), sliceOp.getMixedOffsets(),
-        sliceOp.getMixedSizes(), sliceOp.getMixedStrides());
-    return success();
-  }
-};
-
 struct RewriteBatchMatmulToMatmulImpl
     : public OpRewritePattern<linalg::BatchMatmulOp> {
   using OpRewritePattern<linalg::BatchMatmulOp>::OpRewritePattern;
@@ -125,30 +90,31 @@ struct RewriteBatchMatmulToMatmul
     IRRewriter rewriter(&ctx);
     // Step 1. tiling.
     getOperation()->walk([&](linalg::BatchMatmulOp batchMatmulOp) {
-      scf::SCFTilingOptions tilingOptions;
-      tilingOptions.setTileSizes({1, 0, 0});
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(batchMatmulOp.getOperation()),
-          tilingOptions);
+      if (batchMatmulOp.hasBufferSemantics())
+        return signalPassFailure();
+      SmallVector<OpFoldResult> tiles(
+          batchMatmulOp.getNumLoops(),
+          getAsIndexOpFoldResult(rewriter.getContext(), 0));
+      tiles[0] = getAsIndexOpFoldResult(rewriter.getContext(), 1);
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPoint(batchMatmulOp);
+      auto tilingResult = linalg::tileToForallOpUsingTileSizes(
+          rewriter, cast<TilingInterface>(batchMatmulOp.getOperation()), tiles,
+          /*mapping=*/std::nullopt);
       if (failed(tilingResult))
         return signalPassFailure();
-      tilingResult->loops[0]->setAttr(
-          linalgx::utils::kLoopParallel,
-          rewriter.getStringAttr(linalgx::utils::kLoopRoot));
-      rewriter.replaceOp(batchMatmulOp, tilingResult->replacements);
+      rewriter.replaceOp(batchMatmulOp, tilingResult->tileOp->getResults());
     });
 
     // Step2:
-    // - replace scf.for with scf.forall.
     // - replace extract/insert slice with ranked reduced extract/insert slice
     // and expand shape ops.
     // - replace linalg.batch_matmul with linalg.matmul.
     RewritePatternSet patterns(&ctx);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-    linalgx::utils::populateScfForToForAllRewritePattern(patterns);
-    patterns.add<RankReducedExtractSliceOp, RankReducedParallelInsertSliceOp,
-                 RewriteBatchMatmulToMatmulImpl>(patterns.getContext());
+    patterns.add<RankReducedExtractSliceOp, RewriteBatchMatmulToMatmulImpl>(
+        patterns.getContext());
     ctx.getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
