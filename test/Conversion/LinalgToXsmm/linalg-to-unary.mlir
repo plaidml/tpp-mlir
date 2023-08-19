@@ -99,6 +99,7 @@ func.func @transpose_op(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
+
 func.func @relu(%arg0: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
@@ -121,6 +122,7 @@ func.func @relu(%arg0: memref<4x3xf32>) {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
+
 func.func @relu_1(%arg0: memref<1x3xf32>, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
@@ -143,6 +145,7 @@ func.func @relu_1(%arg0: memref<1x3xf32>, %arg1: memref<4x3xf32>) {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0, 0)>
+
 func.func @relu_2(%arg0: memref<4x1xf32>, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
@@ -165,6 +168,7 @@ func.func @relu_2(%arg0: memref<4x1xf32>, %arg1: memref<4x3xf32>) {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> ()>
+
 func.func @relu_3(%arg0: f32, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
@@ -187,6 +191,7 @@ func.func @relu_3(%arg0: f32, %arg1: memref<4x3xf32>) {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> ()>
+
 func.func @relu_4(%arg0: f32, %arg1: memref<4x3xf32, strided<[?, ?], offset: 0>>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
@@ -203,3 +208,25 @@ func.func @relu_4(%arg0: f32, %arg1: memref<4x3xf32, strided<[?, ?], offset: 0>>
 // CHECK-LABEL: relu_4
 // CHECK-NOT: xsmm.unary relu
 // CHECK: linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @relu_5(%arg1: memref<4x3xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg1 : memref<4x3xf32>) {
+    ^bb0(%in: f32):
+      %0 = arith.maxf %in, %cst : f32
+      linalg.yield %0 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: relu_5
+// CHECK-SAME: %[[ARG1:.+]]: memref<4x3xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch relu [4, 3, 3, 3] flags = (none) data_type = f32
+// CHECK: xsmm.unary relu(data_type = f32, %[[DIS]], %[[ARG1]], %[[ARG1]])

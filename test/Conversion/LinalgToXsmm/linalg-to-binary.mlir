@@ -209,3 +209,26 @@ func.func @add_8(%arg0: memref<256x1024xf32>, %arg1: memref<256x1024xf32>) {
 // CHECK: %[[DIS:.+]] = xsmm.binary.dispatch add [256, 1024, 1024, 1024, 1024] 
 // CHECK-SAME:  flags = (none) data_type = f32
 // CHECK: xsmm.binary add(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG0]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @add_9(%arg0: memref<256x1024xf32>, %arg1: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : memref<256x1024xf32>)
+    outs(%arg1 : memref<256x1024xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %6 = arith.addf %in, %out : f32
+      linalg.yield %6 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: add_9
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch add [256, 1024, 1024, 1024, 1024]
+// CHECK-SAME:  flags = (none) data_type = f32
+// CHECK: xsmm.binary add(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG1]])
