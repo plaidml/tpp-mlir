@@ -63,7 +63,8 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect",
                            "memref::MemRefDialect",
                            "linalg::LinalgDialect",
-                           "xsmm::XsmmDialect"];
+                           "xsmm::XsmmDialect", 
+                           "tensor::TensorDialect"];
 }
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {

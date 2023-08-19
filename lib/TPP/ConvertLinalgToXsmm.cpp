@@ -19,6 +19,8 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 
@@ -604,9 +606,194 @@ struct ConvertGenericToBrgemm : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Emit a transpose operation for `operand` by swapping `dim` with `newDim`.
+// Emit a transpose operation for `operand` by swapping the dimensions at index
+// `dim` with `newDim`.
+static void emitTransposeOnOperand(RewriterBase &rewriter,
+                                   linalg::GenericOp linalgOp,
+                                   OpOperand *operand, unsigned dim,
+                                   unsigned newDim) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(linalgOp);
+
+  Location loc = linalgOp.getLoc();
+  auto operandType = operand->get().getType().cast<ShapedType>();
+  auto rank = operandType.getRank();
+  SmallVector<int64_t> shape = llvm::to_vector(operandType.getShape());
+  auto permutation = llvm::to_vector(llvm::seq<int64_t>(0, rank));
+  std::swap(permutation[dim], permutation[newDim]);
+  assert(isPermutationVector(permutation));
+  LLVM_DEBUG(llvm::interleaveComma(
+      permutation, llvm::dbgs() << "[emitTransposeOnOperand] Perm: "));
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+
+  applyPermutationToVector<int64_t>(shape, permutation);
+  Value buffer;
+  if (linalgOp.hasTensorSemantics()) {
+    buffer = rewriter.create<tensor::EmptyOp>(loc, shape,
+                                              operandType.getElementType());
+    buffer = rewriter
+                 .create<linalg::TransposeOp>(loc, operand->get(), buffer,
+                                              permutation)
+                 .getResults()[0];
+  } else {
+    buffer = rewriter.create<memref::AllocOp>(
+        loc, MemRefType::get(shape, operandType.getElementType()));
+    rewriter.create<linalg::TransposeOp>(loc, operand->get(), buffer,
+                                         permutation);
+  }
+
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  AffineMap operandMap = indexingMaps[operand->getOperandNumber()];
+  LLVM_DEBUG(llvm::dbgs() << "[emitTransposeOnOperand] Old map: " << operandMap
+                          << "\n");
+  SmallVector<AffineExpr> mapResults = llvm::to_vector(operandMap.getResults());
+  applyPermutationToVector<AffineExpr>(mapResults, permutation);
+  AffineMap newMap =
+      AffineMap::get(operandMap.getNumDims(), operandMap.getNumSymbols(),
+                     mapResults, linalgOp.getContext());
+  LLVM_DEBUG(llvm::dbgs() << "[emitTransposeOnOperand] New map: " << newMap
+                          << "\n");
+  indexingMaps[operand->getOperandNumber()] = newMap;
+  // TODO: We probably cannot update the result in place.
+  rewriter.updateRootInPlace(linalgOp, [&]() {
+    linalgOp->setOperand(operand->getOperandNumber(), buffer);
+    linalgOp.setIndexingMapsAttr(
+        ArrayAttr::get(linalgOp.getContext(),
+                       llvm::to_vector(llvm::map_range(
+                           indexingMaps, [](AffineMap map) -> Attribute {
+                             return AffineMapAttr::get(map);
+                           }))));
+  });
+  if (linalgOp.hasBufferSemantics()) {
+    rewriter.setInsertionPointAfter(linalgOp);
+    rewriter.create<memref::DeallocOp>(linalgOp.getLoc(), buffer);
+  }
+}
+
+static bool isInnerMostDim(OpOperand *operand, unsigned minorDim) {
+  auto shapedType = operand->get().getType().cast<ShapedType>();
+  unsigned rank = shapedType.getRank();
+  return minorDim == rank - 1;
+}
+
+static FailureOr<linalg::GenericOp>
+makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
+                             unsigned m, unsigned n, unsigned k) {
+  assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
+  OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
+  OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
+  OpOperand *operandC = linalgOp.getDpsInitOperands()[0];
+
+  // C(m,n) += A(m,k) * B(k,n)
+  // n is expected to be the innermost for C
+  // k is expected to be the innermost for A
+  // n is expected to be the innermost for B
+  auto minorKInCodomainOpA = getPosInCodomain(k, operandA, linalgOp);
+  auto minorMInCodomainOpA = getPosInCodomain(m, operandA, linalgOp);
+  if (!minorKInCodomainOpA || !minorMInCodomainOpA) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "[makeMinorDimensionsInnerMost] did not find minor dims for A\n");
+    return failure();
+  }
+
+  auto minorNInCodomainOpB = getPosInCodomain(n, operandB, linalgOp);
+  auto minorKInCodomainOpB = getPosInCodomain(k, operandB, linalgOp);
+  if (!minorNInCodomainOpB || !minorKInCodomainOpB) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "[makeMinorDimensionsInnerMost] did not find minor dims for B\n");
+    return failure();
+  }
+
+  auto minorNInCodomainOpC = getPosInCodomain(n, operandC, linalgOp);
+  auto minorMInCodomainOpC = getPosInCodomain(m, operandC, linalgOp);
+  if (!minorNInCodomainOpC || !minorMInCodomainOpC) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "[makeMinorDimensionsInnerMost] did not find minor dims for C\n");
+    return failure();
+  }
+
+  if (!isInnerMostDim(operandC, *minorNInCodomainOpC)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[makeMinorDimensionsInnerMost] emit transpose for C\n");
+    assert(isInnerMostDim(operandC, *minorMInCodomainOpC));
+    if (isInnerMostDim(operandA, *minorKInCodomainOpA)) {
+      emitTransposeOnOperand(rewriter, linalgOp, operandA, *minorKInCodomainOpA,
+                             *minorMInCodomainOpA);
+    }
+    if (isInnerMostDim(operandB, *minorNInCodomainOpB)) {
+      emitTransposeOnOperand(rewriter, linalgOp, operandB, *minorNInCodomainOpB,
+                             *minorKInCodomainOpB);
+    }
+    // Avoid transpose on the output by swapping A and B.
+    OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
+    OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
+    SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+    std::swap(indexingMaps[0], indexingMaps[1]);
+    rewriter.updateRootInPlace(linalgOp, [&]() {
+      Value operandATmp = operandA->get();
+      linalgOp->setOperand(operandA->getOperandNumber(), operandB->get());
+      linalgOp->setOperand(operandB->getOperandNumber(), operandATmp);
+      linalgOp.setIndexingMapsAttr(
+          ArrayAttr::get(linalgOp.getContext(),
+                         llvm::to_vector(llvm::map_range(
+                             indexingMaps, [](AffineMap map) -> Attribute {
+                               return AffineMapAttr::get(map);
+                             }))));
+    });
+    return linalgOp;
+  }
+
+  if (!isInnerMostDim(operandA, *minorKInCodomainOpA)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
+    assert(isInnerMostDim(operandA, *minorMInCodomainOpA));
+    emitTransposeOnOperand(rewriter, linalgOp, operandA, *minorKInCodomainOpA,
+                           *minorMInCodomainOpA);
+  }
+  if (!isInnerMostDim(operandB, *minorNInCodomainOpB)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
+    assert(isInnerMostDim(operandB, *minorKInCodomainOpB));
+    emitTransposeOnOperand(rewriter, linalgOp, operandB, *minorKInCodomainOpB,
+                           *minorNInCodomainOpB);
+  }
+  return linalgOp;
+}
+
 void ConvertLinalgToXsmm::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
+  IRRewriter rewriter(&getContext());
+
+  // Enable conversion for linalg.generic to XSMM Brgemm if possible.
+  auto res = getOperation()->walk([&](linalg::GenericOp genericOp) {
+    auto contractionDims = checkStructure(genericOp);
+    // If the generic does not match the structure of a Brgemm op, skip it.
+    if (failed(contractionDims))
+      return WalkResult::skip();
+    unsigned m = contractionDims->m[0];
+    unsigned n = contractionDims->n[0];
+    unsigned k = contractionDims->k.back();
+    unsigned batch = (contractionDims->k.size() == 2)
+                         ? contractionDims->k.front()
+                         : std::numeric_limits<unsigned>::max();
+    if (failed(checkAccess(genericOp, m, n, k, batch))) {
+      // The generic is a Brgemm but the strides of the selected dims (m, n, k)
+      // are not unit strides. Inject transposes to bring them innermost.
+      if (failed(makeMinorDimensionsInnerMost(rewriter, genericOp, m, n, k))) {
+        return WalkResult::interrupt();
+      }
+    }
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted()) {
+    LLVM_DEBUG(llvm::dbgs() << "pass failed!\n");
+    return signalPassFailure();
+  }
   tpp::populateLinalgToXsmmPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
