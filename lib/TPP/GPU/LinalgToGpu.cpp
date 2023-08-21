@@ -1,4 +1,4 @@
-//===- GpuConversion.cpp -----------------------------------------*- C++-*-===//
+//===- LinalgToGpu.cpp -------------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -67,6 +67,7 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
     SmallVector<Value> steps = {one, one, one};
     SmallVector<Value> ivs;
 
+    // Create parallel loops over the outer dimensions.
     auto parallelLoop = rewriter.create<scf::ParallelOp>(
         loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
     auto parallelIvs = parallelLoop.getInductionVars();
@@ -75,10 +76,16 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
 
+    // Fetch the inital value of the output element.
     auto outputBuf = matmulOp.getDpsInitOperand(0)->get();
     Value initVal = rewriter.create<memref::LoadOp>(loc, outputBuf, parallelIvs)
                         .getResult();
 
+    // Compute matmul with a loop over reduction dimension.
+    // Each GPU thread computes a single result element.
+    // Accumulate result locally through loop's iter args.
+    // This maps to more efficient computation as the accumulation is kept
+    // locally by a thread.
     auto bodyBuilder = [&](OpBuilder &b, Location loc, Value localIv,
                            ValueRange iterArgs) {
       SmallVector<Value> loopIvs = ivs;
@@ -96,13 +103,13 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
 
       b.create<scf::YieldOp>(loc, scalarAdd.getResult());
     };
-
     auto accumulationLoop = rewriter.create<scf::ForOp>(
         loc, zero, k, one, ValueRange{initVal},
         [&](OpBuilder &b, Location loc, Value iv, ValueRange iterArgs) {
           bodyBuilder(b, loc, iv, iterArgs);
         });
 
+    // Write back the total sum to the output buffer.
     rewriter.create<memref::StoreOp>(loc, accumulationLoop.getResults()[0],
                                      outputBuf, parallelIvs);
 
@@ -112,9 +119,7 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
 };
 
 void populateLinalgToGpuPatterns(RewritePatternSet &patterns) {
-  // clang-format off
   patterns.add<ConvertMatmulToGpu>(patterns.getContext());
-  // clang-format on
 }
 
 struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
