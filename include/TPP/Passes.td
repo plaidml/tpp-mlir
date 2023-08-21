@@ -530,7 +530,7 @@ def DecomposeAggregatedOps : Pass<"decompose-aggregated-ops", "func::FuncOp"> {
 def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
   let summary = "Convert linalg ops to be GPU compatible.";
   let description = [{
-    Rewrite linalg to ops optimized for computation on GPU.
+    Lower linalg to ops optimized for computation on GPU.
   }];
   let constructor = "mlir::tpp::createLinalgToGpuPass()";
 }
