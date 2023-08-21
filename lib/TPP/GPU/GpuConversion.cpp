@@ -68,6 +68,7 @@ private:
 
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
+    pm.addNestedPass<func::FuncOp>(linalg::createLinalgDeGeneralizationPass());
     pm.addNestedPass<func::FuncOp>(createLinalgToGpuPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
