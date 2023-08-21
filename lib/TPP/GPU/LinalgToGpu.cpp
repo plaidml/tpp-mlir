@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -130,6 +131,7 @@ struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
     registry.insert<scf::SCFDialect>();
     registry.insert<memref::MemRefDialect>();
     registry.insert<gpu::GPUDialect>();
+    registry.insert<arith::ArithDialect>();
   }
 
   void runOnOperation() override {
