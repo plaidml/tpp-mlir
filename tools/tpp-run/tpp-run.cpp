@@ -22,8 +22,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/ExecutionEngine/JitRunner.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -292,6 +294,8 @@ int main(int argc, char **argv) {
   mlir::linalgx::registerTransformDialectExtension(registry);
   registerAllDialects(registry);
   registerAllToLLVMIRTranslations(registry);
+  mlir::linalg::registerTransformDialectExtension(registry);
+  mlir::tensor::registerTransformDialectExtension(registry);
 
   // This is how we integrate with the pipeline
   JitRunnerConfig config;

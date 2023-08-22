@@ -1,8 +1,3 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule -generalize-tensor-pack-unpack -bufferize -convert-linalg-to-loops -expand-strided-metadata | \
-// RUN: tpp-run -print \
-// RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s
-
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
 // RUN: tpp-opt %s -default-tpp-passes | \

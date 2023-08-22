@@ -53,7 +53,8 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: te
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 
+      : (!transform.any_op) -> !transform.any_op
     // Block matmul i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32]
       : !transform.any_op -> !transform.any_op 
@@ -63,7 +64,8 @@ transform.sequence failures(propagate) {
     // Propagate packing
     transform.structured.packing_propagation %f : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
 
@@ -78,7 +80,11 @@ transform.sequence failures(propagate) {
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
     %6 = transform.structured.match ops{["func.func"]} in %arg1 
       : (!transform.any_op) -> !transform.any_op
-    transform.structured.fold_unit_extent_dims %6 : !transform.any_op
+    
+    transform.apply_patterns to %6 {
+      transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
+    } : !transform.any_op    
+
     %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
       : (!transform.any_op) -> !transform.any_op
     %8 = transform.structured.get_blocked_matmuls %7
@@ -146,11 +152,15 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // clean-up IR after fusion
-    %6 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !pdl.operation
-    transform.structured.canonicalize %6
+    %6 = transform.structured.match ops{["func.func"]} in %arg1 
+      : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %6 {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
 
     // map a packed matmul to a brgemm
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+      : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %7 : !transform.any_op
 }
 

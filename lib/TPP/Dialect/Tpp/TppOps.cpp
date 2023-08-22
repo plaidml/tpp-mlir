@@ -21,7 +21,7 @@ using namespace mlir::tpp;
 namespace {
 constexpr std::string_view INS = "ins";
 constexpr std::string_view OUTS = "outs";
-constexpr std::string_view OPERAND_SEGMENT_SIZE = "operand_segment_sizes";
+constexpr std::string_view OPERAND_SEGMENT_SIZE = "operandSegmentSizes";
 constexpr std::string_view UNARY_KIND = "unary_kind";
 constexpr std::string_view BINARY_KIND = "binary_kind";
 constexpr std::string_view UNARY = "unary";
@@ -103,7 +103,7 @@ static ParseResult parseTppOp(OpAsmParser &parser, OperationState &result) {
   NamedAttrList attrs;
   if (parser.parseOptionalAttrDict(attrs))
     return failure();
-  // Check if we parsed `operand_segment_sizes` already, otherwise add it.
+  // Check if we parsed `operandSegmentSizes` already, otherwise add it.
   if (!attrs.get(OPERAND_SEGMENT_SIZE)) {
     auto operandSegmentSize = parser.getBuilder().getDenseI32ArrayAttr(
         {numberOfInputs, numberOfOutputs});
