@@ -126,7 +126,6 @@ func.func @generalize_pack_unpack(%arg0: tensor<12x2x56x56x32xf32>, %arg1: tenso
 
 // CHECK-LABEL: func.func @generalize_pack_unpack(
 // CHECK-NOT: tensor.pack
-// CHECK-DAG:  %[[c64:.+]] = arith.constant 64 : index
 // CHECK-DAG:  %[[c56:.+]] = arith.constant 56 : index
 // CHECK-DAG:  %[[c12:.+]] = arith.constant 12 : index
 // CHECK-DAG:  %[[c1:.+]] = arith.constant 1 : index
@@ -141,7 +140,14 @@ func.func @generalize_pack_unpack(%arg0: tensor<12x2x56x56x32xf32>, %arg1: tenso
 // CHECK:     %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG1]][%[[MUL]], %[[ARG5]]] [2, 1] [1, 1] : tensor<512x1024xbf16> to tensor<2xbf16>
 // CHECK:     tensor.insert_slice %[[EXTRACT]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0] [1, 1, 2] [1, 1, 1] : tensor<2xbf16> into tensor<256x1024x2xbf16>
 // CHECK-NOT: tensor.unpack
-
+// CHECK: %[[BUF:.+]] = tensor.empty() : tensor<12x56x56x64xf32>
+// CHECK: scf.for %[[ARG3:.+]] = %[[c0]] to %[[c12]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF]]) -> (tensor<12x56x56x64xf32>) {
+// CHECK:   scf.for %[[ARG5:.+]] = %[[c0]] to %[[c56]] step %[[c1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<12x56x56x64xf32>) {
+// CHECK:     scf.for %[[ARG7:.+]] = %[[c0]] to %[[c56]] step %[[c1]] iter_args(%[[ARG8:.+]] = %[[ARG6]]) -> (tensor<12x56x56x64xf32>) {
+// CHECK:       scf.for %[[ARG9:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG10:.+]] = %[[ARG8]]) -> (tensor<12x56x56x64xf32>) {
+// CHECK:         %[[MUL0:.+]] = arith.muli %[[ARG9]], %[[c32]] : index
+// CHECK:         %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], %[[ARG9]], %[[ARG5]], %[[ARG7]], 0] [1, 1, 1, 1, 32] [1, 1, 1, 1, 1] : tensor<12x2x56x56x32xf32> to tensor<32xf32>
+// CHECK:	  %[[INSERTED:.+]] = tensor.insert_slice %[[EXTRACT]] into %[[ARG10]][%[[ARG3]], %[[ARG5]], %[[ARG7]], %[[MUL0]]] [1, 1, 1, 32] [1, 1, 1, 1] : tensor<32xf32> into tensor<12x56x56x64xf32>
 // -----
 
 func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
@@ -275,11 +281,12 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
 // Generic before unpack
 // CHECK: linalg.generic
 // Generalized unpack
-// CHECK: %[[EMPTY_UNPACK:.+]] = tensor.empty() : tensor<4x32x8x32xf32>
-// CHECK-NEXT: %[[T_UNPACK:.+]] = linalg.transpose ins(%{{.+}} : tensor<4x8x32x32xf32>) outs(%[[EMPTY_UNPACK]] : tensor<4x32x8x32xf32>) 
-// CHECK-SAME:  permutation = [0, 2, 1, 3]
-// CHECK: %{{.+}} = tensor.collapse_shape %[[T_UNPACK]] {{\[}}[0, 1], [2, 3]] : tensor<4x32x8x32xf32> into tensor<128x256xf32>
-
+// CHECK: scf.for %[[ARG3:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[ARG2]]) -> (tensor<128x256xf32>) {
+// CHECK:   scf.for %[[ARG5:.+]] = %[[c0]] to %[[c8]] step %[[c1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<128x256xf32>) {
+// CHECK:     %[[MUL0:.+]] = arith.muli %[[ARG3]], %[[c32]] : index
+// CHECK:     %[[MUL1:.+]] = arith.muli %[[ARG5]], %[[c32]] : index
+// CHECK:     %[[EXTRACT:.+]] = tensor.extract_slice %{{[^:]+}}[%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<32x32xf32>
+// CHECK:     tensor.insert_slice %[[EXTRACT]] into %[[ARG6]][%[[MUL0]], %[[MUL1]]] [32, 32] [1, 1] : tensor<32x32xf32> into tensor<128x256xf32>
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
