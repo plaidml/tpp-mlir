@@ -565,8 +565,8 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
 // -- n appears on the RHS and OUT but not in LHS.
 // -- k and k' appear on the RHS and LHS but not OUT.
 // -- the stride of the minor dimension for A, k is 1.
-// -- the stride of the minor dimension for B, j is 1.
-// -- the stride of the minor dimension for C, j is 1.
+// -- the stride of the minor dimension for B, n is 1.
+// -- the stride of the minor dimension for C, n is 1.
 static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
   auto contractionDims = checkStructure(linalgOp);
   if (failed(contractionDims)) {
