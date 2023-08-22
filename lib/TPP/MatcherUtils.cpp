@@ -16,8 +16,8 @@ namespace mlir {
 namespace structured_match {
 namespace utils {
 
-// Return true if all the operand have the same type. No implicit conversion in
-// the linalgOp.
+// Return true if all the operand have the same type, i.e., no implicit
+// conversion in the linalgOp.
 static LogicalResult hasEqualOperandTypes(Operation *operation) {
   if (!isa<linalg::LinalgOp>(operation))
     return failure();
