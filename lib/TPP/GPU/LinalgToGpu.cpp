@@ -46,14 +46,9 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
                                    .getType()
                                    .cast<ShapedType>()
                                    .getShape();
-    ArrayRef<int64_t> shapeB =
-        matmulOp.getInputs()[1].getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeA =
         matmulOp.getInputs()[0].getType().cast<ShapedType>().getShape();
-    if (shapeB.size() == 3) {
-      return rewriter.notifyMatchFailure(matmulOp,
-                                         "Packed BF16 loops unsupported");
-    }
+
     // Parallel dims.
     Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
     Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
