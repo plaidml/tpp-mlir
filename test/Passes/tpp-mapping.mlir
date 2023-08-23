@@ -194,7 +194,8 @@ func.func @pack_matmul(
 // CHECK:        tensor.insert_slice %[[EXTRACT]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Packed matmul
 // CHECK:    %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (4, 4)
-// CHECK:     linalg.batch_reduce_matmul
+// CHECK:     %{{.+}} = linalg.batch_reduce_matmul ins(%{{.+}}, %{{.+}} : tensor<4x32x32xf32>, tensor<4x32x32xf32>) 
+// CHECK-SAME:          outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
 
 // -----
 
