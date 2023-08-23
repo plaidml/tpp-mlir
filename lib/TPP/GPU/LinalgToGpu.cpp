@@ -315,8 +315,14 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   // Write back the total sum to the output buffer.
   auto storeOp = rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
 
-  // Try to fuse elementwise consumers
+  // Try to fuse element-wise consumers.
+  // A naive fusion strategy based on the assumption that the tile-and-fuse
+  // pass already gathered fusable ops together under a common parallel loop.
+  //
+  // TODO: replace dependance on the parallel loop with some dedicated fusion
+  // region.
   if (auto parallelOp = dyn_cast<scf::ParallelOp>(linalgOp->getParentOp())) {
+    // Gather other linalg ops within the region.
     SmallVector<linalg::LinalgOp> linalgOps;
     parallelOp->walk([&](linalg::LinalgOp op) {
       if (op != linalgOp)
@@ -327,9 +333,13 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
 
     for (auto op : linalgOps) {
       auto outBuf = op.getDpsInitOperand(0)->get();
+      // Check that the op reuses the same output buffer as the matmul.
+      // Otherwise, it is assumed that the op cannot be fused.
       if (outBuf != matC)
         break;
 
+      // Insert fused eltwise ops before the store and later replace the store
+      // with a new result.
       rewriter.setInsertionPoint(storeOp);
 
       SmallVector<Value> operands;
