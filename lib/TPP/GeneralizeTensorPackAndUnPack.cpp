@@ -11,7 +11,6 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
@@ -69,8 +68,6 @@ struct GeneralizeTensorPackAndUnPack
     MLIRContext *ctx = &getContext();
     auto funcOp = getOperation();
 
-    // Upstream generalization patterns. Decomposition of tensor.unpack
-    // does not support yet outer dim perm.
     {
       RewritePatternSet patterns(ctx);
       patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
