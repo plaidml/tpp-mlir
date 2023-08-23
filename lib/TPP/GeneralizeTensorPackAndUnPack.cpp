@@ -28,7 +28,7 @@ using namespace mlir;
 
 namespace {
 
-// A warpper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
+// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
 // a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
@@ -44,7 +44,7 @@ struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
-// A warpper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
+// A wrapper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
 // lowers a tensor.unpack op to tensor.empty + linalg.transpose +
 // tensor.collapse_shape + tensor.extract_slice ops.
 struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
