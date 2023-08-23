@@ -437,30 +437,47 @@ static void replaceOpWithBrgemm(RewriterBase &rewriter,
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(),
-      ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
-                        strideB});
+  bool hasBatch = batch != std::numeric_limits<unsigned>::max();
+
   auto dtype = xsmm::utils::getDataType(
       rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   Location loc = linalgOp.getLoc();
-  auto flags = rewriter.getArrayAttr(
-      xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
-  Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-      loc, integer64, dims, flags, dtype);
 
-  unsigned batchVal = 1;
-  if (batch != std::numeric_limits<unsigned>::max())
-    batchVal = loops[batch];
-  Value batchDim = rewriter.create<arith::ConstantOp>(
-      loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
-  SmallVector<Value> invokeOperands;
-  invokeOperands.push_back(dispatched);
-  invokeOperands.append(linalgOp->getOperands().begin(),
-                        linalgOp->getOperands().end());
-  invokeOperands.push_back(batchDim);
-  rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype, invokeOperands);
+  if (hasBatch) {
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(),
+        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
+                          strideB});
+    auto flags = rewriter.getArrayAttr(
+        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+    Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
+        loc, integer64, dims, flags, dtype);
+
+    auto batchVal = loops[batch];
+    Value batchDim = rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
+    SmallVector<Value> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(linalgOp->getOperands().begin(),
+                          linalgOp->getOperands().end());
+    invokeOperands.push_back(batchDim);
+    rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype,
+                                                invokeOperands);
+  } else {
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(),
+        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc});
+    auto flags = rewriter.getArrayAttr(
+        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
+        loc, integer64, dims, flags, dtype);
+    SmallVector<Value> invokeOperands;
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(linalgOp->getOperands().begin(),
+                          linalgOp->getOperands().end());
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(linalgOp, dtype, invokeOperands);
+  }
 }
 
 // Structural matcher.
@@ -469,7 +486,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
   // clang-format off
   using namespace structured_match;
   auto maybeBrgemmMatcher =
-    StructuredOpMatcher::make<linalg::GenericOp>()
+    StructuredOpMatcher::make<linalg::LinalgOp>()
       .output(MatchAll(), HasStaticShape())
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasStaticStrides())
@@ -798,12 +815,46 @@ void ConvertLinalgToXsmm::runOnOperation() {
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
 }
+
+// Convert a linalg.matmul to a XSMM matmul op.
+struct ConvertMatmulToMatmul : public OpRewritePattern<linalg::MatmulOp> {
+  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    auto gemmInfo = isMappableToBrgemm(matmulOp);
+    if (failed(gemmInfo)) {
+      llvm::errs() << "Failed\n";
+      return failure();
+    }
+    replaceOpWithBrgemm(rewriter, matmulOp, *gemmInfo);
+    return success();
+  }
+};
+
+// Convert a linalg.batch_reduce_matmul to a XSMM brgemm op.
+struct ConvertBatchReduceMatmulToBatchReduceMatmul
+    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
+  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp batchReduceOp,
+                                PatternRewriter &rewriter) const override {
+    auto brgemmInfo = isMappableToBrgemm(batchReduceOp);
+    if (failed(brgemmInfo))
+      return failure();
+    replaceOpWithBrgemm(rewriter, batchReduceOp, *brgemmInfo);
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
-               ConvertGenericToBrgemm>(patterns.getContext());
+  patterns
+      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+           ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
+           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
+           ConvertMatmulToMatmul>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

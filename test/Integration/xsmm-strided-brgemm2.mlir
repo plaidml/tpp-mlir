@@ -30,7 +30,7 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
   // IR-DAG: %[[C16:.+]] = arith.constant 16 : i64
   // IR-DAG: %[[C0:.+]] = arith.constant 0 : i64
-  // IR: xsmm_brgemm_dispatch(%[[C1]], %[[C2]], %[[C8]], %[[C4]], %[[C8]], %[[C16]], %[[C8]], %[[C1]], %[[C1]], %[[C0]])
+  // IR: xsmm_gemm_dispatch(%[[C1]], %[[C2]], %[[C8]], %[[C4]], %[[C8]], %[[C16]], %[[C8]], %[[C0]])
   %gemm = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]} 
