@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 
 #include "TPP/ValueUtils.h"
+#include "TPP/MatcherUtils.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -312,7 +313,58 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   }
 
   // Write back the total sum to the output buffer.
-  rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+  auto storeOp = rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+
+  // Try to fuse elementwise consumers
+  if (auto parallelOp = dyn_cast<scf::ParallelOp>(linalgOp->getParentOp())) {
+    SmallVector<linalg::LinalgOp> linalgOps;
+    parallelOp->walk([&](linalg::LinalgOp op) {
+      if (op != linalgOp)
+        linalgOps.push_back(op);
+
+      return WalkResult::advance();
+    });
+
+    for (auto op : linalgOps) {
+      auto outBuf = op.getDpsInitOperand(0)->get();
+      if (outBuf != matC)
+        break;
+
+      rewriter.setInsertionPoint(storeOp);
+
+      SmallVector<Value> operands;
+      if (structured_match::utils::isTwoDAddOp(op, &operands)) {
+        // Get the value to be added. Load the element first, if necessary.
+        auto addValue = operands[0] != matC ? operands[0] : operands[1];
+        if (addValue.getType().isa<ShapedType>()) {
+          addValue =
+              rewriter.create<memref::LoadOp>(loc, addValue, parallelIvs)
+                  .getResult();
+        }
+
+        // Fuse the add into the matmul body.
+        auto addOp =
+            rewriter.create<arith::AddFOp>(loc, storeOp.getValue(), addValue);
+        // Store the new result.
+        storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+            storeOp, addOp.getResult(), matC, parallelIvs);
+      } else if (structured_match::utils::isTwoDReluOp(op, &operands)) {
+        // Fuse the relu into the matmul body.
+        Value zero = rewriter.create<arith::ConstantFloatOp>(
+            loc, APFloat(0.0F), rewriter.getF32Type());
+        auto maxOp =
+            rewriter.create<arith::MaxFOp>(loc, storeOp.getValue(), zero);
+        // Store the new result.
+        storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+            storeOp, maxOp.getResult(), matC, parallelIvs);
+      } else {
+        // Not a fusable operation. Bail out.
+        break;
+      }
+
+      rewriter.eraseOp(linalgOp);
+    }
+  }
 
   rewriter.eraseOp(linalgOp);
 
