@@ -437,27 +437,26 @@ static void replaceOpWithBrgemm(RewriterBase &rewriter,
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  bool hasBatch = batch != std::numeric_limits<unsigned>::max();
+  bool hasBatch = (batch != std::numeric_limits<unsigned>::max());
 
   auto dtype = xsmm::utils::getDataType(
       rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   Location loc = linalgOp.getLoc();
+  auto flags = rewriter.getArrayAttr(
+      xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+  SmallVector<Value> invokeOperands;
 
   if (hasBatch) {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(),
         ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
                           strideB});
-    auto flags = rewriter.getArrayAttr(
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
         loc, integer64, dims, flags, dtype);
-
     auto batchVal = loops[batch];
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
-    SmallVector<Value> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(linalgOp->getOperands().begin(),
                           linalgOp->getOperands().end());
@@ -468,11 +467,8 @@ static void replaceOpWithBrgemm(RewriterBase &rewriter,
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(),
         ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc});
-    auto flags = rewriter.getArrayAttr(
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
     Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, flags, dtype);
-    SmallVector<Value> invokeOperands;
     invokeOperands.push_back(dispatched);
     invokeOperands.append(linalgOp->getOperands().begin(),
                           linalgOp->getOperands().end());
