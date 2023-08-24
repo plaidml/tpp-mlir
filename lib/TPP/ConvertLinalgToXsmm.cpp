@@ -422,9 +422,10 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-static void replaceOpWithBrgemm(RewriterBase &rewriter,
-                                linalg::LinalgOp linalgOp,
-                                BrgemmInfo brgemmInfo) {
+// Replace linalgOp with a matmul or a batch reduce matmul.
+static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
+                                    linalg::LinalgOp linalgOp,
+                                    BrgemmInfo brgemmInfo) {
   OpBuilder::InsertionGuard guard(rewriter);
   auto loops = linalgOp.computeStaticLoopSizes();
   unsigned m = brgemmInfo.m;
@@ -614,7 +615,7 @@ struct ConvertGenericToBrgemm : public OpRewritePattern<linalg::GenericOp> {
     auto brgemmInfo = isMappableToBrgemm(genericOp);
     if (failed(brgemmInfo))
       return failure();
-    replaceOpWithBrgemm(rewriter, genericOp, *brgemmInfo);
+    replaceOpWithGemmLikeOp(rewriter, genericOp, *brgemmInfo);
     return success();
   }
 };
@@ -819,11 +820,9 @@ struct ConvertMatmulToMatmul : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     auto gemmInfo = isMappableToBrgemm(matmulOp);
-    if (failed(gemmInfo)) {
-      llvm::errs() << "Failed\n";
+    if (failed(gemmInfo))
       return failure();
-    }
-    replaceOpWithBrgemm(rewriter, matmulOp, *gemmInfo);
+    replaceOpWithGemmLikeOp(rewriter, matmulOp, *gemmInfo);
     return success();
   }
 };
@@ -838,7 +837,7 @@ struct ConvertBatchReduceMatmulToBatchReduceMatmul
     auto brgemmInfo = isMappableToBrgemm(batchReduceOp);
     if (failed(brgemmInfo))
       return failure();
-    replaceOpWithBrgemm(rewriter, batchReduceOp, *brgemmInfo);
+    replaceOpWithGemmLikeOp(rewriter, batchReduceOp, *brgemmInfo);
     return success();
   }
 };
