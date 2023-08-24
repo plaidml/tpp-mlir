@@ -73,7 +73,7 @@ class TensorDialect;
 
 namespace gpu {
 class GPUModuleOp;
-class GpuDialect;
+class GPUDialect;
 } // namespace gpu
 
 namespace spirv {
