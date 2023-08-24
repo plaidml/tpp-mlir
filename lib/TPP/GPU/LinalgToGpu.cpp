@@ -36,9 +36,10 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasBufferSemantics())
+    if (!matmulOp.hasBufferSemantics()) {
       return rewriter.notifyMatchFailure(matmulOp,
                                          "Linalg to GPU expects memref type");
+    }
 
     Location loc = matmulOp.getLoc();
     ArrayRef<int64_t> shapeC = matmulOp.getDpsInitOperand(0)
