@@ -83,3 +83,62 @@ func.func @brgemm_dynamic_shapes(%arg0: memref<?x?x?xf32>,
 
 // CHECK-LABEL: func.func @brgemm_dynamic_shapes
 // CHECK: linalg.batch_reduce_matmul
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @tiled_fc(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024xf32>, %arg2: memref<256x1024xf32>, %arg3: memref<256x1024xf32>) {
+  %c0 = arith.constant 0 : index
+  %c256 = arith.constant 256 : index
+  %c1024 = arith.constant 1024 : index
+  %c32 = arith.constant 32 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  scf.parallel (%arg4, %arg5) = (%c0, %c0) to (%c256, %c1024) step (%c32, %c32) {
+    %subview = memref.subview %arg2[%arg4, %arg5] [32, 32] [1, 1] : memref<256x1024xf32> to memref<32x32xf32, strided<[1024, 1], offset: ?>>
+    %subview_0 = memref.subview %arg0[%arg4, 0] [32, 1024] [1, 1] : memref<256x1024xf32> to memref<32x1024xf32, strided<[1024, 1], offset: ?>>
+    %subview_1 = memref.subview %arg1[0, %arg5] [1024, 32] [1, 1] : memref<1024x1024xf32> to memref<1024x32xf32, strided<[1024, 1], offset: ?>>
+    %subview_2 = memref.subview %arg3[%arg4, %arg5] [32, 32] [1, 1] : memref<256x1024xf32> to memref<32x32xf32, strided<[1024, 1], offset: ?>>
+    linalg.matmul ins(%subview_0, %subview_1 : memref<32x1024xf32, strided<[1024, 1], offset: ?>>, memref<1024x32xf32, strided<[1024, 1], offset: ?>>) outs(%subview_2 : memref<32x32xf32, strided<[1024, 1], offset: ?>>)
+    linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%subview : memref<32x32xf32, strided<[1024, 1], offset: ?>>) outs(%subview_2 : memref<32x32xf32, strided<[1024, 1], offset: ?>>) {
+    ^bb0(%in: f32, %out: f32):
+      %0 = arith.addf %in, %out : f32
+      linalg.yield %0 : f32
+    }
+    linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%subview_2 : memref<32x32xf32, strided<[1024, 1], offset: ?>>) {
+    ^bb0(%out: f32):
+      %0 = arith.maxf %out, %cst : f32
+      linalg.yield %0 : f32
+    }
+    scf.yield
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @tiled_fc(
+// CHECK-SAME:  %[[A:.+]]: memref<256x1024xf32>, %[[B:.+]]: memref<1024x1024xf32>, %[[bias:.+]]: memref<256x1024xf32>, %[[C:.+]]: memref<256x1024xf32>
+// CHECK-DAG:     %[[m:.+]] = arith.constant 256 : index
+// CHECK-DAG:     %[[n:.+]] = arith.constant 1024 : index
+// CHECK-DAG:     %[[tile:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[zero:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK:         scf.parallel (%[[arg5:.+]], %[[arg6:.+]]) ={{.*}}to (%[[m]], %[[n]])
+// CHECK:           %[[outTile:.+]] = memref.subview %[[C]]
+// CHECK:           scf.parallel (%[[arg6:.+]], %[[arg7:.+]]) ={{.*}}to (%[[tile]], %[[tile]])
+// CHECK-NOT:         linalg.matmul
+// CHECK:             %[[init:.+]] = memref.load %[[outTile]]{{\[}}%[[arg6]], %[[arg7]]{{\]}} : memref<32x32xf32
+// CHECK:             %[[sum:.+]] = scf.for {{.*}}to %[[n]] {{.*}}iter_args(%[[acc:.*]] = %[[init]])
+// CHECK:               %[[elemA:.+]] = memref.load
+// CHECK:               %[[elemB:.+]] = memref.load
+// CHECK:               %[[mul:.+]] = arith.mulf %[[elemA]], %[[elemB]] : f32
+// CHECK:               %[[res:.+]] = arith.addf %[[acc]], %[[mul]] : f32
+// CHECK:               scf.yield %[[res]] : f32
+// CHECK:             }
+// CHECK-NOT:         linalg.generic
+// CHECK:             %[[elemBias:.+]] = memref.load
+// CHECK:             %[[biasAdd:.+]] = arith.addf %[[sum]], %[[elemBias]]
+// CHECK:             %[[reluRes:.+]] = arith.maxf %[[biasAdd]], %[[zero]]
+// CHECK:             memref.store %[[reluRes]], %[[outTile]]
+// CHECK:             scf.yield
+// CHECK:           }
+// CHECK:           scf.yield
+// CHECK:         }
