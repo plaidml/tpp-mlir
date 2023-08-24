@@ -1,4 +1,4 @@
-// RUN: tpp-opt --tpp-mapping -cleanup -tpp-conversion --bufferize --convert-memref-to-tpp --convert-tpp-to-xsmm %s --split-input-file | FileCheck %s
+// RUN: tpp-opt -tpp-mapping -bufferize -convert-memref-to-xsmm %s --split-input-file | FileCheck %s
 
 func.func @pack1(%in: tensor<4x4xf32>, %out: tensor<2x2x2x2xf32>) ->  tensor<2x2x2x2xf32> {
   %1 = tensor.pack %in inner_dims_pos = [0, 1] inner_tiles = [2,2] into %out : tensor<4x4xf32> -> tensor<2x2x2x2xf32>

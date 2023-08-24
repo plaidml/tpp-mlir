@@ -22,13 +22,13 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
   let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
 }
 
-def ConvertMemRefToTpp : Pass<"convert-memref-to-tpp", "func::FuncOp"> {
-  let summary = "Convert memref ops to tpp.";
+def ConvertMemRefToXsmm : Pass<"convert-memref-to-xsmm", "func::FuncOp"> {
+  let summary = "Convert memref ops to xsmm.";
   let description = [{
-    Convert memref operations (i.e., memref.copy) to tpp operations.
+    Convert memref operations (i.e., memref.copy) to xsmm operations.
   }];
-  let constructor = "mlir::tpp::createConvertMemRefToTppPass()";
-  let dependentDialects = ["memref::MemRefDialect", "tpp::TppDialect"];
+  let constructor = "mlir::tpp::createConvertMemRefToXsmmPass()";
+  let dependentDialects = ["memref::MemRefDialect", "xsmm::XsmmDialect"];
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {

@@ -52,14 +52,6 @@ struct BrgemmInfo {
   int64_t strideB;
 };
 
-struct UnaryInfo {
-  unsigned m;
-  unsigned n;
-
-  int64_t ldi;
-  int64_t ldo;
-};
-
 struct BinaryInfo {
   unsigned m;
   unsigned n;
@@ -76,58 +68,6 @@ std::optional<unsigned> getPosInCodomain(unsigned dim, OpOperand *operand,
   assert(operand->getOwner() == linalgOp);
   return linalgOp.getMatchingIndexingMap(operand).getResultPosition(
       getAffineDimExpr(dim, linalgOp.getContext()));
-}
-
-// Get UnaryInfo from input and output. The output must be of rank 2, while
-// the input can be constant, 1d or 2d. Additionally verify that the innermost
-// stride is 1, if this is not the case we cannot map to xsmm.
-static FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
-  Type outputType = output.getType();
-
-  assert(isa<ShapedType>(outputType));
-  auto outputShapedType = output.getType().cast<ShapedType>();
-  if (outputShapedType.getRank() != 2)
-    return failure();
-
-  UnaryInfo unaryInfo;
-  unaryInfo.m = outputShapedType.getShape()[0];
-  unaryInfo.n = outputShapedType.getShape()[1];
-
-  int64_t ldi = 1;
-  if (isa<ShapedType>(input.getType())) {
-    auto stridesOnInput = utils::getStaticStrides(input);
-    if (failed(stridesOnInput) || stridesOnInput->back() != 1)
-      return failure();
-    ldi = stridesOnInput->front();
-  }
-  auto stridesOnOutput = utils::getStaticStrides(output);
-  if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
-    return failure();
-
-  unaryInfo.ldi = ldi;
-  unaryInfo.ldo = stridesOnOutput->front();
-  return unaryInfo;
-}
-
-// Replace `linalgOp` with a unary dispatch plus invoke.
-static void replaceOpWithUnary(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp,
-                               ArrayRef<Value> operands, UnaryInfo unaryInfo,
-                               ArrayAttr flags, xsmm::UnaryKindAttr kind) {
-  Location loc = linalgOp.getLoc();
-  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo.m, unaryInfo.n,
-                                               unaryInfo.ldi, unaryInfo.ldo});
-  auto dtype = xsmm::utils::getDataType(
-      rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
-  Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-      loc, integer64, kind, dims, flags, dtype);
-  SmallVector<Value> invokeOperands;
-  invokeOperands.push_back(dispatched);
-  invokeOperands.append(operands.begin(), operands.end());
-  rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(linalgOp, dtype, kind,
-                                             invokeOperands);
 }
 
 // Replace `linalgOp` with a binary dispatch plus invoke.
@@ -164,7 +104,7 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
       return failure();
     }
 
-    auto unaryInfo = getUnaryInfo(operands[0], operands[1]);
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
     if (failed(unaryInfo))
       return failure();
 
@@ -172,7 +112,8 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
         rewriter.getContext(), xsmm::UnaryFlags::BCAST_SCALAR));
     xsmm::UnaryKindAttr kind =
         xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::ZERO);
-    replaceOpWithUnary(rewriter, fillOp, operands, *unaryInfo, flags, kind);
+    xsmm::utils::replaceOpWithUnary(rewriter, fillOp, operands, *unaryInfo,
+                                    flags, kind);
     return success();
   }
 };
@@ -191,7 +132,7 @@ struct ConvertTransposeOpToUnaryTranspose
       return failure();
     }
 
-    auto unaryInfo = getUnaryInfo(operands[0], operands[1]);
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
     if (failed(unaryInfo))
       return failure();
 
@@ -201,8 +142,8 @@ struct ConvertTransposeOpToUnaryTranspose
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
     xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
         rewriter.getContext(), xsmm::UnaryKind::TRANSPOSE);
-    replaceOpWithUnary(rewriter, transposeOp, operands, *unaryInfo, flags,
-                       kind);
+    xsmm::utils::replaceOpWithUnary(rewriter, transposeOp, operands, *unaryInfo,
+                                    flags, kind);
     return success();
   }
 };
@@ -307,7 +248,7 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    auto unaryInfo = getUnaryInfo(operands[0], operands[1]);
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
     if (failed(unaryInfo))
       return failure();
     OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
@@ -319,7 +260,8 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
         xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
     xsmm::UnaryKindAttr kind =
         xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::RELU);
-    replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo, flags, kind);
+    xsmm::utils::replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo,
+                                    flags, kind);
     return success();
   }
 };
