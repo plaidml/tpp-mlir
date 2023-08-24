@@ -73,7 +73,7 @@ class TensorDialect;
 
 namespace gpu {
 class GPUModuleOp;
-class GpuDialect;
+class GPUDialect;
 } // namespace gpu
 
 namespace spirv {
@@ -161,6 +161,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createGpuVulkanAbiPass(bool use64bitIndex = false);
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeAggregatedOpsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgToGpuPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertPackOptimization();
 // Testing passes.

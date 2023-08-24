@@ -45,8 +45,10 @@ module {
 // CHECK:         %[[gpu0:.+]],{{.*}}= gpu.alloc async ()
 // CHECK:         %[[gpu1:.+]],{{.*}}= gpu.alloc async ()
 // CHECK:         %[[gpu2:.+]],{{.*}}= gpu.alloc async ()
-// CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel
-// CHECK-SAME:    args(%[[gpu0]]{{.*}}, %[[gpu1]]{{.*}}, %[[gpu2]]{{.*}}
+// CHECK-NOT:     gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[ARG0]]
+// CHECK-NOT:     gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[ARG1]]
+// CHECK-NOT:     gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[ARG2]]
+// CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[gpu0]]
 // CHECK:         gpu.memcpy async %[[ARG2]], %[[gpu2]]
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel attributes {gpu.binary = "
