@@ -422,9 +422,10 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-static void replaceOpWithBrgemm(RewriterBase &rewriter,
-                                linalg::LinalgOp linalgOp,
-                                BrgemmInfo brgemmInfo) {
+// Replace linalgOp with a matmul or a batch reduce matmul.
+static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
+                                    linalg::LinalgOp linalgOp,
+                                    BrgemmInfo brgemmInfo) {
   OpBuilder::InsertionGuard guard(rewriter);
   auto loops = linalgOp.computeStaticLoopSizes();
   unsigned m = brgemmInfo.m;
@@ -437,30 +438,43 @@ static void replaceOpWithBrgemm(RewriterBase &rewriter,
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(),
-      ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
-                        strideB});
+  bool hasBatch = (batch != std::numeric_limits<unsigned>::max());
+
   auto dtype = xsmm::utils::getDataType(
       rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   Location loc = linalgOp.getLoc();
   auto flags = rewriter.getArrayAttr(
       xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
-  Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
-      loc, integer64, dims, flags, dtype);
-
-  unsigned batchVal = 1;
-  if (batch != std::numeric_limits<unsigned>::max())
-    batchVal = loops[batch];
-  Value batchDim = rewriter.create<arith::ConstantOp>(
-      loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
   SmallVector<Value> invokeOperands;
-  invokeOperands.push_back(dispatched);
-  invokeOperands.append(linalgOp->getOperands().begin(),
-                        linalgOp->getOperands().end());
-  invokeOperands.push_back(batchDim);
-  rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype, invokeOperands);
+
+  if (hasBatch) {
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(),
+        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
+                          strideB});
+    Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
+        loc, integer64, dims, flags, dtype);
+    auto batchVal = loops[batch];
+    Value batchDim = rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(linalgOp->getOperands().begin(),
+                          linalgOp->getOperands().end());
+    invokeOperands.push_back(batchDim);
+    rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype,
+                                                invokeOperands);
+  } else {
+    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(),
+        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc});
+    Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
+        loc, integer64, dims, flags, dtype);
+    invokeOperands.push_back(dispatched);
+    invokeOperands.append(linalgOp->getOperands().begin(),
+                          linalgOp->getOperands().end());
+    rewriter.replaceOpWithNewOp<xsmm::GemmOp>(linalgOp, dtype, invokeOperands);
+  }
 }
 
 // Structural matcher.
@@ -469,7 +483,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
   // clang-format off
   using namespace structured_match;
   auto maybeBrgemmMatcher =
-    StructuredOpMatcher::make<linalg::GenericOp>()
+    StructuredOpMatcher::make<linalg::LinalgOp>()
       .output(MatchAll(), HasStaticShape())
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasStaticStrides())
@@ -601,7 +615,7 @@ struct ConvertGenericToBrgemm : public OpRewritePattern<linalg::GenericOp> {
     auto brgemmInfo = isMappableToBrgemm(genericOp);
     if (failed(brgemmInfo))
       return failure();
-    replaceOpWithBrgemm(rewriter, genericOp, *brgemmInfo);
+    replaceOpWithGemmLikeOp(rewriter, genericOp, *brgemmInfo);
     return success();
   }
 };
@@ -798,12 +812,44 @@ void ConvertLinalgToXsmm::runOnOperation() {
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
 }
+
+// Convert a linalg.matmul to a XSMM matmul op.
+struct ConvertMatmulToMatmul : public OpRewritePattern<linalg::MatmulOp> {
+  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    auto gemmInfo = isMappableToBrgemm(matmulOp);
+    if (failed(gemmInfo))
+      return failure();
+    replaceOpWithGemmLikeOp(rewriter, matmulOp, *gemmInfo);
+    return success();
+  }
+};
+
+// Convert a linalg.batch_reduce_matmul to a XSMM brgemm op.
+struct ConvertBatchReduceMatmulToBatchReduceMatmul
+    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
+  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp batchReduceOp,
+                                PatternRewriter &rewriter) const override {
+    auto brgemmInfo = isMappableToBrgemm(batchReduceOp);
+    if (failed(brgemmInfo))
+      return failure();
+    replaceOpWithGemmLikeOp(rewriter, batchReduceOp, *brgemmInfo);
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
-               ConvertGenericToBrgemm>(patterns.getContext());
+  patterns
+      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+           ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
+           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
+           ConvertMatmulToMatmul>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
