@@ -533,6 +533,11 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
     Lower linalg to ops optimized for computation on GPU.
   }];
   let constructor = "mlir::tpp::createLinalgToGpuPass()";
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "gpu::GPUDialect",
+                           "arith::ArithDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

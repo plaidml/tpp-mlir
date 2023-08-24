@@ -121,14 +121,6 @@ void populateLinalgToGpuPatterns(RewritePatternSet &patterns) {
 struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
   LinalgToGpu() = default;
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<scf::SCFDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<gpu::GPUDialect>();
-    registry.insert<arith::ArithDialect>();
-  }
-
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateLinalgToGpuPatterns(patterns);
