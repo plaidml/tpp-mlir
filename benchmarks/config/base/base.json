@@ -113,4 +113,31 @@
       "extensions": [ "avx2" ]
     }
   }}
+  {
+    "pack": {
+      "gemm_operand_a_512x1024": {
+        "type": "MLIR",
+        "benchmark": "pack-gemm-operand-a-512x1024.mlir",
+        "environment": {},
+        "flags": [ "-n", "500" ],
+        "extensions": [ "(avx2|asimd)" ]
+    },
+    "gemm_operand_b_512x1024": {
+      "type": "MLIR",
+      "benchmark": "pack-gemm-operand-b-512x1024.mlir",
+      "environment": {},
+      "flags": [ "-n", "500" ],
+      "extensions": [ "(avx2|asimd)" ]
+    }
+  }},
+  {
+    "unpack": {
+      "gemm_operand_c_512x512": {
+        "type": "MLIR",
+        "benchmark": "unpack-gemm-operand-a-512x512.mlir",
+        "environment": {},
+        "flags": [ "-n", "500" ],
+        "extensions": [ "(avx2|asimd)" ]
+    }
+  }}
 ]
