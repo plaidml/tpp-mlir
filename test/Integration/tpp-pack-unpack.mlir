@@ -15,6 +15,16 @@ func.func private @pack3(%in: tensor<8x2x2x2xf32>, %out: tensor<2x2x1x4x2x2xf32>
   return %2: tensor<2x2x1x4x2x2xf32>
 }
 
+func.func private @unpack1(%in:tensor<2x2x2x2xf32>, %out:  tensor<4x4xf32>) ->   tensor<4x4xf32> {
+  %1 = tensor.unpack %in inner_dims_pos = [0, 1] inner_tiles = [2,2] into %out : tensor<2x2x2x2xf32> -> tensor<4x4xf32>
+  return %1 : tensor<4x4xf32>
+}
+
+func.func private @unpack2(%0:  tensor<1x2x2x2x2xf32>, %1: tensor<1x2x2x4xf32>)-> tensor<1x2x2x4xf32>{
+ %2 = tensor.unpack %0  outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %1 : tensor<1x2x2x2x2xf32>->tensor<1x2x2x4xf32>
+  return %2: tensor<1x2x2x4xf32>
+}
+
 
 func.func @entry(){
   %0 = arith.constant dense<[[0.0, 1.0, 2.0, 3.0],
@@ -59,5 +69,23 @@ func.func @entry(){
   %v2 = vector.transfer_read %8[%c0, %c0, %c0, %c0, %c0, %c0], %d1 : tensor<2x2x1x4x2x2xf32>, vector<2x2x1x4x2x2xf32>
   vector.print %v2 : vector<2x2x1x4x2x2xf32>
   // CHECK-NOT: ( ( ( ( ( ( 0, 3 ), ( 7, 11 ) ), ( ( 14, 18 ), ( 22, 26 ) ), ( ( 30, 34 ), ( 38, 42 ) ), ( ( 46, 50 ), ( 53, 57 ) ) ) ), ( ( ( ( 2, 5 ), ( 9, 13 ) ), ( ( 16, 20 ), ( 24, 28 ) ), ( ( 32, 36 ), ( 40, 44 ) ), ( ( 48, 52 ), ( 55, 59 ) ) ) ) ), ( ( ( ( ( 1, 4 ), ( 8, 12 ) ), ( ( 15, 19 ), ( 23, 27 ) ), ( ( 31, 35 ), ( 39, 43 ) ), ( ( 47, 51 ), ( 54, 58 ) ) ) ), ( ( ( ( 3, 6 ), ( 10, 14 ) ), ( ( 17, 21 ), ( 25, 29 ) ), ( ( 33, 37 ), ( 41, 45 ) ), ( ( 49, 53 ), ( 56, 60 ) ) ) ) ) )
+
+  %9 = arith.constant dense<((((0.0, 1.0), (4.0, 5.0)),
+                               ((2.0, 3.0), (6.0, 7.0))),
+                              (((8.0, 9.0), (12.0, 13.0)),
+                               ((10.0, 11.0), (14.0, 15.0))))>: tensor<2x2x2x2xf32>
+  %10 = tensor.empty():tensor<4x4xf32>
+  %11 = call @unpack1(%9,%10) : (tensor<2x2x2x2xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %v3 = vector.transfer_read %11[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
+  vector.print %v3 : vector<4x4xf32>
+  // CHECK: ( ( 0, 1, 2, 3 ), ( 4, 5, 6, 7 ), ( 8, 9, 10, 11 ), ( 12, 13, 14, 15 ) )
+
+  %12 = arith.constant dense < ( ( ( ( 0.0, 1.0 ), ( 4.0, 5.0 ) ), ( ( 8.0, 9.0 ), ( 12.0, 13.0 ) ) ), ( ( ( 2.0, 3.0 ), ( 6.0, 7.0 ) ), ( ( 10.0, 11.0 ), ( 14.0, 15.0 ) ) ) ) >:tensor<1x2x2x2x2xf32>
+  %13 = tensor.empty():tensor<1x2x2x4xf32>
+  %14 = call @unpack2(%12, %13):(tensor<1x2x2x2x2xf32>, tensor<1x2x2x4xf32>)->(tensor<1x2x2x4xf32>)
+  %v4 = vector.transfer_read %14[%c0, %c0, %c0, %c0], %d1 : tensor<1x2x2x4xf32>, vector<1x2x2x4xf32>
+  vector.print %v4 : vector<1x2x2x4xf32>
+  // CHECK: ( ( ( ( 0, 1, 2, 3 ), ( 4, 5, 6, 7 ) ), ( ( 8, 9, 10, 11 ), ( 12, 13, 14, 15 ) ) ) )
+
   return
 }
