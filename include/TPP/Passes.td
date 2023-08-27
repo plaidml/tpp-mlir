@@ -210,8 +210,6 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
     Option<"maxDepth", "max-depth", "int64_t", "5", 
            "Get producers till maxDepth">,
-    Option<"startFromLastFusableConsumer", "start-from-last-consumer", "bool",
-           "true", "Fuse from the last fusable consumer of the current target">,
     Option<"useForAll", "use-for-all", "bool", "true", "Use parallel forAll">
   ];
   let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect",

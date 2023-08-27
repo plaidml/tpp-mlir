@@ -682,6 +682,74 @@ static Operation *getLastFusableEltWiseConsumer(
   return currentConsumer;
 }
 
+static void doFusion(RewriterBase &rewriter, func::FuncOp func,
+                     ArrayRef<int64_t> tileSizes, int64_t maxDepth) {
+  // Set to keep track of fused ops.
+  llvm::SmallDenseSet<Operation *> fusedOps;
+
+  SmallVector<linalg::LinalgOp> linalgContractionOperations;
+  func->walk([&](linalg::LinalgOp linalgOp) {
+    if ((isConvolutionLike(linalgOp) ||
+         succeeded(linalgx::utils::isContraction(linalgOp))) &&
+        linalgOp.hasTensorSemantics())
+      linalgContractionOperations.push_back(linalgOp);
+  });
+
+  if (linalgContractionOperations.empty())
+    return;
+
+  // Reverse the ops. Start from the bottom to increase
+  // the fusion boundaries.
+  std::reverse(linalgContractionOperations.begin(),
+               linalgContractionOperations.end());
+  llvm::SmallDenseSet<Operation *> visitedConsumers;
+  llvm::SmallDenseSet<Operation *> fusionRoots;
+
+  // Compute the tile sizes for each contraction operations or
+  // use the default one.
+  llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> defaultTiles;
+  for (auto contractionOp : linalgContractionOperations) {
+    auto tiles = getDefaultTileSizes(contractionOp, tileSizes);
+    if (failed(tiles)) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to compute default tile sizes for: "
+                              << contractionOp << "\n");
+      return;
+    }
+    defaultTiles[contractionOp] =
+        getAsOpFoldResult(rewriter.getI64ArrayAttr(*tiles));
+  }
+
+  for (linalg::LinalgOp contractionOp : linalgContractionOperations) {
+    Operation *consumerOp = getLastFusableEltWiseConsumer(
+        contractionOp, visitedConsumers, defaultTiles);
+    fusionRoots.insert(consumerOp);
+  }
+  LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
+
+  SmallVector<Operation *> allLinalgOps;
+  func->walk(
+      [&](linalg::LinalgOp linalgOp) { allLinalgOps.push_back(linalgOp); });
+
+  // We want to walk operations in reverse order as fusion will likely find
+  // larger cluster of operations to fuse if we go bottom-up.
+  std::reverse(allLinalgOps.begin(), allLinalgOps.end());
+
+  for (Operation *linalgOp : allLinalgOps) {
+    if (fusionRoots.count(linalgOp)) {
+      LLVM_DEBUG(llvm::dbgs() << "\n\n");
+      FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
+          fuseWithEltwise(rewriter, cast<TilingInterface>(linalgOp),
+                          defaultTiles, fusedOps, maxDepth);
+      LLVM_DEBUG(llvm::dbgs() << "\n\n");
+      if (succeeded(fuseAndTileResult)) {
+        rewriter.replaceOp(
+            linalgOp,
+            (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
+      }
+    }
+  }
+}
+
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
   TileConsumerAndFuseProducers() = default;
@@ -690,7 +758,6 @@ struct TileConsumerAndFuseProducers
                                bool useForAll) {
     this->tileSizes = tileSizes;
     this->maxDepth = maxDepth;
-    this->startFromLastFusableConsumer = startFromLastFusableConsumer;
     this->useForAll = useForAll;
   }
 
@@ -704,72 +771,27 @@ struct TileConsumerAndFuseProducers
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    func::FuncOp func = getOperation();
-    IRRewriter rewriter(&getContext());
+    int fixedPoint = 3;
+    do {
+      func::FuncOp func = getOperation();
+      IRRewriter rewriter(&getContext());
+      doFusion(rewriter, func, this->tileSizes, this->maxDepth);
 
-    // Set to keep track of fused ops.
-    llvm::SmallDenseSet<Operation *> fusedOps;
-
-    SmallVector<linalg::LinalgOp> linalgContractionOperations;
-    func->walk([&](linalg::LinalgOp linalgOp) {
-      if ((isConvolutionLike(linalgOp) ||
-           succeeded(linalgx::utils::isContraction(linalgOp))) &&
-          linalgOp.hasTensorSemantics())
-        linalgContractionOperations.push_back(linalgOp);
-    });
-
-    // Reverse the ops. Start from the bottom to increase
-    // the fusion boundaries.
-    std::reverse(linalgContractionOperations.begin(),
-                 linalgContractionOperations.end());
-    llvm::SmallDenseSet<Operation *> visitedConsumers;
-    llvm::SmallDenseSet<Operation *> fusionRoots;
-
-    // Compute the tile sizes for each contraction operations or
-    // use the default one.
-    llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> defaultTiles;
-    for (auto contractionOp : linalgContractionOperations) {
-      auto tiles = getDefaultTileSizes(contractionOp, this->tileSizes);
-      if (failed(tiles)) {
-        LLVM_DEBUG(llvm::dbgs() << "Failed to compute default tile sizes for: "
-                                << contractionOp << "\n");
-        return;
+      {
+        RewritePatternSet patterns(&ctx);
+        // Fold unit-extent dims for linalg on tensors. Since
+        // `populateFoldUnitExtentDimsViaSlicesPatterns` works only with
+        // linalg.generic we need to generalize first using
+        // `populateLinalgNamedOpsGeneralizationPatterns`.
+        linalg::ControlDropUnitDims options;
+        options.rankReductionStrategy = linalg::ControlDropUnitDims::
+            RankReductionStrategy::ExtractInsertSlice;
+        linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
+        tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+        linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
+        (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
       }
-      defaultTiles[contractionOp] =
-          getAsOpFoldResult(rewriter.getI64ArrayAttr(*tiles));
-    }
-
-    for (linalg::LinalgOp contractionOp : linalgContractionOperations) {
-      Operation *consumerOp = contractionOp.getOperation();
-      if (this->startFromLastFusableConsumer)
-        consumerOp = getLastFusableEltWiseConsumer(
-            contractionOp, visitedConsumers, defaultTiles);
-      fusionRoots.insert(consumerOp);
-    }
-    LLVM_DEBUG(llvm::dbgs() << "#fusionRoots: " << fusionRoots.size() << "\n");
-
-    SmallVector<Operation *> allLinalgOps;
-    func->walk(
-        [&](linalg::LinalgOp linalgOp) { allLinalgOps.push_back(linalgOp); });
-
-    // We want to walk operations in reverse order as fusion will likely find
-    // larger cluster of operations to fuse if we go bottom-up.
-    std::reverse(allLinalgOps.begin(), allLinalgOps.end());
-
-    for (Operation *linalgOp : allLinalgOps) {
-      if (fusionRoots.count(linalgOp)) {
-        LLVM_DEBUG(llvm::dbgs() << "\n\n");
-        FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
-            fuseWithEltwise(rewriter, cast<TilingInterface>(linalgOp),
-                            defaultTiles, fusedOps, this->maxDepth);
-        LLVM_DEBUG(llvm::dbgs() << "\n\n");
-        if (succeeded(fuseAndTileResult)) {
-          rewriter.replaceOp(
-              linalgOp,
-              (*fuseAndTileResult).replacements[linalgOp->getResults()[0]]);
-        }
-      }
-    }
+    } while (fixedPoint--);
 
     {
       // Patterns for scf.for.
@@ -783,16 +805,6 @@ struct TileConsumerAndFuseProducers
       RewritePatternSet patterns(&ctx);
       if (this->useForAll)
         linalgx::utils::populateScfForToForAllRewritePattern(patterns);
-      // Fold unit-extent dims for linalg on tensors. Since
-      // `populateFoldUnitExtentDimsViaSlicesPatterns` works only with
-      // linalg.generic we need to generalize first using
-      // `populateLinalgNamedOpsGeneralizationPatterns`.
-      linalg::ControlDropUnitDims options;
-      options.rankReductionStrategy = linalg::ControlDropUnitDims::
-          RankReductionStrategy::ExtractInsertSlice;
-      linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
-      tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-      linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
