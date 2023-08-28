@@ -342,7 +342,7 @@ private:
       pm.addPass(createConvertTppToLoopsPass());
     else {
       // Memref to tpp conversion patterns.
-      pm.addPass(createConvertMemRefToTppPass());
+      pm.addPass(createConvertMemRefToXsmmPass());
       // Tpp to Xsmm conversion patterns.
       pm.addPass(createConvertTppToXsmmPass());
     }

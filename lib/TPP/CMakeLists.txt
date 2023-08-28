@@ -22,7 +22,7 @@ add_mlir_library(MLIRTPP
     CombineTpp.cpp
     RewriteBatchMatmulToMatmul.cpp
     LinalgDeGeneralize.cpp
-    ConvertMemRefToTpp.cpp
+    ConvertMemRefToXsmm.cpp
     DefaultPipeline.cpp
     ConvertLinalgToXsmm.cpp
     DecomposeAggregatedOps.cpp
