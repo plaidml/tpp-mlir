@@ -33,10 +33,10 @@ fi
 if [ "${COMPILER}" == "clang" ]; then
   GCC_COMPAT_OPTION="-g ${GCC_TOOLCHAIN}"
 fi
-if [ "${SANITIZERS}" ]; then
+if [ "${SANITIZERS}" ] && [ "0" != "${SANITIZERS}" ]; then
   SANITIZERS="-S"
 fi
-if [ "${INSTALL}" ]; then
+if [ "${INSTALL}" ] && [ "0" != "${INSTALL}" ]; then
   if [ -d "${INSTALL_PREFIX}" ]; then
     INSTALL_OPTION="-i ${INSTALL_PREFIX}"
   else
@@ -115,7 +115,7 @@ then
 fi
 
 # Check
-if [ "${CHECK}" ]; then
+if [ "${CHECK}" ] && [ "0" != "${CHECK}" ]; then
   echo "--- CHECK"
   if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BLD_DIR} \
@@ -126,7 +126,7 @@ if [ "${CHECK}" ]; then
 fi
 
 # Install
-if [ "${INSTALL}" ]; then
+if [ "${INSTALL}" ] && [ "0" != "${INSTALL}" ]; then
   echo "--- INSTALL"
   if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BLD_DIR} \
@@ -137,7 +137,7 @@ if [ "${INSTALL}" ]; then
 fi
 
 # Benchmark
-if [ "${BENCH}" ]; then
+if [ "${BENCH}" ] && [ "0" != "${BENCH}" ]; then
   echo "--- BENCHMARK"
   export LOGFILE=benchmark-output.txt
   ${SCRIPT_DIR}/ci/build.sh \

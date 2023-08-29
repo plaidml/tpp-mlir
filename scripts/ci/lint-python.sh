@@ -12,6 +12,11 @@ REPOROOT=$(realpath "$(dirname "$0")/../..")
 PATTERN="./*.py"
 LINTER=$(command -v black)
 
+# Check if Black actually works
+if [ "${LINTER}" ] && ! ${LINTER} --version >/dev/null 2>/dev/null; then
+  unset LINTER
+fi
+
 if [ "${LINTER}" ]; then
   FLAKE8=$(command -v flake8)
   FLAKE8_IGNORE="--ignore=E402,E501,F821"
@@ -64,5 +69,5 @@ if [ "${LINTER}" ]; then
     echo "OK (${OK} files processed)"
   fi
 else  # soft error (exit normally)
-  echo "ERROR: missing Python-linter (${LINTER})."
+  echo "WARNING: missing Python-linter."
 fi
