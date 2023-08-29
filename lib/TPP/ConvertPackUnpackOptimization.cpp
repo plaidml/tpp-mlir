@@ -1,4 +1,4 @@
-//===ConvertPackOptimization.cpp -------------------------------*----C++-*-===//
+//===ConvertPackandUnpackOptimization.cpp ----------------------*----C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM
 // Exceptions. / See https://llvm.org/LICENSE.txt for license information. /
@@ -22,13 +22,16 @@ using namespace mlir::tpp;
 
 namespace {
 
-template <typename Op, bool IsPack>
-class ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
+template <typename Op>
+struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op packOp,
                                 PatternRewriter &rewriter) const override {
     if (packOp.getStaticInnerTiles().size() <= 0)
       return failure();
+
+    constexpr bool IsPack =
+        std::is_same<mlir::tensor::PackOp, Op>::value == true;
     ArrayRef<int64_t> shape = IsPack ? packOp.getSourceType().getShape()
                                      : packOp.getDestType().getShape();
     int numLoops = shape.size();
@@ -71,9 +74,9 @@ class ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
 
     auto loopNest = mlir::scf::buildLoopNest(
         rewriter, packOp.getLoc(), lbs, ubs, steps, packOp.getDest(),
-        [&packOp, &numLoops,
-         &tiledDims](OpBuilder &rewriter, Location loc, ValueRange localIvs,
-                     ValueRange iterArgs) -> scf::ValueVector {
+        [&packOp, &numLoops, &tiledDims,
+         &IsPack](OpBuilder &rewriter, Location loc, ValueRange localIvs,
+                  ValueRange iterArgs) -> scf::ValueVector {
           SmallVector<OpFoldResult> extractSliceOffsets;
           SmallVector<OpFoldResult> extractSliceStrides;
           SmallVector<OpFoldResult> extractSliceSizes;
@@ -190,10 +193,10 @@ class ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
 };
 
 void populatePackUnpackOptimizationPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-     patterns.add<ConvertPackUnpackOptimizationOp<mlir::tensor::PackOp, true>>(patterns.getContext());
-     patterns.add<ConvertPackUnpackOptimizationOp<mlir::tensor::UnPackOp, false>>(patterns.getContext());
-  // clang-format on
+  patterns.add<ConvertPackUnpackOptimizationOp<mlir::tensor::PackOp>>(
+      patterns.getContext());
+  patterns.add<ConvertPackUnpackOptimizationOp<mlir::tensor::UnPackOp>>(
+      patterns.getContext());
 }
 
 struct ConvertPackUnpackOptimization
