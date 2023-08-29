@@ -3,11 +3,11 @@ channels:
 dependencies:
   - python
   - clang=16
-  - clang-format
+  - clang-format=16
   - compiler-rt_linux-64
   - gcc_linux-64=12
   - gxx_linux-64=12
   - llvm-openmp
   - cmake
   - ninja
-  - lld
+  - lld=16
