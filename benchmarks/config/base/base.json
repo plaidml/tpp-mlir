@@ -112,12 +112,12 @@
       "flags": [ "100", "256", "3", "F", "64", "64", "64", "1", "1024", "1024", "1024", "1024" ],
       "extensions": [ "avx2" ]
     }
-  }}
+  }},
   {
     "pack": {
       "fp32_gemm_operand_a_512x1024": {
         "type": "MLIR",
-        "benchmark": "fp3-pack-gemm-operand-a-512x1024.mlir",
+        "benchmark": "fp32-pack-gemm-operand-a-512x1024.mlir",
         "environment": {},
         "flags": [ "-n", "500" ],
         "extensions": [ "(avx2|asimd)" ]
