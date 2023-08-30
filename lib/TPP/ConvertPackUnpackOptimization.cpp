@@ -19,7 +19,6 @@ using namespace mlir::tpp;
 
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
-
 namespace {
 
 template <typename Op>
@@ -84,7 +83,14 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
           SmallVector<OpFoldResult> insertSliceStrides;
           SmallVector<OpFoldResult> insertSliceSizes;
 
-          if (IsPack) {
+          auto setArgs = [&numLoops, &tiledDims, &rewriter, &localIvs, &packOp,
+                          &loc, &IsPack](
+                             SmallVector<OpFoldResult> &extractSliceOffsets,
+                             SmallVector<OpFoldResult> &extractSliceStrides,
+                             SmallVector<OpFoldResult> &extractSliceSizes,
+                             SmallVector<OpFoldResult> &insertSliceOffsets,
+                             SmallVector<OpFoldResult> &insertSliceStrides,
+                             SmallVector<OpFoldResult> &insertSliceSizes) {
             for (int i = 0; i < numLoops; i++) {
               if (tiledDims.count(i)) {
                 Value muliOp = rewriter.create<arith::MulIOp>(
@@ -107,7 +113,9 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
                 extractSliceSizes.push_back(rewriter.getIndexAttr(1));
               }
             }
-            for (size_t i = 0; i < packOp.getDestRank(); i++)
+            size_t bound =
+                IsPack ? packOp.getDestRank() : packOp.getSourceRank();
+            for (size_t i = 0; i < bound; i++)
               insertSliceStrides.push_back(rewriter.getIndexAttr(1));
 
             for (int i = 0; i < numLoops; i++) {
@@ -117,60 +125,25 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
               }
               insertSliceOffsets.push_back(localIvs[indirection]);
             }
-            for (size_t i = numLoops; i < packOp.getDestRank(); i++) {
+            for (size_t i = numLoops; i < bound; i++) {
               insertSliceOffsets.push_back(rewriter.getIndexAttr(0));
             }
             for (int i = 0; i < numLoops; i++)
               insertSliceSizes.push_back(rewriter.getIndexAttr(1));
 
-            for (size_t i = numLoops; i < packOp.getDestRank(); i++) {
+            for (size_t i = numLoops; i < bound; i++) {
               insertSliceSizes.push_back(rewriter.getIndexAttr(
                   packOp.getStaticInnerTiles()[i - numLoops]));
             }
+          };
+          if (IsPack) {
+            setArgs(extractSliceOffsets, extractSliceStrides, extractSliceSizes,
+                    insertSliceOffsets, insertSliceStrides, insertSliceSizes);
+
           } else {
-
-            for (int i = 0; i < numLoops; i++) {
-              if (tiledDims.count(i)) {
-                Value muliOp = rewriter.create<arith::MulIOp>(
-                    loc, localIvs[i],
-                    getConstIndex(rewriter,
-                                  packOp.getStaticInnerTiles()[tiledDims[i]]));
-                insertSliceOffsets.push_back(muliOp);
-              } else {
-                insertSliceOffsets.push_back(localIvs[i]);
-              }
-            }
-            for (int i = 0; i < numLoops; i++)
-              insertSliceStrides.push_back(rewriter.getIndexAttr(1));
-
-            for (int i = 0; i < numLoops; i++) {
-              if (tiledDims.count(i)) {
-                insertSliceSizes.push_back(rewriter.getIndexAttr(
-                    packOp.getStaticInnerTiles()[tiledDims[i]]));
-              } else {
-                insertSliceSizes.push_back(rewriter.getIndexAttr(1));
-              }
-            }
-            for (int i = 0; i < numLoops; i++) {
-              int indirection = i;
-              if (packOp.getOuterDimsPerm().size() > 0) {
-                indirection = packOp.getOuterDimsPerm()[i];
-              }
-              extractSliceOffsets.push_back(localIvs[indirection]);
-            }
-            for (size_t i = numLoops; i < packOp.getSourceRank(); i++) {
-              extractSliceOffsets.push_back(rewriter.getIndexAttr(0));
-            }
-
-            for (int i = 0; i < numLoops; i++)
-              extractSliceSizes.push_back(rewriter.getIndexAttr(1));
-
-            for (size_t i = numLoops; i < packOp.getSourceRank(); i++) {
-              extractSliceSizes.push_back(rewriter.getIndexAttr(
-                  packOp.getStaticInnerTiles()[i - numLoops]));
-            }
-            for (size_t i = 0; i < packOp.getSourceRank(); i++)
-              extractSliceStrides.push_back(rewriter.getIndexAttr(1));
+            setArgs(insertSliceOffsets, insertSliceStrides, insertSliceSizes,
+                    extractSliceOffsets, extractSliceStrides,
+                    extractSliceSizes);
           }
           auto tensorExtractType =
               tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
@@ -205,9 +178,6 @@ struct ConvertPackUnpackOptimization
     RewritePatternSet patterns(&getContext());
     populatePackUnpackOptimizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-  }
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect>();
   }
 };
 
