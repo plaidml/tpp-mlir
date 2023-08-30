@@ -37,8 +37,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   %0 = tensor.empty() : tensor<64x32x8x64xf32>
   
   // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C64]])
-  // Should be an scf.forall
-  // CHECK: %{{.+}} = scf.for %{{.+}} = %{{.+}} to %[[C8]] step %{{.+}}
+  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C8]])
   %fill_1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %3 = linalg.generic {
     "__projection_Q__",

@@ -408,11 +408,6 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
     if (forOp.getNumRegionIterArgs() != 1)
       return failure();
 
-    // Only top-level loops.
-    auto parent = forOp->getParentOp();
-    if (!parent || isa<LoopLikeOpInterface>(parent))
-      return failure();
-
     SmallVector<scf::ForOp> nestedLoops;
     getPerfectlyNestedLoops(nestedLoops, forOp);
     if (nestedLoops.size() == 0)
@@ -463,7 +458,7 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
               SmallVector<OpFoldResult> offsets;
               for (OpFoldResult offset : insertSlice.getMixedOffsets()) {
                 if (auto valueOffset = offset.dyn_cast<Value>())
-                  offsets.push_back(mapping.lookup(valueOffset));
+                  offsets.push_back(mapping.lookupOrDefault(valueOffset));
                 else
                   offsets.push_back(offset);
               }

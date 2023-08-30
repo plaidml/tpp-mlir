@@ -682,6 +682,7 @@ static Operation *getLastFusableEltWiseConsumer(
   return currentConsumer;
 }
 
+// Run `fuseWithEltwise` on contraction-like operations.
 static void doFusion(RewriterBase &rewriter, func::FuncOp func,
                      ArrayRef<int64_t> tileSizes, int64_t maxDepth) {
   // Set to keep track of fused ops.
@@ -753,12 +754,8 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
 struct TileConsumerAndFuseProducers
     : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
   TileConsumerAndFuseProducers() = default;
-  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes, int maxDepth,
-                               bool startFromLastFusableConsumer,
-                               bool useForAll) {
+  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
     this->tileSizes = tileSizes;
-    this->maxDepth = maxDepth;
-    this->useForAll = useForAll;
   }
 
   void runOnOperation() override {
@@ -771,7 +768,7 @@ struct TileConsumerAndFuseProducers
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    int fixedPoint = 3;
+    int64_t numIters = this->numIters;
     do {
       func::FuncOp func = getOperation();
       IRRewriter rewriter(&getContext());
@@ -791,7 +788,7 @@ struct TileConsumerAndFuseProducers
         linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
         (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
       }
-    } while (fixedPoint--);
+    } while (--numIters);
 
     {
       // Patterns for scf.for.
@@ -851,11 +848,8 @@ struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTileConsumerAndFuseProducersPass(
-    ArrayRef<int64_t> tileSizes, int maxDepth,
-    bool startFromLastFusableConsumer, bool useForAll) {
-  return std::make_unique<TileConsumerAndFuseProducers>(
-      tileSizes, maxDepth, startFromLastFusableConsumer, useForAll);
+mlir::tpp::createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes) {
+  return std::make_unique<TileConsumerAndFuseProducers>(tileSizes);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
