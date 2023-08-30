@@ -64,7 +64,6 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 set(LLVM_LIT_ARGS "-sv" CACHE STRING "lit default options")
-include(sanitizers)
 include(openmp)
 
 # libxsmm
@@ -72,6 +71,9 @@ include(xsmm)
 message (STATUS "LIBXSMM Include dir: ${XSMM_INCLUDE_DIRS}")
 include(xsmm-dnn)
 message (STATUS "LIBXSMM-DNN Include dir: ${XSMM_DNN_INCLUDE_DIRS}")
+
+# Sanitizers (include as late as possible aka append)
+include(sanitizers)
 
 add_subdirectory(include)
 add_subdirectory(lib)

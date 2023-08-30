@@ -33,10 +33,10 @@ fi
 if [ "${COMPILER}" == "clang" ]; then
   GCC_COMPAT_OPTION="-g ${GCC_TOOLCHAIN}"
 fi
-if [ "${SANITIZERS}" ]; then
+if [ "1" == "${SANITIZERS}" ]; then
   SANITIZERS="-S"
 fi
-if [ "${INSTALL}" ]; then
+if [ "1" == "${INSTALL}" ]; then
   if [ -d "${INSTALL_PREFIX}" ]; then
     INSTALL_OPTION="-i ${INSTALL_PREFIX}"
   else
@@ -54,7 +54,7 @@ elif [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
 fi
 
-if [ "${CLEAN}" ] && [ "0" != "${CLEAN}" ]; then
+if [ "1" == "${CLEAN}" ]; then
   BLD_DIR_RM=-R
 fi
 
@@ -81,7 +81,7 @@ fi
 
 CUDA_DRIVER=/usr/lib64/libcuda.so
 # CUDA: original GPU setting had boolean semantic (true/non-zero implies "cuda")
-if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" = "${GPU}" ]; then
+if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" == "${GPU}" ]; then
   if [ "${CUDA_DRIVER}" ]; then
     echo "Enabled GPU backend (cuda)"
   else
@@ -115,7 +115,7 @@ then
 fi
 
 # Check
-if [ "${CHECK}" ]; then
+if [ "1" == "${CHECK}" ]; then
   echo "--- CHECK"
   if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BLD_DIR} \
@@ -126,7 +126,7 @@ if [ "${CHECK}" ]; then
 fi
 
 # Install
-if [ "${INSTALL}" ]; then
+if [ "1" == "${INSTALL}" ]; then
   echo "--- INSTALL"
   if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BLD_DIR} \
@@ -137,14 +137,14 @@ if [ "${INSTALL}" ]; then
 fi
 
 # Benchmark
-if [ "${BENCH}" ]; then
+if [ "1" == "${BENCH}" ]; then
   echo "--- BENCHMARK"
   export LOGFILE=benchmark-output.txt
   ${SCRIPT_DIR}/ci/build.sh \
     -b ${BLD_DIR} \
     -B | tee ${LOGFILE}
   echo "--- RESULTS"
-  if [ "main" = "${BUILDKITE_BRANCH}" ]; then
+  if [ "main" == "${BUILDKITE_BRANCH}" ]; then
     export LOGRPTBRN=main
   fi
   cat ${LOGFILE} | ${LIBXSMMROOT}/scripts/tool_logrept.sh

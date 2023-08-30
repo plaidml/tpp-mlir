@@ -62,7 +62,7 @@ fi
 
 # Summary report for all benchmarks
 echo "+++ REPORT"
-if [ "main" = "${BUILDKITE_BRANCH}" ]; then
+if [ "main" == "${BUILDKITE_BRANCH}" ]; then
   export LOGRPTBRN=main
 fi
 eval "${LIBXSMMROOT}/scripts/tool_logrept.sh ${LOGFILE}"
