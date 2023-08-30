@@ -73,9 +73,9 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
 
     auto loopNest = mlir::scf::buildLoopNest(
         rewriter, packOp.getLoc(), lbs, ubs, steps, packOp.getDest(),
-        [&packOp, &numLoops, &tiledDims,
-         &IsPack](OpBuilder &rewriter, Location loc, ValueRange localIvs,
-                  ValueRange iterArgs) -> scf::ValueVector {
+        [&packOp, &numLoops,
+         &tiledDims](OpBuilder &rewriter, Location loc, ValueRange localIvs,
+                     ValueRange iterArgs) -> scf::ValueVector {
           SmallVector<OpFoldResult> extractSliceOffsets;
           SmallVector<OpFoldResult> extractSliceStrides;
           SmallVector<OpFoldResult> extractSliceSizes;
@@ -86,13 +86,12 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
           // Sets extract and insert slice args for pack and unpack operations
           // based on the flag `IsPack`
           auto setArgs = [&numLoops, &tiledDims, &rewriter, &localIvs, &packOp,
-                          &loc, &IsPack](
-                             SmallVector<OpFoldResult> &sourceSliceOffsets,
-                             SmallVector<OpFoldResult> &sourceSliceStrides,
-                             SmallVector<OpFoldResult> &sourceSliceSizes,
-                             SmallVector<OpFoldResult> &destSliceOffsets,
-                             SmallVector<OpFoldResult> &destSliceStrides,
-                             SmallVector<OpFoldResult> &destSliceSizes) {
+                          &loc](SmallVector<OpFoldResult> &sourceSliceOffsets,
+                                SmallVector<OpFoldResult> &sourceSliceStrides,
+                                SmallVector<OpFoldResult> &sourceSliceSizes,
+                                SmallVector<OpFoldResult> &destSliceOffsets,
+                                SmallVector<OpFoldResult> &destSliceStrides,
+                                SmallVector<OpFoldResult> &destSliceSizes) {
             for (int i = 0; i < numLoops; i++) {
               if (tiledDims.count(i)) {
                 Value muliOp = rewriter.create<arith::MulIOp>(
