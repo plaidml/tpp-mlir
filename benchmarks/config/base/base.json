@@ -139,5 +139,36 @@
         "flags": [ "-n", "500" ],
         "extensions": [ "(avx2|asimd)" ]
     }
-  }}
+  }},
+  {
+    "mha": {
+      "fp32_mha_tensorflow": {
+        "type": "MLIR",
+        "benchmark": "fp32-mha-tensorflow.mlir",
+        "environment": {},
+        "flags": [ "-n", "5" ],
+        "extensions": [ "(avx2|asimd)" ]
+      },
+      "fp32_projection": {
+        "type": "MLIR",
+        "benchmark": "fp32-projection.mlir",
+        "environment": {},
+        "flags": [ "-n", "10" ],
+        "extensions": [ "(avx2|asimd)" ]
+      },
+      "fp32_query_times_keys": {
+        "type": "MLIR",
+        "benchmark": "fp32-query-times-key.mlir",
+        "environment": {},
+        "flags": [ "-n", "10" ],
+        "extensions": [ "(avx2|asimd)" ]
+      },
+      "fp32_out_softmax_times_value.mlir": {
+        "type": "MLIR",
+        "benchmark": "fp32-out-softmax-times-value.mlir",
+        "environment": {},
+        "flags": [ "-n", "10" ],
+        "extensions": [ "(avx2|asimd)" ]
+      }
+    }}
 ]
