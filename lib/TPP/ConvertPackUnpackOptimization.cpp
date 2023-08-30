@@ -83,58 +83,59 @@ struct ConvertPackUnpackOptimizationOp : public OpRewritePattern<Op> {
           SmallVector<OpFoldResult> insertSliceStrides;
           SmallVector<OpFoldResult> insertSliceSizes;
 
+          // Sets extract and insert slice args for pack and unpack operations
+          // based on the flag `IsPack`
           auto setArgs = [&numLoops, &tiledDims, &rewriter, &localIvs, &packOp,
                           &loc, &IsPack](
-                             SmallVector<OpFoldResult> &extractSliceOffsets,
-                             SmallVector<OpFoldResult> &extractSliceStrides,
-                             SmallVector<OpFoldResult> &extractSliceSizes,
-                             SmallVector<OpFoldResult> &insertSliceOffsets,
-                             SmallVector<OpFoldResult> &insertSliceStrides,
-                             SmallVector<OpFoldResult> &insertSliceSizes) {
+                             SmallVector<OpFoldResult> &sourceSliceOffsets,
+                             SmallVector<OpFoldResult> &sourceSliceStrides,
+                             SmallVector<OpFoldResult> &sourceSliceSizes,
+                             SmallVector<OpFoldResult> &destSliceOffsets,
+                             SmallVector<OpFoldResult> &destSliceStrides,
+                             SmallVector<OpFoldResult> &destSliceSizes) {
             for (int i = 0; i < numLoops; i++) {
               if (tiledDims.count(i)) {
                 Value muliOp = rewriter.create<arith::MulIOp>(
                     loc, localIvs[i],
                     getConstIndex(rewriter,
                                   packOp.getStaticInnerTiles()[tiledDims[i]]));
-                extractSliceOffsets.push_back(muliOp);
+                sourceSliceOffsets.push_back(muliOp);
               } else {
-                extractSliceOffsets.push_back(localIvs[i]);
+                sourceSliceOffsets.push_back(localIvs[i]);
               }
             }
             for (int i = 0; i < numLoops; i++)
-              extractSliceStrides.push_back(rewriter.getIndexAttr(1));
+              sourceSliceStrides.push_back(rewriter.getIndexAttr(1));
 
             for (int i = 0; i < numLoops; i++) {
               if (tiledDims.count(i)) {
-                extractSliceSizes.push_back(rewriter.getIndexAttr(
+                sourceSliceSizes.push_back(rewriter.getIndexAttr(
                     packOp.getStaticInnerTiles()[tiledDims[i]]));
               } else {
-                extractSliceSizes.push_back(rewriter.getIndexAttr(1));
+                sourceSliceSizes.push_back(rewriter.getIndexAttr(1));
               }
             }
             size_t bound =
                 IsPack ? packOp.getDestRank() : packOp.getSourceRank();
             for (size_t i = 0; i < bound; i++)
-              insertSliceStrides.push_back(rewriter.getIndexAttr(1));
+              destSliceStrides.push_back(rewriter.getIndexAttr(1));
 
             for (int i = 0; i < numLoops; i++) {
               int indirection = i;
               if (packOp.getOuterDimsPerm().size() > 0) {
                 indirection = packOp.getOuterDimsPerm()[i];
               }
-              insertSliceOffsets.push_back(localIvs[indirection]);
+              destSliceOffsets.push_back(localIvs[indirection]);
             }
-            for (size_t i = numLoops; i < bound; i++) {
-              insertSliceOffsets.push_back(rewriter.getIndexAttr(0));
-            }
-            for (int i = 0; i < numLoops; i++)
-              insertSliceSizes.push_back(rewriter.getIndexAttr(1));
+            for (size_t i = numLoops; i < bound; i++)
+              destSliceOffsets.push_back(rewriter.getIndexAttr(0));
 
-            for (size_t i = numLoops; i < bound; i++) {
-              insertSliceSizes.push_back(rewriter.getIndexAttr(
+            for (int i = 0; i < numLoops; i++)
+              destSliceSizes.push_back(rewriter.getIndexAttr(1));
+
+            for (size_t i = numLoops; i < bound; i++)
+              destSliceSizes.push_back(rewriter.getIndexAttr(
                   packOp.getStaticInnerTiles()[i - numLoops]));
-            }
           };
           if (IsPack) {
             setArgs(extractSliceOffsets, extractSliceStrides, extractSliceSizes,
