@@ -73,7 +73,7 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
 };
 
 static bool isConvolutionLike(Operation *op) {
-  if (linalg::GenericOp maybeMatmul = dyn_cast_or_null<linalg::GenericOp>(op))
+  if (isa_and_nonnull<linalg::GenericOp>(op))
     return linalgx::utils::isBlockedConvolution(op);
   return false;
 }
