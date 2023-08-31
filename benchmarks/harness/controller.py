@@ -244,13 +244,6 @@ if __name__ == "__main__":
         "-q", "--quiet", action="count", default=0, help="Suppress warnings"
     )
     parser.add_argument(
-        "-x",
-        "--xsmm",
-        action="count",
-        default=1,
-        help="Turn on TPP optimizations (default)",
-    )
-    parser.add_argument(
         "--disable-lsan", action="count", default=0, help="Disable LSAN"
     )
     parser.add_argument(
