@@ -151,6 +151,8 @@ class BenchmarkController(object):
             runCmd.extend(["--seed", str(self.args.seed)])
         if self.args.splat_to_random != 0:
             runCmd.append("--splat-to-random")
+        if self.args.linalg_to_xsmm != 0:
+            runCmd.append("--linalg-to-xsmm")
         if self.args.init_type:
             runCmd.extend(["--init-type", self.args.init_type])
         if self.args.gpu is not None:
@@ -224,7 +226,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-flops",
         type=float,
-        help="Known number of FP OPs (checks BENCH_EXPECTED_FLOPS line)",
+        help="Known number of FP OPs (checks BENCH_TOTAL_FLOPS line)",
     )
     parser.add_argument(
         "-entry", type=str, help="Name of the entry point (checks RUN line)"
@@ -255,6 +257,12 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Replace splat dense tensors with random value (default: enabled)",
+    )
+    parser.add_argument(
+        "--linalg-to-xsmm",
+        type=int,
+        default=0,
+        help="Directly lower linalg to xsmm dialect",
     )
     parser.add_argument(
         "--init-type",
