@@ -9,7 +9,8 @@ dependencies:
   - gcc_linux-64=12
   - gxx_linux-64=12
   - llvm-openmp
-  - cuda-toolkit
   - cmake
   - ninja
   - lld=16
+  - cuda
+  - git
