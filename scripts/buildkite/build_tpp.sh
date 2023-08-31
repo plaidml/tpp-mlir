@@ -93,7 +93,11 @@ else
   if [ ! -f "${CUDA_DRIVER}" ]; then
     if [ "${CUDATOOLKIT_HOME}" ]; then
       echo "Creating links to CUDA stubs"
-      ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+      if [ -d "${CUDATOOLKIT_HOME}/lib64" ]; then
+        ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+      else
+        ln -fs ${CUDATOOLKIT_HOME}/lib/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
+      fi
       ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
       export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
     else
