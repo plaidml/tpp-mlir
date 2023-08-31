@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -propagate-pack-and-unpack -canonicalize -tile-consumer-and-fuse-producers="tile-sizes=1,1" | FileCheck %s
+// RUN: tpp-opt %s -pack-matmul="block-factors=32,32,32" -propagate-pack-and-unpack -canonicalize -tile-consumer-and-fuse-producers | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 

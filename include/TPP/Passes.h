@@ -110,10 +110,7 @@ createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
 createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes = {},
-                                       int maxDepth = 5,
-                                       bool startFromLastFusableConsumer = true,
-                                       bool useForAll = true);
+createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes = {});
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>

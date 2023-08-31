@@ -13,21 +13,20 @@
 #map11 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 #map12 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3, d4)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
-// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>
-// CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
-// CHECK-DAG: #[[MAP6:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d0, d3)>
-// CHECK-DAG: #[[MAP7:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
-// CHECK-DAG: #[[MAP8:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
-// CHECK-DAG: #[[MAP9:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d2, d0)>
+// CHECK-DAG: #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[MAP7:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 
 // CHECK-LABEL: mha_tensorflow
 func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
                            %arg0: tensor<64x32x8x64xf32>,
                            %arg2: tensor<64x32x8x64xf32>) -> tensor<64x32x512xf32> {
+  // CHECK: %[[C8:.+]] = arith.constant 8 : index
   // CHECK: %[[C64:.+]] = arith.constant 64 : index
   %cst_3 = arith.constant dense<4.0> : tensor<8x64x8x64xf32>
   %cst_4 = arith.constant dense<2.0> : tensor<8x64x8x64xf32>
@@ -38,6 +37,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   %0 = tensor.empty() : tensor<64x32x8x64xf32>
   
   // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C64]])
+  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C8]])
   %fill_1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %3 = linalg.generic {
     "__projection_Q__",
@@ -51,7 +51,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   } -> tensor<64x32x8x64xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"]
+  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel"]
 
   %fill_2 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %5 = linalg.generic {
@@ -66,7 +66,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   } -> tensor<64x32x8x64xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"]
+  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "parallel"]
 
   %6 = tensor.empty() : tensor<64x8x32x32xf32>
   %7 = linalg.fill ins(%cst_1 : f32) outs(%6 : tensor<64x8x32x32xf32>) -> tensor<64x8x32x32xf32>
@@ -82,7 +82,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   } -> tensor<64x8x32x32xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps =  [#[[MAP3]], #[[MAP4]], #[[MAP5]]]
-  // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel"]
+  // CHECK-SAME: iterator_types = ["parallel", "reduction", "parallel"]
  
   %fill = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %2 = linalg.generic {
@@ -97,7 +97,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   } -> tensor<64x32x8x64xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-  // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "parallel", "parallel"] 
+  // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "parallel"] 
 
   %fill_4 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %11 = linalg.generic {
@@ -112,7 +112,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   } -> tensor<64x32x8x64xf32>
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME: indexing_maps = [#[[MAP3]], #[[MAP6]], #[[MAP7]]]
-  // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel"]
+  // CHECK-SAME: iterator_types = ["parallel", "reduction", "parallel"]
 
   %result = tensor.empty() : tensor<64x32x512xf32>
   %fill_r = linalg.fill ins(%cst_1 : f32) outs(%result : tensor<64x32x512xf32>) -> tensor<64x32x512xf32>
@@ -127,7 +127,7 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
       linalg.yield %24 : f32
   } -> tensor<64x32x512xf32>
   // CHECK: %{{.+}} = linalg.generic
-  // CHECK-SAME: indexing_maps = [#[[MAP3]], #[[MAP8]], #[[MAP9]]]
+  // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction", "parallel"]
 
   return %12: tensor<64x32x512xf32>

@@ -99,8 +99,9 @@ func.func @no_top_level(%arg0: tensor<3x3xf32>,
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NOT: scf.forall
+  // CHECK: scf.for
   %outer = scf.for %i = %c0 to %c3 step %c1 iter_args(%arg2 = %arg1) -> (tensor<3x3xf32>) {
+    // CHECK: scf.forall
     %inner = scf.for %j = %c0 to %c3 step %c1 iter_args(%arg3 = %arg2) -> (tensor<3x3xf32>) {
       %source = tensor.extract_slice %arg0[%i, %j][1, 1][1, 1] : tensor<3x3xf32> to tensor<f32>
       %dest = tensor.insert_slice %source into %arg3[%i, %j][1, 1][1, 1] : tensor<f32> into tensor<3x3xf32>
