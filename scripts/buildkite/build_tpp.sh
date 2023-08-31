@@ -79,10 +79,10 @@ then
   exit 1
 fi
 
-CUDA_DRIVER=/usr/lib64/libcuda.so
+CUDA_LIBRARY=/usr/lib64/libcuda.so
 # CUDA: original GPU setting had boolean semantic (true/non-zero implies "cuda")
 if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" == "${GPU}" ]; then
-  if [ "${CUDA_DRIVER}" ]; then
+  if [ "${CUDA_LIBRARY}" ]; then
     echo "Enabled GPU backend (cuda)"
   else
     echo "CUDA support requires GPU driver to be present"
@@ -90,16 +90,17 @@ if [[ (${GPU} =~ ^[+-]?[0-9]+([.][0-9]+)?$) && ("0" != "${GPU}") ]] || [ "cuda" 
   fi
 else
   # create link to CUDA stubs (CUDA incorporated by default)
-  if [ ! -f "${CUDA_DRIVER}" ]; then
+  if [ ! -f "${CUDA_LIBRARY}" ]; then
     if [ "${CUDATOOLKIT_HOME}" ]; then
       echo "Creating links to CUDA stubs"
-      if [ -d "${CUDATOOLKIT_HOME}/lib64" ]; then
-        ln -fs ${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
-      else
-        ln -fs ${CUDATOOLKIT_HOME}/lib/stubs/libcuda.so ${BLD_DIR}/lib/libcuda.so.1
-      fi
-      ln -fs ${BLD_DIR}/lib/libcuda.so.1 ${BLD_DIR}/lib/libcuda.so
       export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+      if [ -d "${CUDATOOLKIT_HOME}/lib64" ]; then
+        CUDA_LIBRARY=${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so
+      else
+        CUDA_LIBRARY=${CUDATOOLKIT_HOME}/lib/stubs/libcuda.so
+      fi
+      ln -fs ${CUDA_LIBRARY} ${BLD_DIR}/lib/libcuda.so.1
+      ln -fs ${CUDA_LIBRARY} ${BLD_DIR}/lib/libcuda.so
     else
       echo "CUDA stub libraries are needed but CUDATOOLKIT_HOME is not set"
       exit 1
