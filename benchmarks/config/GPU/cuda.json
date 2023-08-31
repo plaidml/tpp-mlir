@@ -28,20 +28,6 @@
       "environment": {},
       "flags": [ "-n", "100", "--gpu=cuda" ],
       "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp32_1024_packed_base_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-packed-base.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp32_1024_packed_tpp_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-packed-tpp.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
     }
   }}
 ]
