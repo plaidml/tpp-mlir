@@ -25,10 +25,10 @@
 // Base class for float values.
 struct TensorInitFloat : public TensorInit<llvm::APFloat> {
   // Supported data types. (TODO: Support 8-bit data types)
-  enum class DataType { AUTO, FP32, FP64, BF16 };
+  enum class DataType { AUTO, FP16, FP32, FP64, BF16 };
 
   static bool isTypeSupported(const mlir::Type &type) {
-    return type.isF32() || type.isF64() || type.isBF16();
+    return type.isF16() || type.isF32() || type.isF64() || type.isBF16();
   }
 
   // Get data type from element type.
@@ -38,6 +38,13 @@ struct TensorInitFloat : public TensorInit<llvm::APFloat> {
   virtual ~TensorInitFloat() = default;
 
 protected:
+  // FP16 conversion (by reference).
+  static void toFP16(llvm::APFloat &value) {
+    bool ignored;
+    value.convert(llvm::APFloat::IEEEhalf(), llvm::APFloat::rmNearestTiesToEven,
+                  &ignored);
+  }
+
   // FP32 conversion (by reference).
   static void toFP32(llvm::APFloat &value) {
     bool ignored;

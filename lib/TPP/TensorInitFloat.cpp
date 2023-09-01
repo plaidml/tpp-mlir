@@ -14,6 +14,8 @@ TensorInitFloat::DataType
 TensorInitFloat::getTensorInitDataType(mlir::Type type) {
   if (type.isBF16())
     return DataType::BF16;
+  if (type.isF16())
+    return DataType::FP16;
   if (type.isF32())
     return DataType::FP32;
   if (type.isF64())
@@ -31,6 +33,9 @@ void TensorInitFloat::push(float value) {
 
 void TensorInitFloat::convertType(llvm::APFloat &value) {
   switch (type) {
+  case DataType::FP16:
+    toFP16(value);
+    break;
   case DataType::FP32:
     toFP32(value);
     break;
