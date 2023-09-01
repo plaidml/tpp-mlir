@@ -57,22 +57,27 @@ public:
         spirv::Capability::Float64,
         spirv::Capability::AtomicFloat32AddEXT,
         spirv::Capability::ExpectAssumeKHR,
+        spirv::Capability::CooperativeMatrixNV,
         // clang-format on
     };
     spirv::Capability caps_vulkan[] = {
         // clang-format off
         spirv::Capability::Shader,
+        spirv::Capability::CooperativeMatrixNV,
+        spirv::Capability::Float16,
         // clang-format on
     };
     spirv::Extension exts_opencl[] = {
         spirv::Extension::SPV_INTEL_bfloat16_conversion,
         spirv::Extension::SPV_EXT_shader_atomic_float_add,
-        spirv::Extension::SPV_KHR_expect_assume};
+        spirv::Extension::SPV_KHR_expect_assume,
+        spirv::Extension::SPV_NV_cooperative_matrix};
     spirv::Extension exts_vulkan[] = {
-        spirv::Extension::SPV_KHR_storage_buffer_storage_class};
+        spirv::Extension::SPV_KHR_storage_buffer_storage_class,
+        spirv::Extension::SPV_NV_cooperative_matrix};
     if (clientAPI == "opencl") {
       auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_0, caps_opencl, exts_opencl, context);
+          spirv::Version::V_1_4, caps_opencl, exts_opencl, context);
       auto attr = spirv::TargetEnvAttr::get(
           triple, spirv::getDefaultResourceLimits(context),
           spirv::ClientAPI::OpenCL, spirv::Vendor::Unknown,
@@ -83,7 +88,7 @@ public:
       });
     } else if (clientAPI == "vulkan") {
       auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_0, caps_vulkan, exts_vulkan, context);
+          spirv::Version::V_1_4, caps_vulkan, exts_vulkan, context);
       auto attr = spirv::TargetEnvAttr::get(
           triple, spirv::getDefaultResourceLimits(context),
           spirv::ClientAPI::Vulkan, spirv::Vendor::Unknown,

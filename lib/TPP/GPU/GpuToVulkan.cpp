@@ -69,6 +69,7 @@ private:
     // Preprocess
     // Subviews are not supported by SPIRV ops
     pm.addPass(memref::createFoldMemRefAliasOpsPass());
+    pm.addPass(createLowerAffinePass());
 
     // Create SPIRV kernels.
     pm.addPass(tpp::createSetSPIRVCapabilitiesPass());
