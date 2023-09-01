@@ -140,7 +140,7 @@ createGpuPipelinePass(StringRef gpuBackend = "cuda");
 std::unique_ptr<OperationPass<ModuleOp>> createGpuConversionPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
-                    StringRef gpuChip = "sm_35",
+                    StringRef gpuChip = "sm_70",
                     StringRef gpuFeatures = "+ptx60");
 std::unique_ptr<OperationPass<ModuleOp>> createGpuToVulkanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
