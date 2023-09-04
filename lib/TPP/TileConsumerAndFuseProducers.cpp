@@ -10,6 +10,7 @@
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
@@ -480,11 +481,20 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
     // Find the candidate operation potentially walking bbArgs in scf.for.
     // If we find a candidate we check if it is in our worklist and fuse it
     // only if so. We do not consider the candidate if it is already fused.
+    // Exception made for zero initialization fill operations. Fusing the same
+    // operation multiple times and duplicating the op is OK, as it will get
+    // folded as a flag in xsmm dispatch.
     Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
-    if (!candidateOp || worklist.count(candidateOp) == 0 ||
-        alreadyFusedOps.count(candidateOp))
+    if ((!candidateOp || worklist.count(candidateOp) == 0 ||
+         alreadyFusedOps.count(candidateOp)) &&
+        !isa_and_nonnull<linalg::FillOp>(candidateOp)) {
       continue;
+    }
+    if (isa<linalg::FillOp>(candidateOp) &&
+        !utils::isZeroTensor(candidateOp->getResult(0))) {
+      continue;
+    }
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,

@@ -185,14 +185,16 @@ func.func @pack_matmul(
 // CHECK:        %[[EXTRACT]] = tensor.extract_slice %[[ARG0]][%[[MUL0]], %[[MUL1]]] [32, 32] [1, 1] : tensor<128x128xf32> to tensor<32x32xf32>
 // CHECK:        tensor.insert_slice %[[EXTRACT]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Generalize pack for second input
-// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF]]) -> (tensor<4x4x32x32xf32>) {
+// CHECK: %[[BUF_1:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
+// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF_1]]) -> (tensor<4x4x32x32xf32>) {
 // CHECK:      scf.for %[[ARG5:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG6:.+]] = %arg4) -> (tensor<4x4x32x32xf32>) {
 // CHECK:        %[[MUL0:.+]] = arith.muli %[[ARG3]], %[[c32]] : index
 // CHECK:        %[[MUL1:.+]] = arith.muli %[[ARG5]], %[[c32]] : index
 // CHECK:        %[[EXTRACT]] = tensor.extract_slice %[[ARG1]][%[[MUL0]], %[[MUL1]]] [32, 32] [1, 1] : tensor<128x128xf32> to tensor<32x32xf32>
 // CHECK:        tensor.insert_slice %[[EXTRACT]] into %[[ARG6]][%[[ARG5]], %[[ARG3]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<4x4x32x32xf32>
 // Generalize pack for output
-// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF]]) -> (tensor<4x4x32x32xf32>) {
+// CHECK:   %[[BUF_2:.+]] = tensor.empty() : tensor<4x4x32x32xf32>
+// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF_2]]) -> (tensor<4x4x32x32xf32>) {
 // CHECK:      scf.for %[[ARG5:.+]] = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[ARG6:.+]] = %arg4) -> (tensor<4x4x32x32xf32>) {
 // CHECK:        %[[MUL0:.+]] = arith.muli %[[ARG3]], %[[c32]] : index
 // CHECK:        %[[MUL1:.+]] = arith.muli %[[ARG5]], %[[c32]] : index
@@ -351,14 +353,16 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK:        %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG0]][%[[MUL0]], %[[MUL1]]] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
 // CHECK:        tensor.insert_slice %extracted_slice into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<2x2x32x32xf32>
 // Generalized pack for second input
-// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF]]) -> (tensor<2x2x32x32xf32>) {
+// CHECK: %[[BUF_1:.+]] = tensor.empty() : tensor<2x2x32x32xf32>
+// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF_1]]) -> (tensor<2x2x32x32xf32>) {
 // CHECK:      scf.for %[[ARG5:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<2x2x32x32xf32>) {
 // CHECK:        %[[MUL0:.+]] = arith.muli %[[ARG3]], %[[c32]] : index
 // CHECK:        %[[MUL1:.+]] = arith.muli %[[ARG5]], %[[c32]] : index
 // CHECK:        %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG1]][%[[MUL0]], %[[MUL1]]] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
 // CHECK:        tensor.insert_slice %extracted_slice into %[[ARG6]][%[[ARG5]], %[[ARG3]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xf32> into tensor<2x2x32x32xf32>
 // Generalized pack of the output
-// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF]]) -> (tensor<2x2x32x32xf32>) {
+// CHECK: %[[BUF_2:.+]] = tensor.empty() : tensor<2x2x32x32xf32>
+// CHECK:    scf.for %[[ARG3:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG4:.+]] = %[[BUF_2]]) -> (tensor<2x2x32x32xf32>) {
 // CHECK:      scf.for %[[ARG5:.+]] = %[[c0]] to %[[c2]] step %[[c1]] iter_args(%[[ARG6:.+]] = %[[ARG4]]) -> (tensor<2x2x32x32xf32>) {
 // CHECK:        %[[MUL0:.+]] = arith.muli %[[ARG3]], %[[c32]] : index
 // CHECK:        %[[MUL1:.+]] = arith.muli %[[ARG5]], %[[c32]] : index
