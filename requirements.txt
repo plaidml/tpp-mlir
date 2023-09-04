@@ -1,5 +1,6 @@
 coloredlogs
 matplotlib
 pybind11
+requests
 black
 lit

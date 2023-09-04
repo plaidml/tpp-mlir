@@ -1,5 +1,6 @@
 channels:
   - conda-forge
+  - nvidia
 dependencies:
   - python
   - clang=16
@@ -11,3 +12,5 @@ dependencies:
   - cmake
   - ninja
   - lld=16
+  - cuda
+  - git
