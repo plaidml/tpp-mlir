@@ -15,6 +15,7 @@
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "TPP/ValueUtils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -35,6 +36,10 @@ namespace {
 
 struct ConvertLinalgToXsmm
     : public ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
+  void runOnOperation() override;
+};
+
+struct FoldXsmmFlags : public FoldXsmmFlagsBase<FoldXsmmFlags> {
   void runOnOperation() override;
 };
 
@@ -720,6 +725,81 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   return linalgOp;
 }
 
+template <typename OpTy>
+static LogicalResult foldFlags(RewriterBase &rewriter, OpTy gemmDispatchOp) {
+  SmallVector<Operation *> users(gemmDispatchOp.getResults().getUsers());
+  if (users.size() != 1)
+    return failure();
+  Operation *user = users[0];
+  if (!isa_and_nonnull<xsmm::GemmOp>(user) &&
+      !isa_and_nonnull<xsmm::BrgemmOp>(user)) {
+    return failure();
+  }
+
+  Value output = (isa<xsmm::GemmOp>(user)) ? user->getOperands().back()
+                                           : user->getOperands()[3];
+  Operation *maybeAlloc = output.getDefiningOp();
+  while (maybeAlloc) {
+    if (auto subView = dyn_cast_or_null<memref::SubViewOp>(maybeAlloc)) {
+      output = subView.getSource();
+      maybeAlloc = subView.getSource().getDefiningOp();
+    }
+    if (isa<BlockArgument>(output))
+      break;
+    if (isa<memref::AllocOp>(maybeAlloc))
+      break;
+  }
+
+  SetVector<Operation *> forwardSlice;
+  mlir::getForwardSlice(output, &forwardSlice);
+  Operation *maybeZeroOp = nullptr;
+  for (Operation *op : forwardSlice) {
+    if (isa_and_nonnull<xsmm::UnaryOp>(op))
+      maybeZeroOp = op;
+  }
+  if (!maybeZeroOp)
+    return failure();
+  xsmm::UnaryDispatchOp zeroDispatchOp = cast<xsmm::UnaryDispatchOp>(
+      cast<xsmm::UnaryOp>(maybeZeroOp).getInputs()[0].getDefiningOp());
+  auto kind = zeroDispatchOp.getKind();
+  if (kind != xsmm::UnaryKind::ZERO)
+    return failure();
+
+  rewriter.updateRootInPlace(gemmDispatchOp, [&]() {
+    ArrayAttr flags = gemmDispatchOp.getFlags();
+    SmallVector<Attribute> newFlags;
+    for (auto flag : flags) {
+      // None.
+      if (flag.dyn_cast<IntegerAttr>().getInt() == 0)
+        continue;
+      newFlags.push_back(flag);
+    }
+    newFlags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                xsmm::GemmFlags::BETA_0));
+    gemmDispatchOp.setFlagsAttr(rewriter.getArrayAttr(newFlags));
+  });
+  rewriter.eraseOp(maybeZeroOp);
+  return success();
+}
+
+struct FoldZeroInBrgemm : public OpRewritePattern<xsmm::BrgemmDispatchOp> {
+  using OpRewritePattern<xsmm::BrgemmDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xsmm::BrgemmDispatchOp brgemmDispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return foldFlags<xsmm::BrgemmDispatchOp>(rewriter, brgemmDispatchOp);
+  }
+};
+
+struct FoldZeroInGemm : public OpRewritePattern<xsmm::GemmDispatchOp> {
+  using OpRewritePattern<xsmm::GemmDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xsmm::GemmDispatchOp gemmDispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return foldFlags<xsmm::GemmDispatchOp>(rewriter, gemmDispatchOp);
+  }
+};
+
 void ConvertLinalgToXsmm::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
@@ -738,8 +818,8 @@ void ConvertLinalgToXsmm::runOnOperation() {
                          ? contractionDims->k.front()
                          : std::numeric_limits<unsigned>::max();
     if (failed(checkAccess(genericOp, m, n, k, batch))) {
-      // The generic is a Brgemm but the strides of the selected dims (m, n, k)
-      // are not unit strides. Inject transposes to bring them innermost.
+      // The generic is a Brgemm but the strides of the selected dims (m, n,
+      // k) are not unit strides. Inject transposes to bring them innermost.
       if (failed(makeMinorDimensionsInnerMost(rewriter, genericOp, m, n, k))) {
         return WalkResult::interrupt();
       }
@@ -751,6 +831,14 @@ void ConvertLinalgToXsmm::runOnOperation() {
     return signalPassFailure();
   }
   tpp::populateLinalgToXsmmPatterns(patterns);
+  if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+    return signalPassFailure();
+}
+
+void FoldXsmmFlags::runOnOperation() {
+  MLIRContext *ctx = &getContext();
+  RewritePatternSet patterns(ctx);
+  patterns.add<FoldZeroInGemm, FoldZeroInBrgemm>(ctx);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
 }
@@ -797,4 +885,9 @@ void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertLinalgToXsmmPass() {
   return std::make_unique<ConvertLinalgToXsmm>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::tpp::createFoldXsmmFlagsPass() {
+  return std::make_unique<FoldXsmmFlags>();
 }

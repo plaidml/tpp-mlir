@@ -95,7 +95,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
 
   let extraClassDeclaration = [{
     bool hasScalarInput() {
-      // skip the function pointer. The operand
+      // Skip the function pointer. The operand
       // is at position 1.
       Type operand = getInputs()[1].getType();
       if (!operand.isa<ShapedType>())
