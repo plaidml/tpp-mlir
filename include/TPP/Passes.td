@@ -385,6 +385,9 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
     Option<"tppToLoops", "tpp-to-loops",
            "bool", /*default=*/"0",
            "By default TPP ops are lowered to XSMM. Lower TPP to loops instead.">,
+    Option<"linalgToXsmm", "linalg-to-xsmm",
+           "bool", /*default=*/"0",
+           "By default Linalg ops are lowered to TPP. Lower Linalg to XSMM instead.">,
   ];
   let constructor = "mlir::tpp::createTppLoweringPass()";
 }
