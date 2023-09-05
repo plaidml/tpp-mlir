@@ -413,6 +413,7 @@ private:
 
       // linalg to xsmm.
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToXsmmPass());
+      pm.addNestedPass<func::FuncOp>(createFoldXsmmFlagsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     } else {

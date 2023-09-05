@@ -12,6 +12,7 @@
 #map1 = affine_map<(b, i, h, k, j) -> (b, k, h, j)>
 #map2 = affine_map<(b, i, h, k, j) -> (b, i, h, j)>
 
+// IR-LABEL: matmul_static
 func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] :
     !A_tensor_t into tensor<2x8x2x4xf32>
@@ -24,13 +25,11 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   %empty = tensor.empty() : tensor<2x2x8x2xf32>
   %fill = linalg.fill ins(%cst_fill : f32) outs(%empty: tensor<2x2x8x2xf32>) -> tensor<2x2x8x2xf32>
 
-  // IR: %[[C2:.+]] = arith.constant 2 : i64
+  // IR-DAG: %[[C2:.+]] = arith.constant 2 : i64
   // IR-DAG: %[[C1:.+]] = arith.constant 1 : i64
   // IR-DAG: %[[C16:.+]] = arith.constant 16 : i64
-  // IR-DAG: %[[C8:.+]] = arith.constant 8 : i64
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
-  // IR-DAG: %[[C0:.+]] = arith.constant 0 : i64
-  // IR: xsmm_gemm_dispatch(%[[C1]], %[[C2]], %[[C2]], %[[C4]], %[[C4]], %[[C16]], %[[C16]], %[[C0]])
+  // IR: xsmm_gemm_dispatch(%[[C1]], %[[C2]], %[[C2]], %[[C4]], %[[C4]], %[[C16]], %[[C16]], %[[C4]])
   %gemm = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
     iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]} 
