@@ -130,7 +130,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTppLoweringPass(bool loops = false);
+createTppLoweringPass(bool tppToLoops = false, bool linalgToXsmm = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>

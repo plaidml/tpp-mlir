@@ -308,8 +308,11 @@ private:
 // Lower TPP to into combination of standard and local dialects.
 struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
                          UtilityPassBase<func::FuncOp> {
-  TppLoweringPass() : TppLoweringPass(false){};
-  TppLoweringPass(bool tppToLoops) { this->tppToLoops = tppToLoops; };
+  TppLoweringPass() : TppLoweringPass(false, false){};
+  TppLoweringPass(bool tppToLoops, bool linalgToXsmm) {
+    this->tppToLoops = tppToLoops;
+    this->linalgToXsmm = linalgToXsmm;
+  };
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -343,8 +346,13 @@ private:
     else {
       // Memref to tpp conversion patterns.
       pm.addPass(createConvertMemRefToXsmmPass());
-      // Tpp to Xsmm conversion patterns.
-      pm.addPass(createConvertTppToXsmmPass());
+      if (linalgToXsmm) {
+        // Linalg to Xsmm conversion patterns.
+        pm.addPass(createConvertLinalgToXsmmPass());
+      } else {
+        // Tpp to Xsmm conversion patterns.
+        pm.addPass(createConvertTppToXsmmPass());
+      }
     }
   }
 };
@@ -406,18 +414,6 @@ private:
       pm.addPass(createBufferizePass());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
-    } else if (linalgToXsmm) {
-      // tile and fuse.
-      pm.addPass(createTileConsumerAndFuseProducersPass());
-      pm.addPass(createCleanupPass());
-
-      // tensor->memref.
-      pm.addPass(createBufferizePass());
-
-      // linalg to xsmm.
-      pm.addNestedPass<func::FuncOp>(createConvertLinalgToXsmmPass());
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
-
     } else {
       // Convert linalg.batch_matmul to linalg.matmul.
       pm.addPass(createRewriteBatchMatmulToMatmulPass());
@@ -432,14 +428,17 @@ private:
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
 
       // Lower linalg operations to TPP.
-      pm.addNestedPass<func::FuncOp>(createTppConversionPass());
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
+      if (!linalgToXsmm) {
+        pm.addNestedPass<func::FuncOp>(createTppConversionPass());
+        pm.addNestedPass<func::FuncOp>(createCleanupPass());
+      }
 
       // Bufferize: tensor->memref.
       pm.addPass(createBufferizePass());
 
-      // Lower all TPP operations.
-      pm.addNestedPass<func::FuncOp>(createTppLoweringPass(tppToLoops));
+      // Lower all Tile operations.
+      pm.addNestedPass<func::FuncOp>(
+          createTppLoweringPass(tppToLoops, linalgToXsmm));
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     }
 
@@ -485,8 +484,8 @@ mlir::tpp::createTppConversionPass() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTppLoweringPass(bool loops) {
-  return std::make_unique<TppLoweringPass>(loops);
+mlir::tpp::createTppLoweringPass(bool linalgToLoops, bool linalgToXsmm) {
+  return std::make_unique<TppLoweringPass>(linalgToLoops, linalgToXsmm);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>
