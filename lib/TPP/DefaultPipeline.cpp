@@ -203,6 +203,12 @@ private:
 
     pm.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
 
+    // Anything useful has been lowered by now.
+    // Cleanup IR by removing any dead symbols.
+    // This step aims to avoid errors caused by frontend leftovers.
+    // See issue: #704
+    pm.addPass(createSymbolDCEPass());
+
     // Print IR of kernel and main in LLVM dialect
     if (print == PrintStage::LLVM)
       pm.addPass(createPrintIRPass());
