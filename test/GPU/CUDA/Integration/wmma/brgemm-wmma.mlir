@@ -12,7 +12,7 @@ module attributes {gpu.container_module} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index
-    gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c2, %c4, %c1) threads in (%c32, %c1, %c1) 
+    gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c2, %c4, %c1) threads in (%c32, %c1, %c1)
     args(%c1 : index, %c0 : index, %arg0 : memref<2x4x16x16xf16>, %arg1 : memref<4x4x16x16xf16>, %arg2 : memref<2x4x16x16xf16>)
 
     %out = memref.alloc() : memref<2x4x16x16xf16>
