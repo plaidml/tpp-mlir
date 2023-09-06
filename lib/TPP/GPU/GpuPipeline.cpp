@@ -44,6 +44,10 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
+llvm::cl::opt<bool> gpuWmma("gpu-wmma",
+                            llvm::cl::desc("Enable GPU WMMA support"),
+                            llvm::cl::init(false));
+
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
@@ -131,12 +135,18 @@ private:
 
     // Lower GPU ops to the chosen GPU backend.
     switch (parseGpuOption(this->gpuBackend)) {
-    case GpuType::Cuda:
-      pm.addPass(createGpuToCudaPass());
+    case GpuType::Cuda: {
+      std::string gpuTriple = "nvptx64-nvidia-cuda";
+      std::string gpuChip = gpuWmma ? "sm_70" : "sm_35";
+      std::string gpuFeatures = "+ptx60";
+
+      pm.addPass(createGpuToCudaPass(gpuTriple, gpuChip, gpuFeatures));
       break;
-    case GpuType::Vulkan:
+    }
+    case GpuType::Vulkan: {
       pm.addPass(createGpuToVulkanPass());
       break;
+    }
     }
 
     // Clean up after the GPU pipeline.
