@@ -212,8 +212,7 @@ std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
       return nullptr;
     }
 
-    llvm::CodeGenOpt::Level codeGenOpt =
-        (llvm::CodeGenOpt::Level)optLevel.getValue();
+    auto codeGenOpt = (llvm::CodeGenOptLevel)optLevel.getValue();
 
     // These options should force fused MLA, but they don't. :/
     // Adding unsafe math attribute to functions below do the trick.

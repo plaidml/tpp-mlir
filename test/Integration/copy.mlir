@@ -87,7 +87,6 @@ func.func @entry() {
 
   %v1 = vector.transfer_read %1[%c0, %c0], %d1 : tensor<9x6xf32>, vector<9x6xf32>
   vector.print %v1 : vector<9x6xf32>
-  bufferization.dealloc_tensor %1 : tensor<9x6xf32>
 
   %bcastcol = arith.constant dense<[
       [ 1.1 ],
@@ -111,7 +110,6 @@ func.func @entry() {
 
   %v2 = vector.transfer_read %2[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
   vector.print %v2 : vector<6x9xf32>
-  bufferization.dealloc_tensor %2 : tensor<6x9xf32>
 
   %s = arith.constant 23.1 : f32
   %3 = call @copyscalar(%s) : (f32) -> tensor<6x9xf32>
@@ -127,7 +125,6 @@ func.func @entry() {
 
   %v3 = vector.transfer_read %3[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
   vector.print %v3 : vector<6x9xf32>
-  bufferization.dealloc_tensor %3 : tensor<6x9xf32>
 
   %ss = arith.constant dense<[
       [43.1]
@@ -146,7 +143,6 @@ func.func @entry() {
 
   %v4 = vector.transfer_read %4[%c0, %c0], %d1 : tensor<6x9xf32>, vector<6x9xf32>
   vector.print %v4 : vector<6x9xf32>
-  bufferization.dealloc_tensor %4 : tensor<6x9xf32>
 
   return
 }

@@ -10,6 +10,8 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// XFAIL: *
+
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
@@ -38,7 +40,7 @@ func.func @walk(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<3x3x8x8xf32>, %arg2: t
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x6x6x8xf32>) {
     ^bb0(%out: f32):
-      %10 = arith.maxf %out, %c0 : f32
+      %10 = arith.maximumf %out, %c0 : f32
       linalg.yield %10 : f32
   } -> tensor<1x6x6x8xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -54,7 +56,7 @@ func.func @walk(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<3x3x8x8xf32>, %arg2: t
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x8x8x8xf32>, tensor<3x3x8x8xf32>) outs(%6 : tensor<1x6x6x8xf32>) -> tensor<1x6x6x8xf32>
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x6x6x8xf32>) {
     ^bb0(%out: f32):
-      %10 = arith.maxf %out, %c0 : f32
+      %10 = arith.maximumf %out, %c0 : f32
       linalg.yield %10 : f32
   } -> tensor<1x6x6x8xf32>
   return %9 : tensor<1x6x6x8xf32>

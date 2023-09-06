@@ -81,8 +81,8 @@ static void replaceOpWithBinary(RewriterBase &rewriter,
       rewriter.getContext(),
       ArrayRef<int64_t>{binaryInfo.m, binaryInfo.n, binaryInfo.ldiLhs,
                         binaryInfo.ldiRhs, binaryInfo.ldo});
-  auto dtype = xsmm::utils::getDataType(
-      rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
+  auto dtype =
+      xsmm::utils::getDataType(rewriter, linalgOp.getDpsInits()[0].getType());
   Value dispatched = rewriter.create<xsmm::BinaryDispatchOp>(
       loc, integer64, kind, dims, flags, dtype);
   SmallVector<Value> invokeOperands;
@@ -151,7 +151,8 @@ struct ConvertTransposeOpToUnaryTranspose
 // Get the OpOperand matching 'input', assert if 'input' is not found.
 static OpOperand *getOperandFromValue(linalg::GenericOp genericOp, Value val) {
   SmallVector<OpOperand *> allOperands = genericOp.getDpsInputOperands();
-  SmallVector<OpOperand *> initOperands = genericOp.getDpsInitOperands();
+  SmallVector<OpOperand *> initOperands = llvm::to_vector(llvm::map_range(
+      genericOp.getDpsInitsMutable(), [](OpOperand &o) { return &o; }));
   allOperands.append(initOperands.begin(), initOperands.end());
 
   OpOperand *valAsOperand = nullptr;
@@ -413,8 +414,8 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
 
   bool hasBatch = (batch != std::numeric_limits<unsigned>::max());
 
-  auto dtype = xsmm::utils::getDataType(
-      rewriter, linalgOp.getDpsInitOperands()[0]->get().getType());
+  auto dtype =
+      xsmm::utils::getDataType(rewriter, linalgOp.getDpsInits()[0].getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   Location loc = linalgOp.getLoc();
   auto flags = rewriter.getArrayAttr(
@@ -495,7 +496,7 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
   assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
   OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
   OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
-  OpOperand *operandC = linalgOp.getDpsInitOperands()[0];
+  OpOperand *operandC = &linalgOp.getDpsInitsMutable()[0];
 
   auto checkStridesAndGetLda = [&](unsigned minorDim, unsigned majorDim,
                                    OpOperand *operand) -> FailureOr<int64_t> {
@@ -670,7 +671,7 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
   OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
   OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
-  OpOperand *operandC = linalgOp.getDpsInitOperands()[0];
+  OpOperand &operandC = linalgOp.getDpsInitsMutable()[0];
 
   // C(m,n) += A(m,k) * B(k,n)
   // n is expected to be the innermost for C
@@ -694,8 +695,8 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
     return failure();
   }
 
-  auto minorNInCodomainOpC = getPosInCodomain(n, operandC, linalgOp);
-  auto minorMInCodomainOpC = getPosInCodomain(m, operandC, linalgOp);
+  auto minorNInCodomainOpC = getPosInCodomain(n, &operandC, linalgOp);
+  auto minorMInCodomainOpC = getPosInCodomain(m, &operandC, linalgOp);
   if (!minorNInCodomainOpC || !minorMInCodomainOpC) {
     LLVM_DEBUG(
         llvm::dbgs()
@@ -703,10 +704,10 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
     return failure();
   }
 
-  if (!isInnerMostDim(operandC, *minorNInCodomainOpC)) {
+  if (!isInnerMostDim(&operandC, *minorNInCodomainOpC)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for C\n");
-    assert(isInnerMostDim(operandC, *minorMInCodomainOpC));
+    assert(isInnerMostDim(&operandC, *minorMInCodomainOpC));
     if (isInnerMostDim(operandA, *minorKInCodomainOpA)) {
       emitTransposeOnOperand(rewriter, linalgOp, operandA, *minorKInCodomainOpA,
                              *minorMInCodomainOpA);

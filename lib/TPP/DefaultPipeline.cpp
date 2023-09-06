@@ -119,7 +119,7 @@ struct DefaultPipeline : public DefaultPipelineBase<DefaultPipeline>,
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
-    bufferization::registerAllocationOpInterfaceExternalModels(registry);
+    // bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);

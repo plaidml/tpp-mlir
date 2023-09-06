@@ -17,7 +17,7 @@
 // BF16:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // BF16:         arith.addf
 // BF16:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// BF16:         arith.maxf
+// BF16:         arith.maximumf
 // BF16-NOT: dealloc
 
 // DP2: // RUN{{.*}}tpp-run %s -n {{\d*}}
@@ -35,7 +35,7 @@
 // DP2:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // DP2:         arith.addf
 // DP2:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// DP2:         arith.maxf
+// DP2:         arith.maximumf
 // DP2-NOT: dealloc
 
 // DP4: // RUN{{.*}}tpp-run %s -n {{\d*}}
@@ -53,5 +53,5 @@
 // DP4:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // DP4:         arith.addf
 // DP4:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// DP4:         arith.maxf
+// DP4:         arith.maximumf
 // DP4-NOT: dealloc

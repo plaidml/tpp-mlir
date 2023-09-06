@@ -11,7 +11,7 @@ func.func @matmul_eletwise(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
                        iterator_types = ["parallel", "parallel"]} 
     outs(%0: tensor<64x64xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<64x64xf32>
   return %1 : tensor<64x64xf32>
@@ -46,7 +46,7 @@ func.func @expect_not_to_fuse_tile_sizes_do_not_divide(
                        iterator_types = ["parallel", "parallel"]} 
     outs(%0: tensor<2x2xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<2x2xf32>
   return %1 : tensor<2x2xf32>
@@ -62,7 +62,7 @@ func.func @expect_not_to_fuse_tile_sizes_do_not_divide(
 // CHECK-LABEL: func.func @blocked_matmul
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, 
                           %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  // CHECK: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -83,7 +83,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     outs(%0: tensor<4x8x32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
   } -> tensor<4x8x32x32xf32>
   return %1 :  tensor<4x8x32x32xf32>
@@ -98,7 +98,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 
 // CHECK-LABEL: func.func @blocked_convolutions
 func.func @blocked_convolutions(%arg0: tensor<14x16x28x28x32xf32>, %arg1: tensor<32x16x1x1x32x32xf32>, %arg2: tensor<14x32x28x28x32xf32>) -> tensor<14x32x28x28x32xf32> {
-  // CHECK: %[[C28:.+]] = arith.constant 28 : index
+  // CHECK-DAG: %[[C28:.+]] = arith.constant 28 : index
   // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
   // CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
@@ -122,7 +122,7 @@ func.func @blocked_convolutions(%arg0: tensor<14x16x28x28x32xf32>, %arg1: tensor
                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
     outs(%0: tensor<14x32x28x28x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
   } -> tensor<14x32x28x28x32xf32>
   return %1 : tensor<14x32x28x28x32xf32>
@@ -156,7 +156,7 @@ func.func @blocked_matmul_with_wrong_region(
                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     outs(%0: tensor<4x8x32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
   } -> tensor<4x8x32x32xf32>
   return %1 :  tensor<4x8x32x32xf32>
@@ -176,7 +176,7 @@ func.func @blocked_matmul_with_vnni_blocking(
     %arg1: tensor<48x48x16x32x2xbf16>, 
     %arg2: tensor<1536xbf16>, %arg3: tensor<8x48x32x32xbf16>) -> tensor<8x48x32x32xbf16> {
   %cst = arith.constant 0.000000e+00 : bf16
-  // CHECK: %[[C48:.+]] = arith.constant 48 : index
+  // CHECK-DAG: %[[C48:.+]] = arith.constant 48 : index
   // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -208,7 +208,7 @@ func.func @blocked_matmul_with_vnni_blocking(
     ins(%1 : tensor<8x48x32x32xbf16>) 
     outs(%arg3 : tensor<8x48x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %3 = arith.maxf %in, %cst : bf16
+      %3 = arith.maximumf %in, %cst : bf16
       linalg.yield %3 : bf16
   } -> tensor<8x48x32x32xbf16>
   return %2 : tensor<8x48x32x32xbf16>
@@ -228,7 +228,7 @@ func.func @matmul_fuse_with_fill(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf
                        iterator_types = ["parallel", "parallel"]} 
     outs(%0: tensor<64x64xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
   } -> tensor<64x64xf32>
   return %1 : tensor<64x64xf32>
@@ -281,7 +281,7 @@ func.func @blocked_matmul_with_fill(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor
                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     outs(%0: tensor<4x8x32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
   } -> tensor<4x8x32x32xf32>
   return %1 :  tensor<4x8x32x32xf32>
@@ -384,7 +384,7 @@ func.func @projection_mha(%arg2: tensor<64x32x8x64xf32>, %cst_3: tensor<8x64x8x6
 
 // CHECK-LABEL: projection_mha
 // CHECK-SAME: %[[ARG0:.+]]: tensor<64x32x8x64xf32>, %[[ARG1:.+]]: tensor<8x64x8x64xf32>
-// CHECK: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -435,7 +435,7 @@ func.func @batch_mha_trans(%arg0: tensor<64x32x8x64xf32>, %arg1: tensor<64x32x8x
 
 // CHECK-LABEL: batch_mha_trans
 // CHECK-SAME: %[[ARG0:.+]]: tensor<64x32x8x64xf32>, %[[ARG1:.+]]: tensor<64x32x8x64xf32>
-// CHECK: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -486,7 +486,7 @@ func.func @batch_mha(%arg0: tensor<64x8x32x32xf32>, %arg1: tensor<64x32x8x64xf32
 
 // CHECK-LABEL: batch_mha
 // CHECK-SAME: %[[ARG0:.+]]: tensor<64x8x32x32xf32>, %[[ARG1:.+]]: tensor<64x32x8x64xf32>
-// CHECK: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -537,7 +537,7 @@ func.func @Wo_projection_mha(%arg0: tensor<64x32x8x64xf32>, %cst_6: tensor<8x64x
 
 // CHECK: Wo_projection_mha
 // CHECK-SAME: %[[ARG0:.+]]: tensor<64x32x8x64xf32>, %[[ARG1:.+]]: tensor<8x64x512xf32>
-// CHECK: %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32

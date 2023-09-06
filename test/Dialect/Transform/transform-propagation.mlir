@@ -7,7 +7,7 @@ func.func @propagation(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf
   %c0 = arith.constant 0.0 : f32
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
-    %3 = arith.maxf %out, %c0 : f32
+    %3 = arith.maximumf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
@@ -36,7 +36,7 @@ func.func @propagation1(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64x
   %c0 = arith.constant 0.0 : f32
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
-    %3 = arith.maxf %out, %c0 : f32
+    %3 = arith.maximumf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
@@ -67,7 +67,7 @@ func.func @main(%arg0: tensor<12x2x56x56x32xf32>) -> tensor<12x56x56x64xf32> {
   // expected-note @below {{non-isolated target}}
   %2 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%1 : tensor<12x56x56x64xf32>) {
   ^bb0(%out: f32):
-    %3 = arith.maxf %out, %c0 : f32
+    %3 = arith.maximumf %out, %c0 : f32
     linalg.yield %3 : f32
   } -> tensor<12x56x56x64xf32>
   return %2 : tensor<12x56x56x64xf32>
@@ -89,7 +89,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
   %c0 = arith.constant 0.0 : f32
   %1 = linalg.generic {indexing_maps = [#map0], iterator_types = ["parallel", "parallel"]} outs(%0: tensor<128x256xf32>) {
     ^bb0(%arg3: f32):
-      %2 = arith.maxf %arg3, %c0 : f32
+      %2 = arith.maximumf %arg3, %c0 : f32
       linalg.yield %2 : f32
   } -> tensor<128x256xf32>
   return %1 : tensor<128x256xf32>
@@ -176,7 +176,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
   %c0 = arith.constant 0.0 : f32
   %1 = linalg.generic {indexing_maps = [#map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%0 : tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32):
-      %13 = arith.maxf %in, %c0 : f32
+      %13 = arith.maximumf %in, %c0 : f32
       linalg.yield %13 : f32
   } -> tensor<1x56x56x64xf32>
   return %1 : tensor<1x56x56x64xf32>
@@ -356,7 +356,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
   %c0 = arith.constant 0.0 : f32
   %1 = linalg.generic {indexing_maps = [#map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%0 : tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32):
-      %13 = arith.maxf %in, %c0 : f32
+      %13 = arith.maximumf %in, %c0 : f32
       linalg.yield %13 : f32
   } -> tensor<1x56x56x64xf32>
   %cst = arith.constant 0.000000e+00 : f32

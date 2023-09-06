@@ -140,7 +140,7 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
   %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg2 : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
   %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%unpack : tensor<128x256xf32>) {
     ^bb0(%out: f32):
-      %5 = arith.maxf %out, %cst : f32
+      %5 = arith.maximumf %out, %cst : f32
       linalg.yield %5 : f32
   } -> tensor<128x256xf32>
   return %4 : tensor<128x256xf32>
@@ -195,7 +195,7 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
                        iterator_types = ["parallel", "parallel"]}
     outs(%0: tensor<64x64xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<64x64xf32>
   return %1 : tensor<64x64xf32>
@@ -208,5 +208,5 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK: linalg.batch_reduce_matmul{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
-// CHECK:   arith.maxf
+// CHECK:   arith.maximumf
 // CHECK: tensor.unpack

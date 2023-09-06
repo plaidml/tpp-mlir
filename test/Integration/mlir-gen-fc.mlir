@@ -15,5 +15,5 @@
 // FP32:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // FP32:         arith.addf
 // FP32:     linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// FP32:         arith.maxf
+// FP32:         arith.maximumf
 // FP32-NOT: dealloc

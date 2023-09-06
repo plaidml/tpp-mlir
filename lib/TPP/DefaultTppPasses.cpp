@@ -76,35 +76,6 @@ private:
   }
 };
 
-// Apply any present transforms and remove transform blocks afterwards.
-struct TransformPass : public TransformBase<TransformPass>,
-                       UtilityPassBase<ModuleOp> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<transform::TransformDialect>();
-  }
-
-  void runOnOperation() override {
-    auto module = getOperation();
-
-    // Initialize the pipeline if needed.
-    // Otherwise, just run the cached one.
-    if (pm.empty())
-      constructPipeline();
-
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
-  }
-
-private:
-  void constructPipeline() override {
-    pm.clear();
-
-    // Run all transforms and clean them up afterwards.
-    pm.addPass(createTransformDialectInterpreterPass());
-    pm.addPass(createTransformDropSchedulePass());
-  }
-};
-
 // Lower all local dialects (XSMM, check etc.) to standard dialects
 // and function calls.
 struct LocalDialectsLoweringPass
@@ -366,7 +337,7 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
-    bufferization::registerAllocationOpInterfaceExternalModels(registry);
+    // bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -439,10 +410,6 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     }
 
-    // Convert forAll to parallel loops should run after bufferization
-    // as scf.parallel does not handle tensor.
-    pm.addPass(createConvertForAllToParallelOpPass());
-
     // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLoweringPass());
 
@@ -455,10 +422,6 @@ private:
 
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createCleanupPass() {
   return std::make_unique<CleanupPass>();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTransformPass() {
-  return std::make_unique<TransformPass>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>

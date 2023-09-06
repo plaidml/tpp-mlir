@@ -22,7 +22,7 @@ func.func @matmul_with_relu(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf3
   %unpack = tensor.unpack %3 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg2 : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
   %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%unpack : tensor<128x256xf32>) {
     ^bb0(%out: f32):
-      %5 = arith.maxf %out, %cst : f32
+      %5 = arith.maximumf %out, %cst : f32
       linalg.yield %5 : f32
   } -> tensor<128x256xf32>
   return %4 : tensor<128x256xf32>
@@ -123,7 +123,7 @@ func.func @conv_with_relu(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64
   %unpack = tensor.unpack %3 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg2 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
     %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%unpack : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
-      %5 = arith.maxf %out, %cst : f32
+      %5 = arith.maximumf %out, %cst : f32
       linalg.yield %5 : f32
   } -> tensor<1x56x56x64xf32>
   return %4 : tensor<1x56x56x64xf32>
@@ -329,7 +329,7 @@ func.func @conv_with_pad(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64x
   %unpack = tensor.unpack %3 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg2 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
   %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%unpack : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
-      %5 = arith.maxf %out, %cst : f32
+      %5 = arith.maximumf %out, %cst : f32
       linalg.yield %5 : f32
   } -> tensor<1x56x56x64xf32>
   %padded = tensor.pad %4 low[0, 1, 1, 0] high[0, 1, 1, 0] {
@@ -393,9 +393,6 @@ func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x
 // CHECK-SAME: %[[ARG1:.+]]: tensor<1x56x56x64xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: tensor<1x1x64x64xf32>
 // CHECK: %[[RES:.+]] = tensor.empty() : tensor<1x56x56x64xf32>
-// CHECK: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
-// CHECK: %[[PACKED_FILL:.+]] = linalg.fill ins(%[[ARG0]] : f32)
-// CHECK-SAME: outs(%[[EMPTY_FILL]] : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[EMPTY_ARG1:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK_ARG1:.+]] = tensor.pack %[[ARG1]] 
 // CHECK-SAME: outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] 
@@ -404,6 +401,9 @@ func.func @fill(%arg0: f32, %arg1: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x
 // CHECK: %[[PACK_ARG2:.+]] = tensor.pack %[[ARG2]] 
 // CHECK-SAME: outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] 
 // CHECK-SAME: into %[[EMPTY_ARG2]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
+// CHECK: %[[EMPTY_FILL:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
+// CHECK: %[[PACKED_FILL:.+]] = linalg.fill ins(%[[ARG0]] : f32)
+// CHECK-SAME: outs(%[[EMPTY_FILL]] : tensor<1x2x56x56x32xf32>) -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[GEN:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: ins(%[[PACK_ARG1]], %[[PACK_ARG2]]
@@ -441,7 +441,7 @@ func.func @matmul_with_relu_and_bias(%arg0: tensor<256x512xf32>, %arg1: tensor<5
   %unpack = tensor.unpack %4 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %0 : tensor<8x32x32x32xf32> -> tensor<256x1024xf32>
   %5 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%unpack : tensor<256x1024xf32>) {
     ^bb0(%out: f32):
-      %6 = arith.maxf %out, %cst : f32
+      %6 = arith.maximumf %out, %cst : f32
       linalg.yield %6 : f32
   } -> tensor<256x1024xf32>
   return %5 : tensor<256x1024xf32>
@@ -513,7 +513,7 @@ func.func @simple_4_layers_mlp_destination_passing(%arg0: tensor<128x256xf32>, %
   %unpack = tensor.unpack %4 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %0 : tensor<4x16x32x32xf32> -> tensor<128x512xf32>
   %5 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%unpack : tensor<128x512xf32>) {
     ^bb0(%out: f32):
-      %24 = arith.maxf %out, %cst : f32
+      %24 = arith.maximumf %out, %cst : f32
       linalg.yield %24 : f32
   } -> tensor<128x512xf32>
   %6 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg4 : tensor<1024xf32>) outs(%arg11 : tensor<128x1024xf32>) {
@@ -535,7 +535,7 @@ func.func @simple_4_layers_mlp_destination_passing(%arg0: tensor<128x256xf32>, %
   %unpack_5 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %6 : tensor<4x32x32x32xf32> -> tensor<128x1024xf32>
   %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%unpack_5 : tensor<128x1024xf32>) {
     ^bb0(%out: f32):
-      %24 = arith.maxf %out, %cst : f32
+      %24 = arith.maximumf %out, %cst : f32
       linalg.yield %24 : f32
   } -> tensor<128x1024xf32>
   %12 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg6 : tensor<2048xf32>) outs(%arg10 : tensor<128x2048xf32>) {
@@ -557,7 +557,7 @@ func.func @simple_4_layers_mlp_destination_passing(%arg0: tensor<128x256xf32>, %
   %unpack_9 = tensor.unpack %16 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %12 : tensor<4x64x32x32xf32> -> tensor<128x2048xf32>
   %17 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%unpack_9 : tensor<128x2048xf32>) {
     ^bb0(%out: f32):
-      %24 = arith.maxf %out, %cst : f32
+      %24 = arith.maximumf %out, %cst : f32
       linalg.yield %24 : f32
   } -> tensor<128x2048xf32>
   %18 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg8 : tensor<1024xf32>) outs(%arg9 : tensor<128x1024xf32>) {
@@ -579,7 +579,7 @@ func.func @simple_4_layers_mlp_destination_passing(%arg0: tensor<128x256xf32>, %
   %unpack_13 = tensor.unpack %22 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %18 : tensor<4x32x32x32xf32> -> tensor<128x1024xf32>
   %23 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%unpack_13 : tensor<128x1024xf32>) {
     ^bb0(%out: f32):
-      %24 = arith.maxf %out, %cst : f32
+      %24 = arith.maximumf %out, %cst : f32
       linalg.yield %24 : f32
   } -> tensor<128x1024xf32>
   // CHECK: %[[UNPACK:.+]] = tensor.unpack %{{.+}} inner_dims_pos = [0, 1] 

@@ -33,7 +33,7 @@ func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tens
                        iterator_types = ["parallel", "parallel"]} 
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<32x32xf32>
   return %1 : tensor<32x32xf32>
@@ -72,7 +72,7 @@ func.func @matmul_eletwise_blk_matmul(%arg0: tensor<4x4x32x32xf32>, %arg1: tenso
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
       outs(%0 : tensor<4x4x32x32xf32>) {
     ^bb0(%out: f32):
-      %4 = arith.maxf %out, %c0 : f32
+      %4 = arith.maximumf %out, %c0 : f32
       linalg.yield %4 : f32
   } -> tensor<4x4x32x32xf32>
   return %3 : tensor<4x4x32x32xf32>
@@ -104,7 +104,7 @@ func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: ten
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   return %3 : tensor<32x32xf32>
@@ -138,14 +138,14 @@ func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: 
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   %5 = linalg.generic {indexing_maps = [#map],
                        iterator_types = ["parallel", "parallel"]}
     outs(%3: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %6 = arith.maxf %out, %c0 : f32
+        %6 = arith.maximumf %out, %c0 : f32
         linalg.yield %6 : f32
   } -> tensor<32x32xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map],
@@ -169,11 +169,11 @@ func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: 
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]]], iterator_types = ["parallel", "parallel"]
 // CHECK: ^bb0(
-// CHECK-NEXT: arith.maxf
+// CHECK-NEXT: arith.maximumf
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]]], iterator_types = ["parallel", "parallel"]
 // CHECK: ^bb0(
-// CHECK-NEXT: arith.maxf
+// CHECK-NEXT: arith.maximumf
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel"]
 // CHECK: ^bb0(
@@ -199,14 +199,14 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   %5 = linalg.generic {indexing_maps = [#map],
                        iterator_types = ["parallel", "parallel"]}
     outs(%3: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %6 = arith.maxf %out, %c0 : f32
+        %6 = arith.maximumf %out, %c0 : f32
         linalg.yield %6 : f32
   } -> tensor<32x32xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map],
@@ -301,7 +301,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<8x112x32x32xbf16>) outs(%1 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16> 
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -320,7 +320,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %4 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%3, %arg4 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg6 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -337,7 +337,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %7 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%6 : tensor<8x112x32x32xbf16>) outs(%5 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -356,7 +356,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %8 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%7, %arg7 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg9 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -373,7 +373,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %11 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%10 : tensor<8x112x32x32xbf16>) outs(%9 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -392,7 +392,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %12 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%11, %arg10 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg12 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -409,7 +409,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %15 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%14 : tensor<8x112x32x32xbf16>) outs(%13 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -428,7 +428,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %16 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%15, %arg13 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg15 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -445,7 +445,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %19 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%18 : tensor<8x112x32x32xbf16>) outs(%17 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -464,7 +464,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
    %20 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%19, %arg16 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg18 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -481,7 +481,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %23 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%22 : tensor<8x112x32x32xbf16>) outs(%21 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -500,7 +500,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %24 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%23, %arg19 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg21 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -517,7 +517,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %27 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%26 : tensor<8x112x32x32xbf16>) outs(%25 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -536,7 +536,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %28 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%27, %arg22 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg24 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -553,7 +553,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %31 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%30 : tensor<8x112x32x32xbf16>) outs(%29 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -572,7 +572,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %32 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%31, %arg25 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg27 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -589,7 +589,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %35 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%34 : tensor<8x112x32x32xbf16>) outs(%33 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -608,7 +608,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %36 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%35, %arg28 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg30 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
@@ -625,7 +625,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   } -> tensor<8x112x32x32xbf16>
   %39 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%38 : tensor<8x112x32x32xbf16>) outs(%37 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
   // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
@@ -644,12 +644,12 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   // CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK:       ^bb0(
-  // CHECK-NEXT:    arith.maxf
+  // CHECK-NEXT:    arith.maximumf
   // CHECK: scf.forall.in_parallel
   %c0 = arith.constant 0: index
   %d1 = arith.constant -1.0 : bf16
-  %subview_3 = tensor.extract_slice %39[%c0, %c0, 0, 0][1, 1, 4, 4][1, 1, 1, 1] : tensor<8x112x32x32xbf16> to tensor<4x4xbf16, strided<[4,1], offset:?>>
-  %v0 = vector.transfer_read %subview_3[%c0, %c0], %d1 : tensor<4x4xbf16, strided<[4,1], offset: ? >>, vector<4x4xbf16>
+  %subview_3 = tensor.extract_slice %39[%c0, %c0, 0, 0][1, 1, 4, 4][1, 1, 1, 1] : tensor<8x112x32x32xbf16> to tensor<4x4xbf16>
+  %v0 = vector.transfer_read %subview_3[%c0, %c0], %d1 : tensor<4x4xbf16>, vector<4x4xbf16>
   %f1 = arith.extf %v0 : vector<4x4xbf16> to vector<4x4xf32>
   vector.print %f1 : vector<4x4xf32>
   return %39 : tensor<8x112x32x32xbf16>

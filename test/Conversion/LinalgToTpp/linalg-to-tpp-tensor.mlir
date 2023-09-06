@@ -173,7 +173,7 @@ func.func @matmul_mapping(%arg0 : tensor<28x55xf32>, %arg1 : tensor<55x32xf32>) 
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %0 = arith.mulf %in, %in_2 : f32
       %1 = arith.addf %out, %0 : f32
-      %2 = arith.maxf %1, %cst : f32
+      %2 = arith.maximumf %1, %cst : f32
       linalg.yield %2 : f32
   } -> tensor<28x32xf32>
 
@@ -190,7 +190,7 @@ func.func @relu_mapping(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
     iterator_types = ["parallel", "parallel"]}
     outs(%arg0: tensor<10x10xf32>) {
       ^bb0(%out : f32):
-        %0 = arith.maxf %out, %c0 : f32
+        %0 = arith.maximumf %out, %c0 : f32
         linalg.yield %0 : f32
   } -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
@@ -210,7 +210,7 @@ func.func @relu_mapping(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>) -> t
     iterator_types = ["parallel", "parallel"]}
     ins(%arg1: tensor<10x10xf32>) outs(%arg0: tensor<10x10xf32>) {
       ^bb0(%in : f32, %out : f32):
-        %0 = arith.maxf %in, %c0 : f32
+        %0 = arith.maximumf %in, %c0 : f32
         linalg.yield %0 : f32
   } -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
@@ -225,7 +225,7 @@ func.func @relu_mapping(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>) -> t
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-// Expect not to map as the operation is not a relu see: arith.maxf %in %out.
+// Expect not to map as the operation is not a relu see: arith.maximumf %in %out.
 // CHECK-LABEL: func.func @relu_max_with_no_zero
 func.func @relu_max_with_no_zero(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>) -> tensor<10x10xf32> {
   // CHECK-NOT: tpp.relu
@@ -234,7 +234,7 @@ func.func @relu_max_with_no_zero(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf
     iterator_types = ["parallel", "parallel"]}
     ins(%arg1: tensor<10x10xf32>) outs(%arg0: tensor<10x10xf32>) {
       ^bb0(%in : f32, %out : f32):
-        %0 = arith.maxf %in, %out : f32
+        %0 = arith.maximumf %in, %out : f32
         linalg.yield %0 : f32
   } -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
@@ -244,7 +244,7 @@ func.func @relu_max_with_no_zero(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf
 
 #map = affine_map<(d0) -> (d0)>
 
-// Expect not to map as not a relu see: arith.maxf %c0 %c0.
+// Expect not to map as not a relu see: arith.maximumf %c0 %c0.
 // CHECK-LABEL: func.func @relu_max_with_only_zeros
 func.func @relu_max_with_only_zeros(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
   %c0 = arith.constant 0.0 : f32
@@ -254,7 +254,7 @@ func.func @relu_max_with_only_zeros(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) 
     iterator_types = ["parallel"]}
     ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
-        %0 = arith.maxf %c0, %c0 : f32
+        %0 = arith.maximumf %c0, %c0 : f32
         linalg.yield %0 : f32
     } -> tensor<3xf32>
   return %0 : tensor<3xf32>
@@ -275,7 +275,7 @@ func.func @relu_mapping_1d_output(%arg0: tensor<3xf32>,
     iterator_types = ["parallel"]}
     ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
-        %0 = arith.maxf %arg3, %c0 : f32
+        %0 = arith.maximumf %arg3, %c0 : f32
         linalg.yield %0 : f32
     } -> tensor<3xf32>
   return %0 : tensor<3xf32>
@@ -285,7 +285,7 @@ func.func @relu_mapping_1d_output(%arg0: tensor<3xf32>,
 
 #map = affine_map<(d0) -> (d0)>
 
-// Expect not to map as the operation is not a relu see: arith.maxf %arg3 %arg3.
+// Expect not to map as the operation is not a relu see: arith.maximumf %arg3 %arg3.
 // CHECK-LABEL: func.func @relu_max_with_no_zero2
 func.func @relu_max_with_no_zero2(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
   %c0 = arith.constant 0.0 : f32
@@ -295,7 +295,7 @@ func.func @relu_max_with_no_zero2(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) ->
     iterator_types = ["parallel"]}
     ins(%arg0: tensor<3xf32>) outs(%arg1: tensor<3xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
-        %0 = arith.maxf %arg3, %arg3 : f32
+        %0 = arith.maximumf %arg3, %arg3 : f32
         linalg.yield %0 : f32
     } -> tensor<3xf32>
   return %0 : tensor<3xf32>
@@ -312,7 +312,7 @@ func.func @relu_mapping_inplace(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
     iterator_types = ["parallel", "parallel"]}
     outs(%arg0: tensor<10x10xf32>) {
       ^bb0(%out : f32):
-        %0 = arith.maxf %out, %c0 : f32
+        %0 = arith.maximumf %out, %c0 : f32
         linalg.yield %0 : f32
   } -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
@@ -333,7 +333,7 @@ func.func @relu_mapping_outofplace(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10
     iterator_types = ["parallel", "parallel"]}
     ins(%arg1: tensor<10x10xf32>) outs(%arg0: tensor<10x10xf32>) {
       ^bb0(%in : f32, %out : f32):
-        %0 = arith.maxf %in, %c0 : f32
+        %0 = arith.maximumf %in, %c0 : f32
         linalg.yield %0 : f32
   } -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
@@ -721,7 +721,7 @@ func.func @linalg_bias_relu(%arg0: tensor<4x4xf32>, %arg1: tensor<4xf32>, %arg2:
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4xf32>) outs(%arg2 : tensor<4x4xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
     %1 = arith.addf %in, %in_1 : f32
-    %2 = arith.maxf %1, %cst : f32
+    %2 = arith.maximumf %1, %cst : f32
     linalg.yield %2 : f32
     } -> tensor<4x4xf32>
   return %0 : tensor<4x4xf32>
@@ -740,7 +740,7 @@ func.func @linalg_bias_relu(%arg0: tensor<4x4xf32>, %arg1: tensor<4xf32>) -> ten
   %0 = linalg.generic {indexing_maps = [#map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<4xf32>) outs(%arg0 : tensor<4x4xf32>) {
   ^bb0(%in: f32, %out: f32):
     %1 = arith.addf %in, %out : f32
-    %2 = arith.maxf %1, %cst : f32
+    %2 = arith.maximumf %1, %cst : f32
     linalg.yield %2 : f32
   } -> tensor<4x4xf32>
   return %0 : tensor<4x4xf32>
@@ -788,7 +788,7 @@ func.func @linalg_zero_gemm_bias_relu(%arg0: tensor<128x256xf32>, %arg1: tensor<
               {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]}
               outs(%1 : tensor<128x512xf32>) {
   ^bb0(%arg9: f32):
-    %16 = arith.maxf %arg9, %c0 : f32
+    %16 = arith.maximumf %arg9, %c0 : f32
     linalg.yield %16 : f32
   } -> tensor<128x512xf32>
 
@@ -830,7 +830,7 @@ func.func @linalg_zero_gemm_fused_bias_relu(%arg0: tensor<128x256xf32>, %arg1: t
               outs(%0 : tensor<128x512xf32>) {
   ^bb0(%arg9: f32, %arg10: f32):
     %16 = arith.addf %arg9, %arg10 : f32
-    %17 = arith.maxf %16, %c0 : f32
+    %17 = arith.maximumf %16, %c0 : f32
     linalg.yield %17 : f32
   } -> tensor<128x512xf32>
 
@@ -855,7 +855,7 @@ func.func @linalg_zero_gemm_fused_bias_relu_no_chain(%arg0: tensor<128x256xf32>,
               outs(%fill : tensor<128x512xf32>) {
   ^bb0(%arg9: f32, %arg10: f32):
     %16 = arith.addf %arg9, %arg10 : f32
-    %17 = arith.maxf %external, %c0 : f32
+    %17 = arith.maximumf %external, %c0 : f32
     linalg.yield %17 : f32
   } -> tensor<128x512xf32>
 

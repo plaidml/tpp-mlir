@@ -37,7 +37,7 @@ func.func @tpp_identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 func.func @tpp_relu(%arg0: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
-  // CHECK:     arith.maxf
+  // CHECK:     arith.maximumf
   tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
 
   return
@@ -127,7 +127,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  // CHECK: scf.parallel
+  // CHECK: scf.forall
   // CHECK:   scf.for
   // CHECK:     scf.for
   // CHECK:       scf.for
@@ -275,11 +275,11 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // Relu
   // CHECK: scf.for
   // CHECK:   scf.for
-  // CHECK:     arith.maxf
+  // CHECK:     arith.maximumf
   %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
-      %16 = arith.maxf %arg9, %c0 : f32
+      %16 = arith.maximumf %arg9, %c0 : f32
       linalg.yield %16 : f32
   } -> tensor<128x512xf32>
 

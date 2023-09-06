@@ -69,8 +69,8 @@ struct MatmulOpDeGeneralizationPattern
                                 PatternRewriter &rewriter) const override {
     if (!isMatmulOp(linalgOp))
       return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
+    SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
+    SmallVector<Value> outputOperands = linalgOp.getDpsInits();
     rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
         linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
     return success();
@@ -112,8 +112,8 @@ struct BatchReduceOpDeGeneralizationPattern
                                 PatternRewriter &rewriter) const override {
     if (!isBrgemmOp(linalgOp))
       return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
+    SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
+    SmallVector<Value> outputOperands = linalgOp.getDpsInits();
     rewriter.replaceOpWithNewOp<linalg::BatchReduceMatmulOp>(
         linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
     return success();
@@ -147,8 +147,8 @@ struct FillOpDeGeneralizationPattern
                                 PatternRewriter &rewriter) const override {
     if (!isFillOp(linalgOp))
       return failure();
-    SmallVector<Value> inputOperands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> outputOperands = linalgOp.getDpsInitOperands();
+    SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
+    SmallVector<Value> outputOperands = linalgOp.getDpsInits();
     rewriter.replaceOpWithNewOp<linalg::FillOp>(
         linalgOp, linalgOp.getResultTypes(), inputOperands, outputOperands);
     return success();
@@ -164,8 +164,8 @@ struct TppBrgemmDeGeneralizationPattern
                                 PatternRewriter &rewriter) const override {
     if (!tpp::utils::isTppVnniOp(linalgOp, /*captures=*/nullptr))
       return failure();
-    SmallVector<Value> operands = linalgOp.getDpsInputOperands();
-    SmallVector<Value> initOperands = linalgOp.getDpsInitOperands();
+    SmallVector<Value> operands = linalgOp.getDpsInputs();
+    SmallVector<Value> initOperands = linalgOp.getDpsInits();
     operands.append(initOperands.begin(), initOperands.end());
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(linalgOp, operands,
                                                operands.back().getType());

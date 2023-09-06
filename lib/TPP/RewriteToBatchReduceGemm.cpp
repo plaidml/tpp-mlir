@@ -128,9 +128,9 @@ getSlicedOperands(OpBuilder &builder, Location loc, ValueRange localIvs,
 
     slicedOperands.push_back(*slicedOperand);
   }
-  for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+  for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
     FailureOr<Value> slicedOperand = linalgx::utils::getSliceOperand(
-        builder, operand, linalgOp, localIvs, valuesToUse, 2);
+        builder, &operand, linalgOp, localIvs, valuesToUse, 2);
     if (failed(slicedOperand))
       return failure();
     slicedOperands.push_back(*slicedOperand);

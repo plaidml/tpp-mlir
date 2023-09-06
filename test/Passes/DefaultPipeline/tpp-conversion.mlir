@@ -12,7 +12,7 @@ func.func @tpp_sequence(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
     iterator_types = ["parallel", "parallel"]}
     outs(%arg2 : tensor<5x5xf32>) {
       ^bb0(%arg14: f32):
-        %13 = arith.maxf %arg14, %c0: f32
+        %13 = arith.maximumf %arg14, %c0: f32
         linalg.yield %13 : f32
   } -> tensor<5x5xf32>
   %2 = linalg.matmul ins(%1, %0: tensor<5x5xf32>, tensor<5x5xf32>)
@@ -54,7 +54,7 @@ func.func @linalg_dialect_expect_fused_brgemm(
     iterator_types = ["parallel", "parallel"]}
     outs(%1: tensor<3x3xf32>) {
       ^bb0(%out: f32):
-        %relu = arith.maxf %out, %c0 : f32
+        %relu = arith.maximumf %out, %c0 : f32
         linalg.yield %relu : f32
   } -> tensor<3x3xf32>
   return %2: tensor<3x3xf32>

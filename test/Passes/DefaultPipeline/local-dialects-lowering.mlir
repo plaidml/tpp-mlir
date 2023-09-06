@@ -39,8 +39,6 @@ func.func @perf_dialect(%A: tensor<4x8xf32>,
   %mean = perf.mean(%deltas : memref<?xf64>) : f64
   %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
 
-  memref.dealloc %deltas : memref<?xf64>
-  
   return %mean, %stdev, %res : f64, f64, i64
 }
 

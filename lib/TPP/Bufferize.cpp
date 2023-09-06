@@ -9,9 +9,11 @@
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
 
+#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Pipelines/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -75,7 +77,6 @@ void Bufferize::runOnOperation() {
 
   // One-shot.
   bufferization::OneShotBufferizationOptions buffOpts;
-  buffOpts.allowReturnAllocs = true;
   buffOpts.bufferizeFunctionBoundaries = true;
   buffOpts.setFunctionBoundaryTypeConversion(
       bufferization::LayoutMapOption::IdentityLayoutMap);
@@ -99,7 +100,10 @@ void Bufferize::runOnOperation() {
     // memrefs are unified in CSE pass, so we can truly remove redundant memcpy.
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
-
+  passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
+  bufferization::BufferDeallocationPipelineOptions options;
+  bufferization::buildBufferDeallocationPipeline(passManager, options);
+  passManager.addPass(createBufferizationToMemRefPass());
   if (failed(runPipeline(passManager, moduleOp)))
     return signalPassFailure();
 }

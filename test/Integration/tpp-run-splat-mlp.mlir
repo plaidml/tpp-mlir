@@ -27,7 +27,7 @@ func.func @entry(%arg0: tensor<8x8xf32>, %output: tensor<8x8xf32>) -> tensor<8x8
     ins(%1 : tensor<8x8xf32>)
     outs(%out_shape : tensor<8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %16 = arith.maxf %in, %c0 : f32
+      %16 = arith.maximumf %in, %c0 : f32
       linalg.yield %16 : f32
   } -> tensor<8x8xf32>
 
@@ -43,7 +43,7 @@ func.func @entry(%arg0: tensor<8x8xf32>, %output: tensor<8x8xf32>) -> tensor<8x8
     ins(%4 : tensor<8x8xf32>)
     outs(%out_shape : tensor<8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %16 = arith.maxf %in, %c0 : f32
+      %16 = arith.maximumf %in, %c0 : f32
       linalg.yield %16 : f32
   } -> tensor<8x8xf32>
   return %5 : tensor<8x8xf32>

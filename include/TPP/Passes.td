@@ -351,11 +351,6 @@ def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let constructor = "mlir::tpp::createCleanupPass()";
 }
 
-def Transform : Pass<"transform", "ModuleOp"> {
-  let summary = "Runs transformation schedules and then drops them.";
-  let constructor = "mlir::tpp::createTransformPass()";
-}
-
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
   let summary = "Lower all local dialects (XSMM, check etc.).";
   let constructor = "mlir::tpp::createLocalDialectsLoweringPass()";
@@ -402,15 +397,6 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
            "By default Linalg ops are lowered to TPP. Lower Linalg to XSMM instead.">,
   ];
   let constructor = "mlir::tpp::createTppLoweringPass()";
-}
-
-def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
-                                     "func::FuncOp"> {
-  let summary = "Convert scf.forall to scf.parallel";
-  let description = [{
-    Rewrite an scf.forall to scf.parallel after bufferization.
-  }];
-  let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
 }
 
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {

@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/TransformUtils.h"
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 

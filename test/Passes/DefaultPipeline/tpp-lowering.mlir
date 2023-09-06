@@ -25,7 +25,7 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // LOOPS:   arith.addf
 // LOOPS-NOT: tpp.relu
 // LOOPS: scf.for
-// LOOPS:   arith.maxf
+// LOOPS:   arith.maximumf
 // LOOPS-NOT: tpp.gemm
 // LOOPS: scf.for
 // LOOPS:   arith.mulf

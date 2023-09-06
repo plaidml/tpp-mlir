@@ -112,9 +112,9 @@ struct ConvertBrgemmToTpp
       return rewriter.notifyMatchFailure(
           brMatmulOp, "Expect static shape when mapping to tpp");
     }
-    SmallVector<Value> inputs = brMatmulOp.getDpsInputOperands();
-    inputs.push_back(brMatmulOp.getDpsInitOperands()[0]->get());
-    SmallVector<Value> outputs = brMatmulOp.getDpsInitOperands();
+    SmallVector<Value> inputs = brMatmulOp.getDpsInputs();
+    inputs.push_back(brMatmulOp.getDpsInits()[0]);
+    SmallVector<Value> outputs = brMatmulOp.getDpsInits();
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs,
                                                outputs[0].getType());
     return success();
@@ -135,9 +135,9 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
       return rewriter.notifyMatchFailure(
           matmulOp, "Expect static shape when mapping to tpp");
     }
-    SmallVector<Value> inputs = matmulOp.getDpsInputOperands();
-    inputs.push_back(matmulOp.getDpsInitOperands()[0]->get());
-    SmallVector<Value> outputs = matmulOp.getDpsInitOperands();
+    SmallVector<Value> inputs = matmulOp.getDpsInputs();
+    inputs.push_back(matmulOp.getDpsInits()[0]);
+    SmallVector<Value> outputs = matmulOp.getDpsInits();
     rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs,
                                              outputs[0].getType());
     return success();

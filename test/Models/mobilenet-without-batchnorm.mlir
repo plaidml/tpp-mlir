@@ -177,8 +177,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %31 = tensor.empty() : tensor<1x112x112x32xf32>
   %32 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %10, %cst_2 : tensor<f32>, tensor<1x112x112x32xf32>, tensor<f32>) outs(%31 : tensor<1x112x112x32xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x32xf32>
   
@@ -194,8 +194,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %56 = tensor.empty() : tensor<1x112x112x32xf32>
   %57 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %35, %cst_2 : tensor<f32>, tensor<1x112x112x32xf32>, tensor<f32>) outs(%56 : tensor<1x112x112x32xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x32xf32>
   //
@@ -213,8 +213,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %104 = tensor.empty() : tensor<1x112x112x96xf32>
   %105 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %83, %cst_2 : tensor<f32>, tensor<1x112x112x96xf32>, tensor<f32>) outs(%104 : tensor<1x112x112x96xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x96xf32>
 
@@ -231,8 +231,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %129 = tensor.empty() : tensor<1x56x56x96xf32>
   %130 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %108, %cst_2 : tensor<f32>, tensor<1x56x56x96xf32>, tensor<f32>) outs(%129 : tensor<1x56x56x96xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x96xf32>
 
@@ -248,8 +248,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %177 = tensor.empty() : tensor<1x56x56x144xf32>
   %178 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %156, %cst_2 : tensor<f32>, tensor<1x56x56x144xf32>, tensor<f32>) outs(%177 : tensor<1x56x56x144xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
   
@@ -266,8 +266,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %202 = tensor.empty() : tensor<1x56x56x144xf32>
   %203 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %181, %cst_2 : tensor<f32>, tensor<1x56x56x144xf32>, tensor<f32>) outs(%202 : tensor<1x56x56x144xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
 
@@ -291,8 +291,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %252 = tensor.empty() : tensor<1x56x56x144xf32>
   %253 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %231, %cst_2 : tensor<f32>, tensor<1x56x56x144xf32>, tensor<f32>) outs(%252 : tensor<1x56x56x144xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
 
@@ -309,8 +309,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %277 = tensor.empty() : tensor<1x28x28x144xf32>
   %278 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %256, %cst_2 : tensor<f32>, tensor<1x28x28x144xf32>, tensor<f32>) outs(%277 : tensor<1x28x28x144xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x144xf32>
 
@@ -326,8 +326,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %325 = tensor.empty() : tensor<1x28x28x192xf32>
   %326 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %304, %cst_2 : tensor<f32>, tensor<1x28x28x192xf32>, tensor<f32>) outs(%325 : tensor<1x28x28x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
 
@@ -344,8 +344,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %350 = tensor.empty() : tensor<1x28x28x192xf32>
   %351 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %329, %cst_2 : tensor<f32>, tensor<1x28x28x192xf32>, tensor<f32>) outs(%350 : tensor<1x28x28x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
 
@@ -369,8 +369,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %400 = tensor.empty() : tensor<1x28x28x192xf32>
   %401 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %379, %cst_2 : tensor<f32>, tensor<1x28x28x192xf32>, tensor<f32>) outs(%400 : tensor<1x28x28x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
   
@@ -387,8 +387,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %425 = tensor.empty() : tensor<1x28x28x192xf32>
   %426 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %404, %cst_2 : tensor<f32>, tensor<1x28x28x192xf32>, tensor<f32>) outs(%425 : tensor<1x28x28x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
 
@@ -412,8 +412,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %475 = tensor.empty() : tensor<1x28x28x192xf32>
   %476 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %454, %cst_2 : tensor<f32>, tensor<1x28x28x192xf32>, tensor<f32>) outs(%475 : tensor<1x28x28x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
   
@@ -430,8 +430,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %500 = tensor.empty() : tensor<1x14x14x192xf32>
   %501 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %479, %cst_2 : tensor<f32>, tensor<1x14x14x192xf32>, tensor<f32>) outs(%500 : tensor<1x14x14x192xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x192xf32>
 
@@ -447,8 +447,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %548 = tensor.empty() : tensor<1x14x14x384xf32>
   %549 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %527, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%548 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -465,8 +465,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %573 = tensor.empty() : tensor<1x14x14x384xf32>
   %574 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %552, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%573 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -490,8 +490,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %623 = tensor.empty() : tensor<1x14x14x384xf32>
   %624 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %602, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%623 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -508,8 +508,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %648 = tensor.empty() : tensor<1x14x14x384xf32>
   %649 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %627, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%648 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -533,8 +533,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %698 = tensor.empty() : tensor<1x14x14x384xf32>
   %699 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %677, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%698 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -551,8 +551,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %723 = tensor.empty() : tensor<1x14x14x384xf32>
   %724 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %702, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%723 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -576,8 +576,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %773 = tensor.empty() : tensor<1x14x14x384xf32>
   %774 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %752, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%773 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -594,8 +594,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %798 = tensor.empty() : tensor<1x14x14x384xf32>
   %799 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %777, %cst_2 : tensor<f32>, tensor<1x14x14x384xf32>, tensor<f32>) outs(%798 : tensor<1x14x14x384xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x384xf32>
 
@@ -611,8 +611,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %846 = tensor.empty() : tensor<1x14x14x576xf32>
   %847 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %825, %cst_2 : tensor<f32>, tensor<1x14x14x576xf32>, tensor<f32>) outs(%846 : tensor<1x14x14x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
 
@@ -629,8 +629,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %871 = tensor.empty() : tensor<1x14x14x576xf32>
   %872 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %850, %cst_2 : tensor<f32>, tensor<1x14x14x576xf32>, tensor<f32>) outs(%871 : tensor<1x14x14x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
 
@@ -654,8 +654,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %921 = tensor.empty() : tensor<1x14x14x576xf32>
   %922 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %900, %cst_2 : tensor<f32>, tensor<1x14x14x576xf32>, tensor<f32>) outs(%921 : tensor<1x14x14x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
 
@@ -672,8 +672,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %946 = tensor.empty() : tensor<1x14x14x576xf32>
   %947 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %925, %cst_2 : tensor<f32>, tensor<1x14x14x576xf32>, tensor<f32>) outs(%946 : tensor<1x14x14x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
 
@@ -697,8 +697,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %996 = tensor.empty() : tensor<1x14x14x576xf32>
   %997 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %975, %cst_2 : tensor<f32>, tensor<1x14x14x576xf32>, tensor<f32>) outs(%996 : tensor<1x14x14x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x14x14x576xf32>
 
@@ -715,8 +715,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1021 = tensor.empty() : tensor<1x7x7x576xf32>
   %1022 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1000, %cst_2 : tensor<f32>, tensor<1x7x7x576xf32>, tensor<f32>) outs(%1021 : tensor<1x7x7x576xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x576xf32>
 
@@ -732,8 +732,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1069 = tensor.empty() : tensor<1x7x7x960xf32>
   %1070 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1048, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1069 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -750,8 +750,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1094 = tensor.empty() : tensor<1x7x7x960xf32>
   %1095 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1073, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1094 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -775,8 +775,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1144 = tensor.empty() : tensor<1x7x7x960xf32>
   %1145 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1123, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1144 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -793,8 +793,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1169 = tensor.empty() : tensor<1x7x7x960xf32>
   %1170 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1148, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1169 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -818,8 +818,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1219 = tensor.empty() : tensor<1x7x7x960xf32>
   %1220 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1198, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1219 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -836,8 +836,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1244 = tensor.empty() : tensor<1x7x7x960xf32>
   %1245 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1223, %cst_2 : tensor<f32>, tensor<1x7x7x960xf32>, tensor<f32>) outs(%1244 : tensor<1x7x7x960xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x960xf32>
 
@@ -853,8 +853,8 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %1292 = tensor.empty() : tensor<1x7x7x1280xf32>
   %1293 = linalg.generic {indexing_maps = [#map1, #map0, #map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_3, %1271, %cst_2 : tensor<f32>, tensor<1x7x7x1280xf32>, tensor<f32>) outs(%1292 : tensor<1x7x7x1280xf32>) {
   ^bb0(%in: f32, %in_52: f32, %in_53: f32, %out: f32):
-    %1307 = arith.maxf %in, %in_52 : f32
-    %1308 = arith.minf %1307, %in_53 : f32
+    %1307 = arith.maximumf %in, %in_52 : f32
+    %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x7x7x1280xf32>
 

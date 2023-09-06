@@ -115,11 +115,8 @@ static LogicalResult bufferizeUnaryOp(Operation *op, RewriterBase &rewriter,
   // Out-of-place bufferization.
   if (!canBufferizeOnOperand(op, unaryOp.getInputs()[0], options)) {
     AnalysisState analysisState(options);
-    bool dealloc = shouldDeallocateOpResult(
-        unaryOp.getResult(0).template cast<OpResult>(), options);
     FailureOr<Value> alloc = allocateTensorForShapedValue(
-        rewriter, loc, unaryOp.getResult(0),
-        /*escape=*/!dealloc, options, /*copy=*/false);
+        rewriter, loc, unaryOp.getResult(0), options, /*copy=*/false);
     if (failed(alloc))
       return failure();
     FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);
@@ -284,11 +281,8 @@ static LogicalResult bufferizeBinaryOp(Operation *op, RewriterBase &rewriter,
   if (!canBufferizeOnOperand(op, lhs, options) &&
       !canBufferizeOnOperand(op, rhs, options)) {
     LLVM_DEBUG(llvm::dbgs() << "BINARY: bufferize out of place\n");
-    bool dealloc = shouldDeallocateOpResult(
-        binaryOp.getResult(0).template cast<OpResult>(), options);
     FailureOr<Value> alloc = allocateTensorForShapedValue(
-        rewriter, loc, binaryOp.getResult(0),
-        /*escape=*/!dealloc, options, /*copy=*/false);
+        rewriter, loc, binaryOp.getResult(0), options, /*copy=*/false);
     if (failed(alloc))
       return failure();
     FailureOr<Value> allocBuffer = getBufferOrScalar(rewriter, *alloc, options);

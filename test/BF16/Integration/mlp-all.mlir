@@ -27,7 +27,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   %2 = linalg.matmul ins(%arg0, %arg1: tensor<128x256xbf16>, tensor<256x512xbf16>) outs(%1: tensor<128x512xbf16>) -> tensor<128x512xbf16> 
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xbf16>) {
   ^bb0(%arg9: bf16):
-    %16 = arith.maxf %arg9, %c0 : bf16
+    %16 = arith.maximumf %arg9, %c0 : bf16
     linalg.yield %16 : bf16
   } -> tensor<128x512xbf16>
     %5 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg4 : tensor<1024xbf16>) outs(%output2 : tensor<128x1024xbf16>) {
@@ -39,7 +39,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   %6 = linalg.matmul  ins(%3, %arg3 : tensor<128x512xbf16>, tensor<512x1024xbf16>) outs(%5 : tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
   %7 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%6 : tensor<128x1024xbf16>)  {
   ^bb0(%arg9: bf16):
-    %16 = arith.maxf %arg9, %c0 : bf16
+    %16 = arith.maximumf %arg9, %c0 : bf16
     linalg.yield %16 : bf16
   } -> tensor<128x1024xbf16>
 
@@ -52,7 +52,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   %10 = linalg.matmul ins(%7, %arg5 : tensor<128x1024xbf16>, tensor<1024x2048xbf16>) outs(%9 : tensor<128x2048xbf16>) -> tensor<128x2048xbf16>
   %11 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%10 : tensor<128x2048xbf16>) {
   ^bb0(%arg9: bf16):
-    %16 = arith.maxf %arg9, %c0 : bf16
+    %16 = arith.maximumf %arg9, %c0 : bf16
     linalg.yield %16 : bf16
   } -> tensor<128x2048xbf16>
 
@@ -65,7 +65,7 @@ func.func @mlp(%arg0: tensor<128x256xbf16>, %arg1: tensor<256x512xbf16>,
   %14 = linalg.matmul  ins(%11, %arg7 : tensor<128x2048xbf16>, tensor<2048x1024xbf16>) outs(%13 : tensor<128x1024xbf16>) -> tensor<128x1024xbf16>
   %15 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%14 : tensor<128x1024xbf16>) {
   ^bb0(%arg9: bf16):
-    %16 = arith.maxf %arg9, %c0 : bf16
+    %16 = arith.maximumf %arg9, %c0 : bf16
     linalg.yield %16 : bf16
   } -> tensor<128x1024xbf16>
 

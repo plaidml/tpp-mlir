@@ -22,12 +22,11 @@ static LogicalResult hasEqualOperandTypes(Operation *operation) {
   if (!isa<linalg::LinalgOp>(operation))
     return failure();
   auto linalgOp = cast<linalg::LinalgOp>(operation);
-  OpOperand *outputOperand = linalgOp.getDpsInitOperands().back();
-  auto elemType = getElementTypeOrSelf(outputOperand->get().getType());
+  OpOperand &outputOperand = linalgOp.getDpsInitsMutable()[0];
+  auto elemType = getElementTypeOrSelf(outputOperand.get().getType());
 
-  if (!llvm::all_of(linalgOp.getDpsInitOperands(), [&](OpOperand *operand) {
-        auto currentOperandType =
-            getElementTypeOrSelf(operand->get().getType());
+  if (!llvm::all_of(linalgOp.getDpsInitsMutable(), [&](OpOperand &operand) {
+        auto currentOperandType = getElementTypeOrSelf(operand.get().getType());
         return currentOperandType == elemType;
       })) {
     return failure();
@@ -117,11 +116,11 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   if (yieldOp->getNumOperands() != 1)
     return false;
   Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-  if (!isa<arith::MaxFOp>(innerOp))
+  if (!isa<arith::MaximumFOp>(innerOp))
     return false;
   if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
     return false;
-  auto maxfOp = cast<arith::MaxFOp>(innerOp);
+  auto maxfOp = cast<arith::MaximumFOp>(innerOp);
   Value maxfLhs = maxfOp.getLhs();
   Value maxfRhs = maxfOp.getRhs();
 
@@ -224,7 +223,7 @@ bool isTwoDZeroOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
     return false;
 
   // Only take the output as tpp.zero is an in-place operation.
-  auto output = linalgOp.getDpsInitOperands()[0]->get();
+  Value output = linalgOp.getDpsInits()[0];
   if (!output.getType().isa<ShapedType>())
     return false;
 
@@ -241,14 +240,14 @@ bool isTwoDBiasReluOp(linalg::LinalgOp linalgOp,
   auto biasReluMatcher = 
     StructuredOpMatcher::make<linalg::LinalgOp>()
       .region(MatchOne(0), 
-              WithOpChain<arith::AddFOp, arith::MaxFOp>(operands));
+              WithOpChain<arith::AddFOp, arith::MaximumFOp>(operands));
   // clang-format on
 
   if (!isTppBinaryOp(linalgOp) || !biasReluMatcher.match(linalgOp))
     return false;
 
   // Only take the output as tpp.add + tpp.relu should be in-place operations.
-  auto output = linalgOp.getDpsInitOperands()[0]->get();
+  Value output = linalgOp.getDpsInits()[0];
   if (!output.getType().isa<ShapedType>())
     return false;
 
@@ -268,8 +267,8 @@ bool isTwoDTransposeOp(linalg::LinalgOp linalgOp,
   if (!isTppUnaryOp(linalgOp) || !isTwoDTransposeMatcher.match(linalgOp))
     return false;
   if (operands) {
-    operands->push_back(linalgOp.getDpsInputOperands()[0]->get());
-    operands->push_back(linalgOp.getDpsInitOperands()[0]->get());
+    operands->push_back(linalgOp.getDpsInputs()[0]);
+    operands->push_back(linalgOp.getDpsInits()[0]);
   }
   return true;
 }
@@ -290,8 +289,8 @@ bool isTwoDFillOpWithZeros(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *op
   if (!isTppUnaryOp(linalgOp) || !isTwoDFillOpWithZerosMatcher.match(linalgOp))
     return false;
   if (operands) {
-    operands->push_back(linalgOp.getDpsInputOperands()[0]->get());
-    operands->push_back(linalgOp.getDpsInitOperands()[0]->get());
+    operands->push_back(linalgOp.getDpsInputs()[0]);
+    operands->push_back(linalgOp.getDpsInits()[0]);
   }
   return true;
 }

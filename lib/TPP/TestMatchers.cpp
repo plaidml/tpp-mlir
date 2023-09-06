@@ -9,7 +9,7 @@
 #include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 using namespace mlir;

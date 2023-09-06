@@ -124,6 +124,5 @@ func.func @entry() {
   %v3 = vector.transfer_read %alloc[%cst, %cst], %d1 : memref<4x8xf32>, vector<4x8xf32>
   vector.print %v3 : vector<4x8xf32>
 
-  memref.dealloc %alloc : memref<4x8xf32>
   return
 }

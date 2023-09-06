@@ -124,15 +124,12 @@ std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvInitSimplifyPass();
 std::unique_ptr<OperationPass<ModuleOp>> createBufferizePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
-std::unique_ptr<OperationPass<ModuleOp>> createTransformPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLocalDialectsLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool tppToLoops = false, bool linalgToXsmm = false);
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyAndCanonicalizePackPass();
 std::unique_ptr<OperationPass<ModuleOp>>

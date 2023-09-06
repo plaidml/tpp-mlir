@@ -97,12 +97,11 @@ void GPUToSPIRVPass::runOnOperation() {
     SPIRVConversionOptions options;
     options.use64bitIndex = this->use64bitIndex;
     SPIRVTypeConverter typeConverter(targetAttr, options);
-    typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
-      return convertMMAToSPIRVType(type);
-    });
+    populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
     RewritePatternSet patterns(context);
     populateGPUToSPIRVPatterns(typeConverter, patterns);
-    populateGpuWMMAToSPIRVConversionPatterns(typeConverter, patterns);
+    populateGpuWMMAToSPIRVCoopMatrixNVConversionPatterns(typeConverter,
+                                                         patterns);
     // TODO: Change SPIR-V conversion to be progressive and remove the following
     // patterns.
     mlir::arith::populateArithToSPIRVPatterns(typeConverter, patterns);

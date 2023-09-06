@@ -34,6 +34,5 @@ func.func @entry() {
   // CHECK-SAME:  ( 0, 0, 0, 0, 0, 0, 0, 0 ),
   // CHECK-SAME:  ( 0, 0, 0, 0, 0, 0, 0, 0 ) )  
   //
-  memref.dealloc %alloc : memref<4x8xf32>
   return
 }

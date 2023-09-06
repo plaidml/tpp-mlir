@@ -236,7 +236,7 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
-      %10 = arith.maxf %out, %c0 : f32
+      %10 = arith.maximumf %out, %c0 : f32
       linalg.yield %10 : f32
   } -> tensor<1x56x56x64xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -266,7 +266,7 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-SAME:  outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
-      %10 = arith.maxf %out, %c0 : f32
+      %10 = arith.maximumf %out, %c0 : f32
       linalg.yield %10 : f32
   } -> tensor<1x56x56x64xf32>
   return %9 : tensor<1x56x56x64xf32>

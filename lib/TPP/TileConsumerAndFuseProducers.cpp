@@ -42,14 +42,14 @@ struct ReplaceIterArgs : public OpRewritePattern<scf::ForOp> {
 
   void replaceIterArgs(PatternRewriter &rewriter, scf::ForOp outerFor,
                        scf::ForOp innerFor) const {
-    assert(outerFor.getNumIterOperands() == innerFor.getNumIterOperands() &&
+    assert(outerFor.getInitArgs().size() == innerFor.getInitArgs().size() &&
            "expect same number of iter args");
     Block *block = &(*innerFor.getRegion().begin());
-    for (auto it : llvm::zip_equal(outerFor.getIterOperands(),
+    for (auto it : llvm::zip_equal(outerFor.getInitArgsMutable(),
                                    innerFor.getRegionIterArgs())) {
-      Value source = std::get<0>(it);
-      Value target = std::get<1>(it);
-      rewriter.replaceUsesWithIf(source, target, [&](OpOperand &use) {
+      auto &source = std::get<0>(it);
+      auto target = std::get<1>(it);
+      rewriter.replaceUsesWithIf(source.get(), target, [&](OpOperand &use) {
         return use.getOwner()->getBlock() == block;
       });
     }
@@ -193,7 +193,8 @@ static FailureOr<AffineMap> getProducerOutputMap(Operation *producer) {
   assert(producer->getNumResults() == 1);
   if (auto linalgProducer = dyn_cast_or_null<linalg::LinalgOp>(producer)) {
     return linalgProducer.getIndexingMapMatchingResult(
-        linalgProducer.getTiedOpResult(linalgProducer.getDpsInitOperands()[0]));
+        linalgProducer.getTiedOpResult(
+            &linalgProducer.getDpsInitsMutable()[0]));
   }
   return failure();
 }
@@ -305,14 +306,8 @@ tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
   assert(canBeTiledWithCurrentSpec(consumer, tileSizes) &&
          "expect valid tile sizes");
-  auto tileSizeComputationFunction = [tileSizes](OpBuilder &builder,
-                                                 Operation *op) {
-    OpBuilder::InsertionGuard guard(builder);
-    return getValueOrCreateConstantIndexOp(builder, op->getLoc(), tileSizes);
-  };
-  auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
-      tileSizeComputationFunction);
 
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
   FailureOr<scf::SCFTilingResult> tilingResult =
       scf::tileUsingSCFForOp(rewriter, consumer, options);
   return tilingResult;
@@ -393,9 +388,11 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
 static Operation *
 getUntiledProducerFromSliceSource(OpOperand *source,
                                   ArrayRef<scf::ForOp> loops) {
+  assert(source);
   auto loopIt = loops.rbegin();
   while (auto iterArg = source->get().dyn_cast<BlockArgument>()) {
     scf::ForOp loop = *loopIt;
+    assert(loop);
     if (iterArg.getOwner()->getParentOp() != loop)
       break;
     source = &loop.getOpOperandForRegionIterArg(iterArg);
@@ -473,6 +470,9 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
         candidates.push(sliceOp);
   };
 
+  auto forLoops = llvm::to_vector(
+      llvm::map_range(tileAndFuseResult.loops,
+                      [](Operation *op) { return cast<scf::ForOp>(op); }));
   std::queue<tensor::ExtractSliceOp> frontier;
   addCandidateSlices(tilingResult->tiledOps.back(), frontier);
   OpBuilder::InsertionGuard g(rewriter);
@@ -484,14 +484,13 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
     // If we find a candidate we check if it is in our worklist and fuse it
     // only if so. We do not consider the candidate if it is already fused.
     Operation *candidateOp = getUntiledProducerFromSliceSource(
-        &candidateSliceOp->getOpOperand(0), tileAndFuseResult.loops);
+        &candidateSliceOp->getOpOperand(0), forLoops);
     if (!candidateOp || worklist.count(candidateOp) == 0 ||
         alreadyFusedOps.count(candidateOp))
       continue;
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
-        tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
-                                   tileAndFuseResult.loops);
+        scf::tileAndFuseProducerOfSlice(rewriter, candidateSliceOp, forLoops);
     if (!fusedProducer)
       continue;
 
@@ -626,7 +625,7 @@ getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
   linalg::LinalgOp producerOp = cast<linalg::LinalgOp>(producer);
   assert(producerOp.getNumDpsInits() == 1);
   AffineMap outputMap =
-      producerOp.getMatchingIndexingMap(producerOp.getDpsInitOperands()[0]);
+      producerOp.getMatchingIndexingMap(&producerOp.getDpsInitsMutable()[0]);
   assert(outputMap.isProjectedPermutation());
   assert(outputMap.getNumDims() == tilesProducer.size());
   SmallVector<OpFoldResult> eltWiseTiles;

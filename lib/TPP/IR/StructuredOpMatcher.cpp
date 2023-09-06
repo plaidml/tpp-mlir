@@ -75,7 +75,7 @@ structured_match::StructuredOpMatcher::output(
     MatchSelector range,
     std::function<bool(OpOperand *operand, Operation *operation)> fun) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    auto operands = linalgOp.getDpsInitOperands();
+    auto operands = linalgOp.getDpsInitsMutable();
     size_t upperBound = range.getUpperBound();
     size_t lowerBound = range.getLowerBound();
     if (upperBound == std::numeric_limits<size_t>::max())
@@ -83,7 +83,7 @@ structured_match::StructuredOpMatcher::output(
 
     for (auto idx :
          llvm::to_vector(llvm::seq<size_t>(lowerBound, upperBound))) {
-      if (!fun(operands[idx], linalgOp.getOperation()))
+      if (!fun(&operands[idx], linalgOp.getOperation()))
         return false;
     }
     return true;

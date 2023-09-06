@@ -18,7 +18,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   return %3 : tensor<32x32xf32>

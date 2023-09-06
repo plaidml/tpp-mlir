@@ -155,9 +155,5 @@ func.func @entry() {
   //
   vector.print %v2 : vector<1x2x2x8xf32>
 
-  bufferization.dealloc_tensor %img_seed : tensor<?xf32>
-  bufferization.dealloc_tensor %filter_seed : tensor<?xf32>
-  bufferization.dealloc_tensor %output_seed : tensor<?xf32>
-
   return
 }

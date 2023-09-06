@@ -30,7 +30,7 @@ func.func @dps_test(%arg0: tensor<8x48x32x32xbf16>,
   } -> tensor<8x48x32x32xbf16>
   %3 = linalg.generic {__internal_linalg_transform__ = "fusion", indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<8x48x32x32xbf16>) outs(%arg3 : tensor<8x48x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x48x32x32xbf16> 
   return %3 : tensor<8x48x32x32xbf16>

@@ -23,7 +23,7 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
   } -> tensor<32x128x4x4xbf16>
   %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<32x128x4x4xbf16>) outs(%1 : tensor<32x128x4x4xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %4 = arith.maxf %in, %cst : bf16
+      %4 = arith.maximumf %in, %cst : bf16
       linalg.yield %4 : bf16
   } -> tensor<32x128x4x4xbf16>
   return %3 : tensor<32x128x4x4xbf16>
@@ -45,4 +45,4 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
 // CHECK-SAME:  iterator_types = ["parallel", "parallel"]
 // CHECK: ^bb0(
 // CHECK-NEXT:  %{{.+}} = arith.addf
-// CHECK-NEXT:  %{{.+}} = arith.maxf
+// CHECK-NEXT:  %{{.+}} = arith.maximumf
