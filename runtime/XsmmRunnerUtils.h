@@ -74,27 +74,4 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void xsmm_fused_brgemm_invoke(
     int64_t offsetA, void *alignedPtrB, int64_t offsetB, void *alignedPtrC,
     int64_t offsetC, void *alignedPtrD, int64_t offsetD, int64_t numBatches);
 
-//----------------------------------------------------------------------------//
-// BRGEMM connection on the IREE side.
-//----------------------------------------------------------------------------//
-
-/// Eternal functions imported in IREE must pass everything via void*.
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_brgemm_dispatch(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_gemm_dispatch(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_unary_dispatch(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_binary_dispatch(void *params, void *context, void *reserved);
-
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_brgemm_invoke(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_gemm_invoke(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_unary_invoke(void *params, void *context, void *reserved);
-extern "C" MLIR_RUNNERUTILS_EXPORT int
-iree_xsmm_binary_invoke(void *params, void *context, void *reserved);
-
 #endif // TPP_EXECUTIONENGINE_CRUNNERUTILS_H

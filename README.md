@@ -6,8 +6,6 @@ This repository contains an out-of-tree [MLIR](https://mlir.llvm.org/) dialect a
 
 It also contains the recipes to use [LIBXSMM](https://github.com/libxsmm/libxsmm) from inside MLIR and can be used by other tools to drive our passes.
 
-There's [work in progress](https://github.com/iree-org/iree/tree/tpp) inside [IREE](https://iree-org.github.io/iree/) to use this work on their pipeline.
-
 This repository was previously called `tpp-sandbox`.
 If you have a checkout with the previous name, please follow [these instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository) to rename the remote locally.
 
@@ -150,7 +148,3 @@ BRGEMM: [High-Performance Deep Learning via a Single Building Block (2019)](http
 TPP: [Tensor Processing Primitives: A Programming Abstraction for Efficiency and Portability in Deep Learning & HPC Workloads (2021)](https://arxiv.org/abs/2104.05755)
 
 PARLOOPER: [Harnessing Deep Learning and HPC Kernels via High-Level Loop and Tensor Abstractions on CPU Architectures (2023)](https://arxiv.org/abs/2304.12576)
-
-
-
-
