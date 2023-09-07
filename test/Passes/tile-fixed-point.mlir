@@ -37,10 +37,8 @@ func.func @fixed_point_fusion(%arg0: tensor<64x8x32x32xf32>, %arg1: tensor<64x32
 }
 
 // CHECK-LABEL: fixed_point_fusion
-// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-// CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C64]])
-// CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C8]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}) in (64)
+// CHECK: %{{.+}} = scf.forall (%{{.+}}) in (8)
 
 // ONE-LABEL: fixed_point_fusion
 // ONE-COUNT-1: %{{.+}} = scf.forall
