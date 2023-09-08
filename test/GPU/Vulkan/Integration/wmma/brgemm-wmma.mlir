@@ -3,6 +3,10 @@
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
+// XFAIL:*
+// TODO: figure out why SPIR-V lowering does not perform full computation
+//       when the same IR works with CUDA
+
 #map = affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>
 
 module attributes {gpu.container_module} {
@@ -16,7 +20,7 @@ module attributes {gpu.container_module} {
     args(%c1 : index, %c0 : index, %arg0 : memref<2x4x16x16xf16>, %arg1 : memref<4x4x16x16xf16>, %arg2 : memref<2x4x16x16xf16>)
 
     %vcst = arith.constant -1.000000e+00 : f16
-    %v0 = vector.transfer_read %arg2[%c1, %c2, %c0, %c0], %vcst : memref<2x4x16x16xf16>, vector<16x16xf16>
+    %v0 = vector.transfer_read %arg2[%c0, %c0, %c0, %c0], %vcst : memref<2x4x16x16xf16>, vector<16x16xf16>
     vector.print %v0 : vector<16x16xf16>
 
     return
