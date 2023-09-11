@@ -38,17 +38,17 @@ module attributes {gpu.container_module} {
       %c4 = arith.constant 4 : index
 
       %init = gpu.subgroup_mma_load_matrix %subview_1[%c0, %c0]
-              {leadDimension = 8 : index}
+              {leadDimension = 16 : index}
               : memref<16x16xf16, strided<[16, 1], offset: ?>>
               -> !gpu.mma_matrix<16x16xf16, "COp">
 
       %sum = scf.for %arg6 = %c0 to %c4 step %c1 iter_args(%acc = %init) -> !gpu.mma_matrix<16x16xf16, "COp"> {
         %tile_A = gpu.subgroup_mma_load_matrix %subview[%arg6, %c0, %c0]
-                  {leadDimension = 8 : index}
+                  {leadDimension = 16 : index}
                   : memref<4x16x16xf16, strided<[256, 16, 1], offset: ?>>
                   -> !gpu.mma_matrix<16x16xf16, "AOp">
         %tile_B = gpu.subgroup_mma_load_matrix %subview_0[%arg6, %c0, %c0]
-                  {leadDimension = 8 : index}
+                  {leadDimension = 16 : index}
                   : memref<4x16x16xf16, strided<[256, 16, 1], offset: ?>>
                   -> !gpu.mma_matrix<16x16xf16, "BOp">
         %R = gpu.subgroup_mma_compute %tile_A, %tile_B, %acc
@@ -59,7 +59,7 @@ module attributes {gpu.container_module} {
       }
 
       gpu.subgroup_mma_store_matrix %sum, %subview_1[%c0, %c0]
-        {leadDimension = 8 : index}
+        {leadDimension = 16 : index}
         : !gpu.mma_matrix<16x16xf16, "COp">,
           memref<16x16xf16, strided<[16, 1], offset: ?>>
 

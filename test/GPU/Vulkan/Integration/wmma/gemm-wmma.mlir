@@ -20,15 +20,15 @@ module attributes {gpu.container_module} {
       %c0 = arith.constant 0 : index
 
       %C = gpu.subgroup_mma_load_matrix %arg4[%c0, %c0]
-              {leadDimension = 8 : index}
+              {leadDimension = 16 : index}
               : memref<16x16xf16>
               -> !gpu.mma_matrix<16x16xf16, "COp">
       %A = gpu.subgroup_mma_load_matrix %arg2[%c0, %c0]
-                {leadDimension = 8 : index}
+                {leadDimension = 16 : index}
                 : memref<16x16xf16>
                 -> !gpu.mma_matrix<16x16xf16, "AOp">
       %B = gpu.subgroup_mma_load_matrix %arg3[%c0, %c0]
-                {leadDimension = 8 : index}
+                {leadDimension = 16 : index}
                 : memref<16x16xf16>
                 -> !gpu.mma_matrix<16x16xf16, "BOp">
 
@@ -38,7 +38,7 @@ module attributes {gpu.container_module} {
             -> !gpu.mma_matrix<16x16xf16, "COp">
 
       gpu.subgroup_mma_store_matrix %R, %arg4[%c0, %c0]
-        {leadDimension = 8 : index}
+        {leadDimension = 16 : index}
         : !gpu.mma_matrix<16x16xf16, "COp">,
           memref<16x16xf16>
 
