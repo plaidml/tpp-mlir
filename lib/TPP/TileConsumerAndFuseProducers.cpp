@@ -539,10 +539,6 @@ getDefaultTileSizesForMatmulLikeOp(linalg::LinalgOp linalgOp) {
   mDims.pop_back();
   nDims.pop_back();
 
-  llvm::DenseSet<unsigned> otherParallelDims(mDims.begin(), mDims.end());
-  otherParallelDims.insert(nDims.begin(), nDims.end());
-  otherParallelDims.insert(batchDims.begin(), batchDims.end());
-
   int64_t constexpr tileFactor = 1;
   for (auto dim : mDims)
     tiles[dim] = tileFactor;
@@ -810,6 +806,7 @@ struct TileConsumerAndFuseProducers
       RewritePatternSet patterns(&ctx);
       linalg::populateLinalgDeGeneralizationPatterns(patterns);
       tpp::populateTppDeGeneralizationPatterns(patterns);
+      scf::ForallOp::getCanonicalizationPatterns(patterns, &ctx);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
   }

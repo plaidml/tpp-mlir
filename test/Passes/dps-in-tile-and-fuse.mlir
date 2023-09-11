@@ -44,11 +44,7 @@ func.func @dps_test(%arg0: tensor<8x48x32x32xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<48x48x16x32x2xbf16>, 
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<1536xbf16>, 
 // CHECK-SAME:  %[[ARG3:.+]]: tensor<8x48x32x32xbf16>
-// CHECK: %[[C48:.+]] = arith.constant 48 : index
-// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) in (%[[C8]], %[[C48]]) 
+// CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) in (8, 48) 
 // CHECK-SAME:  shared_outs(%[[ARG6:.+]] = %[[ARG3]])
 // CHECK: %[[SLICE_ARG0:.+]] = tensor.extract_slice 
 // CHECK-SAME:  %[[ARG0]][%[[I]], 0, 0, 0] [1, 48, 32, 32] [1, 1, 1, 1] 

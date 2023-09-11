@@ -24,7 +24,6 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 

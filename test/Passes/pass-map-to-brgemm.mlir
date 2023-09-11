@@ -19,11 +19,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 
 // CHECK-LABEL: blocked_matmul
 // CHECK-SAME: %[[ARG0:.+]]: tensor<4x16x32x32xf32>, %[[ARG1:.+]]: tensor<8x16x32x32xf32>, %[[ARG2:.+]]: tensor<4x8x32x32xf32>
-// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-// CHECK: %{{.+}} = scf.forall (%[[ARG3:.+]], %[[ARG4:.+]]) in (%[[C4]], %[[C8]]) shared_outs(%[[ARG5:.+]] = %[[ARG2]]) 
+// CHECK: %{{.+}} = scf.forall (%[[ARG3:.+]], %[[ARG4:.+]]) in (4, 8) shared_outs(%[[ARG5:.+]] = %[[ARG2]]) 
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] 
 // CHECK-SAME:  : tensor<4x16x32x32xf32> to tensor<16x32x32xf32>
 // CHECK: %[[SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] 

@@ -13,15 +13,11 @@ func.func @matmul_sequence_only_tiling_fusion(%arg0: tensor<32x64xf32>, %arg1: t
 }
 
 // CHECK-LABEL: func.func @matmul_sequence_only_tiling_fusion
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C64]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 64) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 
 // -----
@@ -45,10 +41,7 @@ func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tens
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: func.func @matmul_eletwise_matmul_and_relu
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 // CHECK: linalg.generic 
 // CHECK-SAME:  indexing_maps = [#[[MAP]]], 
@@ -90,10 +83,7 @@ func.func @matmul_eletwise_blk_matmul(%arg0: tensor<4x4x32x32xf32>, %arg1: tenso
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 // CHECK: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK-LABEL: func.func @matmul_eletwise_blk_matmul(
-// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C4]], %[[C4]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (4, 4) step (2, 2)
 // CHECK-COUNT-2: linalg.generic
 
 // -----
@@ -122,11 +112,8 @@ func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: ten
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: func.func @matmul_sequence_fusion_with_relu
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-COUNT-2: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 // CHECK: linalg.generic 
 // CHECK-SAME:  indexing_maps = [#[[MAP]]], 
@@ -173,15 +160,11 @@ func.func @matmul_sequence_fusion_with_eltwise(%arg0: tensor<32x64xf32>, %arg1: 
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: matmul_sequence_fusion_with_eltwise
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C64]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 64) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 // CHECK: linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]]], iterator_types = ["parallel", "parallel"]
@@ -237,15 +220,11 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
 }
 
 // CHECK-LABEL: func.func @matmul_sequence_fusion(
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C64]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 64) step (2, 2)
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (%[[C0]], %[[C0]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 
 // -----
@@ -270,11 +249,8 @@ func.func @matmul_sequence_fusion_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x3
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: func.func @matmul_sequence_fusion_1(
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK: linalg.matmul
-// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C32]], %[[C32]]) step (%[[C2]], %[[C2]])
+// CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (32, 32) step (2, 2)
 // CHECK: linalg.matmul
 // CHECK: linalg.generic 
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel"]} 
@@ -327,12 +303,8 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
     ^bb0(%in: bf16, %out: bf16):
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
-  } -> tensor<8x112x32x32xbf16>
-  // CHECK: %[[C112:.+]] = arith.constant 112 : index
-  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  } -> tensor<8x112x32x32xbf16> 
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -368,7 +340,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -404,7 +376,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -440,7 +412,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -476,7 +448,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -512,7 +484,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -548,7 +520,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -584,7 +556,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -620,7 +592,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
@@ -656,7 +628,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maxf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) to (%[[C8]], %[[C112]]) step (%[[C2]], %[[C2]])
+  // CHECK: %{{.+}} = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8, 112) step (2, 2)
   // CHECK: %{{.+}} = linalg.generic
   // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]

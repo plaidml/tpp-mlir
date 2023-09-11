@@ -26,8 +26,6 @@
 func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
                            %arg0: tensor<64x32x8x64xf32>,
                            %arg2: tensor<64x32x8x64xf32>) -> tensor<64x32x512xf32> {
-  // CHECK: %[[C8:.+]] = arith.constant 8 : index
-  // CHECK: %[[C64:.+]] = arith.constant 64 : index
   %cst_3 = arith.constant dense<4.0> : tensor<8x64x8x64xf32>
   %cst_4 = arith.constant dense<2.0> : tensor<8x64x8x64xf32>
   %cst_5 = arith.constant dense<1.0> : tensor<8x64x8x64xf32>
@@ -36,8 +34,8 @@ func.func @mha_tensorflow(%arg1: tensor<64x32x8x64xf32>,
   %cst_1 = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<64x32x8x64xf32>
   
-  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C64]])
-  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (%[[C8]])
+  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (64)
+  // CHECK: %{{.+}} = scf.forall (%{{.+}}) in (8)
   %fill_1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<64x32x8x64xf32>) -> tensor<64x32x8x64xf32>
   %3 = linalg.generic {
     "__projection_Q__",
