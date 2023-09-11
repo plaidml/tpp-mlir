@@ -42,6 +42,10 @@ Value getConstIndex(OpBuilder &, int);
 Value getConstInt(OpBuilder &, int, int);
 Value getConstFloat(OpBuilder &, float, int);
 
+// Return a typed attribute of specified type and value.
+// For integer types, the value is rounded toward zero.
+TypedAttr getTypedAttr(OpBuilder &builder, Type type, double value);
+
 } // namespace mlir
 
 #endif // TPP_BUILDER_UTILS_H
