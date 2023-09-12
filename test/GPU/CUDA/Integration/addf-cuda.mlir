@@ -6,7 +6,7 @@
 module attributes {gpu.container_module} {
   gpu.module @kernels {
     gpu.func @kernel_add(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
-      kernel attributes { spirv.entry_point_abi = #spirv.entry_point_abi<workgroup_size = [1, 1, 1]>} {
+      kernel attributes { gpu.known_block_size = array<i32: 8, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1> } {
       %0 = gpu.block_id x
       %1 = memref.load %arg0[%0] : memref<8xf32>
       %2 = memref.load %arg1[%0] : memref<8xf32>
@@ -17,16 +17,12 @@ module attributes {gpu.container_module} {
   }
 
   func.func @entry() {
-    %arg0 = memref.alloc() : memref<8xf32>
-    %arg1 = memref.alloc() : memref<8xf32>
-    %arg2 = memref.alloc() : memref<8xf32>
-
-    %cast_a = memref.cast %arg0 : memref<8xf32> to memref<*xf32>
-    gpu.host_register %cast_a : memref<*xf32>
-    %cast_b = memref.cast %arg1 : memref<8xf32> to memref<*xf32>
-    gpu.host_register %cast_b : memref<*xf32>
-    %cast_c = memref.cast %arg2 :memref<8xf32> to memref<*xf32>
-    gpu.host_register %cast_c : memref<*xf32>
+    %arg0, %t0 = gpu.alloc async () : memref<8xf32>
+    gpu.wait [%t0]
+    %arg1, %t1 = gpu.alloc async () : memref<8xf32>
+    gpu.wait [%t1]
+    %arg2, %t2 = gpu.alloc async () : memref<8xf32>
+    gpu.wait [%t2]
 
     %value0 = arith.constant 0.0 : f32
     %value1 = arith.constant 1.1 : f32
@@ -40,18 +36,25 @@ module attributes {gpu.container_module} {
     gpu.launch_func @kernels::@kernel_add
         blocks in (%cst8, %cst1, %cst1) threads in (%cst1, %cst1, %cst1)
         args(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
-    %castOut = memref.cast %arg2 : memref<8xf32> to memref<*xf32>
-    call @printMemrefF32(%castOut) : (memref<*xf32>) -> ()
 
-    memref.dealloc %arg0 : memref<8xf32>
-    memref.dealloc %arg1 : memref<8xf32>
-    memref.dealloc %arg2 : memref<8xf32>
+    %out = memref.alloc() : memref<8xf32>
+    %tOut = gpu.memcpy async %out, %arg2 : memref<8xf32>, memref<8xf32>
+    gpu.wait [%tOut]
+    %cast = memref.cast %out : memref<8xf32> to memref<*xf32>
+    call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
+
+    %tD0 = gpu.dealloc async %arg0 : memref<8xf32>
+    gpu.wait [%tD0]
+    %tD1 = gpu.dealloc async %arg1 : memref<8xf32>
+    gpu.wait [%tD1]
+    %tD2 = gpu.dealloc async %arg2 : memref<8xf32>
+    gpu.wait [%tD2]
+
+    memref.dealloc %out : memref<8xf32>
 
     return
   }
   func.func private @printMemrefF32(%ptr : memref<*xf32>)
 }
 
-// TODO check real values when host_register 'CUDA_ERROR_ILLEGAL_ADDRESS' bug is resolved
-// [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
-// CHECK: {{\[}}{{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}, {{-?}}{{[0-9]+}}{{.?}}{{[0-9e-]*}}
+// CHECK: [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
