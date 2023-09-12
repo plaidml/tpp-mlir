@@ -131,7 +131,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversionPass());
+    pm.addPass(createGpuConversionPass(gpuWmma));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (parseGpuOption(this->gpuBackend)) {

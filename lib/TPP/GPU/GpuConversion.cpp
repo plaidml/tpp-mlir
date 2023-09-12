@@ -38,6 +38,7 @@ namespace {
 struct GpuConversion : public GpuConversionBase<GpuConversion>,
                        UtilityPassBase<ModuleOp> {
   GpuConversion() = default;
+  GpuConversion(bool useWmma) { this->useWmma = useWmma; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tpp::TppDialect>();
@@ -69,7 +70,7 @@ private:
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(linalg::createLinalgDeGeneralizationPass());
-    pm.addNestedPass<func::FuncOp>(createLinalgToGpuPass());
+    pm.addNestedPass<func::FuncOp>(createLinalgToGpuPass(useWmma));
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
     // Map loops into GPU kernels.
@@ -89,6 +90,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuConversionPass() {
-  return std::make_unique<GpuConversion>();
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createGpuConversionPass(bool useWmma) {
+  return std::make_unique<GpuConversion>(useWmma);
 }

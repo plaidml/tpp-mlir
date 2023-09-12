@@ -34,6 +34,9 @@ namespace {
 struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
 
+  ConvertMatmulToGpu(MLIRContext *ctx, bool useWmma)
+      : OpRewritePattern(ctx), useWmma(useWmma) {}
+
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics()) {
@@ -113,18 +116,22 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
     rewriter.eraseOp(matmulOp);
     return success();
   }
+
+private:
+  bool useWmma;
 };
 
-void populateLinalgToGpuPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertMatmulToGpu>(patterns.getContext());
+void populateLinalgToGpuPatterns(RewritePatternSet &patterns, bool useWmma) {
+  patterns.add<ConvertMatmulToGpu>(patterns.getContext(), useWmma);
 }
 
 struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
   LinalgToGpu() = default;
+  LinalgToGpu(bool useWmma) { this->useWmma = useWmma; }
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateLinalgToGpuPatterns(patterns);
+    populateLinalgToGpuPatterns(patterns, useWmma);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -132,6 +139,6 @@ struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createLinalgToGpuPass() {
-  return std::make_unique<LinalgToGpu>();
+mlir::tpp::createLinalgToGpuPass(bool useWmma) {
+  return std::make_unique<LinalgToGpu>(useWmma);
 }
