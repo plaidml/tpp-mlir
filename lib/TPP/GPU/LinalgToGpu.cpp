@@ -30,6 +30,33 @@ using namespace mlir::tpp;
 
 namespace {
 
+// Return true if the operation can be represented with WMMA compute.
+bool supportsMMACompute(linalg::LinalgOp linalgOp) {
+  if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
+        isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)))
+    return false;
+
+  auto aType =
+      linalgOp.getDpsInputOperands()[0]->get().getType().cast<ShapedType>();
+  auto bType =
+      linalgOp.getDpsInputOperands()[1]->get().getType().cast<ShapedType>();
+  auto cType =
+      linalgOp.getDpsInitOperands()[0]->get().getType().cast<ShapedType>();
+
+  ArrayRef<int64_t> shapeA = aType.getShape();
+  ArrayRef<int64_t> shapeC = cType.getShape();
+  int64_t m = shapeC[0];
+  int64_t n = shapeC[1];
+  // Matrix A might be 2D (gemm) or 3D (brgemm) but the last dimension will
+  // always be reduction.
+  int64_t k = shapeA.back();
+
+  // For now, only M-N-K F16[16] x F16[16] x F16[16] WMMA variant is supported.
+  // TODO: add more WMMA combinations.
+  return aType.getElementType().isF16() && bType.getElementType().isF16() &&
+         cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
+}
+
 // Convert linalg.matmul to GPU-compatible kernel.
 struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
@@ -45,11 +72,8 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
     }
 
     Location loc = matmulOp.getLoc();
-    ArrayRef<int64_t> shapeC = matmulOp.getDpsInitOperand(0)
-                                   ->get()
-                                   .getType()
-                                   .cast<ShapedType>()
-                                   .getShape();
+    ArrayRef<int64_t> shapeC =
+        matmulOp.getOutputs()[0].getType().cast<ShapedType>().getShape();
     ArrayRef<int64_t> shapeA =
         matmulOp.getInputs()[0].getType().cast<ShapedType>().getShape();
 
@@ -77,7 +101,7 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
     rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
 
     // Fetch the inital value of the output element.
-    auto outputBuf = matmulOp.getDpsInitOperand(0)->get();
+    auto outputBuf = matmulOp.getOutputs()[0];
     Value initVal = rewriter.create<memref::LoadOp>(loc, outputBuf, parallelIvs)
                         .getResult();
 
