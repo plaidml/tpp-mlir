@@ -6,7 +6,8 @@ set(LIBS
         MLIRToLLVMIRTranslationRegistration
         MLIROptLib
         MLIRTPP
-        tpp_c_runner_utils
+        tpp_xsmm_runner_utils
+        tpp_dnnl_runner_utils
         )
 add_llvm_executable(tpp-opt tpp-opt.cpp)
 
