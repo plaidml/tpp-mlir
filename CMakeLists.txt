@@ -12,40 +12,18 @@ project(tpp-dialect LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
-option(TPP_INSIDE_IREE "Enables being built inside IREE" OFF)
-
 set(TPP_GPU "" CACHE STRING "Enables GPU runtime (default: '')")
 set_property(CACHE TPP_GPU PROPERTY STRINGS "" "cuda" "vulkan")
 
-if (NOT TPP_INSIDE_IREE)
-  find_package(MLIR REQUIRED CONFIG)
+find_package(MLIR REQUIRED CONFIG)
 
-  set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
-  set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
-  set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
-  message(STATUS "Enabling tpp tooling")
-  message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-  list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
-  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-else()
-  set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir ) # --src-root
-  set(MLIR_INCLUDE_DIR ${MLIR_MAIN_SRC_DIR}/include ) # --includedir
-  set(MLIR_GENERATED_INCLUDE_DIR ${LLVM_BINARY_DIR}/tools/mlir/include)
-  set(MLIR_LIBRARY_DIR ${LLVM_BINARY_DIR}/lib)
-  include_directories(SYSTEM ${MLIR_INCLUDE_DIR})
-  include_directories(SYSTEM ${MLIR_GENERATED_INCLUDE_DIR})
-  include_directories(SYSTEM ${MLIR_TABLEGEN_OUTPUT_DIR})
-
-  set(BACKEND_PACKAGE_STRING "${PACKAGE_STRING}")
-  list(APPEND CMAKE_MODULE_PATH "${MLIR_MAIN_SRC_DIR}/cmake/modules")
-
-  # message(STATUS "Enabling IREE tooling")
-  # message(STATUS "Using MLIRConfig.cmake in: ${MLIR_MAIN_SRC_DIR}/cmake/modules")
-  # message(STATUS "Using LLVMConfig.cmake in: ${LLVM_MAIN_SRC_DIR}/cmake")
-  # list(APPEND CMAKE_MODULE_PATH "${MLIR_MAIN_SRC_DIR}/cmake/modules")
-  # list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake)
-endif()
+set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
+set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
+set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
+message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 include(TableGen)
@@ -75,105 +53,104 @@ message (STATUS "LIBXSMM-DNN Include dir: ${XSMM_DNN_INCLUDE_DIRS}")
 # Sanitizers (include as late as possible aka append)
 include(sanitizers)
 
+# Sub directories
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(runtime)
+add_subdirectory(tools)
+add_subdirectory(test)
 
-# IREE doesn't need any of these
-if (NOT TPP_INSIDE_IREE)
-  add_subdirectory(tools)
-  add_subdirectory(test)
+# Benchmarks
+set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
+set(CONFIG_DIR "${BENCHMARK_DIR}/config")
 
-  set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
-  set(CONFIG_DIR "${BENCHMARK_DIR}/config")
+# Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
+add_custom_target(quick-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+                  -c ${CONFIG_DIR}/base/base.json
+                  DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                  WORKING_DIRECTORY ${BENCHMARK_DIR}
+                  COMMENT Run Quick Benchmarks)
+
+# Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
+set(MATMUL_PERF_CFGS
+  ${CONFIG_DIR}/matmul/256x1024x1024.json
+  ${CONFIG_DIR}/matmul/256x1024x4096.json
+  ${CONFIG_DIR}/matmul/256x4096x1024.json
+  ${CONFIG_DIR}/matmul/128x1024x4096.json
+  ${CONFIG_DIR}/matmul/128x4096x1024.json
+  ${CONFIG_DIR}/matmul/128x1024x1024.json
+  ${CONFIG_DIR}/matmul/256x768x768.json
+  ${CONFIG_DIR}/matmul/128x768x768.json
+  ${CONFIG_DIR}/matmul/128x3072x768.json
+  ${CONFIG_DIR}/matmul/128x768x3072.json
+  ${CONFIG_DIR}/matmul/256x3072x768.json
+  ${CONFIG_DIR}/matmul/256x768x3072.json
+  ${CONFIG_DIR}/matmul/128x768x2304.json
+  ${CONFIG_DIR}/matmul/1024x2560x1024.json
+  ${CONFIG_DIR}/matmul/1024x1024x512.json
+  ${CONFIG_DIR}/matmul/1024x352x512.json
+  ${CONFIG_DIR}/matmul/1024x512x256.json
+)
+set(FC_PERF_CFGS
+  ${CONFIG_DIR}/fc/256x1024x1024.json
+  ${CONFIG_DIR}/fc/256x1024x4096.json
+  ${CONFIG_DIR}/fc/256x4096x1024.json
+  ${CONFIG_DIR}/fc/128x1024x4096.json
+  ${CONFIG_DIR}/fc/128x4096x1024.json
+  ${CONFIG_DIR}/fc/128x1024x1024.json
+  ${CONFIG_DIR}/fc/256x768x768.json
+  ${CONFIG_DIR}/fc/128x768x768.json
+  ${CONFIG_DIR}/fc/128x3072x768.json
+  ${CONFIG_DIR}/fc/128x768x3072.json
+  ${CONFIG_DIR}/fc/256x3072x768.json
+  ${CONFIG_DIR}/fc/256x768x3072.json
+  ${CONFIG_DIR}/fc/128x768x2304.json
+  ${CONFIG_DIR}/fc/1024x2560x1024.json
+  ${CONFIG_DIR}/fc/1024x1024x512.json
+  ${CONFIG_DIR}/fc/1024x352x512.json
+  ${CONFIG_DIR}/fc/1024x512x256.json
+)
+string(JOIN ',' PERF_CFGS_STR ${MATMUL_PERF_CFGS} ${FC_PERF_CFGS})
+add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+  -c ${PERF_CFGS_STR}
+                  DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                  WORKING_DIRECTORY ${BENCHMARK_DIR}
+                  COMMENT Run Quick Performance Benchmarks)
+
+# Run baseline benchmarks with default iterations to track simple performance
+set(BENCH_CFGS
+  ${CONFIG_DIR}/base/base.json
+  ${CONFIG_DIR}/omp/dnn-fp32.json
+  ${CONFIG_DIR}/omp/dnn-bf16.json
+  ${CONFIG_DIR}/omp/mlir-fp32.json
+  ${CONFIG_DIR}/omp/mlir-bf16.json
+)
+string(JOIN ',' BENCH_CFGS_STR ${BENCH_CFGS})
+add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
+  -c ${BENCH_CFGS_STR}
+                  DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
+                  WORKING_DIRECTORY ${BENCHMARK_DIR}
+                  COMMENT Run Benchmarks)
+
+# GPU Benchmarks
+if (TPP_GPU)
+  if (TPP_GPU MATCHES "cuda")
+    set(BENCH_CUDA_CFGS
+      ${CONFIG_DIR}/GPU/cuda.json
+    )
+    set(BENCH_CUDA_DEPS
+      bench_cuda_matmul
+    )
+  endif()
+
+  string(JOIN ',' BENCH_GPU_CFGS_STR ${BENCH_CUDA_CFGS})
 
   # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
-  add_custom_target(quick-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-                    -c ${CONFIG_DIR}/base/base.json
-                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
-                    WORKING_DIRECTORY ${BENCHMARK_DIR}
-                    COMMENT Run Quick Benchmarks)
-
-  # Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
-  set(MATMUL_PERF_CFGS
-    ${CONFIG_DIR}/matmul/256x1024x1024.json
-    ${CONFIG_DIR}/matmul/256x1024x4096.json
-    ${CONFIG_DIR}/matmul/256x4096x1024.json
-    ${CONFIG_DIR}/matmul/128x1024x4096.json
-    ${CONFIG_DIR}/matmul/128x4096x1024.json
-    ${CONFIG_DIR}/matmul/128x1024x1024.json
-    ${CONFIG_DIR}/matmul/256x768x768.json
-    ${CONFIG_DIR}/matmul/128x768x768.json
-    ${CONFIG_DIR}/matmul/128x3072x768.json
-    ${CONFIG_DIR}/matmul/128x768x3072.json
-    ${CONFIG_DIR}/matmul/256x3072x768.json
-    ${CONFIG_DIR}/matmul/256x768x3072.json
-    ${CONFIG_DIR}/matmul/128x768x2304.json
-    ${CONFIG_DIR}/matmul/1024x2560x1024.json
-    ${CONFIG_DIR}/matmul/1024x1024x512.json
-    ${CONFIG_DIR}/matmul/1024x352x512.json
-    ${CONFIG_DIR}/matmul/1024x512x256.json
-  )
-  set(FC_PERF_CFGS
-    ${CONFIG_DIR}/fc/256x1024x1024.json
-    ${CONFIG_DIR}/fc/256x1024x4096.json
-    ${CONFIG_DIR}/fc/256x4096x1024.json
-    ${CONFIG_DIR}/fc/128x1024x4096.json
-    ${CONFIG_DIR}/fc/128x4096x1024.json
-    ${CONFIG_DIR}/fc/128x1024x1024.json
-    ${CONFIG_DIR}/fc/256x768x768.json
-    ${CONFIG_DIR}/fc/128x768x768.json
-    ${CONFIG_DIR}/fc/128x3072x768.json
-    ${CONFIG_DIR}/fc/128x768x3072.json
-    ${CONFIG_DIR}/fc/256x3072x768.json
-    ${CONFIG_DIR}/fc/256x768x3072.json
-    ${CONFIG_DIR}/fc/128x768x2304.json
-    ${CONFIG_DIR}/fc/1024x2560x1024.json
-    ${CONFIG_DIR}/fc/1024x1024x512.json
-    ${CONFIG_DIR}/fc/1024x352x512.json
-    ${CONFIG_DIR}/fc/1024x512x256.json
-  )
-  string(JOIN ',' PERF_CFGS_STR ${MATMUL_PERF_CFGS} ${FC_PERF_CFGS})
-  add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-    -c ${PERF_CFGS_STR}
-                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
-                    WORKING_DIRECTORY ${BENCHMARK_DIR}
-                    COMMENT Run Quick Performance Benchmarks)
-
-  # Run baseline benchmarks with default iterations to track simple performance
-  set(BENCH_CFGS
-    ${CONFIG_DIR}/base/base.json
-    ${CONFIG_DIR}/omp/dnn-fp32.json
-    ${CONFIG_DIR}/omp/dnn-bf16.json
-    ${CONFIG_DIR}/omp/mlir-fp32.json
-    ${CONFIG_DIR}/omp/mlir-bf16.json
-  )
-  string(JOIN ',' BENCH_CFGS_STR ${BENCH_CFGS})
-  add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-    -c ${BENCH_CFGS_STR}
-                    DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
-                    WORKING_DIRECTORY ${BENCHMARK_DIR}
-                    COMMENT Run Benchmarks)
-
-  if (TPP_GPU)
-    if (TPP_GPU MATCHES "cuda")
-      set(BENCH_CUDA_CFGS
-        ${CONFIG_DIR}/GPU/cuda.json
-      )
-      set(BENCH_CUDA_DEPS
-        bench_cuda_matmul
-      )
-    endif()
-
-    string(JOIN ',' BENCH_GPU_CFGS_STR ${BENCH_CUDA_CFGS})
-
-    # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
-    add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-    -c ${BENCH_GPU_CFGS_STR}
-    DEPENDS tpp-opt tpp-run ${BENCH_CUDA_DEPS}
-    WORKING_DIRECTORY ${BENCHMARK_DIR}
-    COMMENT Run Quick GPU Benchmarks)
-  endif()
+  add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+  -c ${BENCH_GPU_CFGS_STR}
+  DEPENDS tpp-opt tpp-run ${BENCH_CUDA_DEPS}
+  WORKING_DIRECTORY ${BENCHMARK_DIR}
+  COMMENT Run Quick GPU Benchmarks)
 endif()
 
 # Code reformat
@@ -189,5 +166,3 @@ add_custom_target(check-format DEPENDS check-clang check-python)
 
 # Check-all
 add_custom_target(check-all DEPENDS check check-format)
-
-message(STATUS "TPP Project CMakeLists.txt END")

@@ -234,7 +234,6 @@ bool isTwoDZeroOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
 }
 
 // Return true if the linalg.generic can be mapped to a tpp.add + tpp.max.
-// FIXME: This is necessary because IREE fuses addf + maxf and we don't match
 // TODO: This will be done at tpp.group level later on
 bool isTwoDBiasReluOp(linalg::LinalgOp linalgOp,
                       SmallVectorImpl<Value> *operands) {

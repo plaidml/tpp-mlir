@@ -23,7 +23,7 @@ using namespace mlir::xsmm;
 #include "TPP/Passes.h.inc"
 
 // NOTE: The ordering of operands to XSMM function calls as it is defined here
-// is strictly followed by XsmmRunnerUtils for IREE XSMM calls. Please change
+// is strictly followed by XsmmRunnerUtils for XSMM calls. Please change
 // the ordering of the fields in XsmmRunnerUtils for any such change in this
 // file.
 
