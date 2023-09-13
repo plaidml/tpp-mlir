@@ -15,8 +15,6 @@ set(LIBS
         MLIRSupport
         MLIROptLib
         MLIRTPP
-        tpp_xsmm_runner_utils
-        tpp_dnnl_runner_utils
         )
 
 set(LLVM_LINK_COMPONENTS
@@ -51,8 +49,6 @@ endif()
 message(STATUS "TPP libraries at: ${CMAKE_BINARY_DIR}/lib")
 message(STATUS "MLIR libraries at: ${LLVM_LIBRARY_DIR}")
 # Add TPP/MLIR library path so we don't need --shared-libs on every call
-# TODO: I don't understand... they are already in LIBS above.
-# also --no-as-needed is not available on MAC and is repeated.
 target_link_options(tpp-run PRIVATE
   -Wl,--no-as-needed
   -L${CMAKE_BINARY_DIR}/lib
@@ -64,7 +60,6 @@ target_link_options(tpp-run PRIVATE
   -lmlir_async_runtime
   ${TPP_GPU_LINK_FLAGS}
   -lomp
-  -Wl,--as-needed
 )
 
 install(TARGETS tpp-run RUNTIME DESTINATION bin)
