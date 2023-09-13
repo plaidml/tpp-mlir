@@ -60,6 +60,7 @@ target_link_options(tpp-run PRIVATE
   -lmlir_async_runtime
   ${TPP_GPU_LINK_FLAGS}
   -lomp
-)
+  -Wl,--no-as-needed
+  )
 
 install(TARGETS tpp-run RUNTIME DESTINATION bin)
