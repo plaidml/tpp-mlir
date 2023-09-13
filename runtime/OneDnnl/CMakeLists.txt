@@ -1,4 +1,4 @@
-add_mlir_library(tpp_dnnl_runner_utils
+add_mlir_library(tpp_dnnl_runner_utils DEPENDS project_dnnl
   SHARED
   OneDnnlRunnerUtils.cpp
   ../PerfRunnerUtils.cpp
