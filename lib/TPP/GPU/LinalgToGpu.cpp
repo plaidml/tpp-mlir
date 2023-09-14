@@ -57,6 +57,92 @@ bool supportsMMACompute(linalg::LinalgOp linalgOp) {
          cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
 }
 
+// Create WMMA instructions out of matmul-like operation.
+void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
+  assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
+          isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
+         "Requires a matmul like op for mma lowering");
+
+  Location loc = linalgOp.getLoc();
+
+  auto matA = linalgOp.getDpsInputOperands()[0]->get();
+  auto matB = linalgOp.getDpsInputOperands()[1]->get();
+  auto matC = linalgOp.getDpsInitOperands()[0]->get();
+
+  auto typeA = matA.getType().cast<ShapedType>();
+  auto typeB = matB.getType().cast<ShapedType>();
+  auto typeC = matC.getType().cast<ShapedType>();
+
+  gpu::MMAMatrixType mmaTypeA = gpu::MMAMatrixType::get(
+      typeA.getShape().take_back(2), typeA.getElementType(), "AOp");
+  gpu::MMAMatrixType mmaTypeB = gpu::MMAMatrixType::get(
+      typeB.getShape().take_back(2), typeB.getElementType(), "BOp");
+  gpu::MMAMatrixType mmaTypeC =
+      gpu::MMAMatrixType::get(typeC.getShape(), typeC.getElementType(), "COp");
+
+  // Matrix A might be 2D (gemm) or 3D (brgemm) but the last dimension will
+  // always be reduction.
+  auto ldb = rewriter.getIndexAttr(typeA.getShape().back());
+  auto lda = rewriter.getIndexAttr(typeC.getDimSize(0));
+  auto ldc = rewriter.getIndexAttr(typeC.getDimSize(0));
+
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+
+  // Fetch the inital value of the output element.
+  Value tileC = rewriter
+                    .create<gpu::SubgroupMmaLoadMatrixOp>(
+                        loc, mmaTypeC, matC, ValueRange{zero, zero}, ldc,
+                        /*transpose=*/UnitAttr())
+                    .getRes();
+
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
+  scf::ForOp batchLoop;
+  Value batchIv;
+  if (isBrgemm) {
+    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    Value batch =
+        rewriter.create<arith::ConstantIndexOp>(loc, typeA.getDimSize(0));
+    batchLoop =
+        rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{tileC});
+    rewriter.setInsertionPointToStart(batchLoop.getBody());
+    batchIv = batchLoop.getInductionVar();
+    tileC = batchLoop.getRegionIterArg(0);
+  }
+
+  auto readIndices =
+      isBrgemm ? ValueRange{batchIv, zero, zero} : ValueRange{zero, zero};
+
+  Value tileA =
+      rewriter
+          .create<gpu::SubgroupMmaLoadMatrixOp>(
+              loc, mmaTypeA, matA, readIndices, lda, /*transpose=*/UnitAttr())
+          .getRes();
+  Value tileB =
+      rewriter
+          .create<gpu::SubgroupMmaLoadMatrixOp>(
+              loc, mmaTypeB, matB, readIndices, ldb, /*transpose=*/UnitAttr())
+          .getRes();
+
+  Value result = rewriter
+                     .create<gpu::SubgroupMmaComputeOp>(
+                         loc, tileA, tileB, tileC, /*a_transpose=*/UnitAttr(),
+                         /*b_transpose=*/UnitAttr())
+                     .getRes();
+
+  if (isBrgemm) {
+    rewriter.setInsertionPointToEnd(batchLoop.getBody());
+    rewriter.create<scf::YieldOp>(loc, ValueRange{result});
+    result = batchLoop.getResults()[0];
+    rewriter.setInsertionPointAfter(batchLoop);
+  }
+
+  // Write back the total sum to the output buffer.
+  rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
+      loc, result, matC, ValueRange{zero, zero}, ldc, /*transpose=*/UnitAttr());
+}
+
 // Create loops out of matmul-like operation.
 void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
@@ -167,7 +253,10 @@ struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
           matmulOp, "Linalg gemm to GPU expects memref type");
     }
 
-    gemmToGpuLoops(matmulOp, rewriter);
+    if (useWmma && supportsMMACompute(matmulOp))
+      gemmToGpuMMA(matmulOp, rewriter);
+    else
+      gemmToGpuLoops(matmulOp, rewriter);
 
     rewriter.eraseOp(matmulOp);
     return success();
@@ -192,7 +281,10 @@ struct ConvertBrgemmToGpu
           brgemmOp, "Linalg brgemm to GPU expects memref type");
     }
 
-    gemmToGpuLoops(brgemmOp, rewriter);
+    if (useWmma && supportsMMACompute(brgemmOp))
+      gemmToGpuMMA(brgemmOp, rewriter);
+    else
+      gemmToGpuLoops(brgemmOp, rewriter);
 
     rewriter.eraseOp(brgemmOp);
     return success();
