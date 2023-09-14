@@ -414,6 +414,8 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   auto outputType = cast<ShapedType>(val.getType());
   assert(outputType && "expected a shaped type");
 
+  Type outElmType = outputType.getElementType();
+
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
@@ -422,29 +424,17 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   ArrayRef<int64_t> outerDims(1);
   if (outputType.getRank() > 1) {
     ArrayRef<int64_t> innerDims(&outputType.getShape()[lastDim], 1);
-    vecType = VectorType::get(innerDims, outputType.getElementType());
+    vecType = VectorType::get(innerDims, outElmType);
     outerDims =
         ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank() - 1);
   } else {
-    vecType =
-        VectorType::get(outputType.getShape(), outputType.getElementType());
+    vecType = VectorType::get(outputType.getShape(), outElmType);
   }
   assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
 
   // Vector undefined value
-  APFloat vectorFloatValue = APFloat(-1.0F);
-  Value minusOne;
-  if (outputType.getElementType().isBF16()) {
-    bool ignored;
-    vectorFloatValue.convert(APFloat::BFloat(), APFloat::rmNearestTiesToEven,
-                             &ignored);
-
-    minusOne = builder.create<arith::ConstantFloatOp>(
-        unkLoc, vectorFloatValue, FloatType::getBF16(builder.getContext()));
-  } else {
-    minusOne = builder.create<arith::ConstantFloatOp>(unkLoc, vectorFloatValue,
-                                                      builder.getF32Type());
-  }
+  Value minusOne = builder.create<arith::ConstantOp>(
+      unkLoc, getTypedAttr(builder, outElmType, -1.0));
 
   // Loop through the shaped type, transfer each dim to vector
   auto count = getConstIndex(builder, outerDims[0]);

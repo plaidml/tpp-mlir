@@ -108,4 +108,20 @@ Value createDenseMemref(OpBuilder &builder, ModuleOp module,
   auto nameAttr = builder.getStringAttr(globalName);
   return builder.create<memref::GetGlobalOp>(unkLoc, type, nameAttr);
 }
+
+TypedAttr getTypedAttr(OpBuilder &builder, Type type, double value) {
+  if (isa<FloatType>(type))
+    return builder.getFloatAttr(type, value);
+  if (isa<IndexType>(type))
+    return builder.getIndexAttr(value);
+  if (auto intTp = dyn_cast<IntegerType>(type))
+    return builder.getIntegerAttr(type, APInt(intTp.getWidth(), value));
+  if (isa<RankedTensorType, VectorType>(type)) {
+    auto shapedType = cast<ShapedType>(type);
+    if (auto one = getTypedAttr(builder, shapedType.getElementType(), value))
+      return DenseElementsAttr::get(shapedType, one);
+  }
+  llvm_unreachable("Unsupported attribute type");
+}
+
 } // namespace mlir
