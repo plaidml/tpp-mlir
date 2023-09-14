@@ -30,7 +30,7 @@ module attributes {gpu.container_module} {
 }
 
 // VULKAN: module attributes {gpu.container_module} {
-// VULKAN: gpu.module @entry_kernel attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, api=Vulkan, #spirv.resource_limits<>>} {
+// VULKAN: gpu.module @entry_kernel attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, CooperativeMatrixNV, Float16, StorageBuffer16BitAccess], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_16bit_storage, SPV_NV_cooperative_matrix]>, api=Vulkan, #spirv.resource_limits<>>} {
 
 // OPENCL: module attributes {gpu.container_module} {
-// OPENCL: gpu.module @entry_kernel attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Addresses, Float16Buffer, Int64, Int16, Int8, Bfloat16ConversionINTEL, Kernel, Linkage, Vector16, GenericPointer, Groups, Float16, Float64, AtomicFloat32AddEXT, ExpectAssumeKHR], [SPV_INTEL_bfloat16_conversion, SPV_EXT_shader_atomic_float_add, SPV_KHR_expect_assume]>, api=OpenCL, #spirv.resource_limits<>>} {
+// OPENCL: gpu.module @entry_kernel attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Addresses, Float16Buffer, Int64, Int16, Int8, Bfloat16ConversionINTEL, Kernel, Linkage, Vector16, GenericPointer, Groups, Float16, Float64, AtomicFloat32AddEXT, ExpectAssumeKHR, CooperativeMatrixNV, StorageBuffer16BitAccess], [SPV_INTEL_bfloat16_conversion, SPV_EXT_shader_atomic_float_add, SPV_KHR_expect_assume, SPV_KHR_16bit_storage, SPV_NV_cooperative_matrix]>, api=OpenCL, #spirv.resource_limits<>>} {
