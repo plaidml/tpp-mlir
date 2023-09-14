@@ -83,8 +83,8 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   // Matrix A might be 2D (gemm) or 3D (brgemm) but the last dimension will
   // always be reduction.
   auto ldb = rewriter.getIndexAttr(typeA.getShape().back());
-  auto lda = rewriter.getIndexAttr(typeC.getDimSize(0));
-  auto ldc = rewriter.getIndexAttr(typeC.getDimSize(0));
+  auto lda = rewriter.getIndexAttr(typeC.getShape()[0]);
+  auto ldc = rewriter.getIndexAttr(typeC.getShape()[0]);
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
 
@@ -103,7 +103,7 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   if (isBrgemm) {
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     Value batch =
-        rewriter.create<arith::ConstantIndexOp>(loc, typeA.getDimSize(0));
+        rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
     batchLoop =
         rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{tileC});
     rewriter.setInsertionPointToStart(batchLoop.getBody());
@@ -111,25 +111,28 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
     tileC = batchLoop.getRegionIterArg(0);
   }
 
-  auto readIndices =
-      isBrgemm ? ValueRange{batchIv, zero, zero} : ValueRange{zero, zero};
+  Value tileA = rewriter
+                    .create<gpu::SubgroupMmaLoadMatrixOp>(
+                        loc, mmaTypeA, matA,
+                        isBrgemm ? ValueRange{batchIv, zero, zero}
+                                 : ValueRange{zero, zero},
+                        lda,
+                        /*transpose=*/UnitAttr())
+                    .getRes();
+  Value tileB = rewriter
+                    .create<gpu::SubgroupMmaLoadMatrixOp>(
+                        loc, mmaTypeB, matB,
+                        isBrgemm ? ValueRange{batchIv, zero, zero}
+                                 : ValueRange{zero, zero},
+                        ldb, /*transpose=*/UnitAttr())
+                    .getRes();
 
-  Value tileA =
+  Value result =
       rewriter
-          .create<gpu::SubgroupMmaLoadMatrixOp>(
-              loc, mmaTypeA, matA, readIndices, lda, /*transpose=*/UnitAttr())
+          .create<gpu::SubgroupMmaComputeOp>(loc, tileC.getType(), tileA, tileB,
+                                             tileC, /*a_transpose=*/UnitAttr(),
+                                             /*b_transpose=*/UnitAttr())
           .getRes();
-  Value tileB =
-      rewriter
-          .create<gpu::SubgroupMmaLoadMatrixOp>(
-              loc, mmaTypeB, matB, readIndices, ldb, /*transpose=*/UnitAttr())
-          .getRes();
-
-  Value result = rewriter
-                     .create<gpu::SubgroupMmaComputeOp>(
-                         loc, tileA, tileB, tileC, /*a_transpose=*/UnitAttr(),
-                         /*b_transpose=*/UnitAttr())
-                     .getRes();
 
   if (isBrgemm) {
     rewriter.setInsertionPointToEnd(batchLoop.getBody());
