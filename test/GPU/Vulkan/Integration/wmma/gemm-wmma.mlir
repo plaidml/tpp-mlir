@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=vulkan -gpu-wmma \
+// RUN: tpp-run %s -gpu=vulkan -gpu-wmma -print \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
@@ -10,10 +10,6 @@ module attributes {gpu.container_module} {
     %c32 = arith.constant 32 : index
     gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c32, %c1, %c1)
     args(%c1 : index, %c0 : index, %arg0 : memref<16x16xf16>, %arg1 : memref<16x16xf16>, %arg2 : memref<16x16xf16>)
-
-    %vcst = arith.constant -1.000000e+00 : f16
-    %v0 = vector.transfer_read %arg2[%c0, %c0], %vcst : memref<16x16xf16>, vector<16x16xf16>
-    vector.print %v0 : vector<16x16xf16>
 
     return
   }
