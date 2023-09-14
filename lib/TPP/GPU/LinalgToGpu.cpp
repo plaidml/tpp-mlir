@@ -57,12 +57,11 @@ bool supportsMMACompute(linalg::LinalgOp linalgOp) {
          cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
 }
 
+// Create loops out of matmul-like operation.
 void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
           isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
          "Requires a matmul like op for loop lowering");
-
-  OpBuilder::InsertionGuard guard(rewriter);
 
   Location loc = linalgOp.getLoc();
 
@@ -90,6 +89,7 @@ void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   auto parallelIvs = parallelLoop.getInductionVars();
   ivs.append(parallelIvs.begin(), parallelIvs.end());
 
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
 
   // Fetch the inital value of the output element.
@@ -97,14 +97,15 @@ void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
       rewriter.create<memref::LoadOp>(loc, matC, parallelIvs).getResult();
 
   bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
+  scf::ForOp batchLoop;
   Value batchIv;
   if (isBrgemm) {
     Value batch = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[0]);
-    auto batchLoop =
+    batchLoop =
         rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{initVal});
-    rewriter.setInsertionPoint(batchLoop.getBody()->getTerminator());
+    rewriter.setInsertionPointToStart(batchLoop.getBody());
     batchIv = batchLoop.getInductionVar();
-    initVal = batchLoop.getInitArgs()[0];
+    initVal = batchLoop.getRegionIterArg(0);
   }
 
   // Compute matmul with a loop over reduction dimension.
@@ -139,23 +140,31 @@ void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
         bodyBuilder(b, loc, iv, iterArgs);
       });
 
+  Value result = accumulationLoop.getResults()[0];
+
+  if (isBrgemm) {
+    rewriter.setInsertionPointToEnd(batchLoop.getBody());
+    rewriter.create<scf::YieldOp>(loc, ValueRange{result});
+    result = batchLoop.getResults()[0];
+    rewriter.setInsertionPointAfter(batchLoop);
+  }
+
   // Write back the total sum to the output buffer.
-  rewriter.create<memref::StoreOp>(loc, accumulationLoop.getResults()[0], matC,
-                                   parallelIvs);
+  rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
 }
 
 // Convert linalg.matmul to GPU-compatible kernel.
-struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
+struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
 
-  ConvertMatmulToGpu(MLIRContext *ctx, bool useWmma)
+  ConvertGemmToGpu(MLIRContext *ctx, bool useWmma)
       : OpRewritePattern(ctx), useWmma(useWmma) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics()) {
-      return rewriter.notifyMatchFailure(matmulOp,
-                                         "Linalg to GPU expects memref type");
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Linalg gemm to GPU expects memref type");
     }
 
     gemmToGpuLoops(matmulOp, rewriter);
@@ -168,8 +177,34 @@ private:
   bool useWmma;
 };
 
+// Convert linalg.batch_reduce_matmul to GPU-compatible kernel.
+struct ConvertBrgemmToGpu
+    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
+  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
+
+  ConvertBrgemmToGpu(MLIRContext *ctx, bool useWmma)
+      : OpRewritePattern(ctx), useWmma(useWmma) {}
+
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
+                                PatternRewriter &rewriter) const override {
+    if (!brgemmOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Linalg brgemm to GPU expects memref type");
+    }
+
+    gemmToGpuLoops(brgemmOp, rewriter);
+
+    rewriter.eraseOp(brgemmOp);
+    return success();
+  }
+
+private:
+  bool useWmma;
+};
+
 void populateLinalgToGpuPatterns(RewritePatternSet &patterns, bool useWmma) {
-  patterns.add<ConvertMatmulToGpu>(patterns.getContext(), useWmma);
+  patterns.add<ConvertGemmToGpu, ConvertBrgemmToGpu>(patterns.getContext(),
+                                                     useWmma);
 }
 
 struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
