@@ -57,6 +57,93 @@ bool supportsMMACompute(linalg::LinalgOp linalgOp) {
          cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
 }
 
+void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
+  assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
+          isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
+         "Requires a matmul like op for loop lowering");
+
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  Location loc = linalgOp.getLoc();
+
+  auto matA = linalgOp.getDpsInputOperands()[0]->get();
+  auto matB = linalgOp.getDpsInputOperands()[1]->get();
+  auto matC = linalgOp.getDpsInitOperands()[0]->get();
+
+  ArrayRef<int64_t> shapeC = matC.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeA = matA.getType().cast<ShapedType>().getShape();
+
+  // Parallel dims.
+  Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
+  Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
+  // Reduction dim.
+  Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA.back());
+  // Lbs.
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  // Step.
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<Value> ivs;
+
+  // Create parallel loops over the outer dimensions.
+  auto parallelLoop = rewriter.create<scf::ParallelOp>(
+      loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
+  auto parallelIvs = parallelLoop.getInductionVars();
+  ivs.append(parallelIvs.begin(), parallelIvs.end());
+
+  rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
+
+  // Fetch the inital value of the output element.
+  Value initVal =
+      rewriter.create<memref::LoadOp>(loc, matC, parallelIvs).getResult();
+
+  bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
+  Value batchIv;
+  if (isBrgemm) {
+    Value batch = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[0]);
+    auto batchLoop =
+        rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{initVal});
+    rewriter.setInsertionPoint(batchLoop.getBody()->getTerminator());
+    batchIv = batchLoop.getInductionVar();
+    initVal = batchLoop.getInitArgs()[0];
+  }
+
+  // Compute matmul with a loop over reduction dimension.
+  // Each GPU thread computes a single result element.
+  // Accumulate result locally through loop's iter args.
+  // This maps to more efficient computation as the accumulation is kept
+  // locally by a thread.
+  auto bodyBuilder = [&](OpBuilder &b, Location loc, Value localIv,
+                         ValueRange iterArgs) {
+    SmallVector<Value> loopIvs = ivs;
+    loopIvs.push_back(localIv);
+    assert(loopIvs.size() == 3);
+    Value localI = loopIvs[0];
+    Value localJ = loopIvs[1];
+    Value localK = loopIvs[2];
+    Value scalarA =
+        b.create<memref::LoadOp>(loc, matA,
+                                 isBrgemm ? ValueRange{batchIv, localI, localK}
+                                          : ValueRange{localI, localK});
+    Value scalarB =
+        b.create<memref::LoadOp>(loc, matB,
+                                 isBrgemm ? ValueRange{batchIv, localK, localJ}
+                                          : ValueRange{localK, localJ});
+    Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
+    auto scalarAdd = b.create<arith::AddFOp>(loc, iterArgs[0], scalarMul);
+
+    b.create<scf::YieldOp>(loc, scalarAdd.getResult());
+  };
+  auto accumulationLoop = rewriter.create<scf::ForOp>(
+      loc, zero, k, one, ValueRange{initVal},
+      [&](OpBuilder &b, Location loc, Value iv, ValueRange iterArgs) {
+        bodyBuilder(b, loc, iv, iterArgs);
+      });
+
+  // Write back the total sum to the output buffer.
+  rewriter.create<memref::StoreOp>(loc, accumulationLoop.getResults()[0], matC,
+                                   parallelIvs);
+}
+
 // Convert linalg.matmul to GPU-compatible kernel.
 struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
@@ -71,71 +158,7 @@ struct ConvertMatmulToGpu : public OpRewritePattern<linalg::MatmulOp> {
                                          "Linalg to GPU expects memref type");
     }
 
-    Location loc = matmulOp.getLoc();
-    ArrayRef<int64_t> shapeC =
-        matmulOp.getOutputs()[0].getType().cast<ShapedType>().getShape();
-    ArrayRef<int64_t> shapeA =
-        matmulOp.getInputs()[0].getType().cast<ShapedType>().getShape();
-
-    // Parallel dims.
-    Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);
-    Value j = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[1]);
-    // Reduction dim.
-    Value k = rewriter.create<arith::ConstantIndexOp>(loc, shapeA[1]);
-    SmallVector<Value> ubs = {i, j, k};
-    // Lbs.
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> lbs = {zero, zero, zero};
-    // Step.
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> steps = {one, one, one};
-    SmallVector<Value> ivs;
-
-    // Create parallel loops over the outer dimensions.
-    auto parallelLoop = rewriter.create<scf::ParallelOp>(
-        loc, ValueRange{zero, zero}, ValueRange{i, j}, ValueRange{one, one});
-    auto parallelIvs = parallelLoop.getInductionVars();
-    ivs.append(parallelIvs.begin(), parallelIvs.end());
-
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
-
-    // Fetch the inital value of the output element.
-    auto outputBuf = matmulOp.getOutputs()[0];
-    Value initVal = rewriter.create<memref::LoadOp>(loc, outputBuf, parallelIvs)
-                        .getResult();
-
-    // Compute matmul with a loop over reduction dimension.
-    // Each GPU thread computes a single result element.
-    // Accumulate result locally through loop's iter args.
-    // This maps to more efficient computation as the accumulation is kept
-    // locally by a thread.
-    auto bodyBuilder = [&](OpBuilder &b, Location loc, Value localIv,
-                           ValueRange iterArgs) {
-      SmallVector<Value> loopIvs = ivs;
-      loopIvs.push_back(localIv);
-      assert(loopIvs.size() == 3);
-      Value localI = loopIvs[0];
-      Value localJ = loopIvs[1];
-      Value localK = loopIvs[2];
-      Value scalarA = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[0],
-                                               ValueRange{localI, localK});
-      Value scalarB = b.create<memref::LoadOp>(loc, matmulOp.getInputs()[1],
-                                               ValueRange{localK, localJ});
-      Value scalarMul = b.create<arith::MulFOp>(loc, scalarA, scalarB);
-      auto scalarAdd = b.create<arith::AddFOp>(loc, iterArgs[0], scalarMul);
-
-      b.create<scf::YieldOp>(loc, scalarAdd.getResult());
-    };
-    auto accumulationLoop = rewriter.create<scf::ForOp>(
-        loc, zero, k, one, ValueRange{initVal},
-        [&](OpBuilder &b, Location loc, Value iv, ValueRange iterArgs) {
-          bodyBuilder(b, loc, iv, iterArgs);
-        });
-
-    // Write back the total sum to the output buffer.
-    rewriter.create<memref::StoreOp>(loc, accumulationLoop.getResults()[0],
-                                     outputBuf, parallelIvs);
+    gemmToGpuLoops(matmulOp, rewriter);
 
     rewriter.eraseOp(matmulOp);
     return success();
