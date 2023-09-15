@@ -113,15 +113,10 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Typically there max number of threads per block is 1024.
-    // For 2D tiles, use max 32 threads per dimension.
-    // For WMMA, 16x16 tiles are required.
-    int tileSize = gpuWmma ? 16 : 32;
-
-    // Tile to split the kernel into threads and blocks
+    // Tile to split the kernel into threads and blocks.
+    // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanupPass());
-    pm.addPass(createTileConsumerAndFuseProducersPass(
-        /*tileSizes=*/{tileSize, tileSize}));
+    pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
 
     // Preprocess and bufferize as further conversion requires memref
