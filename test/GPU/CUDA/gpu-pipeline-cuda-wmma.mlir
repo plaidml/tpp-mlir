@@ -18,7 +18,13 @@ func.func @packed_matmul(%arg0: tensor<2x4x16x16xf16>, %arg1: tensor<4x4x16x16xf
 
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @packed_matmul
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
+// CHECK-NOT:     linalg.generic
 // CHECK:         gpu.launch_func  @packed_matmul_kernel::@packed_matmul_kernel
+// CHECK-SAME:    blocks in (%[[C2]], %[[C4]], %[[C1]]) threads in (%[[C32]], %[[C1]], %[[C1]])
 // CHECK:       }
 // CHECK: gpu.module @packed_matmul_kernel attributes {gpu.binary = "
 // CHECK-LABEL: llvm.func @packed_matmul_kernel
