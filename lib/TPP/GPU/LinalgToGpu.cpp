@@ -87,6 +87,18 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   auto ldc = rewriter.getIndexAttr(typeC.getShape()[0]);
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  // WMMA requires warp/subgroup size of 32 threads/work items.
+  Value subgroupSize = rewriter.create<arith::ConstantIndexOp>(loc, 32);
+
+  // Create parallel loop to indicate that the whole subgroup is performing MMA
+  // operations together. It also ensures that the kernel is outlined with
+  // the correct number of threads.
+  auto parallelLoop = rewriter.create<scf::ParallelOp>(
+      loc, ValueRange{zero}, ValueRange{subgroupSize}, ValueRange{one});
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
 
   // Fetch the inital value of the output element.
   Value tileC = rewriter
@@ -95,13 +107,10 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
                         /*transpose=*/UnitAttr())
                     .getRes();
 
-  OpBuilder::InsertionGuard guard(rewriter);
-
   bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
   scf::ForOp batchLoop;
   Value batchIv;
   if (isBrgemm) {
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     Value batch =
         rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
     batchLoop =
