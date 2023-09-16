@@ -67,6 +67,18 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
                            "tensor::TensorDialect"];
 }
 
+def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
+  let summary = "Convert linalg to func";
+  let constructor = "mlir::tpp::createConvertLinalgToFuncPass()";
+  let description = [{
+    Convert linalg named operations to function call using a BLAS-style
+    API.
+  }];
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "linalg::LinalgDialect", "LLVM::LLVMDialect"];
+}
+
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
