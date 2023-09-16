@@ -11,6 +11,7 @@
 
 namespace mlir {
 class Value;
+class OpBuilder;
 namespace utils {
 
 // Returns true if the value is a constant float or integer.
@@ -23,6 +24,11 @@ bool isZeroTensor(Value val);
 // only if the `val` type is a strided memref and the strides are statically
 // known.
 FailureOr<SmallVector<int64_t>> getStaticStrides(Value val);
+
+// Return the offset and ptr for `val`. Assert if `val`
+// is not a memref.
+std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value val,
+                                        Location loc);
 
 } // namespace utils
 } // namespace mlir

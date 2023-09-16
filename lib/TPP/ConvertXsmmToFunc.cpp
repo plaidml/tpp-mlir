@@ -10,6 +10,7 @@
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
+#include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -29,12 +30,11 @@ using namespace mlir::xsmm;
 
 namespace {
 
-static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands,
-                                                   IndexType indexType,
-                                                   PatternRewriter &rewriter) {
+static SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
+                                                   OperandRange operands) {
   SmallVector<Type> results;
   // One extra operand for datatype
-  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
   results.push_back(integer64);
   for (Value operand : operands) {
     Type operandType = operand.getType();
@@ -43,7 +43,7 @@ static SmallVector<Type> extractInvokeOperandTypes(OperandRange operands,
       Type basePtrType =
           LLVM::LLVMPointerType::get(memrefType.getElementType());
       results.push_back(basePtrType);
-      results.push_back(indexType); // offset
+      results.push_back(builder.getIndexType()); // offset
     } else {
       results.push_back(operand.getType());
     }
@@ -67,54 +67,34 @@ static SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
       res.push_back(operand);
       continue;
     }
-    MemRefType baseMemrefType =
-        MemRefType::get({}, memrefType.getElementType());
-    Type basePtrType = builder.getIndexType();
-    Type offsetType = builder.getIndexType();
-    SmallVector<Type> sizesTypes(memrefType.getRank(), offsetType);
-    SmallVector<Type> stridesTypes(memrefType.getRank(), offsetType);
-    auto meta = builder.create<memref::ExtractStridedMetadataOp>(
-        loc, baseMemrefType, offsetType, sizesTypes, stridesTypes, operand);
-    Value alignedPointerAsIndex =
-        builder.create<memref::ExtractAlignedPointerAsIndexOp>(loc, basePtrType,
-                                                               operand);
-    Value alignedPointerAsI64 = builder.create<arith::IndexCastOp>(
-        loc, builder.getIntegerType(64), alignedPointerAsIndex);
-    // TODO: non-POD will require an LLVMTypeConverter.
-    Value alignedPointer = builder.create<LLVM::IntToPtrOp>(
-        loc, LLVM::LLVMPointerType::get(memrefType.getElementType()),
-        alignedPointerAsI64);
-    Value offset = meta.getOffset();
-    res.push_back(alignedPointer);
+    auto [ptr, offset] = utils::getPtrAndOffset(builder, operand, loc);
+    res.push_back(ptr);
     res.push_back(offset);
   }
   return res;
 }
 
-static LogicalResult buildInvokeCall(Location loc, std::string funcName,
-                                     Operation *op, PatternRewriter &rewriter,
-                                     IntegerAttr dataTypeAttr) {
+static void buildInvokeCall(OpBuilder &builder, Location loc,
+                            std::string funcName, Operation *op,
+                            IntegerAttr dataTypeAttr) {
   FlatSymbolRefAttr fnName = SymbolRefAttr::get(op->getContext(), funcName);
   ModuleOp module = op->getParentOfType<ModuleOp>();
-  auto libFnType = rewriter.getFunctionType(
-      extractInvokeOperandTypes(op->getOperands(), rewriter.getIndexType(),
-                                rewriter),
-      {});
+  auto libFnType = builder.getFunctionType(
+      extractInvokeOperandTypes(builder, op->getOperands()), {});
 
   if (!module.lookupSymbol(fnName)) {
-    OpBuilder::InsertionGuard guard(rewriter);
+    OpBuilder::InsertionGuard guard(builder);
     // Insert before module terminator.
-    rewriter.setInsertionPoint(module.getBody(),
-                               std::prev(module.getBody()->end()));
+    builder.setInsertionPoint(module.getBody(),
+                              std::prev(module.getBody()->end()));
     func::FuncOp funcOp =
-        rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
+        builder.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
     funcOp.setPrivate();
   }
 
-  rewriter.create<func::CallOp>(
+  builder.create<func::CallOp>(
       loc, fnName.getValue(), TypeRange(),
-      getOperands(rewriter, loc, op->getOperands(), dataTypeAttr));
-  return success();
+      getOperands(builder, loc, op->getOperands(), dataTypeAttr));
 }
 
 struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
@@ -124,12 +104,10 @@ struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
                                 PatternRewriter &rewriter) const override {
     std::string funcName =
         "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
-    if (succeeded(buildInvokeCall(ternaryOp.getLoc(), funcName, ternaryOp,
-                                  rewriter, ternaryOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(ternaryOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, ternaryOp.getLoc(), funcName, ternaryOp,
+                    ternaryOp.getDataTypeAttr());
+    rewriter.eraseOp(ternaryOp);
+    return success();
   }
 };
 
@@ -139,12 +117,10 @@ struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
   LogicalResult matchAndRewrite(GemmOp gemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_gemm_invoke";
-    if (succeeded(buildInvokeCall(gemmOp.getLoc(), funcName, gemmOp, rewriter,
-                                  gemmOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(gemmOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, gemmOp.getLoc(), funcName, gemmOp,
+                    gemmOp.getDataTypeAttr());
+    rewriter.eraseOp(gemmOp);
+    return success();
   }
 };
 
@@ -154,12 +130,10 @@ struct ConvertBrgemmXsmmOp : public OpRewritePattern<BrgemmOp> {
   LogicalResult matchAndRewrite(BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_brgemm_invoke";
-    if (succeeded(buildInvokeCall(brgemmOp.getLoc(), funcName, brgemmOp,
-                                  rewriter, brgemmOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(brgemmOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, brgemmOp.getLoc(), funcName, brgemmOp,
+                    brgemmOp.getDataTypeAttr());
+    rewriter.eraseOp(brgemmOp);
+    return success();
   }
 };
 
@@ -175,12 +149,10 @@ struct ConvertUnaryXsmmOp : public OpRewritePattern<UnaryOp> {
     std::string funcName = "xsmm_unary_invoke";
     if (unaryOp.hasScalarInput())
       funcName = "xsmm_unary_scalar_invoke";
-    if (succeeded(buildInvokeCall(unaryOp.getLoc(), funcName, unaryOp, rewriter,
-                                  unaryOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(unaryOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, unaryOp.getLoc(), funcName, unaryOp,
+                    unaryOp.getDataTypeAttr());
+    rewriter.eraseOp(unaryOp);
+    return success();
   }
 };
 
@@ -190,12 +162,10 @@ struct ConvertBinaryXsmmOp : public OpRewritePattern<BinaryOp> {
   LogicalResult matchAndRewrite(BinaryOp binaryOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_binary_invoke";
-    if (succeeded(buildInvokeCall(binaryOp.getLoc(), funcName, binaryOp,
-                                  rewriter, binaryOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(binaryOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, binaryOp.getLoc(), funcName, binaryOp,
+                    binaryOp.getDataTypeAttr());
+    rewriter.eraseOp(binaryOp);
+    return success();
   }
 };
 
@@ -205,13 +175,10 @@ struct ConvertFusedBrgemmXsmmOp : public OpRewritePattern<FusedBrgemmOp> {
   LogicalResult matchAndRewrite(FusedBrgemmOp fusedBrgemmOp,
                                 PatternRewriter &rewriter) const override {
     std::string funcName = "xsmm_fused_brgemm_invoke";
-    if (succeeded(buildInvokeCall(fusedBrgemmOp.getLoc(), funcName,
-                                  fusedBrgemmOp, rewriter,
-                                  fusedBrgemmOp.getDataTypeAttr()))) {
-      rewriter.eraseOp(fusedBrgemmOp);
-      return success();
-    }
-    return failure();
+    buildInvokeCall(rewriter, fusedBrgemmOp.getLoc(), funcName, fusedBrgemmOp,
+                    fusedBrgemmOp.getDataTypeAttr());
+    rewriter.eraseOp(fusedBrgemmOp);
+    return success();
   }
 };
 
