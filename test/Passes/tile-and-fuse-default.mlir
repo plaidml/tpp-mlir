@@ -615,3 +615,117 @@ func.func @check_tile_propagation_to_eltwise_consumer(%arg0: tensor<2x2x2x4xf32>
 // CHECK: %[[ADD:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#map3, #map3]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+func.func @contraction(%arg0: tensor<1024x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<1024x64xf32> {
+  %0 = tensor.empty() : tensor<1024x64xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1024x64xf32>) -> tensor<1024x64xf32>
+  %2 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["parallel", "reduction", "parallel"]} 
+    ins(%arg0, %arg1 : tensor<1024x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<1024x64xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+  } -> tensor<1024x64xf32>
+  return %2 : tensor<1024x64xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CEHCK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+// CHECK-LABEL: contraction
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1024x1024xf32>, %[[ARG1:.+]]: tensor<1024x64xf32>
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1024x64xf32>
+// CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
+// CHECK: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
+// CHECK: %[[SLICE_ARG0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [32, 1024] [1, 1] 
+// CHECK-SAME:  : tensor<1024x1024xf32> to tensor<32x1024xf32>
+// CHECK: %[[SLICE_ARG1:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG4]]] [1024, 32] [1, 1] 
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<1024x32xf32>
+// CHECK: %[[SLICE_INIT:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], %[[ARG4]]] [32, 32] [1, 1] 
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<32x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE_INIT]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %{{.+}} = linalg.generic
+// CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME: iterator_types = ["parallel", "reduction", "parallel"]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+func.func @contraction(%arg0: tensor<16x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<16x64xf32> {
+  %0 = tensor.empty() : tensor<16x64xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<16x64xf32>) -> tensor<16x64xf32>
+  %2 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["parallel", "reduction", "parallel"]} 
+    ins(%arg0, %arg1 : tensor<16x1024xf32>, tensor<1024x64xf32>) outs(%1 : tensor<16x64xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+  } -> tensor<16x64xf32>
+  return %2 : tensor<16x64xf32>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+// CHECK-LABEL: contraction
+// CHECK-SAME: %[[ARG0:.+]]: tensor<16x1024xf32>, %[[ARG1:.+]]: tensor<1024x64xf32>
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x64xf32>
+// CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG2]]] [1024, 32] [1, 1] 
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<1024x32xf32>
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG3]][0, %[[ARG2]]] [16, 32] [1, 1] 
+// CHECK-SAME:  : tensor<16x64xf32> to tensor<16x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[SLICE_1]] : tensor<16x32xf32>) -> tensor<16x32xf32>
+// CHECK: %{{.+}} = linalg.generic
+// CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME: iterator_types = ["parallel", "reduction", "parallel"]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+func.func @contraction(%arg0: tensor<16x1xf32>, %arg1: tensor<1x32xf32>) -> tensor<16x32xf32> {
+  %0 = tensor.empty() : tensor<16x32xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<16x32xf32>) -> tensor<16x32xf32>
+  %2 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["parallel", "reduction", "parallel"]} 
+    ins(%arg0, %arg1 : tensor<16x1xf32>, tensor<1x32xf32>) outs(%1 : tensor<16x32xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %3 = arith.mulf %in, %in_0 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+  } -> tensor<16x32xf32>
+  return %2 : tensor<16x32xf32>
+}
+
+// CHECK-LABEL: contraction
+// CHECK-NOT: scf.for

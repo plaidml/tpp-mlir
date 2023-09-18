@@ -100,10 +100,13 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
     return false;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Running tile validations ----\n");
   if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
                                                tileSizes)) {
+    LLVM_DEBUG(llvm::dbgs() << "FAILED\n");
     return false;
   }
+  LLVM_DEBUG(llvm::dbgs() << "OK\n");
 
   for (auto tileIdx : llvm::seq<size_t>(0, tileSizes.size())) {
     if (isConstantIntValue(tileSizes[tileIdx], 0))
@@ -514,51 +517,58 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
   return tileAndFuseResult;
 }
 
+// Trivial tile selection. If the dimension is statically known, it perfectly
+// divides the tile, and we have enough iterations return a default of 32.
+static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
+  const int64_t tile = 32;
+  SmallVector<int64_t, 4> loopsRange = linalgOp.getStaticLoopRanges();
+  if (loopsRange[dim] == ShapedType::kDynamic)
+    return tile;
+  if (loopsRange[dim] < tile || loopsRange[dim] % tile != 0)
+    return 0;
+  return tile;
+}
+
 // Return tile sizes for `linalgOp`.
 // - For linalg.matmul -> {32, 32}
 // - For all other matmul-like contractions: tile fully all the parallel loops
 // that are not involved in a GEMM computation.
-static FailureOr<SmallVector<int64_t>>
+static SmallVector<int64_t>
 getDefaultTileSizesForMatmulLikeOp(linalg::LinalgOp linalgOp) {
   SmallVector<int64_t> tiles(linalgOp.getNumLoops(), 0);
   if (isa<linalg::MatmulOp>(linalgOp)) {
-    tiles[0] = 32; // i loop
-    tiles[1] = 32; // j loop
+    tiles[0] = getTileForDim(linalgOp, 0); // i loop
+    tiles[1] = getTileForDim(linalgOp, 1); // j loop
     return tiles;
   }
 
   auto contractionDims = linalgx::utils::isContraction(linalgOp);
   if (failed(contractionDims))
-    return failure();
+    return tiles;
 
   SmallVector<unsigned, 2> mDims = contractionDims->m;
   SmallVector<unsigned, 2> nDims = contractionDims->n;
+  SmallVector<unsigned, 2> kDims = contractionDims->k;
   SmallVector<unsigned, 2> batchDims = contractionDims->batch;
-  // Drop the minor dimensions on m and n. These dimensions are part of the
-  // GEMM computation and should not be tiled.
-  mDims.pop_back();
-  nDims.pop_back();
+  // Trivial GEMM-like contractions.
+  if (tiles.size() == 3 && batchDims.size() == 0 && mDims.size() == 1 &&
+      nDims.size() == 1 && kDims.size() == 1) {
+    tiles[mDims[0]] = getTileForDim(linalgOp, mDims[0]); // i loop
+    tiles[nDims[0]] = getTileForDim(linalgOp, nDims[0]); // j loop
+  } else {
+    // Non-trivial contraction: Drop the minor dimensions on m and n. These
+    // dimensions are part of the GEMM computation and should not be tiled.
+    mDims.pop_back();
+    nDims.pop_back();
 
-  int64_t constexpr tileFactor = 1;
-  for (auto dim : mDims)
-    tiles[dim] = tileFactor;
-  for (auto dim : nDims)
-    tiles[dim] = tileFactor;
-  for (auto dim : batchDims)
-    tiles[dim] = tileFactor;
-
-  LLVM_DEBUG(llvm::dbgs() << "+++++++++++ TILES +++++++++++\n");
-  LLVM_DEBUG(llvm::dbgs() << "Tile sizes for op: " << linalgOp << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "Parallal dims:\n");
-  LLVM_DEBUG(llvm::interleaveComma(contractionDims->m, llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n");
-  LLVM_DEBUG(llvm::interleaveComma(contractionDims->n, llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "Tile selected on domanin:\n");
-  LLVM_DEBUG(llvm::interleaveComma(tiles, llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n\n");
-  LLVM_DEBUG(llvm::dbgs() << "+++++++++ END TILES +++++++++\n");
-
+    int64_t constexpr tileFactor = 1;
+    for (auto dim : mDims)
+      tiles[dim] = tileFactor;
+    for (auto dim : nDims)
+      tiles[dim] = tileFactor;
+    for (auto dim : batchDims)
+      tiles[dim] = tileFactor;
+  }
   return tiles;
 }
 
@@ -712,6 +722,10 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
                               << contractionOp << "\n");
       return;
     }
+    LLVM_DEBUG(llvm::dbgs() << "Tiles to use for op:\n");
+    LLVM_DEBUG(llvm::dbgs() << contractionOp << "\n");
+    LLVM_DEBUG(llvm::interleaveComma(*tiles, llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "\n\n");
     defaultTiles[contractionOp] =
         getAsOpFoldResult(rewriter.getI64ArrayAttr(*tiles));
   }

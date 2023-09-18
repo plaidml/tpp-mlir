@@ -343,10 +343,6 @@ static std::optional<int64_t> getConstantRange(const Range &range) {
   return (*size - *offset);
 }
 
-static bool isFullTile(int64_t tileFactor, int64_t range) {
-  return range % tileFactor == 0;
-}
-
 static bool validateFullTilesOnDim(TilingInterface tileOp,
                                    const OpFoldResult &tile, size_t dim) {
   OpBuilder builder(tileOp);
@@ -364,11 +360,15 @@ static bool validateFullTilesOnDim(TilingInterface tileOp,
   if (!tileFactor || !rangeOnDim)
     return true;
 
-  // Tiling with '0' along 'dim' is valid - no tiling.
+  // Corner case: Tiling with '0' along 'dim' is valid - no tiling.
   if (*tileFactor == 0)
     return true;
 
-  return isFullTile(*tileFactor, *rangeOnDim);
+  // Corner case: Tiling '1' with '1' is valid.
+  if (*tileFactor == 1 && *rangeOnDim == 1)
+    return true;
+
+  return (*rangeOnDim % *tileFactor == 0 && *rangeOnDim / *tileFactor != 1);
 }
 
 bool validateFullTilesOnDims(TilingInterface tileOp,
@@ -385,9 +385,8 @@ bool validateFullTilesOnDims(TilingInterface tileOp,
     dimsToCheck = llvm::to_vector(dims);
   assert(dimsToCheck.size() == tiles.size());
 
-  size_t idxInTiles = 0;
-  for (size_t dim : dimsToCheck) {
-    if (!validateFullTilesOnDim(tileOp, tiles[idxInTiles++], dim))
+  for (auto dim : llvm::enumerate(dimsToCheck)) {
+    if (!validateFullTilesOnDim(tileOp, tiles[dim.index()], dim.value()))
       return false;
   }
   return true;
