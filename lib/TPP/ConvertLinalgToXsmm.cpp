@@ -266,6 +266,37 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Convert linalg.generic to xsmm unary identity op.
+struct ConvertGenericToUnaryIdentity : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    if (!genericOp.hasBufferSemantics() ||
+        !structured_match::utils::isTwoDIdentityOp(genericOp, &operands) ||
+        operands.size() != 2) {
+      return failure();
+    }
+
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
+    if (failed(unaryInfo))
+      return failure();
+    OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
+    auto broadCastFlag = getBroadCastUnaryFlagFromMap(
+        genericOp.getMatchingIndexingMap(inputOperand));
+    if (failed(broadCastFlag))
+      return failure();
+    auto flags = rewriter.getArrayAttr(
+        xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
+    xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
+        rewriter.getContext(), xsmm::UnaryKind::IDENTITY);
+    xsmm::utils::replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo,
+                                    flags, kind);
+    return success();
+  }
+};
+
 static FailureOr<xsmm::BinaryFlags>
 getBroadCastBinaryFlagFromMap(AffineMap map, unsigned operandIdx) {
   auto broadCastType = getBroadCastFromMap(map);
@@ -791,7 +822,8 @@ void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
       .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
            ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
            ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul>(patterns.getContext());
+           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity>(
+          patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

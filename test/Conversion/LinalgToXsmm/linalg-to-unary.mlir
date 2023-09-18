@@ -230,3 +230,65 @@ func.func @relu_5(%arg1: memref<4x3xf32>) {
 // CHECK-SAME: %[[ARG1:.+]]: memref<4x3xf32>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch relu [4, 3, 3, 3] flags = (none) data_type = f32
 // CHECK: xsmm.unary relu(data_type = f32, %[[DIS]], %[[ARG1]], %[[ARG1]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @identity_1(%arg0: memref<512xf32>, %arg1: memref<128x512xf32>) {
+  linalg.generic {
+    indexing_maps = [#map0, #map1], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0 : memref<512xf32>) outs(%arg1 : memref<128x512xf32>) {
+    ^bb0(%arg9: f32, %arg10: f32):
+      linalg.yield %arg9 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: identity_1
+// CHECK-SAME: %[[ARG0:.+]]: memref<512xf32>, %[[ARG1:.+]]: memref<128x512xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 1, 512] flags = (bcast_col) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @identity_2(%arg0: memref<128x512xf32>, %arg1: memref<128x512xf32>) {
+  linalg.generic {
+    indexing_maps = [#map0, #map0], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0 : memref<128x512xf32>) outs(%arg1 : memref<128x512xf32>) {
+    ^bb0(%arg9: f32, %arg10: f32):
+      linalg.yield %arg9 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: identity_2
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x512xf32>, %[[ARG1:.+]]: memref<128x512xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 512, 512] flags = (none) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, 0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @identity_3(%arg0: memref<128x1xf32>, %arg1: memref<128x512xf32>) {
+  linalg.generic {
+    indexing_maps = [#map0, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : memref<128x1xf32>) outs(%arg1 : memref<128x512xf32>) {
+    ^bb0(%arg9: f32, %arg10: f32):
+      linalg.yield %arg9 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: identity_3
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x1xf32>, %[[ARG1:.+]]: memref<128x512xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 1, 512] flags = (bcast_row) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
