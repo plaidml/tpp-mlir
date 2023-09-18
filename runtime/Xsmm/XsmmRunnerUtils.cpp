@@ -58,14 +58,6 @@ static bool hasImplicitComputeDtypeUnary(const libxsmm_meltw_unary_type dtype) {
 }
 
 namespace {
-// Definition of this struct should match with the definition used in
-// MemrefToLLVM pass.
-// https://mlir.llvm.org/doxygen/TypeConverter_8cpp_source.html#l00283,
-// we are using only alignedPtr and offset fields from the structure.
-typedef struct {
-  void *alignedPtr;
-  int64_t offset;
-} mlir_memref_descriptor_t;
 
 void *get_base_ptr(const libxsmm_datatype dType, void *alignedPtr,
                    int64_t offset) {
