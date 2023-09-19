@@ -8,6 +8,8 @@
 
 #include "TPP/Passes.h"
 
+#include "TPP/ValueUtils.h"
+
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -31,9 +33,14 @@ using namespace mlir::tpp;
 namespace {
 
 // Return true if the operation can be represented with WMMA compute.
-bool supportsMMACompute(linalg::LinalgOp linalgOp) {
+static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
-        isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)))
+        isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp))) {
+    return false;
+  }
+
+  // Only static shapes are supported.
+  if (linalgOp.hasDynamicShape())
     return false;
 
   auto aType =
@@ -47,7 +54,7 @@ bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   ArrayRef<int64_t> shapeC = cType.getShape();
   int64_t m = shapeC[0];
   int64_t n = shapeC[1];
-  // Matrix A might be 2D (gemm) or 3D (brgemm) but the last dimension will
+  // Buffer A might be 2D (gemm) or 3D (brgemm) but the last dimension will
   // always be reduction.
   int64_t k = shapeA.back();
 
@@ -58,10 +65,11 @@ bool supportsMMACompute(linalg::LinalgOp linalgOp) {
 }
 
 // Create WMMA instructions out of matmul-like operation.
-void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
+static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
+                                  PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
           isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
-         "Requires a matmul like op for mma lowering");
+         "Requires a matmul like op for MMA lowering");
 
   Location loc = linalgOp.getLoc();
 
@@ -80,11 +88,26 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   gpu::MMAMatrixType mmaTypeC =
       gpu::MMAMatrixType::get(typeC.getShape(), typeC.getElementType(), "COp");
 
-  // Matrix A might be 2D (gemm) or 3D (brgemm) but the last dimension will
-  // always be reduction.
-  auto ldb = rewriter.getIndexAttr(typeA.getShape().back());
-  auto lda = rewriter.getIndexAttr(typeC.getShape()[0]);
-  auto ldc = rewriter.getIndexAttr(typeC.getShape()[0]);
+  auto stridesA = utils::getStaticStrides(matA);
+  auto stridesB = utils::getStaticStrides(matB);
+  auto stridesC = utils::getStaticStrides(matC);
+
+  if (failed(stridesA) || failed(stridesB) || failed(stridesC)) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expect static strides for MMA lowering");
+  }
+  if (stridesA->back() != 1 || stridesB->back() != 1 || stridesC->back() != 1) {
+    return rewriter.notifyMatchFailure(
+        linalgOp,
+        "Expect unit stride in the innermost dimension for MMA operations");
+  }
+
+  bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
+
+  // Skip batch dimension stride in case of brgemm.
+  auto lda = rewriter.getIndexAttr(stridesA->begin()[isBrgemm ? 1 : 0]);
+  auto ldb = rewriter.getIndexAttr(stridesB->begin()[isBrgemm ? 1 : 0]);
+  auto ldc = rewriter.getIndexAttr(stridesC->front());
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
@@ -107,7 +130,6 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
                         /*transpose=*/UnitAttr())
                     .getRes();
 
-  bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
   scf::ForOp batchLoop;
   Value batchIv;
   if (isBrgemm) {
@@ -153,10 +175,15 @@ void gemmToGpuMMA(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
   // Write back the total sum to the output buffer.
   rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
       loc, result, matC, ValueRange{zero, zero}, ldc, /*transpose=*/UnitAttr());
+
+  rewriter.eraseOp(linalgOp);
+
+  return success();
 }
 
 // Create loops out of matmul-like operation.
-void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
+static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
+                                    PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
           isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
          "Requires a matmul like op for loop lowering");
@@ -249,6 +276,10 @@ void gemmToGpuLoops(linalg::LinalgOp linalgOp, PatternRewriter &rewriter) {
 
   // Write back the total sum to the output buffer.
   rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+
+  rewriter.eraseOp(linalgOp);
+
+  return success();
 }
 
 // Convert linalg.matmul to GPU-compatible kernel.
@@ -264,14 +295,15 @@ struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
       return rewriter.notifyMatchFailure(
           matmulOp, "Linalg gemm to GPU expects memref type");
     }
+    if (matmulOp.hasDynamicShape()) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "Expect static shape when mapping to GPU");
+    }
 
     if (useWmma && supportsMMACompute(matmulOp))
-      gemmToGpuMMA(matmulOp, rewriter);
+      return gemmToGpuMMA(matmulOp, rewriter);
     else
-      gemmToGpuLoops(matmulOp, rewriter);
-
-    rewriter.eraseOp(matmulOp);
-    return success();
+      return gemmToGpuLoops(matmulOp, rewriter);
   }
 
 private:
@@ -292,14 +324,15 @@ struct ConvertBrgemmToGpu
       return rewriter.notifyMatchFailure(
           brgemmOp, "Linalg brgemm to GPU expects memref type");
     }
+    if (brgemmOp.hasDynamicShape()) {
+      return rewriter.notifyMatchFailure(
+          brgemmOp, "Expect static shape when mapping to GPU");
+    }
 
     if (useWmma && supportsMMACompute(brgemmOp))
-      gemmToGpuMMA(brgemmOp, rewriter);
+      return gemmToGpuMMA(brgemmOp, rewriter);
     else
-      gemmToGpuLoops(brgemmOp, rewriter);
-
-    rewriter.eraseOp(brgemmOp);
-    return success();
+      return gemmToGpuLoops(brgemmOp, rewriter);
   }
 
 private:

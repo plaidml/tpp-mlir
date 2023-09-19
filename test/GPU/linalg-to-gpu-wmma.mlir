@@ -72,3 +72,29 @@ func.func @wrong_shapes(%arg0: memref<32x32xf16>,
 
 // CHECK-LABEL: func.func @wrong_shapes(
 // CHECK-NOT: gpu.{{.*}}_mma_
+
+// -----
+
+// Dynamic shapes are not supported.
+func.func @matmul_dynamic_shapes(%arg0: memref<?x?xf16>, %arg1: memref<?x?xf16>, %arg2: memref<?x?xf16>) {
+  linalg.matmul ins(%arg0, %arg1 : memref<?x?xf16>, memref<?x?xf16>)
+                outs(%arg2 : memref<?x?xf16>)
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_dynamic_shape
+// CHECK: linalg.matmul
+
+// -----
+
+// Dynamic shapes are not supported.
+func.func @brgemm_dynamic_shapes(%arg0: memref<?x?x?xf16>,
+                 %arg1: memref<?x?x?xf16>,
+                 %arg2: memref<?x?xf16>) {
+  linalg.batch_reduce_matmul  ins(%arg0, %arg1 : memref<?x?x?xf16>, memref<?x?x?xf16>)
+                              outs(%arg2 : memref<?x?xf16>)
+  return
+}
+
+// CHECK-LABEL: func.func @brgemm_dynamic_shapes
+// CHECK: linalg.batch_reduce_matmul

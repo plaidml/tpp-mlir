@@ -57,3 +57,29 @@ func.func @batch_reduce_matmul(%arg0: memref<32x256x2048xf32>,
 // CHECK:           memref.store %[[res]], %[[C]][%arg3, %arg4] : memref<256x1024xf32>
 // CHECK:           scf.yield
 // CHECK:         }
+
+// -----
+
+// Dynamic shapes are not supported.
+func.func @matmul_dynamic_shapes(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>) {
+  linalg.matmul ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>)
+                outs(%arg2 : memref<?x?xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_dynamic_shape
+// CHECK: linalg.matmul
+
+// -----
+
+// Dynamic shapes are not supported.
+func.func @brgemm_dynamic_shapes(%arg0: memref<?x?x?xf32>,
+                 %arg1: memref<?x?x?xf32>,
+                 %arg2: memref<?x?xf32>) {
+  linalg.batch_reduce_matmul  ins(%arg0, %arg1 : memref<?x?x?xf32>, memref<?x?x?xf32>)
+                              outs(%arg2 : memref<?x?xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @brgemm_dynamic_shapes
+// CHECK: linalg.batch_reduce_matmul
