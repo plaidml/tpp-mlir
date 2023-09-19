@@ -16,18 +16,11 @@
 #include "dnnl.h"
 #include <cassert>
 
-extern "C" void
-_mlir_ciface_linalg_matmul_view64x64xf32_view64x64xf32_view64x64xf32(
-    StridedMemRefType<float, 2> *A, StridedMemRefType<float, 2> *B,
-    StridedMemRefType<float, 2> *C) {
-
-  // printMemRefMetaData(std::cout, *A);
-  // printMemRefMetaData(std::cout, *B);
-  // printMemRefMetaData(std::cout, *C);
-
-  dnnl_dim_t dim = 64;
-  auto status =
-      dnnl_sgemm('n', 'n', dim, dim, dim, 1.0, A->data + A->offset, dim,
-                 B->data + B->offset, dim, 1.0, C->data + C->offset, dim);
+extern "C" void linalg_matmul_blas(size_t m, size_t n, size_t k, const float *A,
+                                   size_t offsetA, size_t lda, const float *B,
+                                   size_t offsetB, size_t ldb, float *C,
+                                   size_t offsetC, size_t ldc) {
+  auto status = dnnl_sgemm('n', 'n', m, n, k, 1.0, A + offsetA, lda,
+                           B + offsetB, ldb, 1.0, C + offsetC, ldc);
   assert(status == 0);
 }
