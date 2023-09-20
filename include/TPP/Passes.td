@@ -429,6 +429,11 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
     Convert all eligble operations into generic GPU operations.
   }];
   let constructor = "mlir::tpp::createGpuConversionPass()";
+  let options = [
+    Option<"useWmma", "wmma",
+           "bool", /*default=*/"false",
+           "Use WMMA operations">
+  ];
 }
 
 def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
@@ -553,6 +558,11 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
                            "memref::MemRefDialect",
                            "gpu::GPUDialect",
                            "arith::ArithDialect"];
+  let options = [
+    Option<"useWmma", "wmma",
+           "bool", /*default=*/"false",
+           "Use WMMA operations">
+  ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

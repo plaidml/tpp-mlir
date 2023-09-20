@@ -113,14 +113,10 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Typically there max number of threads per block is 1024.
-    // For 2D tiles, use max 32 threads per dimension.
-    constexpr int maxNumThreadsPerDim = 32;
-
-    // Tile to split the kernel into threads and blocks
+    // Tile to split the kernel into threads and blocks.
+    // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanupPass());
-    pm.addPass(createTileConsumerAndFuseProducersPass(
-        /*tileSizes=*/{maxNumThreadsPerDim, maxNumThreadsPerDim}));
+    pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
 
     // Preprocess and bufferize as further conversion requires memref
@@ -131,7 +127,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversionPass());
+    pm.addPass(createGpuConversionPass(gpuWmma));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (parseGpuOption(this->gpuBackend)) {

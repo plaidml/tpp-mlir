@@ -137,7 +137,8 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyAndCanonicalizePackPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuPipelinePass(StringRef gpuBackend = "cuda");
-std::unique_ptr<OperationPass<ModuleOp>> createGpuConversionPass();
+std::unique_ptr<OperationPass<ModuleOp>>
+createGpuConversionPass(bool useWmma = false);
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
                     StringRef gpuChip = "sm_35",
@@ -158,7 +159,8 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createGpuVulkanAbiPass(bool use64bitIndex = false);
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeAggregatedOpsPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgToGpuPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgToGpuPass(bool useWmma = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertPackUnpackOptimization();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
