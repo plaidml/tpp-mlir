@@ -15,7 +15,8 @@ add_mlir_library(TPPPipeline
   ${PROJECT_SOURCE_DIR}/include/TPP
 
   DEPENDS
-    TPPCompilerPassIncGen
+    TPPCompilerPassIncGe
+    TPPXeGPUDialect
 
   LINK_LIBS PUBLIC
     MLIRIR

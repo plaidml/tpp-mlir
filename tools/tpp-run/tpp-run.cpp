@@ -48,6 +48,7 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/GPU/Utils.h"
 #include "TPP/Passes.h"
@@ -313,6 +314,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
+  registry.insert<mlir::xegpu::XeGPUDialect>();
   mlir::linalgx::registerTransformDialectExtension(registry);
   registerAllDialects(registry);
   registerAllExtensions(registry);
