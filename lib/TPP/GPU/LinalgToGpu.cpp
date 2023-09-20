@@ -32,6 +32,38 @@ using namespace mlir::tpp;
 
 namespace {
 
+// Creates an outermost parallel loop wrapper around an operation to represent
+// number of GPU blocks.
+// If there is already a parallel loop present, no operation is created and
+// a nullopt is returned instead.
+static std::optional<scf::ParallelOp>
+createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
+                       PatternRewriter &rewriter) {
+  assert(blockDims.size() <= 3 && "Too many GPU blocks dimensions");
+
+  auto loc = op->getLoc();
+
+  auto parentOp = op->getParentOp();
+  if (isa<scf::ParallelOp>(parentOp))
+    return std::nullopt;
+
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+
+  SmallVector<Value> gpuBlocks;
+  SmallVector<Value> lbs;
+  SmallVector<Value> steps;
+  for (auto blockDim : blockDims) {
+    auto blockSize = rewriter.create<arith::ConstantIndexOp>(loc, blockDim);
+    gpuBlocks.push_back(blockSize);
+    // Add matching number of lbs and steps.
+    lbs.push_back(zero);
+    steps.push_back(one);
+  }
+
+  return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
+}
+
 // Return true if the operation can be represented with WMMA compute.
 static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
@@ -72,6 +104,14 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
          "Requires a matmul like op for MMA lowering");
 
   Location loc = linalgOp.getLoc();
+
+  // If there is no parallel loop, create a unit blocks wrapper around the
+  // current op.
+  // This ensures that WMMA operations are created at the thread level (inner
+  // nested parallel loops).
+  auto blocksLoop = createGpuBlocksWrapper(linalgOp, {1, 1}, rewriter);
+  if (blocksLoop)
+    rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
 
   auto matA = linalgOp.getDpsInputOperands()[0]->get();
   auto matB = linalgOp.getDpsInputOperands()[1]->get();
