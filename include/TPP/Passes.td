@@ -524,4 +524,17 @@ def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
+def LinalgToXegpu : Pass<"linalg-to-xegpu", "func::FuncOp"> {
+  let summary = "Convert linalg ops to be XeGPU dialect.";
+  let description = [{
+    Lower linalg to ops to XeGPU dialect.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "gpu::GPUDialect",
+                           "arith::ArithDialect",
+                           "xegpu::XeGPUDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

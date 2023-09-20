@@ -72,6 +72,10 @@ namespace tensor {
 class TensorDialect;
 } // namespace tensor
 
+namespace xegpu {
+class XeGPUDialect;
+} // namespace xegpu
+
 namespace tpp {
 
 // Testing passes.
