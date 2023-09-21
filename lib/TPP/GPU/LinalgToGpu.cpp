@@ -372,7 +372,7 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
         break;
       }
 
-      rewriter.eraseOp(linalgOp);
+      rewriter.eraseOp(op);
     }
   }
 
