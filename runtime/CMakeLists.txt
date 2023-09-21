@@ -1,2 +1,5 @@
 add_subdirectory(Xsmm)
-add_subdirectory(OneDnnl)
+
+if(USE_OneDNN)
+  add_subdirectory(OneDnnl)
+endif()

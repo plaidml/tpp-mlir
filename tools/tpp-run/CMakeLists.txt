@@ -1,5 +1,15 @@
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+
+if(USE_OneDNN)
+  set(ONEDNN_LIBS "tpp_dnnl_runner_utils")
+  set(ONEDNN_LIBS_INCL "-ltpp_dnnl_runner_utils")
+endif()
+
+if(USE_OpenMP)
+  set(OPENMP_LIBS_INCL "-lomp")
+endif()
+
 set(LIBS
         ${dialect_libs}
         ${conversion_libs}
@@ -16,7 +26,7 @@ set(LIBS
         MLIROptLib
         MLIRTPP
         tpp_xsmm_runner_utils
-        tpp_dnnl_runner_utils
+        ${ONEDNN_LIBS}
         )
 
 set(LLVM_LINK_COMPONENTS
@@ -57,13 +67,13 @@ target_link_options(tpp-run PRIVATE
   -Wl,--no-as-needed
   -L${CMAKE_BINARY_DIR}/lib
   -ltpp_xsmm_runner_utils
-  -ltpp_dnnl_runner_utils
+  ${ONEDNN_LIBS_INCL}
   -L${LLVM_LIBRARY_DIR}
   -lmlir_c_runner_utils
   -lmlir_runner_utils
   -lmlir_async_runtime
   ${TPP_GPU_LINK_FLAGS}
-  -lomp
+  ${OPENMP_LIBS_INCL}
   -Wl,--as-needed
 )
 
