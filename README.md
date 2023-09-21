@@ -109,6 +109,9 @@ This setup assumes that you have built LLVM and MLIR in `$CUSTOM_LLVM_ROOT` as a
 _Note: OpenMP is a requirement to get multi-threaded performance on our code.
 If you don't want to build with OpenMP, disable with the CMake flag `-DUSE_OpenMP=False`._
 
+_Note: OneDNN is a requirement to get performance comparisons against our code.
+If you don't want to build with OneDNN, disable with the CMake flag `-DUSE_OneDNN=False`._
+
 ```sh
 # Clone
 git clone https://github.com/plaidml/tpp-mlir.git
