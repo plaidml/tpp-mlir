@@ -24,6 +24,22 @@ namespace linalgx {
 
 namespace utils {
 
+// Given a value `val` expand it's shape based on `reassociationMap`.
+Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
+             ArrayAttr reassociationMap) {
+  if (newType == val.getType())
+    return val;
+  if (newType.isa<RankedTensorType>()) {
+    return builder.create<tensor::ExpandShapeOp>(loc, newType, val,
+                                                 reassociationMap);
+  }
+  if (newType.isa<MemRefType>()) {
+    return builder.create<memref::ExpandShapeOp>(loc, newType, val,
+                                                 reassociationMap);
+  }
+  assert(false && "expect tensor or memref");
+}
+
 // taken from LinalgInterfaces.cpp
 // Returns true if the use-def chain from `v` to `from` consists of 0 or more
 // unary single-operand operations.

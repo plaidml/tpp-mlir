@@ -230,6 +230,12 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
                            "tensor::TensorDialect", "tpp::TppDialect"];
 }
 
+def PackConsumerAndProducerFusion : Pass<"fuse-pack-consumer-producer",
+                                         "func::FuncOp"> {
+  let constructor = "mlir::tpp::createPackConsumerAndProducerFusionPass()";
+  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
+}
+
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 
                                        "func::FuncOp"> {
   let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";

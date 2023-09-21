@@ -92,6 +92,10 @@ constexpr const static llvm::StringLiteral kLoopParallel = "parallel";
 constexpr const static llvm::StringLiteral kLoopRoot = "root";
 void populateScfForToForAllRewritePattern(RewritePatternSet &patterns);
 
+// Given a value `val` expand it's shape based on `reassociationMap`.
+Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
+             ArrayAttr reassociationMap);
+
 } // namespace utils
 } // namespace linalgx
 } // namespace mlir

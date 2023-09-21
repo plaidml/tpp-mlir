@@ -164,6 +164,8 @@ createLinalgToGpuPass(bool useWmma = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertPackUnpackOptimization();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createPackConsumerAndProducerFusionPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();

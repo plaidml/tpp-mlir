@@ -75,4 +75,4 @@ func.func @unpack3(%in: tensor<2x2x1x4x2x2xf32>, %out: tensor<8x2x2x2xf32>) -> t
 
 // CHECK-LABEL: unpack3
 // CHECK-SAME: %[[ARG0:.+]]: memref<2x2x1x4x2x2xf32>, %[[ARG1:.+]]: memref<8x2x2x2xf32>
-// CHECK: linalg.transpose ins(%{{[^:]+}} : memref<2x2xf32, strided<[2, 1], offset: ?>>) outs(%alloc_0 : memref<2x2xf32>) permutation = [1, 0] 
+// CHECK: linalg.transpose ins(%{{[^:]+}} : memref<2x2xf32, strided<[2, 1], offset: ?>>) outs(%{{[^:]+}} : memref<2x2xf32, strided<[2, 1]>>) permutation = [1, 0] 
