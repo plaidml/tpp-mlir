@@ -316,64 +316,67 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   auto storeOp = rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
 
   // Try to fuse element-wise consumers.
-  // A naive fusion strategy based on the assumption that the tile-and-fuse
-  // pass already gathered fusable ops together under a common parallel loop.
-  //
-  // TODO: replace dependance on the parallel loop with some dedicated fusion
-  // region.
-  if (auto parallelOp = dyn_cast<scf::ParallelOp>(linalgOp->getParentOp())) {
-    // Gather other linalg ops within the region.
-    SmallVector<linalg::LinalgOp> linalgOps;
-    parallelOp->walk([&](linalg::LinalgOp op) {
-      if (op != linalgOp)
-        linalgOps.push_back(op);
+  // A naive fusion strategy that looks at the other operations after the root
+  // linalg op and tries to fused them.
+  // Attemps bails on the first mismatch.
+  auto parentOp = linalgOp->getParentOp();
+  SmallVector<linalg::LinalgOp> consumers;
 
-      return WalkResult::advance();
-    });
+  // Traverse other ops within the same region and collect consumers.
+  Operation *nextOp = linalgOp;
+  while ((nextOp = nextOp->getNextNode())) {
+    // Potential consumers must be within the same region.
+    if (nextOp->getParentOp() != parentOp)
+      break;
+    // Only other linalg ops are expected as consumers.
+    if (!isa<linalg::LinalgOp>(nextOp))
+      break;
 
-    for (auto op : linalgOps) {
-      auto outBuf = op.getDpsInitOperand(0)->get();
-      // Check that the op reuses the same output buffer as the matmul.
-      // Otherwise, it is assumed that the op cannot be fused.
-      if (outBuf != matC)
-        break;
+    auto consumer = cast<linalg::LinalgOp>(nextOp);
+    auto outBuf = consumer.getDpsInitOperand(0)->get();
+    // Check that the op reuses the same output buffer as the root op.
+    // Otherwise, it is assumed that the op cannot be fused.
+    if (outBuf != matC)
+      break;
 
-      // Insert fused eltwise ops before the store and later replace the store
-      // with a new result.
-      rewriter.setInsertionPoint(storeOp);
+    consumers.push_back(consumer);
+  }
 
-      SmallVector<Value> operands;
-      if (structured_match::utils::isTwoDAddOp(op, &operands)) {
-        // Get the value to be added. Load the element first, if necessary.
-        auto addValue = operands[0] != matC ? operands[0] : operands[1];
-        if (addValue.getType().isa<ShapedType>()) {
-          addValue =
-              rewriter.create<memref::LoadOp>(loc, addValue, parallelIvs)
-                  .getResult();
-        }
+  for (auto op : consumers) {
+    // Insert fused eltwise ops before the store and later replace the store
+    // with a new result.
+    rewriter.setInsertionPoint(storeOp);
 
-        // Fuse the add into the matmul body.
-        auto addOp =
-            rewriter.create<arith::AddFOp>(loc, storeOp.getValue(), addValue);
-        // Store the new result.
-        storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
-            storeOp, addOp.getResult(), matC, parallelIvs);
-      } else if (structured_match::utils::isTwoDReluOp(op, &operands)) {
-        // Fuse the relu into the matmul body.
-        Value zero = rewriter.create<arith::ConstantFloatOp>(
-            loc, APFloat(0.0F), rewriter.getF32Type());
-        auto maxOp =
-            rewriter.create<arith::MaxFOp>(loc, storeOp.getValue(), zero);
-        // Store the new result.
-        storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
-            storeOp, maxOp.getResult(), matC, parallelIvs);
-      } else {
-        // Not a fusable operation. Bail out.
-        break;
+    SmallVector<Value> operands;
+    if (structured_match::utils::isTwoDAddOp(op, &operands)) {
+      // Get the value to be added. Load the element first, if necessary.
+      auto addValue = operands[0] != matC ? operands[0] : operands[1];
+      if (addValue.getType().isa<ShapedType>()) {
+        addValue = rewriter.create<memref::LoadOp>(loc, addValue, parallelIvs)
+                       .getResult();
       }
 
-      rewriter.eraseOp(op);
+      // Fuse the add into the matmul body.
+      auto addOp =
+          rewriter.create<arith::AddFOp>(loc, storeOp.getValue(), addValue);
+      // Store the new result.
+      storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+          storeOp, addOp.getResult(), matC, parallelIvs);
+    } else if (structured_match::utils::isTwoDReluOp(op, &operands)) {
+      // Fuse the relu into the matmul body.
+      Value zero = rewriter.create<arith::ConstantFloatOp>(
+          loc, APFloat(0.0F), rewriter.getF32Type());
+      auto maxOp =
+          rewriter.create<arith::MaxFOp>(loc, storeOp.getValue(), zero);
+      // Store the new result.
+      storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+          storeOp, maxOp.getResult(), matC, parallelIvs);
+    } else {
+      // Not a fusable operation. Bail out.
+      break;
     }
+
+    rewriter.eraseOp(op);
   }
 
   rewriter.eraseOp(linalgOp);
