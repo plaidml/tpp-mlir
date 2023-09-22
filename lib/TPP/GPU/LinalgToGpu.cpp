@@ -328,11 +328,15 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
     // Potential consumers must be within the same region.
     if (nextOp->getParentOp() != parentOp)
       break;
+
     // Only other linalg ops are expected as consumers.
-    if (!isa<linalg::LinalgOp>(nextOp))
+    auto consumer = dyn_cast<linalg::LinalgOp>(nextOp);
+    if (!consumer || !linalg::isElementwise(consumer))
+      break;
+    // Require same iteration space.
+    if (consumer.getNumParallelLoops() != linalgOp.getNumParallelLoops())
       break;
 
-    auto consumer = cast<linalg::LinalgOp>(nextOp);
     auto outBuf = consumer.getDpsInitOperand(0)->get();
     // Check that the op reuses the same output buffer as the root op.
     // Otherwise, it is assumed that the op cannot be fused.
@@ -355,7 +359,6 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
         addValue = rewriter.create<memref::LoadOp>(loc, addValue, parallelIvs)
                        .getResult();
       }
-
       // Fuse the add into the matmul body.
       auto addOp =
           rewriter.create<arith::AddFOp>(loc, storeOp.getValue(), addValue);
