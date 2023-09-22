@@ -94,9 +94,12 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
          cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
 }
 
-Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-                     gpu::SubgroupMmaStoreMatrixOp rootStoreOp,
-                     ValueRange storeIndices, PatternRewriter &rewriter) {
+// Fuse a consumer using WMMA operations.
+// Returns updated store op.
+static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
+                            gpu::SubgroupMmaStoreMatrixOp rootStoreOp,
+                            ValueRange storeIndices,
+                            PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
 
   auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
@@ -173,9 +176,13 @@ Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   return newStore;
 }
 
-Operation *scalarFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-                        memref::StoreOp rootStoreOp, ValueRange storeIndices,
-                        PatternRewriter &rewriter) {
+// Fuse a consumer using scalar operations.
+// Returns updated store op.
+static Operation *scalarFusion(linalg::LinalgOp rootOp,
+                               linalg::LinalgOp consumer,
+                               memref::StoreOp rootStoreOp,
+                               ValueRange storeIndices,
+                               PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
   auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
 
@@ -223,14 +230,15 @@ Operation *scalarFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   return newStore;
 }
 
-// Fuse element-wise consumers.
+// Fuse elementwise consumers.
 // A naive fusion strategy that looks at the other operations after the root
-// linalg op and tries to fused them.
+// linalg op and tries to fuse them.
 // Attemps bails on the first mismatch.
 // Returns updated store op.
-Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp, Operation *rootStoreOp,
-                                ValueRange storeIndices,
-                                PatternRewriter &rewriter) {
+static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
+                                       Operation *rootStoreOp,
+                                       ValueRange storeIndices,
+                                       PatternRewriter &rewriter) {
   auto parentOp = rootOp->getParentOp();
   auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
 
