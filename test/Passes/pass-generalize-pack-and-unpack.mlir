@@ -47,3 +47,27 @@ func.func @unpack_matmul(%in: tensor<8x32x32x32xf32>) -> tensor<256x1024xf32> {
 // CHECK: %[[T:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<8x32x32x32xf32>) outs(%[[EMPTY]] : tensor<8x32x32x32xf32>) 
 // CHECK-SAME:  permutation = [0, 2, 1, 3]
 // CHECK: %[[CLP:.+]] = tensor.collapse_shape %[[T]] {{\[}}[0, 1], [2, 3]] : tensor<8x32x32x32xf32> into tensor<256x1024xf32>
+
+// -----
+
+func.func @pack3(%in: tensor<8x2x2x2xf32>, %out: tensor<2x2x1x4x2x2xf32>)-> tensor<2x2x1x4x2x2xf32>{
+  %2 = tensor.pack %in outer_dims_perm = [3, 2, 1, 0] inner_dims_pos=[1, 0] inner_tiles = [2, 2] into %out:   tensor<8x2x2x2xf32>->tensor<2x2x1x4x2x2xf32>
+  return %2: tensor<2x2x1x4x2x2xf32>
+}
+
+// CHECK-LABEL: pack3
+// CHECK-SAME: %[[ARG0:.+]]: tensor<8x2x2x2xf32>, %[[ARG1:.+]]: tensor<2x2x1x4x2x2xf32>
+// CHECK: %[[EXP:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2, 3], [4], [5]] : tensor<8x2x2x2xf32> into tensor<4x2x1x2x2x2xf32>
+// CHECK: %{{.+}} = linalg.transpose ins(%[[EXP]] : tensor<4x2x1x2x2x2xf32>) outs(%[[ARG1]] : tensor<2x2x1x4x2x2xf32>)
+// CHECK-SAME:  permutation = [5, 4, 2, 0, 3, 1]
+
+// -----
+
+func.func @unpack3(%in: tensor<2x2x1x4x2x2xf32>, %out: tensor<8x2x2x2xf32>)-> tensor<8x2x2x2xf32>{
+  %2 = tensor.unpack %in outer_dims_perm = [3, 2, 1, 0] inner_dims_pos=[1, 0] inner_tiles = [2, 2] into %out: tensor<2x2x1x4x2x2xf32>->tensor<8x2x2x2xf32>
+  return %2: tensor<8x2x2x2xf32>
+}
+
+// CHECK-LABEL: unpack3
+// CHECK: (%[[ARG0:.+]]: tensor<2x2x1x4x2x2xf32>, %[[ARG1:.+]]: tensor<8x2x2x2xf32>) -> tensor<8x2x2x2xf32> {
+// CHECK: linalg.transpose ins(%{{.+}} : tensor<2x2xf32>) outs(%{{.+}} : tensor<2x2xf32>) permutation = [1, 0]
