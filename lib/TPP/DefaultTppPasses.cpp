@@ -261,13 +261,6 @@ private:
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
-    pm.addPass(createConvertPackUnpackOptimization());
-
-    // Generalize tensor.pack and tensor.unpack.
-    pm.addPass(createGeneralizeTensorPackAndUnPackPass());
-
-    // Final clenaup after all the mapping.
-    pm.addPass(createCleanupPass());
   }
 };
 
@@ -420,6 +413,10 @@ private:
 
       // Applies a set of passes at the linalg level to fuse and pack.
       pm.addPass(createTppMappingPass());
+
+      // Generalize tensor.pack and tensor.unpack.
+      pm.addPass(createConvertPackUnpackOptimization());
+      pm.addPass(createGeneralizeTensorPackAndUnPackPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
       // Decompose Aggregated operations. These ops currently do not
