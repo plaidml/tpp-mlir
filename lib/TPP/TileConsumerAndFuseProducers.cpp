@@ -695,7 +695,8 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
   llvm::SmallDenseSet<Operation *> fusedOps;
 
   SmallVector<linalg::LinalgOp> linalgContractionOperations;
-  func->walk([&](linalg::LinalgOp linalgOp) {
+  // Walk postorder to increase fusion boundaries.
+  func->walk<WalkOrder::PostOrder>([&](linalg::LinalgOp linalgOp) {
     if ((isConvolutionLike(linalgOp) ||
          succeeded(linalgx::utils::isContraction(linalgOp))) &&
         linalgOp.hasTensorSemantics())
@@ -705,10 +706,6 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
   if (linalgContractionOperations.empty())
     return;
 
-  // Reverse the ops. Start from the bottom to increase
-  // the fusion boundaries.
-  std::reverse(linalgContractionOperations.begin(),
-               linalgContractionOperations.end());
   llvm::SmallDenseSet<Operation *> visitedConsumers;
   llvm::SmallDenseSet<Operation *> fusionRoots;
 
