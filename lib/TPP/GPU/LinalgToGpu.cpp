@@ -95,7 +95,7 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
 }
 
 // Fuse a consumer using WMMA operations.
-// Returns updated store op.
+// Returns updated store op or nullptr if the fusion fails.
 static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
                             gpu::SubgroupMmaStoreMatrixOp rootStoreOp,
                             ValueRange storeIndices,
@@ -177,7 +177,7 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
 }
 
 // Fuse a consumer using scalar operations.
-// Returns updated store op.
+// Returns updated store op or nullptr if the fusion fails.
 static Operation *scalarFusion(linalg::LinalgOp rootOp,
                                linalg::LinalgOp consumer,
                                memref::StoreOp rootStoreOp,
@@ -234,7 +234,7 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
 // A naive fusion strategy that looks at the other operations after the root
 // linalg op and tries to fuse them.
 // Attemps bails on the first mismatch.
-// Returns updated store op.
+// Returns updated store op or nullptr if the fusion fails.
 static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                                        Operation *rootStoreOp,
                                        ValueRange storeIndices,
@@ -251,10 +251,11 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
       break;
 
     // Only other linalg ops are expected as consumers.
+    // TODO: continue on ops without side effects like subview
     auto consumer = dyn_cast<linalg::LinalgOp>(nextOp);
     if (!consumer || !linalg::isElementwise(consumer))
       break;
-    // Require same iteration space.
+    // Require the same iteration space.
     if (consumer.getNumParallelLoops() != rootOp.getNumParallelLoops())
       break;
 
