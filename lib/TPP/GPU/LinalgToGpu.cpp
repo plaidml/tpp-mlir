@@ -8,8 +8,8 @@
 
 #include "TPP/Passes.h"
 
-#include "TPP/ValueUtils.h"
 #include "TPP/MatcherUtils.h"
+#include "TPP/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -509,7 +509,8 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   }
 
   // Write back the total sum to the output buffer.
-  auto storeOp = rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+  auto storeOp =
+      rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
 
   (void)fuseEltwiseConsumers(linalgOp, storeOp, parallelIvs, rewriter);
 
