@@ -189,16 +189,8 @@ static LogicalResult gemmToXegpu(linalg::LinalgOp linalgOp,
   auto loadB = rewriter.create<xegpu::Load2DOp>(loc, vecTypeB, tileB, vnniAxisB,
                                                 transpose);
 
-  // No loadC operand for accumulation?
-  auto dpas = rewriter.create<xegpu::DpasOp>(loc, vecTypeC, loadA, loadB);
-
-  // DPAS does not have accumulation operand so insert a eltwise vector add
-  // manually.
-  Value result;
-  if (llvm::isa<FloatType>(tileTypeC.getElementType()))
-    result = rewriter.create<arith::AddFOp>(loc, dpas, loadC);
-  else
-    result = rewriter.create<arith::AddIOp>(loc, dpas, loadC);
+  Value result =
+      rewriter.create<xegpu::DpasOp>(loc, vecTypeC, loadA, loadB, loadC);
 
   if (isBrgemm) {
     rewriter.setInsertionPointToEnd(batchLoop.getBody());

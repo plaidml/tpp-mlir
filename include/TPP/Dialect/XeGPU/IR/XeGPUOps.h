@@ -38,13 +38,10 @@ SmallVector<Range, 8> getOrCreateRanges(OffsetSizeAndStrideOpInterface op,
 
 namespace xegpu {
 
-class TileType;
+class TensorDescType;
 
-} // namespace xegpu
-
-namespace xegpu {
-
-class TileBase : public mlir::Type, public mlir::ShapedType::Trait<TileBase> {
+class BaseTensorDescType : public mlir::Type,
+                           public mlir::ShapedType::Trait<BaseTensorDescType> {
 public:
   using Type::Type;
 
@@ -59,8 +56,8 @@ public:
 
   /// Clone this type with the given shape and element type. If the
   /// provided shape is `None`, the current shape of the type is used.
-  TileBase cloneWith(std::optional<llvm::ArrayRef<int64_t>> shape,
-                     mlir::Type elementType) const;
+  BaseTensorDescType cloneWith(std::optional<llvm::ArrayRef<int64_t>> shape,
+                               mlir::Type elementType) const;
 
   /// Return true if the specified element type is ok in a tensor.
   static bool isValidElementType(Type type);
@@ -75,10 +72,13 @@ public:
 } // namespace xegpu
 } // namespace mlir
 
-#include "TPP/Dialect/XeGPU/IR/XeGPUOpsDialect.h.inc"
+#include <TPP/Dialect/XeGPU/IR/XeGPUOpsDialect.h.inc>
+#include <TPP/Dialect/XeGPU/IR/XeGPUOpsEnums.h.inc>
+#define GET_ATTRDEF_CLASSES
+#include <TPP/Dialect/XeGPU/IR/XeGPUOpsAttrs.h.inc>
 #define GET_TYPEDEF_CLASSES
-#include "TPP/Dialect/XeGPU/IR/XeGPUOpsTypes.h.inc"
+#include <TPP/Dialect/XeGPU/IR/XeGPUOpsTypes.h.inc>
 #define GET_OP_CLASSES
-#include "TPP/Dialect/XeGPU/IR/XeGPUOps.h.inc"
+#include <TPP/Dialect/XeGPU/IR/XeGPUOps.h.inc>
 
 #endif // _XeGPU_OPS_H_INCLUDED_

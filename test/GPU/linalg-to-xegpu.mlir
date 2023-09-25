@@ -19,8 +19,7 @@ func.func @matmul_f16_f16_f32(%arg0: memref<8x16xf16>,
 // CHECK-DAG:       %[[loadC:.+]] = xegpu.load_2d %[[tileC]]{{.*}}-> vector<8x16xf32>
 // CHECK-DAG:       %[[loadA:.+]] = xegpu.load_2d %[[tileA]] VNNI_AXIS 0 TRANSPOSE false{{.*}}-> vector<8x8x2xf16>
 // CHECK-DAG:       %[[loadB:.+]] = xegpu.load_2d %[[tileB]] VNNI_AXIS 1 TRANSPOSE false{{.*}}-> vector<8x16x2xf16>
-// CHECK:           %[[dpas:.+]] = xegpu.dpas %[[loadA]], %[[loadB]]
-// CHECK:           %[[res:.+]] = arith.addf %[[dpas]], %[[loadC]]
+// CHECK:           %[[res:.+]] = xegpu.dpas %[[loadA]], %[[loadB]], %[[loadC]]
 // CHECK:           xegpu.store_2d %[[tileC]],  %[[res]]
 // CHECK:           scf.yield
 // CHECK:         }
@@ -46,8 +45,7 @@ func.func @matmul_i8_i8_i32(%arg0: memref<8x32xi8>,
 // CHECK-DAG:       %[[loadC:.+]] = xegpu.load_2d %[[tileC]]{{.*}}-> vector<8x16xi32>
 // CHECK-DAG:       %[[loadA:.+]] = xegpu.load_2d %[[tileA]] VNNI_AXIS 0 TRANSPOSE false{{.*}}-> vector<8x16x2xi8>
 // CHECK-DAG:       %[[loadB:.+]] = xegpu.load_2d %[[tileB]] VNNI_AXIS 1 TRANSPOSE false{{.*}}-> vector<16x16x2xi8>
-// CHECK:           %[[dpas:.+]] = xegpu.dpas %[[loadA]], %[[loadB]]
-// CHECK:           %[[res:.+]] = arith.addi %[[dpas]], %[[loadC]]
+// CHECK:           %[[res:.+]] = xegpu.dpas %[[loadA]], %[[loadB]], %[[loadC]]
 // CHECK:           xegpu.store_2d %[[tileC]],  %[[res]]
 // CHECK:           scf.yield
 // CHECK:         }
@@ -76,8 +74,7 @@ func.func @matmul_i8_i8_i32(%arg0: memref<8x32xi8>,
 // FIX_CHECK-DAG:         %[[tileB:.+]] = xegpu.init_tile %[[B]]
 // FIX_CHECK-DAG:         %[[loadA:.+]] = xegpu.load_2d %[[tileA]] VNNI_AXIS 0 TRANSPOSE false{{.*}}-> vector<8x8x2xf16>
 // FIX_CHECK-DAG:         %[[loadB:.+]] = xegpu.load_2d %[[tileB]] VNNI_AXIS 1 TRANSPOSE false{{.*}}-> vector<8x16x2xf16>
-// FIX_CHECK:             %[[dpas:.+]] = xegpu.dpas %[[loadA]], %[[loadB]]
-// FIX_CHECK:             %[[part_sum:.+]] = arith.addf %[[dpas]], %[[acc_tile]]
+// FIX_CHECK:             %[[part_sum:.+]] = xegpu.dpas %[[loadA]], %[[loadB]], %[[acc_tile]]
 // FIX_CHECK:             scf.yield %[[part_sum]]
 // FIX_CHECK:           xegpu.store_2d %[[tileC]],  %[[res]]
 // FIX_CHECK:           scf.yield
@@ -107,8 +104,7 @@ func.func @matmul_i8_i8_i32(%arg0: memref<8x32xi8>,
 // FIX_CHECK-DAG:         %[[tileB:.+]] = xegpu.init_tile %[[B]]
 // FIX_CHECK-DAG:         %[[loadA:.+]] = xegpu.load_2d %[[tileA]] VNNI_AXIS 0 TRANSPOSE false{{.*}}-> vector<8x8x2xi8>
 // FIX_CHECK-DAG:         %[[loadB:.+]] = xegpu.load_2d %[[tileB]] VNNI_AXIS 1 TRANSPOSE false{{.*}}-> vector<8x16x2xi8>
-// FIX_CHECK:             %[[dpas:.+]] = xegpu.dpas %[[loadA]], %[[loadB]]
-// FIX_CHECK:             %[[part_sum:.+]] = arith.addi %[[dpas]], %[[acc_tile]]
+// FIX_CHECK:             %[[part_sum:.+]] = xegpu.dpas %[[loadA]], %[[loadB]], %[[acc_tile]]
 // FIX_CHECK:             scf.yield %[[part_sum]]
 // FIX_CHECK:           xegpu.store_2d %[[tileC]],  %[[res]]
 // FIX_CHECK:           scf.yield

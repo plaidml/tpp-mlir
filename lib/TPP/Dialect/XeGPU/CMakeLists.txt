@@ -1,5 +1,6 @@
 add_mlir_dialect_library(TPPXeGPUDialect
   # Ops and dialects
+    XeGPUDialect.cpp
     XeGPUOps.cpp
 
   ADDITIONAL_HEADER_DIRS
@@ -9,6 +10,7 @@ add_mlir_dialect_library(TPPXeGPUDialect
   DEPENDS
     # add_mlir_dialect macro force-prefixes with MLIR
     MLIRXeGPUOpsIncGen
+    XeGPUOpsAttrsIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR
