@@ -88,7 +88,7 @@ func.func @brgemm_dynamic_shapes(%arg0: memref<?x?x?xf32>,
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func.func @tiled_fc(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024xf32>, %arg2: memref<256x1024xf32>, %arg3: memref<256x1024xf32>) {
+func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024xf32>, %arg2: memref<256x1024xf32>, %arg3: memref<256x1024xf32>) {
   %c0 = arith.constant 0 : index
   %c256 = arith.constant 256 : index
   %c1024 = arith.constant 1024 : index
@@ -115,8 +115,8 @@ func.func @tiled_fc(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024xf32>, %
   return
 }
 
-// CHECK-LABEL: func.func @tiled_fc(
-// CHECK-SAME:  %[[A:.+]]: memref<256x1024xf32>, %[[B:.+]]: memref<1024x1024xf32>, %[[bias:.+]]: memref<256x1024xf32>, %[[C:.+]]: memref<256x1024xf32>
+// CHECK-LABEL: func.func @matmul_add_relu(
+// CHECK-SAME:  %[[A:.+]]: memref<256x1024xf32>, %[[B:.+]]: memref<1024x1024xf32>, %[[BIAS:.+]]: memref<256x1024xf32>, %[[C:.+]]: memref<256x1024xf32>
 // CHECK-DAG:     %[[m:.+]] = arith.constant 256 : index
 // CHECK-DAG:     %[[n:.+]] = arith.constant 1024 : index
 // CHECK-DAG:     %[[tile:.+]] = arith.constant 32 : index

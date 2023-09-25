@@ -139,3 +139,45 @@ func.func @brgemm_dynamic_shapes(%arg0: memref<?x?x?xf16>,
 
 // CHECK-LABEL: func.func @brgemm_dynamic_shapes
 // CHECK: linalg.batch_reduce_matmul
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @matmul_add_relu(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %arg2: memref<16x16xf16>, %arg3: memref<16x16xf16>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  linalg.matmul ins(%arg0, %arg1 : memref<16x16xf16>, memref<16x16xf16>) outs(%arg3 : memref<16x16xf16>)
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg2 : memref<16x16xf16>) outs(%arg3 : memref<16x16xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %0 = arith.addf %in, %out : f16
+    linalg.yield %0 : f16
+  }
+  linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg3 :memref<16x16xf16>) {
+  ^bb0(%out: f16):
+    %0 = arith.maxf %out, %cst : f16
+    linalg.yield %0 : f16
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_add_relu(
+// CHECK-SAME:  %[[A:.+]]: memref<16x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[BIAS:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<16x16xf16>
+// CHECK-DAG:     %[[subgroup_size:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[one:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[zeroF16:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK:         scf.parallel {{.*}}to (%[[one]], %[[one]])
+// CHECK:           scf.parallel {{.*}}to (%[[subgroup_size]])
+// CHECK-DAG:         %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
+// CHECK-DAG:         %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
+// CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
+// CHECK:             %[[compRes:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
+// CHECK:             %[[tileBias:.+]] = gpu.subgroup_mma_load_matrix %[[BIAS]]{{.*}}leadDimension = 16
+// CHECK:             %[[addRes:.+]] = gpu.subgroup_mma_elementwise  addf %[[compRes]], %[[tileBias]]
+// CHECK:             %[[tileCstZero:.+]] = gpu.subgroup_mma_constant_matrix %[[zeroF16]]
+// CHECK:             %[[reluRes:.+]] = gpu.subgroup_mma_elementwise  maxf %[[addRes]], %[[tileCstZero]]
+// CHECK:             gpu.subgroup_mma_store_matrix %[[reluRes]], %[[C]]{{.*}}leadDimension = 16
+// CHECK:             scf.yield
+// CHECK:           scf.yield
+// CHECK:         }
