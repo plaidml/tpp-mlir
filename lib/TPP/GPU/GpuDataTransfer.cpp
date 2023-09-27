@@ -14,6 +14,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
@@ -23,14 +24,45 @@ using namespace mlir::tpp;
 #include "TPP/Passes.h.inc"
 
 namespace {
+
+static bool isDeviceAccess(Operation *op) {
+  return isa<gpu::LaunchFuncOp>(op) ||
+         op->getParentOfType<mlir::gpu::LaunchOp>();
+}
+
+static bool isMemoryAccess(Operation *op) {
+  if (auto memInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
+    return memInterface.hasEffect<mlir::MemoryEffects::Read>() ||
+           memInterface.hasEffect<mlir::MemoryEffects::Write>();
+  }
+
+  return false;
+}
+
+static void transferMemrefAlloc(RewriterBase &rewriter,
+                                memref::AllocOp allocOp) {}
+
+static void transferGpuAlloc(RewriterBase &rewriter, gpu::AllocOp allocOp) {}
+
+static void transferMemrefGlobal(RewriterBase &rewriter,
+                                 memref::GetGlobalOp globalOp) {}
+
 class GpuDataTransfer : public GpuDataTransferBase<GpuDataTransfer> {
 public:
   GpuDataTransfer() = default;
 
   void runOnOperation() override {
     auto func = getOperation();
-    auto *context = &getContext();
-    mlir::OpBuilder builder(func);
+    IRRewriter rewriter(&getContext());
+
+    func->walk([&](memref::AllocOp allocOp) {
+      transferMemrefAlloc(rewriter, allocOp);
+    });
+    func->walk(
+        [&](gpu::AllocOp allocOp) { transferGpuAlloc(rewriter, allocOp); });
+    func->walk([&](memref::GetGlobalOp globalOp) {
+      transferMemrefGlobal(rewriter, globalOp);
+    });
   }
 };
 
