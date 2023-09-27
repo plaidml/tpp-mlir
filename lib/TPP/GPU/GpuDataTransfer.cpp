@@ -25,10 +25,7 @@ using namespace mlir::tpp;
 
 namespace {
 
-static bool isDeviceAccess(Operation *op) {
-  return isa<gpu::LaunchFuncOp>(op) ||
-         op->getParentOfType<mlir::gpu::LaunchOp>();
-}
+static bool isDeviceAccess(Operation *op) { return isa<gpu::LaunchFuncOp>(op); }
 
 static bool isMemoryAccess(Operation *op) {
   if (auto memInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
@@ -36,11 +33,66 @@ static bool isMemoryAccess(Operation *op) {
            memInterface.hasEffect<mlir::MemoryEffects::Write>();
   }
 
+  if (isa<func::CallOp, gpu::LaunchFuncOp>(op))
+    return true;
+
   return false;
 }
 
 static void transferMemrefAlloc(RewriterBase &rewriter,
-                                memref::AllocOp allocOp) {}
+                                memref::AllocOp allocOp) {
+  auto loc = allocOp.getLoc();
+
+  // There must be at least one case where data is used by the device.
+  if (llvm::none_of(allocOp->getUsers(),
+                    [](Operation *user) { return isDeviceAccess(user); })) {
+    return;
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  // Replace the host alloc with a device alloc, if the buffer is not used on
+  // the host.
+  if (llvm::all_of(allocOp->getUsers(), [](Operation *user) {
+        return !isMemoryAccess(user) || isDeviceAccess(user);
+      })) {
+    rewriter.setInsertionPoint(allocOp);
+    auto gpuAlloc =
+        rewriter.create<gpu::AllocOp>(loc, TypeRange({allocOp.getMemref()}),
+                                      ValueRange{}, ValueRange{}, ValueRange{});
+
+    // Replace the host dealloc with a device dealloc.
+    for (auto user : allocOp->getUsers()) {
+      if (auto dealloc = dyn_cast<memref::DeallocOp>(user)) {
+        rewriter.setInsertionPoint(dealloc);
+        rewriter.replaceOpWithNewOp<gpu::DeallocOp>(dealloc, std::nullopt,
+                                                    gpuAlloc.getMemref());
+        break;
+      }
+    }
+
+    rewriter.replaceOp(allocOp, gpuAlloc.getMemref());
+
+    return;
+  }
+
+  // Examine invidividual users and insert copies from/to the device
+  // such that data is accessible for each user.
+  Value data = allocOp.getResult();
+  bool onDevice = false;
+
+  for (auto user : allocOp->getUsers()) {
+    if (!isMemoryAccess(user))
+      continue;
+
+    const bool deviceAccess = isDeviceAccess(user);
+    if (deviceAccess && !onDevice) {
+    }
+
+    if (!deviceAccess && onDevice) {
+    }
+  }
+}
 
 static void transferGpuAlloc(RewriterBase &rewriter, gpu::AllocOp allocOp) {}
 
