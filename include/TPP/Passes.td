@@ -569,4 +569,15 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
   ];
 }
 
+def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
+  let summary = "Transfer data to and from GPU.";
+  let description = [{
+    Ensures that data shared between host and GPU resides in correct places.
+  }];
+  let constructor = "mlir::tpp::createGpuDataTransferPass()";
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "gpu::GPUDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

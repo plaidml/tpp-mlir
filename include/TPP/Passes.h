@@ -166,6 +166,7 @@ createConvertPackUnpackOptimization();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createPackConsumerAndProducerFusionPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createGpuDataTransferPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();
