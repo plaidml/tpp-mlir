@@ -25,26 +25,39 @@ using namespace mlir::tpp;
 
 namespace {
 
+// True if an operation represents memory access from a device.
 static bool isDeviceAccess(Operation *op) { return isa<gpu::LaunchFuncOp>(op); }
 
+// True if an operation performs memory access.
 static bool isMemoryAccess(Operation *op) {
   if (auto memInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
     return memInterface.hasEffect<mlir::MemoryEffects::Read>() ||
            memInterface.hasEffect<mlir::MemoryEffects::Write>();
   }
 
-  if (isa<func::CallOp, gpu::LaunchFuncOp>(op))
+  // Assume that every function call accesses passed memory.
+  if (isa<func::CallOp, gpu::LaunchFuncOp, mlir::CallOpInterface>(op))
     return true;
 
   return false;
 }
 
+// Move host allocated data between host and device.
 static void transferMemrefAlloc(RewriterBase &rewriter,
                                 memref::AllocOp allocOp) {
   auto loc = allocOp.getLoc();
 
+  llvm::SmallVector<Operation *, 32> allocUsers(allocOp->getUsers().begin(),
+                                                allocOp->getUsers().end());
+  // Place users in order from the first to the last.
+  // 'getUsers()' starts from the last user.
+  std::reverse(allocUsers.begin(), allocUsers.end());
+
+  auto &aliases = getAnalysis<mlir::BufferViewFlowAnalysis>();
+  memref::CastOp allocOp;
+
   // There must be at least one case where data is used by the device.
-  if (llvm::none_of(allocOp->getUsers(),
+  if (llvm::none_of(allocUsers,
                     [](Operation *user) { return isDeviceAccess(user); })) {
     return;
   }
@@ -53,7 +66,7 @@ static void transferMemrefAlloc(RewriterBase &rewriter,
 
   // Replace the host alloc with a device alloc, if the buffer is not used on
   // the host.
-  if (llvm::all_of(allocOp->getUsers(), [](Operation *user) {
+  if (llvm::all_of(allocUsers, [](Operation *user) {
         return !isMemoryAccess(user) || isDeviceAccess(user);
       })) {
     rewriter.setInsertionPoint(allocOp);
@@ -62,7 +75,7 @@ static void transferMemrefAlloc(RewriterBase &rewriter,
                                       ValueRange{}, ValueRange{}, ValueRange{});
 
     // Replace the host dealloc with a device dealloc.
-    for (auto user : allocOp->getUsers()) {
+    for (auto user : allocUsers) {
       if (auto dealloc = dyn_cast<memref::DeallocOp>(user)) {
         rewriter.setInsertionPoint(dealloc);
         rewriter.replaceOpWithNewOp<gpu::DeallocOp>(dealloc, std::nullopt,
@@ -78,24 +91,47 @@ static void transferMemrefAlloc(RewriterBase &rewriter,
 
   // Examine invidividual users and insert copies from/to the device
   // such that data is accessible for each user.
-  Value data = allocOp.getResult();
   bool onDevice = false;
 
-  for (auto user : allocOp->getUsers()) {
+  rewriter.setInsertionPointAfter(allocOp);
+  auto gpuBuffer =
+      rewriter.create<gpu::AllocOp>(loc, TypeRange{{allocOp.getMemref()}},
+                                    ValueRange{}, ValueRange{}, ValueRange{});
+
+  for (auto user : allocUsers) {
     if (!isMemoryAccess(user))
       continue;
 
-    const bool deviceAccess = isDeviceAccess(user);
+    rewriter.setInsertionPoint(user);
+
+    bool deviceAccess = isDeviceAccess(user);
+    // Transfer to device.
     if (deviceAccess && !onDevice) {
+      rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{},
+                                     gpuBuffer.getMemref(),
+                                     allocOp.getMemref());
+      onDevice = true;
+    }
+    // Transfer to host.
+    if (!deviceAccess && onDevice) {
+      rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{},
+                                     allocOp.getMemref(),
+                                     gpuBuffer.getMemref());
+      onDevice = false;
     }
 
-    if (!deviceAccess && onDevice) {
-    }
+    rewriter.setInsertionPointAfter(user);
   }
+
+  // Deallocate after the last user.
+  rewriter.setInsertionPointAfter(allocUsers.back());
+  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer.getMemref());
 }
 
+// Move device allocated data between host and device.
 static void transferGpuAlloc(RewriterBase &rewriter, gpu::AllocOp allocOp) {}
 
+// Move host global data to device when needed.
 static void transferMemrefGlobal(RewriterBase &rewriter,
                                  memref::GetGlobalOp globalOp) {}
 
