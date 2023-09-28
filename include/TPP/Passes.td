@@ -399,6 +399,15 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
   let constructor = "mlir::tpp::createTppLoweringPass()";
 }
 
+def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
+                                     "func::FuncOp"> {
+  let summary = "Convert scf.forall to scf.parallel";
+  let description = [{
+    Rewrite an scf.forall to scf.parallel after bufferization.
+  }];
+  let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
+}
+
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let summary = "Lower all eligible operations into GPU compatible IR";
   let constructor = "mlir::tpp::createGpuPipelinePass()";

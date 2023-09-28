@@ -227,8 +227,6 @@ private:
     pm.addPass(createConstantFoldPackPass());
     pm.addPass(createSimplifyAndCanonicalizePackPass());
 
-    // Looks like we want to agressively remove tensor.empty before fusion.
-    // See: `test/Passes/tile-and-fuse-with-cse.mlir`.
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
     pm.addPass(createCleanupPass());
@@ -337,7 +335,6 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
-    // bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);

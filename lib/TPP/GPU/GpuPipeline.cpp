@@ -85,7 +85,6 @@ struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
     registry.insert<nvgpu::NVGPUDialect>();
     registry.insert<bufferization::BufferizationDialect>();
     registry.insert<spirv::SPIRVDialect>();
-    // bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -123,6 +122,7 @@ private:
     // abstraction.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
     pm.addPass(createBufferizePass());
+    pm.addPass(createConvertForAllToParallelOpPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.
