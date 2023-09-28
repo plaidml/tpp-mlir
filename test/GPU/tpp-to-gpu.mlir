@@ -29,7 +29,7 @@ func.func @tpp_relu(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 // CHECK-LABEL: gpu.func @tpp_relu_kernel
 // CHECK:         gpu.block_id
 // CHECK:         memref.load
-// CHECK:         arith.maxf
+// CHECK:         arith.maximumf
 // CHECK:         memref.store
 // CHECK:         gpu.return
 

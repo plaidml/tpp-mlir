@@ -189,6 +189,9 @@ private:
 
     pm.addNestedPass<func::FuncOp>(createGpuAsyncRegionPass());
     pm.addPass(createGpuToLLVMConversionPass());
+    GpuModuleToBinaryPassOptions gpuModuleToBinaryPassOptions;
+    gpuModuleToBinaryPassOptions.compilationTarget = "fatbin";
+    pm.addPass(createGpuModuleToBinaryPass(gpuModuleToBinaryPassOptions));
     pm.addPass(createAsyncToAsyncRuntimePass());
     pm.addPass(createAsyncRuntimeRefCountingPass());
     pm.addPass(createConvertAsyncToLLVMPass());

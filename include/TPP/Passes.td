@@ -337,6 +337,9 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let constructor = "mlir::tpp::createBufferizePass()";
   let options = [
+    Option<"dealloc", "dealloc",
+           "bool", /*default=*/"1",
+           "Enables automatic deallocation.">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
             /*default=*/"false",
            "Only runs inplaceability analysis (for testing purposes only)">,

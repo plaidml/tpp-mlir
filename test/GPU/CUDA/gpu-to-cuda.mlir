@@ -58,7 +58,7 @@ module attributes {gpu.container_module} {
 // CHECK:         gpu.launch_func  @entry_kernel::@entry_kernel
 // CHECK:         call @printMemrefF32
 // CHECK:       }
-// CHECK: gpu.module @entry_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @entry_kernel
 // CHECK-LABEL: llvm.func @entry_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -105,7 +105,7 @@ module attributes {gpu.container_module} {
 // CHECK-LABEL: func.func @entry
 // CHECK:         gpu.launch_func  @entry_kernel::@entry_kernel
 // CHECK:       }
-// CHECK: gpu.module @entry_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @entry_kernel
 // CHECK-LABEL: llvm.func @entry_kernel
 // CHECK-NOT:     builtin.unrealized_conversion_cast
 // CHECK-DAG:     nvvm.read

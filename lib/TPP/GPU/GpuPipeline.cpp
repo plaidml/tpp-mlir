@@ -121,7 +121,7 @@ private:
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
-    pm.addPass(createBufferizePass());
+    pm.addPass(createBufferizePass(/*dealloc=*/false));
     pm.addPass(createConvertForAllToParallelOpPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 

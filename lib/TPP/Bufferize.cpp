@@ -45,6 +45,8 @@ namespace {
 
 struct Bufferize : public BufferizeBase<Bufferize> {
   Bufferize() = default;
+  Bufferize(bool dealloc) { this->dealloc = dealloc; };
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -101,8 +103,12 @@ void Bufferize::runOnOperation() {
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
   passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
-  bufferization::BufferDeallocationPipelineOptions options;
-  bufferization::buildBufferDeallocationPipeline(passManager, options);
+
+  if (dealloc) {
+    bufferization::BufferDeallocationPipelineOptions options;
+    bufferization::buildBufferDeallocationPipeline(passManager, options);
+  }
+
   passManager.addPass(createBufferizationToMemRefPass());
   if (failed(runPipeline(passManager, moduleOp)))
     return signalPassFailure();
@@ -110,6 +116,7 @@ void Bufferize::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createBufferizePass() {
-  return std::make_unique<Bufferize>();
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createBufferizePass(bool dealloc) {
+  return std::make_unique<Bufferize>(dealloc);
 }

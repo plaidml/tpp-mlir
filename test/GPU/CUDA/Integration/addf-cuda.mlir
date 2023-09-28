@@ -4,7 +4,7 @@
 // RUN: FileCheck %s
 
 module attributes {gpu.container_module} {
-  gpu.module @kernels {
+  gpu.module @kernels [#nvvm.target<chip = "sm_35">] {
     gpu.func @kernel_add(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
       kernel attributes { gpu.known_block_size = array<i32: 8, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1> } {
       %0 = gpu.block_id x
@@ -42,15 +42,6 @@ module attributes {gpu.container_module} {
     gpu.wait [%tOut]
     %cast = memref.cast %out : memref<8xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
-
-    %tD0 = gpu.dealloc async %arg0 : memref<8xf32>
-    gpu.wait [%tD0]
-    %tD1 = gpu.dealloc async %arg1 : memref<8xf32>
-    gpu.wait [%tD1]
-    %tD2 = gpu.dealloc async %arg2 : memref<8xf32>
-    gpu.wait [%tD2]
-
-    memref.dealloc %out : memref<8xf32>
 
     return
   }

@@ -39,8 +39,7 @@ using namespace mlir::tpp;
 namespace {
 
 // Lower generic GPU ops to CUDA backend.
-struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
-                   UtilityPassBase<gpu::GPUModuleOp> {
+struct GpuToCuda : public GpuToCudaBase<GpuToCuda>, UtilityPassBase<ModuleOp> {
   GpuToCuda() = default;
   GpuToCuda(StringRef gpuTriple, StringRef gpuChip, StringRef gpuFeatures) {
     this->gpuTriple = gpuTriple.str();
@@ -65,14 +64,7 @@ struct GpuToCuda : public GpuToCudaBase<GpuToCuda>,
     if (pm.empty())
       constructPipeline();
 
-    // Process GPU modules sequentially to avoid CUDA errors that
-    // appear during parallel compilation.
-    auto walkRes = module->walk([&](gpu::GPUModuleOp gpuModule) {
-      if (failed(runPipeline(pm, gpuModule)))
-        return WalkResult::interrupt();
-      return WalkResult::advance();
-    });
-    if (walkRes.wasInterrupted())
+    if (failed(runPipeline(pm, module)))
       return signalPassFailure();
   }
 
@@ -82,16 +74,21 @@ private:
 
 #ifdef TPP_CUDA_ENABLE
     // Preprocess and lower standard ops.
-    pm.addPass(memref::createExpandStridedMetadataPass());
-    pm.addPass(arith::createArithExpandOpsPass());
-    pm.addPass(createLowerAffinePass());
-    pm.addPass(createConvertSCFToCFPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(
+        memref::createExpandStridedMetadataPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(arith::createArithExpandOpsPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createLowerAffinePass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertSCFToCFPass());
 
     // Create CUDA kernels.
-    pm.addPass(createStripDebugInfoPass());
-    pm.addPass(createLowerGpuOpsToNVVMOpsPass());
-    pm.addPass(createReconcileUnrealizedCastsPass());
-    pm.addPass(createGpuSerializeToCubinPass(gpuTriple, gpuChip, gpuFeatures));
+    pm.addNestedPass<gpu::GPUModuleOp>(createStripDebugInfoPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertGpuOpsToNVVMOps());
+    pm.addNestedPass<gpu::GPUModuleOp>(createReconcileUnrealizedCastsPass());
+    GpuNVVMAttachTargetOptions nvvmTargetOptions;
+    nvvmTargetOptions.triple = gpuTriple;
+    nvvmTargetOptions.chip = gpuChip;
+    nvvmTargetOptions.features = gpuFeatures;
+    pm.addPass(createGpuNVVMAttachTarget(nvvmTargetOptions));
 
     // Cleanup IR.
     pm.addPass(createCanonicalizerPass());

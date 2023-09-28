@@ -461,6 +461,11 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     auto gpuSync =
         builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
 
+    // Dealloc the output buffer at the end of program.
+    // For now, automatic deallocation is disabled for GPUs.
+    builder.setInsertionPointToEnd(&getMainBlock());
+    builder.create<memref::DeallocOp>(unkLoc, outBuf);
+
     // Restore insertion point
     builder.setInsertionPointAfter(gpuSync);
 

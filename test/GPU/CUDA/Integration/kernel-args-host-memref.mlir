@@ -51,7 +51,7 @@ module {
 // CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[gpu0]]
 // CHECK:         gpu.memcpy async %[[ARG2]], %[[gpu2]]
 // CHECK:       }
-// CHECK: gpu.module @_entry_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
