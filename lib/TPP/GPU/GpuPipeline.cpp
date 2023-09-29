@@ -112,6 +112,8 @@ private:
   void constructPipeline() override {
     pm.clear();
 
+    GpuType gpuType = parseGpuOption(this->gpuBackend);
+
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanupPass());
@@ -121,7 +123,7 @@ private:
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createGeneralizeTensorPackAndUnPackPass());
-    pm.addPass(createBufferizePass(/*dealloc=*/false));
+    pm.addPass(createBufferizePass(/*dealloc=*/gpuType != GpuType::Cuda));
     pm.addPass(createConvertForAllToParallelOpPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
@@ -129,7 +131,7 @@ private:
     pm.addPass(createGpuConversionPass(gpuWmma));
 
     // Lower GPU ops to the chosen GPU backend.
-    switch (parseGpuOption(this->gpuBackend)) {
+    switch (gpuType) {
     case GpuType::Cuda: {
       std::string gpuTriple = "nvptx64-nvidia-cuda";
       std::string gpuChip = "sm_70";

@@ -1,11 +1,11 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-run %s -gpu=vulkan \
-// RUN:  -entry-point-result=void -e entry -print-mlir=early 2>&1 | \
+// RUN:  -entry-point-result=void -e entry -print-mlir=mid 2>&1 | \
 // RUN: FileCheck %s --check-prefix=SINGLE
 
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-run %s -gpu=vulkan -n 2 \
-// RUN:  -entry-point-result=void -e entry -print-mlir=early 2>&1 | \
+// RUN:  -entry-point-result=void -e entry -print-mlir=mid 2>&1 | \
 // RUN: FileCheck %s --check-prefix=BENCH
 
 module attributes {

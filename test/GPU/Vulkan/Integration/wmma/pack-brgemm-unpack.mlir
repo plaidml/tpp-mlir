@@ -28,10 +28,7 @@ func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memr
     linalg.transpose ins(%alloc : memref<2x2x16x16xf16>) outs(%alloc_4 : memref<2x16x2x16xf16>) permutation = [0, 2, 1, 3] 
     %collapse_shape = memref.collapse_shape %alloc_4 [[0, 1], [2, 3]] : memref<2x16x2x16xf16> into memref<32x32xf16>
     linalg.copy ins(%collapse_shape : memref<32x32xf16>) outs(%arg2 : memref<32x32xf16>)
-    memref.dealloc %alloc : memref<2x2x16x16xf16>
-    memref.dealloc %alloc_0 : memref<2x2x16x16xf16>
-    memref.dealloc %alloc_2 : memref<2x2x16x16xf16>
-    memref.dealloc %alloc_4 : memref<2x16x2x16xf16>
+
     return
   }
 
