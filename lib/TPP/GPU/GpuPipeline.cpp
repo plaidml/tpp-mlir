@@ -132,7 +132,7 @@ private:
     switch (parseGpuOption(this->gpuBackend)) {
     case GpuType::Cuda: {
       std::string gpuTriple = "nvptx64-nvidia-cuda";
-      std::string gpuChip = gpuWmma ? "sm_70" : "sm_35";
+      std::string gpuChip = "sm_70";
       std::string gpuFeatures = "+ptx60";
 
       pm.addPass(createGpuToCudaPass(gpuTriple, gpuChip, gpuFeatures));
