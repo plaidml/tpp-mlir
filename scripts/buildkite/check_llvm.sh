@@ -19,7 +19,7 @@ LLVM_VERSION=$(llvm_version)
 
 # If not found, trigger a build
 if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
-  ${TPPROOT}/trigger.sh tpp-llvm ${LLVM_VERSION}
+  ${HOME}/scripts/trigger.sh tpp-llvm ${LLVM_VERSION}
 else
   echo "Found $LLVM_VERSION"
 fi
