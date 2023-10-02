@@ -47,14 +47,23 @@ static void transferMemrefAlloc(RewriterBase &rewriter,
                                 memref::AllocOp allocOp) {
   auto loc = allocOp.getLoc();
 
-  llvm::SmallVector<Operation *, 32> allocUsers(allocOp->getUsers().begin(),
-                                                allocOp->getUsers().end());
+  // Gather all alloc users in order.
   // Place users in order from the first to the last.
   // 'getUsers()' starts from the last user.
+  llvm::SmallVector<Operation *, 32> allocUsers(allocOp->getUsers().begin(),
+                                                allocOp->getUsers().end());
   std::reverse(allocUsers.begin(), allocUsers.end());
 
-  auto &aliases = getAnalysis<mlir::BufferViewFlowAnalysis>();
-  memref::CastOp allocOp;
+  // TODO: follow memref aliases and gather their users too.
+  if (llvm::any_of(allocUsers,
+                   [](Operation *user) { return isa<memref::CastOp>(user); })) {
+    return;
+  }
+  // Do nothing in case there already are device copies present.
+  if (llvm::any_of(allocUsers,
+                   [](Operation *user) { return isa<gpu::MemcpyOp>(user); })) {
+    return;
+  }
 
   // There must be at least one case where data is used by the device.
   if (llvm::none_of(allocUsers,
