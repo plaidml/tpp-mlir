@@ -54,13 +54,13 @@ elif [ "${GPU}" ]; then
 fi
 
 if [ "1" == "${CLEAN}" ]; then
-  BLD_DIR_RM=-R
+  BUILD_DIR_RM=-R
 fi
 
 # Defaults when lacking CI environment
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
 if [ ! "${PROJECT_DIR}" ]; then
-  echo "PROJECT_DIR source checkout not set"
+  echo "PROJECT_DIR source path not set"
   exit 1
 fi
 if [ ! "${BUILD_DIR}" ]; then
@@ -72,7 +72,7 @@ mkdir -p ${BUILD_DIR}
 
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
-  -b ${BUILD_DIR} \
+  -b ${BUILD_DIR} ${BUILD_DIR_RM} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
@@ -100,14 +100,14 @@ else
   if [ ! -f "${CUDA_LIBRARY}" ]; then
     if [ "${CUDATOOLKIT_HOME}" ]; then
       echo "Creating links to CUDA stubs"
-      export LD_LIBRARY_PATH=${BLD_DIR}/lib:${LD_LIBRARY_PATH}
+      export LD_LIBRARY_PATH=${BUILD_DIR}/lib:${LD_LIBRARY_PATH}
       if [ -d "${CUDATOOLKIT_HOME}/lib64" ]; then
         CUDA_LIBRARY=${CUDATOOLKIT_HOME}/lib64/stubs/libcuda.so
       else
         CUDA_LIBRARY=${CUDATOOLKIT_HOME}/lib/stubs/libcuda.so
       fi
-      ln -fs ${CUDA_LIBRARY} ${BLD_DIR}/lib/libcuda.so.1
-      ln -fs ${CUDA_LIBRARY} ${BLD_DIR}/lib/libcuda.so
+      ln -fs ${CUDA_LIBRARY} ${BUILD_DIR}/lib/libcuda.so.1
+      ln -fs ${CUDA_LIBRARY} ${BUILD_DIR}/lib/libcuda.so
     else
       echo "CUDA stub libraries are needed but CUDATOOLKIT_HOME is not set"
       exit 1
@@ -121,7 +121,7 @@ fi
 # Build
 echo "--- BUILD"
 if ! ${SCRIPT_DIR}/ci/build.sh \
-  -b ${BLD_DIR}
+  -b ${BUILD_DIR}
 then
   exit 1
 fi
@@ -130,7 +130,7 @@ fi
 if [ "1" == "${CHECK}" ]; then
   echo "--- CHECK"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BLD_DIR} \
+    -b ${BUILD_DIR} \
     -c
   then
     exit 1
@@ -141,7 +141,7 @@ fi
 if [ "1" == "${INSTALL}" ]; then
   echo "--- INSTALL"
   if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BLD_DIR} \
+    -b ${BUILD_DIR} \
     -i
   then
     exit 1
@@ -153,7 +153,7 @@ if [ "1" == "${BENCH}" ]; then
   echo "--- BENCHMARK"
   export LOGFILE=benchmark-output.txt
   ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BLD_DIR} \
+    -b ${BUILD_DIR} \
     -B | tee ${LOGFILE}
   echo "--- RESULTS"
   if [ "main" == "${BUILDKITE_BRANCH}" ]; then
