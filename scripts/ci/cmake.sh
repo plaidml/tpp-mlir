@@ -148,6 +148,7 @@ check_program pip
 pip install --upgrade --user lit
 check_program lit
 pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
+export PATH=$PATH:$HOME/.local/bin
 
 TPP_LIT=$(which lit)
 # patch incorrect interpreter
@@ -160,19 +161,6 @@ if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
   echo_run rm -rf ${BLD_DIR}
 fi
 
-# CXX: simple check for external toolchain argument
-read -ra CMAKE_CXX <<<"${CXX}"
-if [[ "${CMAKE_CXX[@]:1}" == "--gcc-toolchain="* ]]; then
-  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CXX[@]:1}")"
-  CXX=${CMAKE_CXX[0]}
-fi
-# CC: simple check for external toolchain argument
-read -ra CMAKE_CC <<<"${CC}"
-if [[ "${CMAKE_CC[@]:1}" == "--gcc-toolchain="* ]]; then
-  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CC_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CC[@]:1}")"
-  CC=${CMAKE_CC[0]}
-fi
-
 # CMake
 echo_run cmake -Wno-dev -G Ninja \
     -B${BLD_DIR} -S${SRC_DIR} \
@@ -181,7 +169,6 @@ echo_run cmake -Wno-dev -G Ninja \
     -DMLIR_DIR=${MLIR_DIR} \
     -DLLVM_EXTERNAL_LIT=${TPP_LIT} \
     ${BUILD_OPTIONS} \
-    ${GCC_TOOLCHAIN_OPTIONS} \
     ${LINKER_OPTIONS} \
     ${SAN_OPTIONS} \
     ${ENABLE_GPU}
