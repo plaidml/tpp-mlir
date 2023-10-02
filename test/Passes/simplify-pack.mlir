@@ -136,3 +136,42 @@ func.func @rank_reduce_pack(%arg0: tensor<32x32xbf16>, %arg1: tensor<1x16x32x2xb
     : tensor<1x32x32xbf16> -> tensor<1x16x32x2xbf16>
   return %pack : tensor<1x16x32x2xbf16>
 }
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 32)>
+
+func.func @vnni_pack(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x32x16x32x2xbf16>) -> tensor<16x32x16x32x2xbf16> {
+  %c32 = arith.constant 32 : index
+  %c1 = arith.constant 1 : index
+  %c16 = arith.constant 16 : index
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<16x32x32x32xbf16>
+  %1 = scf.forall (%arg2, %arg3) in (%c16, %c32) shared_outs(%arg4 = %arg1) -> (tensor<16x32x16x32x2xbf16>) {
+    %2 = affine.apply #map(%arg3)
+    %3 = affine.apply #map(%arg2)
+    %extracted_slice = tensor.extract_slice %arg0[%2, %3] [32, 32] [1, 1] : tensor<1024x512xbf16> to tensor<32x32xbf16>
+    %extracted_slice_0 = tensor.extract_slice %0[%arg2, %arg3, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<16x32x32x32xbf16> to tensor<1x1x32x32xbf16>
+    %pack = tensor.pack %extracted_slice outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %extracted_slice_0 : tensor<32x32xbf16> -> tensor<1x1x32x32xbf16>
+    %extracted_slice_1 = tensor.extract_slice %arg4[%arg2, %arg3, %c0, %c0, 0] [1, 1, %c16, %c32, 2] [1, 1, 1, 1, 1] : tensor<16x32x16x32x2xbf16> to tensor<1x1x?x?x2xbf16>
+    %pack_2 = tensor.pack %pack inner_dims_pos = [2] inner_tiles = [2] into %extracted_slice_1 : tensor<1x1x32x32xbf16> -> tensor<1x1x?x?x2xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %pack_2 into %arg4[%arg2, %arg3, %c0, %c0, 0] [1, 1, %c16, %c32, 2] [1, 1, 1, 1, 1] : tensor<1x1x?x?x2xbf16> into tensor<16x32x16x32x2xbf16>
+    }
+  }
+  return %1 : tensor<16x32x16x32x2xbf16>
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
+// CHECK-LABEL: vnni_pack
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1024x512xbf16>, %[[ARG1:.+]]: tensor<16x32x16x32x2xbf16>
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (%[[C16]], %[[C32]]) shared_outs(%[[ARG4:.+]] = %[[ARG1]])
+// CHECK: %[[AFFINE_APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]])
+// CHECK: %[[AFFINE_APPLY_1:.+]] = affine.apply #[[MAP]](%[[ARG2]])
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %arg0[%[[AFFINE_APPLY]], %[[AFFINE_APPLY_1]]] [32, 32] [1, 1] 
+// CHECK-SAME:  : tensor<1024x512xbf16> to tensor<32x32xbf16>
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x32x2xbf16>
+// CHECK: %[[PACK:.+]] = tensor.pack %[[SLICE]] inner_dims_pos = [0] inner_tiles = [2] into %[[EMPTY]] 
+// CHECK-SAME:  : tensor<32x32xbf16> -> tensor<16x32x2xbf16>

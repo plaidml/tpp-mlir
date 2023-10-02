@@ -845,18 +845,30 @@ struct SimplifyAndCanonicalizePack
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    tensor::populateSimplifyTensorPack(patterns);
-    tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
-    tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
-    linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
-    patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
-                 FoldExpandShapeInParallelInsertOp>(ctx);
-    tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+    tpp::populateSimplifyPacking(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
 } // end namespace
+
+void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
+  MLIRContext *ctx = patterns.getContext();
+  tensor::populateSimplifyTensorPack(patterns);
+  tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
+      patterns);
+  patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
+               FoldExpandShapeInParallelInsertOp>(ctx);
+  tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
 
 void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
