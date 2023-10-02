@@ -59,12 +59,20 @@ fi
 
 # Defaults when lacking CI environment
 PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
+if [ ! "${PROJECT_DIR}" ]; then
+  echo "PROJECT_DIR source checkout not set"
+  exit 1
+fi
+if [ ! "${BUILD_DIR}" ]; then
+  BUILD_DIR="/tmp/tpp"
+fi
+BUILD_DIR=$(realpath ${BUILD_DIR})
 BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}
+mkdir -p ${BUILD_DIR}
 
-BLD_DIR=$(realpath ${BUILD_DIR})
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
-  -b ${BLD_DIR} ${BLD_DIR_RM} \
+  -b ${BUILD_DIR} \
   -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
