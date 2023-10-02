@@ -37,6 +37,5 @@ func.func @entry() {
   // CHECK-SAME:  ( 7.1, 7.2, 7.3, 7.4 ), 
   // CHECK-SAME:  ( 8.1, 8.2, 8.3, 8.4 ) ) 
   //
-  memref.dealloc %alloc : memref<8x4xf32>
   return
 } 

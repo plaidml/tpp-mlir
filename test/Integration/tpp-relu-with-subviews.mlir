@@ -56,7 +56,7 @@ func.func @entry() {
         // TPP: tpp.relu
         %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%extracted_slice : tensor<56x32xf32>) {
           ^bb0(%out: f32):
-            %5 = arith.maxf %out, %cf : f32
+            %5 = arith.maximumf %out, %cf : f32
             linalg.yield %5 : f32
         } -> tensor<56x32xf32>
         %inserted_slice = tensor.insert_slice %4 into %ia3 [%arg3, %arg4, %arg5, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
@@ -70,7 +70,7 @@ func.func @entry() {
 
   %relu2 = linalg.generic {indexing_maps = [#map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%0 : tensor<12x2x56x56x32xf32>) {
       ^bb0(%out: f32):
-        %6 = arith.maxf %out, %cf : f32
+        %6 = arith.maximumf %out, %cf : f32
         linalg.yield %6 : f32
   } -> tensor<12x2x56x56x32xf32>
 

@@ -200,11 +200,11 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // Relu
   // CHECK: scf.for
   // CHECK:   scf.for
-  // CHECK:     arith.maxf
+  // CHECK:     arith.maximumf
   %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
-      %16 = arith.maxf %arg9, %c0 : f32
+      %16 = arith.maximumf %arg9, %c0 : f32
       linalg.yield %16 : f32
   } -> tensor<128x512xf32>
 

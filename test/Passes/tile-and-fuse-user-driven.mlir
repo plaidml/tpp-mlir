@@ -13,7 +13,7 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                        iterator_types = ["parallel", "parallel"]} 
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<32x32xf32>
   return %1 : tensor<32x32xf32>

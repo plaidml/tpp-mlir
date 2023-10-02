@@ -50,7 +50,7 @@ func.func @relu_mapping(%arg0: memref<10x10xf32>) {
     iterator_types = ["parallel", "parallel"]} 
     outs(%arg0: memref<10x10xf32>) {
       ^bb0(%out : f32):
-        %0 = arith.maxf %out, %c0 : f32
+        %0 = arith.maximumf %out, %c0 : f32
         linalg.yield %0 : f32
   }
   return

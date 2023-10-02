@@ -38,7 +38,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
   // CHECK: call @xsmm_brgemm_dispatch
-  // CHECK: scf.parallel
+  // CHECK: scf.forall
   // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
@@ -170,7 +170,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
 
   // CHECK-DAG: call @xsmm_brgemm_dispatch
   // CHECK-DAG: call @xsmm_unary_dispatch 
-  // CHECK: scf.parallel
+  // CHECK: scf.forall
   %outShape = tensor.empty() : tensor<128x512xf32>
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%outShape : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
@@ -203,7 +203,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
-      %16 = arith.maxf %arg9, %c0 : f32
+      %16 = arith.maximumf %arg9, %c0 : f32
       linalg.yield %16 : f32
   } -> tensor<128x512xf32>
 
@@ -229,7 +229,7 @@ func.func @batch_matmul_rewrite(%arg0: tensor<512x32x64xf32>, %arg1: tensor<512x
   // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : i64
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i64
   // CHECK: %{{.+}} = call @xsmm_gemm_dispatch(%[[C1]], %[[C32]], %[[C32]], %[[C64]], %[[C64]], %[[C32]], %[[C32]], %[[C0]])
-  // CHECK: scf.parallel
+  // CHECK: scf.forall
   // CHECK: xsmm_gemm_invoke
   %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<512x32x64xf32>, tensor<512x64x32xf32>)
                            outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>

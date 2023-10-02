@@ -26,7 +26,7 @@ module {
 // CHECK-LABEL: func.func @_entry
 // CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel
 // CHECK:       }
-// CHECK: gpu.module @_entry_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul

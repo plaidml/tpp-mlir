@@ -25,10 +25,6 @@ func.func @entry() {
   %castOut = memref.cast %cast2 : memref<?x?xf32> to memref<*xf32>
   call @printMemrefF32(%castOut) : (memref<*xf32>) -> ()
 
-  memref.dealloc %0 : memref<8x8xf32>
-  memref.dealloc %1 : memref<8x8xf32>
-  memref.dealloc %2 : memref<8x8xf32>
-
   return
 }
 func.func private @fillResource2DFloat(%0 : memref<?x?xf32>, %1 : f32)

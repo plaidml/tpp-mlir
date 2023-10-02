@@ -45,7 +45,7 @@ func.func @matmul_static(
   %res = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]}
       outs(%matmul : !C_tensor_t) {
     ^bb0(%arg9: f32):
-      %16 = arith.maxf %arg9, %c0 : f32
+      %16 = arith.maximumf %arg9, %c0 : f32
       linalg.yield %16 : f32
   } -> !C_tensor_t
 

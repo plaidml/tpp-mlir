@@ -18,7 +18,6 @@ add_mlir_library(MLIRTPP
     GeneralizeTensorPackAndUnPack.cpp
     ConstantFoldPack.cpp
     ConvInitSimplify.cpp
-    ConvertForAllToParallelOp.cpp
     CombineTpp.cpp
     RewriteBatchMatmulToMatmul.cpp
     LinalgDeGeneralize.cpp

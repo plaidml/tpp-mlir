@@ -30,16 +30,16 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   for (size_t idx = 0, e = rank - /*GEMM operand size=*/2; idx < e; idx++)
     sizes.push_back(builder.getIndexAttr(1));
 
-  OpOperand *output = linalgOp.getDpsInitOperands()[0];
+  Value output = linalgOp.getDpsInits()[0];
   OpOperand *filter = linalgOp.getDpsInputOperands()[1];
   ArrayRef<int64_t> outputShape =
-      output->get().getType().cast<ShapedType>().getShape();
+      output.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> filterShape =
       filter->get().getType().cast<ShapedType>().getShape();
   int64_t mIdx = outputShape.size() - 2;
   int64_t kIdx = filterShape.size() - 2;
-  sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
-                                            output->get(), mIdx));
+  sizes.push_back(
+      linalg::createFoldedDimOp(builder, linalgOp.getLoc(), output, mIdx));
   sizes.push_back(linalg::createFoldedDimOp(builder, linalgOp.getLoc(),
                                             filter->get(), kIdx));
   return sizes;
@@ -196,9 +196,9 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
     return failure();
   slicedOperands.push_back(*slicedFilter);
 
-  OpOperand *output = linalgOp.getDpsInitOperands()[0];
+  OpOperand &output = linalgOp.getDpsInitsMutable()[0];
   FailureOr<Value> slicedOutput =
-      getSlicedConvOperand(builder, output, linalgOp, localIvs, valuesToUse);
+      getSlicedConvOperand(builder, &output, linalgOp, localIvs, valuesToUse);
   if (failed(slicedOutput))
     return failure();
   slicedOperands.push_back(*slicedOutput);

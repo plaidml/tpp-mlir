@@ -409,7 +409,7 @@ Value MLIRGenerator::lowerRelu(Value input) {
       getIterators(MAP_PARALLEL),
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
         auto arg0 = blockArgs[0];
-        auto max = nestedBuilder.create<arith::MaxFOp>(loc, arg0, zero);
+        auto max = nestedBuilder.create<arith::MaximumFOp>(loc, arg0, zero);
         nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
       });
   return relu.getResult(0);

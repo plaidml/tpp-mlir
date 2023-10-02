@@ -18,10 +18,6 @@ func.func @linalg_matmul() {
 
   call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
 
-  memref.dealloc %0 : memref<8x8xf32>
-  memref.dealloc %1 : memref<8x8xf32>
-  memref.dealloc %2 : memref<8x8xf32>
-
   return
 }
 
@@ -38,7 +34,7 @@ func.func private @printMemrefF32(memref<*xf32>)
 // CHECK:         gpu.launch_func  @linalg_matmul_kernel::@linalg_matmul_kernel
 // CHECK:         call @printMemrefF32
 // CHECK:       }
-// CHECK: gpu.module @linalg_matmul_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @linalg_matmul_kernel
 // CHECK-LABEL: llvm.func @linalg_matmul_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -55,7 +51,7 @@ func.func @tpp_gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memr
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @tpp_gemm
 // CHECK:         gpu.launch_func  @tpp_gemm_kernel::@tpp_gemm_kernel
-// CHECK: gpu.module @tpp_gemm_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @tpp_gemm_kernel
 // CHECK-LABEL: llvm.func @tpp_gemm_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -82,7 +78,7 @@ func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x6
 // CHECK-LABEL: func.func @packed_brgemm
 // CHECK-NOT:     scf.parallel
 // CHECK:         gpu.launch_func  @packed_brgemm_kernel::@packed_brgemm_kernel
-// CHECK: gpu.module @packed_brgemm_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @packed_brgemm_kernel
 // CHECK-LABEL: llvm.func @packed_brgemm_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -104,7 +100,7 @@ func.func @forall_loop(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64x
 // CHECK-LABEL: func.func @forall_loop
 // CHECK-NOT:     scf.forall
 // CHECK:         gpu.launch_func  @forall_loop_kernel::@forall_loop_kernel
-// CHECK: gpu.module @forall_loop_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @forall_loop_kernel
 // CHECK-LABEL: llvm.func @forall_loop_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -130,4 +126,4 @@ func.func @matmul_blocks_threads(
 // CHECK-NOT:     linalg.matmul
 // CHECK:         gpu.launch_func  @matmul_blocks_threads_kernel::@matmul_blocks_threads_kernel
 // CHECK-SAME:    blocks in (%[[C8]], %[[C64]], %[[C1]]) threads in (%[[C32]], %[[C32]], %[[C1]])
-// CHECK: gpu.module @matmul_blocks_threads_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @matmul_blocks_threads_kernel

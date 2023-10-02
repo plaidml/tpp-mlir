@@ -255,11 +255,5 @@ func.func @entry() {
   //
  
   vector.print %v6 : vector<1x1x1x1x8x32xf32>
-
-  bufferization.dealloc_tensor %input_tensor : tensor<?xf32>
-  bufferization.dealloc_tensor %input_tensor1 : tensor<?xf32>
-  bufferization.dealloc_tensor %input_tensor2 : tensor<?xf32>
-  bufferization.dealloc_tensor %input_tensor3 : tensor<?xf32>
-
   return
 }

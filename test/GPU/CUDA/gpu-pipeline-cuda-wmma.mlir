@@ -26,7 +26,7 @@ func.func @packed_matmul(%arg0: tensor<2x4x16x16xf16>, %arg1: tensor<4x4x16x16xf
 // CHECK:         gpu.launch_func  @packed_matmul_kernel::@packed_matmul_kernel
 // CHECK-SAME:    blocks in (%[[C2]], %[[C4]], %[[C1]]) threads in (%[[C32]], %[[C1]], %[[C1]])
 // CHECK:       }
-// CHECK: gpu.module @packed_matmul_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @packed_matmul_kernel
 // CHECK-LABEL: llvm.func @packed_matmul_kernel
 // CHECK-DAG:     nvvm.wmma.load
 // CHECK-DAG:     nvvm.wmma.mma

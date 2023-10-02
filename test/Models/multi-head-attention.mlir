@@ -153,7 +153,7 @@ func.func @multi_head_attention(
     %113 = linalg.fill ins(%cst : f32) outs(%112 : tensor<32x2x8xf32>) -> tensor<32x2x8xf32>
     %114 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%111 : tensor<32x2x8x8xf32>) outs(%113 : tensor<32x2x8xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %490 = arith.maxf %out, %in : f32
+      %490 = arith.maximumf %out, %in : f32
       linalg.yield %490 : f32
     } -> tensor<32x2x8xf32>
     %expanded_28 = tensor.expand_shape %114 [[0], [1], [2, 3]] : tensor<32x2x8xf32> into tensor<32x2x8x1xf32>

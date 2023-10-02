@@ -42,11 +42,8 @@ module {
     gpu.wait [%tD2]
 
     %outTensor = bufferization.to_tensor %out restrict : memref<8x8xf32>
-    %res = bufferization.copy_tensor %outTensor, %arg2 : tensor<8x8xf32>
 
-    memref.dealloc %out : memref<8x8xf32>
-
-    return %res : tensor<8x8xf32>
+    return %outTensor : tensor<8x8xf32>
   }
 }
 
@@ -61,10 +58,8 @@ module {
 // CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel{{.*}}%[[gpu0]]
 // CHECK:         %[[out:.+]] = memref.alloc()
 // CHECK:         gpu.memcpy async %[[out]], %[[gpu2]]
-// CHECK:         memref.copy %[[out]], %[[ARG2]]
-// CHECK:         memref.dealloc %[[out]]
 // CHECK:       }
-// CHECK: gpu.module @_entry_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
@@ -74,5 +69,5 @@ module {
 // CHECK:         %[[host1:.+]] = memref.get_global @__wrapper_1
 // CHECK:         %[[host2:.+]] = memref.get_global @__wrapper_2
 // CHECK:         call @_entry(%[[host0]], %[[host1]], %[[host2]])
-// CHECK:         vector.transfer_read %[[host2]]
+// CHECK:         vector.transfer_read
 // CHECK-COUNT-8: ( 9, 9, 9, 9, 9, 9, 9, 9 )

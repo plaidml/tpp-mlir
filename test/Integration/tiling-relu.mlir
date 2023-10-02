@@ -22,7 +22,7 @@ func.func @bigrelu(%B: tensor<32x16xf32>) -> tensor<32x16xf32>  {
                         iterator_types = ["parallel", "parallel"] }
     outs(%B: tensor<32x16xf32>) {
       ^bb0(%b: f32):
-        %0 = arith.maxf %b, %c0 : f32
+        %0 = arith.maximumf %b, %c0 : f32
         linalg.yield %0: f32
   } -> tensor<32x16xf32>
   return %O: tensor<32x16xf32>

@@ -9,6 +9,7 @@ add_mlir_library(TPPGPU
   SetSPIRVAbiAttribute.cpp
   GpuVulkanAbi.cpp
   LinalgToGpu.cpp
+  ConvertForAllToParallelOp.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

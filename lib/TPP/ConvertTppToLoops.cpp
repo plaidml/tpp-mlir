@@ -180,7 +180,8 @@ struct ConvertTppReluOp : public OpRewritePattern<ReluOp> {
     auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange localIvs) {
       Value scalarLhs =
           b.create<memref::LoadOp>(loc, reluOp.getInputs()[0], localIvs);
-      Value scalarRelu = b.create<arith::MaxFOp>(loc, zeroConstant, scalarLhs);
+      Value scalarRelu =
+          b.create<arith::MaximumFOp>(loc, zeroConstant, scalarLhs);
       b.create<memref::StoreOp>(loc, scalarRelu, reluOp.getOutput(), localIvs);
     };
     buildUnaryLoop(rewriter, reluOp, bodyBuilder, parallel);

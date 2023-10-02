@@ -22,7 +22,7 @@ func.func @relutpp(%A: tensor<9x6xf32>) -> tensor<9x6xf32>  {
   %O = linalg.generic { indexing_maps = [#map0], iterator_types = ["parallel", "parallel"] }
     outs(%A: tensor<9x6xf32>) {
       ^bb0(%a: f32):
-        %0 = arith.maxf %a, %c0 : f32
+        %0 = arith.maximumf %a, %c0 : f32
         linalg.yield %0: f32
   } -> tensor<9x6xf32>
   return %O: tensor<9x6xf32>

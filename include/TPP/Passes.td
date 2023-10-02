@@ -337,6 +337,9 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let constructor = "mlir::tpp::createBufferizePass()";
   let options = [
+    Option<"dealloc", "dealloc",
+           "bool", /*default=*/"1",
+           "Enables automatic deallocation.">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
             /*default=*/"false",
            "Only runs inplaceability analysis (for testing purposes only)">,
@@ -349,11 +352,6 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
 def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
   let constructor = "mlir::tpp::createCleanupPass()";
-}
-
-def Transform : Pass<"transform", "ModuleOp"> {
-  let summary = "Runs transformation schedules and then drops them.";
-  let constructor = "mlir::tpp::createTransformPass()";
 }
 
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {

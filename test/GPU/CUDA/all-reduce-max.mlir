@@ -70,7 +70,7 @@ func.func private @printMemrefI32(memref<*xi32>)
 // CHECK:         gpu.host_register
 // CHECK:         gpu.launch_func  @main_kernel::@main_kernel
 // CHECK:       }
-// CHECK: gpu.module @main_kernel attributes {gpu.binary = "
+// CHECK: gpu.module @main_kernel
 // CHECK-LABEL: llvm.func @main_kernel
 // CHECK-DAG:     nvvm.read
 // CHECK-DAG:     nvvm.shfl.sync

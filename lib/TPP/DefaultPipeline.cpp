@@ -119,7 +119,6 @@ struct DefaultPipeline : public DefaultPipelineBase<DefaultPipeline>,
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
-    bufferization::registerAllocationOpInterfaceExternalModels(registry);
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -190,6 +189,9 @@ private:
 
     pm.addNestedPass<func::FuncOp>(createGpuAsyncRegionPass());
     pm.addPass(createGpuToLLVMConversionPass());
+    GpuModuleToBinaryPassOptions gpuModuleToBinaryPassOptions;
+    gpuModuleToBinaryPassOptions.compilationTarget = "fatbin";
+    pm.addPass(createGpuModuleToBinaryPass(gpuModuleToBinaryPassOptions));
     pm.addPass(createAsyncToAsyncRuntimePass());
     pm.addPass(createAsyncRuntimeRefCountingPass());
     pm.addPass(createConvertAsyncToLLVMPass());

@@ -454,10 +454,10 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     if (!reassociationFilter)
       return failure();
 
-    OpOperand *output = linalgOp.getDpsInitOperands()[0];
-    Type newOutputType = getCollapsedType(output, 2, 3);
+    OpOperand &output = linalgOp.getDpsInitsMutable()[0];
+    Type newOutputType = getCollapsedType(&output, 2, 3);
     auto reassociationOutput = getReassociationIndicesForCollapse(
-        output->get().getType().cast<ShapedType>().getShape(),
+        output.get().getType().cast<ShapedType>().getShape(),
         newOutputType.cast<ShapedType>().getShape());
     if (!reassociationOutput)
       return failure();
@@ -473,7 +473,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
         rewriter);
 
     Value collapsedOutput = collapse(
-        output->get(), newOutputType,
+        output.get(), newOutputType,
         getReassociationIndicesAttribute(rewriter, *reassociationOutput), loc,
         rewriter);
 
@@ -487,11 +487,11 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     Value res = replacementOp->getResult(0);
     reassociationOutput = getReassociationIndicesForReshape(
         res.getType().cast<ShapedType>(),
-        output->get().getType().cast<ShapedType>());
+        output.get().getType().cast<ShapedType>());
     if (!reassociationOutput)
       return failure();
     Value resExpanded =
-        expand(res, output->get().getType(),
+        expand(res, output.get().getType(),
                getReassociationIndicesAttribute(rewriter, *reassociationOutput),
                loc, rewriter);
     rewriter.replaceOp(linalgOp, resExpanded);

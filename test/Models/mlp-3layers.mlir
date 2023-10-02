@@ -28,7 +28,7 @@ func.func @mlp_3layers(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   } -> tensor<256x1024xf32>
   %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<256x1024xf32>) outs(%out_shape : tensor<256x1024xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<256x1024xf32>
 
@@ -41,7 +41,7 @@ func.func @mlp_3layers(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   } -> tensor<256x1024xf32>
   %7 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<256x1024xf32>) outs(%out_shape : tensor<256x1024xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<256x1024xf32>
 
@@ -54,7 +54,7 @@ func.func @mlp_3layers(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   } -> tensor<256x1024xf32>
   %11 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%10 : tensor<256x1024xf32>) outs(%out_shape : tensor<256x1024xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<256x1024xf32>
 

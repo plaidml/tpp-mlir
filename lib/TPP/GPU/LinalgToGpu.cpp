@@ -75,12 +75,9 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   if (linalgOp.hasDynamicShape())
     return false;
 
-  auto aType =
-      linalgOp.getDpsInputOperands()[0]->get().getType().cast<ShapedType>();
-  auto bType =
-      linalgOp.getDpsInputOperands()[1]->get().getType().cast<ShapedType>();
-  auto cType =
-      linalgOp.getDpsInitOperands()[0]->get().getType().cast<ShapedType>();
+  auto aType = linalgOp.getDpsInputs()[0].getType().cast<ShapedType>();
+  auto bType = linalgOp.getDpsInputs()[1].getType().cast<ShapedType>();
+  auto cType = linalgOp.getDpsInits()[0].getType().cast<ShapedType>();
 
   ArrayRef<int64_t> shapeA = aType.getShape();
   ArrayRef<int64_t> shapeC = cType.getShape();
@@ -113,9 +110,9 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   if (blocksLoop)
     rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
 
-  auto matA = linalgOp.getDpsInputOperands()[0]->get();
-  auto matB = linalgOp.getDpsInputOperands()[1]->get();
-  auto matC = linalgOp.getDpsInitOperands()[0]->get();
+  auto matA = linalgOp.getDpsInputs()[0];
+  auto matB = linalgOp.getDpsInputs()[1];
+  auto matC = linalgOp.getDpsInits()[0];
 
   auto typeA = matA.getType().cast<ShapedType>();
   auto typeB = matB.getType().cast<ShapedType>();
@@ -230,9 +227,9 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
 
   Location loc = linalgOp.getLoc();
 
-  auto matA = linalgOp.getDpsInputOperands()[0]->get();
-  auto matB = linalgOp.getDpsInputOperands()[1]->get();
-  auto matC = linalgOp.getDpsInitOperands()[0]->get();
+  auto matA = linalgOp.getDpsInputs()[0];
+  auto matB = linalgOp.getDpsInputs()[1];
+  auto matC = linalgOp.getDpsInits()[0];
 
   ArrayRef<int64_t> shapeC = matC.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> shapeA = matA.getType().cast<ShapedType>().getShape();

@@ -5,7 +5,7 @@ func.func @pack1(%in: tensor<4x4xf32>, %out: tensor<2x2x2x2xf32>) ->  tensor<2x2
   return %1 : tensor<2x2x2x2xf32>
 }
 
-// CHECK: func.func @pack1(%[[ARG1:.+]]: memref<4x4xf32>, %[[ARG1:.+]]: memref<2x2x2x2xf32>)  ->  memref<2x2x2x2xf32> {
+// CHECK: func.func @pack1(%[[ARG1:.+]]: memref<4x4xf32>, %[[ARG1:.+]]: memref<2x2x2x2xf32>) {
 // CHECK: scf.for
 // CHECK:  scf.for
 // CHECK:    %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [2, 2, 4, 2] flags = (none) data_type = f32 
@@ -13,12 +13,12 @@ func.func @pack1(%in: tensor<4x4xf32>, %out: tensor<2x2x2x2xf32>) ->  tensor<2x2
 
 // -----
 
-func.func @pack2(%0: tensor<1x2x2x4xf32>, %1:  tensor<1x2x2x2x2xf32>)-> tensor<1x2x2x2x2xf32>{
+func.func @pack2(%0: tensor<1x2x2x4xf32>, %1:  tensor<1x2x2x2x2xf32>) -> tensor<1x2x2x2x2xf32>{
  %2 = tensor.pack %0  outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %1 : tensor<1x2x2x4xf32> -> tensor<1x2x2x2x2xf32>
   return %2: tensor<1x2x2x2x2xf32>
 }
 
-// CHECK: func.func @pack2(%[[ARG0:.+]]: memref<1x2x2x4xf32>, %[[ARG1:.+]]: memref<1x2x2x2x2xf32>) -> memref<1x2x2x2x2xf32> {
+// CHECK: func.func @pack2(%[[ARG0:.+]]: memref<1x2x2x4xf32>, %[[ARG1:.+]]: memref<1x2x2x2x2xf32>) {
 // CHECK: scf.for
 // CHECK:   scf.for
 // CHECK:     scf.for
@@ -45,7 +45,7 @@ func.func @unpack1(%in: tensor<2x2x2x2xf32>, %out: tensor<4x4xf32>) ->  tensor<4
   return %1 : tensor<4x4xf32>
 }
 
-// CHECK: func.func @unpack1(%[[ARG1:.+]]: memref<2x2x2x2xf32>, %[[ARG1:.+]]: memref<4x4xf32>)  ->  memref<4x4xf32> {
+// CHECK: func.func @unpack1(%[[ARG1:.+]]: memref<2x2x2x2xf32>, %[[ARG1:.+]]: memref<4x4xf32>) {
 // CHECK: scf.for
 // CHECK:  scf.for
 // CHECK:    %[[DISPATCH:.+]] = xsmm.unary.dispatch identity [2, 2, 2, 4] flags = (none) data_type = f32
@@ -53,12 +53,12 @@ func.func @unpack1(%in: tensor<2x2x2x2xf32>, %out: tensor<4x4xf32>) ->  tensor<4
 
 // -----
 
-func.func @unpack2(%0: tensor<1x2x2x2x2xf32>, %1: tensor<1x2x2x4xf32>)-> tensor<1x2x2x4xf32>{
+func.func @unpack2(%0: tensor<1x2x2x2x2xf32>, %1: tensor<1x2x2x4xf32>) -> tensor<1x2x2x4xf32>{
  %2 = tensor.unpack %0  outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %1 : tensor<1x2x2x2x2xf32>-> tensor<1x2x2x4xf32>
   return %2:  tensor<1x2x2x4xf32>
 }
 
-// CHECK: func.func @unpack2(%[[ARG0:.+]]: memref<1x2x2x2x2xf32>, %[[ARG1:.+]]: memref<1x2x2x4xf32>) -> memref<1x2x2x4xf32> {
+// CHECK: func.func @unpack2(%[[ARG0:.+]]: memref<1x2x2x2x2xf32>, %[[ARG1:.+]]: memref<1x2x2x4xf32>) {
 // CHECK: scf.for
 // CHECK:  scf.for
 // CHECK:    scf.for
@@ -68,7 +68,7 @@ func.func @unpack2(%0: tensor<1x2x2x2x2xf32>, %1: tensor<1x2x2x4xf32>)-> tensor<
 
 // -----
 
-func.func @unpack3(%in: tensor<2x2x1x4x2x2xf32>, %out: tensor<8x2x2x2xf32>)-> tensor<8x2x2x2xf32>{  
+func.func @unpack3(%in: tensor<2x2x1x4x2x2xf32>, %out: tensor<8x2x2x2xf32>) -> tensor<8x2x2x2xf32> {  
   %2 = tensor.unpack %in outer_dims_perm = [3, 2, 1, 0] inner_dims_pos=[1, 0] inner_tiles = [2, 2] into %out: tensor<2x2x1x4x2x2xf32>-> tensor<8x2x2x2xf32>
   return %2: tensor<8x2x2x2xf32>
 }

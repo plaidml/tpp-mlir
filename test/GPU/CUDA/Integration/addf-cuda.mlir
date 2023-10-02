@@ -43,15 +43,6 @@ module attributes {gpu.container_module} {
     %cast = memref.cast %out : memref<8xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
 
-    %tD0 = gpu.dealloc async %arg0 : memref<8xf32>
-    gpu.wait [%tD0]
-    %tD1 = gpu.dealloc async %arg1 : memref<8xf32>
-    gpu.wait [%tD1]
-    %tD2 = gpu.dealloc async %arg2 : memref<8xf32>
-    gpu.wait [%tD2]
-
-    memref.dealloc %out : memref<8xf32>
-
     return
   }
   func.func private @printMemrefF32(%ptr : memref<*xf32>)

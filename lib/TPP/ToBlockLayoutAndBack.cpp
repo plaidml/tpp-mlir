@@ -189,8 +189,8 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   Location loc = convOp.getLoc();
   MLIRContext *ctx = convOp.getContext();
 
-  SmallVector<Value> inputOperands = convOp.getDpsInputOperands();
-  SmallVector<Value> outputOperands = convOp.getDpsInitOperands();
+  SmallVector<Value> inputOperands = convOp.getDpsInputs();
+  SmallVector<Value> outputOperands = convOp.getDpsInits();
 
   // pack the image and the filter.
   Value image = inputOperands[0];
@@ -740,6 +740,7 @@ struct SimplifyAndCanonicalizePack
     tensor::populateSimplifyTensorPack(patterns);
     tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
+    linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
     patterns.add<SimplifyPackToEmpty>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

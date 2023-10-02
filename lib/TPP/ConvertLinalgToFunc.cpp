@@ -104,10 +104,10 @@ struct ConvertMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasBufferSemantics())
       return failure();
-    SmallVector<OpOperand *> operands = matmulOp.getDpsInputOperands();
-    operands.push_back(matmulOp.getDpsInitOperands()[0]);
-    if (!llvm::all_of(operands, [](OpOperand *operand) {
-          MemRefType memref = operand->get().getType().cast<MemRefType>();
+    SmallVector<Value> operands = matmulOp.getDpsInputs();
+    operands.push_back(matmulOp.getDpsInits()[0]);
+    if (!llvm::all_of(operands, [](Value operand) {
+          MemRefType memref = operand.getType().cast<MemRefType>();
           return memref.getLayout().isIdentity() &&
                  memref.getElementType().isF32();
         })) {

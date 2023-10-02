@@ -9,9 +9,11 @@
 #include "TPP/Passes.h"
 #include "TPP/Transforms.h"
 
+#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Pipelines/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -43,6 +45,8 @@ namespace {
 
 struct Bufferize : public BufferizeBase<Bufferize> {
   Bufferize() = default;
+  Bufferize(bool dealloc) { this->dealloc = dealloc; };
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -75,7 +79,6 @@ void Bufferize::runOnOperation() {
 
   // One-shot.
   bufferization::OneShotBufferizationOptions buffOpts;
-  buffOpts.allowReturnAllocs = true;
   buffOpts.bufferizeFunctionBoundaries = true;
   buffOpts.setFunctionBoundaryTypeConversion(
       bufferization::LayoutMapOption::IdentityLayoutMap);
@@ -99,13 +102,21 @@ void Bufferize::runOnOperation() {
     // memrefs are unified in CSE pass, so we can truly remove redundant memcpy.
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
+  passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
 
+  if (dealloc) {
+    bufferization::BufferDeallocationPipelineOptions options;
+    bufferization::buildBufferDeallocationPipeline(passManager, options);
+  }
+
+  passManager.addPass(createBufferizationToMemRefPass());
   if (failed(runPipeline(passManager, moduleOp)))
     return signalPassFailure();
 }
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createBufferizePass() {
-  return std::make_unique<Bufferize>();
+std::unique_ptr<OperationPass<ModuleOp>>
+mlir::tpp::createBufferizePass(bool dealloc) {
+  return std::make_unique<Bufferize>(dealloc);
 }

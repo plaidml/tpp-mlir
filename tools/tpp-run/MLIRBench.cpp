@@ -197,7 +197,6 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
 
     // Dealloc the arg buffer at the end of program
     builder.setInsertionPointToEnd(&getMainBlock());
-    builder.create<memref::DeallocOp>(unkLoc, localBuf);
 
     // Continue inserting ops after the created kernel arg
     builder.setInsertionPointAfter(copy);
@@ -282,18 +281,7 @@ LogicalResult MLIRBench::createMainWrapper() {
 
 Operation *MLIRBench::callKernel() {
   // Call the kernel
-  auto call = builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
-
-  // Cleanup kernel result if the returned value is a buffer
-  auto funcType = kernel.getFunctionType();
-  if (funcType.getNumResults() != 0) {
-    auto result = call->getOpResult(0);
-
-    if (dyn_cast_or_null<MemRefType>(result.getType()))
-      builder.create<memref::DeallocOp>(unkLoc, result);
-  }
-
-  return call;
+  return builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
 }
 
 Value MLIRBench::getKernelResult(Operation *kernelCall) {
@@ -387,10 +375,6 @@ Value MLIRBench::getTimerStats(unsigned loopId) {
   auto insDev =
       builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
 
-  // Clean up results buffer
-  builder.create<memref::DeallocOp>(unkLoc, accBuf);
-  builder.create<memref::DeallocOp>(unkLoc, acc);
-
   // Invalidate the bench loop
   benchLoop.valid = false;
 
@@ -477,7 +461,8 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     auto gpuSync =
         builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
 
-    // Dealloc the output buffer at the end of program
+    // Dealloc the output buffer at the end of program.
+    // For now, automatic deallocation is disabled for GPUs.
     builder.setInsertionPointToEnd(&getMainBlock());
     builder.create<memref::DeallocOp>(unkLoc, outBuf);
 

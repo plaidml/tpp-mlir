@@ -32,8 +32,5 @@ func.func @entry(){
       vector.print %f1 : vector<4x4xf32>
     }
   }
-  memref.dealloc %alloc : memref<32x64x4x4xbf16>
-  memref.dealloc %wt_alloc : memref<128x64x2x4x2xbf16>
-  memref.dealloc %alloc_1 : memref<32x128x4x4xbf16>
   return
 }

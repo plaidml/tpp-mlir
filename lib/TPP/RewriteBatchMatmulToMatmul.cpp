@@ -65,12 +65,13 @@ struct RewriteBatchMatmulToMatmulImpl
 
   LogicalResult matchAndRewrite(linalg::BatchMatmulOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto operands = linalgOp.getDpsInputOperands();
-    operands.append(linalgOp.getDpsInitOperands());
+    SmallVector<Value> operands = linalgOp.getDpsInputs();
+    operands.append(linalgOp.getDpsInits().begin(),
+                    linalgOp.getDpsInits().end());
     SmallVector<Value> matmulOperands;
-    for (OpOperand *operand : operands) {
+    for (Value operand : operands) {
       tensor::ExpandShapeOp expandOp =
-          operand->get().getDefiningOp<tensor::ExpandShapeOp>();
+          operand.getDefiningOp<tensor::ExpandShapeOp>();
       if (!expandOp || expandOp.getSrcType().getRank() != 2)
         return failure();
       matmulOperands.push_back(expandOp.getSrc());

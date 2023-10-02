@@ -107,7 +107,7 @@ func.func @relu(%arg0: memref<4x3xf32>) {
     iterator_types = ["parallel", "parallel"]} 
     ins(%arg0 : memref<4x3xf32>) outs(%arg0 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return
@@ -130,7 +130,7 @@ func.func @relu_1(%arg0: memref<1x3xf32>, %arg1: memref<4x3xf32>) {
     iterator_types = ["parallel", "parallel"]} 
     ins(%arg0 : memref<1x3xf32>) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return
@@ -153,7 +153,7 @@ func.func @relu_2(%arg0: memref<4x1xf32>, %arg1: memref<4x3xf32>) {
     iterator_types = ["parallel", "parallel"]} 
     ins(%arg0 : memref<4x1xf32>) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return
@@ -176,7 +176,7 @@ func.func @relu_3(%arg0: f32, %arg1: memref<4x3xf32>) {
     iterator_types = ["parallel", "parallel"]} 
     ins(%arg0 : f32) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return
@@ -199,7 +199,7 @@ func.func @relu_4(%arg0: f32, %arg1: memref<4x3xf32, strided<[?, ?], offset: 0>>
     iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : f32) outs(%arg1 : memref<4x3xf32, strided<[?, ?], offset: 0>>) {
     ^bb0(%in: f32, %out: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return
@@ -220,7 +220,7 @@ func.func @relu_5(%arg1: memref<4x3xf32>) {
     iterator_types = ["parallel", "parallel"]}
     outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32):
-      %0 = arith.maxf %in, %cst : f32
+      %0 = arith.maximumf %in, %cst : f32
       linalg.yield %0 : f32
   }
   return

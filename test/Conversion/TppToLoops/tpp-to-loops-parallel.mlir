@@ -25,7 +25,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>) {
   // CHECK-DAG: %[[relu:.*]] = arith.constant 0.000000e+00 : f32
   // CHECK: scf.parallel (%[[i:.*]], %[[j:.*]]) = (%[[lb]], %[[lb]]) to (%[[ub]], %[[ub]]) step (%[[step]], %[[step]]) {
   // CHECK:   %[[load:.*]] = memref.load %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
-  // CHECK:   %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
+  // CHECK:   %[[max:.*]] = arith.maximumf %[[load]], %[[relu]] : f32
   // CHECK:   memref.store %[[max]], %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
   tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg0: memref<3x3xf32>)
   return
@@ -42,7 +42,7 @@ func.func @relu_to_loops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK-DAG: %[[relu:.*]] = arith.constant 0.000000e+00 : f32
   // CHECK: scf.parallel (%[[i:.*]], %[[j:.*]]) = (%[[lb]], %[[lb]]) to (%[[ub]], %[[ub]]) step (%[[step]], %[[step]]) {
   // CHECK:   %[[load:.*]] = memref.load %[[ARG0]][%[[i]], %[[j]]] : memref<3x3xf32>
-  // CHECK:   %[[max:.*]] = arith.maxf %[[load]], %[[relu]] : f32
+  // CHECK:   %[[max:.*]] = arith.maximumf %[[load]], %[[relu]] : f32
   // CHECK:   memref.store %[[max]], %[[ARG1]][%[[i]], %[[j]]] : memref<3x3xf32>
   tpp.relu ins(%arg0: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
   return
@@ -261,5 +261,5 @@ func.func @fused_brgemm_to_loops(%arg0 : memref<2x3x4xf32>, %arg1 : memref<2x4x3
 // -- ReLU
 // CHECK: scf.parallel (%[[i:.*]], %[[j:.*]]) = (%[[zero]], %[[zero]]) to (%[[three]], %[[three]]) step (%[[one]], %[[one]]) {
 // CHECK:   %[[reluVal:.*]] = memref.load %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>
-// CHECK:   %[[reluRes:.*]] = arith.maxf %[[reluVal]], %[[zeroF32]] : f32
+// CHECK:   %[[reluRes:.*]] = arith.maximumf %[[reluVal]], %[[zeroF32]] : f32
 // CHECK:   memref.store %[[reluRes]], %[[ARG2]][%[[i]], %[[j]]] : memref<3x3xf32>

@@ -81,11 +81,11 @@ struct GeneralizeTensorPackAndUnPack
 
     // Fall back on tile by one + generalization patterns.
     {
-      IRRewriter rewriter(&getContext());
+      IRRewriter rewriter(ctx);
       funcOp->walk([&](tensor::UnPackOp unPackOp) {
         scf::SCFTilingOptions unpackTilingOptions;
         SmallVector<int64_t> tiles(unPackOp.getDestType().getRank(), 1);
-        unpackTilingOptions.setTileSizes(tiles);
+        unpackTilingOptions.setTileSizes(getAsIndexOpFoldResult(ctx, tiles));
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
             rewriter, cast<TilingInterface>(unPackOp.getOperation()),
             unpackTilingOptions);
@@ -96,7 +96,7 @@ struct GeneralizeTensorPackAndUnPack
       funcOp->walk([&](tensor::PackOp packOp) {
         SmallVector<int64_t> tiles(packOp.getSourceType().getRank(), 1);
         scf::SCFTilingOptions packTilingOptions;
-        packTilingOptions.setTileSizes(tiles);
+        packTilingOptions.setTileSizes(getAsIndexOpFoldResult(ctx, tiles));
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
             rewriter, cast<TilingInterface>(packOp.getOperation()),
             packTilingOptions);

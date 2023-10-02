@@ -148,7 +148,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf64>) -> tensor<1x112x112x64xf64
   } -> tensor<1x112x112x64xf64>
   %5 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%4, %cst_0 : tensor<1x112x112x64xf64>, tensor<1x112x112x64xf64>) outs(%0 : tensor<1x112x112x64xf64>) {
     ^bb0(%in: f64, %in_4: f64, %out: f64):
-      %6 = arith.maxf %in, %in_4 : f64
+      %6 = arith.maximumf %in, %in_4 : f64
       linalg.yield %6 : f64
   } -> tensor<1x112x112x64xf64>
   return %5 : tensor<1x112x112x64xf64>
@@ -181,4 +181,4 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf64>) -> tensor<1x112x112x64xf64
 // CHECK-SAME:  ins(%[[CONV]], %[[CST_0]]
 // CHECK-SAME:  outs(%[[EMPTY]]
 // CHECK: ^bb0(
-// CHECK-NEXT: %{{.+}} = arith.maxf
+// CHECK-NEXT: %{{.+}} = arith.maximumf

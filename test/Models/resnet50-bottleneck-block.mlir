@@ -79,7 +79,7 @@ func.func @first_conv2d_1x1_biasadd_relu(
         ins(%6, %cst_9 : !first_conv1x1_output_tensor_t, !first_conv1x1_output_tensor_t)
         outs(%7 : !first_conv1x1_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
-                %1591 = arith.maxf %in, %in_34 : f32
+                %1591 = arith.maximumf %in, %in_34 : f32
                 linalg.yield %1591 : f32
     } -> !first_conv1x1_output_tensor_t
 
@@ -135,7 +135,7 @@ func.func @conv2d_3x3_biasadd_relu(
         ins(%6, %cst_9 : !conv3x3_output_tensor_t, !conv3x3_output_tensor_t)
         outs(%7 : !conv3x3_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
-                %1591 = arith.maxf %in, %in_34 : f32
+                %1591 = arith.maximumf %in, %in_34 : f32
                 linalg.yield %1591 : f32
     } -> !conv3x3_output_tensor_t
 
@@ -192,7 +192,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
         ins(%6, %cst_9 : !second_conv1x1_output_tensor_t, !second_conv1x1_output_tensor_t)
         outs(%7 : !second_conv1x1_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
-                %1591 = arith.maxf %in, %in_34 : f32
+                %1591 = arith.maximumf %in, %in_34 : f32
                 linalg.yield %1591 : f32
     } -> !second_conv1x1_output_tensor_t
     
@@ -263,14 +263,6 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
 
     // Copy to output to avoid deallocation / double-free problem with the last result (see IR for more details)
     %copy = linalg.copy ins(%ret : !tensor_print_t) outs(%output : !tensor_print_t) -> !tensor_print_t
-
-    // Cleanup temporary buffers
-    bufferization.dealloc_tensor %first_conv1x1_output : !first_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %padded_first_conv1x1_output : !conv3x3_input_tensor_t
-    bufferization.dealloc_tensor %conv3x3_output : !conv3x3_output_tensor_t
-    bufferization.dealloc_tensor %second_conv1x1_output : !second_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %skip : !second_conv1x1_output_tensor_t
-    bufferization.dealloc_tensor %ret : !tensor_print_t
 
     // Return value to keep copy above intact
     return %copy : !tensor_print_t

@@ -68,8 +68,6 @@ module {
     //
 
     vector.print %8 : vector<1x2x2x8xf32>
-    memref.dealloc %4 : memref<1x2x2x8xf32>
-
 
     %9 = memref.alloc() {alignment = 128 : i64} : memref<1x2x2x8xf32>
     memref.copy %2, %9 : memref<1x2x2x8xf32> to memref<1x2x2x8xf32>
@@ -90,8 +88,7 @@ module {
     //
 
     vector.print %11 : vector<1x2x2x8xf32>
-    memref.dealloc %9 : memref<1x2x2x8xf32>
-
+    
     return
   }
 }

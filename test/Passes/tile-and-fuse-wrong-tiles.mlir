@@ -14,7 +14,7 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
                        iterator_types = ["parallel", "parallel"]}
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %2 = arith.maxf %out, %c0 : f32
+        %2 = arith.maximumf %out, %c0 : f32
         linalg.yield %2 : f32
     } -> tensor<32x32xf32>
   return %1 : tensor<32x32xf32>
@@ -57,14 +57,14 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   %5 = linalg.generic {indexing_maps = [#map],
                        iterator_types = ["parallel", "parallel"]}
     outs(%3: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %6 = arith.maxf %out, %c0 : f32
+        %6 = arith.maximumf %out, %c0 : f32
         linalg.yield %6 : f32
   } -> tensor<32x32xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map],
@@ -107,14 +107,14 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
                        iterator_types = ["parallel", "parallel"]}
     outs(%2: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %4 = arith.maxf %out, %c0 : f32
+        %4 = arith.maximumf %out, %c0 : f32
         linalg.yield %4 : f32
   } -> tensor<32x32xf32>
   %5 = linalg.generic {indexing_maps = [#map],
                        iterator_types = ["parallel", "parallel"]}
     outs(%3: tensor<32x32xf32>) {
       ^bb0(%out: f32):
-        %6 = arith.maxf %out, %c0 : f32
+        %6 = arith.maximumf %out, %c0 : f32
         linalg.yield %6 : f32
   } -> tensor<32x32xf32>
   %7 = linalg.generic {indexing_maps = [#map, #map],

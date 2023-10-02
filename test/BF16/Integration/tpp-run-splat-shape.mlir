@@ -30,7 +30,7 @@ func.func @entry(%arg0: tensor<4x8x8x8xbf16>, %output: tensor<4x8x8x8xbf16>) -> 
   } -> tensor<4x8x8x8xbf16>
   %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<4x8x8x8xbf16>) outs(%output : tensor<4x8x8x8xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<4x8x8x8xbf16>
 
