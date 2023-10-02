@@ -85,10 +85,3 @@ benchmark fc/1024x2560x1024.json "FC 1024x2560x1024"
 benchmark fc/1024x1024x512.json "FC 1024x1024x512"
 benchmark fc/1024x352x512.json "FC 1024x352x512"
 benchmark fc/1024x512x256.json "FC 1024x512x256"
-
-# Summary report for all benchmarks
-echo "+++ REPORT"
-if [ "main" == "${BUILDKITE_BRANCH}" ]; then
-  export LOGRPTBRN=main
-fi
-eval "${LIBXSMMROOT}/scripts/tool_logrept.sh ${LOGFILE}"

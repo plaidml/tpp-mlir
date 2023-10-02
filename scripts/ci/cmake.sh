@@ -13,7 +13,6 @@ die_syntax() {
   echo "  -i: Optional install dir, defaults to system"
   echo "  -t: Optional build type flag, defaults to Release"
   echo "  -c: Optional compiler flag, defaults to clang"
-  echo "  -g: Optional gcc toolchain flag, may be needed by clang"
   echo "  -l: Optional linker flag, defaults to system linker"
   echo "  -R: Optional request to remove BLD_DIR before CMake"
   echo "  -S: Optional sanitizer flag, defaults to none"
@@ -23,7 +22,7 @@ die_syntax() {
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:g:l:n:G:RS" arg; do
+while getopts "s:b:i:m:t:c:l:n:G:RS" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -52,10 +51,6 @@ while getopts "s:b:i:m:t:c:g:l:n:G:RS" arg; do
         echo "MLIR '${OPTARG}' not a CMake directory"
         die_syntax
       fi
-      ;;
-    g)
-      GCC_DIR=$(realpath ${OPTARG})
-      GCC_TOOLCHAIN_OPTIONS="-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN=${GCC_DIR} -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=${GCC_DIR}"
       ;;
     c)
       if [ "${OPTARG}" == "clang" ]; then
@@ -146,31 +141,16 @@ check_program cmake
 check_program ninja
 check_program pip
 pip install --upgrade --user lit
-check_program lit
 pip install --upgrade --user -r ${SRC_DIR}/benchmarks/harness/requirements.txt
-
-TPP_LIT=$(which lit)
-# patch incorrect interpreter
-if [ "${TPP_LIT}" ] && [ "$(command -v sed)" ]; then
-  sed -i 's/#!\/usr\/bin\/python3/#!\/usr\/bin\/env python3/' ${TPP_LIT}
+TPP_LIT=$HOME/.local/bin/lit
+if [ ! -x "${TPP_LIT}" ]; then
+  echo "LIT at ${TPP_LIT} not executable"
+  exit 1
 fi
 
 # Consider to remove BLD_DIR shortly before running CMake
 if [ "${REMOVE_BLD_DIR}" ] && [ "0" != "${REMOVE_BLD_DIR}" ]; then
   echo_run rm -rf ${BLD_DIR}
-fi
-
-# CXX: simple check for external toolchain argument
-read -ra CMAKE_CXX <<<"${CXX}"
-if [[ "${CMAKE_CXX[@]:1}" == "--gcc-toolchain="* ]]; then
-  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CXX[@]:1}")"
-  CXX=${CMAKE_CXX[0]}
-fi
-# CC: simple check for external toolchain argument
-read -ra CMAKE_CC <<<"${CC}"
-if [[ "${CMAKE_CC[@]:1}" == "--gcc-toolchain="* ]]; then
-  GCC_TOOLCHAIN_OPTIONS+=" -DCMAKE_CC_COMPILER_EXTERNAL_TOOLCHAIN=$(cut -d= -f2 <<<"${CMAKE_CC[@]:1}")"
-  CC=${CMAKE_CC[0]}
 fi
 
 # CMake
@@ -181,7 +161,6 @@ echo_run cmake -Wno-dev -G Ninja \
     -DMLIR_DIR=${MLIR_DIR} \
     -DLLVM_EXTERNAL_LIT=${TPP_LIT} \
     ${BUILD_OPTIONS} \
-    ${GCC_TOOLCHAIN_OPTIONS} \
     ${LINKER_OPTIONS} \
     ${SAN_OPTIONS} \
     ${ENABLE_GPU}
