@@ -15,7 +15,7 @@ steps:
   - wait
 
   - label: "GPU-Nvidia-Cuda"
-    command: "${SRUN} --partition=nv-a100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=a100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=cuda CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
@@ -27,7 +27,7 @@ steps:
       TPP_CUDAVER: "12.2"
 
   - label: "GPU-Nvidia-Vulkan"
-    command: "${SRUN} --partition=nv-a100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=a100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
@@ -43,13 +43,13 @@ steps:
               'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 CLEAN=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
-      TPP_LAUNCH_NODE: "pcl-adl01"
+      TPP_LAUNCH_NODE: "pvc"
       TPP_PROXY_ENABLE: "1"
       TPP_CLANGVER: "16.0.4"
       TPP_GCCVER: "12.3.0"
 
   - label: "GPU-Nvidia-Cuda-bench"
-    command: "${SRUN} --partition=nv-a100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=a100 --time=0:30:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld GPU=cuda \
               scripts/buildkite/benchmark_gpu.sh'"
     env:

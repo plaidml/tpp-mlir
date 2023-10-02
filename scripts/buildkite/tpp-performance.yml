@@ -17,7 +17,7 @@ steps:
   - wait
 
   - label: "TPP-MLIR-performance"
-    command: "${SRUN} --partition=clxtrb --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'"
+    command: "${SRUN} --partition=spr --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'"
     env:
       LOGRPTSUM: "mlir"
       LOGRPTBND: "-"
