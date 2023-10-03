@@ -43,8 +43,8 @@ static bool isMemoryAccess(Operation *op) {
 }
 
 // Move host allocated data between host and device.
-static void transferMemrefAlloc(RewriterBase &rewriter,
-                                memref::AllocOp allocOp) {
+static void transferMemrefAlloc_OLD(RewriterBase &rewriter,
+                                    memref::AllocOp allocOp) {
   auto loc = allocOp.getLoc();
 
   // Gather all alloc users in order.
@@ -137,29 +137,109 @@ static void transferMemrefAlloc(RewriterBase &rewriter,
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer.getMemref());
 }
 
-// Move device allocated data between host and device.
-static void transferGpuAlloc(RewriterBase &rewriter, gpu::AllocOp allocOp) {}
-
 // Move host global data to device when needed.
 static void transferMemrefGlobal(RewriterBase &rewriter,
                                  memref::GetGlobalOp globalOp) {}
+
+// Transfer host allocated data between host and device.
+static Value transferMemrefAlloc(RewriterBase &rewriter,
+                                 gpu::LaunchFuncOp launchFuncOp,
+                                 size_t operandId, memref::AllocOp allocOp) {
+  auto loc = allocOp.getLoc();
+
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  // Copy to the device.
+  rewriter.setInsertionPoint(launchFuncOp);
+  auto gpuAlloc =
+      rewriter.create<gpu::AllocOp>(loc, TypeRange({allocOp.getMemref()}),
+                                    ValueRange{}, ValueRange{}, ValueRange{});
+
+  Value hostBuffer = allocOp.getMemref();
+  Value gpuBuffer = gpuAlloc.getMemref();
+  rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
+                                 hostBuffer);
+
+  // Copy back to the host.
+  rewriter.setInsertionPointAfter(launchFuncOp);
+  rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
+                                 gpuBuffer);
+  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
+
+  return gpuBuffer;
+}
+
+static Operation *getDeviceTransferableBuffer(Value val) {
+  // Not a buffer - nothing to do.
+  if (!isa<MemRefType>(val.getType()))
+    return nullptr;
+
+  Operation *op = val.getDefiningOp();
+
+  // Host-space allocation or a global variable can be easily transfered to
+  // a device.
+  if (isa<memref::AllocOp, memref::GetGlobalOp>(op))
+    return op;
+
+  // Follow through mmeref alias to get to the real source.
+  if (auto viewOp = dyn_cast<mlir::ViewLikeOpInterface>(op))
+    return getDeviceTransferableBuffer(viewOp.getViewSource());
+
+  // Nothing to do for all the other cases.
+  // Assume it is a valid buffer, if the value comes from a device allocation,
+  // a function call, a function arguments, device allocation etc.
+  return nullptr;
+}
+
+struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
+  TransferDataToGpu(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<gpu::LaunchFuncOp>(context, benefit) {}
+
+  LogicalResult matchAndRewrite(gpu::LaunchFuncOp launchFuncOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> newOperands;
+
+    // Track if there are any changes to the root.
+    bool updatedOperands = false;
+
+    for (auto [index, operand] :
+         llvm::enumerate(launchFuncOp.getKernelOperands())) {
+      Operation *src = getDeviceTransferableBuffer(operand);
+      if (!src) {
+        newOperands.push_back(operand);
+        continue;
+      }
+
+      // Any transferable buffer n
+      updatedOperands = true;
+
+      if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
+        auto newOperand =
+            transferMemrefAlloc(rewriter, launchFuncOp, index, allocOp);
+        newOperands.push_back(newOperand);
+      }
+    }
+
+    // If there are any new operands, update the kernel launch.
+    if (updatedOperands) {
+      rewriter.updateRootInPlace(launchFuncOp, [&]() {
+        launchFuncOp.getKernelOperandsMutable().assign(newOperands);
+      });
+    }
+
+    return success();
+  }
+};
 
 class GpuDataTransfer : public GpuDataTransferBase<GpuDataTransfer> {
 public:
   GpuDataTransfer() = default;
 
   void runOnOperation() override {
-    auto func = getOperation();
-    IRRewriter rewriter(&getContext());
-
-    func->walk([&](memref::AllocOp allocOp) {
-      transferMemrefAlloc(rewriter, allocOp);
-    });
-    func->walk(
-        [&](gpu::AllocOp allocOp) { transferGpuAlloc(rewriter, allocOp); });
-    func->walk([&](memref::GetGlobalOp globalOp) {
-      transferMemrefGlobal(rewriter, globalOp);
-    });
+    MLIRContext *ctx = getOperation().getContext();
+    RewritePatternSet patterns(ctx);
+    patterns.add<TransferDataToGpu>(ctx);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
