@@ -168,25 +168,27 @@ static Value transferMemrefAlloc(RewriterBase &rewriter,
                                  gpu::LaunchFuncOp launchFuncOp,
                                  memref::AllocOp allocOp) {
   auto loc = launchFuncOp.getLoc();
+  auto block = launchFuncOp->getBlock();
 
   OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(launchFuncOp);
 
   // Alloc device buffer.
+  rewriter.setInsertionPointToStart(block);
   Value hostBuffer = allocOp.getMemref();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
   // Copy data to the device.
+  rewriter.setInsertionPoint(launchFuncOp);
   Value gpuBuffer = gpuAlloc.getMemref();
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
-  rewriter.setInsertionPointAfter(launchFuncOp);
-
   // Copy back to the host - data might have been updated.
+  rewriter.setInsertionPointAfter(launchFuncOp);
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
                                  gpuBuffer);
   // Cleanup device buffer.
+  rewriter.setInsertionPoint(block->getTerminator());
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
 
   return gpuBuffer;
@@ -197,15 +199,17 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
                                   gpu::LaunchFuncOp launchFuncOp,
                                   memref::GetGlobalOp getGlobalOp) {
   auto loc = launchFuncOp.getLoc();
+  auto block = launchFuncOp->getBlock();
 
   OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(launchFuncOp);
 
   // Alloc device buffer.
+  rewriter.setInsertionPointToStart(block);
   Value hostBuffer = getGlobalOp.getResult();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
   // Copy data to the device.
+  rewriter.setInsertionPoint(launchFuncOp);
   Value gpuBuffer = gpuAlloc.getMemref();
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
@@ -222,14 +226,15 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
     }
   }
 
-  rewriter.setInsertionPointAfter(launchFuncOp);
 
   // Copy back to the host if it is not a constant value.
   if (!isGlobalConst) {
+    rewriter.setInsertionPoint(launchFuncOp);
     rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
                                    gpuBuffer);
   }
   // Cleanup device buffer.
+  rewriter.setInsertionPoint(block->getTerminator());
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
 
   return gpuBuffer;
