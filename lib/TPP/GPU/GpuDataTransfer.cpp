@@ -137,6 +137,28 @@ static void transferMemrefAlloc_OLD(RewriterBase &rewriter,
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer.getMemref());
 }
 
+static Operation *getDeviceTransferableBuffer(Value val) {
+  // Not a buffer - nothing to do.
+  if (!isa<MemRefType>(val.getType()))
+    return nullptr;
+
+  Operation *op = val.getDefiningOp();
+
+  // Host-space allocation or a global variable can be easily transfered to
+  // a device.
+  if (isa<memref::AllocOp, memref::GetGlobalOp>(op))
+    return op;
+
+  // Follow through mmeref alias to get to the real source.
+  if (auto viewOp = dyn_cast<mlir::ViewLikeOpInterface>(op))
+    return getDeviceTransferableBuffer(viewOp.getViewSource());
+
+  // Nothing to do for all the other cases.
+  // Assume it is a valid buffer, if the value comes from a device allocation,
+  // a function call, a function arguments, device allocation etc.
+  return nullptr;
+}
+
 // Move host global data to device when needed.
 static void transferMemrefGlobal_OLD(RewriterBase &rewriter,
                                      memref::GetGlobalOp globalOp) {}
@@ -211,28 +233,6 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
 
   return gpuBuffer;
-}
-
-static Operation *getDeviceTransferableBuffer(Value val) {
-  // Not a buffer - nothing to do.
-  if (!isa<MemRefType>(val.getType()))
-    return nullptr;
-
-  Operation *op = val.getDefiningOp();
-
-  // Host-space allocation or a global variable can be easily transfered to
-  // a device.
-  if (isa<memref::AllocOp, memref::GetGlobalOp>(op))
-    return op;
-
-  // Follow through mmeref alias to get to the real source.
-  if (auto viewOp = dyn_cast<mlir::ViewLikeOpInterface>(op))
-    return getDeviceTransferableBuffer(viewOp.getViewSource());
-
-  // Nothing to do for all the other cases.
-  // Assume it is a valid buffer, if the value comes from a device allocation,
-  // a function call, a function arguments, device allocation etc.
-  return nullptr;
 }
 
 struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
