@@ -1,27 +1,14 @@
 env:
-  # Required environment to call this script
-  #  - TPPROOT
-  #  - BUILD_DIR
-  #  - SRUN
-  LLVMROOT: "${TPPROOT}/llvm"
-  INSTALL_PREFIX: "${TPPROOT}/compiler"
   NPROCS_LIMIT_LINK: "8"
   #LIBXSMM_VERBOSE: 4
   #LIBXSMMFETCH: 1
-  TPP_CLANGVER: "16.0.4"
-  TPP_GCCVER: "12.3.0"
 
 steps:
   - label: "LLVM"
     command: "scripts/buildkite/check_llvm.sh"
   - wait
 
-  - label: "TPP-MLIR-gcc"
-    command: "${SRUN} --partition=clxtrb --time=0:30:00 -- \
-              'KIND=RelWithDebInfo COMPILER=gcc CHECK=1 \
-              scripts/buildkite/build_tpp.sh'"
-
   - label: "TPP-MLIR-clang"
-    command: "${SRUN} --partition=clxtrb --time=0:30:00 -- \
+    command: "${SRUN} --partition=clxap --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 \
               scripts/buildkite/build_tpp.sh'"

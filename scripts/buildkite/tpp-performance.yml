@@ -1,14 +1,7 @@
 env:
-  # Required environment to call this script
-  #  - TPPROOT
-  #  - BUILD_DIR
-  #  - SRUN
-  LLVMROOT: "${TPPROOT}/llvm"
   NPROCS_LIMIT_LINK: "8"
   #LIBXSMM_VERBOSE: 4
   #LIBXSMMFETCH: 1
-  TPP_CLANGVER: "16.0.4"
-  TPP_GCCVER: "12.3.0"
 
 # upload with absolute path but symlinks not resolved (-P), mount point is different on head/compute node, upload even if failure
 steps:
@@ -17,9 +10,6 @@ steps:
   - wait
 
   - label: "TPP-MLIR-performance"
-    command: "${SRUN} --partition=clxtrb --time=1:30:00 -- 'KIND=Release COMPILER=clang LINKER=lld scripts/buildkite/benchmark.sh'"
-    env:
-      LOGRPTSUM: "mlir"
-      LOGRPTBND: "-"
-      LOGRPTQRY: ""
-      LOGRPTSEP: -1
+    command: "${SRUN} --partition=spr --time=1:30:00 -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh'"

@@ -59,10 +59,3 @@ if [ "${GPU_OPTION}" == "vulkan" ]; then
   echo "No Vulkan benchmarks"
   exit 1
 fi
-
-# Summary report for all benchmarks
-echo "+++ REPORT"
-if [ "main" == "${BUILDKITE_BRANCH}" ]; then
-  export LOGRPTBRN=main
-fi
-eval "${LIBXSMMROOT}/scripts/tool_logrept.sh ${LOGFILE}"
