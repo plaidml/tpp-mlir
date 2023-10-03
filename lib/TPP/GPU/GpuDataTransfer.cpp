@@ -138,32 +138,76 @@ static void transferMemrefAlloc_OLD(RewriterBase &rewriter,
 }
 
 // Move host global data to device when needed.
-static void transferMemrefGlobal(RewriterBase &rewriter,
-                                 memref::GetGlobalOp globalOp) {}
+static void transferMemrefGlobal_OLD(RewriterBase &rewriter,
+                                     memref::GetGlobalOp globalOp) {}
 
 // Transfer host allocated data between host and device.
 static Value transferMemrefAlloc(RewriterBase &rewriter,
                                  gpu::LaunchFuncOp launchFuncOp,
-                                 size_t operandId, memref::AllocOp allocOp) {
-  auto loc = allocOp.getLoc();
+                                 memref::AllocOp allocOp) {
+  auto loc = launchFuncOp.getLoc();
 
   OpBuilder::InsertionGuard guard(rewriter);
-
-  // Copy to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-  auto gpuAlloc =
-      rewriter.create<gpu::AllocOp>(loc, TypeRange({allocOp.getMemref()}),
-                                    ValueRange{}, ValueRange{}, ValueRange{});
 
+  // Alloc device buffer.
   Value hostBuffer = allocOp.getMemref();
+  auto gpuAlloc = rewriter.create<gpu::AllocOp>(
+      loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
+  // Copy data to the device.
   Value gpuBuffer = gpuAlloc.getMemref();
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
-  // Copy back to the host.
   rewriter.setInsertionPointAfter(launchFuncOp);
+
+  // Copy back to the host - data might have been updated.
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
                                  gpuBuffer);
+  // Cleanup device buffer.
+  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
+
+  return gpuBuffer;
+}
+
+// Transfer host global data to device.
+static Value transferMemrefGlobal(RewriterBase &rewriter,
+                                  gpu::LaunchFuncOp launchFuncOp,
+                                  memref::GetGlobalOp getGlobalOp) {
+  auto loc = launchFuncOp.getLoc();
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(launchFuncOp);
+
+  // Alloc device buffer.
+  Value hostBuffer = getGlobalOp.getResult();
+  auto gpuAlloc = rewriter.create<gpu::AllocOp>(
+      loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
+  // Copy data to the device.
+  Value gpuBuffer = gpuAlloc.getMemref();
+  rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
+                                 hostBuffer);
+
+  bool isGlobalConst = false;
+
+  // Get to the memref.global defining the symbol.
+  auto *symbolTableOp = getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
+  if (symbolTableOp) {
+    if (auto globalOp =
+            dyn_cast_or_null<memref::GlobalOp>(SymbolTable::lookupSymbolIn(
+                symbolTableOp, getGlobalOp.getNameAttr()))) {
+      isGlobalConst = globalOp.getConstant();
+    }
+  }
+
+  rewriter.setInsertionPointAfter(launchFuncOp);
+
+  // Copy back to the host if it is not a constant value.
+  if (!isGlobalConst) {
+    rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
+                                   gpuBuffer);
+  }
+  // Cleanup device buffer.
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
 
   return gpuBuffer;
@@ -202,20 +246,25 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
     // Track if there are any changes to the root.
     bool updatedOperands = false;
 
-    for (auto [index, operand] :
-         llvm::enumerate(launchFuncOp.getKernelOperands())) {
+    for (auto operand : launchFuncOp.getKernelOperands()) {
       Operation *src = getDeviceTransferableBuffer(operand);
       if (!src) {
+        // Not a transferable operand. Keep it as is.
         newOperands.push_back(operand);
         continue;
       }
 
-      // Any transferable buffer n
+      // Operand can be moved to the device.
+      // The kernel launch will be updated.
       updatedOperands = true;
 
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
+        auto newOperand = transferMemrefAlloc(rewriter, launchFuncOp, allocOp);
+        newOperands.push_back(newOperand);
+      }
+      if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
         auto newOperand =
-            transferMemrefAlloc(rewriter, launchFuncOp, index, allocOp);
+            transferMemrefGlobal(rewriter, launchFuncOp, getGlobalOp);
         newOperands.push_back(newOperand);
       }
     }
