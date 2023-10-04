@@ -283,7 +283,6 @@ module attributes {gpu.container_module} {
     gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c1, %c1, %c1)
         args(%0 : memref<8x8xf32>)
     %cast = memref.cast %0 : memref<8x8xf32> to memref<?x?xf32>
-    // call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     linalg.fill ins(%cst : f32) outs(%cast : memref<?x?xf32>)
     memref.dealloc %0 : memref<8x8xf32>
 
@@ -294,12 +293,68 @@ module attributes {gpu.container_module} {
       gpu.return
     }
   }
-
-  func.func private @printMemrefF32(%ptr : memref<*xf32>)
 }
 
 
 // CHECK-LABEL: @host_device_users
+// CHECK-NOT: memref.alloc
+// CHECK: gpu.alloc
+// CHECK: gpu.launch_func
+// CHECK-NOT: memref.dealloc
+// CHECK: gpu.dealloc
+
+// -----
+
+module attributes {gpu.container_module} {
+  func.func @subview_cast_mix() {
+    %c1 = arith.constant 1 : index
+
+    %0 = memref.alloc() : memref<32x32xf32>
+    %cast = memref.cast %0 : memref<32x32xf32> to memref<?x?xf32>
+    %subview = memref.subview %cast[0, 0] [8, 8] [1, 1] : memref<?x?xf32> to memref<8x8xf32, strided<[?, 1], offset: ?>>
+    gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c1, %c1, %c1)
+        args(%subview : memref<8x8xf32, strided<[?, 1], offset: ?>>)
+    memref.dealloc %0 : memref<32x32xf32>
+
+    return
+  }
+  gpu.module @entry_kernel {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[?, 1], offset: ?>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+      gpu.return
+    }
+  }
+}
+
+// CHECK-LABEL: @subview_cast_mix
+// CHECK-NOT: memref.alloc
+// CHECK: gpu.alloc
+// CHECK: gpu.launch_func
+// CHECK-NOT: memref.dealloc
+// CHECK: gpu.dealloc
+
+// -----
+
+module attributes {gpu.container_module} {
+  func.func @cast_subview_mix() {
+    %c1 = arith.constant 1 : index
+
+    %0 = memref.alloc() : memref<32x32xf32>
+    %subview = memref.subview %0[0, 0] [8, 8] [1, 1] : memref<32x32xf32> to memref<8x8xf32, strided<[32, 1]>>
+    %cast = memref.cast %subview : memref<8x8xf32, strided<[32, 1]>> to memref<?x?xf32, strided<[?, 1]>>
+    gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c1, %c1, %c1)
+        args(%cast :  memref<?x?xf32, strided<[?, 1]>>)
+    memref.dealloc %0 : memref<32x32xf32>
+
+    return
+  }
+  gpu.module @entry_kernel {
+    gpu.func @entry_kernel(%arg0:  memref<?x?xf32, strided<[?, 1]>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+      gpu.return
+    }
+  }
+}
+
+// CHECK-LABEL: @subview_cast_mix
 // CHECK-NOT: memref.alloc
 // CHECK: gpu.alloc
 // CHECK: gpu.launch_func

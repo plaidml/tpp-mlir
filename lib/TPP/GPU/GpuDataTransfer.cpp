@@ -47,11 +47,11 @@ static Operation *getDeviceTransferableBuffer(Value val) {
   return nullptr;
 }
 
-// Matches the host and device buffer such that data can be transfered
-// correctly between them.
+// Matches the kernel operand and device buffer types such that data can be
+// transfered correctly from the original host buffer.
 static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
                                           Value kernelOperand,
-                                          Value &hostBuffer, Value &gpuBuffer) {
+                                          Value &gpuBuffer) {
   auto loc = gpuBuffer.getLoc();
 
   auto operandType = kernelOperand.getType().cast<MemRefType>();
@@ -62,10 +62,14 @@ static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
   if (operandType == gpuAllocType)
     return success();
 
-  // Use the host operand directly as a host buffer to ensure the type
-  // matches correctly for data copy.
-  // Device buffer type has to be adapted.
-  hostBuffer = kernelOperand;
+  // Examine view source type. More type conversions might be needed.
+  if (auto viewOp =
+          dyn_cast<mlir::ViewLikeOpInterface>(kernelOperand.getDefiningOp())) {
+    if (failed(matchTransferBuffers(rewriter, viewOp.getViewSource(),
+                                    gpuBuffer))) {
+      return failure();
+    }
+  }
 
   // Cast device allocation to match the operand if possible.
   if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
@@ -115,8 +119,14 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
 
   // Copy data to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-  if (failed(matchTransferBuffers(rewriter, operand, hostBuffer, gpuBuffer)))
-    return failure();
+  if (operand.getType() != gpuBuffer.getType()) {
+    // Use the kernel operand directly as the host buffer to ensure the type
+    // matches correctly for data copy.
+    // Device buffer type has to be adapted.
+    hostBuffer = operand;
+    if (failed(matchTransferBuffers(rewriter, operand, gpuBuffer)))
+      return failure();
+  }
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
