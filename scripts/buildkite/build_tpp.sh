@@ -113,8 +113,10 @@ fi
 # Benchmark
 if [ "1" == "${BENCH}" ]; then
   echo "--- BENCHMARK"
-  export LOGFILE=benchmark-output.txt
-  ${SCRIPT_DIR}/ci/build.sh \
+  if ! ${SCRIPT_DIR}/ci/build.sh \
     -b ${BUILD_DIR} \
-    -B | tee ${LOGFILE}
+    -B
+  then
+    exit 1
+  fi
 fi

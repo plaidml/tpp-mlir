@@ -27,7 +27,7 @@ func.func @entry(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf32>, 
   } -> tensor<8x32x32x32xf32>
   %3 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<8x32x32x32xf32>) outs(%arg3 : tensor<8x32x32x32xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<8x32x32x32xf32>
 
@@ -45,7 +45,7 @@ func.func @entry(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf32>, 
   } -> tensor<8x32x32x32xf32>
   %7 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%6 : tensor<8x32x32x32xf32>) outs(%arg6 : tensor<8x32x32x32xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<8x32x32x32xf32>
 
@@ -63,7 +63,7 @@ func.func @entry(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf32>, 
   } -> tensor<8x32x32x32xf32>
   %11 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%10 : tensor<8x32x32x32xf32>) outs(%arg9 : tensor<8x32x32x32xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %max = arith.maxf %in, %cst : f32
+      %max = arith.maximumf %in, %cst : f32
       linalg.yield %max : f32
   } -> tensor<8x32x32x32xf32>
 
