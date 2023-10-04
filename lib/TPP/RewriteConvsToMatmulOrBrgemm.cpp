@@ -369,23 +369,6 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     assert(false && "expect tensor or memref");
   }
 
-  // Return the original value if the type is unchanged, or expand it. Assert
-  // if this is an unsupported type.
-  Value expand(Value result, Type origResultType, ArrayAttr reassociationMap,
-               Location loc, PatternRewriter &rewriter) const {
-    if (origResultType == result.getType())
-      return result;
-    if (origResultType.isa<RankedTensorType>()) {
-      return rewriter.create<tensor::ExpandShapeOp>(loc, origResultType, result,
-                                                    reassociationMap);
-    }
-    if (origResultType.isa<MemRefType>()) {
-      return rewriter.create<memref::ExpandShapeOp>(loc, origResultType, result,
-                                                    reassociationMap);
-    }
-    assert(false && "expect tensor or memref");
-  }
-
   // Collapse dimension at index 'startCollapse' to 'endCollapse'.
   Type getCollapsedType(OpOperand *operand, size_t startCollapse,
                         size_t endCollapse) const {
@@ -490,10 +473,9 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
         output.get().getType().cast<ShapedType>());
     if (!reassociationOutput)
       return failure();
-    Value resExpanded =
-        expand(res, output.get().getType(),
-               getReassociationIndicesAttribute(rewriter, *reassociationOutput),
-               loc, rewriter);
+    Value resExpanded = linalgx::utils::expand(
+        rewriter, loc, res, output.get().getType(),
+        getReassociationIndicesAttribute(rewriter, *reassociationOutput));
     rewriter.replaceOp(linalgOp, resExpanded);
     return success();
   }

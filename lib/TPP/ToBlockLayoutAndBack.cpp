@@ -719,6 +719,7 @@ struct PropagatePackUnPack
 };
 
 // TODO: (lorenzo) Upstream in `populateSimplifyTensorPack`.
+// Do not pack an empty.
 struct SimplifyPackToEmpty : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
 
@@ -732,6 +733,113 @@ struct SimplifyPackToEmpty : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
+// If all the tiled dimension create unit tile loops pack can be rewritten as
+// a reshape.
+struct PackAsReshape : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    if (packOp.getPaddingValue())
+      return failure();
+    RankedTensorType sourceType = packOp.getSourceType();
+    ArrayRef<int64_t> sourceShape = sourceType.getShape();
+    size_t dimsToDrop = 0;
+    for (auto [dim, tile] : packOp.getDimAndTileMapping()) {
+      auto constantTile = getConstantIntValue(tile);
+      if (constantTile && sourceShape[dim] == *constantTile)
+        dimsToDrop++;
+    }
+    // All the tiled dimension need to be dropped, we cannot drop
+    // single dimensions.
+    if (dimsToDrop != sourceShape.size())
+      return failure();
+
+    auto reassoc = getReassociationIndicesForReshape(packOp.getSourceType(),
+                                                     packOp.getDestType());
+    if (!reassoc)
+      return failure();
+    Value expanded = linalgx::utils::expand(
+        rewriter, packOp.getLoc(), packOp.getSource(), packOp.getDestType(),
+        getReassociationIndicesAttribute(rewriter, *reassoc));
+    rewriter.replaceOp(packOp, expanded);
+    return success();
+  }
+};
+
+// Fold: expand_shape(tensor.pack).
+struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    if (!packOp.getOuterDimsPerm().empty())
+      return failure();
+
+    auto expandShapeOp =
+        packOp.getSource().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!expandShapeOp)
+      return failure();
+    SmallVector<ReassociationIndices, 4> reassoc =
+        expandShapeOp.getReassociationIndices();
+    // The operation must expand only leading dimensions.
+    for (int i = reassoc.size() - 1; i > 0; i--)
+      if (reassoc[i].size() != 1)
+        return failure();
+
+    // Shift the innerDimsPos by the number of leading ones.
+    SmallVector<int64_t> innerDimsPos =
+        llvm::to_vector(packOp.getInnerDimsPos());
+    int64_t shift = reassoc[0].size() - 1;
+    for (size_t i = 0; i < innerDimsPos.size(); i++)
+      innerDimsPos[i] = innerDimsPos[i] - shift;
+
+    auto newPackType = tensor::PackOp::inferPackedType(
+        expandShapeOp.getSrcType(), packOp.getStaticInnerTiles(), innerDimsPos,
+        packOp.getOuterDimsPerm());
+    auto reassocExpand =
+        getReassociationIndicesForReshape(newPackType, packOp.getDestType());
+    if (!reassocExpand)
+      return failure();
+
+    Value destTensor = tensor::PackOp::createDestinationTensor(
+        rewriter, packOp.getLoc(), expandShapeOp.getSrc(),
+        packOp.getMixedTiles(), innerDimsPos, packOp.getOuterDimsPerm());
+    Value packedVal = rewriter.create<tensor::PackOp>(
+        packOp.getLoc(), expandShapeOp.getSrc(), destTensor, innerDimsPos,
+        packOp.getMixedTiles(), packOp.getPaddingValue(),
+        packOp.getOuterDimsPerm());
+
+    Value expanded = linalgx::utils::expand(
+        rewriter, packOp.getLoc(), packedVal, packOp.getDestType(),
+        getReassociationIndicesAttribute(rewriter, *reassocExpand));
+    rewriter.replaceOp(packOp, expanded);
+
+    return success();
+  }
+};
+
+struct FoldExpandShapeInParallelInsertOp
+    : public OpRewritePattern<tensor::ParallelInsertSliceOp> {
+  using OpRewritePattern<tensor::ParallelInsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ParallelInsertSliceOp insertOp,
+                                PatternRewriter &rewriter) const override {
+    auto expandShapeOp =
+        insertOp.getSource().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!expandShapeOp)
+      return failure();
+    SliceVerificationResult res = isRankReducedType(
+        expandShapeOp.getResultType(), expandShapeOp.getSrcType());
+    if (res != SliceVerificationResult::Success)
+      return failure();
+    rewriter.updateRootInPlace(insertOp, [&]() {
+      insertOp.setOperand(/*source=*/0, expandShapeOp.getSrc());
+    });
+    return success();
+  }
+};
+
 struct SimplifyAndCanonicalizePack
     : public SimplifyAndCanonicalizePackBase<SimplifyAndCanonicalizePack> {
   void runOnOperation() override {
@@ -741,7 +849,9 @@ struct SimplifyAndCanonicalizePack
     tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
-    patterns.add<SimplifyPackToEmpty>(ctx);
+    patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
+                 FoldExpandShapeInParallelInsertOp>(ctx);
+    tensor::populateReassociativeReshapeFoldingPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
