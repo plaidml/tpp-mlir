@@ -21,10 +21,11 @@ module attributes {gpu.container_module} {
 
 
 // CHECK-LABEL: @alloc_only_device_users
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
 // CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
 // CHECK: gpu.dealloc
 
 // -----
@@ -54,11 +55,16 @@ module attributes {gpu.container_module} {
 
 
 // CHECK-LABEL: @alloc_with_subview
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
-// CHECK: gpu.dealloc
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK:     scf.for
+// CHECK-DAG:   %[[HOST_SUB:.+]] = memref.subview %[[HOST]]
+// CHECK-DAG:   %[[GPU_SUB:.+]] = memref.subview %[[GPU]]
+// CHECK:       gpu.memcpy  %[[GPU_SUB]], %[[HOST_SUB]]
+// CHECK:       gpu.launch_func{{.*}}args(%[[GPU_SUB]]
+// CHECK:       gpu.memcpy  %[[HOST_SUB]], %[[GPU_SUB]]
+// CHECK:     }
+// CHECK:     gpu.dealloc
 
 // -----
 
@@ -83,10 +89,12 @@ module attributes {gpu.container_module} {
 
 
 // CHECK-LABEL: @alloc_with_cast
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[CAST:.+]] = memref.cast %[[GPU]]
+// CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[CAST]]
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
 // CHECK: gpu.dealloc
 
 // -----
@@ -140,19 +148,18 @@ module attributes {gpu.container_module} {
 
 // CHECK-LABEL: @global_only_device_users
 // Non-constant global
-// CHECK-DAG: %[[GLOBAL:.+]] = memref.get_global @__global
 // CHECK-DAG: %[[gpuGlobal:.+]] = gpu.alloc
+// CHECK-DAG: %[[gpuConst:.+]] = gpu.alloc
+// CHECK-DAG: %[[GLOBAL:.+]] = memref.get_global @__global
 // CHECK: gpu.memcpy %[[gpuGlobal]], %[[GLOBAL]]
 // CHECK: gpu.launch_func  @entry_kernel::@entry_kernel
 // CHECK: gpu.memcpy %[[GLOBAL]], %[[gpuGlobal]]
-// CHECK: gpu.dealloc %[[gpuGlobal]]
 // Constant global
-// CHECK-DAG: %[[CONST:.+]] = memref.get_global @__constant_global
-// CHECK-DAG: %[[gpuConst:.+]] = gpu.alloc
+// CHECK: %[[CONST:.+]] = memref.get_global @__constant_global
 // CHECK: gpu.memcpy %[[gpuConst]], %[[CONST]]
 // CHECK: gpu.launch_func  @entry_kernel::@entry_kernel_1
 // CHECK-NOT: gpu.memcpy
-// CHECK: gpu.dealloc %[[gpuConst]]
+// CHECK-COUNT-2: gpu.dealloc
 
 // -----
 
@@ -179,13 +186,17 @@ module attributes {gpu.container_module} {
   }
 }
 
-
-// CHECK-LABEL: @alloc_with_subview
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
-// CHECK: gpu.dealloc
+// CHECK-LABEL: @global_with_subview
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[GLOBAL:.+]] = memref.get_global @__constant_global
+// CHECK:     scf.for
+// CHECK-DAG:   %[[GLOBAL_SUB:.+]] = memref.subview %[[GLOBAL]]
+// CHECK-DAG:   %[[GPU_SUB:.+]] = memref.subview %[[GPU]]
+// CHECK:       gpu.memcpy  %[[GPU_SUB]], %[[GLOBAL_SUB]]
+// CHECK:       gpu.launch_func{{.*}}args(%[[GPU_SUB]]
+// CHECK-NOT:   gpu.memcpy
+// CHECK:     }
+// CHECK:     gpu.dealloc
 
 // -----
 
@@ -208,12 +219,13 @@ module attributes {gpu.container_module} {
   }
 }
 
-
-// CHECK-LABEL: @alloc_with_cast
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-LABEL: @global_with_cast
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[GLOBAL:.+]] = memref.get_global @__constant_global
+// CHECK-DAG: %[[CAST:.+]] = memref.cast %[[GPU]]
+// CHECK: gpu.memcpy  %[[GPU]], %[[GLOBAL]]
+// CHECK: gpu.launch_func{{.*}}args(%[[CAST]]
+// CHECK-NOT: gpu.memcpy
 // CHECK: gpu.dealloc
 
 // -----
@@ -231,12 +243,12 @@ module attributes {gpu.container_module} {
 }
 
 // CHECK-LABEL: @global_only_host_users
-// CHECK: memref.get_global
 // CHECK-NOT: gpu.alloc
+// CHECK: memref.get_global
 // CHECK-NOT: gpu.memcpy
 // CHECK: linalg.fill
 // CHECK-NOT: gpu.memcpy
-// CHECK: memref.dealloc
+// CHECK-NOT: gpu.dealloc
 
 // -----
 
@@ -263,18 +275,22 @@ module attributes {gpu.container_module} {
   }
 }
 
-
-// CHECK-LABEL: @alloc_only_device_users
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-LABEL: @kernel_launch_chain
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[GPU1:.+]] = gpu.alloc
+// CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[GPU]]
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
+// CHECK: gpu.memcpy  %[[GPU1]], %[[HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[GPU1]]
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU1]]
 // CHECK: gpu.dealloc
 
 // -----
 
 module attributes {gpu.container_module} {
-  func.func @host_device_users() {
+  func.func @mixed_users() {
     %c1 = arith.constant 1 : index
     %cst = arith.constant 5.0 : f32
 
@@ -295,12 +311,14 @@ module attributes {gpu.container_module} {
   }
 }
 
-
-// CHECK-LABEL: @host_device_users
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-LABEL: @mixed_users
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK: linalg.fill{{.*}}outs(%[[HOST]]
+// CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[GPU]]
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
+// CHECK: linalg.fill{{.*}}outs(%[[HOST]]
 // CHECK: gpu.dealloc
 
 // -----
@@ -326,10 +344,15 @@ module attributes {gpu.container_module} {
 }
 
 // CHECK-LABEL: @subview_cast_mix
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[CAST_GPU:.+]] = memref.cast %[[GPU]]
+// CHECK-DAG: %[[CAST_HOST:.+]] = memref.cast %[[HOST]]
+// CHECK-DAG: %[[SUB_GPU:.+]] = memref.subview %[[CAST_GPU]]
+// CHECK-DAG: %[[SUB_HOST:.+]] = memref.subview %[[CAST_HOST]]
+// CHECK: gpu.memcpy  %[[SUB_GPU]], %[[SUB_HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[SUB_GPU]]
+// CHECK: gpu.memcpy  %[[SUB_HOST]], %[[SUB_GPU]]
 // CHECK: gpu.dealloc
 
 // -----
@@ -354,9 +377,13 @@ module attributes {gpu.container_module} {
   }
 }
 
-// CHECK-LABEL: @subview_cast_mix
-// CHECK-NOT: memref.alloc
-// CHECK: gpu.alloc
-// CHECK: gpu.launch_func
-// CHECK-NOT: memref.dealloc
+// CHECK-LABEL: @cast_subview_mix
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK-DAG: %[[SUB_GPU:.+]] = memref.subview %[[GPU]]
+// CHECK-DAG: %[[SUB_HOST:.+]] = memref.subview %[[HOST]]
+// CHECK-DAG: %[[CAST_GPU:.+]] = memref.cast %[[SUB_GPU]]
+// CHECK: gpu.memcpy  %[[SUB_GPU]], %[[SUB_HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[CAST_GPU]]
+// CHECK: gpu.memcpy  %[[SUB_HOST]], %[[SUB_GPU]]
 // CHECK: gpu.dealloc
