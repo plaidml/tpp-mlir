@@ -19,12 +19,42 @@ module attributes {gpu.container_module} {
   }
 }
 
-
 // CHECK-LABEL: @alloc_only_device_users
 // CHECK-DAG: %[[HOST:.+]] = memref.alloc
 // CHECK-DAG: %[[GPU:.+]] = gpu.alloc
 // CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
 // CHECK: gpu.launch_func
+// CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
+// CHECK: gpu.dealloc
+
+// -----
+
+// Assumes that the buffer passed to the function lives in the correct space.
+// In this case, %arg0 is assumed to be allocated on the device.
+module attributes {gpu.container_module} {
+  func.func @kernel_alloc_argument(%arg0: memref<8x8xf32>) {
+    %c1 = arith.constant 1 : index
+
+    %0 = memref.alloc() : memref<8x8xf32>
+    gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c1, %c1, %c1)
+        args(%0 : memref<8x8xf32>, %arg0 : memref<8x8xf32>)
+    memref.dealloc %0 : memref<8x8xf32>
+
+    return
+  }
+  gpu.module @entry_kernel {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>, %arg1: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+      gpu.return
+    }
+  }
+}
+
+// CHECK-LABEL: @kernel_alloc_argument(
+// CHECK-SAME: %[[arg0:.+]]: memref<8x8xf32>
+// CHECK-DAG: %[[HOST:.+]] = memref.alloc
+// CHECK-DAG: %[[GPU:.+]] = gpu.alloc
+// CHECK: gpu.memcpy  %[[GPU]], %[[HOST]]
+// CHECK: gpu.launch_func{{.*}}args(%[[GPU]]{{.*}}, %[[arg0]]
 // CHECK: gpu.memcpy  %[[HOST]], %[[GPU]]
 // CHECK: gpu.dealloc
 
@@ -52,7 +82,6 @@ module attributes {gpu.container_module} {
     }
   }
 }
-
 
 // CHECK-LABEL: @alloc_with_subview
 // CHECK-DAG: %[[HOST:.+]] = memref.alloc
@@ -86,7 +115,6 @@ module attributes {gpu.container_module} {
     }
   }
 }
-
 
 // CHECK-LABEL: @alloc_with_cast
 // CHECK-DAG: %[[HOST:.+]] = memref.alloc

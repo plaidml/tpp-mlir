@@ -137,6 +137,10 @@ private:
       std::string gpuChip = "sm_70";
       std::string gpuFeatures = "+ptx60";
 
+      // Perform explicit GPU data transfers only for CUDA as the unified
+      // memory is not currently used here.
+      // Vulkan runner assumes unified memory.
+      pm.addNestedPass<func::FuncOp>(createGpuDataTransferPass());
       pm.addPass(createGpuToCudaPass(gpuTriple, gpuChip, gpuFeatures));
       break;
     }

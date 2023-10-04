@@ -30,7 +30,11 @@ static Operation *getDeviceTransferableBuffer(Value val) {
   if (!isa<MemRefType>(val.getType()))
     return nullptr;
 
+  // Assume it is a valid buffer, if the operation that defines the value
+  // is not available e.g., buffer coming from a function argument.
   Operation *op = val.getDefiningOp();
+  if (!op)
+    return nullptr;
 
   // Host-space allocation or a global variable can be easily transfered to
   // a device.
