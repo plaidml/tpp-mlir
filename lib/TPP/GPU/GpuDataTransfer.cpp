@@ -93,19 +93,22 @@ static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
   return failure();
 }
 
-// Transfer host allocated data between host and device.
-static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
-                                            gpu::LaunchFuncOp launchFuncOp,
-                                            Value operand,
-                                            memref::AllocOp allocOp) {
+// Transfer host allocated data between the host and a device.
+static FailureOr<Value> transferMemref(RewriterBase &rewriter,
+                                       gpu::LaunchFuncOp launchFuncOp,
+                                       Value operand, Value hostBuffer,
+                                       bool copyDataBack = true) {
+  // A memref buffer is expected.
+  if (!isa<MemRefType>(hostBuffer.getType()))
+    return failure();
+
   auto loc = launchFuncOp.getLoc();
   auto &block = launchFuncOp->getParentOfType<func::FuncOp>().getBody().front();
 
   OpBuilder::InsertionGuard guard(rewriter);
 
-  // Alloc device buffer.
+  // Allocate device buffer.
   rewriter.setInsertionPointToStart(&block);
-  Value hostBuffer = allocOp.getMemref();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
   Value gpuBuffer = gpuAlloc.getMemref();
@@ -117,60 +120,13 @@ static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
-  // Copy back to the host - data might have been updated.
-  rewriter.setInsertionPointAfter(launchFuncOp);
-  rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
-                                 gpuBuffer);
-  // Cleanup device buffer.
-  rewriter.setInsertionPoint(block.getTerminator());
-  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
-
-  return gpuBuffer;
-}
-
-// Transfer host global data to device.
-static FailureOr<Value> transferMemrefGlobal(RewriterBase &rewriter,
-                                             gpu::LaunchFuncOp launchFuncOp,
-                                             Value operand,
-                                             memref::GetGlobalOp getGlobalOp) {
-  auto loc = launchFuncOp.getLoc();
-  auto &block = launchFuncOp->getParentOfType<func::FuncOp>().getBody().front();
-
-  OpBuilder::InsertionGuard guard(rewriter);
-
-  // Alloc device buffer.
-  rewriter.setInsertionPointToStart(&block);
-  Value hostBuffer = getGlobalOp.getResult();
-  auto gpuAlloc = rewriter.create<gpu::AllocOp>(
-      loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
-  Value gpuBuffer = gpuAlloc.getMemref();
-
-  // Copy data to the device.
-  rewriter.setInsertionPoint(launchFuncOp);
-  if (failed(matchTransferBuffers(rewriter, operand, hostBuffer, gpuBuffer)))
-    return failure();
-  rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
-                                 hostBuffer);
-
-  bool isGlobalConst = false;
-
-  // Get to the memref.global defining the symbol.
-  auto *symbolTableOp = getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>();
-  if (symbolTableOp) {
-    if (auto globalOp =
-            dyn_cast_or_null<memref::GlobalOp>(SymbolTable::lookupSymbolIn(
-                symbolTableOp, getGlobalOp.getNameAttr()))) {
-      isGlobalConst = globalOp.getConstant();
-    }
-  }
-
-
-  // Copy back to the host if it is not a constant value.
-  if (!isGlobalConst) {
-    rewriter.setInsertionPoint(launchFuncOp);
+  // If requested, copy data back to the host.
+  if (copyDataBack) {
+    rewriter.setInsertionPointAfter(launchFuncOp);
     rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
                                    gpuBuffer);
   }
+
   // Cleanup device buffer.
   rewriter.setInsertionPoint(block.getTerminator());
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
@@ -204,12 +160,27 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
       FailureOr<Value> newOperand = failure();
 
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
+        // Copy data back to the host as it might have been updated on device.
         newOperand =
-            transferMemrefAlloc(rewriter, launchFuncOp, operand, allocOp);
+            transferMemref(rewriter, launchFuncOp, operand, allocOp.getMemref(),
+                           /*copyDataBack=*/true);
       }
       if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
-        newOperand =
-            transferMemrefGlobal(rewriter, launchFuncOp, operand, getGlobalOp);
+        // Data does not need to be updated if the global data is constant
+        // (read-only).
+        bool isGlobalConst = false;
+        if (auto *symbolTableOp =
+                getGlobalOp->getParentWithTrait<OpTrait::SymbolTable>()) {
+          if (auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
+                  SymbolTable::lookupSymbolIn(symbolTableOp,
+                                              getGlobalOp.getNameAttr()))) {
+            isGlobalConst = globalOp.getConstant();
+          }
+        }
+
+        newOperand = transferMemref(rewriter, launchFuncOp, operand,
+                                    getGlobalOp.getResult(),
+                                    /*copyDataBack=*/!isGlobalConst);
       }
 
       if (failed(newOperand))
