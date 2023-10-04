@@ -360,35 +360,3 @@ module attributes {gpu.container_module} {
 // CHECK: gpu.launch_func
 // CHECK-NOT: memref.dealloc
 // CHECK: gpu.dealloc
-
-// -----
-
-// func.func @entry() {
-//   %0 = memref.alloc() : memref<8x8xf32>
-//   %1 = memref.alloc() : memref<8x8xf32>
-//   %2 = memref.alloc() : memref<8x8xf32>
-
-//   %cst0 = arith.constant 0.0 : f32
-//   %cst1 = arith.constant 1.0 : f32
-//   %cst2 = arith.constant 2.0 : f32
-
-//   linalg.fill ins(%cst1 : f32) outs(%0 : memref<8x8xf32>)
-//   linalg.fill ins(%cst2 : f32) outs(%1 : memref<8x8xf32>)
-//   linalg.fill ins(%cst0 : f32) outs(%2 : memref<8x8xf32>)
-
-//   linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-//                 outs(%2 : memref<8x8xf32>)
-
-//   %cast = memref.cast %2 : memref<8x8xf32> to memref<*xf32>
-//   call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
-
-//   memref.dealloc %0 : memref<8x8xf32>
-//   memref.dealloc %1 : memref<8x8xf32>
-//   memref.dealloc %2 : memref<8x8xf32>
-
-//   return
-// }
-
-// func.func private @printMemrefF32(memref<*xf32>)
-
-// CHECK-COUNT-8: [16, 16, 16, 16, 16, 16, 16, 16]
