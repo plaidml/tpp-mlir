@@ -164,9 +164,10 @@ static void transferMemrefGlobal_OLD(RewriterBase &rewriter,
                                      memref::GetGlobalOp globalOp) {}
 
 // Transfer host allocated data between host and device.
-static Value transferMemrefAlloc(RewriterBase &rewriter,
-                                 gpu::LaunchFuncOp launchFuncOp, Value operand,
-                                 memref::AllocOp allocOp) {
+static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
+                                            gpu::LaunchFuncOp launchFuncOp,
+                                            Value operand,
+                                            memref::AllocOp allocOp) {
   auto loc = launchFuncOp.getLoc();
   auto block = launchFuncOp->getBlock();
 
@@ -199,6 +200,8 @@ static Value transferMemrefAlloc(RewriterBase &rewriter,
                           subview.getStaticOffsets(), subview.getStaticSizes(),
                           subview.getStaticStrides())
                       .getResult();
+    } else {
+      return failure();
     }
   }
 
@@ -223,9 +226,10 @@ static Value transferMemrefAlloc(RewriterBase &rewriter,
 }
 
 // Transfer host global data to device.
-static Value transferMemrefGlobal(RewriterBase &rewriter,
-                                  gpu::LaunchFuncOp launchFuncOp, Value operand,
-                                  memref::GetGlobalOp getGlobalOp) {
+static FailureOr<Value> transferMemrefGlobal(RewriterBase &rewriter,
+                                             gpu::LaunchFuncOp launchFuncOp,
+                                             Value operand,
+                                             memref::GetGlobalOp getGlobalOp) {
   auto loc = launchFuncOp.getLoc();
   auto block = launchFuncOp->getBlock();
 
@@ -258,6 +262,8 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
                           subview.getStaticOffsets(), subview.getStaticSizes(),
                           subview.getStaticStrides())
                       .getResult();
+    } else {
+      return failure();
     }
   }
 
@@ -314,14 +320,18 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
       updatedOperands = true;
 
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
-        Value newOperand =
+        auto newOperand =
             transferMemrefAlloc(rewriter, launchFuncOp, operand, allocOp);
-        newOperands.push_back(newOperand);
+        if (failed(newOperand))
+          return failure();
+        newOperands.push_back(*newOperand);
       }
       if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
-        Value newOperand =
+        auto newOperand =
             transferMemrefGlobal(rewriter, launchFuncOp, operand, getGlobalOp);
-        newOperands.push_back(newOperand);
+        if (failed(newOperand))
+          return failure();
+        newOperands.push_back(*newOperand);
       }
     }
 
