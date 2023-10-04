@@ -169,12 +169,12 @@ static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
                                             Value operand,
                                             memref::AllocOp allocOp) {
   auto loc = launchFuncOp.getLoc();
-  auto block = launchFuncOp->getBlock();
+  auto &block = launchFuncOp->getParentOfType<func::FuncOp>().getBody().front();
 
   OpBuilder::InsertionGuard guard(rewriter);
 
   // Alloc device buffer.
-  rewriter.setInsertionPointAfter(allocOp);
+  rewriter.setInsertionPointToStart(&block);
   Value hostBuffer = allocOp.getMemref();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
@@ -213,13 +213,7 @@ static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, hostBuffer,
                                  gpuBuffer);
   // Cleanup device buffer.
-  rewriter.setInsertionPoint(block->getTerminator());
-  for (auto user : allocOp.getMemref().getUsers()) {
-    if (isa<memref::DeallocOp>(user)) {
-      rewriter.setInsertionPoint(user);
-      break;
-    }
-  }
+  rewriter.setInsertionPoint(block.getTerminator());
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
 
   return gpuBuffer;
@@ -231,12 +225,12 @@ static FailureOr<Value> transferMemrefGlobal(RewriterBase &rewriter,
                                              Value operand,
                                              memref::GetGlobalOp getGlobalOp) {
   auto loc = launchFuncOp.getLoc();
-  auto block = launchFuncOp->getBlock();
+  auto &block = launchFuncOp->getParentOfType<func::FuncOp>().getBody().front();
 
   OpBuilder::InsertionGuard guard(rewriter);
 
   // Alloc device buffer.
-  rewriter.setInsertionPointToStart(block);
+  rewriter.setInsertionPointToStart(&block);
   Value hostBuffer = getGlobalOp.getResult();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
@@ -290,7 +284,7 @@ static FailureOr<Value> transferMemrefGlobal(RewriterBase &rewriter,
                                    gpuBuffer);
   }
   // Cleanup device buffer.
-  rewriter.setInsertionPoint(block->getTerminator());
+  rewriter.setInsertionPoint(block.getTerminator());
   rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
 
   return gpuBuffer;
