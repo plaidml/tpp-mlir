@@ -25,118 +25,6 @@ using namespace mlir::tpp;
 
 namespace {
 
-// True if an operation represents memory access from a device.
-static bool isDeviceAccess(Operation *op) { return isa<gpu::LaunchFuncOp>(op); }
-
-// True if an operation performs memory access.
-static bool isMemoryAccess(Operation *op) {
-  if (auto memInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
-    return memInterface.hasEffect<mlir::MemoryEffects::Read>() ||
-           memInterface.hasEffect<mlir::MemoryEffects::Write>();
-  }
-
-  // Assume that every function call accesses passed memory.
-  if (isa<func::CallOp, gpu::LaunchFuncOp, mlir::CallOpInterface>(op))
-    return true;
-
-  return false;
-}
-
-// Move host allocated data between host and device.
-static void transferMemrefAlloc_OLD(RewriterBase &rewriter,
-                                    memref::AllocOp allocOp) {
-  auto loc = allocOp.getLoc();
-
-  // Gather all alloc users in order.
-  // Place users in order from the first to the last.
-  // 'getUsers()' starts from the last user.
-  llvm::SmallVector<Operation *, 32> allocUsers(allocOp->getUsers().begin(),
-                                                allocOp->getUsers().end());
-  std::reverse(allocUsers.begin(), allocUsers.end());
-
-  // TODO: follow memref aliases and gather their users too.
-  if (llvm::any_of(allocUsers,
-                   [](Operation *user) { return isa<memref::CastOp>(user); })) {
-    return;
-  }
-  // Do nothing in case there already are device copies present.
-  if (llvm::any_of(allocUsers,
-                   [](Operation *user) { return isa<gpu::MemcpyOp>(user); })) {
-    return;
-  }
-
-  // There must be at least one case where data is used by the device.
-  if (llvm::none_of(allocUsers,
-                    [](Operation *user) { return isDeviceAccess(user); })) {
-    return;
-  }
-
-  OpBuilder::InsertionGuard guard(rewriter);
-
-  // Replace the host alloc with a device alloc, if the buffer is not used on
-  // the host.
-  if (llvm::all_of(allocUsers, [](Operation *user) {
-        return !isMemoryAccess(user) || isDeviceAccess(user);
-      })) {
-    rewriter.setInsertionPoint(allocOp);
-    auto gpuAlloc =
-        rewriter.create<gpu::AllocOp>(loc, TypeRange({allocOp.getMemref()}),
-                                      ValueRange{}, ValueRange{}, ValueRange{});
-
-    // Replace the host dealloc with a device dealloc.
-    for (auto user : allocUsers) {
-      if (auto dealloc = dyn_cast<memref::DeallocOp>(user)) {
-        rewriter.setInsertionPoint(dealloc);
-        rewriter.replaceOpWithNewOp<gpu::DeallocOp>(dealloc, std::nullopt,
-                                                    gpuAlloc.getMemref());
-        break;
-      }
-    }
-
-    rewriter.replaceOp(allocOp, gpuAlloc.getMemref());
-
-    return;
-  }
-
-  // Examine invidividual users and insert copies from/to the device
-  // such that data is accessible for each user.
-  bool onDevice = false;
-
-  rewriter.setInsertionPointAfter(allocOp);
-  auto gpuBuffer =
-      rewriter.create<gpu::AllocOp>(loc, TypeRange{{allocOp.getMemref()}},
-                                    ValueRange{}, ValueRange{}, ValueRange{});
-
-  for (auto user : allocUsers) {
-    if (!isMemoryAccess(user))
-      continue;
-
-    rewriter.setInsertionPoint(user);
-
-    bool deviceAccess = isDeviceAccess(user);
-    // Transfer to device.
-    if (deviceAccess && !onDevice) {
-      rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{},
-                                     gpuBuffer.getMemref(),
-                                     allocOp.getMemref());
-      onDevice = true;
-    }
-    // Transfer to host.
-    if (!deviceAccess && onDevice) {
-      rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{},
-                                     allocOp.getMemref(),
-                                     gpuBuffer.getMemref());
-      onDevice = false;
-    }
-
-    rewriter.setInsertionPointAfter(user);
-  }
-
-  // Deallocate after the last user.
-  rewriter.setInsertionPointAfter(allocUsers.back());
-  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer.getMemref());
-}
-
 static Operation *getDeviceTransferableBuffer(Value val) {
   // Not a buffer - nothing to do.
   if (!isa<MemRefType>(val.getType()))
@@ -159,9 +47,51 @@ static Operation *getDeviceTransferableBuffer(Value val) {
   return nullptr;
 }
 
-// Move host global data to device when needed.
-static void transferMemrefGlobal_OLD(RewriterBase &rewriter,
-                                     memref::GetGlobalOp globalOp) {}
+// Matches the host and device buffer such that data can be transfered
+// correctly between them.
+static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
+                                          Value kernelOperand,
+                                          Value &hostBuffer, Value &gpuBuffer) {
+  auto loc = gpuBuffer.getLoc();
+
+  auto operandType = kernelOperand.getType().cast<MemRefType>();
+  auto gpuAllocType = gpuBuffer.getType().cast<MemRefType>();
+
+  // Kernel operands type already matches the device buffer.
+  // The host and device buffers can be used directly.
+  if (operandType == gpuAllocType)
+    return success();
+
+  // Use the host operand directly as a host buffer to ensure the type
+  // matches correctly for data copy.
+  // Device buffer type has to be adapted.
+  hostBuffer = kernelOperand;
+
+  // Cast device allocation to match the operand if possible.
+  if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
+    gpuBuffer =
+        rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer).getDest();
+    return success();
+  }
+
+  // Take an equal subview of the device buffer if the operand is a subview.
+  // This ensures correct data access and eliminates need to change kernel
+  // argument types.
+  if (auto subview =
+          dyn_cast<memref::SubViewOp>(kernelOperand.getDefiningOp())) {
+    gpuBuffer = rewriter
+                    .create<memref::SubViewOp>(
+                        loc, operandType, gpuBuffer, subview.getOffsets(),
+                        subview.getSizes(), subview.getStrides(),
+                        subview.getStaticOffsets(), subview.getStaticSizes(),
+                        subview.getStaticStrides())
+                    .getResult();
+    return success();
+  }
+
+  // No way to connect the device buffer to the kernel operand.
+  return failure();
+}
 
 // Transfer host allocated data between host and device.
 static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
@@ -182,29 +112,8 @@ static FailureOr<Value> transferMemrefAlloc(RewriterBase &rewriter,
 
   // Copy data to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-
-  auto operandType = operand.getType().cast<MemRefType>();
-  auto gpuAllocType = gpuAlloc.getType().cast<MemRefType>();
-  if (operandType != gpuAllocType) {
-    if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
-      hostBuffer = operand;
-      gpuBuffer = rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer)
-                      .getDest();
-    } else if (auto subview =
-                   dyn_cast<memref::SubViewOp>(operand.getDefiningOp())) {
-      hostBuffer = operand;
-      gpuBuffer = rewriter
-                      .create<memref::SubViewOp>(
-                          loc, operandType, gpuBuffer, subview.getOffsets(),
-                          subview.getSizes(), subview.getStrides(),
-                          subview.getStaticOffsets(), subview.getStaticSizes(),
-                          subview.getStaticStrides())
-                      .getResult();
-    } else {
-      return failure();
-    }
-  }
-
+  if (failed(matchTransferBuffers(rewriter, operand, hostBuffer, gpuBuffer)))
+    return failure();
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
@@ -238,29 +147,8 @@ static FailureOr<Value> transferMemrefGlobal(RewriterBase &rewriter,
 
   // Copy data to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-
-  auto operandType = operand.getType().cast<MemRefType>();
-  auto gpuAllocType = gpuAlloc.getType().cast<MemRefType>();
-  if (operandType != gpuAllocType) {
-    if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
-      hostBuffer = operand;
-      gpuBuffer = rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer)
-                      .getDest();
-    } else if (auto subview =
-                   dyn_cast<memref::SubViewOp>(operand.getDefiningOp())) {
-      hostBuffer = operand;
-      gpuBuffer = rewriter
-                      .create<memref::SubViewOp>(
-                          loc, operandType, gpuBuffer, subview.getOffsets(),
-                          subview.getSizes(), subview.getStrides(),
-                          subview.getStaticOffsets(), subview.getStaticSizes(),
-                          subview.getStaticStrides())
-                      .getResult();
-    } else {
-      return failure();
-    }
-  }
-
+  if (failed(matchTransferBuffers(rewriter, operand, hostBuffer, gpuBuffer)))
+    return failure();
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
@@ -313,20 +201,20 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
       // The kernel launch will be updated.
       updatedOperands = true;
 
+      FailureOr<Value> newOperand = failure();
+
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
-        auto newOperand =
+        newOperand =
             transferMemrefAlloc(rewriter, launchFuncOp, operand, allocOp);
-        if (failed(newOperand))
-          return failure();
-        newOperands.push_back(*newOperand);
       }
       if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
-        auto newOperand =
+        newOperand =
             transferMemrefGlobal(rewriter, launchFuncOp, operand, getGlobalOp);
-        if (failed(newOperand))
-          return failure();
-        newOperands.push_back(*newOperand);
       }
+
+      if (failed(newOperand))
+        return failure();
+      newOperands.push_back(*newOperand);
     }
 
     // If there are any new operands, update the kernel launch.
