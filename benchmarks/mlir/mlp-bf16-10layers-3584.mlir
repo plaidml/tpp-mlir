@@ -64,7 +64,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%2 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -88,7 +88,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%6 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -112,7 +112,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%10 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -136,7 +136,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%14 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -160,7 +160,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%18 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -184,7 +184,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%22 : tensor<8x112x32x32xbf16>)
     outs(%out_shape : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -208,7 +208,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%26 : tensor<8x112x32x32xbf16>)
     outs(%zero_init : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -233,7 +233,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%30 : tensor<8x112x32x32xbf16>)
     outs(%zero_init : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -257,7 +257,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%34 : tensor<8x112x32x32xbf16>)
     outs(%zero_init : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
@@ -281,7 +281,7 @@ func.func @entry(%arg0: tensor<8x112x32x32xbf16>, %output: tensor<8x112x32x32xbf
     ins(%38 : tensor<8x112x32x32xbf16>)
     outs(%output : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %out: bf16):
-      %max = arith.maxf %in, %cst : bf16
+      %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
 
