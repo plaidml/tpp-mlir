@@ -165,7 +165,7 @@ static void transferMemrefGlobal_OLD(RewriterBase &rewriter,
 
 // Transfer host allocated data between host and device.
 static Value transferMemrefAlloc(RewriterBase &rewriter,
-                                 gpu::LaunchFuncOp launchFuncOp,
+                                 gpu::LaunchFuncOp launchFuncOp, Value operand,
                                  memref::AllocOp allocOp) {
   auto loc = launchFuncOp.getLoc();
   auto block = launchFuncOp->getBlock();
@@ -173,13 +173,35 @@ static Value transferMemrefAlloc(RewriterBase &rewriter,
   OpBuilder::InsertionGuard guard(rewriter);
 
   // Alloc device buffer.
-  rewriter.setInsertionPointToStart(block);
+  rewriter.setInsertionPointAfter(allocOp);
   Value hostBuffer = allocOp.getMemref();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
+  Value gpuBuffer = gpuAlloc.getMemref();
+
   // Copy data to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-  Value gpuBuffer = gpuAlloc.getMemref();
+
+  auto operandType = operand.getType().cast<MemRefType>();
+  auto gpuAllocType = gpuAlloc.getType().cast<MemRefType>();
+  if (operandType != gpuAllocType) {
+    if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
+      hostBuffer = operand;
+      gpuBuffer = rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer)
+                      .getDest();
+    } else if (auto subview =
+                   dyn_cast<memref::SubViewOp>(operand.getDefiningOp())) {
+      hostBuffer = operand;
+      gpuBuffer = rewriter
+                      .create<memref::SubViewOp>(
+                          loc, operandType, gpuBuffer, subview.getOffsets(),
+                          subview.getSizes(), subview.getStrides(),
+                          subview.getStaticOffsets(), subview.getStaticSizes(),
+                          subview.getStaticStrides())
+                      .getResult();
+    }
+  }
+
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
@@ -189,14 +211,20 @@ static Value transferMemrefAlloc(RewriterBase &rewriter,
                                  gpuBuffer);
   // Cleanup device buffer.
   rewriter.setInsertionPoint(block->getTerminator());
-  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
+  for (auto user : allocOp.getMemref().getUsers()) {
+    if (isa<memref::DeallocOp>(user)) {
+      rewriter.setInsertionPoint(user);
+      break;
+    }
+  }
+  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
 
   return gpuBuffer;
 }
 
 // Transfer host global data to device.
 static Value transferMemrefGlobal(RewriterBase &rewriter,
-                                  gpu::LaunchFuncOp launchFuncOp,
+                                  gpu::LaunchFuncOp launchFuncOp, Value operand,
                                   memref::GetGlobalOp getGlobalOp) {
   auto loc = launchFuncOp.getLoc();
   auto block = launchFuncOp->getBlock();
@@ -208,9 +236,31 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
   Value hostBuffer = getGlobalOp.getResult();
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
       loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
+  Value gpuBuffer = gpuAlloc.getMemref();
+
   // Copy data to the device.
   rewriter.setInsertionPoint(launchFuncOp);
-  Value gpuBuffer = gpuAlloc.getMemref();
+
+  auto operandType = operand.getType().cast<MemRefType>();
+  auto gpuAllocType = gpuAlloc.getType().cast<MemRefType>();
+  if (operandType != gpuAllocType) {
+    if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
+      hostBuffer = operand;
+      gpuBuffer = rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer)
+                      .getDest();
+    } else if (auto subview =
+                   dyn_cast<memref::SubViewOp>(operand.getDefiningOp())) {
+      hostBuffer = operand;
+      gpuBuffer = rewriter
+                      .create<memref::SubViewOp>(
+                          loc, operandType, gpuBuffer, subview.getOffsets(),
+                          subview.getSizes(), subview.getStrides(),
+                          subview.getStaticOffsets(), subview.getStaticSizes(),
+                          subview.getStaticStrides())
+                      .getResult();
+    }
+  }
+
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
 
@@ -235,7 +285,7 @@ static Value transferMemrefGlobal(RewriterBase &rewriter,
   }
   // Cleanup device buffer.
   rewriter.setInsertionPoint(block->getTerminator());
-  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuBuffer);
+  rewriter.create<gpu::DeallocOp>(loc, std::nullopt, gpuAlloc.getMemref());
 
   return gpuBuffer;
 }
@@ -264,12 +314,13 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
       updatedOperands = true;
 
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
-        auto newOperand = transferMemrefAlloc(rewriter, launchFuncOp, allocOp);
+        Value newOperand =
+            transferMemrefAlloc(rewriter, launchFuncOp, operand, allocOp);
         newOperands.push_back(newOperand);
       }
       if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
-        auto newOperand =
-            transferMemrefGlobal(rewriter, launchFuncOp, getGlobalOp);
+        Value newOperand =
+            transferMemrefGlobal(rewriter, launchFuncOp, operand, getGlobalOp);
         newOperands.push_back(newOperand);
       }
     }
