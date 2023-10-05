@@ -20,8 +20,12 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUDATATRANSFER
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -224,7 +228,7 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
 };
 
 // Transfer data from host to a GPU device.
-class GpuDataTransfer : public GpuDataTransferBase<GpuDataTransfer> {
+class GpuDataTransfer : public tpp::impl::GpuDataTransferBase<GpuDataTransfer> {
 public:
   GpuDataTransfer() = default;
 
@@ -238,8 +242,3 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createGpuDataTransferPass() {
-  return std::make_unique<GpuDataTransfer>();
-}

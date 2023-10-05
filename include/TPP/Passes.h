@@ -166,19 +166,29 @@ createConvertPackUnpackOptimization();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createPackConsumerAndProducerFusionPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createGpuDataTransferPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();
 void registerTestForToForAllRewrite();
 
 } // namespace tpp
+
 namespace linalg {
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgDeGeneralizationPass();
 } // namespace linalg
 } // namespace mlir
 
+namespace mlir {
+namespace tpp {
+// TODO: This should be per-pass so that pass can live
+// in their namespace (xsmm, check...). All the passes
+// are now in tpp.
+#define GEN_PASS_DECL
+#include "TPP/Passes.h.inc"
+
 #define GEN_PASS_REGISTRATION
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #endif // TPP_PASSES_H

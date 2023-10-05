@@ -575,7 +575,6 @@ def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
     Make host data required by GPU kernels accessible by the device.
     It might involve data copies and/or movement.
   }];
-  let constructor = "mlir::tpp::createGpuDataTransferPass()";
   let dependentDialects = ["func::FuncDialect",
                            "memref::MemRefDialect",
                            "gpu::GPUDialect"];

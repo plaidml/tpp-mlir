@@ -140,7 +140,7 @@ private:
       // Perform explicit GPU data transfers only for CUDA as the unified
       // memory is not currently used here.
       // Vulkan runner assumes usage of GPU unified memory.
-      pm.addNestedPass<func::FuncOp>(createGpuDataTransferPass());
+      pm.addNestedPass<func::FuncOp>(createGpuDataTransfer());
       pm.addPass(createGpuToCudaPass(gpuTriple, gpuChip, gpuFeatures));
       break;
     }
