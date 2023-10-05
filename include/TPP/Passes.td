@@ -572,7 +572,8 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
 def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
   let summary = "Transfer data to and from GPU.";
   let description = [{
-    Ensures that data shared between host and GPU resides in correct places.
+    Make host data required by GPU kernels accessible by the device.
+    It might involve data copies and/or movement.
   }];
   let constructor = "mlir::tpp::createGpuDataTransferPass()";
   let dependentDialects = ["func::FuncDialect",

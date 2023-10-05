@@ -30,7 +30,8 @@ module attributes {gpu.container_module} {
 // -----
 
 // Assumes that the buffer passed to the function lives in the correct space.
-// In this case, %arg0 is assumed to be allocated on the device.
+// In this case, %arg0 is assumed to be allocated on the device, thus,
+// no memory copies of %arg0 are needed.
 module attributes {gpu.container_module} {
   func.func @kernel_alloc_argument(%arg0: memref<8x8xf32>) {
     %c1 = arith.constant 1 : index

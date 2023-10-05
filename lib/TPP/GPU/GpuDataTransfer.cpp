@@ -25,6 +25,10 @@ using namespace mlir::tpp;
 
 namespace {
 
+// Returns the source operation of the given value (data) e.g., host allocation,
+// if it should be moved to the device.
+// Nullptr is returned (nothing to do), if the source is unknown and/or
+// the buffer is believed to already live on the device.
 static Operation *getDeviceTransferableBuffer(Value val) {
   // Not a buffer - nothing to do.
   if (!isa<MemRefType>(val.getType()))
@@ -32,6 +36,8 @@ static Operation *getDeviceTransferableBuffer(Value val) {
 
   // Assume it is a valid buffer, if the operation that defines the value
   // is not available e.g., buffer coming from a function argument.
+  // TODO: This assumption about function arguments should be optional
+  //       and controlled by a flag.
   Operation *op = val.getDefiningOp();
   if (!op)
     return nullptr;
@@ -53,6 +59,7 @@ static Operation *getDeviceTransferableBuffer(Value val) {
 
 // Matches the kernel operand and device buffer types such that data can be
 // transfered correctly from the original host buffer.
+// Returns failure if the two types cannot be connected.
 static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
                                           Value kernelOperand,
                                           Value &gpuBuffer) {
@@ -102,6 +109,8 @@ static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
 }
 
 // Transfer host allocated data between the host and a device.
+// Optionally, copies data back to the host after device computations.
+// Returns device-allocated buffer with the moved data.
 static FailureOr<Value> transferMemref(RewriterBase &rewriter,
                                        gpu::LaunchFuncOp launchFuncOp,
                                        Value operand, Value hostBuffer,
@@ -148,6 +157,7 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
   return gpuBuffer;
 }
 
+// Move host data used by GPU kernel calls to the device.
 struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
   TransferDataToGpu(MLIRContext *context, PatternBenefit benefit = 1)
       : OpRewritePattern<gpu::LaunchFuncOp>(context, benefit) {}
@@ -174,7 +184,8 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
       FailureOr<Value> newOperand = failure();
 
       if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
-        // Copy data back to the host as it might have been updated on device.
+        // Copy data back to the host as it might have been updated on
+        // the device.
         newOperand =
             transferMemref(rewriter, launchFuncOp, operand, allocOp.getMemref(),
                            /*copyDataBack=*/true);
@@ -191,7 +202,6 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
             isGlobalConst = globalOp.getConstant();
           }
         }
-
         newOperand = transferMemref(rewriter, launchFuncOp, operand,
                                     getGlobalOp.getResult(),
                                     /*copyDataBack=*/!isGlobalConst);
@@ -213,6 +223,7 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
   }
 };
 
+// Transfer data from host to a GPU device.
 class GpuDataTransfer : public GpuDataTransferBase<GpuDataTransfer> {
 public:
   GpuDataTransfer() = default;
@@ -220,6 +231,7 @@ public:
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
+    // TODO: Add cleanup patterns to minimize data copies.
     patterns.add<TransferDataToGpu>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
