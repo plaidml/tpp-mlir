@@ -39,6 +39,7 @@ module {
   }
 }
 
+// Check data transfers and kernel dispatches.
 // CHECK-LABEL: func.func @_entry
 // CHECK: gpu.alloc
 // CHECK: gpu.memcpy
@@ -48,6 +49,7 @@ module {
 // CHECK: gpu.launch_func
 // CHECK: gpu.dealloc
 
+// At the moment, each linalg.generic is lowered into a separate kernel.
 // matmul kernel
 // CHECK: gpu.module @_entry_kernel
 // CHECK: llvm.func @_entry_kernel
