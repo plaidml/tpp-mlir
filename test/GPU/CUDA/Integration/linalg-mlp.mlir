@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print \
+// RUN: tpp-run %s -gpu=cuda -print -print-mlir=mid \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
@@ -38,5 +38,31 @@ module {
     return %2 : tensor<8x8xf32>
   }
 }
+
+// CHECK-LABEL: func.func @_entry
+// CHECK: gpu.alloc
+// CHECK: gpu.memcpy
+// CHECK: gpu.launch_func
+// CHECK: gpu.memcpy
+// CHECK: gpu.launch_func
+// CHECK: gpu.launch_func
+// CHECK: gpu.dealloc
+
+// matmul kernel
+// CHECK: gpu.module @_entry_kernel
+// CHECK: llvm.func @_entry_kernel
+// CHECK: llvm.fmul
+// CHECK: llvm.fadd
+
+// bias kernel
+// CHECK: gpu.module @_entry_kernel
+// CHECK: llvm.func @_entry_kernel
+// CHECK: llvm.fadd
+
+// relu kernel
+// CHECK: gpu.module @_entry_kernel
+// CHECK: llvm.func @_entry_kernel
+// CHECK: llvm.fcmp
+// CHECK: llvm.select
 
 // CHECK-COUNT-8: 2.2, 2.2, 2.2, 2.2, 2.2, 2.2, 2.2, 2.2
