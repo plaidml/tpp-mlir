@@ -416,23 +416,19 @@ struct ConvertXsmmToFunc : public ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
   ConvertXsmmToFunc() = default;
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    tpp::populateXsmmToFuncPatterns(patterns);
+    patterns
+        .add<ConvertTernaryXsmmOp, ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
+             ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
+            patterns.getContext());
+    patterns.add<ConvertTernaryDispatchOp, ConvertBinaryDispatchOp,
+                 ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
+                 ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
+        patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
 } // namespace
-
-void mlir::tpp::populateXsmmToFuncPatterns(RewritePatternSet &patterns) {
-  patterns
-      .add<ConvertTernaryXsmmOp, ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
-           ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
-          patterns.getContext());
-  patterns.add<ConvertTernaryDispatchOp, ConvertBinaryDispatchOp,
-               ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
-               ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
-      patterns.getContext());
-}
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::tpp::createConvertXsmmToFuncPass() {

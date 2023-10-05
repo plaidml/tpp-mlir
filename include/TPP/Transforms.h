@@ -80,14 +80,10 @@ collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
 
 namespace tpp {
 void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns);
-void populateMapLinalgToTppPatterns(RewritePatternSet &patterns);
-void populateTppToXsmmPatterns(RewritePatternSet &patterns);
-void populateXsmmToFuncPatterns(RewritePatternSet &patterns);
-void populateCheckToFuncPatterns(RewritePatternSet &patterns);
-void populateSinkPackPatterns(RewritePatternSet &patterns);
 void populateTppDeGeneralizationPatterns(RewritePatternSet &patterns);
 void populateLinalgToXsmmPatterns(RewritePatternSet &patterns);
 void populateSimplifyPacking(RewritePatternSet &patterns);
+void populateSinkPackPatterns(RewritePatternSet &patterns);
 } // namespace tpp
 namespace linalg {
 void populateLinalgDeGeneralizationPatterns(RewritePatternSet &patterns);
