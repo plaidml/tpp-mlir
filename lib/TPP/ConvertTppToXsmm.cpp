@@ -580,18 +580,14 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
 struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    tpp::populateTppToXsmmPatterns(patterns);
+    patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
+                 ConvertTppAddOp, ConvertTppGemmOp, ConvertTppBrgemmOp,
+                 ConvertTppFusedBrgemmOp>(patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
 } // namespace
-
-void mlir::tpp::populateTppToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
-               ConvertTppAddOp, ConvertTppGemmOp, ConvertTppBrgemmOp,
-               ConvertTppFusedBrgemmOp>(patterns.getContext());
-}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createConvertTppToXsmmPass() {
