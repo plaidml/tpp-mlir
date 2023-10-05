@@ -18,7 +18,6 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
-using namespace mlir::tpp;
 
 namespace mlir {
 namespace tpp {
@@ -31,12 +30,12 @@ namespace {
 
 // Returns the source operation of the given value (data) e.g., host allocation,
 // if it should be moved to the device.
-// Nullptr is returned (nothing to do), if the source is unknown and/or
+// Nullopt is returned (nothing to do), if the source is unknown and/or
 // the buffer is believed to already live on the device.
-static Operation *getDeviceTransferableBuffer(Value val) {
+static std::optional<Operation *> getDeviceTransferableBuffer(Value val) {
   // Not a buffer - nothing to do.
   if (!isa<MemRefType>(val.getType()))
-    return nullptr;
+    return std::nullopt;
 
   // Assume it is a valid buffer, if the operation that defines the value
   // is not available e.g., buffer coming from a function argument.
@@ -44,29 +43,29 @@ static Operation *getDeviceTransferableBuffer(Value val) {
   //       and controlled by a flag.
   Operation *op = val.getDefiningOp();
   if (!op)
-    return nullptr;
+    return std::nullopt;
 
   // Host-space allocation or a global variable can be easily transfered to
   // a device.
   if (isa<memref::AllocOp, memref::GetGlobalOp>(op))
     return op;
 
-  // Follow through mmeref alias to get to the real source.
+  // Follow through memref alias to get to the real source.
   if (auto viewOp = dyn_cast<mlir::ViewLikeOpInterface>(op))
     return getDeviceTransferableBuffer(viewOp.getViewSource());
 
   // Nothing to do for all the other cases.
   // Assume it is a valid buffer, if the value comes from a device allocation,
   // a function call, a function arguments, device allocation etc.
-  return nullptr;
+  return std::nullopt;
 }
 
 // Matches the kernel operand and device buffer types such that data can be
 // transfered correctly from the original host buffer.
 // Returns failure if the two types cannot be connected.
-static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
-                                          Value kernelOperand,
-                                          Value &gpuBuffer) {
+static FailureOr<Value> matchTransferBuffers(RewriterBase &rewriter,
+                                             Value kernelOperand,
+                                             Value gpuBuffer) {
   auto loc = gpuBuffer.getLoc();
 
   auto operandType = kernelOperand.getType().cast<MemRefType>();
@@ -75,22 +74,22 @@ static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
   // Kernel operands type already matches the device buffer.
   // The host and device buffers can be used directly.
   if (operandType == gpuAllocType)
-    return success();
+    return gpuBuffer;
 
   // Examine view source type. More type conversions might be needed.
   if (auto viewOp =
           dyn_cast<mlir::ViewLikeOpInterface>(kernelOperand.getDefiningOp())) {
-    if (failed(matchTransferBuffers(rewriter, viewOp.getViewSource(),
-                                    gpuBuffer))) {
+    auto newBuffer =
+        matchTransferBuffers(rewriter, viewOp.getViewSource(), gpuBuffer);
+    if (failed(newBuffer))
       return failure();
-    }
+    gpuBuffer = *newBuffer;
   }
 
   // Cast device allocation to match the operand if possible.
   if (memref::CastOp::areCastCompatible(gpuAllocType, operandType)) {
-    gpuBuffer =
-        rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer).getDest();
-    return success();
+    return rewriter.create<memref::CastOp>(loc, operandType, gpuBuffer)
+        .getDest();
   }
 
   // Take an equal subview of the device buffer if the operand is a subview.
@@ -98,14 +97,13 @@ static LogicalResult matchTransferBuffers(RewriterBase &rewriter,
   // argument types.
   if (auto subview =
           dyn_cast<memref::SubViewOp>(kernelOperand.getDefiningOp())) {
-    gpuBuffer = rewriter
-                    .create<memref::SubViewOp>(
-                        loc, operandType, gpuBuffer, subview.getOffsets(),
-                        subview.getSizes(), subview.getStrides(),
-                        subview.getStaticOffsets(), subview.getStaticSizes(),
-                        subview.getStaticStrides())
-                    .getResult();
-    return success();
+    return rewriter
+        .create<memref::SubViewOp>(
+            loc, operandType, gpuBuffer, subview.getOffsets(),
+            subview.getSizes(), subview.getStrides(),
+            subview.getStaticOffsets(), subview.getStaticSizes(),
+            subview.getStaticStrides())
+        .getResult();
   }
 
   // No way to connect the device buffer to the kernel operand.
@@ -120,6 +118,8 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
                                        Value operand, Value hostBuffer,
                                        bool copyDataBack = true) {
   // A memref buffer is expected.
+  assert(isa<MemRefType>(hostBuffer.getType()) &&
+         "Transfer memref expects memref buffer");
   if (!isa<MemRefType>(hostBuffer.getType()))
     return failure();
 
@@ -141,8 +141,10 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
     // matches correctly for data copy.
     // Device buffer type has to be adapted.
     hostBuffer = operand;
-    if (failed(matchTransferBuffers(rewriter, operand, gpuBuffer)))
+    auto newBuffer = matchTransferBuffers(rewriter, operand, gpuBuffer);
+    if (failed(newBuffer))
       return failure();
+    gpuBuffer = *newBuffer;
   }
   rewriter.create<gpu::MemcpyOp>(loc, std::nullopt, ValueRange{}, gpuBuffer,
                                  hostBuffer);
@@ -163,8 +165,7 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
 
 // Move host data used by GPU kernel calls to the device.
 struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
-  TransferDataToGpu(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<gpu::LaunchFuncOp>(context, benefit) {}
+  using OpRewritePattern<gpu::LaunchFuncOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::LaunchFuncOp launchFuncOp,
                                 PatternRewriter &rewriter) const override {
@@ -174,7 +175,7 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
     bool updatedOperands = false;
 
     for (auto operand : launchFuncOp.getKernelOperands()) {
-      Operation *src = getDeviceTransferableBuffer(operand);
+      auto src = getDeviceTransferableBuffer(operand);
       if (!src) {
         // Not a transferable operand. Keep it as is.
         newOperands.push_back(operand);
@@ -187,14 +188,14 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
 
       FailureOr<Value> newOperand = failure();
 
-      if (auto allocOp = dyn_cast<memref::AllocOp>(src)) {
+      if (auto allocOp = dyn_cast<memref::AllocOp>(*src)) {
         // Copy data back to the host as it might have been updated on
         // the device.
         newOperand =
             transferMemref(rewriter, launchFuncOp, operand, allocOp.getMemref(),
                            /*copyDataBack=*/true);
       }
-      if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(src)) {
+      if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(*src)) {
         // Data does not need to be updated if the global data is constant
         // (read-only).
         bool isGlobalConst = false;
