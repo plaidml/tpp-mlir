@@ -34,7 +34,7 @@
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
-  registerTppCompilerPasses();
+  mlir::tpp::registerTppCompilerPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::tpp::TppDialect>();
