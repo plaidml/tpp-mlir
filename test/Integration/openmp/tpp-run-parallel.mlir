@@ -9,7 +9,7 @@ func.func @entry(%arg0: memref<8x8xf32>) -> memref<8x8xf32> {
   %c1 = arith.constant 1 : index
   %c8 = arith.constant 8 : index
   %alloc = memref.alloc() : memref<8x8xf32>
-  scf.parallel (%arg1, %arg2) = (%c0, %c0) to (%c8, %c8) step (%c1, %c1) {
+  scf.forall (%arg1, %arg2) = (%c0, %c0) to (%c8, %c8) step (%c1, %c1) {
     %0 = memref.load %arg0[%arg1, %arg2] : memref<8x8xf32>
     memref.store %0, %alloc[%arg1, %arg2] : memref<8x8xf32>
     scf.yield

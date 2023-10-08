@@ -127,7 +127,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
 // CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  // CHECK: scf.forall
+  // CHECK: scf.parallel
   // CHECK:   scf.for
   // CHECK:     scf.for
   // CHECK:       scf.for

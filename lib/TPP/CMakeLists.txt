@@ -21,10 +21,9 @@ add_mlir_library(MLIRTPP
     CombineTpp.cpp
     RewriteBatchMatmulToMatmul.cpp
     LinalgDeGeneralize.cpp
-    ConvertMemRefToXsmm.cpp
     DefaultPipeline.cpp
-    ConvertLinalgToXsmm.cpp
     DecomposeAggregatedOps.cpp
+    ConvertForAllToParallelOp.cpp 
 
   # Utils
     MatcherUtils.cpp
@@ -46,6 +45,8 @@ add_mlir_library(MLIRTPP
     ConvertPerfToFunc.cpp
     ConvertPackUnpackOptimization.cpp
     ConvertLinalgToFunc.cpp
+    ConvertLinalgToXsmm.cpp
+    ConvertMemRefToXsmm.cpp
 
   # Test Passes
     TestMatchers.cpp
