@@ -131,7 +131,7 @@ static FailureOr<Value> transferMemref(RewriterBase &rewriter,
   // Allocate device buffer.
   rewriter.setInsertionPointToStart(&block);
   auto gpuAlloc = rewriter.create<gpu::AllocOp>(
-      loc, TypeRange({hostBuffer}), ValueRange{}, ValueRange{}, ValueRange{});
+      loc, TypeRange(hostBuffer), ValueRange{}, ValueRange{}, ValueRange{});
   Value gpuBuffer = gpuAlloc.getMemref();
 
   // Copy data to the device.
