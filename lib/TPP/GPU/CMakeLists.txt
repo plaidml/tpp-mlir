@@ -9,7 +9,6 @@ add_mlir_library(TPPGPU
   SetSPIRVAbiAttribute.cpp
   GpuVulkanAbi.cpp
   LinalgToGpu.cpp
-  ConvertForAllToParallelOp.cpp
   GpuDataTransfer.cpp
 
   ADDITIONAL_HEADER_DIRS
