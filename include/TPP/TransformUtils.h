@@ -92,11 +92,11 @@ constexpr const static llvm::StringLiteral kLoopParallel = "parallel";
 constexpr const static llvm::StringLiteral kLoopRoot = "root";
 void populateScfForToForAllRewritePattern(RewritePatternSet &patterns);
 
-// Given a value `val` expand it's shape based on `reassociationMap`.
+// Given a value `val` expand its shape based on `reassociationMap`.
 Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
              ArrayAttr reassociationMap);
 
-// Given a value `val` collapse it's shape based on  `reassociationMap`.
+// Given a value `val` collapse its shape based on  `reassociationMap`.
 Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
                ArrayAttr reassociationMap);
 

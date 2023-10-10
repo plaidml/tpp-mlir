@@ -229,6 +229,7 @@ private:
 
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
+    pm.addPass(createSimplifyAndCanonicalizePackPass());
     pm.addPass(createCleanupPass());
   }
 };
