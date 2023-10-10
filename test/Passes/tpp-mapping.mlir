@@ -95,12 +95,11 @@ func.func @pack_matmul(
 }
 
 // CHECK-LABEL: pack_matmul
-// CHECK-COUNT-3: tensor.pack
+// CHECK-COUNT-2: tensor.pack
 // Packed matmul
 // CHECK:    %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (4, 4)
 // CHECK:     %{{.+}} = linalg.batch_reduce_matmul ins(%{{.+}}, %{{.+}} : tensor<4x32x32xf32>, tensor<4x32x32xf32>) 
 // CHECK-SAME:          outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: tensor.unpack
 
 // -----
 
@@ -150,7 +149,6 @@ func.func @propagate_pack_unpack(%arg0: tensor<128x512xf32>, %arg1: tensor<512x2
 // CHECK: linalg.batch_reduce_matmul
 // CHECK-NOT: tensor.unpack
 // CHECK: linalg.generic
-// CHECK: tensor.unpack
 
 // -----
 
@@ -202,11 +200,10 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 }
 
 // CHECK-LABEL: tile_and_fuse(
-// CHECK-COUNT-3: tensor.pack
+// CHECK-COUNT-2: tensor.pack
 // Fused matmul and relu
 // CHECK: scf.forall
 // CHECK: linalg.batch_reduce_matmul{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.maximumf
-// CHECK: tensor.unpack

@@ -181,7 +181,7 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // CHECK: %[[ptr3_cast:.+]] = arith.index_cast %[[ptr3]] : index to i64
   // CHECK: %[[llvm_ptr3:.+]] = llvm.inttoptr %[[ptr3_cast]] : i64 to !llvm.ptr<f32>  
 
-  // CHECK: %[[ptr4:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<32x32xf32, strided<[32, 1], offset: ?>> -> index
+  // CHECK: %[[ptr4:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<32x32xf32, strided<[512, 1], offset: ?>> -> index
   // CHECK: %[[ptr4_cast:.+]] = arith.index_cast %[[ptr4]] : index to i64
   // CHECK: %[[llvm_ptr4:.+]] = llvm.inttoptr %[[ptr4_cast]] : i64 to !llvm.ptr<f32>
   

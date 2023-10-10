@@ -12,6 +12,7 @@
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
 #include "TPP/VNNIUtils.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -895,6 +896,170 @@ struct FoldCollapseShapeInExtractSliceOp
   }
 };
 
+// Fold a tensor.unpack into an scf.parallel_insert.
+struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
+  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
+                                PatternRewriter &rewriter) const override {
+    if (!unPackOp.getOuterDimsPerm().empty())
+      return failure();
+    SmallVector<int64_t> innerDimsPos =
+        llvm::to_vector(unPackOp.getInnerDimsPos());
+    SmallVector<int64_t> expectedDimsPos = llvm::to_vector(
+        llvm::seq<int64_t>(0, unPackOp.getDestType().getRank()));
+    if (innerDimsPos != expectedDimsPos)
+      return failure();
+
+    Operation *loop = unPackOp.getSource().getDefiningOp();
+    if (!isa_and_nonnull<scf::ForallOp>(loop))
+      return failure();
+    auto forallOp = cast<scf::ForallOp>(loop);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(forallOp);
+
+    // Create a new scf.forall operation, updating its output.
+    Value unPackOpOutput = unPackOp.getDest();
+    SmallVector<Value> newOuts(forallOp.getOutputs());
+    if (newOuts.size() != 1)
+      return failure();
+
+    newOuts.push_back(unPackOpOutput);
+    auto newForallOp = rewriter.create<scf::ForallOp>(
+        forallOp.getLoc(), forallOp.getMixedLowerBound(),
+        forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newOuts,
+        forallOp.getMapping());
+    rewriter.eraseBlock(newForallOp.getBody());
+    newForallOp.getRegion().takeBody(forallOp.getRegion());
+    newForallOp.getBody()->addArgument(newOuts.back().getType(),
+                                       newOuts.back().getLoc());
+
+    ArrayRef<BlockArgument> bbArgs = newForallOp.getOutputBlockArguments();
+    assert(bbArgs.size() == 2);
+
+    rewriter.setInsertionPointToStart(newForallOp.getBody());
+    AffineExpr dim0;
+    bindDims(rewriter.getContext(), dim0);
+    AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
+    auto mulMap = AffineMap::get(1, 1, {dim0 * s0});
+    SmallVector<OpFoldResult> newMixedOffsets;
+    for (auto ivs : llvm::enumerate(newForallOp.getInductionVars())) {
+      OpFoldResult applied = affine::makeComposedFoldedAffineApply(
+          rewriter, newForallOp.getLoc(), mulMap,
+          {ivs.value(), unPackOp.getMixedTiles()[ivs.index()]});
+      newMixedOffsets.push_back(applied);
+    }
+
+    for (Operation *operation : bbArgs.front().getUsers()) {
+      if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(operation)) {
+        rewriter.setInsertionPoint(extractSliceOp);
+
+        int64_t rank = unPackOp.getDestType().getRank();
+        auto mixedStrides = extractSliceOp.getMixedStrides();
+        auto newMixedStrides = SmallVector<OpFoldResult>(
+            mixedStrides.begin() + rank, mixedStrides.end());
+
+        auto mixedSizes = extractSliceOp.getMixedSizes();
+        auto newMixedSizes = SmallVector<OpFoldResult>(
+            mixedSizes.begin() + rank, mixedSizes.end());
+
+        auto newExtractSliceOp = rewriter.create<tensor::ExtractSliceOp>(
+            extractSliceOp.getLoc(), bbArgs.back(), newMixedOffsets,
+            newMixedSizes, newMixedStrides);
+
+        rewriter.replaceAllUsesWith(extractSliceOp->getResults(),
+                                    newExtractSliceOp->getResults());
+        continue;
+      }
+      if (auto parallelInsertSlice =
+              dyn_cast<tensor::ParallelInsertSliceOp>(operation)) {
+        rewriter.setInsertionPoint(parallelInsertSlice);
+
+        int64_t rank = unPackOp.getDestType().getRank();
+        auto mixedStrides = parallelInsertSlice.getMixedStrides();
+        auto newMixedStrides = SmallVector<OpFoldResult>(
+            mixedStrides.begin() + rank, mixedStrides.end());
+
+        auto mixedSizes = parallelInsertSlice.getMixedSizes();
+        auto newMixedSizes = SmallVector<OpFoldResult>(
+            mixedSizes.begin() + rank, mixedSizes.end());
+
+        auto newInsertSliceOp = rewriter.create<tensor::ParallelInsertSliceOp>(
+            parallelInsertSlice.getLoc(), parallelInsertSlice.getSource(),
+            bbArgs.back(), newMixedOffsets, newMixedSizes, newMixedStrides);
+        rewriter.replaceAllUsesWith(parallelInsertSlice->getResults(),
+                                    newInsertSliceOp->getResults());
+        rewriter.eraseOp(parallelInsertSlice);
+        continue;
+      }
+      return failure();
+    }
+
+    rewriter.replaceOp(unPackOp, newForallOp->getResults()[1]);
+    return success();
+  }
+};
+
+// Fold dead iter args for scf.forall.
+// TODO: (lorenzo) upstream.
+struct ForAllIterArgsFolder : public OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const final {
+    bool canonicalize = false;
+    SmallVector<Value> newOperands;
+    llvm::DenseSet<size_t> unusedIndices;
+
+    size_t idxUnused = 0;
+    for (auto it : llvm::zip_equal(forallOp.getDpsInitsMutable(),
+                                   forallOp.getOutputBlockArguments(),
+                                   forallOp.getResults())) {
+      Value operand = std::get<0>(it).get();
+      BlockArgument bbArg = std::get<1>(it);
+      Value result = std::get<2>(it);
+      if (!bbArg.use_empty() || !result.use_empty()) {
+        newOperands.push_back(operand);
+      } else {
+        unusedIndices.insert(idxUnused);
+        canonicalize = true;
+      }
+      idxUnused++;
+    }
+
+    if (!canonicalize)
+      return failure();
+
+    auto newForallOp = rewriter.create<scf::ForallOp>(
+        forallOp.getLoc(), forallOp.getMixedLowerBound(),
+        forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newOperands,
+        forallOp.getMapping());
+    rewriter.eraseBlock(newForallOp.getBody());
+    newForallOp.getRegion().takeBody(forallOp.getRegion());
+    Block *newBlock = newForallOp.getBody();
+
+    // Mark dead args and remove from the block.
+    BitVector nonLiveArgs(newBlock->getNumArguments(), false);
+    for (auto idx : unusedIndices) {
+      nonLiveArgs[newForallOp.getRank() + idx] = true;
+    }
+    newBlock->eraseArguments(nonLiveArgs);
+
+    SmallVector<Value> repl;
+    for (size_t idx = 0, collapsedIdx = 0, e = forallOp.getNumResults();
+         idx != e; idx++) {
+      if (unusedIndices.count(idx) == 0) {
+        repl.push_back(newForallOp.getResults()[collapsedIdx++]);
+      } else {
+        // The arg is dead replace with the first result.
+        repl.push_back(newForallOp.getResults()[0]);
+      }
+    }
+    rewriter.replaceOp(forallOp, repl);
+    return success();
+  }
+};
+
 struct SimplifyAndCanonicalizePack
     : public SimplifyAndCanonicalizePackBase<SimplifyAndCanonicalizePack> {
   void runOnOperation() override {
@@ -923,7 +1088,8 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
       patterns);
   patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
                FoldExpandShapeInParallelInsertOp, UnPackAsReshape,
-               FoldCollapseShapeInExtractSliceOp>(ctx);
+               FoldCollapseShapeInExtractSliceOp, FoldUnPackIntoInsertSlice,
+               ForAllIterArgsFolder>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
 
