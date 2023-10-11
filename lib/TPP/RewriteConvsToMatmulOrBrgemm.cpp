@@ -351,24 +351,6 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     return reassociationExprs;
   }
 
-  // Return the original value if the type is unchanged, or collapse it. Assert
-  // if this is an unsupported type.
-  Value collapse(Value operand, Type newOperandType, ArrayAttr reassociationMap,
-                 Location loc, PatternRewriter &rewriter) const {
-    Type operandType = operand.getType();
-    if (operandType == newOperandType)
-      return operand;
-    if (operandType.isa<MemRefType>()) {
-      return rewriter.create<memref::CollapseShapeOp>(
-          loc, newOperandType, operand, reassociationMap);
-    }
-    if (operandType.isa<RankedTensorType>()) {
-      return rewriter.create<tensor::CollapseShapeOp>(
-          loc, newOperandType, operand, reassociationMap);
-    }
-    assert(false && "expect tensor or memref");
-  }
-
   // Collapse dimension at index 'startCollapse' to 'endCollapse'.
   Type getCollapsedType(OpOperand *operand, size_t startCollapse,
                         size_t endCollapse) const {
@@ -445,20 +427,17 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     if (!reassociationOutput)
       return failure();
 
-    Value collapsedImage = collapse(
-        image->get(), newImageType,
-        getReassociationIndicesAttribute(rewriter, *reassociationImage), loc,
-        rewriter);
+    Value collapsedImage = linalgx::utils::collapse(
+        rewriter, loc, image->get(), newImageType,
+        getReassociationIndicesAttribute(rewriter, *reassociationImage));
 
-    Value collapsedFilter = collapse(
-        filter->get(), newFilterType,
-        getReassociationIndicesAttribute(rewriter, *reassociationFilter), loc,
-        rewriter);
+    Value collapsedFilter = linalgx::utils::collapse(
+        rewriter, loc, filter->get(), newFilterType,
+        getReassociationIndicesAttribute(rewriter, *reassociationFilter));
 
-    Value collapsedOutput = collapse(
-        output.get(), newOutputType,
-        getReassociationIndicesAttribute(rewriter, *reassociationOutput), loc,
-        rewriter);
+    Value collapsedOutput = linalgx::utils::collapse(
+        rewriter, loc, output.get(), newOutputType,
+        getReassociationIndicesAttribute(rewriter, *reassociationOutput));
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, newOutputType, ValueRange{collapsedImage, collapsedFilter},

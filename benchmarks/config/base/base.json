@@ -46,6 +46,13 @@
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
+    "fp32_flat_3x1024_unp_mlir": {
+      "type": "MLIR",
+      "benchmark": "mlp-fp32-3layers-1024-unpacked.mlir",
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "avx512.*" ]
+    },
     "bf16_flat_3x1024_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-3layers-1024.mlir",
@@ -59,7 +66,7 @@
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "avx512.*" ]
-    },
+    }, 
     "bf16_flat_10x3584_mlir": {
       "type": "MLIR",
       "benchmark": "mlp-bf16-10layers-3584.mlir",

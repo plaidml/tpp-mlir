@@ -14,6 +14,7 @@
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
 #include "TPP/Transforms.h"
+#include "TPP/VNNIUtils.h"
 #include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -816,6 +817,47 @@ struct ConvertBatchReduceMatmulToBatchReduceMatmul
   }
 };
 
+// Convert a vnni pack to xsmm norm to vnni op. It assumes the pack to be
+// decomposed as an expand.shape + linalg.transpose.
+struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!transposeOp.hasBufferSemantics())
+      return failure();
+
+    Value out = transposeOp.getInit();
+    Value source = transposeOp.getInput();
+    MemRefType outType = out.getType().cast<MemRefType>();
+    MemRefType sourceType = source.getType().cast<MemRefType>();
+    if (!outType.hasStaticShape() || !sourceType.hasStaticShape() ||
+        outType.getRank() != 3 || !vnni::utils::isInVnniLayout(outType)) {
+      return failure();
+    }
+
+    memref::ExpandShapeOp expandShapeOp =
+        dyn_cast<memref::ExpandShapeOp>(source.getDefiningOp());
+    if (!expandShapeOp || expandShapeOp.getSrcType().getRank() != 2)
+      return failure();
+
+    // The output is assumed to be 2d even if it is logically
+    // a 3d tensor, thus m, n, ldi and ldo all computed on
+    // the input tile only.
+    source = expandShapeOp.getSrc();
+    auto unaryInfo = xsmm::utils::getUnaryInfo(source, source);
+    if (failed(unaryInfo))
+      return failure();
+    auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
+        rewriter.getContext(), xsmm::UnaryFlags::NONE));
+    xsmm::UnaryKindAttr kind =
+        xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::VNNI2);
+    xsmm::utils::replaceOpWithUnary(rewriter, transposeOp, {source, out},
+                                    *unaryInfo, flags, kind);
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
@@ -823,8 +865,8 @@ void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
       .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
            ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
            ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity>(
-          patterns.getContext());
+           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
+           ConvertVnniPacking>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

@@ -47,7 +47,7 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
 
   assert(isa<ShapedType>(outputType));
   auto outputShapedType = output.getType().cast<ShapedType>();
-  if (outputShapedType.getRank() != 2)
+  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape())
     return failure();
 
   UnaryInfo unaryInfo;
@@ -55,10 +55,12 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
   unaryInfo.n = outputShapedType.getShape()[1];
 
   int64_t ldi = 1;
-  if (isa<ShapedType>(input.getType())) {
+  if (ShapedType inputShapedType = dyn_cast<ShapedType>(input.getType())) {
     auto stridesOnInput = mlir::utils::getStaticStrides(input);
-    if (failed(stridesOnInput) || stridesOnInput->back() != 1)
+    if (failed(stridesOnInput) || stridesOnInput->back() != 1 ||
+        !inputShapedType.hasStaticShape()) {
       return failure();
+    }
     ldi = stridesOnInput->front();
   }
   auto stridesOnOutput = mlir::utils::getStaticStrides(output);

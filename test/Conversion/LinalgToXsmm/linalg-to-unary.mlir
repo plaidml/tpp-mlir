@@ -292,3 +292,36 @@ func.func @identity_3(%arg0: memref<128x1xf32>, %arg1: memref<128x512xf32>) {
 // CHECK-SAME: %[[ARG0:.+]]: memref<128x1xf32>, %[[ARG1:.+]]: memref<128x512xf32>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 1, 512] flags = (bcast_row) data_type = f32
 // CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>,
+                        %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] 
+    : memref<32x32xbf16, strided<[512, 1], offset: ?>> 
+    into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
+  linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>) 
+    outs(%arg1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) permutation = [0, 2, 1]
+  return
+}
+
+// CHECK-LABEL: vnni_packing
+// CHECK-SAME:  %[[ARG0:.+]]: memref<32x32xbf16, strided<[512, 1], offset: ?>>, 
+// CHECK-SAME:  %[[ARG1:.+]]: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 512, 512] flags = (none) data_type = bf16
+// CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @not_vnni_packing(%arg0 : memref<32x32xf32, strided<[512, 1], offset: ?>>,
+                            %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] 
+    : memref<32x32xf32, strided<[512, 1], offset: ?>> 
+    into memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>
+  linalg.transpose ins(%expand_shape : memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>) 
+    outs(%arg1 : memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) permutation = [0, 2, 1]
+  return
+}
+
+// CHECK-LABEL: not_vnni_packing
+// CHECK-NOT: xsmm.unary vnni_2

@@ -122,7 +122,7 @@ private:
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
-    pm.addPass(createGeneralizeTensorPackAndUnPackPass());
+    pm.addPass(createLowerPacksAndUnPacks());
     pm.addPass(createBufferizePass(/*dealloc=*/gpuType != GpuType::Cuda));
     pm.addPass(createConvertForAllToParallelOpPass());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());

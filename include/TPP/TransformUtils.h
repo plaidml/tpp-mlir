@@ -96,6 +96,10 @@ void populateScfForToForAllRewritePattern(RewritePatternSet &patterns);
 Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
              ArrayAttr reassociationMap);
 
+// Given a value `val` collapse it's shape based on  `reassociationMap`.
+Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
+               ArrayAttr reassociationMap);
+
 } // namespace utils
 } // namespace linalgx
 } // namespace mlir

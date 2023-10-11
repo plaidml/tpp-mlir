@@ -45,6 +45,7 @@ def Xsmm_UnaryKind : I64EnumAttr<
       I64EnumAttrCase<"IDENTITY", 1, "identity">,
       I64EnumAttrCase<"ZERO", 2, "zero">,
       I64EnumAttrCase<"RELU", 5, "relu">,
+      I64EnumAttrCase<"VNNI2", 28, "vnni_2">,
       I64EnumAttrCase<"TRANSPOSE", 29, "transpose">
     ]> {
   let cppNamespace = "mlir::xsmm";

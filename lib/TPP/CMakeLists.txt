@@ -15,7 +15,6 @@ add_mlir_library(MLIRTPP
     TileConsumerAndFuseProducers.cpp
     RewriteConvsToMatmulOrBrgemm.cpp
     DefaultTppPasses.cpp
-    GeneralizeTensorPackAndUnPack.cpp
     ConstantFoldPack.cpp
     ConvInitSimplify.cpp
     CombineTpp.cpp
@@ -24,6 +23,7 @@ add_mlir_library(MLIRTPP
     DefaultPipeline.cpp
     DecomposeAggregatedOps.cpp
     ConvertForAllToParallelOp.cpp 
+    LowerPacksAndUnpacks.cpp
 
   # Utils
     MatcherUtils.cpp
@@ -43,7 +43,6 @@ add_mlir_library(MLIRTPP
     ConvertCheckToLoops.cpp
     ConvertPerfToLoops.cpp
     ConvertPerfToFunc.cpp
-    ConvertPackUnpackOptimization.cpp
     ConvertLinalgToFunc.cpp
     ConvertLinalgToXsmm.cpp
     ConvertMemRefToXsmm.cpp
