@@ -1,4 +1,4 @@
-// RUN: tpp-opt -pack-vnni -generalize-tensor-pack-unpack -bufferize %s | FileCheck %s
+// RUN: tpp-opt -pack-vnni -lower-packs-unpacks -bufferize %s | FileCheck %s
 
 // RUN: tpp-opt -pack-vnni %s | FileCheck %s -check-prefix=PACK
 

@@ -116,8 +116,6 @@ createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
                      bool linalgToXsmm = false);
-std::unique_ptr<OperationPass<func::FuncOp>>
-createGeneralizeTensorPackAndUnPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
@@ -161,11 +159,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToXsmmPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeAggregatedOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgToGpuPass(bool useWmma = false);
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertPackUnpackOptimization();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createPackConsumerAndProducerFusionPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();

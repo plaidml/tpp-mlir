@@ -755,14 +755,44 @@ struct PackAsReshape : public OpRewritePattern<tensor::PackOp> {
     if (dimsToDrop != sourceShape.size())
       return failure();
 
-    auto reassoc = getReassociationIndicesForReshape(packOp.getSourceType(),
-                                                     packOp.getDestType());
+    auto reassoc =
+        getReassociationIndicesForReshape(sourceType, packOp.getDestType());
     if (!reassoc)
       return failure();
     Value expanded = linalgx::utils::expand(
         rewriter, packOp.getLoc(), packOp.getSource(), packOp.getDestType(),
         getReassociationIndicesAttribute(rewriter, *reassoc));
     rewriter.replaceOp(packOp, expanded);
+    return success();
+  }
+};
+
+// If all the tiled dimension create unit tile loops unpack can be rewritten as
+// a collapse.
+struct UnPackAsReshape : public OpRewritePattern<tensor::UnPackOp> {
+  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
+                                PatternRewriter &rewriter) const override {
+    RankedTensorType destType = unPackOp.getDestType();
+    ArrayRef<int64_t> destShape = destType.getShape();
+    size_t dimsToDrop = 0;
+    for (auto [dim, tile] : unPackOp.getDimAndTileMapping()) {
+      auto constantTile = getConstantIntValue(tile);
+      if (constantTile && destShape[dim] == *constantTile)
+        dimsToDrop++;
+    }
+    if (dimsToDrop != destShape.size())
+      return failure();
+
+    auto reassoc =
+        getReassociationIndicesForReshape(unPackOp.getSourceType(), destType);
+    if (!reassoc)
+      return failure();
+    Value collapse = linalgx::utils::collapse(
+        rewriter, unPackOp.getLoc(), unPackOp.getSource(), destType,
+        getReassociationIndicesAttribute(rewriter, *reassoc));
+    rewriter.replaceOp(unPackOp, collapse);
     return success();
   }
 };
@@ -840,6 +870,31 @@ struct FoldExpandShapeInParallelInsertOp
   }
 };
 
+// Rank reduce the result of an `ExtractSliceOp` that is a producer
+// of a `CollapseShapeOp` operation.
+struct FoldCollapseShapeInExtractSliceOp
+    : public OpRewritePattern<tensor::CollapseShapeOp> {
+  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseShapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto extractSliceOp =
+        collapseShapeOp.getSrc().getDefiningOp<tensor::ExtractSliceOp>();
+    if (!extractSliceOp)
+      return failure();
+    SliceVerificationResult res = isRankReducedType(
+        extractSliceOp.getResultType(), collapseShapeOp.getResultType());
+    if (res != SliceVerificationResult::Success)
+      return failure();
+    Value rankedReduceExtractSlice = rewriter.create<tensor::ExtractSliceOp>(
+        extractSliceOp.getLoc(), collapseShapeOp.getResultType(),
+        extractSliceOp.getSource(), extractSliceOp.getMixedOffsets(),
+        extractSliceOp.getMixedSizes(), extractSliceOp.getMixedStrides());
+    rewriter.replaceOp(collapseShapeOp, rankedReduceExtractSlice);
+    return success();
+  }
+};
+
 struct SimplifyAndCanonicalizePack
     : public SimplifyAndCanonicalizePackBase<SimplifyAndCanonicalizePack> {
   void runOnOperation() override {
@@ -858,6 +913,7 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
@@ -866,7 +922,8 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
   patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
-               FoldExpandShapeInParallelInsertOp>(ctx);
+               FoldExpandShapeInParallelInsertOp, UnPackAsReshape,
+               FoldCollapseShapeInExtractSliceOp>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
 

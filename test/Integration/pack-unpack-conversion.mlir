@@ -60,7 +60,8 @@ func.func @entry() {
   //
 
   %unpacked_tensor = bufferization.alloc_tensor() : tensor<13x15xf32>
-  %unpack = tensor.unpack %input_tensor_bcast inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %unpacked_tensor : tensor<2x8x8x2xf32> -> tensor<13x15xf32>
+  %unpack = tensor.unpack %input_tensor_bcast inner_dims_pos = [0, 1] inner_tiles = [8, 2] 
+    into %unpacked_tensor : tensor<2x8x8x2xf32> -> tensor<13x15xf32>
   
   %v0 = vector.transfer_read %unpack[%c0, %c0], %d1 : tensor<13x15xf32>, vector<13x15xf32>
   vector.print %v0 : vector<13x15xf32>
@@ -89,7 +90,8 @@ func.func @entry() {
   %input_tensor_bcast1 = linalg.broadcast ins(%input_tensor1_cast: tensor<32xf32>)
                                           outs(%bcast1: tensor<1x1x1x1x8x32xf32>)
                                           dimensions = [0, 1, 2, 3, 4]
-  %v2 = vector.transfer_read %input_tensor_bcast1[%c0, %c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x1x1x1x8x32xf32>, vector<1x1x1x1x8x32xf32>
+  %v2 = vector.transfer_read %input_tensor_bcast1[%c0, %c0, %c0, %c0, %c0, %c0], %d1 
+    : tensor<1x1x1x1x8x32xf32>, vector<1x1x1x1x8x32xf32>
   vector.print %v2 : vector<1x1x1x1x8x32xf32>
 
   //
@@ -104,7 +106,8 @@ func.func @entry() {
   //
 
   %unpacked_tensor1 = bufferization.alloc_tensor() : tensor<1x1x32x8xf32>
-  %unpack1 = tensor.unpack %input_tensor_bcast1 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %unpacked_tensor1 : tensor<1x1x1x1x8x32xf32> -> tensor<1x1x32x8xf32>
+  %unpack1 = tensor.unpack %input_tensor_bcast1 inner_dims_pos = [3, 2] inner_tiles = [8, 32] 
+    into %unpacked_tensor1 : tensor<1x1x1x1x8x32xf32> -> tensor<1x1x32x8xf32>
   
   %v3 = vector.transfer_read %unpack1[%c0, %c0, %c0, %c0], %d1 : tensor<1x1x32x8xf32>, vector<1x1x32x8xf32>
   vector.print %v3 : vector<1x1x32x8xf32>
@@ -152,7 +155,8 @@ func.func @entry() {
                                           outs(%bcast2: tensor<1x4x6x6x2xf32>)
                                           dimensions = [0, 1, 2, 3]
   %unpacked_tensor2 = bufferization.alloc_tensor() : tensor<1x6x6x8xf32>
-  %unpack2 = tensor.unpack %input_tensor_bcast2 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %unpacked_tensor2 : tensor<1x4x6x6x2xf32> -> tensor<1x6x6x8xf32>
+  %unpack2 = tensor.unpack %input_tensor_bcast2 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] 
+    into %unpacked_tensor2 : tensor<1x4x6x6x2xf32> -> tensor<1x6x6x8xf32>
   %v4 = vector.transfer_read %unpack2[%c0, %c0, %c0, %c0], %d1 : tensor<1x6x6x8xf32>, vector<1x6x6x8xf32>
   vector.print %v4 : vector<1x6x6x8xf32>
  
@@ -203,7 +207,8 @@ func.func @entry() {
                                           outs(%bcast3: tensor<1x6x6x8xf32>)
                                           dimensions = [0, 1, 2]
   %packed_tensor = bufferization.alloc_tensor() : tensor<1x4x6x6x2xf32>
-  %pack = tensor.pack %input_tensor_bcast3 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %packed_tensor : tensor<1x6x6x8xf32> -> tensor<1x4x6x6x2xf32>
+  %pack = tensor.pack %input_tensor_bcast3 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] 
+    into %packed_tensor : tensor<1x6x6x8xf32> -> tensor<1x4x6x6x2xf32>
   %v5 = vector.transfer_read %pack[%c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x4x6x6x2xf32>, vector<1x4x6x6x2xf32>
   
   //
@@ -240,7 +245,8 @@ func.func @entry() {
                                           outs(%bcast4: tensor<1x1x32x8xf32>)
                                           dimensions = [0, 1, 2]
   %packed_tensor1 = bufferization.alloc_tensor() : tensor<1x1x1x1x8x32xf32>
-  %pack1 = tensor.pack %input_tensor_bcast4 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %packed_tensor1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
+  %pack1 = tensor.pack %input_tensor_bcast4 inner_dims_pos = [3, 2] inner_tiles = [8, 32] 
+    into %packed_tensor1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
   %v6 = vector.transfer_read %pack1[%c0, %c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x1x1x1x8x32xf32>, vector<1x1x1x1x8x32xf32>
  
   //

@@ -852,74 +852,6 @@ struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
   }
 };
 
-// Tile by one up to the first dimension involved in packing.
-static SmallVector<int64_t> getTileSizes(tensor::PackOp consumerPack) {
-  SmallVector<int64_t> tiledDims =
-      llvm::to_vector(consumerPack.getInnerDimsPos());
-  assert(!tiledDims.empty());
-  int64_t minDim = *std::min_element(tiledDims.begin(), tiledDims.end());
-  return SmallVector<int64_t>(minDim, 1);
-}
-
-static void fusePacksImpl(RewriterBase &rewriter, FunctionOpInterface func) {
-  SmallVector<tensor::PackOp> consumerPackOps;
-  func->walk<WalkOrder::PostOrder>([&](tensor::PackOp consumerPackOp) {
-    Value source = consumerPackOp.getSource();
-    tensor::PackOp producerPackOp =
-        dyn_cast_or_null<tensor::PackOp>(source.getDefiningOp());
-    if (producerPackOp)
-      consumerPackOps.push_back(consumerPackOp);
-  });
-
-  for (auto consumerPackOp : consumerPackOps) {
-    // Step 2. Tile the operation.
-    SmallVector<int64_t> tileSizes = getTileSizes(consumerPackOp);
-    if (tileSizes.empty())
-      continue;
-    auto options = scf::SCFTilingOptions().setTileSizes(
-        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes));
-    FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-        rewriter, cast<TilingInterface>(consumerPackOp.getOperation()),
-        options);
-    if (failed(tilingResult))
-      continue;
-    if (!tilingResult->loops.empty()) {
-      tilingResult->loops[0]->setAttr(
-          linalgx::utils::kLoopParallel,
-          rewriter.getStringAttr(linalgx::utils::kLoopRoot));
-    }
-    auto tiledPack = dyn_cast<tensor::PackOp>(tilingResult->tiledOps.back());
-    assert(tiledPack);
-    // Step 3. Fuse consumer and producer.
-    auto forLoops =
-        llvm::to_vector(llvm::map_range(tilingResult->loops, [](Operation *op) {
-          return cast<scf::ForOp>(op);
-        }));
-    std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
-        scf::tileAndFuseProducerOfSlice(
-            rewriter,
-            cast<tensor::ExtractSliceOp>(tiledPack.getSource().getDefiningOp()),
-            forLoops);
-    if (!fusedProducer)
-      continue;
-    rewriter.replaceOp(consumerPackOp, tilingResult->replacements);
-  }
-}
-
-struct PackConsumerAndProducerFusion
-    : PackConsumerAndProducerFusionBase<PackConsumerAndProducerFusion> {
-  void runOnOperation() override {
-    auto *ctx = &getContext();
-    IRRewriter rewriter(ctx);
-    fusePacksImpl(rewriter, getOperation());
-
-    // Patterns for scf.forall.
-    RewritePatternSet patterns(ctx);
-    linalgx::utils::populateScfForToForAllRewritePattern(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-  }
-};
-
 } // end namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -930,9 +862,4 @@ mlir::tpp::createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes) {
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::tpp::createElementWiseFusionPass() {
   return std::make_unique<ElementWiseFusion>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConsumerAndProducerFusionPass() {
-  return std::make_unique<PackConsumerAndProducerFusion>();
 }

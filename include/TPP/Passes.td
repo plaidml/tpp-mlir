@@ -230,10 +230,9 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
                            "tensor::TensorDialect", "tpp::TppDialect"];
 }
 
-def PackConsumerAndProducerFusion : Pass<"fuse-pack-consumer-producer",
-                                         "func::FuncOp"> {
-  let constructor = "mlir::tpp::createPackConsumerAndProducerFusionPass()";
-  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
+def LowerPacksAndUnPacks : Pass<"lower-packs-unpacks", "func::FuncOp"> {
+  let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect", 
+                           "tensor::TensorDialect"];
 }
 
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 
@@ -257,15 +256,6 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
-def ConvertPackUnpackOptimization : Pass<"pack-unpack-optimization", "func::FuncOp"> {
-  let summary = "Optimize non-transpose pack and unpack  patterns into faster implementation";
-  let description =
-      [{Optimize non-transpose pack and unpack patterns into faster implementation.}];
-  let constructor = "mlir::tpp::createConvertPackUnpackOptimization()";
-
-  let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
-}
-
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let summary = "Collection of default TPP passes";
   let description = [{
@@ -284,17 +274,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "Skip all TPP transformations. Lower lianalg directly to xsmm.">
   ];
   let constructor = "mlir::tpp::createDefaultTppPass()";
-}
-
-def GeneralizeTensorPackAndUnPack : Pass<"generalize-tensor-pack-unpack",
-                                         "func::FuncOp"> {
-  let summary = "Generalize tensor.pack and tensor.unpack.";
-  let description = [{
-    Generalize a pack or unpack operation by first tiling, and then generalize
-    it to other linalg operations.
-  }];
-  let constructor = "mlir::tpp::createGeneralizeTensorPackAndUnPackPass()";
-  let dependentDialects = ["scf::SCFDialect"];
 }
 
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {

@@ -151,13 +151,8 @@ func.func @conv2d_1x1_decomposed(
 func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
 
-  // CHECK: %[[C0:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-  // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
-  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-  // CHECK-DAG: %[[alloc:.*]] = memref.alloc{{.*}}: memref<128x512xf32>
-
   // Identity:
+  // CHECK: %[[alloc:.+]] = memref.alloc() {alignment = 64 : i64} : memref<128x512xf32>
   // CHECK: call @xsmm_unary_dispatch
   // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
   // CHECK-NEXT: %[[cast_ptr0:.*]] = arith.index_cast %[[ptr0]] : index to i64
