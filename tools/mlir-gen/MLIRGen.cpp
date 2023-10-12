@@ -72,7 +72,7 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
                              unsigned typeWidth, int seed, bool enableSoftmax,
                              bool biasAcc, int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), miniBatch(miniBatch),
-      seed(seed), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
+      seed(seed), flops(0), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
       vnniFactor(vnniBlockingFactor) {
 
   // Register all necessary dialects
@@ -191,41 +191,13 @@ Value MLIRGenerator::createOutputLayer(Value arg, Value out) {
 }
 
 std::string MLIRGenerator::createMetadata() {
+  assert(flops && "FLOPS not computed?");
   std::string data = "";
-
-  auto addRunnerString = [&]() {
-    data += "// RUN: tpp-run %s -n 10 \\\n";
-    data += "// RUN:  -e entry -entry-point-result=void\n";
-    data += "\n";
-  };
-
-  auto addFlopsInfo = [&](uint64_t flops) {
-    data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
-    data += "\n";
-  };
-
-  switch (kernelType) {
-  case KernelType::MATMUL: {
-    addRunnerString();
-    // Total flops = matmul O(2*n*m*k)
-    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
-    addFlopsInfo(flops);
-    break;
-  }
-  case KernelType::FULLY_CONNECTED: {
-    addRunnerString();
-    // Total flops = matmul O(2*n*m*k)
-    uint64_t flops = 2 * miniBatch * layers.front() * layers.back();
-    // + BiasAdd O(n*m)
-    flops += miniBatch * layers.back();
-    // + ReLU O(n*m)
-    flops += miniBatch * layers.back();
-    addFlopsInfo(flops);
-    break;
-  }
-  default:
-    break;
-  }
+  data += "// RUN: tpp-run %s -n 10 \\\n";
+  data += "// RUN:  -e entry -entry-point-result=void\n";
+  data += "\n";
+  data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
+  data += "\n";
   data += "\n";
 
   return data;
@@ -342,13 +314,14 @@ int MLIRGenerator::generate(StringRef filename) {
 // ============================================= Helpers
 
 Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
+  auto inputShape = args.input.getType().cast<ShapedType>();
+  auto weightShape = args.weight.getType().cast<ShapedType>();
+
   // If not using bias as accumulator, and output not provided,
   // create a zero filled tensor
   if (!args.output && biasAcc && args.bias) {
     args.output = args.bias;
   } else if (!args.output) {
-    auto inputShape = args.input.getType().cast<ShapedType>();
-    auto weightShape = args.weight.getType().cast<ShapedType>();
     auto dims = getMatMulResultShape(inputShape, weightShape);
     auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
     args.output =
@@ -378,6 +351,16 @@ Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
               })
           .getResult(0);
 
+  // Matmul flops = 2 * M * N * K = 2 * prod(inputDims) * N (weightShape[0])
+  int64_t mkFlops = 1;
+  for (int i = 0, max = inputShape.getRank(); i < max; i++)
+    mkFlops *= inputShape.getDimSize(i);
+  // Tiled: N = NB * n = weightShape[0] + weightShape[3]
+  int64_t nFlops = weightShape.getDimSize(0);
+  if (weightShape.getRank() > 2)
+    nFlops *= weightShape.getDimSize(3);
+  flops += 2 * mkFlops * nFlops;
+
   // If not using bias as accumulator, add the bias add layer
   if (!biasAcc && args.bias)
     return lowerBiasAdd(matmul, args.bias);
@@ -397,6 +380,13 @@ Value MLIRGenerator::lowerBiasAdd(Value input, Value bias) {
         auto add = nestedBuilder.create<arith::AddFOp>(loc, arg0, arg1);
         nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
       });
+
+  // Add flops = M * N = prod(outputDims)
+  int64_t addFlops = 1;
+  for (int i = 0, max = outTy.getRank(); i < max; i++)
+    addFlops *= outTy.getDimSize(i);
+  flops += addFlops;
+
   return sum.getResult(0);
 }
 
@@ -412,6 +402,13 @@ Value MLIRGenerator::lowerRelu(Value input) {
         auto max = nestedBuilder.create<arith::MaximumFOp>(loc, arg0, zero);
         nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
       });
+
+  // Relu flops = M * N = prod(outputDims)
+  int64_t reluFlops = 1;
+  for (int i = 0, max = outTy.getRank(); i < max; i++)
+    reluFlops *= outTy.getDimSize(i);
+  flops += reluFlops;
+
   return relu.getResult(0);
 }
 
@@ -470,6 +467,12 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
         auto div = nestedBuilder.create<arith::DivFOp>(loc, arg0, arg1);
         nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{div});
       });
+
+  // Softmax flops = 4 * M * N = 4 * prod(outputDims)
+  int64_t softmaxFlops = 1;
+  for (int i = 0, max = outTy.getRank(); i < max; i++)
+    softmaxFlops *= outTy.getDimSize(i);
+  flops += 4 * softmaxFlops;
 
   return softmax.getResult(0);
 }
