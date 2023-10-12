@@ -329,6 +329,7 @@ Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
     args.output =
         builder.create<linalg::FillOp>(loc, zero, args.output).getResult(0);
   }
+  auto outShape = args.output.getType().cast<ShapedType>();
 
   // Matmul as a linalg.generic
   auto map1 = getMap(args.input, MAP_MATMUL_INPUT);   // { 0, 2 }
@@ -351,14 +352,16 @@ Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
               })
           .getResult(0);
 
-  // Matmul flops = 2 * M * N * K = 2 * prod(inputDims) * N (weightShape[0])
+  // Matmul flops = 2 * M * N * K = 2 * prod(inputDims) * N (outShape[1])
   int64_t mkFlops = 1;
   for (int i = 0, max = inputShape.getRank(); i < max; i++)
     mkFlops *= inputShape.getDimSize(i);
-  // Tiled: N = NB * n = weightShape[0] + weightShape[3]
-  int64_t nFlops = weightShape.getDimSize(0);
-  if (weightShape.getRank() > 2)
-    nFlops *= weightShape.getDimSize(3);
+  int outRank = outShape.getRank();
+  assert(outRank == 2 || outRank == 4 && "Invalid outRank");
+  // Tiled: N = NB * n = outShape[0] + outShape[3]
+  int64_t nFlops = outShape.getDimSize(outRank - 1);
+  if (outRank > 2)
+    nFlops *= outShape.getDimSize(1);
   flops += 2 * mkFlops * nFlops;
 
   // If not using bias as accumulator, add the bias add layer
