@@ -57,6 +57,9 @@ class MLIRGenerator {
   /// Random seed
   int seed;
 
+  /// Generated model's flops
+  int64_t flops;
+
   /// Tensor init type
   TensorInitType initType;
 
