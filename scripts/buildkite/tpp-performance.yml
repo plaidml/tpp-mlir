@@ -12,4 +12,4 @@ steps:
   - label: "TPP-MLIR-performance"
     command: "${SRUN} --partition=spr --time=1:30:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh'"
+              scripts/buildkite/benchmark.sh -m -f'"

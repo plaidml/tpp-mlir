@@ -13,9 +13,6 @@ BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
 BUILD_DIR=$(realpath "${BUILD_DIR:-build-${COMPILER}}")
 CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
 
-LOGFILE=$(mktemp)
-trap 'rm ${LOGFILE}' EXIT
-
 if [ ! -z "${GPU}" ]; then
   GPU_OPTION="${GPU}"
 else
@@ -44,8 +41,7 @@ benchmark () {
   echo_run ./driver.py -v \
            -n 100 \
            -c "${CONFIG_DIR}/${JSON}" \
-           --build "${BUILD_DIR}" \
-           | tee -a "${LOGFILE}"
+           --build "${BUILD_DIR}"
   popd || exit 1
 }
 

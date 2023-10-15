@@ -68,69 +68,22 @@ set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
 set(CONFIG_DIR "${BENCHMARK_DIR}/config")
 
 # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
-add_custom_target(quick-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
                   -c ${CONFIG_DIR}/base/base.json
                   DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                   WORKING_DIRECTORY ${BENCHMARK_DIR}
-                  COMMENT Run Quick Benchmarks)
-
-# Run performance benchmarks with small iterations to test the benchmarks and run locally on small machines
-set(MATMUL_PERF_CFGS
-  ${CONFIG_DIR}/matmul/256x1024x1024.json
-  ${CONFIG_DIR}/matmul/256x1024x4096.json
-  ${CONFIG_DIR}/matmul/256x4096x1024.json
-  ${CONFIG_DIR}/matmul/128x1024x4096.json
-  ${CONFIG_DIR}/matmul/128x4096x1024.json
-  ${CONFIG_DIR}/matmul/128x1024x1024.json
-  ${CONFIG_DIR}/matmul/256x768x768.json
-  ${CONFIG_DIR}/matmul/128x768x768.json
-  ${CONFIG_DIR}/matmul/128x3072x768.json
-  ${CONFIG_DIR}/matmul/128x768x3072.json
-  ${CONFIG_DIR}/matmul/256x3072x768.json
-  ${CONFIG_DIR}/matmul/256x768x3072.json
-  ${CONFIG_DIR}/matmul/128x768x2304.json
-  ${CONFIG_DIR}/matmul/1024x2560x1024.json
-  ${CONFIG_DIR}/matmul/1024x1024x512.json
-  ${CONFIG_DIR}/matmul/1024x352x512.json
-  ${CONFIG_DIR}/matmul/1024x512x256.json
-)
-set(FC_PERF_CFGS
-  ${CONFIG_DIR}/fc/256x1024x1024.json
-  ${CONFIG_DIR}/fc/256x1024x4096.json
-  ${CONFIG_DIR}/fc/256x4096x1024.json
-  ${CONFIG_DIR}/fc/128x1024x4096.json
-  ${CONFIG_DIR}/fc/128x4096x1024.json
-  ${CONFIG_DIR}/fc/128x1024x1024.json
-  ${CONFIG_DIR}/fc/256x768x768.json
-  ${CONFIG_DIR}/fc/128x768x768.json
-  ${CONFIG_DIR}/fc/128x3072x768.json
-  ${CONFIG_DIR}/fc/128x768x3072.json
-  ${CONFIG_DIR}/fc/256x3072x768.json
-  ${CONFIG_DIR}/fc/256x768x3072.json
-  ${CONFIG_DIR}/fc/128x768x2304.json
-  ${CONFIG_DIR}/fc/1024x2560x1024.json
-  ${CONFIG_DIR}/fc/1024x1024x512.json
-  ${CONFIG_DIR}/fc/1024x352x512.json
-  ${CONFIG_DIR}/fc/1024x512x256.json
-)
-string(JOIN ',' PERF_CFGS_STR ${MATMUL_PERF_CFGS} ${FC_PERF_CFGS})
-add_custom_target(quick-perf ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-  -c ${PERF_CFGS_STR}
-                  DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
-                  WORKING_DIRECTORY ${BENCHMARK_DIR}
-                  COMMENT Run Quick Performance Benchmarks)
+                  COMMENT Run Base Benchmarks)
 
 # Run baseline benchmarks with default iterations to track simple performance
-set(BENCH_CFGS
-  ${CONFIG_DIR}/base/base.json
+set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/dnn-fp32.json
   ${CONFIG_DIR}/omp/dnn-bf16.json
   ${CONFIG_DIR}/omp/mlir-fp32.json
   ${CONFIG_DIR}/omp/mlir-bf16.json
 )
-string(JOIN ',' BENCH_CFGS_STR ${BENCH_CFGS})
-add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-  -c ${BENCH_CFGS_STR}
+string(JOIN ',' BENCH_OMP_CFGS_STR ${BENCH_OMP_CFGS})
+add_custom_target(benchmarks-omp ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
+  -c ${BENCH_OMP_CFGS_STR}
                   DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                   WORKING_DIRECTORY ${BENCHMARK_DIR}
                   COMMENT Run Benchmarks)
@@ -149,7 +102,7 @@ if (TPP_GPU)
   string(JOIN ',' BENCH_GPU_CFGS_STR ${BENCH_CUDA_CFGS})
 
   # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
-  add_custom_target(quick-gpu-bench ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+  add_custom_target(benchmarks-gpu ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
   -c ${BENCH_GPU_CFGS_STR}
   DEPENDS tpp-opt tpp-run ${BENCH_CUDA_DEPS}
   WORKING_DIRECTORY ${BENCHMARK_DIR}

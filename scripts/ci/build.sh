@@ -33,12 +33,6 @@ while getopts "b:cipB" arg; do
     i)
       TARGETS="${TARGETS} install"
       ;;
-    p)
-      POST_INSTALL=1
-      ;;
-    B)
-      TARGETS="${TARGETS} benchmarks"
-      ;;
     ?)
       echo "Invalid option: ${OPTARG}"
       die_syntax
@@ -55,14 +49,4 @@ fi
 echo_run ninja -C ${BLD_DIR} ${TARGETS}
 if [ $? != 0 ]; then
   exit 1
-fi
-
-# Post Install (is this really needed?)
-if [ "${POST_INSTALL}" != "" ]; then
-  CMAKE_CACHE_FILE=${BLD_DIR}/CMakeCache.txt
-  INST_DIR=$(grep "CMAKE_INSTALL_PREFIX:PATH=" ${CMAKE_CACHE_FILE} | cut -d"=" -f2)
-  if ! cp -rv ${BLD_DIR}/* ${INST_DIR}; then
-    echo "Error on post-install"
-    exit 1
-  fi
 fi
