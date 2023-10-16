@@ -183,6 +183,16 @@ struct HasRank {
   std::vector<int64_t> ranks;
 };
 
+// Callable object to verify `operand` to have an element type `T`.
+template <typename T> struct HasElementType {
+  bool operator()(OpOperand *operand, Operation *op) const {
+    auto operandType = operand->get().getType();
+    if (auto shapedType = dyn_cast_or_null<ShapedType>(operandType))
+      operandType = shapedType.getElementType();
+    return isa<T>(operandType);
+  }
+};
+
 // Callable object to check if the input is equal to specified `value`.
 template <typename T> struct EqualsTo {
   EqualsTo() = delete;

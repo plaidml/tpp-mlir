@@ -863,3 +863,14 @@ func.func @linalg_zero_gemm_fused_bias_relu_no_chain(%arg0: tensor<128x256xf32>,
   return %1 : tensor<128x512xf32>
 }
 
+// -----
+
+// CHECK-LABEL: func.func @linalg_matmul_i32
+func.func @linalg_matmul_i32(%arg0: tensor<16x16xi32>, %arg1: tensor<16x16xi32>,
+                             %arg2: tensor<16x16xi32>) -> (tensor<16x16xi32>) {
+  // CHECK-NOT: tpp.gemm
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<16x16xi32>, tensor<16x16xi32>)
+                     outs(%arg2 : tensor<16x16xi32>) -> tensor<16x16xi32>
+
+  return %0 : tensor<16x16xi32>
+}

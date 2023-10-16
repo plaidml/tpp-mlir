@@ -114,9 +114,13 @@ struct ConvertBrgemmToTpp
     }
     SmallVector<Value> inputs = brMatmulOp.getDpsInputs();
     inputs.push_back(brMatmulOp.getDpsInits()[0]);
-    SmallVector<Value> outputs = brMatmulOp.getDpsInits();
-    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs,
-                                               outputs[0].getType());
+    Value output = brMatmulOp.getDpsInits()[0];
+    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    if (!outType || !isa<FloatType>(outType.getElementType()))
+      return rewriter.notifyMatchFailure(brMatmulOp,
+                                         "Expect shaped float type");
+
+    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outType);
     return success();
   }
 };
@@ -137,9 +141,12 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
     }
     SmallVector<Value> inputs = matmulOp.getDpsInputs();
     inputs.push_back(matmulOp.getDpsInits()[0]);
-    SmallVector<Value> outputs = matmulOp.getDpsInits();
-    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs,
-                                             outputs[0].getType());
+    Value output = matmulOp.getDpsInits()[0];
+    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    if (!outType || !isa<FloatType>(outType.getElementType()))
+      return rewriter.notifyMatchFailure(matmulOp, "Expect shaped float type");
+
+    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs, outType);
     return success();
   }
 };
@@ -164,11 +171,14 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
       return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
 
     auto output = fillOp.getOutputs()[0];
+    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    if (!outType || !isa<FloatType>(outType.getElementType()))
+      return rewriter.notifyMatchFailure(fillOp, "Expect shaped float type");
     auto outputRank = output.getType().cast<ShapedType>().getRank();
     if (outputRank != 2)
       return rewriter.notifyMatchFailure(fillOp, "Expect output rank 2");
 
-    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, output.getType());
+    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, outType);
     return success();
   }
 };
