@@ -186,9 +186,7 @@ struct HasRank {
 // Callable object to verify `operand` to have an element type `T`.
 template <typename T> struct HasElementType {
   bool operator()(OpOperand *operand, Operation *op) const {
-    auto operandType = operand->get().getType();
-    if (auto shapedType = dyn_cast_or_null<ShapedType>(operandType))
-      operandType = shapedType.getElementType();
+    auto operandType = getElementTypeOrSelf(operand->get().getType());
     return isa<T>(operandType);
   }
 };

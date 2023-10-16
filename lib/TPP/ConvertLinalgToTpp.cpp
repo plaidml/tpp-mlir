@@ -115,7 +115,7 @@ struct ConvertBrgemmToTpp
     SmallVector<Value> inputs = brMatmulOp.getDpsInputs();
     inputs.push_back(brMatmulOp.getDpsInits()[0]);
     Value output = brMatmulOp.getDpsInits()[0];
-    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    auto outType = dyn_cast<ShapedType>(output.getType());
     if (!outType || !isa<FloatType>(outType.getElementType())) {
       return rewriter.notifyMatchFailure(brMatmulOp,
                                          "Expect shaped float type");
@@ -143,7 +143,7 @@ struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
     SmallVector<Value> inputs = matmulOp.getDpsInputs();
     inputs.push_back(matmulOp.getDpsInits()[0]);
     Value output = matmulOp.getDpsInits()[0];
-    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    auto outType = dyn_cast<ShapedType>(output.getType());
     if (!outType || !isa<FloatType>(outType.getElementType()))
       return rewriter.notifyMatchFailure(matmulOp, "Expect shaped float type");
 
@@ -172,7 +172,7 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
       return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
 
     auto output = fillOp.getOutputs()[0];
-    auto outType = dyn_cast_or_null<ShapedType>(output.getType());
+    auto outType = dyn_cast<ShapedType>(output.getType());
     if (!outType || !isa<FloatType>(outType.getElementType()))
       return rewriter.notifyMatchFailure(fillOp, "Expect shaped float type");
     auto outputRank = outType.getRank();
