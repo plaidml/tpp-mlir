@@ -249,7 +249,7 @@ func.func @identity_1(%arg0: memref<512xf32>, %arg1: memref<128x512xf32>) {
 
 // CHECK-LABEL: identity_1
 // CHECK-SAME: %[[ARG0:.+]]: memref<512xf32>, %[[ARG1:.+]]: memref<128x512xf32>
-// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 1, 512] flags = (bcast_col) data_type = f32
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 512, 512, 512] flags = (bcast_col) data_type = f32
 // CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
 
 // -----
@@ -325,3 +325,24 @@ func.func @not_vnni_packing(%arg0 : memref<32x32xf32, strided<[512, 1], offset: 
 
 // CHECK-LABEL: not_vnni_packing
 // CHECK-NOT: xsmm.unary vnni_2
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @identity_4(%arg0: memref<1024xbf16>, %arg1: memref<128x1024xbf16>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : memref<1024xbf16>) outs(%arg1 : memref<128x1024xbf16>) {
+      ^bb0(%arg2: bf16, %arg3: bf16):
+        linalg.yield %arg2 : bf16
+  }
+  return
+}
+
+// CHECK-LABEL: identity_4
+// CHECK-SAME: %[[ARG0:.+]]: memref<1024xbf16>, %[[ARG1:.+]]: memref<128x1024xbf16>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 1024, 1024, 1024] flags = (bcast_col) data_type = bf16
+// CHECK: xsmm.unary identity(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]])

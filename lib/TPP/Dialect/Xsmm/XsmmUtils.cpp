@@ -62,7 +62,12 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
         !inputShapedType.hasStaticShape()) {
       return failure();
     }
-    ldi = stridesOnInput->front();
+    // For 1d buffer xsmm likes the leading dimension as the size of
+    // the buffer.
+    if (inputShapedType.getRank() == 1)
+      ldi = inputShapedType.getShape()[0];
+    else
+      ldi = stridesOnInput->front();
   }
   auto stridesOnOutput = mlir::utils::getStaticStrides(output);
   if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)

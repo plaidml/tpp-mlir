@@ -30,7 +30,6 @@ struct LinalgDeGeneralize : LinalgDeGeneralizeBase<LinalgDeGeneralize> {
     func::FuncOp func = getOperation();
     RewritePatternSet patterns(&getContext());
     linalg::populateLinalgDeGeneralizationPatterns(patterns);
-    tpp::populateTppDeGeneralizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(func.getBody(), std::move(patterns));
   }
 };
@@ -155,35 +154,12 @@ struct FillOpDeGeneralizationPattern
   }
 };
 
-// From linalg.generic to TPP brgemm (VNNI).
-struct TppBrgemmDeGeneralizationPattern
-    : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!tpp::utils::isTppVnniOp(linalgOp, /*captures=*/nullptr))
-      return failure();
-    SmallVector<Value> operands = linalgOp.getDpsInputs();
-    SmallVector<Value> initOperands = linalgOp.getDpsInits();
-    operands.append(initOperands.begin(), initOperands.end());
-    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(linalgOp, operands,
-                                               operands.back().getType());
-    return success();
-  }
-};
-
 } // namespace
 
 void mlir::linalg::populateLinalgDeGeneralizationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FillOpDeGeneralizationPattern, MatmulOpDeGeneralizationPattern,
                BatchReduceOpDeGeneralizationPattern>(patterns.getContext());
-}
-
-void mlir::tpp::populateTppDeGeneralizationPatterns(
-    RewritePatternSet &patterns) {
-  patterns.add<TppBrgemmDeGeneralizationPattern>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

@@ -36,6 +36,9 @@ func.func @dps_test(%arg0: tensor<8x48x32x32xbf16>,
   return %3 : tensor<8x48x32x32xbf16>
 }
 
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1) -> (d1)>
 
@@ -55,9 +58,11 @@ func.func @dps_test(%arg0: tensor<8x48x32x32xbf16>,
 // CHECK: %[[SLICE_INIT:.+]] = tensor.extract_slice 
 // CHECK-SAME:  %[[ARG6]][%[[I]], %[[J]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
 // CHECK-SAME:  : tensor<8x48x32x32xbf16> to tensor<32x32xbf16>
-// CHECK: %[[MUL:.+]] = tpp.brgemm
-// CHECK-SAME: (%[[SLICE_ARG0]] : tensor<48x32x32xbf16>, %[[SLICE_ARG1]] : tensor<48x16x32x2xbf16>,
-// CHECK-SAME: %[[SLICE_INIT]] : tensor<32x32xbf16>)
+// CHECK: %[[MUL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:  iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]
+// CHECK-SAME:  ins(%[[SLICE_ARG0]], %[[SLICE_ARG1]]
+// CHECK-SAME:  outs(%[[SLICE_INIT]]
 // CHECK: %[[SLICE_EXPAND:.+]] = tensor.extract_slice 
 // CHECK-SAME:  %{{.+}}[%[[J]], 0] [1, 32] [1, 1] 
 // CHECK-SAME:  : tensor<48x32xbf16> to tensor<32xbf16>
