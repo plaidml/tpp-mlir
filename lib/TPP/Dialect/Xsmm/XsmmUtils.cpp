@@ -20,7 +20,6 @@ DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
   auto elemType = getElementTypeOrSelf(type);
   if (elemType.isBF16())
     return xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::BF16);
-  assert(elemType.isF32() && "Element type neither bf16 nor f32");
   return xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::F32);
 }
 
@@ -47,8 +46,10 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
 
   assert(isa<ShapedType>(outputType));
   auto outputShapedType = output.getType().cast<ShapedType>();
-  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape())
+  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
+      !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
+  }
 
   UnaryInfo unaryInfo;
   unaryInfo.m = outputShapedType.getShape()[0];

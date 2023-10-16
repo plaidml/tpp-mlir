@@ -50,6 +50,7 @@ static bool isTppOp(linalg::LinalgOp linalgOp) {
       .input(MatchAll(), HasStaticShape())
       .operation(NumRegions(EqualsTo(1)))
       .output(MatchAll(), HasStaticStrides())
+      .output(MatchAll(), HasElementType<FloatType>())
       .input(MatchAll(), HasStaticStrides())
       .operation(VerifyOpProperty(hasEqualOperandTypes));
   // clang-format on

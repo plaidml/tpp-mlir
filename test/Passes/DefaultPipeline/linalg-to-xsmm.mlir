@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" -split-input-file | FileCheck %s
 
 func.func @fill_op(%arg0: memref<3x3xf32>) {
   %cst = arith.constant 0.0 : f32
@@ -19,3 +19,14 @@ func.func @fill_op(%arg0: memref<3x3xf32>) {
 // CHECK: %[[PTR_TO_INT:.+]] = arith.index_cast %[[PTR]] : index to i64
 // CHECK: %[[LLVM_PTR:.+]] = llvm.inttoptr %[[PTR_TO_INT]] : i64 to !llvm.ptr<f32>
 // CHECK: call @xsmm_unary_scalar_invoke(%[[C1]], %[[DIS]], %[[CST]], %[[LLVM_PTR]], %[[C0]])
+
+// -----
+
+func.func @fill_op_i32(%arg0: memref<3x3xi32>) {
+  %cst = arith.constant 0 : i32
+  linalg.fill ins(%cst : i32) outs(%arg0 : memref<3x3xi32>)
+  return
+}
+
+// CHECK-LABEL: fill_op_i32
+// CHECK-NOT: xsmm
