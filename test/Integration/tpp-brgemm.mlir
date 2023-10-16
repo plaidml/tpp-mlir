@@ -10,8 +10,12 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// RUN: tpp-opt %s -default-tpp-passes | FileCheck %s -check-prefix=IR
+
+// IR-LABEL: brgemm_tpp
 func.func @brgemm_tpp(%A: tensor<1x4x8xf32>,
                      %B: tensor<1x8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32>  {
+  // IR: xsmm_gemm_invoke
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<1x4x8xf32>, tensor<1x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
   return %D: tensor<4x4xf32>
 }

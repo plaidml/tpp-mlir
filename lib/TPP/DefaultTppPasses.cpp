@@ -253,7 +253,7 @@ private:
 // Lower TPP to into combination of standard and local dialects.
 struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
                          UtilityPassBase<func::FuncOp> {
-  TppLoweringPass() : TppLoweringPass(false, false){};
+  TppLoweringPass() : TppLoweringPass(false, true){};
   TppLoweringPass(bool tppToLoops, bool linalgToXsmm) {
     this->tppToLoops = tppToLoops;
     this->linalgToXsmm = linalgToXsmm;
@@ -305,7 +305,7 @@ private:
 // The default pipeline for TPP.
 struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
                           UtilityPassBase<ModuleOp> {
-  DefaultTppPasses() : DefaultTppPasses(false, false, false){};
+  DefaultTppPasses() : DefaultTppPasses(false, false, true){};
   DefaultTppPasses(bool tppToLoops, bool linalgToLoops, bool linalgToXsmm) {
     this->tppToLoops = tppToLoops;
     this->linalgToLoops = linalgToLoops;

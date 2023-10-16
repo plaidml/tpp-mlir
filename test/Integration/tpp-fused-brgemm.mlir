@@ -1,4 +1,4 @@
-// RUN: tpp-run %s \
+// RUN: tpp-run %s -linalg-to-xsmm="false" \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 

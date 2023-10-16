@@ -75,7 +75,7 @@ llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
 // Lower linalg to XSMM directly.
 llvm::cl::opt<bool> linalgToXsmm("linalg-to-xsmm",
                                  llvm::cl::desc("Lower linalg to xsmm"),
-                                 llvm::cl::init(false));
+                                 llvm::cl::init(true));
 
 // Control parallelism.
 llvm::cl::opt<bool>
