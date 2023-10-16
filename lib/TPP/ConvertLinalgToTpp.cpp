@@ -174,7 +174,7 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
     auto outType = dyn_cast_or_null<ShapedType>(output.getType());
     if (!outType || !isa<FloatType>(outType.getElementType()))
       return rewriter.notifyMatchFailure(fillOp, "Expect shaped float type");
-    auto outputRank = output.getType().cast<ShapedType>().getRank();
+    auto outputRank = outType.getRank();
     if (outputRank != 2)
       return rewriter.notifyMatchFailure(fillOp, "Expect output rank 2");
 
