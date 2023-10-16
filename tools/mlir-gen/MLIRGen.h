@@ -27,13 +27,13 @@ namespace func {
 class FuncOp;
 } // namespace func
 
-/// MLIR Generator: produces MLIR linalg-on-tensor dialect for an MLIR mopdel
+/// MLIR Generator: produces MLIR linalg-on-tensor dialect for an MLIR model
 /// with the appropriate number of hidden layers and other properties selected.
 class MLIRGenerator {
   /// MLIR Context
   MLIRContext context;
 
-  /// MLIR OpBulder
+  /// MLIR OpBuilder
   OpBuilder builder;
 
   /// Unknown location, since all this code is auto-generated
@@ -42,8 +42,8 @@ class MLIRGenerator {
   /// Main module
   ModuleOp module;
 
-  /// Mini-Batch
-  unsigned miniBatch;
+  /// Batch size
+  unsigned batch;
 
   /// Layer sizes
   SmallVector<int64_t> layers;
@@ -65,19 +65,32 @@ class MLIRGenerator {
 
   // ============================ Code Generation Options
 
+  /// Lower bias add on every layer
+  bool enableBias;
+
+  /// Lower ReLU on every layer
+  bool enableRelu;
+
   /// Lower softmax at the last layer
   bool enableSoftmax;
 
   /// Initialize accumulation matrix with bias
+  /// Needs `enableBias` to be true
   bool biasAcc;
 
   /// List of supported kernel types that can be generated
-  enum class KernelType { MLP, MATMUL, FULLY_CONNECTED };
+  ///  * Model: Generates an entire model, with input handling, output creation,
+  ///           constant weight and bias, etc. This demonstrates the whole cost
+  ///           of packing, propagation, etc.
+  ///  * Layer: Generates a number of layers with all input/output/weight/bias
+  ///           pre-computed as arguments outside of the function call. This
+  ///           represents the `core` of each layer without any packing costs.
+  enum class KernelType { Model, Layer };
 
   /// Type of kernel to be generated
   KernelType kernelType;
 
-  /// VNNI packing factor
+  /// VNNI packing factor (0, 2, 4)
   int vnniFactor;
 
   // ============================ Helpers
@@ -90,6 +103,9 @@ class MLIRGenerator {
 
   /// Return shaped type (packed if requested)
   TensorType getShape(ArrayRef<int64_t>, PackingType);
+
+  /// Return a zero-init tensor for matmul outputs
+  Value getZeroInitTensor(TensorType);
 
   /// Affine expressions for maps
   SmallVector<AffineExpr, 6> affineExprs;
@@ -118,25 +134,24 @@ class MLIRGenerator {
   // input of the bias add, make it in-place and bind that to the input of
   // the ReLU, also making it in-place, and returning the first alloc.
 
-  /// Some arguments are optional, so we use this struct to simplify the
-  /// argument handling in lowerMatmul
-  struct MatMulArgs {
-    Value input;
-    Value weight;
-    Value bias;
-    Value output;
-  };
-
   /// Creates a matmul in the current function
-  Value lowerMatmul(MatMulArgs);
+  /// Args: A, B, C
+  /// Returns the chain value to be used in the next op
+  Value lowerMatmul(Value, Value, Value);
 
   /// Creates a bias add in the current function
-  Value lowerBiasAdd(Value, Value);
+  /// Args: Input, Output (same for in-place)
+  /// Returns the chain value to be used in the next op
+  Value lowerBiasAdd(Value, Value, Value);
 
   /// Creates a relu in the current function
-  Value lowerRelu(Value);
+  /// Args: Input, Output (same for in-place)
+  /// Returns the chain value to be used in the next op
+  Value lowerRelu(Value, Value);
 
   /// Creates a softmax in the current function
+  /// Args: Input, Output (same for in-place)
+  /// Returns the chain value to be used in the next op
   Value lowerSoftmax(Value, Value);
 
   // ============================ Main API
@@ -144,34 +159,49 @@ class MLIRGenerator {
   /// Creates metadata string containing run command, flops info etc.
   std::string createMetadata();
 
-  /// Creates a hidden layer function, to be called by the kernel
-  /// There will be one per hidden layer
-  Value createLayer(unsigned, Value);
+  /// Types are created first, values are created from the types if inside the
+  /// function, or populated later from function arguments if external.
+  struct Arg {
+    Value value;
+    TensorType type;
+  };
 
-  /// Creates an output layer function, to be called by the kernel
-  /// Classifies the output of the last layer and put it in the second argumnent
-  Value createOutputLayer(Value, Value);
+  /// There could be multiple layers, each with its own weights and biases
+  /// Input of one layer is the output of the previous
+  /// Input of the model is the input of the first layer
+  /// Output of the model is the output of the last layer
+  struct LayerArgs {
+    unsigned index;
+    Arg input;
+    Arg weight;
+    Arg bias;
+    Arg output;
+  };
 
-  /// Creates an MLP kernel
-  void createMlpKernel();
+  /// Some arguments are optional, so we use this struct to simplify the
+  /// argument handling in createLayer.
+  typedef SmallVector<LayerArgs, 3> KernelArgs;
 
-  /// Creates a matmul kernel
-  void createMatmulKernel();
+  /// Creates the kernel types from layer definitions and options
+  void getKernelTypes(KernelArgs &);
 
-  /// Creates a fully connected kernel
-  void createFcKernel();
+  /// Creates the kernel arguments from function args or constants and zero
+  /// tensors, depending on the kernel type (model, layer)
+  void getKernelArgs(KernelArgs &);
 
-  /// Creates the entry point, that creates and executes chosen kernel
-  /// No need to return the function, as all we need is to dump the module
-  /// with metadata appended to the file
-  void createEntryPoint();
+  /// Creates a layer function, to be called by the kernel
+  Value createLayer(LayerArgs &);
+
+  /// Creates a kernel (N * {GEMM + AddBias + ReLU} + Softmax)
+  /// AddBias, ReLU and Softmax are optional
+  void createKernel();
 
 public:
   /// Creates a specific module. Different configurations need different modules
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
   MLIRGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
-                bool, int);
+                bool, bool, int);
 
   ~MLIRGenerator() { module->destroy(); }
 

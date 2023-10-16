@@ -126,7 +126,7 @@ debug "Random seed: $SEED"
 # Defaults
 
 # Command line to extract and run
-MLIR_GEN_ARGS="--float-width=$FLOAT_SIZE --seed=$SEED --mini-batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
+MLIR_GEN_ARGS="--float-width=$FLOAT_SIZE --seed=$SEED --batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
 ORIG_MLIR="mlir-gen-original.mlir"
 debug "\nCreating the original MLIR model:"
 run "$MLIR_GEN $MLIR_GEN_ARGS" $ORIG_MLIR

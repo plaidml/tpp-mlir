@@ -45,35 +45,16 @@ void parseStringList(StringRef str, SmallVector<int64_t> &list) {
   }
 }
 
-SmallVector<int64_t> getMatMulResultShape(ShapedType lhs, ShapedType rhs) {
-  SmallVector<int64_t> shape;
-  assert(lhs.getRank() == rhs.getRank() && "Matmul types must have same rank");
-  // M x K x N -> M x N
-  assert(lhs.getDimSize(1) == rhs.getDimSize(0) &&
-         "Incompatible matmul shapes");
-  int m = lhs.getDimSize(0);
-  shape.push_back(m);
-  int n = rhs.getDimSize(1);
-  shape.push_back(n);
-
-  // Just splat high dims onto the output type
-  for (int i = 2, rank = lhs.getRank(); i < rank; i++) {
-    assert(lhs.getDimSize(i) == rhs.getDimSize(i) &&
-           "low dimensions must be the same");
-    shape.push_back(lhs.getDimSize(i));
-  }
-  return shape;
-}
-
 } // anonymous namespace
 
-MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
+MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
                              StringRef layersStr, StringRef tilesStr,
-                             unsigned typeWidth, int seed, bool enableSoftmax,
-                             bool biasAcc, int vnniBlockingFactor)
-    : builder(&context), loc(builder.getUnknownLoc()), miniBatch(miniBatch),
-      seed(seed), flops(0), enableSoftmax(enableSoftmax), biasAcc(biasAcc),
-      vnniFactor(vnniBlockingFactor) {
+                             unsigned typeWidth, int seed, bool enableBias,
+                             bool enableRelu, bool enableSoftmax,
+                             int vnniBlockingFactor)
+    : builder(&context), loc(builder.getUnknownLoc()), batch(batch), seed(seed),
+      flops(0), enableBias(enableBias), enableRelu(enableRelu),
+      enableSoftmax(enableSoftmax), vnniFactor(vnniBlockingFactor) {
 
   // Register all necessary dialects
   context
@@ -84,15 +65,14 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
 
   // Parse kernel type
   auto optKernel = llvm::StringSwitch<std::optional<KernelType>>(kernelStr)
-                       .CaseLower("mlp", KernelType::MLP)
-                       .CaseLower("matmul", KernelType::MATMUL)
-                       .CaseLower("fc", KernelType::FULLY_CONNECTED)
+                       .CaseLower("model", KernelType::Model)
+                       .CaseLower("layer", KernelType::Layer)
                        .Default(std::nullopt);
   assert(optKernel && "Invalid kernel type");
   kernelType = *optKernel;
 
   // Argument validation
-  assert(miniBatch != 0 && "MiniBatch cannot be zero");
+  assert(batch != 0 && "Batch cannot be zero");
 
   // Parse hidden layer sizes
   parseStringList(layersStr, layers);
@@ -140,153 +120,120 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned miniBatch,
   builder.setInsertionPoint(module);
 }
 
-Value MLIRGenerator::createLayer(unsigned index, Value arg) {
-  assert(index < layers.size() && "out of bounds access");
+void MLIRGenerator::getKernelTypes(KernelArgs &args) {
+  // Input type, also first layer's input
+  TensorType currentType = getShape({batch, layers.front()}, PACK_INPUT);
+
+  // Weights and biases types (which is also relu and input to the next)
+  for (unsigned i = 1, max = layers.size(); i < max; i++) {
+    // Input to the layer is previous size
+    unsigned inputSize = layers[i - 1];
+    // Output to the layer is current size
+    unsigned outputSize = layers[i];
+
+    // Types: {MB, input} X {input, output} + {MB, output} -> ReLU
+    LayerArgs arg;
+    arg.index = i;
+    arg.input.type = currentType;
+    arg.weight.type = getShape({inputSize, outputSize}, PACK_WEIGHT);
+    arg.bias.type = getShape({batch, outputSize}, PACK_OUTPUT);
+    arg.output.type = arg.bias.type;
+    args.push_back(arg);
+
+    // Update next input type with the output type of this layer
+    currentType = arg.output.type;
+  }
+}
+
+Value MLIRGenerator::createLayer(LayerArgs &args) {
   OpBuilder::InsertionGuard guard(builder);
 
-  // Input to the layer is previous size
-  unsigned input = layers[index - 1];
+  Value chain;
+  chain = lowerMatmul(args.input.value, args.weight.value, args.output.value);
 
-  // Output to the layer is current size
-  auto output = layers[index];
+  // These are optional and only emitted if enabled
+  chain = lowerBiasAdd(chain, args.bias.value, args.output.value);
+  chain = lowerRelu(chain, args.output.value);
 
-  // Types: {MB, input} X {input, output} + {MB, output} -> ReLU
-  auto weightType = getShape({input, output}, PACK_WEIGHT);
-  auto outputType = getShape({miniBatch, output}, PACK_OUTPUT);
-
-  // Add matmul/bias/relu as it comes from tensorflow
-  auto weight = createDenseTensor(builder, initType, weightType, getRand());
-  auto bias = createDenseTensor(builder, initType, outputType, getRand());
-  auto matmul = lowerMatmul({arg, weight, bias, /*output=*/nullptr});
-  auto relu = lowerRelu(matmul);
+  // Last layer may output softmax
+  if (args.index == layers.size() - 1)
+    chain = lowerSoftmax(chain, args.output.value);
 
   // Return output tensor to the next layer
-  return relu;
+  return chain;
 }
 
-Value MLIRGenerator::createOutputLayer(Value arg, Value out) {
+void MLIRGenerator::createKernel() {
+  assert((kernelType == KernelType::Model) ||
+         (kernelType == KernelType::Layer) && "Invalid kernel type");
   OpBuilder::InsertionGuard guard(builder);
 
-  auto last = layers.size() - 1;
-  // Input to the layer is penultimate size
-  auto input = layers[last - 1];
+  // Get all kernel types first
+  KernelArgs args;
+  getKernelTypes(args);
+  assert(args.size() > 0 && "Invalid model size");
+  unsigned lastLayer = args.size() - 1;
+  auto &firstArg = args[0];
+  auto &lastArg = args[lastLayer];
 
-  // Output to the layer is last size
-  auto output = layers[last];
-
-  // Add softmax
-  auto weightType = getShape({input, output}, PACK_WEIGHT);
-  auto weight = createDenseTensor(builder, initType, weightType, getRand());
-
-  if (enableSoftmax) {
-    // Return the softmax of the last layer
-    // Allocates a temporay for the matmul, write softmax on out
-    auto matmul =
-        lowerMatmul({arg, weight, /*bias=*/nullptr, /*output=*/nullptr});
-    return lowerSoftmax(matmul, out);
+  // Model type only has `input`, while Layer type has everything
+  // We need to create the function type list first, to set the values from
+  // the function's arguments on the kernel type `layer`.
+  SmallVector<Type, 1> inputTypes{firstArg.input.type};
+  if (kernelType == KernelType::Layer) {
+    for (auto &layer : args) {
+      inputTypes.push_back(layer.weight.type);
+      if (enableBias)
+        inputTypes.push_back(layer.bias.type);
+      inputTypes.push_back(layer.output.type);
+    }
   }
 
-  // Writes output to out
-  return lowerMatmul({arg, weight, /*bias=*/nullptr, out});
-}
+  // Create function with all necessary arguments
+  auto func = createFunction(builder, module, "entry", inputTypes,
+                             {lastArg.output.type});
 
-std::string MLIRGenerator::createMetadata() {
-  assert(flops && "FLOPS not computed?");
-  std::string data = "";
-  data += "// RUN: tpp-run %s -n 10 \\\n";
-  data += "// RUN:  -e entry -entry-point-result=void\n";
-  data += "\n";
-  data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
-  data += "\n";
-  data += "\n";
+  // Initialize the values depending on the KernelType
+  //   * Model: input = arg, weights/bias = const, output = zero
+  //   * Layer: input/weights/bias/output = args
+  firstArg.input.value = func.getArgument(0);
 
-  return data;
-}
+  // Argument position is input + N * { weight/bias } + output
+  // First weight is at position 1, every two
+  unsigned argPos = 1;
+  // Caches the output to chain into the next layer's input
+  Value lastOutput;
+  for (auto &arg : args) {
+    // Chain the last output into this layer
+    if (!arg.input.value)
+      arg.input.value = lastOutput;
 
-void MLIRGenerator::createMlpKernel() {
-  OpBuilder::InsertionGuard guard(builder);
+    // Initialize weights and biases
+    if (kernelType == KernelType::Layer) {
+      arg.weight.value = func.getArgument(argPos++);
+      if (enableBias)
+        arg.bias.value = func.getArgument(argPos++);
+      arg.output.value = func.getArgument(argPos++);
+    } else { // Model
+      arg.weight.value =
+          createDenseTensor(builder, initType, arg.weight.type, getRand());
+      if (enableBias)
+        arg.bias.value =
+            createDenseTensor(builder, initType, arg.bias.type, getRand());
+      arg.output.value = getZeroInitTensor(arg.output.type);
+    }
 
-  // First, create the kernel with the entry point name "entry"
-  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
-  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
-  auto func = createFunction(builder, module, "entry", {inputType, outputType},
-                             {outputType});
-
-  // Now pass the input through all layers
-  Value data = func.getArgument(0);
-  for (unsigned i = 1, max = layers.size() - 1; i < max; i++) {
-    data = createLayer(i, data);
+    // Now pass the input through all layers
+    lastOutput = createLayer(arg);
+    arg.output.value = lastOutput;
   }
-
-  // Convert data to predictions
-  Value output = func.getArgument(1);
-  data = createOutputLayer(data, output);
-
   // Data is now output
-  builder.create<func::ReturnOp>(loc, data);
-}
-
-void MLIRGenerator::createMatmulKernel() {
-  OpBuilder::InsertionGuard guard(builder);
-
-  // First, create the kernel with the entry point name "entry"
-  // Ignore all hidden layers - only a single matmul operation is needed
-  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
-  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
-  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
-  auto func = createFunction(builder, module, "entry",
-                             {inputType, weightType, outputType}, {outputType});
-
-  // Add only matmul without bias or activation func
-  auto data = lowerMatmul({/*input=*/func.getArgument(0),
-                           /*weight=*/func.getArgument(1),
-                           /*bias=*/nullptr, /*output=*/func.getArgument(2)});
-
-  // Data is now output
-  builder.create<func::ReturnOp>(loc, data);
-}
-
-void MLIRGenerator::createFcKernel() {
-  OpBuilder::InsertionGuard guard(builder);
-
-  // First, create the kernel with the entry point name "entry"
-  // Ignore all hidden layers - only a single matmul operation is needed
-  auto inputType = getShape({miniBatch, layers.front()}, PACK_INPUT);
-  auto weightType = getShape({layers.front(), layers.back()}, PACK_WEIGHT);
-  auto outputType = getShape({miniBatch, layers.back()}, PACK_OUTPUT);
-  auto biasType = outputType;
-  auto func = createFunction(builder, module, "entry",
-                             {inputType, weightType, biasType, outputType},
-                             {outputType});
-
-  // Create a fully connected (FC) kernel that is: matmul + bias + relu
-  Value data = lowerMatmul({/*input=*/func.getArgument(0),
-                            /*weight=*/func.getArgument(1),
-                            /*bias=*/func.getArgument(2),
-                            /*output=*/func.getArgument(3)});
-  data = lowerRelu(data);
-
-  // Data is now output
-  builder.create<func::ReturnOp>(loc, data);
-}
-
-void MLIRGenerator::createEntryPoint() {
-  switch (kernelType) {
-  case KernelType::MLP:
-    createMlpKernel();
-    break;
-  case KernelType::MATMUL:
-    createMatmulKernel();
-    break;
-  case KernelType::FULLY_CONNECTED:
-    createFcKernel();
-    break;
-  }
+  builder.create<func::ReturnOp>(loc, lastArg.output.value);
 }
 
 int MLIRGenerator::generate(StringRef filename) {
   // First, populate the module with all functions
-  createEntryPoint();
+  createKernel();
 
   // Verify
   if (failed(module.verify())) {
@@ -313,33 +260,32 @@ int MLIRGenerator::generate(StringRef filename) {
 
 // ============================================= Helpers
 
-Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
-  auto inputShape = args.input.getType().cast<ShapedType>();
-  auto weightShape = args.weight.getType().cast<ShapedType>();
+std::string MLIRGenerator::createMetadata() {
+  assert(flops && "FLOPS not computed?");
+  std::string data = "";
+  data += "// RUN: tpp-run %s -n 10 \\\n";
+  data += "// RUN:  -e entry -entry-point-result=void\n";
+  data += "\n";
+  data += "// BENCH_TOTAL_FLOPS: " + std::to_string(flops);
+  data += "\n";
+  data += "\n";
 
-  // If not using bias as accumulator, and output not provided,
-  // create a zero filled tensor
-  if (!args.output && biasAcc && args.bias) {
-    args.output = args.bias;
-  } else if (!args.output) {
-    auto dims = getMatMulResultShape(inputShape, weightShape);
-    auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
-    args.output =
-        builder.create<tensor::EmptyOp>(loc, dims, dataType).getResult();
-    args.output =
-        builder.create<linalg::FillOp>(loc, zero, args.output).getResult(0);
-  }
-  auto outShape = args.output.getType().cast<ShapedType>();
+  return data;
+}
+
+Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
+  auto inputShape = input.getType().cast<ShapedType>();
+  auto outShape = output.getType().cast<ShapedType>();
 
   // Matmul as a linalg.generic
-  auto map1 = getMap(args.input, MAP_MATMUL_INPUT);   // { 0, 2 }
-  auto map2 = getMap(args.weight, MAP_MATMUL_WEIGHT); // { 2, 1 }
-  auto map3 = getMap(args.output, MAP_MATMUL_OUTPUT); // { 0, 1 }
+  auto map1 = getMap(input, MAP_MATMUL_INPUT);   // { 0, 2 }
+  auto map2 = getMap(weight, MAP_MATMUL_WEIGHT); // { 2, 1 }
+  auto map3 = getMap(output, MAP_MATMUL_OUTPUT); // { 0, 1 }
   auto matmul =
       builder
           .create<linalg::GenericOp>(
-              loc, args.output.getType(), ValueRange{args.input, args.weight},
-              ValueRange{args.output}, ArrayRef<AffineMap>{map1, map2, map3},
+              loc, output.getType(), ValueRange{input, weight},
+              ValueRange{output}, ArrayRef<AffineMap>{map1, map2, map3},
               getIterators(MAP_MATMUL),
               [&](OpBuilder &nestedBuilder, Location nestedLoc,
                   ValueRange blockArgs) {
@@ -364,25 +310,28 @@ Value MLIRGenerator::lowerMatmul(MatMulArgs args) {
     nFlops *= outShape.getDimSize(1);
   flops += 2 * mkFlops * nFlops;
 
-  // If not using bias as accumulator, add the bias add layer
-  if (!biasAcc && args.bias)
-    return lowerBiasAdd(matmul, args.bias);
-
   return matmul;
 }
 
-Value MLIRGenerator::lowerBiasAdd(Value input, Value bias) {
+Value MLIRGenerator::lowerBiasAdd(Value input, Value bias, Value output) {
+  if (!enableBias)
+    return input;
+
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
-  auto sum = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{bias}, ValueRange{input},
-      ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
-      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
-        auto arg0 = blockArgs[0];
-        auto arg1 = blockArgs[1];
-        auto add = nestedBuilder.create<arith::AddFOp>(loc, arg0, arg1);
-        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
-      });
+  auto sum =
+      builder
+          .create<linalg::GenericOp>(
+              loc, outTy, ValueRange{bias}, ValueRange{input},
+              ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
+              [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                  ValueRange blockArgs) {
+                auto arg0 = blockArgs[0];
+                auto arg1 = blockArgs[1];
+                auto add = nestedBuilder.create<arith::AddFOp>(loc, arg0, arg1);
+                nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
+              })
+          .getResult(0);
 
   // Add flops = M * N = prod(outputDims)
   int64_t addFlops = 1;
@@ -390,21 +339,29 @@ Value MLIRGenerator::lowerBiasAdd(Value input, Value bias) {
     addFlops *= outTy.getDimSize(i);
   flops += addFlops;
 
-  return sum.getResult(0);
+  return sum;
 }
 
-Value MLIRGenerator::lowerRelu(Value input) {
+Value MLIRGenerator::lowerRelu(Value input, Value output) {
+  if (!enableRelu)
+    return input;
+
   auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
-  auto relu = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{}, ValueRange{input}, ArrayRef<AffineMap>{map},
-      getIterators(MAP_PARALLEL),
-      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
-        auto arg0 = blockArgs[0];
-        auto max = nestedBuilder.create<arith::MaximumFOp>(loc, arg0, zero);
-        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
-      });
+  auto relu =
+      builder
+          .create<linalg::GenericOp>(
+              loc, outTy, ValueRange{}, ValueRange{input},
+              ArrayRef<AffineMap>{map}, getIterators(MAP_PARALLEL),
+              [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                  ValueRange blockArgs) {
+                auto arg0 = blockArgs[0];
+                auto max =
+                    nestedBuilder.create<arith::MaximumFOp>(loc, arg0, zero);
+                nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{max});
+              })
+          .getResult(0);
 
   // Relu flops = M * N = prod(outputDims)
   int64_t reluFlops = 1;
@@ -412,10 +369,13 @@ Value MLIRGenerator::lowerRelu(Value input) {
     reluFlops *= outTy.getDimSize(i);
   flops += reluFlops;
 
-  return relu.getResult(0);
+  return relu;
 }
 
 Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
+  if (!enableSoftmax)
+    return input;
+
   assert(input.getType().cast<ShapedType>().getRank() == 2 &&
          "Packed softmax not implemented yet");
   auto map1 = getMap(input, MAP_PARALLEL);
@@ -434,7 +394,7 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
       });
 
   // Second, we sum-reduce and splat
-  SmallVector<int64_t> dims{miniBatch, 1};
+  SmallVector<int64_t> dims{batch, 1};
   auto redTy = getShape(dims, PACK_OUTPUT);
   Value redTensor =
       builder.create<tensor::EmptyOp>(loc, dims, outTy.getElementType());
@@ -460,16 +420,20 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
       });
 
   // Third, we update the exp/sum(exp) onto the output tensor
-  auto softmax = builder.create<linalg::GenericOp>(
-      loc, outTy, ValueRange{exp.getResult(0), mean.getResult(0)},
-      ValueRange{output}, ArrayRef<AffineMap>{map1, map1, map1},
-      getIterators(MAP_PARALLEL),
-      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange blockArgs) {
-        auto arg0 = blockArgs[0];
-        auto arg1 = blockArgs[1];
-        auto div = nestedBuilder.create<arith::DivFOp>(loc, arg0, arg1);
-        nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{div});
-      });
+  auto softmax =
+      builder
+          .create<linalg::GenericOp>(
+              loc, outTy, ValueRange{exp.getResult(0), mean.getResult(0)},
+              ValueRange{output}, ArrayRef<AffineMap>{map1, map1, map1},
+              getIterators(MAP_PARALLEL),
+              [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                  ValueRange blockArgs) {
+                auto arg0 = blockArgs[0];
+                auto arg1 = blockArgs[1];
+                auto div = nestedBuilder.create<arith::DivFOp>(loc, arg0, arg1);
+                nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{div});
+              })
+          .getResult(0);
 
   // Softmax flops = 4 * M * N = 4 * prod(outputDims)
   int64_t softmaxFlops = 1;
@@ -477,7 +441,7 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
     softmaxFlops *= outTy.getDimSize(i);
   flops += 4 * softmaxFlops;
 
-  return softmax.getResult(0);
+  return softmax;
 }
 
 TensorType MLIRGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
@@ -654,4 +618,12 @@ int MLIRGenerator::getRand() {
   int temp = seed;
   seed = rand();
   return temp;
+}
+
+Value MLIRGenerator::getZeroInitTensor(TensorType type) {
+  auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
+  Value tensor =
+      builder.create<tensor::EmptyOp>(loc, type, ValueRange{}).getResult();
+  tensor = builder.create<linalg::FillOp>(loc, zero, tensor).getResult(0);
+  return tensor;
 }
