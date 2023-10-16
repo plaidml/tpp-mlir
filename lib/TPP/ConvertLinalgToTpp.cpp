@@ -116,9 +116,10 @@ struct ConvertBrgemmToTpp
     inputs.push_back(brMatmulOp.getDpsInits()[0]);
     Value output = brMatmulOp.getDpsInits()[0];
     auto outType = dyn_cast_or_null<ShapedType>(output.getType());
-    if (!outType || !isa<FloatType>(outType.getElementType()))
+    if (!outType || !isa<FloatType>(outType.getElementType())) {
       return rewriter.notifyMatchFailure(brMatmulOp,
                                          "Expect shaped float type");
+    }
 
     rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outType);
     return success();
