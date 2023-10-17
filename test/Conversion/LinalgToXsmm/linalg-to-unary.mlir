@@ -308,7 +308,7 @@ func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>
 // CHECK-LABEL: vnni_packing
 // CHECK-SAME:  %[[ARG0:.+]]: memref<32x32xbf16, strided<[512, 1], offset: ?>>, 
 // CHECK-SAME:  %[[ARG1:.+]]: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 512, 512] flags = (none) data_type = bf16
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 512, 32] flags = (none) data_type = bf16
 // CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]])
 
 // -----
@@ -346,3 +346,38 @@ func.func @identity_4(%arg0: memref<1024xbf16>, %arg1: memref<128x1024xbf16>) {
 // CHECK-SAME: %[[ARG0:.+]]: memref<1024xbf16>, %[[ARG1:.+]]: memref<128x1024xbf16>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [128, 1024, 1024, 1024] flags = (bcast_col) data_type = bf16
 // CHECK: xsmm.unary identity(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 32)>
+
+func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2xbf16>) { 
+  scf.forall (%arg3, %arg4) in (4, 4) {
+    %0 = affine.apply #map(%arg4)
+    %1 = affine.apply #map(%arg3)
+    %subview = memref.subview %arg1[%0, %1] [32, 32] [1, 1] 
+      : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
+    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] 
+      : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    %expand_shape = memref.expand_shape %subview [[0, 1], [2]] 
+      : memref<32x32xbf16, strided<[128, 1], offset: ?>> into memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>
+    linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>) 
+                     outs(%subview_1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) 
+                     permutation = [0, 2, 1] 
+  }
+  return
+}
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
+
+// CHECK-LABEL: vnni_packing_1
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x128xbf16>, %[[ARG1:.+]]: memref<4x4x16x32x2xbf16>
+// CHECK: scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (4, 4)
+// CHECK: %[[OFF:.+]] = affine.apply #[[MAP]](%[[ARG3]])
+// CHECK: %[[OFF_1:.+]] = affine.apply #[[MAP]](%[[ARG2]])
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[OFF]], %[[OFF_1]]] [32, 32] [1, 1] 
+// CHECK-SAME:  : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
+// CHECK: %[[SUB_0:.+]] = memref.subview %[[ARG1]][%[[ARG2]], %[[ARG3]], 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] 
+// CHECK-SAME:  : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 128, 32] flags = (none) data_type = bf16
+// CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[SUB]], %[[SUB_0]])
