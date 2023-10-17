@@ -8,6 +8,7 @@
 
 #include "TPP/Passes.h"
 
+#include "TPP/MatcherUtils.h"
 #include "TPP/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"
@@ -91,6 +92,199 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   // TODO: add more WMMA combinations.
   return aType.getElementType().isF16() && bType.getElementType().isF16() &&
          cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
+}
+
+// Fuse a consumer using WMMA operations.
+// Returns updated store op or nullopt if the fusion fails.
+static std::optional<Operation *>
+mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
+          gpu::SubgroupMmaStoreMatrixOp rootStoreOp, ValueRange storeIndices,
+          PatternRewriter &rewriter) {
+  Location loc = rootOp.getLoc();
+
+  auto rootOutput = rootOp.getDpsInits()[0];
+  auto outputType = rootOutput.getType().cast<ShapedType>();
+  // Must be a floating point type.
+  auto floatType = dyn_cast<FloatType>(outputType.getElementType());
+  if (!floatType)
+    return std::nullopt;
+
+  gpu::MMAMatrixType mmaOutputType = gpu::MMAMatrixType::get(
+      outputType.getShape(), outputType.getElementType(), "COp");
+  auto leadingDim = rootStoreOp.getLeadDimension();
+
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+
+  // Insert fused eltwise ops before the store and later replace the store
+  // with a new result.
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(rootStoreOp);
+
+  std::optional<Operation *> newStore = std::nullopt;
+  SmallVector<Value> operands;
+  if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
+    // Get the value to be added - load the tile first.
+    // Must be a buffer of the same type - scalar broadcast is not supported.
+    auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
+    if (addValue.getType() != rootOutput.getType())
+      return std::nullopt;
+    // Fuse the add into the matmul body.
+    addValue = rewriter
+                   .create<gpu::SubgroupMmaLoadMatrixOp>(
+                       loc, mmaOutputType, addValue, ValueRange{zero, zero},
+                       leadingDim,
+                       /*transpose=*/UnitAttr())
+                   .getRes();
+    auto eltwiseAttr = gpu::MMAElementwiseOp::ADDF;
+    auto addRes =
+        rewriter
+            .create<gpu::SubgroupMmaElementwiseOp>(
+                loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), addValue},
+                eltwiseAttr)
+            .getRes();
+    // Store the new result.
+    newStore = rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
+        rootStoreOp, addRes, rootStoreOp.getDstMemref(), ValueRange{zero, zero},
+        leadingDim,
+        /*transpose=*/UnitAttr());
+  } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
+    // Fuse the relu into the matmul body.
+    Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
+        loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
+    Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
+        loc, mmaOutputType, zeroFloat);
+    auto eltwiseAttr = gpu::MMAElementwiseOp::MAXF;
+    auto maxRes =
+        rewriter
+            .create<gpu::SubgroupMmaElementwiseOp>(
+                loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), zeroTile},
+                eltwiseAttr)
+            .getRes();
+    // Store the new result.
+    newStore = rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
+        rootStoreOp, maxRes, rootStoreOp.getDstMemref(), ValueRange{zero, zero},
+        leadingDim,
+        /*transpose=*/UnitAttr());
+  } else {
+    // Not a fusable operation. Bail out.
+    return std::nullopt;
+  }
+
+  rewriter.eraseOp(consumer);
+
+  return newStore;
+}
+
+// Fuse a consumer using scalar operations.
+// Returns updated store op or nullopt if the fusion fails.
+static std::optional<Operation *> scalarFusion(linalg::LinalgOp rootOp,
+                                               linalg::LinalgOp consumer,
+                                               memref::StoreOp rootStoreOp,
+                                               ValueRange storeIndices,
+                                               PatternRewriter &rewriter) {
+  Location loc = rootOp.getLoc();
+  auto rootOutput = rootOp.getDpsInits()[0];
+  auto outputType = rootOutput.getType().cast<ShapedType>();
+  // Must be a floating point type.
+  auto floatType = dyn_cast<FloatType>(outputType.getElementType());
+  if (!floatType)
+    return std::nullopt;
+
+  // Insert fused eltwise ops before the store and later replace the store
+  // with a new result.
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(rootStoreOp);
+
+  std::optional<Operation *> newStore = std::nullopt;
+  SmallVector<Value> operands;
+  if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
+    // Get the value to be added. Load the element first, if necessary.
+    auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
+    if (addValue.getType().isa<ShapedType>()) {
+      addValue = rewriter.create<memref::LoadOp>(loc, addValue, storeIndices)
+                     .getResult();
+    }
+    // Fuse the add into the matmul body.
+    auto addOp =
+        rewriter.create<arith::AddFOp>(loc, rootStoreOp.getValue(), addValue);
+    // Store the new result.
+    newStore = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        rootStoreOp, addOp.getResult(), rootOutput, storeIndices);
+  } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
+    // Fuse the relu into the matmul body.
+    Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
+        loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
+    auto maxOp = rewriter.create<arith::MaximumFOp>(loc, rootStoreOp.getValue(),
+                                                    zeroFloat);
+    // Store the new result.
+    newStore = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        rootStoreOp, maxOp.getResult(), rootOutput, storeIndices);
+  } else {
+    // Not a fusable operation. Bail out.
+    return std::nullopt;
+  }
+
+  rewriter.eraseOp(consumer);
+
+  return newStore;
+}
+
+// Fuse elementwise consumers.
+// A naive fusion strategy that looks at the other operations after the root
+// linalg op and tries to fuse them.
+// Attemps bails on the first mismatch.
+// Returns updated store op.
+static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
+                                       Operation *rootStoreOp,
+                                       ValueRange storeIndices,
+                                       PatternRewriter &rewriter) {
+  auto parentOp = rootOp->getParentOp();
+  auto rootOutput = rootOp.getDpsInits()[0];
+
+  // Traverse other ops within the same region and collect consumers.
+  SmallVector<linalg::LinalgOp> consumers;
+  Operation *nextOp = rootOp;
+  while ((nextOp = nextOp->getNextNode())) {
+    // Potential consumers must be within the same region.
+    if (nextOp->getParentOp() != parentOp)
+      break;
+
+    // Only other linalg ops are expected as consumers.
+    // TODO: might need to be relaxed to skip over ops without side effects
+    auto consumer = dyn_cast<linalg::LinalgOp>(nextOp);
+    if (!consumer || !linalg::isElementwise(consumer))
+      break;
+    // Require the same iteration space.
+    if (consumer.getNumParallelLoops() != rootOp.getNumParallelLoops())
+      break;
+
+    auto outBuf = consumer.getDpsInitOperand(0)->get();
+    // Check that the op reuses the same output buffer as the root op.
+    // Otherwise, it is assumed that the op cannot be fused.
+    if (outBuf != rootOutput)
+      break;
+
+    consumers.push_back(consumer);
+  }
+
+  for (auto op : consumers) {
+    std::optional<Operation *> updatedStoreOp = std::nullopt;
+    if (auto storeOp = dyn_cast<memref::StoreOp>(rootStoreOp)) {
+      updatedStoreOp =
+          scalarFusion(rootOp, op, storeOp, storeIndices, rewriter);
+    } else if (auto mmaStore =
+                   dyn_cast<gpu::SubgroupMmaStoreMatrixOp>(rootStoreOp)) {
+      updatedStoreOp = mmaFusion(rootOp, op, mmaStore, storeIndices, rewriter);
+    }
+
+    // Not a fusable operation. Bail out.
+    if (!updatedStoreOp)
+      break;
+
+    rootStoreOp = *updatedStoreOp;
+  }
+
+  return rootStoreOp;
 }
 
 // Create WMMA instructions out of matmul-like operation.
@@ -210,8 +404,11 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   }
 
   // Write back the total sum to the output buffer.
-  rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
+  auto storeOp = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
       loc, result, matC, ValueRange{zero, zero}, ldc, /*transpose=*/UnitAttr());
+
+  (void)fuseEltwiseConsumers(linalgOp, storeOp, ValueRange{zero, zero},
+                             rewriter);
 
   rewriter.eraseOp(linalgOp);
 
@@ -312,7 +509,10 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   }
 
   // Write back the total sum to the output buffer.
-  rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+  auto storeOp =
+      rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
+
+  (void)fuseEltwiseConsumers(linalgOp, storeOp, parallelIvs, rewriter);
 
   rewriter.eraseOp(linalgOp);
 

@@ -39,26 +39,17 @@ module {
   }
 }
 
-// At the moment, each linalg.generic is lowered into a separate kernel.
+// linalg.generic ops are fused into a single kernel.
 // CHECK-LABEL: func.func @_entry
-// CHECK: gpu.launch_func
-// CHECK: gpu.launch_func
-// CHECK: gpu.launch_func
-
-// matmul kernel
+// CHECK-COUNT-1: gpu.launch_func
 // CHECK: gpu.module @_entry_kernel
 // CHECK: llvm.func @_entry_kernel
+// matmul kernel
 // CHECK: llvm.fmul
 // CHECK: llvm.fadd
-
 // bias kernel
-// CHECK: gpu.module @_entry_kernel
-// CHECK: llvm.func @_entry_kernel
 // CHECK: llvm.fadd
-
 // relu kernel
-// CHECK: gpu.module @_entry_kernel
-// CHECK: llvm.func @_entry_kernel
 // CHECK: llvm.fcmp
 // CHECK: llvm.select
 
