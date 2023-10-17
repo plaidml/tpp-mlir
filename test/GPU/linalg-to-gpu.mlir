@@ -142,3 +142,21 @@ func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024x
 // CHECK:           }
 // CHECK:           scf.yield
 // CHECK:         }
+
+// -----
+
+// Do not fuse unknown ops.
+func.func @mixed_ops_chain(%arg0: memref<256x256xf32>, %arg1: memref<256x256xf32>, %arg2: memref<256x256xf32>) {
+  linalg.matmul ins(%arg0, %arg1 : memref<256x256xf32>, memref<256x256xf32>)
+                outs(%arg2 : memref<256x256xf32>)
+  call @eltwiseFunc(%arg0, %arg1, %arg2) : (memref<256x256xf32>, memref<256x256xf32>, memref<256x256xf32>) -> ()
+  linalg.add ins(%arg0, %arg1 : memref<256x256xf32>, memref<256x256xf32>)
+                outs(%arg2 : memref<256x256xf32>)
+  return
+}
+func.func private @eltwiseFunc(memref<256x256xf32>, memref<256x256xf32>, memref<256x256xf32>) -> ()
+
+// CHECK-LABEL: func.func @mixed_ops_chain
+// CHECK-NOT: linalg.matmul
+// CHECK: call @eltwiseFunc
+// CHECK: linalg.add

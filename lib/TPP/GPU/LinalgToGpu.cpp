@@ -95,15 +95,20 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
 }
 
 // Fuse a consumer using WMMA operations.
-// Returns updated store op or nullptr if the fusion fails.
-static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-                            gpu::SubgroupMmaStoreMatrixOp rootStoreOp,
-                            ValueRange storeIndices,
-                            PatternRewriter &rewriter) {
+// Returns updated store op or nullopt if the fusion fails.
+static std::optional<Operation *>
+mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
+          gpu::SubgroupMmaStoreMatrixOp rootStoreOp, ValueRange storeIndices,
+          PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
 
   auto rootOutput = rootOp.getDpsInits()[0];
   auto outputType = rootOutput.getType().cast<ShapedType>();
+  // Must be a floating point type.
+  auto floatType = dyn_cast<FloatType>(outputType.getElementType());
+  if (!floatType)
+    return std::nullopt;
+
   gpu::MMAMatrixType mmaOutputType = gpu::MMAMatrixType::get(
       outputType.getShape(), outputType.getElementType(), "COp");
   auto leadingDim = rootStoreOp.getLeadDimension();
@@ -115,14 +120,14 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(rootStoreOp);
 
-  Operation *newStore = nullptr;
+  std::optional<Operation *> newStore = std::nullopt;
   SmallVector<Value> operands;
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added - load the tile first.
     // Must be a buffer of the same type - scalar broadcast is not supported.
-    auto addValue = operands[0] != rootOutput ? operands[0] : operands[1];
+    auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
     if (addValue.getType() != rootOutput.getType())
-      return nullptr;
+      return std::nullopt;
     // Fuse the add into the matmul body.
     addValue = rewriter
                    .create<gpu::SubgroupMmaLoadMatrixOp>(
@@ -130,9 +135,7 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
                        leadingDim,
                        /*transpose=*/UnitAttr())
                    .getRes();
-    auto eltwiseAttr = isa<FloatType>(outputType.getElementType())
-                           ? gpu::MMAElementwiseOp::ADDF
-                           : gpu::MMAElementwiseOp::ADDI;
+    auto eltwiseAttr = gpu::MMAElementwiseOp::ADDF;
     auto addRes =
         rewriter
             .create<gpu::SubgroupMmaElementwiseOp>(
@@ -145,10 +148,6 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
         leadingDim,
         /*transpose=*/UnitAttr());
   } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
-    // Must be a floating point type.
-    auto floatType = dyn_cast<FloatType>(outputType.getElementType());
-    if (!floatType)
-      return nullptr;
     // Fuse the relu into the matmul body.
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
         loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
@@ -168,7 +167,7 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
         /*transpose=*/UnitAttr());
   } else {
     // Not a fusable operation. Bail out.
-    return nullptr;
+    return std::nullopt;
   }
 
   rewriter.eraseOp(consumer);
@@ -177,21 +176,26 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
 }
 
 // Fuse a consumer using scalar operations.
-// Returns updated store op or nullptr if the fusion fails.
-static Operation *scalarFusion(linalg::LinalgOp rootOp,
-                               linalg::LinalgOp consumer,
-                               memref::StoreOp rootStoreOp,
-                               ValueRange storeIndices,
-                               PatternRewriter &rewriter) {
+// Returns updated store op or nullopt if the fusion fails.
+static std::optional<Operation *> scalarFusion(linalg::LinalgOp rootOp,
+                                               linalg::LinalgOp consumer,
+                                               memref::StoreOp rootStoreOp,
+                                               ValueRange storeIndices,
+                                               PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
   auto rootOutput = rootOp.getDpsInits()[0];
+  auto outputType = rootOutput.getType().cast<ShapedType>();
+  // Must be a floating point type.
+  auto floatType = dyn_cast<FloatType>(outputType.getElementType());
+  if (!floatType)
+    return std::nullopt;
 
   // Insert fused eltwise ops before the store and later replace the store
   // with a new result.
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(rootStoreOp);
 
-  Operation *newStore = nullptr;
+  std::optional<Operation *> newStore = std::nullopt;
   SmallVector<Value> operands;
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added. Load the element first, if necessary.
@@ -207,11 +211,6 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
     newStore = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         rootStoreOp, addOp.getResult(), rootOutput, storeIndices);
   } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
-    // Must be a floating point type.
-    auto outputType = rootOutput.getType().cast<ShapedType>();
-    auto floatType = dyn_cast<FloatType>(outputType.getElementType());
-    if (!floatType)
-      return nullptr;
     // Fuse the relu into the matmul body.
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
         loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
@@ -222,7 +221,7 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
         rootStoreOp, maxOp.getResult(), rootOutput, storeIndices);
   } else {
     // Not a fusable operation. Bail out.
-    return nullptr;
+    return std::nullopt;
   }
 
   rewriter.eraseOp(consumer);
@@ -234,7 +233,7 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
 // A naive fusion strategy that looks at the other operations after the root
 // linalg op and tries to fuse them.
 // Attemps bails on the first mismatch.
-// Returns updated store op or nullptr if the fusion fails.
+// Returns updated store op.
 static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                                        Operation *rootStoreOp,
                                        ValueRange storeIndices,
@@ -269,7 +268,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
   }
 
   for (auto op : consumers) {
-    Operation *updatedStoreOp = nullptr;
+    std::optional<Operation *> updatedStoreOp = std::nullopt;
     if (auto storeOp = dyn_cast<memref::StoreOp>(rootStoreOp)) {
       updatedStoreOp =
           scalarFusion(rootOp, op, storeOp, storeIndices, rewriter);
@@ -282,7 +281,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
     if (!updatedStoreOp)
       break;
 
-    rootStoreOp = updatedStoreOp;
+    rootStoreOp = *updatedStoreOp;
   }
 
   return rootStoreOp;
