@@ -156,7 +156,7 @@ func.func @matmul_add_relu(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %
   }
   linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg3 :memref<16x16xf16>) {
   ^bb0(%out: f16):
-    %0 = arith.maxf %out, %cst : f16
+    %0 = arith.maximumf %out, %cst : f16
     linalg.yield %0 : f16
   }
   return

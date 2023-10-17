@@ -23,7 +23,7 @@ module {
     %cst = arith.constant 0.000000e+00 : f32
     %2 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%1 : tensor<256x1024xf32>) {
     ^bb0(%out: f32):
-      %3 = arith.maxf %out, %cst : f32
+      %3 = arith.maximumf %out, %cst : f32
       linalg.yield %3 : f32
     } -> tensor<256x1024xf32>
     return %2 : tensor<256x1024xf32>

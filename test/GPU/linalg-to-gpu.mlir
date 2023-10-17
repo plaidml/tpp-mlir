@@ -107,7 +107,7 @@ func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024x
     }
     linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%subview_2 : memref<32x32xf32, strided<[1024, 1], offset: ?>>) {
     ^bb0(%out: f32):
-      %0 = arith.maxf %out, %cst : f32
+      %0 = arith.maximumf %out, %cst : f32
       linalg.yield %0 : f32
     }
     scf.yield
@@ -136,7 +136,7 @@ func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024x
 // CHECK-NOT:         linalg.generic
 // CHECK:             %[[elemBias:.+]] = memref.load
 // CHECK:             %[[biasAdd:.+]] = arith.addf %[[sum]], %[[elemBias]]
-// CHECK:             %[[reluRes:.+]] = arith.maxf %[[biasAdd]], %[[zero]]
+// CHECK:             %[[reluRes:.+]] = arith.maximumf %[[biasAdd]], %[[zero]]
 // CHECK:             memref.store %[[reluRes]], %[[outTile]]
 // CHECK:             scf.yield
 // CHECK:           }

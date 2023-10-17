@@ -102,7 +102,7 @@ static Operation *mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
                             PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
 
-  auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
+  auto rootOutput = rootOp.getDpsInits()[0];
   auto outputType = rootOutput.getType().cast<ShapedType>();
   gpu::MMAMatrixType mmaOutputType = gpu::MMAMatrixType::get(
       outputType.getShape(), outputType.getElementType(), "COp");
@@ -184,7 +184,7 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
                                ValueRange storeIndices,
                                PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
-  auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
+  auto rootOutput = rootOp.getDpsInits()[0];
 
   // Insert fused eltwise ops before the store and later replace the store
   // with a new result.
@@ -215,8 +215,8 @@ static Operation *scalarFusion(linalg::LinalgOp rootOp,
     // Fuse the relu into the matmul body.
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
         loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-    auto maxOp =
-        rewriter.create<arith::MaxFOp>(loc, rootStoreOp.getValue(), zeroFloat);
+    auto maxOp = rewriter.create<arith::MaximumFOp>(loc, rootStoreOp.getValue(),
+                                                    zeroFloat);
     // Store the new result.
     newStore = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         rootStoreOp, maxOp.getResult(), rootOutput, storeIndices);
@@ -240,7 +240,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                                        ValueRange storeIndices,
                                        PatternRewriter &rewriter) {
   auto parentOp = rootOp->getParentOp();
-  auto rootOutput = rootOp.getDpsInitOperands()[0]->get();
+  auto rootOutput = rootOp.getDpsInits()[0];
 
   // Traverse other ops within the same region and collect consumers.
   SmallVector<linalg::LinalgOp> consumers;
@@ -251,7 +251,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
       break;
 
     // Only other linalg ops are expected as consumers.
-    // TODO: continue on ops without side effects like subview
+    // TODO: might need to be relaxed to skip over ops without side effects
     auto consumer = dyn_cast<linalg::LinalgOp>(nextOp);
     if (!consumer || !linalg::isElementwise(consumer))
       break;
