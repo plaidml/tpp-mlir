@@ -199,7 +199,7 @@ static std::optional<Operation *> scalarFusion(linalg::LinalgOp rootOp,
   SmallVector<Value> operands;
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added. Load the element first, if necessary.
-    auto addValue = operands[0] != rootOutput ? operands[0] : operands[1];
+    auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
     if (addValue.getType().isa<ShapedType>()) {
       addValue = rewriter.create<memref::LoadOp>(loc, addValue, storeIndices)
                      .getResult();
