@@ -41,6 +41,9 @@ if [ $? != 0 ]; then
   exit 1
 fi
 
+# Cleanup tar ball to save device space
+rm ${LLVM_TAR_FILE}
+
 LLVM_PROJECT_DIR=${LLVM_TAR_DIR}/llvm-project-${LLVM_VERSION}
 LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
 
@@ -90,7 +93,7 @@ fi
 echo_run cmake -Wno-dev -G Ninja \
     -B${LLVM_BUILD_DIR} -S${LLVM_PROJECT_DIR}/llvm \
     -DLLVM_ENABLE_PROJECTS=${LLVM_PROJECTS} \
-    -DLLVM_BUILD_EXAMPLES=ON \
+    -DLLVM_BUILD_EXAMPLES=OFF \
     -DLLVM_INSTALL_UTILS=ON \
     -DLLVM_TARGETS_TO_BUILD=${LLVM_TARGETS} \
     -DCMAKE_BUILD_TYPE=${KIND} \
