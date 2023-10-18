@@ -381,3 +381,57 @@ func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2
 // CHECK-SAME:  : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 128, 32] flags = (none) data_type = bf16
 // CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[SUB]], %[[SUB_0]])
+
+// -----
+
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @relu_no_input(%arg0: memref<10x10xf32>) {
+  %cst_1 = arith.constant 0.000000e+00 : f32
+  linalg.generic {
+    indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%arg0: memref<10x10xf32>) {
+    ^bb0(%out: f32):
+    %13 = arith.maximumf %out, %cst_1 : f32
+    linalg.yield %13 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: relu_no_input
+// CHECK-SAME: %[[ARG0:.+]]: memref<10x10xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch relu [10, 10, 10, 10] flags = (none) data_type = f32
+// CHECK: xsmm.unary relu(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG0]])
+
+// -----
+
+func.func @identity_5(%arg0 : memref<10xf32>, %arg1 : memref<10x10xf32>) {
+  linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0 : memref<10xf32>) outs(%arg1 : memref<10x10xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: identity_5
+// CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [10, 10, 1, 10] flags = (bcast_row) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @identity_6(%arg0 : memref<10xf32>, %arg1 : memref<10xf32>) {
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]}
+    ins(%arg0 : memref<10xf32>) outs(%arg1 : memref<10xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  return
+}
+
+// CHECK-LABEL: identity_6
+// CHECK-NOT: xsmm.unary identity
