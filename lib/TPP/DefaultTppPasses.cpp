@@ -30,21 +30,6 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-// Extra command line options to control the default TPP utility passes.
-llvm::cl::opt<bool>
-    defPackMatmul("def-pack-matmul",
-                  llvm::cl::desc("Default pipeline - pack matmul"),
-                  llvm::cl::init(true));
-
-llvm::cl::opt<bool> defPipePack("def-pack",
-                                llvm::cl::desc("Default pipeline - packing"),
-                                llvm::cl::init(true));
-
-llvm::cl::opt<bool>
-    disableDefPipe("disable-def-pipe",
-                   llvm::cl::desc("Disable default pipeline execution"),
-                   llvm::cl::init(false));
-
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
 
@@ -208,16 +193,13 @@ private:
     // Preprocess convolutions.
     pm.addPass(createConvInitSimplifyPass());
     pm.addPass(createCleanupPass());
-    if (defPipePack) {
-      pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
-      pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
-      pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
+    pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
+    pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
+    pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
-      // Convert ops to packed layouts.
-      if (defPackMatmul)
-        pm.addPass(createPackMatmulPass({32, 32, 32}));
-      pm.addPass(createPackVNNIPass());
-    }
+    // Convert ops to packed layouts.
+    pm.addPass(createPackMatmulPass({32, 32, 32}));
+    pm.addPass(createPackVNNIPass());
 
     // Postprocess packing.
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
@@ -347,17 +329,15 @@ struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
   }
 
   void runOnOperation() override {
-    if (!disableDefPipe) {
-      auto module = getOperation();
+    auto module = getOperation();
 
-      // Initialize the pipeline if needed.
-      // Otherwise, just run the cached one.
-      if (pm.empty())
-        constructPipeline();
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
 
-      if (failed(runPipeline(pm, module)))
-        return signalPassFailure();
-    }
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
   }
 
 private:
