@@ -5,7 +5,9 @@ env:
 
 steps:
   - label: "LLVM"
-    command: " \
+    concurrency: 1
+    concurrency_group: "tpp-llvm"
+    command: "scripts/buildkite/check_llvm.sh || \
               ${SRUN} --partition=spr --time=1:00:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang CHECK=1 \
               scripts/buildkite/build_llvm.sh'"
