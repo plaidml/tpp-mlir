@@ -1,37 +1,51 @@
 [
   {
   "gemm": {
-    "fp32_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "gemm-fp32-3layers-1024.mlir",
+    "fp32_3x1024_model_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_3x1024_unp_mlir": {
-      "type": "MLIR",
-      "benchmark": "gemm-fp32-3layers-1024-unpacked.mlir",
+    "fp32_3x1024_flat_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "bf16_flat_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "gemm-bf16-3layers-1024.mlir",
+    "fp32_3x1024_64x64_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
+      "environment": {},
+      "flags": [ "-n", "100" ],
+      "extensions": [ "(avx2|asimd)" ]
+    },
+    "bf16_3x1024_flat_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100"],
       "extensions": [ "avx2" ]
     },
-    "bf16_dp2_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "gemm-bf16_dp2-3layers-1024.mlir",
+    "bf16_3x1024_64x64_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
+      "environment": {},
+      "flags": [ "-n", "100"],
+      "extensions": [ "avx2" ]
+    },
+    "bf16_3x1024_dp2_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=2" ],
       "environment": {},
       "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "avx2" ]
     },
-    "bf16_dp4_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "gemm-bf16_dp4-3layers-1024.mlir",
+    "bf16_3x1024_dp4_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=4" ],
       "environment": {},
       "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "svebf16" ]
@@ -39,51 +53,51 @@
   }},
   {
   "mlp": {
-    "fp32_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-fp32-3layers-1024.mlir",
+    "fp32_3x1024_model_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_flat_3x1024_unp_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-fp32-3layers-1024-unpacked.mlir",
+    "fp32_3x1024_flat_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100" ],
-      "extensions": [ "avx512.*" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
-    "bf16_flat_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-bf16-3layers-1024.mlir",
+    "fp32_3x1024_64x64_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
       "environment": {},
       "flags": [ "-n", "100" ],
-      "extensions": [ "avx512.*" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
-    "bf16_flat_3x1024_unp_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-bf16-3layers-1024-unpacked.mlir",
+    "bf16_3x1024_flat_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
-      "flags": [ "-n", "100" ],
-      "extensions": [ "avx512.*" ]
-    }, 
-    "bf16_flat_10x3584_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-bf16-10layers-3584.mlir",
-      "environment": {},
-      "flags": [ "-n", "100" ],
-      "extensions": [ "avx512.*" ]
+      "flags": [ "-n", "100"],
+      "extensions": [ "avx2" ]
     },
-    "bf16_dp2_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-bf16_dp2-3layers-1024.mlir",
+    "bf16_3x1024_64x64_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
+      "environment": {},
+      "flags": [ "-n", "100"],
+      "extensions": [ "avx2" ]
+    },
+    "bf16_3x1024_dp2_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=2" ],
       "environment": {},
       "flags": [ "-n", "100", "--disable-lsan" ],
-      "extensions": [ "avx512.*" ]
+      "extensions": [ "avx2" ]
     },
-    "bf16_dp4_3x1024_mlir": {
-      "type": "MLIR",
-      "benchmark": "mlp-bf16_dp4-3layers-1024.mlir",
+    "bf16_3x1024_dp4_mlir": {
+      "type": "IR-GEN",
+      "benchmark": [ "mlir-gen", "--kernel=layer --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=4" ],
       "environment": {},
       "flags": [ "-n", "100", "--disable-lsan" ],
       "extensions": [ "svebf16" ]
@@ -95,14 +109,14 @@
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "0", "F", "32", "32", "32", "0", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "0", "F", "64", "64", "64", "0", "1024", "1024", "1024", "1024" ],
       "extensions": []
     },
-    "mlp_fp32_dnn": {
+    "mlp_fp64_dnn": {
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "3", "F", "32", "32", "32", "0", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "3", "F", "64", "64", "64", "0", "1024", "1024", "1024", "1024" ],
       "extensions": []
     },
     "gemm_bf16_dnn": {
