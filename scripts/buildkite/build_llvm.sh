@@ -17,15 +17,32 @@ echo "--- LLVM"
 LLVM_VERSION=$(llvm_version)
 echo "LLVM version: ${LLVM_VERSION}"
 
-LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
-mkdir -p ${LLVM_INSTALL_DIR}
-
-LLVM_PROJECTS="mlir"
-LLVM_TARGETS="host"
-
-if [ ! "${KIND}" ]; then
-  KIND=RelWithDebInfo
+# Destination for tar balls
+if [ ! "${LLVM_TAR_DIR}" ]; then
+  LLVM_TAR_DIR="/tmp/tpp-llvm-tar"
 fi
+mkdir -p ${LLVM_TAR_DIR}
+
+# Fetch specific LLVM version
+LLVM_TAR_NAME=${LLVM_VERSION}.zip
+LLVM_TAR_FILE=${LLVM_TAR_DIR}/${LLVM_TAR_NAME}
+if [ ! -f "${LLVM_TAR_FILE}" ]; then
+  echo_run wget -P ${LLVM_TAR_DIR} https://github.com/llvm/llvm-project/archive/${LLVM_TAR_NAME}
+  if [ $? != 0 ]; then
+    echo "Failed to fetch repo"
+    exit 1
+  fi
+fi
+
+# Unzip the fetched repo
+echo_run unzip -uqn ${LLVM_TAR_FILE} -d ${LLVM_TAR_DIR}
+if [ $? != 0 ]; then
+  echo "Failed to unpack repo"
+  exit 1
+fi
+
+LLVM_PROJECT_DIR=${LLVM_TAR_DIR}/llvm-project-${LLVM_VERSION}
+LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
 
 # Environment setup
 echo "--- ENVIRONMENT"
@@ -52,22 +69,24 @@ if [ ! "${LINKER}" ]; then
 fi
 check_program ${LINKER}
 
-PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
-if [ ! "${PROJECT_DIR}" ]; then
-  echo "PROJECT_DIR source path not set"
-  exit 1
+if [ ! "${LLVM_BUILD_DIR}" ]; then
+  LLVM_BUILD_DIR="/tmp/tpp-llvm"
 fi
-if [ ! "${BUILD_DIR}" ]; then
-  BUILD_DIR="/tmp/tpp-llvm"
-fi
-BUILD_DIR=$(realpath ${BUILD_DIR})
-BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}
-mkdir -p ${BUILD_DIR}
+LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
+LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
+mkdir -p ${LLVM_BUILD_DIR}
 
  # Configure LLVM
 echo "--- CONFIGURE"
-echo_run cmake -Wno-dev -G Ninja ${PROJECT_DIR}/llvm \
-    -B${BUILD_DIR} -S${PROJECT_DIR} \
+
+LLVM_PROJECTS="mlir"
+LLVM_TARGETS="host"
+if [ ! "${KIND}" ]; then
+  KIND=RelWithDebInfo
+fi
+
+echo_run cmake -Wno-dev -G Ninja \
+    -B${LLVM_BUILD_DIR} -S${LLVM_PROJECT_DIR}/llvm \
     -DLLVM_ENABLE_PROJECTS=${LLVM_PROJECTS} \
     -DLLVM_BUILD_EXAMPLES=ON \
     -DLLVM_INSTALL_UTILS=ON \
@@ -81,7 +100,7 @@ echo_run cmake -Wno-dev -G Ninja ${PROJECT_DIR}/llvm \
 
 # Build LLVM
 echo "--- BUILD"
-echo_run ninja -C ${BUILD_DIR} all
+echo_run ninja -C ${LLVM_BUILD_DIR} all
 if [ $? != 0 ]; then
   exit 1
 fi
@@ -89,7 +108,7 @@ fi
 # Check LLVM
 if [ "1" == "${CHECK}" ]; then
   echo "--- CHECK"
-  echo_run ninja -C ${BUILD_DIR} check-all
+  echo_run ninja -C ${LLVM_BUILD_DIR} check-all
   if [ $? != 0 ]; then
     exit 1
   fi
@@ -97,7 +116,9 @@ fi
 
  # Install LLVM
  echo "--- INSTALL"
- echo_run ninja -C ${BUILD_DIR} install
+ mkdir -p ${LLVM_INSTALL_DIR}
+ echo_run ninja -C ${LLVM_BUILD_DIR} install
 if [ $? != 0 ]; then
+  rm -r ${LLVM_INSTALL_DIR}
   exit 1
 fi
