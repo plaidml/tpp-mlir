@@ -77,7 +77,8 @@ benchmark () {
   echo_run ./driver.py -v \
            -n 100 \
            -c "${CONFIG_DIR}/${JSON}" \
-           --build "${BUILD_DIR}"
+           --build "${BUILD_DIR}" || exit 1
+
   popd || exit 1
 }
 
