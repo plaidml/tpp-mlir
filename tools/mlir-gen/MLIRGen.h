@@ -74,10 +74,6 @@ class MLIRGenerator {
   /// Lower softmax at the last layer
   bool enableSoftmax;
 
-  /// Initialize accumulation matrix with bias
-  /// Needs `enableBias` to be true
-  bool biasAcc;
-
   /// List of supported kernel types that can be generated
   ///  * Model: Generates an entire model, with input handling, output creation,
   ///           constant weight and bias, etc. This demonstrates the whole cost
@@ -184,10 +180,6 @@ class MLIRGenerator {
 
   /// Creates the kernel types from layer definitions and options
   void getKernelTypes(KernelArgs &);
-
-  /// Creates the kernel arguments from function args or constants and zero
-  /// tensors, depending on the kernel type (model, layer)
-  void getKernelArgs(KernelArgs &);
 
   /// Creates a layer function, to be called by the kernel
   Value createLayer(LayerArgs &);
