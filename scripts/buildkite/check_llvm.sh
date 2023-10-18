@@ -10,16 +10,14 @@ SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
 LLVMROOT=${HOME}/installs/llvm
-if [ ! -d ${LLVMROOT} ]; then
-  mkdir -p ${LLVMROOT}
-fi
+mkdir -p ${LLVMROOT}
 
 # Find LLVM_VERSION
 LLVM_VERSION=$(llvm_version)
 
 # If not found, trigger a build
 if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
-  ${SCRIPT_DIR}/ci/trigger.sh tpp-llvm ${LLVM_VERSION}
+  exit 1
 else
   echo "Found $LLVM_VERSION"
 fi

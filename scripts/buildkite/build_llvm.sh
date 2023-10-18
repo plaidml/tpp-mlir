@@ -10,23 +10,15 @@ SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
 LLVMROOT=${HOME}/installs/llvm
-if [ ! -d ${LLVMROOT} ]; then
-  mkdir -p ${LLVMROOT}
-fi
+mkdir -p ${LLVMROOT}
 
 # LLVM setup
 echo "--- LLVM"
-LLVM_VERSION=${BUILDKITE_COMMIT}
-if [ ! "${LLVM_VERSION}" ]; then
-  echo "Unknown LLVM_VERSION version"
-  exit 1
-fi
+LLVM_VERSION=$(llvm_version)
 echo "LLVM version: ${LLVM_VERSION}"
 
 LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
-if [ ! -d ${LLVM_INSTALL_DIR} ]; then
-  mkdir -p ${LLVM_INSTALL_DIR}
-fi
+mkdir -p ${LLVM_INSTALL_DIR}
 
 LLVM_PROJECTS="mlir"
 LLVM_TARGETS="host"
