@@ -874,3 +874,28 @@ func.func @linalg_matmul_i32(%arg0: tensor<16x16xi32>, %arg1: tensor<16x16xi32>,
 
   return %0 : tensor<16x16xi32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+
+func.func @brgemm_tpp(%arg0: tensor<32x32x32xbf16>, %arg1: tensor<32x16x32x2xbf16>, 
+                      %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]} 
+    ins(%arg0, %arg1 : tensor<32x32x32xbf16>, tensor<32x16x32x2xbf16>) outs(%arg2 : tensor<32x32xbf16>) {
+      ^bb0(%in: bf16, %in_7: bf16, %out: bf16):
+        %6 = arith.mulf %in, %in_7 : bf16
+        %7 = arith.addf %out, %6 : bf16
+        linalg.yield %7 : bf16
+  } -> tensor<32x32xbf16>
+  return %0 : tensor<32x32xbf16>
+}
+
+// CHECK-LABEL: brgemm_tpp
+// CHECK-SAME: %[[ARG0:.+]]: tensor<32x32x32xbf16>, %[[ARG1:.+]]: tensor<32x16x32x2xbf16>, %[[ARG2:.+]]: tensor<32x32xbf16>
+// CHECK: %{{.+}} = tpp.brgemm (%[[ARG0]] : tensor<32x32x32xbf16>, %[[ARG1]] : tensor<32x16x32x2xbf16>, %[[ARG2]] : tensor<32x32xbf16>) 
+// CHECK-SAME:  -> (tensor<32x32xbf16>)

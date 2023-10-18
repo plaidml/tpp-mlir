@@ -41,16 +41,18 @@ struct ConvertLinalgToXsmm
 
 namespace {
 struct BrgemmInfo {
-  unsigned m;
-  unsigned n;
-  unsigned k;
-  unsigned batch;
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  int64_t batch;
 
   int64_t lda;
   int64_t ldb;
   int64_t ldc;
   int64_t strideA;
   int64_t strideB;
+
+  bool isVnni = false;
 };
 
 struct BinaryInfo {
@@ -402,37 +404,41 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
                                     linalg::LinalgOp linalgOp,
                                     BrgemmInfo brgemmInfo) {
   OpBuilder::InsertionGuard guard(rewriter);
-  auto loops = linalgOp.computeStaticLoopSizes();
-  unsigned m = brgemmInfo.m;
-  unsigned n = brgemmInfo.n;
-  unsigned k = brgemmInfo.k;
-  unsigned batch = brgemmInfo.batch;
+  auto m = brgemmInfo.m;
+  auto n = brgemmInfo.n;
+  auto k = brgemmInfo.k;
+  auto batch = brgemmInfo.batch;
   int64_t lda = brgemmInfo.lda;
   int64_t ldb = brgemmInfo.ldb;
   int64_t ldc = brgemmInfo.ldc;
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  bool hasBatch = (batch != std::numeric_limits<unsigned>::max());
+  bool hasBatch = (batch != std::numeric_limits<int64_t>::max());
 
   auto dtype =
       xsmm::utils::getDataType(rewriter, linalgOp.getDpsInits()[0].getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   Location loc = linalgOp.getLoc();
-  auto flags = rewriter.getArrayAttr(
-      xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+  xsmm::GemmFlagsAttr gemmFlags;
+  if (brgemmInfo.isVnni) {
+    gemmFlags = xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                         xsmm::GemmFlags::VNNI_B);
+  } else {
+    gemmFlags =
+        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE);
+  }
+  auto flags = rewriter.getArrayAttr(gemmFlags);
   SmallVector<Value> invokeOperands;
 
   if (hasBatch) {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(),
-        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc, strideA,
-                          strideB});
+        ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
     Value dispatched = rewriter.create<xsmm::BrgemmDispatchOp>(
         loc, integer64, dims, flags, dtype);
-    auto batchVal = loops[batch];
     Value batchDim = rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, batchVal));
+        loc, integer64, rewriter.getIntegerAttr(integer64, batch));
     invokeOperands.push_back(dispatched);
     invokeOperands.append(linalgOp->getOperands().begin(),
                           linalgOp->getOperands().end());
@@ -441,8 +447,7 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
                                                 invokeOperands);
   } else {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(),
-        ArrayRef<int64_t>{loops[m], loops[n], loops[k], lda, ldb, ldc});
+        rewriter.getContext(), ArrayRef<int64_t>{m, n, k, lda, ldb, ldc});
     Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, flags, dtype);
     invokeOperands.push_back(dispatched);
@@ -543,7 +548,13 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
     strideB = (*stridesOnB)[*batchPosCodomainB];
   }
 
-  BrgemmInfo info{m, n, k, batch, *lda, *ldb, *ldc, strideA, strideB};
+  auto loops = linalgOp.computeStaticLoopSizes();
+  int64_t batchVal = (batch != std::numeric_limits<unsigned>::max())
+                         ? loops[batch]
+                         : std::numeric_limits<int64_t>::max();
+
+  BrgemmInfo info{loops[m], loops[n], loops[k], batchVal, *lda,
+                  *ldb,     *ldc,     strideA,  strideB};
   return info;
 }
 
@@ -858,6 +869,47 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
   }
 };
 
+struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!genericOp.hasBufferSemantics() ||
+        !tpp::utils::isTppVnniOp(genericOp, /*captures=*/nullptr)) {
+      return failure();
+    }
+    Value bufferA = genericOp.getDpsInputs()[0];
+    Value bufferB = genericOp.getDpsInputs()[1];
+    Value bufferC = genericOp.getDpsInits()[0];
+
+    int64_t m = bufferC.getType().cast<ShapedType>().getShape()[0];
+    int64_t n = bufferC.getType().cast<ShapedType>().getShape()[1];
+    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[2];
+    int64_t batch = bufferA.getType().cast<ShapedType>().getShape()[0];
+
+    auto stridesOnLhs = utils::getStaticStrides(bufferA);
+    auto stridesOnRhs = utils::getStaticStrides(bufferB);
+    auto stridesOnOutput = utils::getStaticStrides(bufferC);
+    if (failed(stridesOnLhs) || failed(stridesOnRhs) ||
+        failed(stridesOnOutput)) {
+      return failure();
+    }
+    if (stridesOnLhs->back() != 1 || stridesOnRhs->back() != 1 ||
+        stridesOnOutput->back() != 1) {
+      return failure();
+    }
+    int64_t lda = (*stridesOnLhs)[1];
+    int64_t ldb = (*stridesOnRhs)[1] /
+                  *vnni::utils::getVnniBlockingFactor(bufferB.getType());
+    int64_t ldc = (*stridesOnOutput)[0];
+
+    BrgemmInfo brgemmInfo{m,   n,   k,       batch,   lda,
+                          ldb, ldc, lda * m, ldb * k, /*isVnni=*/true};
+    replaceOpWithGemmLikeOp(rewriter, genericOp, brgemmInfo);
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
@@ -866,7 +918,8 @@ void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
            ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
            ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
            ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
-           ConvertVnniPacking>(patterns.getContext());
+           ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
+          patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
