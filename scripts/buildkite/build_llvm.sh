@@ -27,7 +27,7 @@ mkdir -p ${LLVM_TAR_DIR}
 LLVM_TAR_NAME=${LLVM_VERSION}.zip
 LLVM_TAR_FILE=${LLVM_TAR_DIR}/${LLVM_TAR_NAME}
 if [ ! -f "${LLVM_TAR_FILE}" ]; then
-  echo_run wget -P ${LLVM_TAR_DIR} https://github.com/llvm/llvm-project/archive/${LLVM_TAR_NAME}
+  echo_run wget -nv -P ${LLVM_TAR_DIR} https://github.com/llvm/llvm-project/archive/${LLVM_TAR_NAME}
   if [ $? != 0 ]; then
     echo "Failed to fetch repo"
     exit 1
@@ -75,6 +75,8 @@ fi
 LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
 LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
 mkdir -p ${LLVM_BUILD_DIR}
+
+echo "Environment configured successfully"
 
  # Configure LLVM
 echo "--- CONFIGURE"
