@@ -627,3 +627,4 @@ Value MLIRGenerator::getZeroInitTensor(TensorType type) {
   tensor = builder.create<linalg::FillOp>(loc, zero, tensor).getResult(0);
   return tensor;
 }
+
