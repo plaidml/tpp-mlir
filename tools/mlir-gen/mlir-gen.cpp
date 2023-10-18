@@ -27,15 +27,13 @@ using namespace mlir;
 
 // Type of kernel to be generated
 llvm::cl::opt<std::string> kernel("kernel",
-                                  llvm::cl::desc("Kernel to be generated"),
-                                  llvm::cl::value_desc("mlp,matmul,fc"),
-                                  llvm::cl::init("mlp"));
+                                  llvm::cl::desc("Kernel type to be generated"),
+                                  llvm::cl::value_desc("model,layer"),
+                                  llvm::cl::init("model"));
 
 // Input layer
-llvm::cl::opt<unsigned> miniBatch("mini-batch",
-                                  llvm::cl::desc("Mini batch size"),
-                                  llvm::cl::value_desc("256"),
-                                  llvm::cl::init(256));
+llvm::cl::opt<unsigned> batch("batch", llvm::cl::desc("Mini batch size"),
+                              llvm::cl::value_desc("256"), llvm::cl::init(256));
 
 // Hidden layers
 llvm::cl::opt<std::string> layers(
@@ -64,15 +62,22 @@ llvm::cl::opt<std::string> filename("o", llvm::cl::desc("Output filename"),
                                     llvm::cl::value_desc("stdout"),
                                     llvm::cl::init("-"));
 
-// Enable softmax at the last layer
-llvm::cl::opt<bool> enableSoftmax("softmax", llvm::cl::desc("Enable softmax"),
-                                  llvm::cl::value_desc("bool"),
-                                  llvm::cl::init(false));
+// Enable bias add on every layer
+llvm::cl::opt<bool> enableBias("bias",
+                               llvm::cl::desc("Enable bias on every layer"),
+                               llvm::cl::value_desc("bool"),
+                               llvm::cl::init(false));
 
-// Initialize accumulation matrix with bias
-llvm::cl::opt<bool> biasAcc("bias-acc", llvm::cl::desc("Accumulate on bias"),
-                            llvm::cl::value_desc("bool"),
-                            llvm::cl::init(false));
+// Enable relu on every layer
+llvm::cl::opt<bool> enableRelu("relu",
+                               llvm::cl::desc("Enable relu on every layer"),
+                               llvm::cl::value_desc("bool"),
+                               llvm::cl::init(false));
+
+// Enable softmax at the last layer
+llvm::cl::opt<bool>
+    enableSoftmax("softmax", llvm::cl::desc("Enable softmax on the last layer"),
+                  llvm::cl::value_desc("bool"), llvm::cl::init(false));
 
 // Set VNNI packing factor for BF16
 llvm::cl::opt<int>
@@ -88,7 +93,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR Generator");
 
-  MLIRGenerator gen(kernel, miniBatch, layers, tiles, floatWidth, seed,
-                    enableSoftmax, biasAcc, vnni);
+  MLIRGenerator gen(kernel, batch, layers, tiles, floatWidth, seed, enableBias,
+                    enableRelu, enableSoftmax, vnni);
   return gen.generate(filename);
 }
