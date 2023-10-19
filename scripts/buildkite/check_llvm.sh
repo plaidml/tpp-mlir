@@ -3,7 +3,8 @@
 # Script for Buildkite automation only.
 # Environment variables must have been declared already.
 #
-# Check LLVM installation and trigger the build if not.
+# Check LLVM installation.
+# Optionally, trigger a build if LLVM is not found.
 
 # Include common utils
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
@@ -16,8 +17,12 @@ mkdir -p ${LLVMROOT}
 LLVM_VERSION=$(llvm_version)
 
 # If not found, trigger a build
-COMMIT_SHA=$(git_commit)
-${SCRIPT_DIR}/ci/trigger.sh -p tpp-llvm -c ${COMMIT_SHA}
+if [ "1" == "${BUILD}" ]; then
+  COMMIT_SHA=$(git_commit)
+  ${SCRIPT_DIR}/ci/trigger.sh -p tpp-llvm -c ${COMMIT_SHA}
+else
+  exit 1
+fi
 # if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
 #   COMMIT_SHA=$(git_commit)
 #   ${SCRIPT_DIR}/ci/trigger.sh tpp-llvm ${COMMIT_SHA}

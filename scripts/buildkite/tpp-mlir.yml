@@ -5,7 +5,7 @@ env:
 
 steps:
   - label: "LLVM"
-    command: "scripts/buildkite/check_llvm.sh"
+    command: "BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-gcc-rel"
