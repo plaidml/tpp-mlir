@@ -17,7 +17,8 @@ LLVM_VERSION=$(llvm_version)
 
 # If not found, trigger a build
 if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
-  exit 1
+  COMMIT_SHA=$(git_commit)
+  ${SCRIPT_DIR}/ci/trigger.sh tpp-llvm ${COMMIT_SHA}
 else
   echo "Found $LLVM_VERSION"
 fi
