@@ -16,16 +16,13 @@ mkdir -p ${LLVMROOT}
 # Find LLVM_VERSION
 LLVM_VERSION=$(llvm_version)
 
-# If not found, trigger a build
+if [ -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
+  echo "Found $LLVM_VERSION"
+  exit 0
+fi
+
+# LLVM not found, trigger a build if requested.
 if [ "1" == "${BUILD}" ]; then
   COMMIT_SHA=$(git_commit)
   ${SCRIPT_DIR}/ci/trigger.sh -p tpp-llvm -c ${COMMIT_SHA}
-else
-  exit 1
 fi
-# if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
-#   COMMIT_SHA=$(git_commit)
-#   ${SCRIPT_DIR}/ci/trigger.sh tpp-llvm ${COMMIT_SHA}
-# else
-#   echo "Found $LLVM_VERSION"
-# fi
