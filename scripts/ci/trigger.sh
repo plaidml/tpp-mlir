@@ -9,25 +9,21 @@ SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
 die_syntax() {
-  echo "Syntax: $0 -p PIPELINE -c COMMIT [-l lock-name]"
+  echo "Syntax: $0 -p PIPELINE -c COMMIT"
   echo ""
   echo "  -p: Buildkite pipeline"
-  echo "  -c: Git commit SHA to be built"
-  echo "  -l: Optional, uses buildkite lock"
+  echo "  -c: Commit SHA to be built"
   exit 1
 }
 
 # Cmd-line opts
-while getopts "p:c:l:" arg; do
+while getopts "p:c:" arg; do
   case ${arg} in
     p)
       PIPELINE=${OPTARG}
       ;;
     c)
       COMMIT=${OPTARG}
-      ;;
-    l)
-      LOCK=${OPTARG}
       ;;
     ?)
       echo "Invalid option: ${OPTARG}"
@@ -50,13 +46,4 @@ PIPELINE_CMD="steps:
 "
 
 # Upload the new pipeline and add it to the current build.
-# Simply run the job if no lock is defined.
-if [ ! "${LOCK}" ]; then
-  echo "$PIPELINE_CMD" | buildkite-agent pipeline upload
-else
-  BUILD_LOCK=$(buildkite-agent lock do ${LOCK})
-  if [ ${BUILD_LOCK} == 'do' ]; then
-    echo "$PIPELINE_CMD" | buildkite-agent pipeline upload
-    buildkite-agent lock done ${LOCK}
-  fi
-fi
+echo "$PIPELINE_CMD" | buildkite-agent pipeline upload
