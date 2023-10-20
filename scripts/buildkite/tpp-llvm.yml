@@ -1,0 +1,11 @@
+env:
+  NPROCS_LIMIT_LINK: "8"
+
+steps:
+  - label: "TPP-LLVM"
+    concurrency: 1
+    concurrency_group: "tpp-llvm"
+    command: "scripts/buildkite/check_llvm.sh || \
+              ${SRUN} --partition=spr --time=0:30:00 -- \
+              'KIND=RelWithDebInfo COMPILER=clang \
+              scripts/buildkite/build_llvm.sh'"

@@ -6,7 +6,7 @@ env:
 # upload with absolute path but symlinks not resolved (-P), mount point is different on head/compute node, upload even if failure
 steps:
   - label: "LLVM"
-    command: "scripts/buildkite/check_llvm.sh"
+    command: "BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-bench"

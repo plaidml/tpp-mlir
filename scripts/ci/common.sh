@@ -13,6 +13,16 @@ git_root() {
   fi
 }
 
+# Find the current git commit SHA
+git_commit() {
+  if [ "$(command -v git)" ]; then
+    git rev-parse HEAD
+  else
+    echo "ERROR: missing prerequisites!"
+    exit 1
+  fi
+}
+
 # Check if a program is in the PATH
 check_program() {
   PROG=$1
