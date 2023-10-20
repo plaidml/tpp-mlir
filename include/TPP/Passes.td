@@ -42,7 +42,6 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
 
 def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let summary = "Convert tpp to xsmm";
-  let constructor = "mlir::tpp::createConvertTppToXsmmPass()";
   let description = [{
     Convert tpp operations to XSMM operations.
   }];

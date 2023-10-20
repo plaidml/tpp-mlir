@@ -25,8 +25,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTTPPTOXSMM
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "convert-tpp-to-xsmm"
 
@@ -577,7 +581,8 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
   }
 };
 
-struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
+struct ConvertTppToXsmm
+    : public tpp::impl::ConvertTppToXsmmBase<ConvertTppToXsmm> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
@@ -588,8 +593,3 @@ struct ConvertTppToXsmm : public ConvertTppToXsmmBase<ConvertTppToXsmm> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertTppToXsmmPass() {
-  return std::make_unique<ConvertTppToXsmm>();
-}
