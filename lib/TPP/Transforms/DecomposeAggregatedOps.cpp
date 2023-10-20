@@ -13,8 +13,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_DECOMPOSEAGGREGATEDOPS
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -35,7 +39,7 @@ struct DecomposeAggregateOpsImpl : public OpRewritePattern<linalg::SoftmaxOp> {
 };
 
 struct DecomposeAggregatedOps
-    : public DecomposeAggregatedOpsBase<DecomposeAggregatedOps> {
+    : public tpp::impl::DecomposeAggregatedOpsBase<DecomposeAggregatedOps> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     patterns.add<DecomposeAggregateOpsImpl>(patterns.getContext());
@@ -44,8 +48,3 @@ struct DecomposeAggregatedOps
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createDecomposeAggregatedOpsPass() {
-  return std::make_unique<DecomposeAggregatedOps>();
-}

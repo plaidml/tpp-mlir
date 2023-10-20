@@ -506,7 +506,6 @@ def DecomposeAggregatedOps : Pass<"decompose-aggregated-ops", "func::FuncOp"> {
   let description = [{
     Decompose operations that implement the `AggregatedOpInterface`.
   }];
-  let constructor = "mlir::tpp::createDecomposeAggregatedOpsPass()";
 }
 
 def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {

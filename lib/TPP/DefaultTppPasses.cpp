@@ -360,7 +360,7 @@ private:
       // Skip all TPP transformations.
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());
-      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
+      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOps());
       pm.addPass(createBufferizePass());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
@@ -378,7 +378,7 @@ private:
       // Decompose Aggregated operations. These ops currently do not
       // bufferize. Once this is possible we can move this pass after
       // bufferization.
-      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOpsPass());
+      pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOps());
 
       // Lower linalg operations to TPP.
       if (!linalgToXsmm) {
