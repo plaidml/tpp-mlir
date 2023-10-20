@@ -112,7 +112,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     pm.addPass(createConvertXsmmToFunc());
-    pm.addPass(createConvertPerfToFuncPass());
+    pm.addPass(createConvertPerfToFunc());
   }
 };
 

@@ -21,8 +21,12 @@
 using namespace mlir;
 using namespace mlir::perf;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTPERFTOFUNC
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -392,7 +396,8 @@ void populatePerfToFuncPatterns(RewritePatternSet &patterns) {
                ConvertStdevOp, ConvertSinkOp>(patterns.getContext());
 }
 
-struct ConvertPerfToFunc : public ConvertPerfToFuncBase<ConvertPerfToFunc> {
+struct ConvertPerfToFunc
+    : public tpp::impl::ConvertPerfToFuncBase<ConvertPerfToFunc> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populatePerfToFuncPatterns(patterns);
@@ -401,8 +406,3 @@ struct ConvertPerfToFunc : public ConvertPerfToFuncBase<ConvertPerfToFunc> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createConvertPerfToFuncPass() {
-  return std::make_unique<ConvertPerfToFunc>();
-}

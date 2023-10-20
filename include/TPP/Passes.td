@@ -110,7 +110,6 @@ def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
 
 def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
   let summary = "Convert perf to func";
-  let constructor = "mlir::tpp::createConvertPerfToFuncPass()";
   let description = [{
     Convert perf operations to function calls.
   }];
