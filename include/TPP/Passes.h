@@ -88,7 +88,6 @@ class TppDialect;
 // The values should be kept consistent with the default values of the pass
 // declarations present in the corresponding TableGen file.
 
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertPerfToLoopsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertPerfToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createPackVNNIPass();

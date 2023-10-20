@@ -99,7 +99,7 @@ private:
     pm.clear();
 
     pm.addNestedPass<func::FuncOp>(createConvertCheckToLoops());
-    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoopsPass());
+    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
 
     // Note that LICM should be performed before any function calls are
     // generated
