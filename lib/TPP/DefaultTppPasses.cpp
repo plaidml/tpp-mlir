@@ -98,7 +98,7 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    pm.addNestedPass<func::FuncOp>(createConvertCheckToLoopsPass());
+    pm.addNestedPass<func::FuncOp>(createConvertCheckToLoops());
     pm.addNestedPass<func::FuncOp>(createConvertPerfToLoopsPass());
 
     // Note that LICM should be performed before any function calls are

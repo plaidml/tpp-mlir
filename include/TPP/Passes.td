@@ -86,7 +86,6 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
 
 def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let summary = "Convert check to loops";
-  let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";
   let description = [{
     Convert check operations to SCF loops.
   }];
