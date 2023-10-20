@@ -113,14 +113,3 @@ if [ "1" == "${INSTALL}" ]; then
     exit 1
   fi
 fi
-
-# Benchmark
-if [ "1" == "${BENCH}" ]; then
-  echo "--- BENCHMARK"
-  if ! ${SCRIPT_DIR}/ci/build.sh \
-    -b ${BUILD_DIR} \
-    -B
-  then
-    exit 1
-  fi
-fi

@@ -3,13 +3,12 @@ env:
   #LIBXSMM_VERBOSE: 4
   #LIBXSMMFETCH: 1
 
-# upload with absolute path but symlinks not resolved (-P), mount point is different on head/compute node, upload even if failure
 steps:
   - label: "LLVM"
     command: "BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "TPP-MLIR-bench"
-    command: "${SRUN} --partition=spr --time=0:30:00 -- \
+    command: "${SRUN} --partition=spr --time=0:30:00 --constraint=\"notrb\" -- \
               'KIND=Release COMPILER=clang LINKER=lld \
               scripts/buildkite/benchmark.sh -b -o'"
