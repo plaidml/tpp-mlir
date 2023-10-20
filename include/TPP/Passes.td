@@ -52,7 +52,6 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
 
 def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
   let summary = "Convert linalg to xsmm";
-  let constructor = "mlir::tpp::createConvertLinalgToXsmmPass()";
   let description = [{
     Convert linalg operations to XSMM operations.
   }];

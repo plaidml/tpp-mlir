@@ -293,7 +293,7 @@ private:
       pm.addPass(createConvertMemRefToXsmm());
       if (linalgToXsmm) {
         // Linalg to Xsmm conversion patterns.
-        pm.addPass(createConvertLinalgToXsmmPass());
+        pm.addPass(createConvertLinalgToXsmm());
       } else {
         // Tpp to Xsmm conversion patterns.
         pm.addPass(createConvertTppToXsmm());

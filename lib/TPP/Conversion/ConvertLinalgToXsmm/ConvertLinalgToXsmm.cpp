@@ -27,15 +27,19 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTLINALGTOXSMM
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "convert-linalg-to-xsmm"
 
 namespace {
 
 struct ConvertLinalgToXsmm
-    : public ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
+    : public tpp::impl::ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
   void runOnOperation() override;
 };
 
@@ -910,9 +914,4 @@ void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
            ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
            ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
           patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToXsmmPass() {
-  return std::make_unique<ConvertLinalgToXsmm>();
 }
