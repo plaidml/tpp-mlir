@@ -90,7 +90,6 @@ class TppDialect;
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertCheckToLoopsPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertVNNIToTppPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createTransformDialectInterpreterPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvertPerfToLoopsPass();
