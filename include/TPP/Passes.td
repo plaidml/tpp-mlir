@@ -64,7 +64,6 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
 
 def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
   let summary = "Convert linalg to func";
-  let constructor = "mlir::tpp::createConvertLinalgToFuncPass()";
   let description = [{
     Convert linalg named operations to function call using a BLAS-style
     API.

@@ -152,7 +152,6 @@ createGpuVulkanAbiPass(bool use64bitIndex = false);
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeAggregatedOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgToGpuPass(bool useWmma = false);
-std::unique_ptr<OperationPass<ModuleOp>> createConvertLinalgToFuncPass();
 
 // Testing passes.
 void registerTestStructuralMatchers();
