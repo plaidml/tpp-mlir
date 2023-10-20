@@ -87,9 +87,7 @@ class TppDialect;
 // API duplications and combinatorial explosion of flags.
 // The values should be kept consistent with the default values of the pass
 // declarations present in the corresponding TableGen file.
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertLinalgToTppPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertLinalgToTppPass(bool, bool, ArrayRef<int64_t> tiles = {});
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertTppToLoopsPass(bool parallel = false);
 std::unique_ptr<OperationPass<ModuleOp>> createConvertXsmmToFuncPass();

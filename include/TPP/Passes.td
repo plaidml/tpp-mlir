@@ -18,7 +18,6 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
     Linalg generic operations are converted using simple pattern 
     matching (i.e., see `isTppAdd`).
   }];
-  let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
 }
 
