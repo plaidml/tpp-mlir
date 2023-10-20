@@ -107,7 +107,8 @@ struct ConvertFillOpToUnaryZero : public OpRewritePattern<linalg::FillOp> {
       return failure();
     }
 
-    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1],
+                                               xsmm::UnaryFlags::BCAST_SCALAR);
     if (failed(unaryInfo))
       return failure();
 
@@ -135,7 +136,8 @@ struct ConvertTransposeOpToUnaryTranspose
       return failure();
     }
 
-    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
+    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1],
+                                               xsmm::UnaryFlags::NONE);
     if (failed(unaryInfo))
       return failure();
 
@@ -182,37 +184,35 @@ static FailureOr<BroadCastType> getBroadCastFromMap(AffineMap map) {
   if (map.getNumResults() == 0)
     return BroadCastType::SCALAR;
 
-  if (llvm::all_of(map.getResults(), [](AffineExpr expr) {
-        auto cstExpr = expr.dyn_cast_or_null<AffineConstantExpr>();
-        if (!cstExpr)
-          return false;
-        return cstExpr.getValue() == 0;
-      })) {
-    return BroadCastType::SCALAR;
-  }
-
-  // Extend the maps with leading zeros.
-  // Example,
-  // (d0, d1) -> (d1) --> (d0, d1) -> (0, d1)
-  while (map.getNumResults() != map.getNumInputs())
-    map = map.insertResult(mlir::getAffineConstantExpr(0, map.getContext()), 0);
-
   if (!map.isProjectedPermutation(/*allowZeroInResults=*/true))
     return failure();
 
-  SmallVector<unsigned> broadcastedDims;
-  if (!map.isMinorIdentityWithBroadcasting(&broadcastedDims))
-    return failure();
+  LLVM_DEBUG(llvm::dbgs() << "[getBroadCastFromMap] map: " << map << "\n");
 
-  if (broadcastedDims.empty())
+  SmallVector<bool> isPresent(map.getNumInputs(), false);
+  for (auto expr : map.getResults()) {
+    if (auto cstExpr = expr.dyn_cast<AffineConstantExpr>()) {
+      if (cstExpr.getValue() != 0)
+        return failure();
+    } else if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+      isPresent[dimExpr.getPosition()] = true;
+    } else {
+      return failure();
+    }
+  }
+
+  // None of the dimensions are available, scalar broadcast.
+  if (llvm::all_of(isPresent, [](bool dim) { return !dim; })) {
+    return BroadCastType::SCALAR;
+  }
+
+  // All the dimensions are available, no broadcast.
+  if (llvm::all_of(isPresent, [](bool dim) { return dim; })) {
     return BroadCastType::NONE;
+  }
 
-  if (broadcastedDims.size() != 1)
-    return failure();
-
-  unsigned broadcastedDim = broadcastedDims[0];
-  // Broadcast the cols into the rows.
-  if (broadcastedDim == 0)
+  size_t rowPos = 0;
+  if (isPresent[rowPos] == false) // Broadcast the cols into the rows.
     return BroadCastType::COL;
   return BroadCastType::ROW;
 }
@@ -252,13 +252,14 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
-    if (failed(unaryInfo))
-      return failure();
     OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
     auto broadCastFlag = getBroadCastUnaryFlagFromMap(
         genericOp.getMatchingIndexingMap(inputOperand));
     if (failed(broadCastFlag))
+      return failure();
+    auto unaryInfo =
+        xsmm::utils::getUnaryInfo(operands[0], operands[1], *broadCastFlag);
+    if (failed(unaryInfo))
       return failure();
     auto flags = rewriter.getArrayAttr(
         xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
@@ -283,14 +284,16 @@ struct ConvertGenericToUnaryIdentity : OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    auto unaryInfo = xsmm::utils::getUnaryInfo(operands[0], operands[1]);
-    if (failed(unaryInfo))
-      return failure();
     OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
     auto broadCastFlag = getBroadCastUnaryFlagFromMap(
         genericOp.getMatchingIndexingMap(inputOperand));
     if (failed(broadCastFlag))
       return failure();
+    auto unaryInfo =
+        xsmm::utils::getUnaryInfo(operands[0], operands[1], *broadCastFlag);
+    if (failed(unaryInfo))
+      return failure();
+
     auto flags = rewriter.getArrayAttr(
         xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
     xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(

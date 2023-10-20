@@ -41,7 +41,8 @@ void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
                                              invokeOperands);
 }
 
-FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
+FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
+                                  UnaryFlags inputFlag) {
   Type outputType = output.getType();
 
   assert(isa<ShapedType>(outputType));
@@ -62,10 +63,16 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output) {
         !inputShapedType.hasStaticShape()) {
       return failure();
     }
-    // For 1d buffer xsmm likes the leading dimension as the size of
-    // the buffer.
-    if (inputShapedType.getRank() == 1)
-      ldi = inputShapedType.getShape()[0];
+
+    // If we are broascasting a row into cols, the leading
+    // dimension is 1, same for scalar broadcast.
+    if (inputFlag == UnaryFlags::BCAST_ROW ||
+        inputFlag == UnaryFlags::BCAST_SCALAR)
+      ldi = 1;
+    // If we are broascasting a col into rows, the leading
+    // dimension is the size of the tensor.
+    else if (inputFlag == UnaryFlags::BCAST_COL)
+      ldi = inputShapedType.getShape().back();
     else
       ldi = stridesOnInput->front();
   }

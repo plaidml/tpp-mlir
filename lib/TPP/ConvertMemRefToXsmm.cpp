@@ -28,7 +28,8 @@ struct ConvertMemRefCopyToXsmm : public OpRewritePattern<memref::CopyOp> {
                                 PatternRewriter &rewriter) const override {
     Value source = copyOp.getSource();
     Value dest = copyOp.getTarget();
-    auto unaryInfo = xsmm::utils::getUnaryInfo(source, dest);
+    auto unaryInfo =
+        xsmm::utils::getUnaryInfo(source, dest, xsmm::UnaryFlags::NONE);
     if (failed(unaryInfo))
       return failure();
     auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(

@@ -32,7 +32,10 @@ struct UnaryInfo {
 namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
-FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output);
+
+FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
+                                  UnaryFlags inputFlag);
+
 void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
                         ArrayRef<Value> operands, UnaryInfo unaryInfo,
                         ArrayAttr flags, UnaryKindAttr kind);
