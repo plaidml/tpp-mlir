@@ -1,4 +1,5 @@
 add_subdirectory(Dialect)
+add_subdirectory(Conversion)
 add_subdirectory(IR)
 add_subdirectory(GPU)
 
@@ -34,18 +35,6 @@ add_mlir_library(MLIRTPP
     TransformUtils.cpp
     ValueUtils.cpp
     VNNIUtils.cpp
-
-  # Conversions
-    ConvertLinalgToTpp.cpp
-    ConvertTppToLoops.cpp
-    ConvertTppToXsmm.cpp
-    ConvertXsmmToFunc.cpp
-    ConvertCheckToLoops.cpp
-    ConvertPerfToLoops.cpp
-    ConvertPerfToFunc.cpp
-    ConvertLinalgToFunc.cpp
-    ConvertLinalgToXsmm.cpp
-    ConvertMemRefToXsmm.cpp
 
   # Test Passes
     TestMatchers.cpp
