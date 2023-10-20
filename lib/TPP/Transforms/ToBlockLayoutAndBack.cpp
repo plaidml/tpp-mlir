@@ -28,8 +28,22 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_PACKVNNI
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_PACKMATMUL
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_PACKCONV2DNCHWFCHW
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_PACKCONV2DNHWCHWCF
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_PROPAGATEPACKUNPACK
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_SIMPLIFYANDCANONICALIZEPACK
+#include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // Utils
@@ -574,11 +588,8 @@ private:
 // Pack a BatchMatmulOp as following:
 // [B][IB][JB][ib][jb] += [B][IB][KB][ib][kb] * [B][JB][KB][kb][jb]
 // KB is the batch reduce dimension.
-struct PackMatmul : public PackMatmulBase<PackMatmul> {
-  PackMatmul() = default;
-  PackMatmul(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
+struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
+  using PackMatmulBase::PackMatmulBase;
 
   void runOnOperation() override {
     if (blockingFactors.empty())
@@ -614,11 +625,9 @@ private:
   SmallVector<int64_t> blockingFactors;
 };
 
-struct PackConv2DNchwFchw : public PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
-  PackConv2DNchwFchw() = default;
-  PackConv2DNchwFchw(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
+struct PackConv2DNchwFchw
+    : public tpp::impl::PackConv2DNchwFchwBase<PackConv2DNchwFchw> {
+  using PackConv2DNchwFchwBase::PackConv2DNchwFchwBase;
 
   void runOnOperation() override {
     if (blockingFactors.empty())
@@ -652,11 +661,9 @@ private:
   SmallVector<int64_t> blockingFactors;
 };
 
-struct PackConv2DNhwcHwcf : PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
-  PackConv2DNhwcHwcf() = default;
-  PackConv2DNhwcHwcf(ArrayRef<int64_t> blockingFactors) {
-    this->blockingFactors = blockingFactors;
-  }
+struct PackConv2DNhwcHwcf
+    : tpp::impl::PackConv2DNhwcHwcfBase<PackConv2DNhwcHwcf> {
+  using PackConv2DNhwcHwcfBase::PackConv2DNhwcHwcfBase;
 
   void runOnOperation() override {
     if (blockingFactors.empty())
@@ -697,8 +704,7 @@ struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
 };
 
 // Entry point for packing a matmul/brgemm operation to vnni format.
-struct PackVNNI : public PackVNNIBase<PackVNNI> {
-  PackVNNI() = default;
+struct PackVNNI : public tpp::impl::PackVNNIBase<PackVNNI> {
 
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
@@ -710,7 +716,7 @@ struct PackVNNI : public PackVNNIBase<PackVNNI> {
 };
 
 struct PropagatePackUnPack
-    : public PropagatePackUnPackBase<PropagatePackUnPack> {
+    : public tpp::impl::PropagatePackUnPackBase<PropagatePackUnPack> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
@@ -1061,7 +1067,8 @@ struct ForAllIterArgsFolder : public OpRewritePattern<scf::ForallOp> {
 };
 
 struct SimplifyAndCanonicalizePack
-    : public SimplifyAndCanonicalizePackBase<SimplifyAndCanonicalizePack> {
+    : public tpp::impl::SimplifyAndCanonicalizePackBase<
+          SimplifyAndCanonicalizePack> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
@@ -1097,25 +1104,6 @@ void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
       patterns, [](Operation *op) { return true; });
   patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackMatmulPass(ArrayRef<int64_t> blockingFactors) {
-  return std::make_unique<PackMatmul>(blockingFactors);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNchwFchwPass(ArrayRef<int64_t> blockingFactors) {
-  return std::make_unique<PackConv2DNchwFchw>(blockingFactors);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPackConv2DNhwcHwcfPass(ArrayRef<int64_t> blockingFactors) {
-  return std::make_unique<PackConv2DNhwcHwcf>(blockingFactors);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createPackVNNIPass() {
-  return std::make_unique<PackVNNI>();
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

@@ -141,11 +141,6 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
       [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
     - VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/VNNI][N][VNNI]
   }];
-  let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t", 
-               "Blocking factor for vnni layout">
-  ];
-  let constructor = "mlir::tpp::createPackVNNIPass()";
   let dependentDialects = ["tensor::TensorDialect", "tpp::TppDialect"];
 }
 
@@ -159,7 +154,6 @@ def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t", 
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createPackMatmulPass()";
 }
 
 def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
@@ -175,7 +169,6 @@ def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createPackConv2DNchwFchwPass()";
 }
 
 def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
@@ -191,7 +184,6 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for pack and unpack operation">
   ];
-  let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
@@ -272,12 +264,10 @@ def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
     it propagates through linalg element-wise operations. Only one operand in the
     generic must come from a tensor.pack/tensor.unpack.
   }];
-  let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
 }
 
 def SimplifyAndCanonicalizePack : Pass<"simplify-pack", "func::FuncOp"> {
   let summary = "Simplify and canonicalize tensor.pack";
-  let constructor = "mlir::tpp::createSimplifyAndCanonicalizePackPass()";
   let description = [{
     Apply `tensor.pack` and `tensor.unpack` canonicalization and simplification
     patterns.

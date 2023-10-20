@@ -193,21 +193,29 @@ private:
     // Preprocess convolutions.
     pm.addPass(createConvInitSimplifyPass());
     pm.addPass(createCleanupPass());
-    pm.addPass(createPackConv2DNhwcHwcfPass({32, 32}));
-    pm.addPass(createPackConv2DNchwFchwPass({32, 32}));
+
+    PackConv2DNhwcHwcfOptions conv2DNhwcHwcfOptions;
+    conv2DNhwcHwcfOptions.blockingFactors = SmallVector<int64_t>{32, 32};
+    pm.addPass(createPackConv2DNhwcHwcf(conv2DNhwcHwcfOptions));
+
+    PackConv2DNchwFchwOptions conv2DNchwFchwOptions;
+    conv2DNchwFchwOptions.blockingFactors = SmallVector<int64_t>{32, 32};
+    pm.addPass(createPackConv2DNchwFchw(conv2DNchwFchwOptions));
     pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
 
     // Convert ops to packed layouts.
-    pm.addPass(createPackMatmulPass({32, 32, 32}));
-    pm.addPass(createPackVNNIPass());
+    PackMatmulOptions matmulOptions;
+    matmulOptions.blockingFactors = SmallVector<int64_t>{32, 32, 32};
+    pm.addPass(createPackMatmul(matmulOptions));
+    pm.addPass(createPackVNNI());
 
     // Postprocess packing.
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
     // mess up tensor producer-consumer chains used for analysis in the
     // following passes.
-    pm.addPass(createPropagatePackUnPackPass());
+    pm.addPass(createPropagatePackUnPack());
     pm.addPass(createConstantFoldPackPass());
-    pm.addPass(createSimplifyAndCanonicalizePackPass());
+    pm.addPass(createSimplifyAndCanonicalizePack());
 
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducersPass());
