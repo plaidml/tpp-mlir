@@ -287,7 +287,7 @@ private:
 
     // Lower all TPP ops.
     if (tppToLoops)
-      pm.addPass(createConvertTppToLoopsPass());
+      pm.addPass(createConvertTppToLoops());
     else {
       // Memref to tpp conversion patterns.
       pm.addPass(createConvertMemRefToXsmm());

@@ -65,7 +65,9 @@ private:
     pm.clear();
 
     // Lower TPP ops to GPU-compatible format.
-    pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass(true));
+    ConvertTppToLoopsOptions tppToLoopOptions;
+    tppToLoopOptions.parallel = true;
+    pm.addNestedPass<func::FuncOp>(createConvertTppToLoops(tppToLoopOptions));
 
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.

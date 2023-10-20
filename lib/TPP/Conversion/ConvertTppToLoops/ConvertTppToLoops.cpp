@@ -18,8 +18,12 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTTPPTOLOOPS
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -416,9 +420,9 @@ void populateTppToLoopsPatterns(RewritePatternSet &patterns, bool parallel) {
   // clang-format on
 }
 
-struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
-  ConvertTppToLoops() = default;
-  ConvertTppToLoops(bool parallel) { this->parallel = parallel; }
+struct ConvertTppToLoops
+    : public tpp::impl::ConvertTppToLoopsBase<ConvertTppToLoops> {
+  using ConvertTppToLoopsBase::ConvertTppToLoopsBase;
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
@@ -428,8 +432,3 @@ struct ConvertTppToLoops : public ConvertTppToLoopsBase<ConvertTppToLoops> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertTppToLoopsPass(bool parallel) {
-  return std::make_unique<ConvertTppToLoops>(parallel);
-}

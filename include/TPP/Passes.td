@@ -31,7 +31,6 @@ def ConvertMemRefToXsmm : Pass<"convert-memref-to-xsmm", "func::FuncOp"> {
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
-  let constructor = "mlir::tpp::createConvertTppToLoopsPass()";
   let description = [{
     Convert tpp operations to SCF loops.
   }];
