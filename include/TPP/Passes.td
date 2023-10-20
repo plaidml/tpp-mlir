@@ -94,9 +94,9 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
 
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
-  let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
   let description = [{
-    Copy and paste from 'TestTransformDialectInterpreter.cpp'.
+    Copy and paste from 'TestTransformDialectInterpreter.cpp'. Apply the transform
+    schedule.
   }];
 }
 
@@ -130,9 +130,8 @@ def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
 
-def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
+def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
-  let constructor = "mlir::tpp::createTransformDropSchedulePass()";
 }
 
 def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {

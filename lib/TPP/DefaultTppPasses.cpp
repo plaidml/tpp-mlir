@@ -345,7 +345,7 @@ private:
     pm.clear();
 
     // Default pipeline does not support transforms yet
-    pm.addPass(createTransformDropSchedulePass());
+    pm.addPass(createTransformDropSchedule());
 
     if (linalgToLoops) {
       // Lower linalg directly to loops.
