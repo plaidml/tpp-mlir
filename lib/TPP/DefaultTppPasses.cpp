@@ -111,7 +111,7 @@ private:
     // that they are hoisted out of loops.
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
-    pm.addPass(createConvertXsmmToFuncPass());
+    pm.addPass(createConvertXsmmToFunc());
     pm.addPass(createConvertPerfToFuncPass());
   }
 };

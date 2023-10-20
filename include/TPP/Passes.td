@@ -75,7 +75,6 @@ def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
-  let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
   let description = [{
     Convert XSMM operations to libXSMM function calls.
   }];
