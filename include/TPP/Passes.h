@@ -142,7 +142,6 @@ createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
 std::unique_ptr<OperationPass<ModuleOp>> createGpuToVulkanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteBatchMatmulToMatmulPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createConvertMemRefToXsmmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultPipelinePass(StringRef gpuBackend = "");
 std::unique_ptr<OperationPass<ModuleOp>>

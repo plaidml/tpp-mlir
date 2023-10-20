@@ -26,7 +26,6 @@ def ConvertMemRefToXsmm : Pass<"convert-memref-to-xsmm", "func::FuncOp"> {
   let description = [{
     Convert memref operations (i.e., memref.copy) to xsmm operations.
   }];
-  let constructor = "mlir::tpp::createConvertMemRefToXsmmPass()";
   let dependentDialects = ["memref::MemRefDialect", "xsmm::XsmmDialect"];
 }
 

@@ -290,7 +290,7 @@ private:
       pm.addPass(createConvertTppToLoopsPass());
     else {
       // Memref to tpp conversion patterns.
-      pm.addPass(createConvertMemRefToXsmmPass());
+      pm.addPass(createConvertMemRefToXsmm());
       if (linalgToXsmm) {
         // Linalg to Xsmm conversion patterns.
         pm.addPass(createConvertLinalgToXsmmPass());
