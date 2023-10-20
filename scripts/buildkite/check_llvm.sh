@@ -21,8 +21,12 @@ if [ -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
   exit 0
 fi
 
-# LLVM not found, trigger a build if requested.
+# LLVM not found.
+# Trigger a build if requested.
+# Otherwise, return an error.
 if [ "1" == "${BUILD}" ]; then
   COMMIT_SHA=$(git_commit)
   ${SCRIPT_DIR}/ci/trigger.sh -p tpp-llvm -c ${COMMIT_SHA}
+else
+  exit 1
 fi
