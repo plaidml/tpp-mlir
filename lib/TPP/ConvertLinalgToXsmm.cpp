@@ -852,19 +852,26 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
     if (!expandShapeOp || expandShapeOp.getSrcType().getRank() != 2)
       return failure();
 
-    // The output is assumed to be 2d even if it is logically
-    // a 3d tensor, thus m, n, ldi and ldo all computed on
-    // the input tile only.
     source = expandShapeOp.getSrc();
-    auto unaryInfo = xsmm::utils::getUnaryInfo(source, source);
-    if (failed(unaryInfo))
+    xsmm::UnaryInfo unaryInfo;
+    unaryInfo.m = expandShapeOp.getSrcType().getShape()[0];
+    unaryInfo.n = expandShapeOp.getSrcType().getShape()[1];
+    auto stridesOnInput = mlir::utils::getStaticStrides(source);
+    if (failed(stridesOnInput) || stridesOnInput->back() != 1)
       return failure();
+    unaryInfo.ldi = stridesOnInput->front();
+    auto stridesOnOutput = mlir::utils::getStaticStrides(out);
+    if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
+      return failure();
+    // Ajust ldo based on the VNNI factor.
+    unaryInfo.ldo = stridesOnOutput->front() /
+                    *vnni::utils::getVnniBlockingFactor(out.getType());
     auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
     xsmm::UnaryKindAttr kind =
         xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::VNNI2);
     xsmm::utils::replaceOpWithUnary(rewriter, transposeOp, {source, out},
-                                    *unaryInfo, flags, kind);
+                                    unaryInfo, flags, kind);
     return success();
   }
 };
