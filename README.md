@@ -18,49 +18,11 @@ If you have a checkout with the previous name, please follow [these instructions
 
 ## How to setup the environment
 
-In order to build LLVM and TPP-MLIR, several software development tools such as git, cmake, compilers, etc. are needed. As each operating system has its own package 
-manager and package names, we opted for providing instructions for the user-level package manager ```conda```. This environment has been successfully tested on top of a Fedora Server
-minimal installation with less than 400 system-wide packages being installed.
+In order to build LLVM and TPP-MLIR, several software development tools such as git, cmake, compilers, etc. are needed.
+If you're able to build LLVM, you'll be able to build our project, but we do have some additional (optional) dependencies (OneDNN, OpenMP) that can be disabled (see below).
+Our required dependencies (libxsmm, libxsmm-dnn) are fetched and built by our build system, so you should have no problems either.
 
-Initial Setup (using Conda):
-```sh
-export TPPMLIR_WORKSPACE_DIR=/foo
-cd ${TPPMLIR_WORKSPACE_DIR}
-export ARCH_NAME=$(uname -m)
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH_NAME}.sh
-bash Miniconda3-latest-Linux-${ARCH_NAME}.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
-eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
-conda activate
-
-conda install -y cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils
-if [ "${ARCH_NAME}" == "aarch64" ]; then
-   conda install -y gcc_linux-aarch64 gxx_linux-aarch64
-elif [ "${ARCH_NAME}" == "x86_64" ]; then
-   conda install -y gcc_linux-64 gxx_linux-64
-fi
-python -m pip install coloredlogs
-```
-
-Reloading the environment  after conda deactivate/logout/reboot:
-```sh
-export TPPMLIR_WORKSPACE_DIR=/foo
-cd ${TPPMLIR_WORKSPACE_DIR}
-eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
-conda activate
-```
-
-### Formatting Tools
-
-Our project requires Python and C++ source format to be consistent on every commit.
-For that, we use two tools on the `check-all` Ninja target to verify the formatting:
- * `clang-format` version 16
- * Python's `black` lint checker
-
-Due to `clang-format`'s instability and non-backwards compatibility, we require that the version used be 16.
-If you have another version of `clang` installed, make sure you install `clang-format-16` on your system.
-
-Our CI will fail if these tools find formatting checks, as it uses the target `check-all`.
-Having those tools locally will make it easier to have PRs passing CI and being merged.
+If you're having trouble with your build, you can use Conda to create a minimal environment (see below).
 
 ## How to build LLVM
 
@@ -139,6 +101,52 @@ cmake --build . --target mlir-doc
 ```
 
 To enable experimental GPU support see: [GPU/README.md](lib/TPP/GPU/README.md)
+
+### Conda Environment
+
+Every modern Linux and MacOS system should be able to build our project without glitches, however, you may have an older OS or some special condisiont (cluster environment).
+As each operating system has its own package manager and package names, we opted for providing instructions for the user-level package manager ```conda```.
+This environment has been successfully tested on top of a Fedora Server minimal installation with less than 400 system-wide packages being installed.
+
+Initial Setup (using Conda):
+```sh
+export TPPMLIR_WORKSPACE_DIR=/foo
+cd ${TPPMLIR_WORKSPACE_DIR}
+export ARCH_NAME=$(uname -m)
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH_NAME}.sh
+bash Miniconda3-latest-Linux-${ARCH_NAME}.sh -b -p ${TPPMLIR_WORKSPACE_DIR}/miniconda3
+eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
+conda activate
+
+conda install -y cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils
+if [ "${ARCH_NAME}" == "aarch64" ]; then
+   conda install -y gcc_linux-aarch64 gxx_linux-aarch64
+elif [ "${ARCH_NAME}" == "x86_64" ]; then
+   conda install -y gcc_linux-64 gxx_linux-64
+fi
+python -m pip install coloredlogs
+```
+
+Reloading the environment  after conda deactivate/logout/reboot:
+```sh
+export TPPMLIR_WORKSPACE_DIR=/foo
+cd ${TPPMLIR_WORKSPACE_DIR}
+eval "$(${TPPMLIR_WORKSPACE_DIR}/miniconda3/bin/conda shell.bash hook)"
+conda activate
+```
+
+### Formatting Tools
+
+Our project uses Python and C++ source formating tools.
+There are two Ninja targets to verify the formatting:
+ * `check-clang`, which uses clang-format version 16
+ * `check-python`, which uses Python's `black` or `autopep8` lint checkers
+
+Due to `clang-format`'s instability and non-backwards compatibility, we require that the version used be 16.
+If you have another version of `clang` installed, make sure you install `clang-format-16` on your system.
+
+Please, do not submit PRs with formatting issues on other files than you're making your code changes.
+Also avoid PRs with too many formatting changes in the same file on unrelated code.
 
 ## License
 
