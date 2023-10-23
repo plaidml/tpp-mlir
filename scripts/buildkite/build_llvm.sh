@@ -15,6 +15,7 @@ mkdir -p ${LLVMROOT}
 # LLVM setup
 echo "--- LLVM"
 LLVM_VERSION=$(llvm_version)
+
 echo "LLVM version: ${LLVM_VERSION}"
 
 # Destination for tar balls
@@ -43,6 +44,14 @@ fi
 
 # Cleanup tar ball to save device space
 rm ${LLVM_TAR_FILE}
+
+# Add LLVM device extensions
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  DEVICE_EXTENSIONS=${DEVICE_EXTENSIONS}-cuda
+fi
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  DEVICE_EXTENSIONS=${DEVICE_EXTENSIONS}-vulkan
+fi
 
 LLVM_PROJECT_DIR=${LLVM_TAR_DIR}/llvm-project-${LLVM_VERSION}
 LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}

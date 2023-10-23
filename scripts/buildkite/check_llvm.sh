@@ -16,6 +16,14 @@ mkdir -p ${LLVMROOT}
 # Find LLVM_VERSION
 LLVM_VERSION=$(llvm_version)
 
+# Add LLVM device extensions
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  LLVM_VERSION=${LLVM_VERSION}-cuda
+fi
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  LLVM_VERSION=${LLVM_VERSION}-vulkan
+fi
+
 if [ -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
   echo "Found $LLVM_VERSION"
   exit 0
