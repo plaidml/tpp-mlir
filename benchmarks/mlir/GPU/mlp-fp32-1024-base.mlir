@@ -29,7 +29,7 @@ module {
       %3 = arith.maximumf %out, %cst : f32
       linalg.yield %3 : f32
     } -> tensor<256x1024xf32>
-    %3 = bufferization.materialize_in_destination %2 in %arg1 : tensor<256x1024xf32>
+    %3 = bufferization.materialize_in_destination %2 in %arg1 : (tensor<256x1024xf32>, tensor<256x1024xf32>) -> tensor<256x1024xf32>
     return %3 : tensor<256x1024xf32>
   }
 }
