@@ -84,9 +84,9 @@ static LogicalResult gemmToXegpu(linalg::LinalgOp linalgOp,
   if (blocksLoop)
     rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
 
-  auto matA = linalgOp.getDpsInputOperands()[0]->get();
-  auto matB = linalgOp.getDpsInputOperands()[1]->get();
-  auto matC = linalgOp.getDpsInitOperands()[0]->get();
+  auto matA = linalgOp.getDpsInputs()[0];
+  auto matB = linalgOp.getDpsInputs()[1];
+  auto matC = linalgOp.getDpsInits()[0];
 
   auto typeA = matA.getType().cast<ShapedType>();
   auto typeB = matB.getType().cast<ShapedType>();
