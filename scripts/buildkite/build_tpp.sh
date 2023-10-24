@@ -17,7 +17,11 @@ fi
 # Find LLVM_VERSION
 echo "--- LLVM"
 LLVM_VERSION=$(llvm_version)
-if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
+
+LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
+LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
+
+if [ ! -d "${LLVM_INSTALL_DIR}" ]; then
   echo "LLVM ${LLVM_VERSION} not found"
   exit 1
 else
@@ -49,6 +53,7 @@ fi
 
 if [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
+  source ${SCRIPT_DIR}/ci/setup_gpu_env.sh
 fi
 
 if [ "${CLEAN}" ]; then
@@ -72,7 +77,7 @@ echo "--- CONFIGURE"
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
   -b ${BUILD_DIR} ${BUILD_DIR_RM} \
-  -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
+  -m ${LLVM_INSTALL_DIR}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \

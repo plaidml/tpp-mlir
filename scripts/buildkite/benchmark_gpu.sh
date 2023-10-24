@@ -22,6 +22,9 @@ fi
 
 # Build
 eval "GPU=${GPU_OPTION} ${SCRIPT_DIR}/buildkite/build_tpp.sh"
+if [ $? != 0 ]; then
+  exit 1
+fi
 
 # Benchmark
 benchmark () {
@@ -47,11 +50,16 @@ benchmark () {
 
 # CUDA Benchmarks
 if [ "${GPU_OPTION}" == "cuda" ]; then
+  source /swtools/cuda/latest/cuda_vars.sh
   benchmark GPU/cuda.json "CUDA kernels"
+  if [ $? != 0 ]; then
+    exit 1
+  fi
 fi
 
 # Vulkan Benchmarks
 if [ "${GPU_OPTION}" == "vulkan" ]; then
+  source /swtools/vulkan/latest/setup-env.sh
   echo "No Vulkan benchmarks"
   exit 1
 fi

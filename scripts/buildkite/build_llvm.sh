@@ -15,12 +15,14 @@ mkdir -p ${LLVMROOT}
 # LLVM setup
 echo "--- LLVM"
 LLVM_VERSION=$(llvm_version)
+
 echo "LLVM version: ${LLVM_VERSION}"
 
 # Destination for tar balls
 if [ ! "${LLVM_TAR_DIR}" ]; then
   LLVM_TAR_DIR="/tmp/tpp-llvm-tar"
 fi
+LLVM_TAR_DIR=$(add_device_extensions ${LLVM_TAR_DIR} ${GPU})
 mkdir -p ${LLVM_TAR_DIR}
 
 # Fetch specific LLVM version
@@ -46,6 +48,7 @@ rm ${LLVM_TAR_FILE}
 
 LLVM_PROJECT_DIR=${LLVM_TAR_DIR}/llvm-project-${LLVM_VERSION}
 LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
+LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
 
 # Environment setup
 echo "--- ENVIRONMENT"
@@ -79,6 +82,10 @@ LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
 LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
 mkdir -p ${LLVM_BUILD_DIR}
 
+if [ "${GPU}" ]; then
+  source ${SCRIPT_DIR}/ci/setup_gpu_env.sh
+fi
+
 echo "Environment configured successfully"
 
  # Configure LLVM
@@ -88,6 +95,16 @@ LLVM_PROJECTS="mlir"
 LLVM_TARGETS="host"
 if [ ! "${KIND}" ]; then
   KIND=RelWithDebInfo
+fi
+
+# LLVM CUDA setup
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  LLVM_BUILD_EXTENSIONS="${LLVM_BUILD_EXTENSIONS} -DCMAKE_CUDA_COMPILER=nvcc -DMLIR_ENABLE_CUDA_RUNNER=ON -DMLIR_ENABLE_CUDA_CONVERSIONS=ON"
+  LLVM_TARGETS="${LLVM_TARGETS};NVPTX"
+fi
+# LLVM Vulkan setup
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  LLVM_BUILD_EXTENSIONS="${LLVM_BUILD_EXTENSIONS} -DMLIR_ENABLE_SPIRV_CPU_RUNNER=ON -DMLIR_ENABLE_VULKAN_RUNNER=ON"
 fi
 
 echo_run cmake -Wno-dev -G Ninja \
@@ -101,7 +118,8 @@ echo_run cmake -Wno-dev -G Ninja \
     -DCMAKE_C_COMPILER=${CC} \
     -DCMAKE_CXX_COMPILER=${CXX} \
     -DLLVM_USE_LINKER=${LINKER} \
-    -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR}
+    -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR} \
+    ${LLVM_BUILD_EXTENSIONS}
 
 # Build LLVM
 echo "--- BUILD"

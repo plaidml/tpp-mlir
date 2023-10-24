@@ -4,12 +4,14 @@ env:
   #LIBXSMMFETCH: 1
 
 steps:
-  - label: "LLVM"
-    command: "scripts/buildkite/check_llvm.sh"
+  - label: "LLVM-cuda"
+    command: "GPU=cuda BUILD=1 scripts/buildkite/check_llvm.sh"
+  - label: "LLVM-vulkan"
+    command: "GPU=vulkan BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "GPU-Nvidia-Cuda"
-    command: "${SRUN} --partition=a100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=v100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=cuda CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
@@ -18,7 +20,7 @@ steps:
       ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
 
   - label: "GPU-Nvidia-Vulkan"
-    command: "${SRUN} --partition=a100 --time=0:30:00 -- \
+    command: "${SRUN} --partition=v100 --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
     env:
@@ -26,12 +28,12 @@ steps:
       # See: https://github.com/google/sanitizers/issues/629
       ASAN_OPTIONS: "protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS}"
 
-  - label: "GPU-Intel-Vulkan"
-    command: "${SRUN} -- \
-              'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 CLEAN=1 \
-              scripts/buildkite/build_tpp.sh'"
-    env:
-      TPP_LAUNCH_NODE: "pvc"
+  # TODO: enable PVC tests when the device is available to the runner
+  #       currently PVC is not visible to the Vulkan runtime
+  # - label: "GPU-Intel-Vulkan"
+  #   command: "${SRUN} --partition=pvc --time=0:30:00 -- \
+  #             'KIND=Debug COMPILER=clang LINKER=lld GPU=vulkan CHECK=1 CLEAN=1 \
+  #             scripts/buildkite/build_tpp.sh'"
 
   - label: "GPU-Nvidia-Cuda-bench"
     command: "${SRUN} --partition=a100 --time=0:30:00 -- \
