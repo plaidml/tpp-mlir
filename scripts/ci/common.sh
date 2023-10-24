@@ -53,3 +53,19 @@ llvm_version() {
   fi
   echo "${LLVM_VERSION}"
 }
+
+# Add known device extension suffixes to a base string
+add_device_extensions() {
+  local BASE=${1}
+  local DEVICE_LIST=${2}
+
+  # GPU extensions
+  if [[ ${DEVICE_LIST,,} =~ "cuda" ]]; then
+    BASE=${BASE}-cuda
+  fi
+  if [[ ${DEVICE_LIST,,} =~ "vulkan" ]]; then
+    BASE=${BASE}-vulkan
+  fi
+
+  echo ${BASE}
+}

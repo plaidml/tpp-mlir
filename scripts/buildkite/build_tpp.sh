@@ -18,15 +18,10 @@ fi
 echo "--- LLVM"
 LLVM_VERSION=$(llvm_version)
 
-# Add LLVM device extensions
-if [[ ${GPU,,} =~ "cuda" ]]; then
-  LLVM_VERSION=${LLVM_VERSION}-cuda
-fi
-if [[ ${GPU,,} =~ "vulkan" ]]; then
-  LLVM_VERSION=${LLVM_VERSION}-vulkan
-fi
+LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
+LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
 
-if [ ! -d "${LLVMROOT}/${LLVM_VERSION}" ]; then
+if [ ! -d "${LLVM_INSTALL_DIR}" ]; then
   echo "LLVM ${LLVM_VERSION} not found"
   exit 1
 else
@@ -81,7 +76,7 @@ echo "--- CONFIGURE"
 if ! ${SCRIPT_DIR}/ci/cmake.sh \
   -s ${PROJECT_DIR} \
   -b ${BUILD_DIR} ${BUILD_DIR_RM} \
-  -m ${LLVMROOT}/${LLVM_VERSION}/lib/cmake/mlir \
+  -m ${LLVM_INSTALL_DIR}/lib/cmake/mlir \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \
