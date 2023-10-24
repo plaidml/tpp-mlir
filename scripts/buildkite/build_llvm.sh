@@ -82,6 +82,22 @@ LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
 LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
 mkdir -p ${LLVM_BUILD_DIR}
 
+# Env CUDA setup
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  echo "Setting up CUDA environment"
+  echo "Hard-coding GCC to a known stable version (12.3)"
+  source /swtools/gcc/gcc-12.3.0/gcc_vars.sh
+  source /swtools/cuda/latest/cuda_vars.sh
+  check_program nvcc
+fi
+
+# Ebv Vulkan setup
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  echo "Setting up Vulkan environment"
+  source /swtools/vulkan/latest/setup-env.sh
+  check_program vulkaninfo
+fi
+
 echo "Environment configured successfully"
 
  # Configure LLVM
@@ -91,6 +107,16 @@ LLVM_PROJECTS="mlir"
 LLVM_TARGETS="host"
 if [ ! "${KIND}" ]; then
   KIND=RelWithDebInfo
+fi
+
+# LLVM CUDA setup
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  LLVM_BUILD_EXTENSIONS="${LLVM_BUILD_EXTENSIONS} -DCMAKE_CUDA_COMPILER=nvcc -DMLIR_ENABLE_CUDA_RUNNER=ON -DMLIR_ENABLE_CUDA_CONVERSIONS=ON"
+  LLVM_TARGETS="${LLVM_TARGETS};NVPTX"
+fi
+# LLVM Vulkan setup
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  LLVM_BUILD_EXTENSIONS="${LLVM_BUILD_EXTENSIONS} -DMLIR_ENABLE_SPIRV_CPU_RUNNER=ON -DMLIR_ENABLE_VULKAN_RUNNER=ON"
 fi
 
 echo_run cmake -Wno-dev -G Ninja \
@@ -104,7 +130,8 @@ echo_run cmake -Wno-dev -G Ninja \
     -DCMAKE_C_COMPILER=${CC} \
     -DCMAKE_CXX_COMPILER=${CXX} \
     -DLLVM_USE_LINKER=${LINKER} \
-    -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR}
+    -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR} \
+    ${LLVM_BUILD_EXTENSIONS}
 
 # Build LLVM
 echo "--- BUILD"

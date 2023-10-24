@@ -2,10 +2,26 @@ env:
   NPROCS_LIMIT_LINK: "8"
 
 steps:
-  - label: "TPP-LLVM"
+  - label: "TPP-LLVM-base"
     concurrency: 1
-    concurrency_group: "tpp-llvm"
+    concurrency_group: "tpp-llvm-base"
     command: "scripts/buildkite/check_llvm.sh || \
               ${SRUN} --partition=spr --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang \
+              scripts/buildkite/build_llvm.sh'"
+
+  - label: "TPP-LLVM-cuda"
+    concurrency: 1
+    concurrency_group: "tpp-llvm-cuda"
+    command: "GPU=cuda scripts/buildkite/check_llvm.sh || \
+              ${SRUN} --partition=a100 --time=0:30:00 -- \
+              'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
+              scripts/buildkite/build_llvm.sh'"
+
+  - label: "TPP-LLVM-vulkan"
+    concurrency: 1
+    concurrency_group: "tpp-llvm-vulkan"
+    command: "GPU=vulkan scripts/buildkite/check_llvm.sh || \
+              ${SRUN} --partition=spr --time=0:30:00 -- \
+              'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
               scripts/buildkite/build_llvm.sh'"

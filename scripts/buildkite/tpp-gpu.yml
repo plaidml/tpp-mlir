@@ -4,8 +4,10 @@ env:
   #LIBXSMMFETCH: 1
 
 steps:
-  - label: "LLVM"
-    command: "BUILD=1 scripts/buildkite/check_llvm.sh"
+  - label: "LLVM-cuda"
+    command: "GPU=cuda BUILD=1 scripts/buildkite/check_llvm.sh"
+  - label: "LLVM-vulkan"
+    command: "GPU=vulkan BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
   - label: "GPU-Nvidia-Cuda"
