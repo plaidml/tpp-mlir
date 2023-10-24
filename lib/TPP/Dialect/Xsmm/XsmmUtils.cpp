@@ -67,14 +67,16 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
     // If we are broascasting a row into cols, the leading
     // dimension is 1, same for scalar broadcast.
     if (inputFlag == UnaryFlags::BCAST_ROW ||
-        inputFlag == UnaryFlags::BCAST_SCALAR)
+        inputFlag == UnaryFlags::BCAST_SCALAR) {
       ldi = 1;
+    }
     // If we are broascasting a col into rows, the leading
     // dimension is the size of the tensor.
-    else if (inputFlag == UnaryFlags::BCAST_COL)
+    else if (inputFlag == UnaryFlags::BCAST_COL) {
       ldi = inputShapedType.getShape().back();
-    else
+    } else {
       ldi = stridesOnInput->front();
+    }
   }
   auto stridesOnOutput = mlir::utils::getStaticStrides(output);
   if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
@@ -111,10 +113,11 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
     if (lhsFlag == BinaryFlags::BCAST_SCALAR_IN_0 ||
         lhsFlag == BinaryFlags::BCAST_ROW_IN_0) {
       ldiLhs = 1;
-    } else if (lhsFlag == BinaryFlags::BCAST_COL_IN_0)
+    } else if (lhsFlag == BinaryFlags::BCAST_COL_IN_0) {
       ldiLhs = lhsShapedType.getShape().back();
-    else
+    } else {
       ldiLhs = stridesOnLhs->front();
+    }
   }
 
   int64_t ldiRhs = 1;
@@ -128,10 +131,11 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
     if (rhsFlag == BinaryFlags::BCAST_SCALAR_IN_1 ||
         rhsFlag == BinaryFlags::BCAST_ROW_IN_1) {
       ldiRhs = 1;
-    } else if (rhsFlag == BinaryFlags::BCAST_COL_IN_1)
+    } else if (rhsFlag == BinaryFlags::BCAST_COL_IN_1) {
       ldiRhs = rhsShapedType.getShape().back();
-    else
+    } else {
       ldiRhs = stridesOnRhs->front();
+    }
   }
 
   binaryInfo.ldiLhs = ldiLhs;
