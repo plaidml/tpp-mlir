@@ -29,12 +29,24 @@ struct UnaryInfo {
   int64_t ldo;
 };
 
+struct BinaryInfo {
+  unsigned m;
+  unsigned n;
+
+  int64_t ldiLhs;
+  int64_t ldiRhs;
+  int64_t ldo;
+};
+
 namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
 
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
                                   UnaryFlags inputFlag);
+
+FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
+                                    BinaryFlags rhsFlag, Value output);
 
 void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
                         ArrayRef<Value> operands, UnaryInfo unaryInfo,

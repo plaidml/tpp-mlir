@@ -67,14 +67,16 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
     // If we are broascasting a row into cols, the leading
     // dimension is 1, same for scalar broadcast.
     if (inputFlag == UnaryFlags::BCAST_ROW ||
-        inputFlag == UnaryFlags::BCAST_SCALAR)
+        inputFlag == UnaryFlags::BCAST_SCALAR) {
       ldi = 1;
+    }
     // If we are broascasting a col into rows, the leading
     // dimension is the size of the tensor.
-    else if (inputFlag == UnaryFlags::BCAST_COL)
+    else if (inputFlag == UnaryFlags::BCAST_COL) {
       ldi = inputShapedType.getShape().back();
-    else
+    } else {
       ldi = stridesOnInput->front();
+    }
   }
   auto stridesOnOutput = mlir::utils::getStaticStrides(output);
   if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
@@ -83,6 +85,67 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   unaryInfo.ldi = ldi;
   unaryInfo.ldo = stridesOnOutput->front();
   return unaryInfo;
+}
+
+FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
+                                    BinaryFlags rhsFlag, Value output) {
+  Type outputType = output.getType();
+
+  assert(isa<ShapedType>(outputType));
+  auto outputShapedType = output.getType().cast<ShapedType>();
+  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
+      !isa<FloatType>(outputShapedType.getElementType())) {
+    return failure();
+  }
+
+  BinaryInfo binaryInfo;
+  binaryInfo.m = outputShapedType.getShape()[0];
+  binaryInfo.n = outputShapedType.getShape()[1];
+
+  int64_t ldiLhs = 1;
+  if (ShapedType lhsShapedType = dyn_cast<ShapedType>(lhs.getType())) {
+    auto stridesOnLhs = mlir::utils::getStaticStrides(lhs);
+    if (failed(stridesOnLhs) || stridesOnLhs->back() != 1 ||
+        !lhsShapedType.hasStaticShape()) {
+      return failure();
+    }
+
+    if (lhsFlag == BinaryFlags::BCAST_SCALAR_IN_0 ||
+        lhsFlag == BinaryFlags::BCAST_ROW_IN_0) {
+      ldiLhs = 1;
+    } else if (lhsFlag == BinaryFlags::BCAST_COL_IN_0) {
+      ldiLhs = lhsShapedType.getShape().back();
+    } else {
+      ldiLhs = stridesOnLhs->front();
+    }
+  }
+
+  int64_t ldiRhs = 1;
+  if (ShapedType rhsShapedType = dyn_cast<ShapedType>(rhs.getType())) {
+    auto stridesOnRhs = mlir::utils::getStaticStrides(rhs);
+    if (failed(stridesOnRhs) || stridesOnRhs->back() != 1 ||
+        !rhsShapedType.hasStaticShape()) {
+      return failure();
+    }
+
+    if (rhsFlag == BinaryFlags::BCAST_SCALAR_IN_1 ||
+        rhsFlag == BinaryFlags::BCAST_ROW_IN_1) {
+      ldiRhs = 1;
+    } else if (rhsFlag == BinaryFlags::BCAST_COL_IN_1) {
+      ldiRhs = rhsShapedType.getShape().back();
+    } else {
+      ldiRhs = stridesOnRhs->front();
+    }
+  }
+
+  binaryInfo.ldiLhs = ldiLhs;
+  binaryInfo.ldiRhs = ldiRhs;
+
+  auto stridesOnOutput = mlir::utils::getStaticStrides(output);
+  if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
+    return failure();
+  binaryInfo.ldo = stridesOnOutput->front();
+  return binaryInfo;
 }
 
 } // namespace utils

@@ -55,14 +55,6 @@ struct BrgemmInfo {
   bool isVnni = false;
 };
 
-struct BinaryInfo {
-  unsigned m;
-  unsigned n;
-
-  int64_t ldiLhs;
-  int64_t ldiRhs;
-  int64_t ldo;
-};
 } // namespace
 
 // Return the position of `dim` in the codomain of `operand`.
@@ -76,8 +68,9 @@ std::optional<unsigned> getPosInCodomain(unsigned dim, OpOperand *operand,
 // Replace `linalgOp` with a binary dispatch plus invoke.
 static void replaceOpWithBinary(RewriterBase &rewriter,
                                 linalg::LinalgOp linalgOp,
-                                ArrayRef<Value> operands, BinaryInfo binaryInfo,
-                                ArrayAttr flags, xsmm::BinaryKindAttr kind) {
+                                ArrayRef<Value> operands,
+                                xsmm::BinaryInfo binaryInfo, ArrayAttr flags,
+                                xsmm::BinaryKindAttr kind) {
   Location loc = linalgOp.getLoc();
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
   DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
@@ -342,25 +335,6 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
     auto lhs = operands[0];
     auto rhs = operands[1];
     auto output = operands[2];
-    Type outputType = output.getType();
-
-    auto stridesOnLhs = utils::getStaticStrides(lhs);
-    auto stridesOnRhs = utils::getStaticStrides(rhs);
-    auto stridesOnOutput = utils::getStaticStrides(output);
-
-    if (failed(stridesOnLhs) || failed(stridesOnRhs) || failed(stridesOnOutput))
-      return failure();
-    if (stridesOnLhs->back() != 1 || stridesOnRhs->back() != 1 ||
-        stridesOnOutput->back() != 1) {
-      return failure();
-    }
-
-    BinaryInfo binaryInfo;
-    binaryInfo.m = outputType.cast<ShapedType>().getShape()[0];
-    binaryInfo.n = outputType.cast<ShapedType>().getShape()[1];
-    binaryInfo.ldiLhs = stridesOnLhs->front();
-    binaryInfo.ldiRhs = stridesOnRhs->front();
-    binaryInfo.ldo = stridesOnOutput->front();
 
     OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
     auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
@@ -372,6 +346,11 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
     auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
         genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
     if (failed(broadCastFlagRhs))
+      return failure();
+
+    auto binaryInfo = xsmm::utils::getBinaryInfo(lhs, *broadCastFlagLhs, rhs,
+                                                 *broadCastFlagRhs, output);
+    if (failed(binaryInfo))
       return failure();
 
     auto flagLhs =
@@ -397,7 +376,8 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
 
     xsmm::BinaryKindAttr kind =
         xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD);
-    replaceOpWithBinary(rewriter, genericOp, operands, binaryInfo, flags, kind);
+    replaceOpWithBinary(rewriter, genericOp, operands, *binaryInfo, flags,
+                        kind);
     return success();
   }
 };
