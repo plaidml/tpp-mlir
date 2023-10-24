@@ -55,6 +55,22 @@ if [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
 fi
 
+# Env CUDA setup
+if [[ ${GPU,,} =~ "cuda" ]]; then
+  echo "Setting up CUDA environment"
+  echo "Hard-coding CUDA-compatible GCC version (12.3)"
+  source /swtools/gcc/gcc-12.3.0/gcc_vars.sh
+  source /swtools/cuda/latest/cuda_vars.sh
+  check_program nvcc
+fi
+
+# Env Vulkan setup
+if [[ ${GPU,,} =~ "vulkan" ]]; then
+  echo "Setting up Vulkan environment"
+  source /swtools/vulkan/latest/setup-env.sh
+  check_program vulkaninfo
+fi
+
 if [ "${CLEAN}" ]; then
   BUILD_DIR_RM=-R
 fi

@@ -85,7 +85,7 @@ mkdir -p ${LLVM_BUILD_DIR}
 # Env CUDA setup
 if [[ ${GPU,,} =~ "cuda" ]]; then
   echo "Setting up CUDA environment"
-  echo "Hard-coding GCC to a known stable version (12.3)"
+  echo "Hard-coding CUDA-compatible GCC version (12.3)"
   source /swtools/gcc/gcc-12.3.0/gcc_vars.sh
   source /swtools/cuda/latest/cuda_vars.sh
   check_program nvcc
