@@ -14,7 +14,7 @@ steps:
     concurrency: 1
     concurrency_group: "tpp-llvm-cuda"
     command: "GPU=cuda scripts/buildkite/check_llvm.sh || \
-              ${SRUN} --partition=a100 --time=0:30:00 -- \
+              ${SRUN} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
               scripts/buildkite/build_llvm.sh'"
 

@@ -22,6 +22,9 @@ fi
 
 # Build
 eval "GPU=${GPU_OPTION} ${SCRIPT_DIR}/buildkite/build_tpp.sh"
+if [ $? != 0 ]; then
+  exit 1
+fi
 
 # Benchmark
 benchmark () {
