@@ -198,7 +198,6 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     `start-from-last-consumer` allows to move the anchor point to the last fusable
     consumer of the conv or matmul-like pattern.
   }];
-  let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
     Option<"maxDepth", "max-depth", "int64_t", "5", 
@@ -284,7 +283,6 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
 
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let summary = "Run linalg element-wise fusion";
-  let constructor = "mlir::tpp::createElementWiseFusionPass()";
 }
 
 def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {

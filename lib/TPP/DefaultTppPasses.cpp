@@ -218,7 +218,7 @@ private:
     pm.addPass(createSimplifyAndCanonicalizePack());
 
     pm.addPass(createCleanupPass());
-    pm.addPass(createTileConsumerAndFuseProducersPass());
+    pm.addPass(createTileConsumerAndFuseProducers());
     pm.addPass(createSimplifyAndCanonicalizePackPass());
     pm.addPass(createCleanupPass());
   }

@@ -117,7 +117,7 @@ private:
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanupPass());
-    pm.addPass(createTileConsumerAndFuseProducersPass());
+    pm.addPass(createTileConsumerAndFuseProducers());
     pm.addPass(createCleanupPass());
 
     // Preprocess and bufferize as further conversion requires memref

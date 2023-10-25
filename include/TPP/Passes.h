@@ -90,15 +90,12 @@ class TppDialect;
 
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes = {});
-std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
                      bool linalgToXsmm = false);
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createConvInitSimplifyPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizePass(bool dealloc = true);
