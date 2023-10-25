@@ -191,7 +191,7 @@ private:
     pm.clear();
 
     // Preprocess convolutions.
-    pm.addPass(createConvInitSimplifyPass());
+    pm.addPass(createConvInitSimplify());
     pm.addPass(createCleanupPass());
 
     PackConv2DNhwcHwcfOptions conv2DNhwcHwcfOptions;

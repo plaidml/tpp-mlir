@@ -292,7 +292,6 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
     operation. Specifically, instead of initializing the output of a convolution
     with zero and then adding the bias, initialize the output with the bias.  
   }];
-  let constructor = "mlir::tpp::createConvInitSimplifyPass()";
 }
 
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
