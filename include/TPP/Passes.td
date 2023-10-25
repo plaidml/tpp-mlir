@@ -231,7 +231,6 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
 def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
                                       "func::FuncOp"> {
   let summary = "Rewrite a linalg.batch_matmul to linalg.matmul.";
-  let constructor = "mlir::tpp::createRewriteBatchMatmulToMatmulPass()";
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 

@@ -366,7 +366,7 @@ private:
       pm.addNestedPass<func::FuncOp>(createCleanupPass());
     } else {
       // Convert linalg.batch_matmul to linalg.matmul.
-      pm.addPass(createRewriteBatchMatmulToMatmulPass());
+      pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
       pm.addPass(createTppMappingPass());
