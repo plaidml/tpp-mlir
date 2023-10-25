@@ -435,3 +435,57 @@ func.func @identity_6(%arg0 : memref<10xf32>, %arg1 : memref<10xf32>) {
 
 // CHECK-LABEL: identity_6
 // CHECK-NOT: xsmm.unary identity
+
+// -----
+
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> ()>
+
+// Rank zero is not matched.
+func.func @identity7(%arg0: memref<f32, strided<[]>>, %arg1: memref<6x9xf32>) {
+  linalg.generic {
+    indexing_maps = [#map2, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : memref<f32, strided<[]>>) outs(%arg1 : memref<6x9xf32>) {
+      ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    }
+  return
+}
+
+// CHECK-LABEL: identity7
+// CHECK: linalg.generic
+
+// -----
+
+func.func @identity_8(%arg0: f32, %arg1: memref<6x9xf32>) {
+  linalg.fill ins(%arg0 : f32) outs(%arg1 : memref<6x9xf32>)
+  return
+}
+
+// TODO: We would like to convert this fill ops too.
+// CHECK-LABEL: identity_8
+// CHECK: linalg.fill
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @identity_9(%arg0: memref<6xf32, strided<[1]>>, %arg1: memref<6x9xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%arg0 : memref<6xf32, strided<[1]>>) outs(%arg1 : memref<6x9xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  return
+}
+
+// We need to lift: VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape in the matcher.
+// CHECK-LABEL: identity_9
+// CHECK-SAME: %[[ARG0:.+]]: memref<6xf32, strided<[1]>>, %[[ARG1:.+]]: memref<6x9xf32>
+// CHECK: linalg.generic
+// C_HECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [6, 9, 1, 9] flags = (bcast_row) data_type = f32
+// C_HECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])

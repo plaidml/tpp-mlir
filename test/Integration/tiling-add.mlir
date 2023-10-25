@@ -1,5 +1,4 @@
-// This should really be in the passes directory, not here
-// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -default-tpp-passes | FileCheck -check-prefix=IR %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -15,9 +14,10 @@
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
+// IR-LABEL: bigadd
 func.func @bigadd(%A: tensor<32x16xf32>,
                   %B: tensor<32x16xf32>) -> tensor<32x16xf32>  {
-  // TPP: tpp.add
+  // IR: xsmm_binary_invoke
   %O = linalg.generic { indexing_maps = [#map0, #map0],
                         iterator_types = ["parallel", "parallel"] }
     ins(%A : tensor<32x16xf32>) outs(%B: tensor<32x16xf32>) {

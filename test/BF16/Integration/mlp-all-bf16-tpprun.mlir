@@ -1,6 +1,7 @@
-// RUN: tpp-run %s \
+// RUN: tpp-run -linalg-to-xsmm="false" %s \
 // RUN:  -e entry -entry-point-result=void
 //
+
 
   memref.global "private" constant @arg1 : memref<128x512x2xbf16> = dense<1.00e+00> 
   memref.global "private" constant @arg3 : memref<256x1024x2xbf16> = dense<1.00e+00>

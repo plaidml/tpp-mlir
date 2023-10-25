@@ -1,5 +1,4 @@
-// This should really be in the passes directory, not here
-// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
+// RUN: tpp-opt %s -default-tpp-passes | FileCheck -check-prefix=IR %s
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -13,9 +12,10 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+// IR-LABEL: brgemmtpp
 func.func @brgemmtpp(%A: tensor<2x4x8xf32>,
                      %B: tensor<2x8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32>  {
-  // TPP: tpp.brgemm
+  // IR: xsmm_brgemm_invoke
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<2x4x8xf32>, tensor<2x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
   return %D: tensor<4x4xf32>
 }

@@ -1,4 +1,4 @@
-// RUN: tpp-run %s -linalg-to-xsmm \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void \
 // RUN:  -print-mlir=mid -seed=123 -splat-to-random 2>&1 | \
 // RUN: FileCheck %s
