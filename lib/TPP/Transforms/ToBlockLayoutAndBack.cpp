@@ -1105,13 +1105,3 @@ void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
       patterns, [](Operation *op) { return true; });
   patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPropagatePackUnPackPass() {
-  return std::make_unique<PropagatePackUnPack>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createSimplifyAndCanonicalizePackPass() {
-  return std::make_unique<SimplifyAndCanonicalizePack>();
-}

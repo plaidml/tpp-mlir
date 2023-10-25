@@ -201,7 +201,7 @@ private:
     PackConv2DNchwFchwOptions conv2DNchwFchwOptions;
     conv2DNchwFchwOptions.blockingFactors = SmallVector<int64_t>{32, 32};
     pm.addPass(createPackConv2DNchwFchw(conv2DNchwFchwOptions));
-    pm.addPass(createRewriteConvToMatmulOrBrgemmPass());
+    pm.addPass(createRewriteConvToMatmulOrBrgemm());
 
     // Convert ops to packed layouts.
     PackMatmulOptions matmulOptions;
@@ -219,7 +219,7 @@ private:
 
     pm.addPass(createCleanupPass());
     pm.addPass(createTileConsumerAndFuseProducers());
-    pm.addPass(createSimplifyAndCanonicalizePackPass());
+    pm.addPass(createSimplifyAndCanonicalizePack());
     pm.addPass(createCleanupPass());
   }
 };

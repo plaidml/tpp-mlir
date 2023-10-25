@@ -225,7 +225,6 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
     Option<"enableBrgemm", "enable-brgemm", "bool", "false",
            "Rewrite convolution to BRGEMM if possible">
   ];
-  let constructor = "mlir::tpp::createRewriteConvToMatmulOrBrgemmPass()";
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 

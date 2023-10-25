@@ -89,12 +89,9 @@ class TppDialect;
 // declarations present in the corresponding TableGen file.
 
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
                      bool linalgToXsmm = false);
-std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizePass(bool dealloc = true);
 std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
@@ -106,8 +103,6 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createTppLoweringPass(bool tppToLoops = false, bool linalgToXsmm = false);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertForAllToParallelOpPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSimplifyAndCanonicalizePackPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuPipelinePass(StringRef gpuBackend = "cuda");
 std::unique_ptr<OperationPass<ModuleOp>>
