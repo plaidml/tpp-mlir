@@ -278,7 +278,6 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
   let description = [{
     Reduce pack overhead by folding tensor.pack into constant tensors.
   }];
-  let constructor = "mlir::tpp::createConstantFoldPackPass()";
 }
 
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {

@@ -95,7 +95,6 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
                      bool linalgToXsmm = false);
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
-std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizePass(bool dealloc = true);
 std::unique_ptr<OperationPass<func::FuncOp>> createCleanupPass();
