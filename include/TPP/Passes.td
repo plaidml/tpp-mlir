@@ -366,7 +366,6 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
   let description = [{
     Rewrite an scf.forall to scf.parallel after bufferization.
   }];
-  let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
 }
 
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {

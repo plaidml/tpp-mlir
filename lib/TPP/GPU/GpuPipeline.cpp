@@ -124,7 +124,7 @@ private:
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
     pm.addPass(createBufferizePass(/*dealloc=*/gpuType != GpuType::Cuda));
-    pm.addPass(createConvertForAllToParallelOpPass());
+    pm.addPass(createConvertForAllToParallelOp());
     pm.addNestedPass<func::FuncOp>(createCleanupPass());
 
     // Convert to generic GPU ops.
