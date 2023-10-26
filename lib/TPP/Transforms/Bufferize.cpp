@@ -38,14 +38,17 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_BUFFERIZE
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
-struct Bufferize : public BufferizeBase<Bufferize> {
-  Bufferize() = default;
-  Bufferize(bool dealloc) { this->dealloc = dealloc; };
+struct Bufferize : public tpp::impl::BufferizeBase<Bufferize> {
+  using BufferizeBase::BufferizeBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -116,8 +119,3 @@ void Bufferize::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createBufferizePass(bool dealloc) {
-  return std::make_unique<Bufferize>(dealloc);
-}

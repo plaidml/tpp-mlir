@@ -364,7 +364,7 @@ private:
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOps());
-      pm.addPass(createBufferizePass());
+      pm.addPass(createBufferize());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanup());
     } else {
@@ -390,7 +390,7 @@ private:
       }
 
       // Bufferize: tensor->memref.
-      pm.addPass(createBufferizePass());
+      pm.addPass(createBufferize());
 
       // Lower all Tile operations.
       pm.addNestedPass<func::FuncOp>(

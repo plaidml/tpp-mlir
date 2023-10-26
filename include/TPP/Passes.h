@@ -90,8 +90,6 @@ class TppDialect;
 
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
 std::unique_ptr<OperationPass<ModuleOp>>
-createBufferizePass(bool dealloc = true);
-std::unique_ptr<OperationPass<ModuleOp>>
 createGpuPipelinePass(StringRef gpuBackend = "cuda");
 std::unique_ptr<OperationPass<ModuleOp>>
 createGpuConversionPass(bool useWmma = false);
