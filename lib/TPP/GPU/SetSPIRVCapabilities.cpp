@@ -20,17 +20,18 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_SETSPIRVCAPABILITIES
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
-struct SetSPIRVCapabilitiesPass
-    : public SetSPIRVCapabilitiesBase<SetSPIRVCapabilitiesPass> {
-public:
-  SetSPIRVCapabilitiesPass() = default;
-  explicit SetSPIRVCapabilitiesPass(StringRef clientAPI) {
-    this->clientAPI = clientAPI.str();
-  }
+
+struct SetSPIRVCapabilities
+    : public tpp::impl::SetSPIRVCapabilitiesBase<SetSPIRVCapabilities> {
+  using SetSPIRVCapabilitiesBase::SetSPIRVCapabilitiesBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -106,8 +107,3 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createSetSPIRVCapabilitiesPass(StringRef api) {
-  return std::make_unique<SetSPIRVCapabilitiesPass>(api);
-}

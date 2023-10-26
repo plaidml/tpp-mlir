@@ -89,29 +89,6 @@ class TppDialect;
 // declarations present in the corresponding TableGen file.
 
 std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
-std::unique_ptr<OperationPass<ModuleOp>>
-createGpuPipelinePass(StringRef gpuBackend = "cuda");
-std::unique_ptr<OperationPass<ModuleOp>>
-createGpuConversionPass(bool useWmma = false);
-std::unique_ptr<OperationPass<ModuleOp>>
-createGpuToCudaPass(StringRef gpuTriple = "nvptx64-nvidia-cuda",
-                    StringRef gpuChip = "sm_35",
-                    StringRef gpuFeatures = "+ptx60");
-std::unique_ptr<OperationPass<ModuleOp>> createGpuToVulkanPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRewriteBatchMatmulToMatmulPass();
-std::unique_ptr<OperationPass<ModuleOp>>
-createDefaultPipelinePass(StringRef gpuBackend = "");
-std::unique_ptr<OperationPass<ModuleOp>>
-createConvertGPUToSPIRVPass(bool mapMemorySpace = true);
-std::unique_ptr<OperationPass<ModuleOp>>
-createSetSPIRVCapabilitiesPass(StringRef api = "vulkan");
-std::unique_ptr<OperationPass<gpu::GPUModuleOp>>
-createSetSPIRVAbiAttributePass(StringRef api = "vulkan");
-std::unique_ptr<OperationPass<ModuleOp>>
-createGpuVulkanAbiPass(bool use64bitIndex = false);
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgToGpuPass(bool useWmma = false);
 
 // Testing passes.
 void registerTestStructuralMatchers();

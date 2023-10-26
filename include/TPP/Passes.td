@@ -362,7 +362,6 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
 
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let summary = "Lower all eligible operations into GPU compatible IR";
-  let constructor = "mlir::tpp::createGpuPipelinePass()";
   let options = [
     Option<"gpuBackend", "gpu", "std::string",
             /*default=*/"\"cuda\"",
@@ -375,7 +374,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let description = [{
     Convert all eligble operations into generic GPU operations.
   }];
-  let constructor = "mlir::tpp::createGpuConversionPass()";
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
@@ -385,7 +383,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
 
 def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
   let summary = "Lower generic GPU operations to CUDA backend";
-  let constructor = "mlir::tpp::createGpuToCudaPass()";
   let options = [
     Option<"gpuTriple", "triple", "std::string",
             /*default=*/"\"nvptx64-nvidia-cuda\"",
@@ -401,7 +398,6 @@ def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
 
 def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
   let summary = "Lower generic GPU operations to Vulkan backend";
-  let constructor = "mlir::tpp::createGpuToVulkanPass()";
 }
 
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
@@ -414,7 +410,6 @@ def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   let description = [{
     A collection of passes that lower everything to MLIR LLVM IR.
   }];
-  let constructor = "mlir::tpp::createDefaultPipelinePass()";
   let options = [
     Option<"gpuBackend", "gpu", "std::string",
             /*default=*/"\"\"",
@@ -436,7 +431,6 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
     0, in set 0. One can attach `spirv.interface_var_abi` to those parameters
     to control the set and binding if wanted.
   }];
-  let constructor = "mlir::tpp::createConvertGPUToSPIRVPass()";
   let dependentDialects = ["spirv::SPIRVDialect"];
   let options = [
     Option<"use64bitIndex", "use-64bit-index",
@@ -447,7 +441,6 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
 
 def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
   let summary = "Set SPIR-V capabilities.";
-  let constructor = "mlir::tpp::createSetSPIRVCapabilitiesPass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
             /*default=*/"\"vulkan\"",
@@ -457,7 +450,6 @@ def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
 
 def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
   let summary = "Set SPIR-V ABI attribute.";
-  let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
             /*default=*/"\"vulkan\"",
@@ -477,7 +469,6 @@ def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
     The original GPU kernel logic is thrown away to make interface
     adaptation easier.
   }];
-  let constructor = "mlir::tpp::createGpuVulkanAbiPass()";
   let options = [
     Option<"use64bitIndex", "use-64bit-index",
            "bool", /*default=*/"false",
@@ -497,7 +488,6 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
   let description = [{
     Lower linalg to ops optimized for computation on GPU.
   }];
-  let constructor = "mlir::tpp::createLinalgToGpuPass()";
   let dependentDialects = ["linalg::LinalgDialect",
                            "scf::SCFDialect",
                            "memref::MemRefDialect",

@@ -26,13 +26,17 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUVULKANABI
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 // Flatten memref type into 1D shape.
-Type FlattenMemrefType(MemRefType memrefType) {
+static Type FlattenMemrefType(MemRefType memrefType) {
   if (memrefType.getRank() <= 1)
     return memrefType;
 
@@ -50,8 +54,9 @@ Type FlattenMemrefType(MemRefType memrefType) {
 }
 
 // Returns Vulkan compatible wrapper type for a given input type.
-Type getVulkanTypeWrapper(Type type, const SPIRVTypeConverter &typeConverter,
-                          RewriterBase &rewriter) {
+static Type getVulkanTypeWrapper(Type type,
+                                 const SPIRVTypeConverter &typeConverter,
+                                 RewriterBase &rewriter) {
   assert(!type.isa<TensorType>() && "Tensors are not supported by Vulkan");
 
   // Buffers are already Vulkan compatible.
@@ -111,7 +116,7 @@ static void adaptGPUFuncToVulkanABI(gpu::GPUFuncOp &gpuFuncOp,
 }
 
 // Flatten memref buffer into 1D shape.
-Value FlattenMemrefOperand(Value operand, RewriterBase &rewriter) {
+static Value FlattenMemrefOperand(Value operand, RewriterBase &rewriter) {
   auto loc = operand.getLoc();
 
   // Ignore non-memref types and 1D buffers.
@@ -131,9 +136,9 @@ Value FlattenMemrefOperand(Value operand, RewriterBase &rewriter) {
 }
 
 // Returns Vulkan compatible wrapper value for a given input operand.
-Value getVulkanOperandWrapper(Value operand,
-                              const SPIRVTypeConverter &typeConverter,
-                              RewriterBase &rewriter) {
+static Value getVulkanOperandWrapper(Value operand,
+                                     const SPIRVTypeConverter &typeConverter,
+                                     RewriterBase &rewriter) {
   auto loc = operand.getLoc();
   auto type = operand.getType();
 
@@ -163,9 +168,10 @@ Value getVulkanOperandWrapper(Value operand,
 
 // Adapts GPU function launch to Vulkan calling convention.
 // Scalar values are wrapped into Vulkan compatible buffers.
-void adaptGPULaunchFuncToVulkanABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
-                                   const SPIRVTypeConverter &typeConverter,
-                                   RewriterBase &rewriter) {
+static void
+adaptGPULaunchFuncToVulkanABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
+                              const SPIRVTypeConverter &typeConverter,
+                              RewriterBase &rewriter) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(gpuLaunchFuncOp.getOperation());
 
@@ -182,10 +188,8 @@ void adaptGPULaunchFuncToVulkanABI(gpu::LaunchFuncOp &gpuLaunchFuncOp,
   gpuLaunchFuncOp.getKernelOperandsMutable().assign(newOperands);
 }
 
-class GpuVulkanAbi : public GpuVulkanAbiBase<GpuVulkanAbi> {
-public:
-  GpuVulkanAbi() = default;
-  GpuVulkanAbi(bool use64bitIndex) { this->use64bitIndex = use64bitIndex; };
+struct GpuVulkanAbi : public tpp::impl::GpuVulkanAbiBase<GpuVulkanAbi> {
+  using GpuVulkanAbiBase::GpuVulkanAbiBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -233,8 +237,3 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createGpuVulkanAbiPass(bool use64bitIndex) {
-  return std::make_unique<GpuVulkanAbi>(use64bitIndex);
-}
