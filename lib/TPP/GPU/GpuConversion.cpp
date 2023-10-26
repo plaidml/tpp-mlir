@@ -71,7 +71,7 @@ private:
 
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
-    pm.addNestedPass<func::FuncOp>(linalg::createLinalgDeGeneralizationPass());
+    pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
     pm.addNestedPass<func::FuncOp>(createLinalgToGpuPass(useWmma));
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
@@ -79,7 +79,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
     pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
 
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Create GPU kernels.
     pm.addPass(createGpuKernelOutliningPass());

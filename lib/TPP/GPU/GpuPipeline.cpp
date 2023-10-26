@@ -116,16 +116,16 @@ private:
 
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
     pm.addPass(createTileConsumerAndFuseProducers());
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
     pm.addPass(createBufferizePass(/*dealloc=*/gpuType != GpuType::Cuda));
     pm.addPass(createConvertForAllToParallelOp());
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
     pm.addPass(createGpuConversionPass(gpuWmma));

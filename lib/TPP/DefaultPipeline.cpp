@@ -153,11 +153,12 @@ private:
 
     if (!gpuBackend.empty()) {
       // Apply the custom GPU lowering pipeline
-      pm.addPass(tpp::createGpuPipelinePass(gpuBackend));
+      pm.addPass(createGpuPipelinePass(gpuBackend));
     } else {
       // Apply the default preprocessing pass
-      pm.addPass(
-          tpp::createDefaultTppPass(tppToLoops, linalgToLoops, linalgToXsmm));
+      DefaultTppPassesOptions tppDefaultOptions{tppToLoops, linalgToLoops,
+                                                linalgToXsmm};
+      pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
     if (print == PrintStage::Mid)
@@ -165,7 +166,7 @@ private:
 
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());
-    pm.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoops());
+    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
     pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());

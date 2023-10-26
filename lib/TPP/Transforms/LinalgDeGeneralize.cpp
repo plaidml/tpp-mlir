@@ -20,12 +20,17 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_LINALGDEGENERALIZE
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
-struct LinalgDeGeneralize : LinalgDeGeneralizeBase<LinalgDeGeneralize> {
+struct LinalgDeGeneralize
+    : tpp::impl::LinalgDeGeneralizeBase<LinalgDeGeneralize> {
   void runOnOperation() override {
     func::FuncOp func = getOperation();
     RewritePatternSet patterns(&getContext());
@@ -160,9 +165,4 @@ void mlir::linalg::populateLinalgDeGeneralizationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FillOpDeGeneralizationPattern, MatmulOpDeGeneralizationPattern,
                BatchReduceOpDeGeneralizationPattern>(patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::linalg::createLinalgDeGeneralizationPass() {
-  return std::make_unique<LinalgDeGeneralize>();
 }

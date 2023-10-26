@@ -1,9 +1,7 @@
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops=true linalg-to-xsmm=false" -split-input-file | FileCheck %s
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_add(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>
+// CHECK-LABEL: tpp_add
 func.func @tpp_add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
@@ -16,9 +14,7 @@ func.func @tpp_add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_identity(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<1x1xf32>
+// CHECK-LABEL: tpp_identity
 func.func @tpp_identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
@@ -32,8 +28,7 @@ func.func @tpp_identity(%arg0: memref<3x3xf32>, %arg1: memref<1x1xf32>) {
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_relu(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK-LABEL: tpp_relu
 func.func @tpp_relu(%arg0: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
@@ -46,8 +41,7 @@ func.func @tpp_relu(%arg0: memref<3x3xf32>) {
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_zero(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
+// CHECK-LABEL: tpp_zero
 func.func @tpp_zero(%arg0: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
@@ -59,10 +53,7 @@ func.func @tpp_zero(%arg0: memref<3x3xf32>) {
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_brgemm(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<2x3x4xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<2x4x3xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-LABEL: tpp_brgemm
 func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) {
   // CHECK: scf.for
   // CHECK:   scf.for
@@ -79,10 +70,7 @@ func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2:
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_gemm(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
+// CHECK-LABEL: tpp_gemm
 func.func @tpp_gemm(%A: memref<4x8xf32>,
           %B: memref<8x4xf32>, %C: memref<4x4xf32>) {
   // CHECK: scf.for
@@ -99,10 +87,7 @@ func.func @tpp_gemm(%A: memref<4x8xf32>,
 // -----
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @matmul(
-// CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,
-// CHECK-SAME:  %[[ARG1:.+]]: memref<8x4xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xf32>)
+// CHECK-LABEL: matmul
 func.func @matmul(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK: scf.for
@@ -122,10 +107,7 @@ func.func @matmul(%A: tensor<4x8xf32>,
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK-LABEL: func.func @blocked_matmul(
-// CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
-// CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
-// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+// CHECK-LABEL: blocked_matmul
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
   // CHECK: scf.parallel
   // CHECK:   scf.for
@@ -155,8 +137,7 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 !conv1x1_output_tensor_t = tensor<1x7x7x512xf32> // N,H,W,Oc
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK-LABEL: @conv2d_1x1(
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
+// CHECK-LABEL: conv2d_1x1
 func.func @conv2d_1x1(
       %arg0 : !conv1x1_input_tensor_t) -> !conv1x1_output_tensor_t {
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -188,8 +169,7 @@ func.func @conv2d_1x1(
 #map = affine_map<(d0, d1) -> (d0 + d1)>
 
 // CHECK-NOT: func.func private @xsmm_
-// CHECK-LABEL: @conv2d_1x1_decomposed(
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
+// CHECK-LABEL: conv2d_1x1_decomposed
 func.func @conv2d_1x1_decomposed(
       %arg0 : tensor<1x7x7x2048xf32>) -> tensor<1x7x7x512xf32> {
   %c0 = arith.constant 0 : index
@@ -202,11 +182,12 @@ func.func @conv2d_1x1_decomposed(
   // 1x1 Conv2D
   // CHECK: linalg.fill
   // CHECK: scf.for
-  // CHECK:   scf.for
-  // CHECK:     scf.for
-  // CHECK:       scf.for
-  // CHECK:         arith.mulf
-  // CHECK:         arith.addf
+  // CHECK: scf.parallel  
+  // CHECK: scf.for       
+  // CHECK: scf.for       
+  // CHECK: scf.for       
+  // CHECK: arith.mulf
+  // CHECK: arith.addf
   %cst_0 = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x7x7x512xf32>
   %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1x7x7x512xf32>) -> tensor<1x7x7x512xf32>

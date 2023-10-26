@@ -251,7 +251,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "bool", /*default=*/"true",
            "Skip all TPP transformations. Lower lianalg directly to xsmm.">
   ];
-  let constructor = "mlir::tpp::createDefaultTppPass()";
 }
 
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
@@ -309,12 +308,10 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
 
 def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
-  let constructor = "mlir::tpp::createCleanupPass()";
 }
 
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
   let summary = "Lower all local dialects (XSMM, check etc.).";
-  let constructor = "mlir::tpp::createLocalDialectsLoweringPass()";
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
@@ -323,7 +320,6 @@ def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
     Apply various postprocessing passes such parallel loop fusion,
     buffer deallocation, general cleanup etc.
   }];
-  let constructor = "mlir::tpp::createPostprocessingPass()";
 }
 
 def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
@@ -332,7 +328,6 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
     Apply collection of TPP rewriting passes to map eligble operations
     into equivalent TPP-compatible forms.
   }];
-  let constructor = "mlir::tpp::createTppMappingPass()";
 }
 
 def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
@@ -340,7 +335,6 @@ def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
   let description = [{
     Convert all eligble operations into TPP operations.
   }];
-  let constructor = "mlir::tpp::createTppConversionPass()";
 }
 
 def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
@@ -357,7 +351,6 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
            "bool", /*default=*/"true",
            "By default Linalg ops are lowered to TPP. Lower Linalg to XSMM instead.">,
   ];
-  let constructor = "mlir::tpp::createTppLoweringPass()";
 }
 
 def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
@@ -414,7 +407,6 @@ def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
 
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
   let summary = "Convert generic ops into named ops";
-  let constructor = "mlir::linalg::createLinalgDeGeneralizationPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 

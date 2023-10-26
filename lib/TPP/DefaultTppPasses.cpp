@@ -30,16 +30,32 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_DEFAULTTPPPASSES
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_TPPLOWERING
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_CLEANUP
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_LOCALDIALECTSLOWERING
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_POSTPROCESSING
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_TPPMAPPING
+#include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_TPPCONVERSION
+#include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 // A general cleanup pass that performs general IR normalization and
 // generic optimizations without any lowering or any logical changes.
 // Commonly applied after other major passes.
-struct CleanupPass : public CleanupBase<CleanupPass>,
-                     UtilityPassBase<func::FuncOp> {
+struct Cleanup : public tpp::impl::CleanupBase<Cleanup>,
+                 UtilityPassBase<func::FuncOp> {
   void runOnOperation() override {
     auto module = getOperation();
 
@@ -63,8 +79,8 @@ private:
 
 // Lower all local dialects (XSMM, check etc.) to standard dialects
 // and function calls.
-struct LocalDialectsLoweringPass
-    : public LocalDialectsLoweringBase<LocalDialectsLoweringPass>,
+struct LocalDialectsLowering
+    : public tpp::impl::LocalDialectsLoweringBase<LocalDialectsLowering>,
       UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -109,7 +125,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
     // Run cleanup after LICM to allow CSE to eliminate common operations now
     // that they are hoisted out of loops.
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    pm.addNestedPass<func::FuncOp>(createCleanup());
 
     pm.addPass(createConvertXsmmToFunc());
     pm.addPass(createConvertPerfToFunc());
@@ -118,8 +134,8 @@ private:
 
 // Apply various postprocessing passes such as LICM, parallel loop fusion,
 // buffer deallocation, general cleanup etc.
-struct PostprocessingPass : public PostprocessingBase<PostprocessingPass>,
-                            UtilityPassBase<func::FuncOp> {
+struct Postprocessing : public tpp::impl::PostprocessingBase<Postprocessing>,
+                        UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -151,14 +167,14 @@ private:
     pm.addPass(bufferization::createBufferHoistingPass());
 
     // Run general cleanup to normalize IR.
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
   }
 };
 
 // Apply collection of high-level passes that map operations to
 // TPP-compatible forms.
-struct TppMappingPass : public TppMappingBase<TppMappingPass>,
-                        UtilityPassBase<ModuleOp> {
+struct TppMapping : public tpp::impl::TppMappingBase<TppMapping>,
+                    UtilityPassBase<ModuleOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -192,21 +208,16 @@ private:
 
     // Preprocess convolutions.
     pm.addPass(createConvInitSimplify());
-    pm.addPass(createCleanupPass());
-
-    PackConv2DNhwcHwcfOptions conv2DNhwcHwcfOptions;
-    conv2DNhwcHwcfOptions.blockingFactors = SmallVector<int64_t>{32, 32};
-    pm.addPass(createPackConv2DNhwcHwcf(conv2DNhwcHwcfOptions));
-
-    PackConv2DNchwFchwOptions conv2DNchwFchwOptions;
-    conv2DNchwFchwOptions.blockingFactors = SmallVector<int64_t>{32, 32};
-    pm.addPass(createPackConv2DNchwFchw(conv2DNchwFchwOptions));
-    pm.addPass(createRewriteConvToMatmulOrBrgemm());
+    pm.addPass(createCleanup());
 
     // Convert ops to packed layouts.
-    PackMatmulOptions matmulOptions;
-    matmulOptions.blockingFactors = SmallVector<int64_t>{32, 32, 32};
-    pm.addPass(createPackMatmul(matmulOptions));
+    pm.addPass(createPackConv2DNhwcHwcf(
+        PackConv2DNhwcHwcfOptions{SmallVector<int64_t>{32, 32}}));
+    pm.addPass(createPackConv2DNchwFchw(
+        PackConv2DNchwFchwOptions{SmallVector<int64_t>{32, 32}}));
+    pm.addPass(createRewriteConvToMatmulOrBrgemm());
+    pm.addPass(
+        createPackMatmul(PackMatmulOptions{SmallVector<int64_t>{32, 32, 32}}));
     pm.addPass(createPackVNNI());
 
     // Postprocess packing.
@@ -217,16 +228,16 @@ private:
     pm.addPass(createConstantFoldPack());
     pm.addPass(createSimplifyAndCanonicalizePack());
 
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
     pm.addPass(createTileConsumerAndFuseProducers());
     pm.addPass(createSimplifyAndCanonicalizePack());
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
   }
 };
 
 // Convert all matching operations to TPP.
-struct TppConversionPass : public TppConversionBase<TppConversionPass>,
-                           UtilityPassBase<func::FuncOp> {
+struct TppConversion : public tpp::impl::TppConversionBase<TppConversion>,
+                       UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -259,13 +270,9 @@ private:
 };
 
 // Lower TPP to into combination of standard and local dialects.
-struct TppLoweringPass : public TppLoweringBase<TppLoweringPass>,
-                         UtilityPassBase<func::FuncOp> {
-  TppLoweringPass() : TppLoweringPass(false, true){};
-  TppLoweringPass(bool tppToLoops, bool linalgToXsmm) {
-    this->tppToLoops = tppToLoops;
-    this->linalgToXsmm = linalgToXsmm;
-  };
+struct TppLowering : public tpp::impl::TppLoweringBase<TppLowering>,
+                     UtilityPassBase<func::FuncOp> {
+  using TppLoweringBase::TppLoweringBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -311,14 +318,10 @@ private:
 };
 
 // The default pipeline for TPP.
-struct DefaultTppPasses : public DefaultTppPassesBase<DefaultTppPasses>,
-                          UtilityPassBase<ModuleOp> {
-  DefaultTppPasses() : DefaultTppPasses(false, false, true){};
-  DefaultTppPasses(bool tppToLoops, bool linalgToLoops, bool linalgToXsmm) {
-    this->tppToLoops = tppToLoops;
-    this->linalgToLoops = linalgToLoops;
-    this->linalgToXsmm = linalgToXsmm;
-  };
+struct DefaultTppPasses
+    : public tpp::impl::DefaultTppPassesBase<DefaultTppPasses>,
+      UtilityPassBase<ModuleOp> {
+  using DefaultTppPassesBase::DefaultTppPassesBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
@@ -363,17 +366,17 @@ private:
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOps());
       pm.addPass(createBufferizePass());
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
+      pm.addNestedPass<func::FuncOp>(createCleanup());
     } else {
       // Convert linalg.batch_matmul to linalg.matmul.
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
-      pm.addPass(createTppMappingPass());
+      pm.addPass(createTppMapping());
 
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
+      pm.addNestedPass<func::FuncOp>(createCleanup());
 
       // Decompose Aggregated operations. These ops currently do not
       // bufferize. Once this is possible we can move this pass after
@@ -382,8 +385,8 @@ private:
 
       // Lower linalg operations to TPP.
       if (!linalgToXsmm) {
-        pm.addNestedPass<func::FuncOp>(createTppConversionPass());
-        pm.addNestedPass<func::FuncOp>(createCleanupPass());
+        pm.addNestedPass<func::FuncOp>(createTppConversion());
+        pm.addNestedPass<func::FuncOp>(createCleanup());
       }
 
       // Bufferize: tensor->memref.
@@ -391,8 +394,8 @@ private:
 
       // Lower all Tile operations.
       pm.addNestedPass<func::FuncOp>(
-          createTppLoweringPass(tppToLoops, linalgToXsmm));
-      pm.addNestedPass<func::FuncOp>(createCleanupPass());
+          createTppLowering(TppLoweringOptions{tppToLoops, linalgToXsmm}));
+      pm.addNestedPass<func::FuncOp>(createCleanup());
     }
 
     // Convert forAll to parallel loops should run after bufferization
@@ -400,46 +403,11 @@ private:
     pm.addPass(createConvertForAllToParallelOp());
 
     // Covert all local TPP-related dialects.
-    pm.addPass(createLocalDialectsLoweringPass());
+    pm.addPass(createLocalDialectsLowering());
 
     // Clean up after the default pipeline.
-    pm.addNestedPass<func::FuncOp>(createPostprocessingPass());
+    pm.addNestedPass<func::FuncOp>(createPostprocessing());
   }
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createCleanupPass() {
-  return std::make_unique<CleanupPass>();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createLocalDialectsLoweringPass() {
-  return std::make_unique<LocalDialectsLoweringPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createPostprocessingPass() {
-  return std::make_unique<PostprocessingPass>();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createTppMappingPass() {
-  return std::make_unique<TppMappingPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTppConversionPass() {
-  return std::make_unique<TppConversionPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTppLoweringPass(bool linalgToLoops, bool linalgToXsmm) {
-  return std::make_unique<TppLoweringPass>(linalgToLoops, linalgToXsmm);
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createDefaultTppPass(bool tppLoops, bool linalgLoops,
-                                bool linalgToXsmm) {
-  return std::make_unique<DefaultTppPasses>(tppLoops, linalgLoops,
-                                            linalgToXsmm);
-}
