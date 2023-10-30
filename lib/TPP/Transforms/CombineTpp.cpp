@@ -14,8 +14,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_COMBINETPPOPS
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -59,7 +63,7 @@ void populatePatterns(RewritePatternSet &patterns) {
   patterns.add<CombineBrgemmAddAndRelu>(patterns.getContext());
 }
 
-struct CombineTppOps : public CombineTppOpsBase<CombineTppOps> {
+struct CombineTppOps : public tpp::impl::CombineTppOpsBase<CombineTppOps> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populatePatterns(patterns);
@@ -68,7 +72,3 @@ struct CombineTppOps : public CombineTppOpsBase<CombineTppOps> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::tpp::createCombineTppPass() {
-  return std::make_unique<CombineTppOps>();
-}

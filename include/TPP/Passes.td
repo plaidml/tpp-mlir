@@ -121,7 +121,6 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
 
 def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
   let summary = "Combine tpps into bigger tpp";
-  let constructor = "mlir::tpp::createCombineTppPass()";
   let description = [{
     Convert tpp bias + brgemm + relu op to a larger op.
   }];

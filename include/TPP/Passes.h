@@ -83,13 +83,6 @@ class SPIRVDialect;
 namespace tpp {
 class TppDialect;
 
-// The pass options are provided with default argument values to avoid
-// API duplications and combinatorial explosion of flags.
-// The values should be kept consistent with the default values of the pass
-// declarations present in the corresponding TableGen file.
-
-std::unique_ptr<OperationPass<func::FuncOp>> createCombineTppPass();
-
 // Testing passes.
 void registerTestStructuralMatchers();
 void registerTestForToForAllRewrite();
