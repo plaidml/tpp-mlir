@@ -10,7 +10,7 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"

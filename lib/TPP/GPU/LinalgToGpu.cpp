@@ -8,7 +8,7 @@
 
 #include "TPP/Passes.h"
 
-#include "TPP/MatcherUtils.h"
+#include "TPP/IR/MatcherUtils.h"
 #include "TPP/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"

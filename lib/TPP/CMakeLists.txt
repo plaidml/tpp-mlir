@@ -2,46 +2,31 @@ add_subdirectory(Dialect)
 add_subdirectory(Conversion)
 add_subdirectory(IR)
 add_subdirectory(GPU)
+add_subdirectory(Transforms)
 
 get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 
 add_mlir_library(MLIRTPP
   # Passes 
-    Bufferize.cpp
-    ToBlockLayoutAndBack.cpp
-    RewriteToBatchReduceGemm.cpp
-    TransformDialectInterpreter.cpp
-    RewriteConvToMatmulImpl.cpp
-    TileConsumerAndFuseProducers.cpp
-    RewriteConvsToMatmulOrBrgemm.cpp
-    DefaultTppPasses.cpp
-    ConstantFoldPack.cpp
-    ConvInitSimplify.cpp
-    CombineTpp.cpp
-    RewriteBatchMatmulToMatmul.cpp
-    LinalgDeGeneralize.cpp
-    DefaultPipeline.cpp
-    DecomposeAggregatedOps.cpp
-    ConvertForAllToParallelOp.cpp 
-    LowerPacksAndUnpacks.cpp
-
+  DefaultPipeline.cpp
+  DefaultTppPasses.cpp
+  
   # Utils
-    MatcherUtils.cpp
-    TensorInit.cpp
-    TensorInitFloat.cpp
-    TensorInitInt.cpp
-    BuilderUtils.cpp
-    TransformUtils.cpp
-    ValueUtils.cpp
-    VNNIUtils.cpp
+  BuilderUtils.cpp
+  TensorInit.cpp
+  TensorInitFloat.cpp
+  TensorInitInt.cpp
+  TransformUtils.cpp
+  ValueUtils.cpp
+  VNNIUtils.cpp
 
   # Test Passes
-    TestMatchers.cpp
-    TestForToForAllRewrite.cpp
+  #TestMatchers.cpp
+  #TestForToForAllRewrite.cpp
 
-    ADDITIONAL_HEADER_DIRS
-    ${PROJECT_SOURCE_DIR}/include/TPP
+  ADDITIONAL_HEADER_DIRS
+  ${PROJECT_SOURCE_DIR}/include/TPP
 
   DEPENDS
     TPPCompilerPassIncGen
@@ -50,13 +35,12 @@ add_mlir_library(MLIRTPP
     LINK_LIBS PUBLIC
     TPPIR
     TPPTppDialect
+    TPPTransforms
     TPPXsmmDialect
     TPPPerfDialect
     TPPGPU
 
     MLIRIR
-    MLIRInferTypeOpInterface
-    ${mlir_dialect_libs}
     ${conversion_libs}
 )
 

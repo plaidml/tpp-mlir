@@ -9,7 +9,7 @@
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/TransformUtils.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

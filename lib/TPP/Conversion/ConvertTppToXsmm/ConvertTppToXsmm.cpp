@@ -12,7 +12,7 @@
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Passes.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "TPP/VNNIUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

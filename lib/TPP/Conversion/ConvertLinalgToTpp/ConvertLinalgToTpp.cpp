@@ -8,10 +8,10 @@
 
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
-#include "TPP/MatcherUtils.h"
+#include "TPP/IR/MatcherUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "TPP/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

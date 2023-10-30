@@ -13,6 +13,7 @@ set(LIBS
         MLIRTPP
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
+        TPPTestLib
         )
 add_llvm_executable(tpp-opt tpp-opt.cpp)
 

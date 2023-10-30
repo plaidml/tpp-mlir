@@ -9,7 +9,7 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/TransformUtils.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

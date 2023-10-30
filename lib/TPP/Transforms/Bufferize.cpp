@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Passes.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 
 #include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
