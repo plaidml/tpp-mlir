@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRPerfToFunc
+add_mlir_conversion_library(TPPPerfToFunc
   ConvertPerfToFunc.cpp
 
   ADDITIONAL_HEADER_DIRS

@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRTppToLoops
+add_mlir_conversion_library(TPPTppToLoops
   ConvertTppToLoops.cpp
 
   ADDITIONAL_HEADER_DIRS

@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRCheckToLoops
+add_mlir_conversion_library(TPPCheckToLoops
   ConvertCheckToLoops.cpp
 
   ADDITIONAL_HEADER_DIRS

@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRLinalgToFunc
+add_mlir_conversion_library(TPPLinalgToFunc
   ConvertLinalgToFunc.cpp
 
   ADDITIONAL_HEADER_DIRS

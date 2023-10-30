@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRLinalgToTpp
+add_mlir_conversion_library(TPPLinalgToTpp
   ConvertLinalgToTpp.cpp
 
   ADDITIONAL_HEADER_DIRS

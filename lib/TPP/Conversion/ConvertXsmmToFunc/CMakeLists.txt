@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRXsmmToFunc
+add_mlir_conversion_library(TPPXsmmToFunc
   ConvertXsmmToFunc.cpp
 
   ADDITIONAL_HEADER_DIRS

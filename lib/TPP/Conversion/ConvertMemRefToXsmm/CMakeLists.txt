@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRMemRefToXSMM
+add_mlir_conversion_library(TPPMemRefToXSMM
   ConvertMemRefToXsmm.cpp
 
   ADDITIONAL_HEADER_DIRS

@@ -1,4 +1,4 @@
-add_mlir_conversion_library(MLIRPerfToLoop
+add_mlir_conversion_library(TPPPerfToLoop
   ConvertPerfToLoops.cpp
 
   ADDITIONAL_HEADER_DIRS
