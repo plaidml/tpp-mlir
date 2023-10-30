@@ -6,6 +6,7 @@ add_mlir_dialect_library(TPPLinalgXTransformOps
     ${PROJECT_SOURCE_DIR}/include/TPP
 
   DEPENDS
+    TPPCompilerPassIncGen
     TPPLinalgXTransformOpsIncGen
 )
 

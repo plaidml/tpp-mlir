@@ -17,9 +17,19 @@ add_mlir_library(TPPTransforms
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
+  
+  DEPENDS
+    MLIRPerfOpsIncGen
+    MLIRTppOpsIncGen
+    MLIRTppAttrDefIncGen
+    MLIRTppInterfaceIncGen
+    MLIRXsmmOpsIncGen
+    MLIRXsmmAttrDefIncGen
+    TPPCompilerPassIncGen
+    TPPLinalgXTransformOpsIncGen
 
   LINK_LIBS PUBLIC
-  ${mlir_dialect_libs}
-  MLIRBufferizationToMemRef
-  MLIRBufferizationPipelines
+    ${mlir_dialect_libs}
+    MLIRBufferizationToMemRef
+    MLIRBufferizationPipelines
   )
