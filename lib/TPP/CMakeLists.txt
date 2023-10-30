@@ -21,10 +21,6 @@ add_mlir_library(MLIRTPP
   ValueUtils.cpp
   VNNIUtils.cpp
 
-  # Test Passes
-  #TestMatchers.cpp
-  #TestForToForAllRewrite.cpp
-
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/TPP
 
