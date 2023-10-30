@@ -26,16 +26,10 @@ add_mlir_library(MLIRTPP
 
   DEPENDS
     TPPCompilerPassIncGen
-    TPPLinalgXTransformOps
 
-    LINK_LIBS PUBLIC
-    TPPIR
-    TPPTppDialect
+  LINK_LIBS PUBLIC
     TPPTransforms
-    TPPXsmmDialect
-    TPPPerfDialect
     TPPGPU
-
     MLIRIR
     ${conversion_libs}
 )
