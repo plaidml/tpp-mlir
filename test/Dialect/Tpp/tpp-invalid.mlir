@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -split-input-file -verify-diagnostics
 
 func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{operand #2 must be 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
+  // expected-error @below {{operand #2 must be variadic of 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
   tpp.add ins(%arg0: f32, %arg0: f32) outs(%arg1: f32)
   return
 }
@@ -9,7 +9,7 @@ func.func @tpp_add_invalid(%arg0: f32, %arg1: f32) {
 // -----
 
 func.func @tpp_relu_invalid(%arg0: f32, %arg1: f32) {
-  // expected-error @below {{operand #1 must be 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
+  // expected-error @below {{operand #1 must be variadic of 2D memref of floating-point values or 2D tensor of floating-point values, but got 'f32'}}
   tpp.relu ins(%arg0: f32) outs(%arg1: f32)
   return
 }
@@ -17,7 +17,7 @@ func.func @tpp_relu_invalid(%arg0: f32, %arg1: f32) {
 // -----
 
 func.func @tpp_relu_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
-  // expected-error @below {{operand #0 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<f32>'}}
+  // expected-error @below {{operand #0 must be variadic of 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<f32>'}}
   tpp.relu ins(%arg0: memref<f32>) outs(%arg1: memref<f32>)
   return
 }
@@ -33,7 +33,7 @@ func.func @tpp_zero_invalid(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) -> m
 // -----
 
 func.func @tpp_add_invalid(%arg0: memref<f32>, %arg1: memref<f32>) {
-  // expected-error @below {{operand #0 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<f32>'}}
+  // expected-error @below {{operand #0 must be variadic of 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<f32>'}}
   tpp.add ins(%arg0: memref<f32>, %arg1: memref<f32>) outs(%arg1: memref<f32>)
   return
 }
@@ -50,7 +50,7 @@ func.func @tpp_identity_invalid(%arg0: memref<1x2xf32>, %arg1: memref<2x2xf32>) 
 // -----
 
 func.func @myfunc(%arg0: memref<?x?xf32>, %arg1: memref<2x2xf32>) -> memref<2x2xf32> {
-  // expected-error @below {{operand #0 must be 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<?x?xf32>'}}
+  // expected-error @below {{operand #0 must be variadic of 1D/2D memref of floating-point values or 1D/2D tensor of floating-point values or floating-point, but got 'memref<?x?xf32>'}}
   tpp.identity ins(%arg0: memref<?x?xf32>) outs(%arg1: memref<2x2xf32>)
   return %arg1: memref<2x2xf32>
 }
@@ -217,7 +217,7 @@ func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) {
 // -----
 
 func.func @tpp_add_mixing(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> memref<3x3xf32> {
-  // expected-error @below {{result #0 must be 2D tensor of floating-point values, but got 'memref<3x3xf32>'}}
+  // expected-error @below {{result #0 must be variadic of 2D tensor of floating-point values, but got 'memref<3x3xf32>'}}
   %0 = tpp.add (%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> memref<3x3xf32>
   return %0 : memref<3x3xf32>
 }
@@ -395,7 +395,7 @@ func.func @fused_brgemm_invalid_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3
 // during xsmm conversion, and an overloading function in the runtime.
 func.func @fused_brgemm_scalar_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
     %arg2: tensor<32x32xf32>, %bias: f32) -> tensor<32x32xf32> {
-  // expected-error @below {{must be 1D/2D/3D/4D memref of floating-point values or 1D/2D/3D/4D tensor of floating-point values, but got 'f32'}}
+  // expected-error @below {{must be variadic of 1D/2D/3D/4D memref of floating-point values or 1D/2D/3D/4D tensor of floating-point values, but got 'f32'}}
   %0 = tpp.fused_brgemm [unary = relu, binary = add]
                         (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
                          %arg2: tensor<32x32xf32>, %bias: f32) -> tensor<32x32xf32>
