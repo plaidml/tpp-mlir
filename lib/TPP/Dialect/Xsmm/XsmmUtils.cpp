@@ -8,7 +8,7 @@
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
-#include "TPP/ValueUtils.h"
+#include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 

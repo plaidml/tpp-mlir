@@ -9,7 +9,7 @@
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/IR/StructuredOpMatcher.h"
-#include "TPP/VNNIUtils.h"
+#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Value.h"

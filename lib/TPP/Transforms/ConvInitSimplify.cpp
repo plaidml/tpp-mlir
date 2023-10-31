@@ -8,7 +8,7 @@
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
-#include "TPP/ValueUtils.h"
+#include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

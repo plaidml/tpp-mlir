@@ -9,7 +9,7 @@
 #include <utility>
 
 #include "TPP/IR/StructuredOpMatcher.h"
-#include "TPP/TransformUtils.h"
+#include "TPP/Transforms/Utils/TransformUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"

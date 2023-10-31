@@ -32,13 +32,13 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "TPP/BuilderUtils.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
-#include "TPP/TensorInit.h"
-#include "TPP/TensorInitFloat.h"
-#include "TPP/TensorInitInt.h"
+#include "TPP/Transforms/Utils/BuilderUtils.h"
+#include "TPP/Transforms/Utils/TensorInit.h"
+#include "TPP/Transforms/Utils/TensorInitFloat.h"
+#include "TPP/Transforms/Utils/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
 
 #include <algorithm>

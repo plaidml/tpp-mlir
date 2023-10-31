@@ -9,7 +9,7 @@
 #include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Tpp/TppUtils.h"
-#include "TPP/VNNIUtils.h"
+#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES

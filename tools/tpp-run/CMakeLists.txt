@@ -24,7 +24,8 @@ set(LIBS
         MLIRTargetLLVMIRExport
         MLIRSupport
         MLIROptLib
-        MLIRTPP
+        TPPPipeline
+        TPPTransforms
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
         )

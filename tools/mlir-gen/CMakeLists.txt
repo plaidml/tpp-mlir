@@ -8,7 +8,8 @@ set(LIBS
         MLIROptLib
         MLIRParser
         MLIRSupport
-        MLIRTPP
+        TPPPipeline
+        TPPTransformsUtils
         )
 
 set(LLVM_LINK_COMPONENTS

@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppUtils.h"
-#include "TPP/TransformUtils.h"
 #include "TPP/Transforms/Transforms.h"
+#include "TPP/Transforms/Utils/TransformUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"

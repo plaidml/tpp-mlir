@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/TensorInitInt.h"
+#include "TPP/Transforms/Utils/TensorInitInt.h"
 
 using namespace mlir;
 

@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/TensorInit.h"
-#include "TPP/TensorInitFloat.h"
-#include "TPP/TensorInitInt.h"
+#include "TPP/Transforms/Utils/TensorInit.h"
+#include "TPP/Transforms/Utils/TensorInitFloat.h"
+#include "TPP/Transforms/Utils/TensorInitInt.h"
 
 #include <functional>
 #include <unordered_map>

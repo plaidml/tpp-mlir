@@ -1,3 +1,5 @@
+add_subdirectory(Utils)
+
 add_mlir_library(TPPTransforms
   Bufferize.cpp
   CombineTpp.cpp
@@ -14,6 +16,7 @@ add_mlir_library(TPPTransforms
   TileConsumerAndFuseProducers.cpp
   ToBlockLayoutAndBack.cpp
   TransformDialectInterpreter.cpp
+  TransformUtils.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
@@ -32,4 +35,5 @@ add_mlir_library(TPPTransforms
     ${mlir_dialect_libs}
     MLIRBufferizationToMemRef
     MLIRBufferizationPipelines
+    TPPTransformsUtils
   )

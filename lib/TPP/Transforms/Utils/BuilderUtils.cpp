@@ -5,7 +5,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 
-#include "TPP/BuilderUtils.h"
+#include "TPP/Transforms/Utils/BuilderUtils.h"
 
 #include <optional>
 

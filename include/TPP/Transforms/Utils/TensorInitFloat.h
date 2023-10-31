@@ -15,7 +15,7 @@
 #ifndef TPP_TENSORINITFLOAT_H
 #define TPP_TENSORINITFLOAT_H
 
-#include "TPP/TensorInit.h"
+#include "TPP/Transforms/Utils/TensorInit.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Types.h"
 

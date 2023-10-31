@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/TensorInitFloat.h"
+#include "TPP/Transforms/Utils/TensorInitFloat.h"
 
 using namespace mlir;
 

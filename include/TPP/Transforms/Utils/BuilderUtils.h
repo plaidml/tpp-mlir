@@ -8,7 +8,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
-#include "TPP/TensorInit.h"
+#include "TPP/Transforms/Utils/TensorInit.h"
 
 namespace mlir {
 class DenseElementsAttr;
