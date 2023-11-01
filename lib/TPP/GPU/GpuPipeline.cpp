@@ -48,8 +48,12 @@ llvm::cl::opt<bool> gpuWmma("gpu-wmma",
                             llvm::cl::desc("Enable GPU WMMA support"),
                             llvm::cl::init(false));
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUPIPELINE
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -69,10 +73,9 @@ GpuType parseGpuOption(StringRef gpuStr) {
 }
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
-struct GpuPipeline : public GpuPipelineBase<GpuPipeline>,
+struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
                      UtilityPassBase<ModuleOp> {
-  GpuPipeline() = default;
-  GpuPipeline(StringRef gpuBackend) { this->gpuBackend = gpuBackend.str(); }
+  using GpuPipelineBase::GpuPipelineBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tpp::TppDialect>();
@@ -116,19 +119,20 @@ private:
 
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
-    pm.addPass(createCleanupPass());
-    pm.addPass(createTileConsumerAndFuseProducersPass());
-    pm.addPass(createCleanupPass());
+    pm.addPass(createCleanup());
+    pm.addPass(createTileConsumerAndFuseProducers());
+    pm.addPass(createCleanup());
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
-    pm.addPass(createBufferizePass(/*dealloc=*/gpuType != GpuType::Cuda));
-    pm.addPass(createConvertForAllToParallelOpPass());
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    bool dealloc = gpuType != GpuType::Cuda;
+    pm.addPass(createBufferize(BufferizeOptions{dealloc}));
+    pm.addPass(createConvertForAllToParallelOp());
+    pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversionPass(gpuWmma));
+    pm.addPass(createGpuConversion(GpuConversionOptions{gpuWmma}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
@@ -141,11 +145,12 @@ private:
       // memory is not currently used here.
       // Vulkan runner assumes usage of GPU unified memory.
       pm.addNestedPass<func::FuncOp>(createGpuDataTransfer());
-      pm.addPass(createGpuToCudaPass(gpuTriple, gpuChip, gpuFeatures));
+      pm.addPass(
+          createGpuToCuda(GpuToCudaOptions{gpuTriple, gpuChip, gpuFeatures}));
       break;
     }
     case GpuType::Vulkan: {
-      pm.addPass(createGpuToVulkanPass());
+      pm.addPass(createGpuToVulkan());
       break;
     }
     }
@@ -160,8 +165,3 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createGpuPipelinePass(StringRef gpuBackend) {
-  return std::make_unique<GpuPipeline>(gpuBackend);
-}

@@ -83,8 +83,12 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_DEFAULTPIPELINE
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -108,10 +112,9 @@ PrintStage parsePrintStage(StringRef stage) {
 }
 
 // The default lowering pipeline.
-struct DefaultPipeline : public DefaultPipelineBase<DefaultPipeline>,
+struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
                          UtilityPassBase<ModuleOp> {
-  DefaultPipeline() = default;
-  DefaultPipeline(StringRef gpuBackend) { this->gpuBackend = gpuBackend.str(); }
+  using DefaultPipelineBase::DefaultPipelineBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
@@ -153,11 +156,12 @@ private:
 
     if (!gpuBackend.empty()) {
       // Apply the custom GPU lowering pipeline
-      pm.addPass(tpp::createGpuPipelinePass(gpuBackend));
+      pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      pm.addPass(
-          tpp::createDefaultTppPass(tppToLoops, linalgToLoops, linalgToXsmm));
+      DefaultTppPassesOptions tppDefaultOptions{tppToLoops, linalgToLoops,
+                                                linalgToXsmm};
+      pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
     if (print == PrintStage::Mid)
@@ -165,8 +169,8 @@ private:
 
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());
-    pm.addNestedPass<func::FuncOp>(tpp::createConvertPerfToLoopsPass());
-    pm.addPass(tpp::createConvertPerfToFuncPass());
+    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
+    pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
     if (defParallel)
@@ -218,8 +222,3 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createDefaultPipelinePass(StringRef gpuBackend) {
-  return std::make_unique<DefaultPipeline>(gpuBackend);
-}

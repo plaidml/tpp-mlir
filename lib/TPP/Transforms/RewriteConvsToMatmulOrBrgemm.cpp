@@ -19,8 +19,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_REWRITECONVTOMATMULORBRGEMM
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -556,23 +560,17 @@ void populateRewriteBlockedConvPatterns(RewritePatternSet &patterns,
 }
 
 struct RewriteConvToMatmulOrBrgemm
-    : public RewriteConvToMatmulOrBrgemmBase<RewriteConvToMatmulOrBrgemm> {
-  RewriteConvToMatmulOrBrgemm() = default;
-  RewriteConvToMatmulOrBrgemm(bool enableBrgemm) {
-    this->enableBrgemm = enableBrgemm;
-  }
+    : public tpp::impl::RewriteConvToMatmulOrBrgemmBase<
+          RewriteConvToMatmulOrBrgemm> {
+  using RewriteConvToMatmulOrBrgemmBase::RewriteConvToMatmulOrBrgemmBase;
+
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     populateRewrite2DNhwcHwcfConvPatterns(patterns);
-    populateRewriteBlockedConvPatterns(patterns, enableBrgemm);
+    populateRewriteBlockedConvPatterns(patterns, this->enableBrgemm);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
 } // end namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createRewriteConvToMatmulOrBrgemmPass() {
-  return std::make_unique<RewriteConvToMatmulOrBrgemm>();
-}

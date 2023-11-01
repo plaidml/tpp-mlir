@@ -31,15 +31,18 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUTOVULKAN
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 // Lower generic GPU ops to Vulkan backend.
-struct GpuToVulkan : public GpuToVulkanBase<GpuToVulkan>,
+struct GpuToVulkan : public tpp::impl::GpuToVulkanBase<GpuToVulkan>,
                      UtilityPassBase<ModuleOp> {
-  GpuToVulkan() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -94,7 +97,3 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> mlir::tpp::createGpuToVulkanPass() {
-  return std::make_unique<GpuToVulkan>();
-}

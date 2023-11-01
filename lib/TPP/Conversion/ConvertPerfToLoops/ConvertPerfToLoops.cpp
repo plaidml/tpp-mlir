@@ -18,8 +18,12 @@
 using namespace mlir;
 using namespace mlir::perf;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTPERFTOLOOPS
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -98,7 +102,8 @@ void populatePerfToLoopsPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertBenchToLoops>(patterns.getContext());
 }
 
-struct ConvertPerfToLoops : public ConvertPerfToLoopsBase<ConvertPerfToLoops> {
+struct ConvertPerfToLoops
+    : public tpp::impl::ConvertPerfToLoopsBase<ConvertPerfToLoops> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populatePerfToLoopsPatterns(patterns);
@@ -107,8 +112,3 @@ struct ConvertPerfToLoops : public ConvertPerfToLoopsBase<ConvertPerfToLoops> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertPerfToLoopsPass() {
-  return std::make_unique<ConvertPerfToLoops>();
-}

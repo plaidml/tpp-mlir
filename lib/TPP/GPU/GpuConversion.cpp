@@ -29,16 +29,19 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUCONVERSION
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 // Map and lower operations to generic GPU ops.
-struct GpuConversion : public GpuConversionBase<GpuConversion>,
+struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
                        UtilityPassBase<ModuleOp> {
-  GpuConversion() = default;
-  GpuConversion(bool useWmma) { this->useWmma = useWmma; }
+  using GpuConversionBase::GpuConversionBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tpp::TppDialect>();
@@ -65,19 +68,22 @@ private:
     pm.clear();
 
     // Lower TPP ops to GPU-compatible format.
-    pm.addNestedPass<func::FuncOp>(createConvertTppToLoopsPass(true));
+    ConvertTppToLoopsOptions tppToLoopOptions;
+    tppToLoopOptions.parallel = true;
+    pm.addNestedPass<func::FuncOp>(createConvertTppToLoops(tppToLoopOptions));
 
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
-    pm.addNestedPass<func::FuncOp>(linalg::createLinalgDeGeneralizationPass());
-    pm.addNestedPass<func::FuncOp>(createLinalgToGpuPass(useWmma));
+    pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
+    pm.addNestedPass<func::FuncOp>(
+        createLinalgToGpu(LinalgToGpuOptions{useWmma}));
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
     // Map loops into GPU kernels.
     pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
     pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
 
-    pm.addNestedPass<func::FuncOp>(createCleanupPass());
+    pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Create GPU kernels.
     pm.addPass(createGpuKernelOutliningPass());
@@ -89,8 +95,3 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createGpuConversionPass(bool useWmma) {
-  return std::make_unique<GpuConversion>(useWmma);
-}

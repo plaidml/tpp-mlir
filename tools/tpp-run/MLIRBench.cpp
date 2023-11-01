@@ -487,7 +487,8 @@ LogicalResult MLIRBench::finalize() {
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module->getContext());
 
-  passManager.addPass(tpp::createDefaultPipelinePass(defGpuBackend));
+  tpp::DefaultPipelineOptions options{defGpuBackend};
+  passManager.addPass(tpp::createDefaultPipeline(options));
 
   auto result = passManager.run(module);
   if (failed(result)) {

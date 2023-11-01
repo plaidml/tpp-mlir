@@ -33,19 +33,19 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUTOCUDA
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 // Lower generic GPU ops to CUDA backend.
-struct GpuToCuda : public GpuToCudaBase<GpuToCuda>, UtilityPassBase<ModuleOp> {
-  GpuToCuda() = default;
-  GpuToCuda(StringRef gpuTriple, StringRef gpuChip, StringRef gpuFeatures) {
-    this->gpuTriple = gpuTriple.str();
-    this->gpuChip = gpuChip.str();
-    this->gpuFeatures = gpuFeatures.str();
-  };
+struct GpuToCuda : public tpp::impl::GpuToCudaBase<GpuToCuda>,
+                   UtilityPassBase<ModuleOp> {
+  using GpuToCudaBase::GpuToCudaBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -98,9 +98,3 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createGpuToCudaPass(StringRef gpuTriple, StringRef gpuChip,
-                               StringRef gpuFeatures) {
-  return std::make_unique<GpuToCuda>(gpuTriple, gpuChip, gpuFeatures);
-}

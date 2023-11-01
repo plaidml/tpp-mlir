@@ -28,8 +28,12 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_LINALGTOGPU
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -581,9 +585,8 @@ void populateLinalgToGpuPatterns(RewritePatternSet &patterns, bool useWmma) {
                                                      useWmma);
 }
 
-struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
-  LinalgToGpu() = default;
-  LinalgToGpu(bool useWmma) { this->useWmma = useWmma; }
+struct LinalgToGpu : public tpp::impl::LinalgToGpuBase<LinalgToGpu> {
+  using LinalgToGpuBase::LinalgToGpuBase;
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
@@ -593,8 +596,3 @@ struct LinalgToGpu : public LinalgToGpuBase<LinalgToGpu> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createLinalgToGpuPass(bool useWmma) {
-  return std::make_unique<LinalgToGpu>(useWmma);
-}

@@ -18,14 +18,19 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONSTANTFOLDPACK
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "fold-pack-into-cst"
 
 namespace {
 
-struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
+struct ConstantFoldPack
+    : public tpp::impl::ConstantFoldPackBase<ConstantFoldPack> {
 
   // Collect a packed constantOp and its attribute if any.
   static FailureOr<std::pair<arith::ConstantOp, DenseElementsAttr>>
@@ -197,8 +202,3 @@ struct ConstantFoldPack : public ConstantFoldPackBase<ConstantFoldPack> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createConstantFoldPackPass() {
-  return std::make_unique<ConstantFoldPack>();
-}

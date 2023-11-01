@@ -23,8 +23,12 @@ using namespace mlir::cf;
 using namespace mlir::arith;
 using namespace mlir::math;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTCHECKTOLOOPS
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -176,7 +180,7 @@ void populateCheckToLoopsPatterns(RewritePatternSet &patterns) {
 }
 
 struct ConvertCheckToLoops
-    : public ConvertCheckToLoopsBase<ConvertCheckToLoops> {
+    : public tpp::impl::ConvertCheckToLoopsBase<ConvertCheckToLoops> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateCheckToLoopsPatterns(patterns);
@@ -185,8 +189,3 @@ struct ConvertCheckToLoops
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertCheckToLoopsPass() {
-  return std::make_unique<ConvertCheckToLoops>();
-}

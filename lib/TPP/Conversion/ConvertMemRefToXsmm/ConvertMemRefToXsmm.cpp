@@ -15,8 +15,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTMEMREFTOXSMM
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -44,7 +48,7 @@ struct ConvertMemRefCopyToXsmm : public OpRewritePattern<memref::CopyOp> {
 };
 
 struct ConvertMemRefToXsmm
-    : public ConvertMemRefToXsmmBase<ConvertMemRefToXsmm> {
+    : public tpp::impl::ConvertMemRefToXsmmBase<ConvertMemRefToXsmm> {
   ConvertMemRefToXsmm() = default;
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
@@ -55,8 +59,3 @@ struct ConvertMemRefToXsmm
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertMemRefToXsmmPass() {
-  return std::make_unique<ConvertMemRefToXsmm>();
-}

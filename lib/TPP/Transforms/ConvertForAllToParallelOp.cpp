@@ -14,8 +14,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTFORALLTOPARALLELOP
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -49,7 +53,8 @@ struct ConvertForAllToParallelOpImpl : public OpRewritePattern<scf::ForallOp> {
 };
 
 struct ConvertForAllToParallelOp
-    : public ConvertForAllToParallelOpBase<ConvertForAllToParallelOp> {
+    : public tpp::impl::ConvertForAllToParallelOpBase<
+          ConvertForAllToParallelOp> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     patterns.add<ConvertForAllToParallelOpImpl>(patterns.getContext());
@@ -58,8 +63,3 @@ struct ConvertForAllToParallelOp
 };
 
 } // end namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertForAllToParallelOpPass() {
-  return std::make_unique<ConvertForAllToParallelOp>();
-}

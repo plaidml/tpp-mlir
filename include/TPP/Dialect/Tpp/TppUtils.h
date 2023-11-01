@@ -31,9 +31,6 @@ namespace utils {
 // FIXME: This should be unnecessary but it's still used by convolutions
 bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
 
-// Returns true if the linalg operation has copy semantics.
-bool hasCopySemantics(linalg::LinalgOp linalgOp);
-
 // Return true if the linalg.generic can convert to a tpp.brgemm in VNNI format.
 bool isTppVnniOp(linalg::GenericOp linalgOp,
                  SmallVectorImpl<Value> *capturedOperands = nullptr);

@@ -19,8 +19,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVINITSIMPLIFY
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -86,7 +90,8 @@ struct EliminateZeroInitAndAddBiasToInit
   }
 };
 
-struct ConvInitSimplify : public ConvInitSimplifyBase<ConvInitSimplify> {
+struct ConvInitSimplify
+    : public tpp::impl::ConvInitSimplifyBase<ConvInitSimplify> {
   void runOnOperation() override {
     RewritePatternSet patterns(getOperation().getContext());
     patterns.add<EliminateZeroInitAndAddBiasToInit>(patterns.getContext());
@@ -95,8 +100,3 @@ struct ConvInitSimplify : public ConvInitSimplifyBase<ConvInitSimplify> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvInitSimplifyPass() {
-  return std::make_unique<ConvInitSimplify>();
-}

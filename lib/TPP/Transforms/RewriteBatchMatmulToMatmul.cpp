@@ -18,8 +18,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_REWRITEBATCHMATMULTOMATMUL
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -85,7 +89,8 @@ struct RewriteBatchMatmulToMatmulImpl
 };
 
 struct RewriteBatchMatmulToMatmul
-    : public RewriteBatchMatmulToMatmulBase<RewriteBatchMatmulToMatmul> {
+    : public tpp::impl::RewriteBatchMatmulToMatmulBase<
+          RewriteBatchMatmulToMatmul> {
   void runOnOperation() override {
     auto &ctx = getContext();
     IRRewriter rewriter(&ctx);
@@ -126,8 +131,3 @@ struct RewriteBatchMatmulToMatmul
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createRewriteBatchMatmulToMatmulPass() {
-  return std::make_unique<RewriteBatchMatmulToMatmul>();
-}

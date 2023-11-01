@@ -26,8 +26,14 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_TILECONSUMERANDFUSEPRODUCERS
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_ELEMENTWISEFUSION
+#include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "tile-consumer-and-fuse-producers"
 
@@ -758,11 +764,9 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
 }
 
 struct TileConsumerAndFuseProducers
-    : TileConsumerAndFuseProducersBase<TileConsumerAndFuseProducers> {
-  TileConsumerAndFuseProducers() = default;
-  TileConsumerAndFuseProducers(ArrayRef<int64_t> tileSizes) {
-    this->tileSizes = tileSizes;
-  }
+    : tpp::impl::TileConsumerAndFuseProducersBase<
+          TileConsumerAndFuseProducers> {
+  using TileConsumerAndFuseProducersBase::TileConsumerAndFuseProducersBase;
 
   void runOnOperation() override {
     auto &ctx = getContext();
@@ -832,7 +836,7 @@ static bool areFusableOps(Operation *producerOp, Operation *consumerOp) {
   return producerOp->hasOneUse();
 }
 
-struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
+struct ElementWiseFusion : tpp::impl::ElementWiseFusionBase<ElementWiseFusion> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
 
@@ -852,13 +856,3 @@ struct ElementWiseFusion : ElementWiseFusionBase<ElementWiseFusion> {
 };
 
 } // end namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createTileConsumerAndFuseProducersPass(ArrayRef<int64_t> tileSizes) {
-  return std::make_unique<TileConsumerAndFuseProducers>(tileSizes);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createElementWiseFusionPass() {
-  return std::make_unique<ElementWiseFusion>();
-}

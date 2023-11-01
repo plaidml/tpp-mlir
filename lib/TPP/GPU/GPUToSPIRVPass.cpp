@@ -35,8 +35,12 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_GPUTOSPIRV
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 /// Pass to lower GPU Dialect to SPIR-V. The pass only converts the gpu.func ops
@@ -48,18 +52,18 @@ namespace {
 /// replace it).
 ///
 /// 2) Lower the body of the spirv::ModuleOp.
-class GPUToSPIRVPass : public GPUToSPIRVBase<GPUToSPIRVPass> {
+class GPUToSPIRV : public tpp::impl::GPUToSPIRVBase<GPUToSPIRV> {
+  using GPUToSPIRVBase::GPUToSPIRVBase;
+
 public:
-  explicit GPUToSPIRVPass(bool mapMemorySpace)
-      : mapMemorySpace(mapMemorySpace) {}
+  explicit GPUToSPIRV(bool mapMemorySpace) : mapMemorySpace(mapMemorySpace) {}
   void runOnOperation() override;
 
 private:
   bool mapMemorySpace;
 };
-} // namespace
 
-void GPUToSPIRVPass::runOnOperation() {
+void GPUToSPIRV::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp module = getOperation();
 
@@ -119,8 +123,4 @@ void GPUToSPIRVPass::runOnOperation() {
       return signalPassFailure();
   }
 }
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createConvertGPUToSPIRVPass(bool mapMemorySpace) {
-  return std::make_unique<GPUToSPIRVPass>(mapMemorySpace);
-}
+} // namespace

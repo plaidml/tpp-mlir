@@ -18,7 +18,6 @@ def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
     Linalg generic operations are converted using simple pattern 
     matching (i.e., see `isTppAdd`).
   }];
-  let constructor = "mlir::tpp::createConvertLinalgToTppPass()";
   let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
 }
 
@@ -27,13 +26,11 @@ def ConvertMemRefToXsmm : Pass<"convert-memref-to-xsmm", "func::FuncOp"> {
   let description = [{
     Convert memref operations (i.e., memref.copy) to xsmm operations.
   }];
-  let constructor = "mlir::tpp::createConvertMemRefToXsmmPass()";
   let dependentDialects = ["memref::MemRefDialect", "xsmm::XsmmDialect"];
 }
 
 def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
   let summary = "Convert tpp to loops";
-  let constructor = "mlir::tpp::createConvertTppToLoopsPass()";
   let description = [{
     Convert tpp operations to SCF loops.
   }];
@@ -45,7 +42,6 @@ def ConvertTppToLoops : Pass<"convert-tpp-to-loops", "func::FuncOp"> {
 
 def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
   let summary = "Convert tpp to xsmm";
-  let constructor = "mlir::tpp::createConvertTppToXsmmPass()";
   let description = [{
     Convert tpp operations to XSMM operations.
   }];
@@ -56,7 +52,6 @@ def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
 
 def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
   let summary = "Convert linalg to xsmm";
-  let constructor = "mlir::tpp::createConvertLinalgToXsmmPass()";
   let description = [{
     Convert linalg operations to XSMM operations.
   }];
@@ -69,7 +64,6 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
 
 def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
   let summary = "Convert linalg to func";
-  let constructor = "mlir::tpp::createConvertLinalgToFuncPass()";
   let description = [{
     Convert linalg named operations to function call using a BLAS-style
     API.
@@ -81,7 +75,6 @@ def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
-  let constructor = "mlir::tpp::createConvertXsmmToFuncPass()";
   let description = [{
     Convert XSMM operations to libXSMM function calls.
   }];
@@ -93,7 +86,6 @@ def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
 
 def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let summary = "Convert check to loops";
-  let constructor = "mlir::tpp::createConvertCheckToLoopsPass()";
   let description = [{
     Convert check operations to SCF loops.
   }];
@@ -102,15 +94,14 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
 
 def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
   let summary = "Apply transform dialect operations one by one";
-  let constructor = "mlir::tpp::createTransformDialectInterpreterPass()";
   let description = [{
-    Copy and paste from 'TestTransformDialectInterpreter.cpp'.
+    Copy and paste from 'TestTransformDialectInterpreter.cpp'. Apply the transform
+    schedule.
   }];
 }
 
 def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
   let summary = "Convert perf to loops";
-  let constructor = "mlir::tpp::createConvertPerfToLoopsPass()";
   let description = [{
     Convert perf operations to SCF loops.
   }];
@@ -119,7 +110,6 @@ def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
 
 def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
   let summary = "Convert perf to func";
-  let constructor = "mlir::tpp::createConvertPerfToFuncPass()";
   let description = [{
     Convert perf operations to function calls.
   }];
@@ -131,16 +121,14 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
 
 def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
   let summary = "Combine tpps into bigger tpp";
-  let constructor = "mlir::tpp::createCombineTppPass()";
   let description = [{
     Convert tpp bias + brgemm + relu op to a larger op.
   }];
   let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
 }
 
-def TransformDropSchedulePass : Pass<"transform-drop-schedule", "ModuleOp"> {
+def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
-  let constructor = "mlir::tpp::createTransformDropSchedulePass()";
 }
 
 def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
@@ -152,11 +140,6 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
       [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
     - VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/VNNI][N][VNNI]
   }];
-  let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t", 
-               "Blocking factor for vnni layout">
-  ];
-  let constructor = "mlir::tpp::createPackVNNIPass()";
   let dependentDialects = ["tensor::TensorDialect", "tpp::TppDialect"];
 }
 
@@ -170,7 +153,6 @@ def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t", 
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createPackMatmulPass()";
 }
 
 def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
@@ -186,7 +168,6 @@ def PackConv2DNchwFchw : Pass<"pack-conv2DNchwFchw", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for relayout">
   ];
-  let constructor = "mlir::tpp::createPackConv2DNchwFchwPass()";
 }
 
 def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
@@ -202,7 +183,6 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
     ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for pack and unpack operation">
   ];
-  let constructor = "mlir::tpp::createPackConv2DNhwcHwcfPass()";
 }
 
 def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
@@ -217,7 +197,6 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     `start-from-last-consumer` allows to move the anchor point to the last fusable
     consumer of the conv or matmul-like pattern.
   }];
-  let constructor = "mlir::tpp::createTileConsumerAndFuseProducersPass()";
   let options = [
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
     Option<"maxDepth", "max-depth", "int64_t", "5", 
@@ -245,14 +224,12 @@ def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
     Option<"enableBrgemm", "enable-brgemm", "bool", "false",
            "Rewrite convolution to BRGEMM if possible">
   ];
-  let constructor = "mlir::tpp::createRewriteConvToMatmulOrBrgemmPass()";
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
 def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
                                       "func::FuncOp"> {
   let summary = "Rewrite a linalg.batch_matmul to linalg.matmul.";
-  let constructor = "mlir::tpp::createRewriteBatchMatmulToMatmulPass()";
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
@@ -273,7 +250,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "bool", /*default=*/"true",
            "Skip all TPP transformations. Lower lianalg directly to xsmm.">
   ];
-  let constructor = "mlir::tpp::createDefaultTppPass()";
 }
 
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
@@ -283,12 +259,10 @@ def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
     it propagates through linalg element-wise operations. Only one operand in the
     generic must come from a tensor.pack/tensor.unpack.
   }];
-  let constructor = "mlir::tpp::createPropagatePackUnPackPass()"; 
 }
 
 def SimplifyAndCanonicalizePack : Pass<"simplify-pack", "func::FuncOp"> {
   let summary = "Simplify and canonicalize tensor.pack";
-  let constructor = "mlir::tpp::createSimplifyAndCanonicalizePackPass()";
   let description = [{
     Apply `tensor.pack` and `tensor.unpack` canonicalization and simplification
     patterns.
@@ -300,12 +274,10 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
   let description = [{
     Reduce pack overhead by folding tensor.pack into constant tensors.
   }];
-  let constructor = "mlir::tpp::createConstantFoldPackPass()";
 }
 
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let summary = "Run linalg element-wise fusion";
-  let constructor = "mlir::tpp::createElementWiseFusionPass()";
 }
 
 def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
@@ -315,12 +287,10 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
     operation. Specifically, instead of initializing the output of a convolution
     with zero and then adding the bias, initialize the output with the bias.  
   }];
-  let constructor = "mlir::tpp::createConvInitSimplifyPass()";
 }
 
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
-  let constructor = "mlir::tpp::createBufferizePass()";
   let options = [
     Option<"dealloc", "dealloc",
            "bool", /*default=*/"1",
@@ -336,12 +306,10 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
 
 def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
-  let constructor = "mlir::tpp::createCleanupPass()";
 }
 
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
   let summary = "Lower all local dialects (XSMM, check etc.).";
-  let constructor = "mlir::tpp::createLocalDialectsLoweringPass()";
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
@@ -350,7 +318,6 @@ def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
     Apply various postprocessing passes such parallel loop fusion,
     buffer deallocation, general cleanup etc.
   }];
-  let constructor = "mlir::tpp::createPostprocessingPass()";
 }
 
 def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
@@ -359,7 +326,6 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
     Apply collection of TPP rewriting passes to map eligble operations
     into equivalent TPP-compatible forms.
   }];
-  let constructor = "mlir::tpp::createTppMappingPass()";
 }
 
 def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
@@ -367,7 +333,6 @@ def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
   let description = [{
     Convert all eligble operations into TPP operations.
   }];
-  let constructor = "mlir::tpp::createTppConversionPass()";
 }
 
 def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
@@ -384,7 +349,6 @@ def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
            "bool", /*default=*/"true",
            "By default Linalg ops are lowered to TPP. Lower Linalg to XSMM instead.">,
   ];
-  let constructor = "mlir::tpp::createTppLoweringPass()";
 }
 
 def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
@@ -393,12 +357,10 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
   let description = [{
     Rewrite an scf.forall to scf.parallel after bufferization.
   }];
-  let constructor = "mlir::tpp::createConvertForAllToParallelOpPass()";
 }
 
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let summary = "Lower all eligible operations into GPU compatible IR";
-  let constructor = "mlir::tpp::createGpuPipelinePass()";
   let options = [
     Option<"gpuBackend", "gpu", "std::string",
             /*default=*/"\"cuda\"",
@@ -411,7 +373,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let description = [{
     Convert all eligble operations into generic GPU operations.
   }];
-  let constructor = "mlir::tpp::createGpuConversionPass()";
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
@@ -421,7 +382,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
 
 def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
   let summary = "Lower generic GPU operations to CUDA backend";
-  let constructor = "mlir::tpp::createGpuToCudaPass()";
   let options = [
     Option<"gpuTriple", "triple", "std::string",
             /*default=*/"\"nvptx64-nvidia-cuda\"",
@@ -437,12 +397,10 @@ def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
 
 def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
   let summary = "Lower generic GPU operations to Vulkan backend";
-  let constructor = "mlir::tpp::createGpuToVulkanPass()";
 }
 
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
   let summary = "Convert generic ops into named ops";
-  let constructor = "mlir::linalg::createLinalgDeGeneralizationPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
@@ -451,7 +409,6 @@ def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   let description = [{
     A collection of passes that lower everything to MLIR LLVM IR.
   }];
-  let constructor = "mlir::tpp::createDefaultPipelinePass()";
   let options = [
     Option<"gpuBackend", "gpu", "std::string",
             /*default=*/"\"\"",
@@ -473,7 +430,6 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
     0, in set 0. One can attach `spirv.interface_var_abi` to those parameters
     to control the set and binding if wanted.
   }];
-  let constructor = "mlir::tpp::createConvertGPUToSPIRVPass()";
   let dependentDialects = ["spirv::SPIRVDialect"];
   let options = [
     Option<"use64bitIndex", "use-64bit-index",
@@ -484,7 +440,6 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
 
 def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
   let summary = "Set SPIR-V capabilities.";
-  let constructor = "mlir::tpp::createSetSPIRVCapabilitiesPass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
             /*default=*/"\"vulkan\"",
@@ -494,7 +449,6 @@ def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
 
 def SetSPIRVAbiAttribute : Pass<"set-spirv-abi-attr", "gpu::GPUModuleOp"> {
   let summary = "Set SPIR-V ABI attribute.";
-  let constructor = "mlir::tpp::createSetSPIRVAbiAttributePass()";
   let options = [
     Option<"clientAPI", "client-api", "std::string",
             /*default=*/"\"vulkan\"",
@@ -514,7 +468,6 @@ def GpuVulkanAbi : Pass<"gpu-vulkan-abi", "ModuleOp"> {
     The original GPU kernel logic is thrown away to make interface
     adaptation easier.
   }];
-  let constructor = "mlir::tpp::createGpuVulkanAbiPass()";
   let options = [
     Option<"use64bitIndex", "use-64bit-index",
            "bool", /*default=*/"false",
@@ -527,7 +480,6 @@ def DecomposeAggregatedOps : Pass<"decompose-aggregated-ops", "func::FuncOp"> {
   let description = [{
     Decompose operations that implement the `AggregatedOpInterface`.
   }];
-  let constructor = "mlir::tpp::createDecomposeAggregatedOpsPass()";
 }
 
 def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
@@ -535,7 +487,6 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
   let description = [{
     Lower linalg to ops optimized for computation on GPU.
   }];
-  let constructor = "mlir::tpp::createLinalgToGpuPass()";
   let dependentDialects = ["linalg::LinalgDialect",
                            "scf::SCFDialect",
                            "memref::MemRefDialect",

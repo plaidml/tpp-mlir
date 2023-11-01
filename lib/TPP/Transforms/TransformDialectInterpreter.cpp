@@ -19,13 +19,19 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_TRANSFORMDIALECTINTERPRETER
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_TRANSFORMDROPSCHEDULE
+#include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
 struct TransformDialectInterpreter
-    : TransformDialectInterpreterBase<TransformDialectInterpreter> {
+    : tpp::impl::TransformDialectInterpreterBase<TransformDialectInterpreter> {
   void runOnOperation() override {
     ModuleOp module = getOperation();
     for (auto op :
@@ -38,8 +44,8 @@ struct TransformDialectInterpreter
   }
 };
 
-struct TransformDropSchedulePass
-    : TransformDropSchedulePassBase<TransformDropSchedulePass> {
+struct TransformDropSchedule
+    : tpp::impl::TransformDropScheduleBase<TransformDropSchedule> {
   void runOnOperation() override {
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
       if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
@@ -52,13 +58,3 @@ struct TransformDropSchedulePass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createTransformDialectInterpreterPass() {
-  return std::make_unique<TransformDialectInterpreter>();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createTransformDropSchedulePass() {
-  return std::make_unique<TransformDropSchedulePass>();
-}

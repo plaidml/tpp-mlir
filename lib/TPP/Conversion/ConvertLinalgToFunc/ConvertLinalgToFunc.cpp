@@ -16,8 +16,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTLINALGTOFUNC
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 namespace {
 
@@ -120,8 +124,7 @@ struct ConvertMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 };
 
 struct ConvertLinalgToFunc
-    : public ConvertLinalgToFuncBase<ConvertLinalgToFunc> {
-  ConvertLinalgToFunc() = default;
+    : public tpp::impl::ConvertLinalgToFuncBase<ConvertLinalgToFunc> {
   void runOnOperation() override {
     auto ctx = &getContext();
     RewritePatternSet patterns(ctx);
@@ -131,8 +134,3 @@ struct ConvertLinalgToFunc
 };
 
 } // end namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::tpp::createConvertLinalgToFuncPass() {
-  return std::make_unique<ConvertLinalgToFunc>();
-}

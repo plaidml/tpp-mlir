@@ -23,8 +23,12 @@
 
 using namespace mlir;
 
-#define GEN_PASS_CLASSES
+namespace mlir {
+namespace tpp {
+#define GEN_PASS_DEF_CONVERTLINALGTOTPP
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "linalg-convert-to-tpp"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -193,8 +197,8 @@ struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
   }
 };
 
-struct ConvertLinalgToTpp : public ConvertLinalgToTppBase<ConvertLinalgToTpp> {
-  ConvertLinalgToTpp() = default;
+struct ConvertLinalgToTpp
+    : public tpp::impl::ConvertLinalgToTppBase<ConvertLinalgToTpp> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
@@ -215,9 +219,4 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(
                ConvertMatmulToTpp,
                ConvertFillToTpp>(patterns.getContext());
   // clang-format on
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::tpp::createConvertLinalgToTppPass() {
-  return std::make_unique<ConvertLinalgToTpp>();
 }
