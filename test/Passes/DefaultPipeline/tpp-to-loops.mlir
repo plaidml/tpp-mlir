@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops=1 linalg-to-xsmm=0" -split-input-file | FileCheck %s
 
 // CHECK-NOT: func.func private @xsmm_
 // CHECK: func.func @tpp_add(

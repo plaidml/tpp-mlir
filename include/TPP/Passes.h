@@ -115,7 +115,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteConvToMatmulOrBrgemmPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createDefaultTppPass(bool tppLoops = false, bool linalgLoops = false,
-                     bool linalgToXsmm = false);
+                     bool linalgToXsmm = true);
 std::unique_ptr<OperationPass<func::FuncOp>> createPropagatePackUnPackPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConstantFoldPackPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createElementWiseFusionPass();
@@ -128,7 +128,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPostprocessingPass();
 std::unique_ptr<OperationPass<ModuleOp>> createTppMappingPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTppConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTppLoweringPass(bool tppToLoops = false, bool linalgToXsmm = false);
+createTppLoweringPass(bool tppToLoops = false, bool linalgToXsmm = true);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertForAllToParallelOpPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
