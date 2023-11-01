@@ -8,7 +8,6 @@ set(LIBS
         MLIROptLib
         MLIRParser
         MLIRSupport
-        TPPPipeline
         TPPTransformsUtils
         )
 
