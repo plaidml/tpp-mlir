@@ -14,6 +14,13 @@ add_mlir_library(TPPGPU
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
 
+  DEPENDS
+    MLIRPerfOpsIncGen
+    MLIRTppOpsIncGen
+    MLIRXsmmOpsIncGen
+    TPPCompilerPassIncGen
+    TPPLinalgXTransformOpsIncGen
+
   LINK_LIBS PUBLIC
     MLIRGPUDialect
     MLIRGPUTransforms

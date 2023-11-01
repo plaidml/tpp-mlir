@@ -18,7 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
-#include "TPP/TensorInit.h"
+#include "TPP/Transforms/Utils/TensorInit.h"
 
 namespace mlir {
 class ModuleOp;

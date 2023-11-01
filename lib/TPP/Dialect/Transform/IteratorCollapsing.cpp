@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Passes.h"
-#include "TPP/Transforms.h"
+#include "TPP/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

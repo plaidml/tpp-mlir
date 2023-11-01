@@ -8,8 +8,8 @@
 
 #include "TPP/Passes.h"
 
-#include "TPP/MatcherUtils.h"
-#include "TPP/ValueUtils.h"
+#include "TPP/IR/MatcherUtils.h"
+#include "TPP/Transforms/Utils/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

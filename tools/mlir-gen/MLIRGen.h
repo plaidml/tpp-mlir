@@ -16,7 +16,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
-#include "TPP/BuilderUtils.h"
+#include "TPP/Transforms/Utils/BuilderUtils.h"
 
 namespace mlir {
 class ModuleOp;

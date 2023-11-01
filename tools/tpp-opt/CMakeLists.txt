@@ -10,9 +10,11 @@ set(LIBS
         ${conversion_libs}
         MLIRToLLVMIRTranslationRegistration
         MLIROptLib
-        MLIRTPP
+        TPPPipeline
+        TPPTransforms
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
+        TPPTestLib
         )
 add_llvm_executable(tpp-opt tpp-opt.cpp)
 
