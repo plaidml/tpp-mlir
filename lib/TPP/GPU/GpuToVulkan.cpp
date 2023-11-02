@@ -75,15 +75,15 @@ private:
     pm.addPass(createLowerAffinePass());
 
     // Create SPIRV kernels.
-    pm.addPass(tpp::createSetSPIRVCapabilitiesPass());
-    pm.addPass(tpp::createSetSPIRVAbiAttributePass());
-    pm.addPass(tpp::createConvertGPUToSPIRVPass());
+    pm.addPass(tpp::createSetSPIRVCapabilities());
+    pm.addPass(tpp::createSetSPIRVAbiAttribute());
+    pm.addPass(tpp::createGPUToSPIRV());
     pm.addNestedPass<spirv::ModuleOp>(
         spirv::createSPIRVLowerABIAttributesPass());
     pm.addNestedPass<spirv::ModuleOp>(spirv::createSPIRVUpdateVCEPass());
 
     // Adapt GPU kernel to be compliant with Vulkan ABI.
-    pm.addPass(tpp::createGpuVulkanAbiPass());
+    pm.addPass(tpp::createGpuVulkanAbi());
 
     // Create Vulkan dispatch.
     pm.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());

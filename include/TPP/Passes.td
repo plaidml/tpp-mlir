@@ -434,7 +434,10 @@ def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
   let options = [
     Option<"use64bitIndex", "use-64bit-index",
            "bool", /*default=*/"false",
-           "Use 64-bit integers to convert index types">
+           "Use 64-bit integers to convert index types">,
+    Option<"mapMemorySpace", "map-memory-space",
+           "bool", /*default=*/"true",
+           "Map memory space to SPIR-V storage">
   ];
 }
 
