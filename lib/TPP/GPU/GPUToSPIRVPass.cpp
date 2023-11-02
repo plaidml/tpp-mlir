@@ -55,72 +55,67 @@ namespace {
 class GPUToSPIRV : public tpp::impl::GPUToSPIRVBase<GPUToSPIRV> {
   using GPUToSPIRVBase::GPUToSPIRVBase;
 
-public:
-  explicit GPUToSPIRV(bool mapMemorySpace) : mapMemorySpace(mapMemorySpace) {}
-  void runOnOperation() override;
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    ModuleOp module = getOperation();
 
-private:
-  bool mapMemorySpace;
-};
+    SmallVector<Operation *, 1> gpuModules;
+    OpBuilder builder(context);
+    module.walk([&](gpu::GPUModuleOp moduleOp) {
+      // Clone each GPU kernel module for conversion, given that the GPU
+      // launch op still needs the original GPU kernel module.
+      builder.setInsertionPoint(moduleOp.getOperation());
+      gpuModules.push_back(builder.clone(*moduleOp.getOperation()));
+    });
 
-void GPUToSPIRV::runOnOperation() {
-  MLIRContext *context = &getContext();
-  ModuleOp module = getOperation();
+    // Run conversion for each module independently as they can have different
+    // TargetEnv attributes.
+    for (Operation *gpuModule : gpuModules) {
+      // Map MemRef memory space to SPIR-V storage class first if requested.
+      if (mapMemorySpace) {
+        std::unique_ptr<ConversionTarget> target =
+            spirv::getMemorySpaceToStorageClassTarget(*context);
+        spirv::MemorySpaceToStorageClassMap memorySpaceMap =
+            spirv::mapMemorySpaceToVulkanStorageClass;
+        spirv::MemorySpaceToStorageClassConverter converter(memorySpaceMap);
 
-  SmallVector<Operation *, 1> gpuModules;
-  OpBuilder builder(context);
-  module.walk([&](gpu::GPUModuleOp moduleOp) {
-    // Clone each GPU kernel module for conversion, given that the GPU
-    // launch op still needs the original GPU kernel module.
-    builder.setInsertionPoint(moduleOp.getOperation());
-    gpuModules.push_back(builder.clone(*moduleOp.getOperation()));
-  });
+        RewritePatternSet patterns(context);
+        spirv::populateMemorySpaceToStorageClassPatterns(converter, patterns);
 
-  // Run conversion for each module independently as they can have different
-  // TargetEnv attributes.
-  for (Operation *gpuModule : gpuModules) {
-    // Map MemRef memory space to SPIR-V storage class first if requested.
-    if (mapMemorySpace) {
+        if (failed(
+                applyFullConversion(gpuModule, *target, std::move(patterns))))
+          return signalPassFailure();
+      }
+
+      auto targetAttr = spirv::lookupTargetEnvOrDefault(gpuModule);
       std::unique_ptr<ConversionTarget> target =
-          spirv::getMemorySpaceToStorageClassTarget(*context);
-      spirv::MemorySpaceToStorageClassMap memorySpaceMap =
-          spirv::mapMemorySpaceToVulkanStorageClass;
-      spirv::MemorySpaceToStorageClassConverter converter(memorySpaceMap);
+          SPIRVConversionTarget::get(targetAttr);
 
+      SPIRVConversionOptions options;
+      options.use64bitIndex = this->use64bitIndex;
+      SPIRVTypeConverter typeConverter(targetAttr, options);
+      populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter,
+                                                 /*useNVTypes=*/true);
       RewritePatternSet patterns(context);
-      spirv::populateMemorySpaceToStorageClassPatterns(converter, patterns);
+      populateGPUToSPIRVPatterns(typeConverter, patterns);
+      populateGpuWMMAToSPIRVCoopMatrixNVConversionPatterns(typeConverter,
+                                                           patterns);
+      // TODO: Change SPIR-V conversion to be progressive and remove the
+      // following patterns.
+      mlir::arith::populateArithToSPIRVPatterns(typeConverter, patterns);
+      populateMemRefToSPIRVPatterns(typeConverter, patterns);
+      populateFuncToSPIRVPatterns(typeConverter, patterns);
+
+      // TODO: upstream the extra pattern registration if they work well
+      mlir::ScfToSPIRVContext scfToSpirvCtx;
+      mlir::populateSCFToSPIRVPatterns(typeConverter, scfToSpirvCtx, patterns);
+      mlir::cf::populateControlFlowToSPIRVPatterns(typeConverter, patterns);
+      mlir::populateMathToSPIRVPatterns(typeConverter, patterns);
 
       if (failed(applyFullConversion(gpuModule, *target, std::move(patterns))))
         return signalPassFailure();
     }
-
-    auto targetAttr = spirv::lookupTargetEnvOrDefault(gpuModule);
-    std::unique_ptr<ConversionTarget> target =
-        SPIRVConversionTarget::get(targetAttr);
-
-    SPIRVConversionOptions options;
-    options.use64bitIndex = this->use64bitIndex;
-    SPIRVTypeConverter typeConverter(targetAttr, options);
-    populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter,
-                                               /*useNVTypes=*/true);
-    RewritePatternSet patterns(context);
-    populateGPUToSPIRVPatterns(typeConverter, patterns);
-    populateGpuWMMAToSPIRVCoopMatrixNVConversionPatterns(typeConverter,
-                                                         patterns);
-    // TODO: Change SPIR-V conversion to be progressive and remove the following
-    // patterns.
-    mlir::arith::populateArithToSPIRVPatterns(typeConverter, patterns);
-    populateMemRefToSPIRVPatterns(typeConverter, patterns);
-    populateFuncToSPIRVPatterns(typeConverter, patterns);
-
-    // TODO: upstream the extra pattern registration if they work well
-    mlir::ScfToSPIRVContext scfToSpirvCtx;
-    mlir::populateSCFToSPIRVPatterns(typeConverter, scfToSpirvCtx, patterns);
-    mlir::cf::populateControlFlowToSPIRVPatterns(typeConverter, patterns);
-    mlir::populateMathToSPIRVPatterns(typeConverter, patterns);
-
-    if (failed(applyFullConversion(gpuModule, *target, std::move(patterns))))
-      return signalPassFailure();
   }
-}
+};
+
 } // namespace
