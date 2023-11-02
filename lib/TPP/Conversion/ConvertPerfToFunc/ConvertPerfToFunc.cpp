@@ -253,7 +253,7 @@ static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
   // Add function attributes which ensure that the passed data and its producers
   // operations cannot be optimized away such that the time measured by a
   // benchmark loop correctly represents the full workload.
-  auto ctx = rewriter.getContext();
+  auto *ctx = rewriter.getContext();
   funcOp->setAttr("passthrough",
                   rewriter.getArrayAttr({StringAttr::get(ctx, "optnone"),
                                          StringAttr::get(ctx, "noinline")}));
