@@ -267,7 +267,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
   xsmm::BinaryKindAttr getBinaryKind(RewriterBase &rewriter,
                                      tpp::FusedBrgemmOp brgemmOp) const {
     auto kind = brgemmOp.getBinaryKind();
-    auto ctx = rewriter.getContext();
+    auto *ctx = rewriter.getContext();
     if (kind == tpp::FusedBinaryOpKind::NONE)
       return xsmm::BinaryKindAttr::get(ctx, xsmm::BinaryKind::NONE);
     if (kind == tpp::FusedBinaryOpKind::ADD)
@@ -278,7 +278,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
   xsmm::UnaryKindAttr getUnaryKind(RewriterBase &rewriter,
                                    tpp::FusedBrgemmOp brgemmOp) const {
     auto kind = brgemmOp.getUnaryKind();
-    auto ctx = rewriter.getContext();
+    auto *ctx = rewriter.getContext();
     if (kind == tpp::FusedUnaryOpKind::NONE)
       return xsmm::UnaryKindAttr::get(ctx, xsmm::UnaryKind::NONE);
     if (kind == tpp::FusedUnaryOpKind::RELU)

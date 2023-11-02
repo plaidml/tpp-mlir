@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TRANSFORMS_H
-#define TPP_TRANSFORMS_H
+#ifndef TPP_TRANSFORMS_TRANSFORMS_H
+#define TPP_TRANSFORMS_TRANSFORMS_H
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
