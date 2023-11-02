@@ -211,13 +211,10 @@ private:
     pm.addPass(createCleanup());
 
     // Convert ops to packed layouts.
-    pm.addPass(createPackConv2DNhwcHwcf(
-        PackConv2DNhwcHwcfOptions{SmallVector<int64_t>{32, 32}}));
-    pm.addPass(createPackConv2DNchwFchw(
-        PackConv2DNchwFchwOptions{SmallVector<int64_t>{32, 32}}));
+    pm.addPass(createPackConv2DNhwcHwcf());
+    pm.addPass(createPackConv2DNchwFchw());
     pm.addPass(createRewriteConvToMatmulOrBrgemm());
-    pm.addPass(
-        createPackMatmul(PackMatmulOptions{SmallVector<int64_t>{32, 32, 32}}));
+    pm.addPass(createPackMatmul());
     pm.addPass(createPackVNNI());
 
     // Postprocess packing.
