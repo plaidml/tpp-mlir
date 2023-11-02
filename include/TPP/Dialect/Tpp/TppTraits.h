@@ -1,5 +1,5 @@
-#ifndef TPP_DIALECT_TPP_TRAITS_H
-#define TPP_DIALECT_TPP_TRAITS_H
+#ifndef TPP_DIALECT_TPP_TPPTRAITS_H
+#define TPP_DIALECT_TPP_TPPTRAITS_H
 
 #include "mlir/IR/OpDefinition.h"
 
@@ -56,4 +56,4 @@ struct QuaternaryOp : public OpTrait::TraitBase<ConcreteType, QuaternaryOp> {
 } // namespace OpTrait
 } // namespace mlir
 
-#endif // TPP_DIALECT_TPP_TRAITS_H
+#endif // TPP_DIALECT_TPP_TPPTRAITS_H

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TRANSFORMUTILS_H
-#define TPP_TRANSFORMUTILS_H
+#ifndef TPP_TRANSFORMS_UTILS_TRANSFORMUTILS_H
+#define TPP_TRANSFORMS_UTILS_TRANSFORMUTILS_H
 
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
