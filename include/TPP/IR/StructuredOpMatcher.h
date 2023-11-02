@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_STRUCTUREDOPMATCHERS_H
-#define TPP_STRUCTUREDOPMATCHERS_H
+#ifndef TPP_IR_STRUCTUREDOPMATCHER_H
+#define TPP_IR_STRUCTUREDOPMATCHER_H
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "llvm/ADT/SmallSet.h"
@@ -416,4 +416,4 @@ private:
 } // namespace structured_match
 } // namespace mlir
 
-#endif // TPP_STRUCTUREDOPMATCHERS_H
+#endif // TPP_IR_STRUCTUREDOPMATCHER_H

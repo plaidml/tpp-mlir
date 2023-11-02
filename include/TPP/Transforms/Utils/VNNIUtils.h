@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_VNNIUTILS_H
-#define TPP_VNNIUTILS_H
+#ifndef TPP_TRANSFORMS_UTILS_VNNIUTILS_H
+#define TPP_TRANSFORMS_UTILS_VNNIUTILS_H
 
 #include <cstdint>
 #include <optional>
