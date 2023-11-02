@@ -33,7 +33,7 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
   LogicalResult matchAndRewrite(perf::BenchOp benchOp,
                                 PatternRewriter &rewriter) const override {
     auto loc = benchOp.getLoc();
-    auto benchYield = benchOp.getRegion().front().getTerminator();
+    auto *benchYield = benchOp.getRegion().front().getTerminator();
     assert(dyn_cast_or_null<perf::YieldOp>(benchYield) &&
            "expect perf.yield in perf.bench");
 
