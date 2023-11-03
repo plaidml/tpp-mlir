@@ -5,16 +5,19 @@ import argparse
 import subprocess
 
 argParser = argparse.ArgumentParser()
-argParser.add_argument('-p', '--path')
-argParser.add_argument('-d', '--diff')
-argParser.add_argument('ext')
+argParser.add_argument("-p", "--path")
+argParser.add_argument("-d", "--diff")
+argParser.add_argument("ext")
+
 
 def syntax():
     print("Use -h for options\n")
     exit(1)
 
+
 def getFileName(counter):
     return f"{args.path}/%03d.{args.ext}" % counter
+
 
 def readFile(file):
     lines = list()
@@ -27,10 +30,12 @@ def readFile(file):
             lines.append(line)
     return lines
 
+
 def sameFile(prev, next):
     lhs = readFile(prev)
     rhs = readFile(next)
     return lhs == rhs
+
 
 def nextFile(counter):
     counter += 1
@@ -44,7 +49,7 @@ def nextFile(counter):
     return None, counter
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = argParser.parse_args()
     if args.ext is None:
         syntax()
@@ -74,14 +79,14 @@ if __name__ == '__main__':
     last = curr
     while True:
         next, counter = nextFile(counter)
-        if sameFile(curr, next):
-            curr = next
-            continue
         if next is None:
             print("No more files\n")
             break
-        cmd=[args.diff, last, next]
-        print(' '.join(cmd))
+        if sameFile(curr, next):
+            curr = next
+            continue
+        cmd = [args.diff, last, next]
+        print(" ".join(cmd))
         print("Press ENTER to continue or CTRL+C to cancel...\n")
         input()
         subprocess.run(cmd)
