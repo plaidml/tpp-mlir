@@ -22,7 +22,7 @@ if __name__ == '__main__':
     ext=os.path.splitext(args.filename)[1]
     counter = 0
     filename = f"%03d{ext}" % counter
-    outfile = open(filename, "a")
+    outfile = open(filename, "w")
     with open(args.filename, "r") as file:
         for line in file:
             # New files
