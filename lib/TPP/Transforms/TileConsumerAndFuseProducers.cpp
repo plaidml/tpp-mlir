@@ -401,7 +401,7 @@ getUntiledProducerFromSliceSource(OpOperand *source,
     assert(loop);
     if (iterArg.getOwner()->getParentOp() != loop)
       break;
-    source = &loop.getOpOperandForRegionIterArg(iterArg);
+    source = loop.getTiedLoopInit(iterArg);
     loopIt++;
   }
   return source->get().getDefiningOp();
