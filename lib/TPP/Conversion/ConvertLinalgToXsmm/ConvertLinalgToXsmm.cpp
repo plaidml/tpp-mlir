@@ -31,6 +31,8 @@ namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_CONVERTLINALGTOXSMM
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_FOLDXSMMFLAGS
+#include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -40,6 +42,10 @@ namespace {
 
 struct ConvertLinalgToXsmm
     : public tpp::impl::ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
+  void runOnOperation() override;
+};
+
+struct FoldXsmmFlags : public tpp::impl::FoldXsmmFlagsBase<FoldXsmmFlags> {
   void runOnOperation() override;
 };
 
@@ -774,6 +780,100 @@ void ConvertLinalgToXsmm::runOnOperation() {
   tpp::populateLinalgToXsmmPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
+}
+
+template <typename OpTy>
+static void updateGemmOpFlags(RewriterBase &rewriter, OpTy gemmDispatchOp) {
+  static_assert(llvm::is_one_of<OpTy, xsmm::GemmDispatchOp,
+                                xsmm::BrgemmDispatchOp>::value);
+  if (!gemmDispatchOp->hasOneUse())
+    return;
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(gemmDispatchOp);
+
+  rewriter.updateRootInPlace(gemmDispatchOp, [&]() {
+    ArrayAttr flags = gemmDispatchOp.getFlags();
+    SmallVector<Attribute> newFlags;
+    for (auto flag : flags) {
+      if (auto gemmFlag = dyn_cast<xsmm::GemmFlagsAttr>(flag)) {
+        if ((gemmFlag.getValue() == xsmm::GemmFlags::NONE) ||
+            (gemmFlag.getValue() == xsmm::GemmFlags::BETA_0)) {
+          continue;
+        }
+      }
+      newFlags.push_back(flag);
+    }
+    newFlags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                xsmm::GemmFlags::BETA_0));
+    gemmDispatchOp.setFlagsAttr(rewriter.getArrayAttr(newFlags));
+  });
+}
+
+static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
+                                     xsmm::UnaryOp rootOp) {
+  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
+                          << rootOp << "\n");
+  // 1. Prove the alloc to be zero. Linear walk of the bb
+  // and make sure there are only pure operations between
+  // the zero op and the gemm.
+  Value dest = rootOp.getInputs().back();
+  Block *blck = nullptr;
+  if (auto bbArg = dyn_cast<BlockArgument>(dest)) {
+    blck = bbArg.getOwner();
+  } else {
+    Operation *defOp = dest.getDefiningOp();
+    if (!defOp)
+      return;
+    blck = defOp->getBlock();
+  }
+  assert(blck && "must be a valid ptr");
+  auto it = blck->begin();
+  auto itEnd = blck->end();
+  while (it != itEnd && &*it != rootOp.getOperation())
+    it++;
+  if (it == itEnd)
+    return;
+  while (++it != itEnd) {
+    if (mlir::isPure(&*it))
+      continue;
+    if (!isa<xsmm::GemmOp>(*it) && !isa<xsmm::BrgemmOp>(*it)) {
+      LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Bail out\n");
+      return;
+    } else {
+      break;
+    }
+  }
+  if (it == itEnd)
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op OK: "
+                          << rootOp << "\n");
+
+  // 2. Update flags.
+  assert(isa<xsmm::GemmOp>(*it) || isa<xsmm::BrgemmOp>(*it));
+  if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
+    xsmm::GemmDispatchOp gemmDispatchOp =
+        cast<xsmm::GemmDispatchOp>(gemmOp.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, gemmDispatchOp);
+  } else {
+    xsmm::BrgemmDispatchOp brgemmDispatchOp = cast<xsmm::BrgemmDispatchOp>(
+        cast<xsmm::BrgemmOp>(*it).getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, brgemmDispatchOp);
+  }
+  rewriter.eraseOp(rootOp);
+}
+
+void FoldXsmmFlags::runOnOperation() {
+  SmallVector<xsmm::UnaryOp> producers;
+  getOperation()->walk([&](xsmm::UnaryOp unaryOp) {
+    auto kind = unaryOp.getCallee();
+    if (kind == xsmm::UnaryKind::ZERO)
+      producers.push_back(unaryOp);
+  });
+
+  IRRewriter rewriter(&getContext());
+  for (xsmm::UnaryOp producer : producers)
+    fuseZeroWithGemmOrBrgemm(rewriter, producer);
 }
 
 // Convert a linalg.matmul to a XSMM matmul op.

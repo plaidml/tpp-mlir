@@ -310,6 +310,7 @@ private:
         // Tpp to Xsmm conversion patterns.
         pm.addPass(createConvertTppToXsmm());
       }
+      pm.addPass(createFoldXsmmFlags());
     }
   }
 };

@@ -513,4 +513,19 @@ def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
                            "gpu::GPUDialect"];
 }
 
+def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
+  let summary = "Attempt to fold dispatch op as flags in XSMM.";
+  let description = [{
+    Attempt to fold dispatch operations as flags in consumer dispatch
+    operations, for example:
+    ```mlir
+      %alloc = memref.alloc
+      xsmm.unary zero (%alloc)
+      xsmm.gemm.dispatch (%alloc)
+    ```
+    the zero is folded as `beta_0` in `xsmm.gemm.dispatch`.
+  }];
+  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
