@@ -371,6 +371,12 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
     processingQueue.pop();
     for (OpOperand &operand : currentOp->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
+      if (producer && isa<linalg::FillOp>(producer)) {
+        nextProcessingQueue.push(producer);
+        incDepthAndSwap(processingQueue, nextProcessingQueue, depth);
+        worklist.insert(producer);
+        continue;
+      }
       if (producer && isa<TilingInterface>(producer) &&
           !worklist.count(producer) && producer->getNumResults() == 1 &&
           !alreadyFusedOps.count(producer) &&
@@ -492,7 +498,8 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
     Operation *candidateOp = getUntiledProducerFromSliceSource(
         &candidateSliceOp->getOpOperand(0), forLoops);
     if (!candidateOp || worklist.count(candidateOp) == 0 ||
-        alreadyFusedOps.count(candidateOp))
+        (alreadyFusedOps.count(candidateOp) &&
+         !isa<linalg::FillOp>(candidateOp)))
       continue;
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
