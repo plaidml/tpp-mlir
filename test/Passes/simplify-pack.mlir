@@ -302,3 +302,30 @@ func.func @expect_to_remove_first_iter_arg(%arg0: tensor<2x2x32x32xbf16>) -> ten
 // CHECK-LABEL: expect_to_remove_first_iter_arg
 // CHECK-SAME: %[[ARG0:.+]]: tensor<2x2x32x32xbf16>
 // CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (2, 2) shared_outs(%{{.+}} = %[[ARG0]], %{{.+}} = %[[ARG0]])
+
+// -----
+
+func.func private @some_use(%arg0 : tensor<2x2x32x32xbf16>) -> tensor<64x64xbf16>
+
+func.func @fold_pack_expect_to_fail_multiple_uses(
+                                     %arg0: tensor<2x4x32x32xbf16>, %arg1: tensor<2x4x32x32xbf16>,
+                                     %arg2: tensor<2x2x32x32xbf16>, %dest: tensor<64x64xbf16>) -> tensor<64x64xbf16> {
+  %0 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %arg2) -> (tensor<2x2x32x32xbf16>) {
+    %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_3 = tensor.extract_slice %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
+    %4 = linalg.batch_reduce_matmul ins(%extracted_slice, %extracted_slice_2 : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>) outs(%extracted_slice_3 : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %4 into %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
+    }
+  }
+  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
+    : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
+  %use = call @some_use(%0) : (tensor<2x2x32x32xbf16>) -> (tensor<64x64xbf16>)
+  %add = linalg.add ins(%use, %unpack : tensor<64x64xbf16>, tensor<64x64xbf16>) 
+                    outs(%dest: tensor<64x64xbf16>) -> tensor<64x64xbf16>
+  return %add : tensor<64x64xbf16>
+}
+
+// CHECK-LABEL: fold_pack_expect_to_fail_multiple_uses
+// CHECK: tensor.unpack
