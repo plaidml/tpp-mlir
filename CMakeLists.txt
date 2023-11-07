@@ -67,14 +67,21 @@ add_subdirectory(test)
 set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
 set(CONFIG_DIR "${BENCHMARK_DIR}/config")
 
+# Run baseline benchmarks with default iterations to track simple performance
+set(BENCH_CFGS
+  ${CONFIG_DIR}/base/base.json
+  ${CONFIG_DIR}/base/pack.json
+  ${CONFIG_DIR}/base/mha.json
+)
+string(JOIN ',' BENCH_CFGS_STR ${BENCH_CFGS})
 # Run a small set of benchmarks with small iterations to test the benchmarks and run locally on small machines
 add_custom_target(benchmarks ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
-                  -c ${CONFIG_DIR}/base/base.json
+                  -c ${BENCH_CFGS_STR}
                   DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                   WORKING_DIRECTORY ${BENCHMARK_DIR}
                   COMMENT Run Base Benchmarks)
 
-# Run baseline benchmarks with default iterations to track simple performance
+# Run OpenMP benchmarks with default iterations to track simple performance
 set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/dnn-fp32.json
   ${CONFIG_DIR}/omp/dnn-bf16.json
@@ -82,8 +89,8 @@ set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/mlir-bf16.json
 )
 string(JOIN ',' BENCH_OMP_CFGS_STR ${BENCH_OMP_CFGS})
-add_custom_target(benchmarks-omp ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR}
-  -c ${BENCH_OMP_CFGS_STR}
+add_custom_target(benchmarks-omp ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+                  -c ${BENCH_OMP_CFGS_STR}
                   DEPENDS tpp-opt tpp-run xsmm_dnn_mlp
                   WORKING_DIRECTORY ${BENCHMARK_DIR}
                   COMMENT Run Benchmarks)
