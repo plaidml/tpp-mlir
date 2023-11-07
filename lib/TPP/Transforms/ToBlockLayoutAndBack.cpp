@@ -933,6 +933,8 @@ struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
     if (!isa_and_nonnull<scf::ForallOp>(loop))
       return failure();
     auto forallOp = cast<scf::ForallOp>(loop);
+    if (!forallOp->hasOneUse())
+      return failure();
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(forallOp);
 
