@@ -307,7 +307,8 @@ private:
         pm.addPass(createConvertLinalgToXsmm());
       } else {
         // Tpp to Xsmm conversion patterns.
-        pm.addPass(createCombineXsmmOpPass());
+        pm.addPass(createConvertTppToXsmm());
+	pm.addPass(createCombineXsmmOpPass());
       }
       pm.addPass(createFoldXsmmFlags());
       pm.addPass(createVerifyXsmmCalls());
