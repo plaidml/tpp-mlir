@@ -499,8 +499,9 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
         &candidateSliceOp->getOpOperand(0), forLoops);
     if (!candidateOp || worklist.count(candidateOp) == 0 ||
         (alreadyFusedOps.count(candidateOp) &&
-         !isa<linalg::FillOp>(candidateOp)))
+         !isa<linalg::FillOp>(candidateOp))) {
       continue;
+    }
 
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         scf::tileAndFuseProducerOfSlice(rewriter, candidateSliceOp, forLoops);
