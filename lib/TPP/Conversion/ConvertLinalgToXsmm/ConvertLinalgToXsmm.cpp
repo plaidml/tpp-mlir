@@ -357,18 +357,16 @@ static LogicalResult rewriteBinaryOp(RewriterBase &rewriter,
   // Spaghetti code to handle 'NONE' as it conflicts with other flags; we
   // cannot add it if at least the RHS or the LHS is not 'NONE'. Maybe the
   // best solution is to get rid of it.
-  ArrayAttr flags;
-  if (flagLhs.getValue() != xsmm::BinaryFlags::NONE &&
-      flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
-    flags = rewriter.getArrayAttr({flagLhs, flagRhs});
-  } else if (flagLhs.getValue() != xsmm::BinaryFlags::NONE) {
-    flags = rewriter.getArrayAttr({flagLhs});
-  } else if (flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
-    flags = rewriter.getArrayAttr({flagRhs});
-  } else {
-    flags = rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
-        rewriter.getContext(), xsmm::BinaryFlags::NONE));
+  SmallVector<Attribute> flagsVec;
+  if (flagLhs.getValue() != xsmm::BinaryFlags::NONE)
+    flagsVec.push_back(flagLhs);
+  if (flagRhs.getValue() != xsmm::BinaryFlags::NONE)
+    flagsVec.push_back(flagRhs);
+  if (flagsVec.empty()) {
+    flagsVec.push_back(xsmm::BinaryFlagsAttr::get(rewriter.getContext(),
+                                                  xsmm::BinaryFlags::NONE));
   }
+  ArrayAttr flags = rewriter.getArrayAttr(flagsVec);
 
   xsmm::BinaryKindAttr kind =
       xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmmTy);
