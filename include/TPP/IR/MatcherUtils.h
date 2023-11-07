@@ -17,24 +17,31 @@ class LinalgOp;
 namespace structured_match {
 namespace utils {
 
-// Returns true if the linalg operation is a 2d eltwsie addition.
+// Returns true if the linalg operation is a 2d eltwsie floating point addition.
 bool isTwoDAddOp(linalg::LinalgOp linalgOp,
                  SmallVectorImpl<Value> *capturedOperands = nullptr);
 
-// Returns true if the linalg.generic is a 2d eltwise fill operation with zeros.
+// Returns true if the linalg operation is a 2d eltwsie floating point
+// subtraction.
+bool isTwoDSubOp(linalg::LinalgOp linalgOp,
+                 SmallVectorImpl<Value> *capturedOperands = nullptr);
+
+// Returns true if the linalg.generic is a 2d eltwise floating point fill
+// operation with zeros.
 bool isTwoDZeroOp(linalg::LinalgOp linalgOp,
                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
-// Returns true if the linalg.generic is a 2d eltwise relu operation.
+// Returns true if the linalg.generic is a 2d eltwise floating point relu
+// operation.
 bool isTwoDReluOp(linalg::LinalgOp linalgOp,
                   SmallVectorImpl<Value> *capturedOperands = nullptr);
 
-// Returns true if the linalg.generic is a 2d copy operation.
+// Returns true if the linalg.generic is a 2d floating point copy operation.
 bool isTwoDIdentityOp(linalg::LinalgOp linalgOp,
                       SmallVectorImpl<Value> *capturedOperands = nullptr);
 
-// Returns true if the linalg.generic can convert to a 2d eltwise addition
-// followed by a relu.
+// Returns true if the linalg.generic can convert to a 2d eltwise floating point
+// addition followed by a floating point relu.
 bool isTwoDBiasReluOp(linalg::LinalgOp linalgOp,
                       SmallVectorImpl<Value> *capturedOperands = nullptr);
 

@@ -261,3 +261,25 @@ func.func @add_10(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) {
 // C_HECK: %[[DIS:.+]] = xsmm.binary.dispatch add [256, 1024, 1024, 1, 1024]
 // C_HECK-SAME:  flags = (bcast_col_in1) data_type = f32
 // C_HECK: xsmm.binary add(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG0]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @sub1(%arg0: memref<256x1024xf32>, %arg1: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0 : memref<256x1024xf32>, memref<256x1024xf32>)
+    outs(%arg1: memref<256x1024xf32>) {
+      ^bb0(%in: f32, %in_4: f32, %out: f32):
+        %19 = arith.subf %in, %in_4 : f32
+        linalg.yield %19 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: sub1
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1024, 1024] flags = (none) data_type = f32
+// CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG0]], %[[ARG1]])
