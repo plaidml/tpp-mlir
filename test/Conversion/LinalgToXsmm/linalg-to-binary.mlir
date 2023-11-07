@@ -261,3 +261,119 @@ func.func @add_10(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) {
 // C_HECK: %[[DIS:.+]] = xsmm.binary.dispatch add [256, 1024, 1024, 1, 1024]
 // C_HECK-SAME:  flags = (bcast_col_in1) data_type = f32
 // C_HECK: xsmm.binary add(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG0]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @trivial_sub(%arg0: memref<256x1024xf32>, %arg1: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg0 : memref<256x1024xf32>, memref<256x1024xf32>)
+    outs(%arg1: memref<256x1024xf32>) {
+      ^bb0(%in: f32, %in_4: f32, %out: f32):
+        %19 = arith.subf %in, %in_4 : f32
+        linalg.yield %19 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: trivial_sub
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1024, 1024] flags = (none) data_type = f32
+// CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> ()>
+
+func.func @sub_bcast_scalar(%arg0: memref<256x1024xf32>, %arg1: f32, %arg2: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : memref<256x1024xf32>, f32)
+    outs(%arg2: memref<256x1024xf32>) {
+      ^bb0(%in: f32, %in_4: f32, %out: f32):
+        %19 = arith.subf %in, %in_4 : f32
+        linalg.yield %19 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: sub_bcast_scalar
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: f32, %[[ARG2:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1, 1024] flags = (bcast_scalar_in1) data_type = f32
+// CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+
+func.func @sub_bcast_col(%arg0: memref<256x1024xf32>, %arg1: memref<1024xf32>, %arg2: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : memref<256x1024xf32>, memref<1024xf32>)
+    outs(%arg2: memref<256x1024xf32>) {
+      ^bb0(%in: f32, %in_4: f32, %out: f32):
+        %19 = arith.subf %in, %in_4 : f32
+        linalg.yield %19 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: sub_bcast_col
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<1024xf32>, %[[ARG2:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1024, 1024] flags = (bcast_col_in1) data_type = f32
+// CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0, 0)>
+
+func.func @sub_bcast_row(%arg0: memref<256x1024xf32>, %arg1: memref<256x1xf32>, %arg2: memref<256x1024xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map], 
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : memref<256x1024xf32>, memref<256x1xf32>)
+    outs(%arg2: memref<256x1024xf32>) {
+      ^bb0(%in: f32, %in_4: f32, %out: f32):
+        %19 = arith.subf %in, %in_4 : f32
+        linalg.yield %19 : f32
+  }
+  return 
+}
+
+// CHECK-LABEL: sub_bcast_row
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256x1xf32>, %[[ARG2:.+]]: memref<256x1024xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1, 1024] flags = (bcast_row_in1) data_type = f32
+// CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+
+func.func @sub_bcast_row_1(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : memref<256x1024xf32>, memref<256xf32>)
+    outs(%arg0 : memref<256x1024xf32>) {
+    ^bb0(%in: f32, %in_6: f32, %out: f32):
+      %6 = arith.subf %in, %in_6 : f32
+      linalg.yield %6 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: sub_bcast_row_1
+// CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256xf32>
+// CHECK: linalg.generic
+// CHECK-NOT: xsmm.binary sub
+// We need to lift this restriction:
+// https://github.com/plaidml/tpp-mlir/blob/6f475924b5cd97ed636da796fef4305af4a20e6a/lib/TPP/MatcherUtils.cpp#L75

@@ -323,6 +323,74 @@ getBroadCastBinaryFlagFromMap(AffineMap map, unsigned operandIdx) {
   }
 }
 
+static LogicalResult rewriteBinaryOp(RewriterBase &rewriter,
+                                     linalg::GenericOp genericOp,
+                                     ArrayRef<Value> operands,
+                                     xsmm::BinaryKind xsmmTy) {
+  assert(operands.size() == 3);
+  auto lhs = operands[0];
+  auto rhs = operands[1];
+  auto output = operands[2];
+
+  OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
+  auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
+      genericOp.getMatchingIndexingMap(lhsOperand), /*operandIdx=*/0);
+  if (failed(broadCastFlagLhs))
+    return failure();
+
+  OpOperand *rhsOperand = getOperandFromValue(genericOp, rhs);
+  auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
+      genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
+  if (failed(broadCastFlagRhs))
+    return failure();
+
+  auto binaryInfo = xsmm::utils::getBinaryInfo(lhs, *broadCastFlagLhs, rhs,
+                                               *broadCastFlagRhs, output);
+  if (failed(binaryInfo))
+    return failure();
+
+  auto flagLhs =
+      xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagLhs);
+  auto flagRhs =
+      xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagRhs);
+
+  // Spaghetti code to handle 'NONE' as it conflicts with other flags; we
+  // cannot add it if at least the RHS or the LHS is not 'NONE'. Maybe the
+  // best solution is to get rid of it.
+  SmallVector<Attribute> flagsVec;
+  if (flagLhs.getValue() != xsmm::BinaryFlags::NONE)
+    flagsVec.push_back(flagLhs);
+  if (flagRhs.getValue() != xsmm::BinaryFlags::NONE)
+    flagsVec.push_back(flagRhs);
+  if (flagsVec.empty()) {
+    flagsVec.push_back(xsmm::BinaryFlagsAttr::get(rewriter.getContext(),
+                                                  xsmm::BinaryFlags::NONE));
+  }
+  ArrayAttr flags = rewriter.getArrayAttr(flagsVec);
+
+  xsmm::BinaryKindAttr kind =
+      xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmmTy);
+  replaceOpWithBinary(rewriter, genericOp, operands, *binaryInfo, flags, kind);
+  return success();
+}
+
+// Convert linalg.generic to xsmm binary sub op.
+struct ConvertGenericToBinarySub : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    if (!genericOp.hasBufferSemantics() ||
+        !structured_match::utils::isTwoDSubOp(genericOp, &operands) ||
+        operands.size() != 3) {
+      return failure();
+    }
+    return rewriteBinaryOp(rewriter, genericOp, operands,
+                           xsmm::BinaryKind::SUB);
+  }
+};
+
 // Convert linalg.generic to xsmm binary add op.
 struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -335,54 +403,8 @@ struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
         operands.size() != 3) {
       return failure();
     }
-
-    auto lhs = operands[0];
-    auto rhs = operands[1];
-    auto output = operands[2];
-
-    OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
-    auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
-        genericOp.getMatchingIndexingMap(lhsOperand), /*operandIdx=*/0);
-    if (failed(broadCastFlagLhs))
-      return failure();
-
-    OpOperand *rhsOperand = getOperandFromValue(genericOp, rhs);
-    auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
-        genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
-    if (failed(broadCastFlagRhs))
-      return failure();
-
-    auto binaryInfo = xsmm::utils::getBinaryInfo(lhs, *broadCastFlagLhs, rhs,
-                                                 *broadCastFlagRhs, output);
-    if (failed(binaryInfo))
-      return failure();
-
-    auto flagLhs =
-        xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagLhs);
-    auto flagRhs =
-        xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *broadCastFlagRhs);
-
-    // Spaghetti code to handle 'NONE' as it conflicts with other flags; we
-    // cannot add it if at least the RHS or the LHS is not 'NONE'. Maybe the
-    // best solution is to get rid of it.
-    ArrayAttr flags;
-    if (flagLhs.getValue() != xsmm::BinaryFlags::NONE &&
-        flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
-      flags = rewriter.getArrayAttr({flagLhs, flagRhs});
-    } else if (flagLhs.getValue() != xsmm::BinaryFlags::NONE) {
-      flags = rewriter.getArrayAttr({flagLhs});
-    } else if (flagRhs.getValue() != xsmm::BinaryFlags::NONE) {
-      flags = rewriter.getArrayAttr({flagRhs});
-    } else {
-      flags = rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
-          rewriter.getContext(), xsmm::BinaryFlags::NONE));
-    }
-
-    xsmm::BinaryKindAttr kind =
-        xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD);
-    replaceOpWithBinary(rewriter, genericOp, operands, *binaryInfo, flags,
-                        kind);
-    return success();
+    return rewriteBinaryOp(rewriter, genericOp, operands,
+                           xsmm::BinaryKind::ADD);
   }
 };
 
@@ -907,11 +929,11 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns
-      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-           ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
-           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
-           ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
-          patterns.getContext());
+  patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
+               ConvertGenericToBinarySub, ConvertGenericToBrgemm,
+               ConvertBatchReduceMatmulToBatchReduceMatmul,
+               ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
+               ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
+      patterns.getContext());
 }

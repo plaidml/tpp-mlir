@@ -94,14 +94,23 @@ static bool isTppUnaryOp(linalg::LinalgOp linalgOp) {
   return isTppOp(linalgOp) && unaryMatcher.match(linalgOp);
 }
 
-// Return true if the linalg.generic can be mapped to a tpp.add.
-bool isTwoDAddOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
+template <typename OpTy>
+static bool isTwoDEltWiseOpOfTypeTy(linalg::LinalgOp linalgOp,
+                                    SmallVectorImpl<Value> *operands) {
   // clang-format off
-  auto addMatcher =
+  auto matcher =
     StructuredOpMatcher::make<linalg::LinalgOp>().region(
-      MatchOne(0), WithSingleOp<arith::AddFOp>(operands));
+      MatchOne(0), WithSingleOp<OpTy>(operands));
   // clang-format on
-  return isTppBinaryOp(linalgOp) && addMatcher.match(linalgOp);
+  return isTppBinaryOp(linalgOp) && matcher.match(linalgOp);
+}
+
+bool isTwoDAddOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
+  return isTwoDEltWiseOpOfTypeTy<arith::AddFOp>(linalgOp, operands);
+}
+
+bool isTwoDSubOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
+  return isTwoDEltWiseOpOfTypeTy<arith::SubFOp>(linalgOp, operands);
 }
 
 static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
