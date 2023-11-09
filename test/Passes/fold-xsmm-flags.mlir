@@ -216,6 +216,27 @@ func.func private @test(%arg0 : memref<16x16xf32, strided<[32, 1]>>)
 
 // -----
 
+func.func @sub_view_aliasing_1(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %sub = memref.subview %alloc[0, 0] [16, 16] [1, 1] : memref<32x32xf32> to memref<16x16xf32, strided<[32, 1]>>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  call @test(%sub) : (memref<16x16xf32, strided<[32, 1]>>) -> ()
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+func.func private @test(%arg0 : memref<16x16xf32, strided<[32, 1]>>)
+
+// CHECK-LABEL: sub_view_aliasing_1
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+
+// -----
+
 func.func @may_have_mem_effects(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
   %c1_i64 = arith.constant 1 : i64
   %cst = arith.constant 0.000000e+00 : f32

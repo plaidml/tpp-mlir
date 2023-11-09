@@ -49,6 +49,7 @@ func.func @gemm_with_zero(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> ten
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : i64
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : i64
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
+// CHECK-NOT: xsmm_unary_dispatch
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
 // CHECK: %[[DIS:.+]] = call @xsmm_gemm_dispatch(%[[C1]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C4]])
 // CHECK: %[[INT_PTR_ARG0:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]] : memref<3x3xf32> -> index

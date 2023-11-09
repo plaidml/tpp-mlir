@@ -814,8 +814,9 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
                           << rootOp << "\n");
   // 1. Prove the alloc to be zero. Linear walk of the bb
-  // and make sure there are only pure operations between
-  // the zero op and the gemm.
+  // and make sure there are only side-effect free operations between
+  // the zero op and the gemm. Bail out if any operations take
+  // a subview from `dest`.
   Value dest = rootOp.getInputs().back();
   DenseSet<Operation *> destUsers(dest.getUsers().begin(),
                                   dest.getUsers().end());
@@ -832,10 +833,18 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   assert(blck && "must be a valid ptr");
   auto it = blck->begin();
   auto itEnd = blck->end();
-  while (it != itEnd && &*it != rootOp.getOperation())
+  while (it != itEnd && &*it != rootOp.getOperation()) {
+    // View may introduce aliasing.
+    if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
+      if (view.getViewSource() == dest)
+        return;
+    }
     it++;
+  }
+
   if (it == itEnd)
     return;
+
   while (++it != itEnd) {
     // Skip operations that do not touch `dest`.
     if (!destUsers.count(&*it))
