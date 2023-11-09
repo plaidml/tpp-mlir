@@ -146,21 +146,21 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   };
 
   // Multiple patterns map to Relu.
-  if (isa<arith::MaximumFOp>(innerOp)) {
+  if (auto maxfOp = dyn_cast<arith::MaximumFOp>(innerOp)) {
     // Pattern 1 - arith.maximumf(tensor, const 0)
     if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
       return false;
-    auto maxfOp = cast<arith::MaximumFOp>(innerOp);
     Value maxfLhs = maxfOp.getLhs();
     Value maxfRhs = maxfOp.getRhs();
 
     return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
-  } else if (isa<arith::CmpFOp>(innerOp)) {
+  } else if (auto cmpfOp = dyn_cast<arith::CmpFOp>(innerOp)) {
     // Pattern 2 - arith.cmpf, arith.select
-    // %22 = arith.cmpf ugt, %in, %cst : f32
-    // %23 = arith.select %22, %in, %cst : f32
-    // linalg.yield %23 : f32
-
+    //
+    // x = arith.cmpf ugt, value, 0
+    // y = arith.select x, value, 0
+    //
+    // NOTE: ugt - unsigned greater than, one of the predicates
     if (linalgOp.getBlock()->getOperations().size() != 3)
       return false;
 
@@ -182,7 +182,6 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
     if (selectOp->getOperand(0).getDefiningOp() != cmpOp)
       return false;
 
-    auto cmpfOp = cast<arith::CmpFOp>(cmpOp);
     auto cmpPredicate = cmpfOp.getPredicate();
     Value cmpLhs = cmpfOp.getLhs();
     Value cmpRhs = cmpfOp.getRhs();
