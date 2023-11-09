@@ -26,6 +26,11 @@ bool isTwoDAddOp(linalg::LinalgOp linalgOp,
 bool isTwoDSubOp(linalg::LinalgOp linalgOp,
                  SmallVectorImpl<Value> *capturedOperands = nullptr);
 
+// Returns true if the linalg operation is a 2d eltwsie floating point
+// multiplication.
+bool isTwoDMulOp(linalg::LinalgOp linalgOp,
+                 SmallVectorImpl<Value> *capturedOperands = nullptr);
+
 // Returns true if the linalg.generic is a 2d eltwise floating point fill
 // operation with zeros.
 bool isTwoDZeroOp(linalg::LinalgOp linalgOp,

@@ -113,6 +113,10 @@ bool isTwoDSubOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
   return isTwoDEltWiseOpOfTypeTy<arith::SubFOp>(linalgOp, operands);
 }
 
+bool isTwoDMulOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
+  return isTwoDEltWiseOpOfTypeTy<arith::MulFOp>(linalgOp, operands);
+}
+
 static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   if (!isa<linalg::LinalgOp>(op))
     return false;

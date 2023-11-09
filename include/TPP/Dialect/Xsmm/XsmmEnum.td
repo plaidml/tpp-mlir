@@ -32,6 +32,7 @@ def Xsmm_BinaryKind : I64EnumAttr<
     [
       I64EnumAttrCase<"NONE", 0, "none">,
       I64EnumAttrCase<"ADD", 1, "add">,
+      I64EnumAttrCase<"MUL", 2, "mul">,
       I64EnumAttrCase<"SUB", 3, "sub">,
       I64EnumAttrCase<"DIV", 4, "div">
     ]> {

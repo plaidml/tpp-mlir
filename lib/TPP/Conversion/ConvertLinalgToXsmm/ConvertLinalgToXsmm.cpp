@@ -391,6 +391,23 @@ struct ConvertGenericToBinarySub : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+// Convert linalg.generic to xsmm binary mul op.
+struct ConvertGenericToBinaryMul : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    if (!genericOp.hasBufferSemantics() ||
+        !structured_match::utils::isTwoDMulOp(genericOp, &operands) ||
+        operands.size() != 3) {
+      return failure();
+    }
+    return rewriteBinaryOp(rewriter, genericOp, operands,
+                           xsmm::BinaryKind::MUL);
+  }
+};
+
 // Convert linalg.generic to xsmm binary add op.
 struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -929,11 +946,12 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-               ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
-               ConvertGenericToBinarySub, ConvertGenericToBrgemm,
-               ConvertBatchReduceMatmulToBatchReduceMatmul,
-               ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
-               ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
-      patterns.getContext());
+  patterns
+      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+           ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
+           ConvertGenericToBinarySub, ConvertGenericToBinaryMul,
+           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
+           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
+           ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
+          patterns.getContext());
 }
