@@ -848,7 +848,8 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
       if (view.getViewSource() == dest)
         return;
     }
-    // An operation touching `dest`.
+    // A gemm or brgemm operation touching `dest`, fold if the
+    // output (i.e. C matrix) is `dest`.
     if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
       Value outVal = gemmOp.getOutput();
       if (outVal == dest)
