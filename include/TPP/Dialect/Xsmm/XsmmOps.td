@@ -81,6 +81,10 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
+
+  let extraClassDeclaration = [{
+    Value getOutput() { return getInputs().back(); }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -94,6 +98,10 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOutput() { return getInputs()[3]; }
   }];
 }
 

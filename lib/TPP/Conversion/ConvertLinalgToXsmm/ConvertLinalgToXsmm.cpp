@@ -817,6 +817,9 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   // and make sure there are only pure operations between
   // the zero op and the gemm.
   Value dest = rootOp.getInputs().back();
+  DenseSet<Operation *> destUsers(dest.getUsers().begin(),
+                                  dest.getUsers().end());
+
   Block *blck = nullptr;
   if (auto bbArg = dyn_cast<BlockArgument>(dest)) {
     blck = bbArg.getOwner();
@@ -834,14 +837,30 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   if (it == itEnd)
     return;
   while (++it != itEnd) {
-    if (mlir::isPure(&*it))
+    // Skip operations that do not touch `dest`.
+    if (!destUsers.count(&*it))
       continue;
-    if (!isa<xsmm::GemmOp>(*it) && !isa<xsmm::BrgemmOp>(*it)) {
-      LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Bail out\n");
-      return;
-    } else {
-      break;
+    // No memory effects other than read.
+    if (mlir::hasSingleEffect<MemoryEffects::Read>(&*it, dest))
+      continue;
+    // View may introduce aliasing.
+    if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
+      if (view.getViewSource() == dest)
+        return;
     }
+    // An operation touching `dest`.
+    if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
+      Value outVal = gemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
+    if (auto brgemmOp = dyn_cast<xsmm::BrgemmOp>(*it)) {
+      Value outVal = brgemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
+    // Fail.
+    return;
   }
   if (it == itEnd)
     return;

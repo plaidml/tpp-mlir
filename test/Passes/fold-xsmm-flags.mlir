@@ -158,3 +158,131 @@ func.func @zero_flag(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>) {
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
 // CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (beta_0) data_type = f32
 // CHECK: xsmm.brgemm(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ALLOC]], %[[C1]])
+
+// -----
+
+func.func @must_be_user_of_gemm(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %arg2, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: must_be_user_of_gemm
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32 
+
+// -----
+
+func.func @memory_effect_but_do_not_touch_alloc(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  memref.copy %arg2, %arg2 : memref<32x32xf32> to memref<32x32xf32>
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: memory_effect_but_do_not_touch_alloc
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (beta_0) data_type = f32
+
+// -----
+
+func.func @sub_view_aliasing(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  %sub = memref.subview %alloc[0, 0] [16, 16] [1, 1] : memref<32x32xf32> to memref<16x16xf32, strided<[32, 1]>>
+  call @test(%sub) : (memref<16x16xf32, strided<[32, 1]>>) -> ()
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+func.func private @test(%arg0 : memref<16x16xf32, strided<[32, 1]>>)
+
+// CHECK-LABEL: sub_view_aliasing
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+
+// -----
+
+func.func @may_have_mem_effects(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  call @test(%alloc) : (memref<32x32xf32>) -> ()
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+func.func private @test(%arg0 : memref<32x32xf32>)
+
+// CHECK-LABEL: may_have_mem_effects
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+
+// -----
+
+func.func @only_read_effect(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  memref.copy %alloc, %arg2 : memref<32x32xf32> to memref<32x32xf32>
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: only_read_effect
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (beta_0) data_type = f32
+
+// -----
+
+func.func @read_write_effect(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  memref.copy %alloc, %alloc : memref<32x32xf32> to memref<32x32xf32>
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: read_write_effect
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+
+// -----
+
+func.func @free_effect(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %arg2: memref<32x32xf32>) {
+  %c1_i64 = arith.constant 1 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 512, 1, 512] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  memref.dealloc %alloc : memref<32x32xf32>
+  %1 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+  xsmm.brgemm(data_type = f32, %1, %arg0, %arg1, %arg2, %c1_i64) : (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: free_effect
+// CHECK-NOT: beta_0
+// CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
