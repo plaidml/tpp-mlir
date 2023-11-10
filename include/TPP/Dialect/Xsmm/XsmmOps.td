@@ -18,42 +18,6 @@ def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [2]>]>;
 def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
 
 //===----------------------------------------------------------------------===//
-// TernaryOp
-//===----------------------------------------------------------------------===//
-
-def Xsmm_TernaryOp : Xsmm_Op<"ternary"> {
-  let summary = "ternary operation.";
-  let description = [{
-    Ternary operation. The operation kind carries information about the name of
-    the LIBXSMM function to invoke. Additionally, the operation takes five
-    operands. The first is an I64 type representing the datatype. The second must be
-    an I64 type and must result from a dispatch operation (it represents the
-    function pointer to use during invocation). The other operands are of Float
-    types and represent the operands to use for computation.
-    For example, a matmul has the following signature: data_type, I64, memref<MxNxf32>,
-    memref<MxKxf32>, memref<KxNxf32>.
-  }];
-
-  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_TernaryKind:$callee, 
-                       Variadic<XsmmMemRef>:$inputs);
-
-  let assemblyFormat = [{
-    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
-    attr-dict `:` functional-type($inputs, results)
-  }];
-
-  let extraClassDeclaration = [{
-    // Get the argument operands.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-    operand_iterator arg_operand_begin() { return operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-  }];
-}
-
-
-//===----------------------------------------------------------------------===//
 // BinaryOp
 //===----------------------------------------------------------------------===//
 
@@ -145,32 +109,6 @@ def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
-}
-
-//===----------------------------------------------------------------------===//
-// TernaryDispatchOp
-//===----------------------------------------------------------------------===//
-
-def Xsmm_TernaryDispatchOp : Xsmm_Op<"ternary.dispatch", [Pure]> {
-  let summary = "dispatch ternary operation.";
-  let description = [{
-    The 'kind' carries information about the name of the LIBXSMM function to
-    dispatch.  'data_type' is passed to set the datatype in libxsmm call.
-    Additional I64 operands are passed based on the operation to dispatch. For
-    example, leading dimensions or sizes. Returns the pointer to call as I64.
-  }];
-
-  let arguments = (ins 
-    Xsmm_TernaryKind:$kind,
-    ConfinedAttr<DenseI64ArrayAttr,
-                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
-    TypedArrayAttrBase<Xsmm_TernaryFlags, "ternary flags">:$flags,
-    Xsmm_DataType:$data_type);
-  
-  let results = (outs I64:$results);
-  let hasCustomAssemblyFormat = 1;
-
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
