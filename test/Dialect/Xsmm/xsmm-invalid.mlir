@@ -180,24 +180,6 @@ func.func @binary_dispatch() -> i64 {
 
 // -----
 
-// CHECK-LABEL: func.func @ternary_dispatch
-func.func @ternary_dispatch() -> i64 {
-  // expected-error@+1 {{failed to satisfy constraint: i64 dense array attribute whose value is non-negative}}
-  %0 = xsmm.ternary.dispatch none [3, 2, 1, 3, -2] flags = (none) data_type = f32
-  return %0 : i64
-}
-
-// -----
-
-// CHECK-LABEL: func.func @ternary_dispatch
-func.func @ternary_dispatch() -> i64 {
-  // expected-error@+1 {{op expect 6 args but got: 3}}
-  %0 = xsmm.ternary.dispatch none [3, 2, 1] flags = (none) data_type = f32
-  return %0 : i64
-}
-
-// -----
-
 // CHECK-LABEL: func.func @fused_dispatch
 func.func @fused_dispatch() -> i64 {
   // expected-error@+1 {{op expect 8 args but got: 3}}

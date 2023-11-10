@@ -158,20 +158,6 @@ ParseResult BinaryDispatchOp::parse(OpAsmParser &parser,
   return parseDataTypeImpl(parser, result);
 }
 
-ParseResult TernaryDispatchOp::parse(OpAsmParser &parser,
-                                     OperationState &result) {
-  // Parse the type of ternary
-  TernaryKind kind;
-  if (parseEnum(kind, parser))
-    return failure();
-  result.addAttribute(
-      KIND, TernaryKindAttr::get(parser.getBuilder().getContext(), kind));
-  if (failed(parseInputImpl(parser, result)) ||
-      failed(parserFlagsImpl<TernaryFlags>(parser, result, FLAGS_NAME)))
-    return failure();
-  return parseDataTypeImpl(parser, result);
-}
-
 template <typename OpTy>
 static void printerInputImpl(OpAsmPrinter &printer, OpTy op) {
   printer << " [" << op.getInputs() << ']';
@@ -245,14 +231,6 @@ void BinaryDispatchOp::print(OpAsmPrinter &printer) {
   auto getOpFlags = [this]() -> ArrayAttr { return this->getFlags(); };
   printerFlagsImpl<BinaryFlagsAttr>(printer, getOpFlags, FLAGS_NAME);
   printerDataTypeImpl<BinaryDispatchOp>(printer, *this);
-}
-
-void TernaryDispatchOp::print(OpAsmPrinter &printer) {
-  printer << " " << getKind();
-  printerInputImpl<TernaryDispatchOp>(printer, *this);
-  auto getOpFlags = [this]() -> ArrayAttr { return this->getFlags(); };
-  printerFlagsImpl<TernaryFlagsAttr>(printer, getOpFlags, FLAGS_NAME);
-  printerDataTypeImpl<TernaryDispatchOp>(printer, *this);
 }
 
 template <typename FLAGS>
@@ -343,13 +321,6 @@ LogicalResult BinaryDispatchOp::verify() {
   }
   // 'inputs' = [m, n, lda, ldb, ldo]
   return verifyInputs(*this, /*expected=*/5);
-}
-
-LogicalResult TernaryDispatchOp::verify() {
-  // 'inputs' = [m, n, k, lda, ldb, ldc]
-  if (failed(verifyInputs(*this, /*expected=*/6)))
-    return failure();
-  return success();
 }
 
 LogicalResult FusedBrgemmDispatchOp::verify() {

@@ -101,20 +101,6 @@ static void buildInvokeCall(OpBuilder &builder, Location loc,
       getOperands(builder, loc, op->getOperands(), dataTypeAttr));
 }
 
-struct ConvertTernaryXsmmOp : public OpRewritePattern<TernaryOp> {
-  using OpRewritePattern<TernaryOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TernaryOp ternaryOp,
-                                PatternRewriter &rewriter) const override {
-    std::string funcName =
-        "xsmm_" + stringifyEnum(ternaryOp.getCallee()).str() + "_invoke";
-    buildInvokeCall(rewriter, ternaryOp.getLoc(), funcName, ternaryOp,
-                    ternaryOp.getDataTypeAttr());
-    rewriter.eraseOp(ternaryOp);
-    return success();
-  }
-};
-
 struct ConvertGemmXsmmOp : public OpRewritePattern<GemmOp> {
   using OpRewritePattern<GemmOp>::OpRewritePattern;
 
@@ -213,8 +199,7 @@ static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
 template <typename OpTy,
           typename = std::enable_if_t<
               std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
-              std::is_same<OpTy, xsmm::BinaryDispatchOp>::value ||
-              std::is_same<OpTy, xsmm::TernaryDispatchOp>::value>>
+              std::is_same<OpTy, xsmm::BinaryDispatchOp>::value>>
 void addKindOperand(RewriterBase &rewriter, OpTy dispatchOp,
                     SmallVectorImpl<Value> &dispatchOperands,
                     SmallVectorImpl<Type> &dispatchOperandTypes) {
@@ -302,11 +287,10 @@ static LogicalResult buildDispatchOp(RewriterBase &rewriter, OpTy dispatchOp,
   SmallVector<Type, 10> dispatchOperandTypes;
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
-  // If `OpTy` is unary, binary or ternary we need to dispatch and extra
+  // If `OpTy` is unary or binary we need to dispatch and extra
   // integer for the kind of operation to invoke.
   if (std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
-      std::is_same<OpTy, xsmm::BinaryDispatchOp>::value ||
-      std::is_same<OpTy, xsmm::TernaryDispatchOp>::value) {
+      std::is_same<OpTy, xsmm::BinaryDispatchOp>::value) {
     addKindOperand(rewriter, dispatchOp, dispatchOperands,
                    dispatchOperandTypes);
   }
@@ -367,16 +351,6 @@ struct ConvertBrgemmDispatchOp : public OpRewritePattern<BrgemmDispatchOp> {
   }
 };
 
-struct ConvertTernaryDispatchOp : public OpRewritePattern<TernaryDispatchOp> {
-  using OpRewritePattern<TernaryDispatchOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TernaryDispatchOp dispatchOp,
-                                PatternRewriter &rewriter) const override {
-    return buildDispatchOp<TernaryDispatchOp>(rewriter, dispatchOp,
-                                              "xsmm_ternary_dispatch");
-  }
-};
-
 struct ConvertBinaryDispatchOp : public OpRewritePattern<BinaryDispatchOp> {
   using OpRewritePattern<BinaryDispatchOp>::OpRewritePattern;
 
@@ -421,10 +395,10 @@ struct ConvertXsmmToFunc
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns
-        .add<ConvertTernaryXsmmOp, ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
+        .add<ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
              ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
             patterns.getContext());
-    patterns.add<ConvertTernaryDispatchOp, ConvertBinaryDispatchOp,
+    patterns.add<ConvertBinaryDispatchOp,
                  ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
                  ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
         patterns.getContext());
