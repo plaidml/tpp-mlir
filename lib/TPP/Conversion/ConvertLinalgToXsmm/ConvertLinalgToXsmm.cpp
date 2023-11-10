@@ -782,16 +782,19 @@ void ConvertLinalgToXsmm::runOnOperation() {
     return signalPassFailure();
 }
 
-template <typename OpTy>
-static void updateGemmOpFlags(RewriterBase &rewriter, OpTy gemmDispatchOp) {
-  static_assert(llvm::is_one_of<OpTy, xsmm::GemmDispatchOp,
+template <typename XsmmDisTy, typename XsmmTy>
+static void updateGemmOpFlags(RewriterBase &rewriter, XsmmDisTy gemmDispatchOp,
+                              XsmmTy gemmOp) {
+  static_assert(llvm::is_one_of<XsmmDisTy, xsmm::GemmDispatchOp,
                                 xsmm::BrgemmDispatchOp>::value);
-  if (!gemmDispatchOp->hasOneUse())
-    return;
+  static_assert(llvm::is_one_of<XsmmTy, xsmm::GemmOp, xsmm::BrgemmOp>::value);
+
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(gemmDispatchOp);
 
-  rewriter.updateRootInPlace(gemmDispatchOp, [&]() {
+  auto clonedOp =
+      cast<XsmmDisTy>(rewriter.clone(*gemmDispatchOp.getOperation()));
+  rewriter.updateRootInPlace(clonedOp, [&]() {
     ArrayAttr flags = gemmDispatchOp.getFlags();
     SmallVector<Attribute> newFlags;
     for (auto flag : flags) {
@@ -805,8 +808,11 @@ static void updateGemmOpFlags(RewriterBase &rewriter, OpTy gemmDispatchOp) {
     }
     newFlags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
                                                 xsmm::GemmFlags::BETA_0));
-    gemmDispatchOp.setFlagsAttr(rewriter.getArrayAttr(newFlags));
+    clonedOp.setFlagsAttr(rewriter.getArrayAttr(newFlags));
   });
+  rewriter.replaceUsesWithIf(
+      gemmDispatchOp->getResults(), clonedOp->getResults(),
+      [&](OpOperand &operand) { return operand.getOwner() == gemmOp; });
 }
 
 static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
@@ -883,26 +889,24 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
     xsmm::GemmDispatchOp gemmDispatchOp =
         cast<xsmm::GemmDispatchOp>(gemmOp.getInputs()[0].getDefiningOp());
-    updateGemmOpFlags(rewriter, gemmDispatchOp);
+    updateGemmOpFlags(rewriter, gemmDispatchOp, gemmOp);
   } else {
-    xsmm::BrgemmDispatchOp brgemmDispatchOp = cast<xsmm::BrgemmDispatchOp>(
-        cast<xsmm::BrgemmOp>(*it).getInputs()[0].getDefiningOp());
-    updateGemmOpFlags(rewriter, brgemmDispatchOp);
+    auto brgemmOp = cast<xsmm::BrgemmOp>(*it);
+    xsmm::BrgemmDispatchOp brgemmDispatchOp =
+        cast<xsmm::BrgemmDispatchOp>(brgemmOp.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, brgemmDispatchOp, brgemmOp);
   }
   rewriter.eraseOp(rootOp);
 }
 
 void FoldXsmmFlags::runOnOperation() {
   SmallVector<xsmm::UnaryOp> producers;
+  IRRewriter rewriter(&getContext());
   getOperation()->walk([&](xsmm::UnaryOp unaryOp) {
     auto kind = unaryOp.getCallee();
     if (kind == xsmm::UnaryKind::ZERO)
-      producers.push_back(unaryOp);
+      fuseZeroWithGemmOrBrgemm(rewriter, unaryOp);
   });
-
-  IRRewriter rewriter(&getContext());
-  for (xsmm::UnaryOp producer : producers)
-    fuseZeroWithGemmOrBrgemm(rewriter, producer);
 }
 
 // Convert a linalg.matmul to a XSMM matmul op.

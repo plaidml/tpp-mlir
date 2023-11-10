@@ -111,10 +111,12 @@ func.func @multiple_users(%arg0: memref<32x512xf32, strided<[512, 1], offset: ?>
   return
 }
 
-// Here we could replace the flag but we bail if the gemm.dispatch has multiple users.
 // CHECK-LABEL: multiple_users
-// CHECK-NOT: %{{.+}} = xsmm.gemm.dispatch [32, 64, 512, 512, 512, 64] flags = (beta_0) data_type = f32
-// CHECK: %{{.+}} = xsmm.gemm.dispatch [32, 64, 512, 512, 512, 64] flags = (none) data_type = f32
+// CHECK: %[[FIRST_GEMM:.+]] = xsmm.gemm.dispatch [32, 64, 512, 512, 512, 64] flags = (beta_0) data_type = f32
+// CHECK: %[[SECOND_GEMM:.+]] = xsmm.gemm.dispatch [32, 64, 512, 512, 512, 64] flags = (beta_0) data_type = f32
+// CHECK: xsmm.gemm(data_type = f32, %[[FIRST_GEMM]], %{{.+}}, %{{.+}}, %{{.+}})
+// CHECK: xsmm.gemm(data_type = f32, %[[SECOND_GEMM]], %{{.+}}, %{{.+}}, %{{.+}})
+
 
 // -----
 
@@ -134,10 +136,11 @@ func.func @multiple_users_1(%arg0: memref<512x512xf32>,
   return
 }
 
-// Here we must not replace the flag.
 // CHECK-LABEL: multiple_users_1
-// CHECK-NOT: %{{.+}} = xsmm.gemm.dispatch [512, 512, 512, 512, 512, 512] flags = (beta_0) data_type = f32
-// CHECK: %{{.+}} = xsmm.gemm.dispatch [512, 512, 512, 512, 512, 512] flags = (none) data_type = f32
+// CHECK: %[[FIRST_GEMM:.+]] = xsmm.gemm.dispatch [512, 512, 512, 512, 512, 512] flags = (beta_0) data_type = f32
+// CHECK: %[[SECOND_GEMM:.+]] = xsmm.gemm.dispatch [512, 512, 512, 512, 512, 512] flags = (none) data_type = f32
+// CHECK: xsmm.gemm(data_type = f32, %[[FIRST_GEMM]], %{{.+}}, %{{.+}}, %{{.+}})
+// CHECK: xsmm.gemm(data_type = f32, %[[SECOND_GEMM]], %{{.+}}, %{{.+}}, %{{.+}})
 
 // -----
 
