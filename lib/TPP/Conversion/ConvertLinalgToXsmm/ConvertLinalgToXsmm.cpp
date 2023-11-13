@@ -894,6 +894,7 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
                                      xsmm::UnaryOp rootOp) {
   LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
                           << rootOp << "\n");
+  // 1. Check if we have a gemm zero initialized by rootOp.
   auto gemmLikeOp = getZeroInitGemmLikeOp(rootOp);
   if (!gemmLikeOp)
     return;
