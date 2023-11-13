@@ -236,18 +236,28 @@ static FailureOr<xsmm::UnaryFlags> getBroadCastUnaryFlagFromMap(AffineMap map) {
   }
 }
 
-// Convert linalg.generic to xsmm unary relu op.
-struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
+// Convert linalg.generic to xsmm unary relu or identity op.
+struct ConvertGenericToUnary : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics() ||
-        !structured_match::utils::isTwoDReluOp(genericOp, &operands) ||
-        operands.size() != 2) {
+    if (!genericOp.hasBufferSemantics())
       return failure();
+
+    xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr();
+    if (structured_match::utils::isTwoDReluOp(genericOp, &operands)) {
+      kind = xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                      xsmm::UnaryKind::RELU);
+    } else if (structured_match::utils::isTwoDIdentityOp(genericOp,
+                                                         &operands)) {
+      kind = xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                      xsmm::UnaryKind::IDENTITY);
     }
+
+    if (!kind || operands.size() != 2)
+      return failure();
 
     OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
     auto broadCastFlag = getBroadCastUnaryFlagFromMap(
@@ -260,41 +270,6 @@ struct ConvertGenericToUnaryRelu : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     auto flags = rewriter.getArrayAttr(
         xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
-    xsmm::UnaryKindAttr kind =
-        xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::RELU);
-    xsmm::utils::replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo,
-                                    flags, kind);
-    return success();
-  }
-};
-
-// Convert linalg.generic to xsmm unary identity op.
-struct ConvertGenericToUnaryIdentity : OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics() ||
-        !structured_match::utils::isTwoDIdentityOp(genericOp, &operands) ||
-        operands.size() != 2) {
-      return failure();
-    }
-
-    OpOperand *inputOperand = getOperandFromValue(genericOp, operands[0]);
-    auto broadCastFlag = getBroadCastUnaryFlagFromMap(
-        genericOp.getMatchingIndexingMap(inputOperand));
-    if (failed(broadCastFlag))
-      return failure();
-    auto unaryInfo =
-        xsmm::utils::getUnaryInfo(operands[0], operands[1], *broadCastFlag);
-    if (failed(unaryInfo))
-      return failure();
-
-    auto flags = rewriter.getArrayAttr(
-        xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *broadCastFlag));
-    xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
-        rewriter.getContext(), xsmm::UnaryKind::IDENTITY);
     xsmm::utils::replaceOpWithUnary(rewriter, genericOp, operands, *unaryInfo,
                                     flags, kind);
     return success();
@@ -374,54 +349,30 @@ static LogicalResult rewriteBinaryOp(RewriterBase &rewriter,
   return success();
 }
 
-// Convert linalg.generic to xsmm binary sub op.
-struct ConvertGenericToBinarySub : public OpRewritePattern<linalg::GenericOp> {
+// Convert linalg.generic to xsmm binary:
+// 1. Add
+// 2. Mul
+// 3. Sub
+struct ConvertGenericToBinary : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics() ||
-        !structured_match::utils::isTwoDSubOp(genericOp, &operands) ||
-        operands.size() != 3) {
+    if (!genericOp.hasBufferSemantics())
       return failure();
-    }
-    return rewriteBinaryOp(rewriter, genericOp, operands,
-                           xsmm::BinaryKind::SUB);
-  }
-};
+    xsmm::BinaryKind kind = xsmm::BinaryKind::NONE;
 
-// Convert linalg.generic to xsmm binary mul op.
-struct ConvertGenericToBinaryMul : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+    if (structured_match::utils::isTwoDAddOp(genericOp, &operands))
+      kind = xsmm::BinaryKind::ADD;
+    else if (structured_match::utils::isTwoDMulOp(genericOp, &operands))
+      kind = xsmm::BinaryKind::MUL;
+    else if (structured_match::utils::isTwoDSubOp(genericOp, &operands))
+      kind = xsmm::BinaryKind::SUB;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics() ||
-        !structured_match::utils::isTwoDMulOp(genericOp, &operands) ||
-        operands.size() != 3) {
+    if (kind == xsmm::BinaryKind::NONE || operands.size() != 3)
       return failure();
-    }
-    return rewriteBinaryOp(rewriter, genericOp, operands,
-                           xsmm::BinaryKind::MUL);
-  }
-};
-
-// Convert linalg.generic to xsmm binary add op.
-struct ConvertGenericToBinaryAdd : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics() ||
-        !structured_match::utils::isTwoDAddOp(genericOp, &operands) ||
-        operands.size() != 3) {
-      return failure();
-    }
-    return rewriteBinaryOp(rewriter, genericOp, operands,
-                           xsmm::BinaryKind::ADD);
+    return rewriteBinaryOp(rewriter, genericOp, operands, kind);
   }
 };
 
@@ -946,12 +897,9 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns
-      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-           ConvertGenericToUnaryRelu, ConvertGenericToBinaryAdd,
-           ConvertGenericToBinarySub, ConvertGenericToBinaryMul,
-           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul, ConvertGenericToUnaryIdentity,
-           ConvertVnniPacking, ConvertGenericToVnniBrgemm>(
-          patterns.getContext());
+  patterns.add<
+      ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+      ConvertGenericToUnary, ConvertGenericToBinary, ConvertGenericToBrgemm,
+      ConvertBatchReduceMatmulToBatchReduceMatmul, ConvertMatmulToMatmul,
+      ConvertVnniPacking, ConvertGenericToVnniBrgemm>(patterns.getContext());
 }
