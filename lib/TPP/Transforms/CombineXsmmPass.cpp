@@ -97,26 +97,42 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
       if (isa<xsmm::BinaryOp>(user) &&
           (dyn_cast<xsmm::BinaryOp>(user)).getCallee() ==
               mlir::xsmm::BinaryKind::ADD) {
-        binaryOp = (dyn_cast<xsmm::BinaryOp>(user));
+        auto add = (dyn_cast<xsmm::BinaryOp>(user));
+        // Every operand is a different user, op can appear multiple times
+        if (binaryOp && binaryOp == add)
+          continue;
+        // But still, there should be only one binary
+        if (binaryOp && binaryOp != add)
+          return failure();
+        binaryOp = add;
         auto dispatchOp = dyn_cast<xsmm::BinaryDispatchOp>(
             binaryOp.getOperand(0).getDefiningOp());
         auto isFusedAdd = dispatchOp.getKind() == xsmm::BinaryKind::ADD;
         auto binaryFlags = dispatchOp.getFlags();
-        if (isFusedAdd &&
-            (binaryFlags.size() != 1 ||
-             (binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue() !=
-                  mlir::xsmm::BinaryFlags::BCAST_COL_IN_0 &&
-              binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue() !=
-                  mlir::xsmm::BinaryFlags::BCAST_COL_IN_1))) {
-          return failure();
+        if (isFusedAdd && (binaryFlags.size() != 1)) {
+          switch (binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue()) {
+            case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0:
+            case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1:
+            case mlir::xsmm::BinaryFlags::NONE:
+              return failure();
+            default:
+              break;
+          }
         }
-        continue;
       }
 
       if (isa<xsmm::UnaryOp>(user) &&
           (dyn_cast<xsmm::UnaryOp>(user)).getCallee() ==
               mlir::xsmm::UnaryKind::RELU) {
-        unaryOp = dyn_cast<xsmm::UnaryOp>(user);
+        auto relu = dyn_cast<xsmm::UnaryOp>(user);
+        // Every operand is a different user, op can appear multiple times
+        if (unaryOp && unaryOp == relu)
+          continue;
+        // But still, there should be only one binary
+        if (unaryOp && unaryOp != relu)
+          return failure();
+        unaryOp = relu;
+        continue;
       }
     }
 
