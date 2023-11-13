@@ -88,6 +88,9 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
   LogicalResult matchAndRewrite(xsmm::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     auto use = brgemmOp.getOperand(3).getDefiningOp();
+    if (!use)
+      return failure();
+
     xsmm::BinaryOp binaryOp;
     xsmm::UnaryOp unaryOp;
     for (auto user : use->getUsers()) {

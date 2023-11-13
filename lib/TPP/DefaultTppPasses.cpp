@@ -305,10 +305,10 @@ private:
       if (linalgToXsmm) {
         // Linalg to Xsmm conversion patterns.
         pm.addPass(createConvertLinalgToXsmm());
+        pm.addPass(createCombineXsmmOpPass());
       } else {
         // Tpp to Xsmm conversion patterns.
         pm.addPass(createConvertTppToXsmm());
-	pm.addPass(createCombineXsmmOpPass());
       }
       pm.addPass(createFoldXsmmFlags());
       pm.addPass(createVerifyXsmmCalls());
