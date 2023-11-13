@@ -30,6 +30,8 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   // IR-DAG: %[[C8:.+]] = arith.constant 8 : i64
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
   // IR-DAG: %[[C0:.+]] = arith.constant 0 : i64
+  // The unary dispatch in this case is the transpose. 
+  // IR-COUNT-1: xsmm_unary_dispatch
   // IR: xsmm_gemm_dispatch(%[[C1]], %[[C8]], %[[C2]], %[[C4]], %[[C8]], %[[C2]], %[[C2]], %[[C4]]) 
   %gemm = linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
