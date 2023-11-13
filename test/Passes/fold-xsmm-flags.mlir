@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -fold-xsmm-flags -split-input-file | FileCheck %s
 
-func.func @zero_flag(%arg0: memref<32x512xf32, strided<[512, 1], offset: ?>>,
-                     %arg1: memref<512x64xf32, strided<[512, 1], offset: ?>>) {
+func.func @zero_flag_gemm(%arg0: memref<32x512xf32, strided<[512, 1], offset: ?>>,
+                          %arg1: memref<512x64xf32, strided<[512, 1], offset: ?>>) {
   %cst = arith.constant 0.000000e+00 : f32
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x64xf32>
   %0 = xsmm.unary.dispatch zero [32, 64, 1, 64] flags = (bcast_scalar) data_type = f32
@@ -11,7 +11,7 @@ func.func @zero_flag(%arg0: memref<32x512xf32, strided<[512, 1], offset: ?>>,
   return
 }
 
-// CHECK-LABEL: zero_flag
+// CHECK-LABEL: zero_flag_gemm
 // CHECK-SAME: %[[ARG0:.+]]: memref<32x512xf32, strided<[512, 1], offset: ?>>
 // CHECK-SAME: %[[ARG1:.+]]: memref<512x64xf32, strided<[512, 1], offset: ?>>
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32x64xf32>
@@ -310,3 +310,24 @@ func.func @free_effect(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32x32xf32>, %
 // CHECK-LABEL: free_effect
 // CHECK-NOT: beta_0
 // CHECK: %{{.+}} = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 1] flags = (none) data_type = f32
+
+// -----
+
+func.func @zero_flag_fused_brgemm(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>, %arg2: memref<32x32xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c32_i64 = arith.constant 32 : i64 
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
+  %0 = xsmm.unary.dispatch zero [32, 32, 1, 32] flags = (bcast_scalar) data_type = f32
+  xsmm.unary zero(data_type = f32, %0, %cst, %alloc) : (i64, f32, memref<32x32xf32>) -> ()
+  
+  %1 = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 32] [add, relu]
+    flags = (none) binary_flags = (none) unary_flags = (none) data_type = f32
+  xsmm.fused_brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %arg2, %c32_i64) : 
+    (i64, memref<32x32xf32>, memref<32x32xf32>, memref<32x32xf32>, memref<32x32xf32>, i64) -> ()
+  return
+}
+
+// CHECK-LABEL: zero_flag_fused_brgemm
+// CHECK: %[[DIS:.+]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 32][add,relu]  
+// CHECK-SAME:  flags = (beta_0)  binary_flags = (none)  unary_flags = (none) data_type = f32
+// CHECK: xsmm.fused_brgemm(data_type = f32, %[[DIS]], %{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}, %{{.+}})

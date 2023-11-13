@@ -117,6 +117,10 @@ def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
+
+  let extraClassDeclaration = [{
+    Value getOutput() { return getInputs()[3]; }
+  }];
 }
 
 //===----------------------------------------------------------------------===//

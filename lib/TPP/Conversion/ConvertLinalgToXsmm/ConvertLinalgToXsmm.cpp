@@ -782,12 +782,16 @@ void ConvertLinalgToXsmm::runOnOperation() {
     return signalPassFailure();
 }
 
+// Set the beta flags of a gemm dispatch to zero by cloning and updating the
+// clone.
 template <typename XsmmDisTy, typename XsmmTy>
 static void updateGemmOpFlags(RewriterBase &rewriter, XsmmDisTy gemmDispatchOp,
                               XsmmTy gemmOp) {
-  static_assert(llvm::is_one_of<XsmmDisTy, xsmm::GemmDispatchOp,
-                                xsmm::BrgemmDispatchOp>::value);
-  static_assert(llvm::is_one_of<XsmmTy, xsmm::GemmOp, xsmm::BrgemmOp>::value);
+  static_assert(
+      llvm::is_one_of<XsmmDisTy, xsmm::GemmDispatchOp, xsmm::BrgemmDispatchOp,
+                      xsmm::FusedBrgemmDispatchOp>::value);
+  static_assert(llvm::is_one_of<XsmmTy, xsmm::GemmOp, xsmm::BrgemmOp,
+                                xsmm::FusedBrgemmOp>::value);
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(gemmDispatchOp);
@@ -815,14 +819,12 @@ static void updateGemmOpFlags(RewriterBase &rewriter, XsmmDisTy gemmDispatchOp,
       [&](OpOperand &operand) { return operand.getOwner() == gemmOp; });
 }
 
-static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
-                                     xsmm::UnaryOp rootOp) {
-  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
-                          << rootOp << "\n");
-  // 1. Prove the alloc to be zero. Linear walk of the bb
-  // and make sure there are only side-effect free operations between
-  // the zero op and the gemm. Bail out if any operations take
-  // a subview from `dest`.
+// Given `rootOp` return the first gemm-like operation that is zero initialized
+// by `rootOp`.
+static std::optional<Operation *> getZeroInitGemmLikeOp(xsmm::UnaryOp rootOp) {
+  // Walk the bb and make sure there are only side-effect free operations
+  // between the zero op and the gemm. Bail out if any operations take a subview
+  // from `dest`.
   Value dest = rootOp.getInputs().back();
   DenseSet<Operation *> destUsers(dest.getUsers().begin(),
                                   dest.getUsers().end());
@@ -833,7 +835,7 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
   } else {
     Operation *defOp = dest.getDefiningOp();
     if (!defOp)
-      return;
+      return std::nullopt;
     blck = defOp->getBlock();
   }
   assert(blck && "must be a valid ptr");
@@ -843,13 +845,13 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
     // View may introduce aliasing.
     if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
       if (view.getViewSource() == dest)
-        return;
+        return std::nullopt;
     }
     it++;
   }
 
   if (it == itEnd)
-    return;
+    return std::nullopt;
 
   while (++it != itEnd) {
     // Skip operations that do not touch `dest`.
@@ -861,7 +863,7 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
     // View may introduce aliasing.
     if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
       if (view.getViewSource() == dest)
-        return;
+        return std::nullopt;
     }
     // A gemm or brgemm operation touching `dest`, fold if the
     // output (i.e. C matrix) is `dest`.
@@ -875,26 +877,47 @@ static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
       if (outVal == dest)
         break;
     }
+    if (auto fusedBrgemmOp = dyn_cast<xsmm::FusedBrgemmOp>(*it)) {
+      Value outVal = fusedBrgemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
     // Fail.
-    return;
+    return std::nullopt;
   }
   if (it == itEnd)
+    return std::nullopt;
+  return &*it;
+}
+
+static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
+                                     xsmm::UnaryOp rootOp) {
+  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
+                          << rootOp << "\n");
+  auto gemmLikeOp = getZeroInitGemmLikeOp(rootOp);
+  if (!gemmLikeOp)
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op OK: "
                           << rootOp << "\n");
 
   // 2. Update flags.
-  assert(isa<xsmm::GemmOp>(*it) || isa<xsmm::BrgemmOp>(*it));
-  if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
+  assert(isa<xsmm::GemmOp>(*gemmLikeOp) || isa<xsmm::BrgemmOp>(*gemmLikeOp) ||
+         isa<xsmm::FusedBrgemmOp>(*gemmLikeOp));
+  if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*gemmLikeOp)) {
     xsmm::GemmDispatchOp gemmDispatchOp =
         cast<xsmm::GemmDispatchOp>(gemmOp.getInputs()[0].getDefiningOp());
     updateGemmOpFlags(rewriter, gemmDispatchOp, gemmOp);
-  } else {
-    auto brgemmOp = cast<xsmm::BrgemmOp>(*it);
+  } else if (auto brgemmOp = dyn_cast<xsmm::BrgemmOp>(*gemmLikeOp)) {
     xsmm::BrgemmDispatchOp brgemmDispatchOp =
         cast<xsmm::BrgemmDispatchOp>(brgemmOp.getInputs()[0].getDefiningOp());
     updateGemmOpFlags(rewriter, brgemmDispatchOp, brgemmOp);
+  } else {
+    auto fusedBrgemm = cast<xsmm::FusedBrgemmOp>(*gemmLikeOp);
+    xsmm::FusedBrgemmDispatchOp fusedBrgemmDispatchOp =
+        cast<xsmm::FusedBrgemmDispatchOp>(
+            fusedBrgemm.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, fusedBrgemmDispatchOp, fusedBrgemm);
   }
   rewriter.eraseOp(rootOp);
 }
