@@ -347,7 +347,7 @@ mlir::linalgx::collapseIterators(RewriterBase &rewriter,
     // original maps and push the collapsed dimension in a set.
     auto isCollapsedDim = [&](int64_t pos) -> bool {
       auto isInSet = [&](int64_t pos) -> bool {
-        if (AffineDimExpr dimExpr = resultExprs[pos].dyn_cast<AffineDimExpr>())
+        if (AffineDimExpr dimExpr = dyn_cast<AffineDimExpr>(resultExprs[pos]))
           if (collapsedDims.count(dimExpr.getPosition())) {
             assert(!isValidGroupReass &&
                    "multiple collapse dimension per reassociation group");

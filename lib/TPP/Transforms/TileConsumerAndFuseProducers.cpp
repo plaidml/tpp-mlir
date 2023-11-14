@@ -236,7 +236,7 @@ static FailureOr<llvm::SmallBitVector> getTileConfigProducer(
   llvm::SmallBitVector tileConfigProducer(numLoopsProd);
   SmallVector<OpFoldResult> tileProducer(numLoopsProd);
   for (auto expr : llvm::enumerate(consumerOperandMap->getResults())) {
-    auto dim = expr.value().cast<AffineDimExpr>();
+    auto dim = cast<AffineDimExpr>(expr.value());
     tileConfigProducer[expr.index()] = tileSpecConsumer[dim.getPosition()];
     tileProducer[expr.index()] = tileSizes.at(consumer)[dim.getPosition()];
   }
@@ -645,7 +645,7 @@ getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
   SmallVector<OpFoldResult> eltWiseTiles;
   for (auto expr : outputMap.getResults()) {
     eltWiseTiles.push_back(
-        tilesProducer[expr.cast<AffineDimExpr>().getPosition()]);
+        tilesProducer[cast<AffineDimExpr>(expr).getPosition()]);
   }
   return eltWiseTiles;
 }

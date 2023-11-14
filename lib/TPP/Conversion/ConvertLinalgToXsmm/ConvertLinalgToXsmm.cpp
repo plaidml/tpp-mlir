@@ -194,10 +194,10 @@ static FailureOr<BroadCastType> getBroadCastFromMap(AffineMap map) {
 
   SmallVector<bool> isPresent(map.getNumInputs(), false);
   for (auto expr : map.getResults()) {
-    if (auto cstExpr = expr.dyn_cast<AffineConstantExpr>()) {
+    if (auto cstExpr = dyn_cast<AffineConstantExpr>(expr)) {
       if (cstExpr.getValue() != 0)
         return failure();
-    } else if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    } else if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
       isPresent[dimExpr.getPosition()] = true;
     } else {
       return failure();

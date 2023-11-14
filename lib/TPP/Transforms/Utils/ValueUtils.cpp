@@ -138,7 +138,7 @@ std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value operand,
       loc, builder.getIntegerType(64), alignedPointerAsIndex);
   // TODO: non-POD will require an LLVMTypeConverter.
   Value alignedPointer = builder.create<LLVM::IntToPtrOp>(
-      loc, LLVM::LLVMPointerType::get(memrefType.getElementType()),
+      loc, LLVM::LLVMPointerType::get(builder.getContext()),
       alignedPointerAsI64);
   Value offset = meta.getOffset();
   return std::make_pair(alignedPointer, offset);
