@@ -16,8 +16,8 @@ else()
 
   FetchContent_Declare(
     xsmm_dnn
-    URL https://github.com/libxsmm/libxsmm-dnn/archive/3ef7d1d6206fa4b75c9a787e1e2c11aa3e925f60.tar.gz
-    URL_HASH SHA256=223b6c6f03830701afd1c8fcf950ab67e2a0da22dee8e00c062682a750f56056
+    URL https://github.com/libxsmm/libxsmm-dnn/archive/24fefde9f8c4ed777d0a8d675db46bc4e3a92120.tar.gz
+    URL_HASH SHA256=5f5fcf5a47e38f658f80efa3b1654b6ca8df6f610efdc5ccaf2b83f6cd5a1b70
   )
 
   FetchContent_GetProperties(xsmm_dnn)
@@ -37,6 +37,8 @@ add_executable(xsmm_dnn_mlp
   ${XSMM_DNN_SRCS}
   ${LIBXSMM_DNNROOT}/tests/mlp/mlp_example.c
 )
+set_property(TARGET xsmm_dnn_mlp PROPERTY COMPILE_WARNING_AS_ERROR ON)
+
 set_Target_properties(xsmm_dnn_mlp PROPERTIES RUNTIME_OUTPUT_DIRECTORY bin)
 target_include_directories(xsmm_dnn_mlp PRIVATE ${XSMM_INCLUDE_DIRS})
 target_include_directories(xsmm_dnn_mlp PRIVATE ${XSMM_INCLUDE_DIRS}/../src/template)
