@@ -183,15 +183,16 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
       return failure();
 
     // We only support row/col broadcast for binary (or NONE)
+    // TODO: Check if the arguments shapes match the flags in each case
     switch (binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue()) {
     case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0:
     case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1:
     case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_0:
     case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_1:
     case mlir::xsmm::BinaryFlags::NONE:
-      return failure();
-    default:
       break;
+    default:
+      return failure();
     }
 
     // Now, replace the ops with a fused BRGEMM
