@@ -31,6 +31,8 @@ namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_CONVERTLINALGTOXSMM
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_FOLDXSMMFLAGS
+#include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -40,6 +42,10 @@ namespace {
 
 struct ConvertLinalgToXsmm
     : public tpp::impl::ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
+  void runOnOperation() override;
+};
+
+struct FoldXsmmFlags : public tpp::impl::FoldXsmmFlagsBase<FoldXsmmFlags> {
   void runOnOperation() override;
 };
 
@@ -774,6 +780,157 @@ void ConvertLinalgToXsmm::runOnOperation() {
   tpp::populateLinalgToXsmmPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
+}
+
+// Set the beta flags of a gemm dispatch to zero by cloning and updating the
+// clone.
+template <typename XsmmDisTy, typename XsmmTy>
+static void updateGemmOpFlags(RewriterBase &rewriter, XsmmDisTy gemmDispatchOp,
+                              XsmmTy gemmOp) {
+  static_assert(
+      llvm::is_one_of<XsmmDisTy, xsmm::GemmDispatchOp, xsmm::BrgemmDispatchOp,
+                      xsmm::FusedBrgemmDispatchOp>::value);
+  static_assert(llvm::is_one_of<XsmmTy, xsmm::GemmOp, xsmm::BrgemmOp,
+                                xsmm::FusedBrgemmOp>::value);
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(gemmDispatchOp);
+
+  auto clonedOp =
+      cast<XsmmDisTy>(rewriter.clone(*gemmDispatchOp.getOperation()));
+  rewriter.updateRootInPlace(clonedOp, [&]() {
+    ArrayAttr flags = gemmDispatchOp.getFlags();
+    SmallVector<Attribute> newFlags;
+    for (auto flag : flags) {
+      if (auto gemmFlag = dyn_cast<xsmm::GemmFlagsAttr>(flag)) {
+        if ((gemmFlag.getValue() == xsmm::GemmFlags::NONE) ||
+            (gemmFlag.getValue() == xsmm::GemmFlags::BETA_0)) {
+          continue;
+        }
+      }
+      newFlags.push_back(flag);
+    }
+    newFlags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                xsmm::GemmFlags::BETA_0));
+    clonedOp.setFlagsAttr(rewriter.getArrayAttr(newFlags));
+  });
+  rewriter.replaceUsesWithIf(
+      gemmDispatchOp->getResults(), clonedOp->getResults(),
+      [&](OpOperand &operand) { return operand.getOwner() == gemmOp; });
+}
+
+// Given `rootOp` return the first gemm-like operation that is zero initialized
+// by `rootOp`.
+static std::optional<Operation *> getZeroInitGemmLikeOp(xsmm::UnaryOp rootOp) {
+  // Walk the bb and make sure there are only side-effect free operations
+  // between the zero op and the gemm. Bail out if any operations take a subview
+  // from `dest`.
+  Value dest = rootOp.getInputs().back();
+  DenseSet<Operation *> destUsers(dest.getUsers().begin(),
+                                  dest.getUsers().end());
+
+  Block *blck = nullptr;
+  if (auto bbArg = dyn_cast<BlockArgument>(dest)) {
+    blck = bbArg.getOwner();
+  } else {
+    Operation *defOp = dest.getDefiningOp();
+    if (!defOp)
+      return std::nullopt;
+    blck = defOp->getBlock();
+  }
+  assert(blck && "must be a valid ptr");
+  auto it = blck->begin();
+  auto itEnd = blck->end();
+  while (it != itEnd && &*it != rootOp.getOperation()) {
+    // View may introduce aliasing.
+    if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
+      if (view.getViewSource() == dest)
+        return std::nullopt;
+    }
+    it++;
+  }
+
+  if (it == itEnd)
+    return std::nullopt;
+
+  while (++it != itEnd) {
+    // Skip operations that do not touch `dest`.
+    if (!destUsers.count(&*it))
+      continue;
+    // No memory effects other than read.
+    if (mlir::hasSingleEffect<MemoryEffects::Read>(&*it, dest))
+      continue;
+    // View may introduce aliasing.
+    if (auto view = dyn_cast<ViewLikeOpInterface>(&*it)) {
+      if (view.getViewSource() == dest)
+        return std::nullopt;
+    }
+    // A gemm or brgemm operation touching `dest`, fold if the
+    // output (i.e. C matrix) is `dest`.
+    if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*it)) {
+      Value outVal = gemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
+    if (auto brgemmOp = dyn_cast<xsmm::BrgemmOp>(*it)) {
+      Value outVal = brgemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
+    if (auto fusedBrgemmOp = dyn_cast<xsmm::FusedBrgemmOp>(*it)) {
+      Value outVal = fusedBrgemmOp.getOutput();
+      if (outVal == dest)
+        break;
+    }
+    // Fail.
+    return std::nullopt;
+  }
+  if (it == itEnd)
+    return std::nullopt;
+  return &*it;
+}
+
+static void fuseZeroWithGemmOrBrgemm(RewriterBase &rewriter,
+                                     xsmm::UnaryOp rootOp) {
+  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op: "
+                          << rootOp << "\n");
+  // 1. Check if we have a gemm zero initialized by rootOp.
+  auto gemmLikeOp = getZeroInitGemmLikeOp(rootOp);
+  if (!gemmLikeOp)
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "[fuseZeroWithGemmOrBrgemm] Candidate op OK: "
+                          << rootOp << "\n");
+
+  // 2. Update flags.
+  assert(isa<xsmm::GemmOp>(*gemmLikeOp) || isa<xsmm::BrgemmOp>(*gemmLikeOp) ||
+         isa<xsmm::FusedBrgemmOp>(*gemmLikeOp));
+  if (auto gemmOp = dyn_cast<xsmm::GemmOp>(*gemmLikeOp)) {
+    xsmm::GemmDispatchOp gemmDispatchOp =
+        cast<xsmm::GemmDispatchOp>(gemmOp.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, gemmDispatchOp, gemmOp);
+  } else if (auto brgemmOp = dyn_cast<xsmm::BrgemmOp>(*gemmLikeOp)) {
+    xsmm::BrgemmDispatchOp brgemmDispatchOp =
+        cast<xsmm::BrgemmDispatchOp>(brgemmOp.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, brgemmDispatchOp, brgemmOp);
+  } else {
+    auto fusedBrgemm = cast<xsmm::FusedBrgemmOp>(*gemmLikeOp);
+    xsmm::FusedBrgemmDispatchOp fusedBrgemmDispatchOp =
+        cast<xsmm::FusedBrgemmDispatchOp>(
+            fusedBrgemm.getInputs()[0].getDefiningOp());
+    updateGemmOpFlags(rewriter, fusedBrgemmDispatchOp, fusedBrgemm);
+  }
+  rewriter.eraseOp(rootOp);
+}
+
+void FoldXsmmFlags::runOnOperation() {
+  SmallVector<xsmm::UnaryOp> producers;
+  IRRewriter rewriter(&getContext());
+  getOperation()->walk([&](xsmm::UnaryOp unaryOp) {
+    auto kind = unaryOp.getCallee();
+    if (kind == xsmm::UnaryKind::ZERO)
+      fuseZeroWithGemmOrBrgemm(rewriter, unaryOp);
+  });
 }
 
 // Convert a linalg.matmul to a XSMM matmul op.
