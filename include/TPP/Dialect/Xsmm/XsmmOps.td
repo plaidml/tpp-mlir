@@ -83,7 +83,7 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   }];
 
   let extraClassDeclaration = [{
-    Value getOutput() { return getInputs().back(); }
+    Value getOutput() { return getInputs()[3]; }
   }];
 }
 
