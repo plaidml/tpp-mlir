@@ -143,8 +143,8 @@ def Perf_BenchOp : Perf_Op<"bench",
     An example of a benchmark with an output result:
 
     ```mlir
-    %sum = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%val : i32) {
-      %sum_next = arith.addi %val, %cst : i32
+    %sum = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %val) -> i32 {
+      %sum_next = arith.addi %arg0, %cst : i32
       perf.yield %sum_next : i32
     } -> i32
     memref.store %sum, %buff[] : memref<i32>
@@ -154,7 +154,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     a benchmarking loop.
     For example, the following input:
     ```mlir
-    %res, ... = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%x, ... : ...) {
+    %res, ... = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(...) -> ... {
       ... // body - ops under measurement
 
       // Yield current iteration values to the next iteration iter_args (%x, ...)

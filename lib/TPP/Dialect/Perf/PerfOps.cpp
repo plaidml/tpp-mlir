@@ -170,29 +170,28 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   locs.clear();
 
   // Parse iter_args, if any
-  if (succeeded(parser.parseOptionalKeyword("iter_args"))) {
-    if (parser.parseLParen())
+  SmallVector<OpAsmParser::Argument, 4> regionArgs;
+  bool hasIterArgs = succeeded(parser.parseOptionalKeyword("iter_args"));
+  if (hasIterArgs) {
+    if (parser.parseAssignmentList(regionArgs, operands) ||
+        parser.parseArrowTypeList(result.types))
       return failure();
+  }
 
-    locs.push_back(parser.getCurrentLocation());
-    if (parser.parseOperandList(operands))
-      return failure();
-    if (parser.parseColon())
-      return failure();
+  if (regionArgs.size() != result.types.size() + 1)
+    return parser.emitError(parser.getNameLoc(),
+        "mismatch in number of loop-carried values and defined values");
 
-    // Avoid using parseTypeList because it crashes on GCC
-    if (parser.parseCommaSeparatedList(parseType))
-      return failure();
-    if (parser.parseRParen())
-      return failure();
-
-    // Validate operands
-    if (!operands.size())
-      return parser.emitError(parser.getCurrentLocation(), "expect arguments");
-    if (operands.size() != types.size())
-      return parser.emitError(locs[0], "expect same number of types as args");
-    if (parser.resolveOperands(operands, types, locs[0], result.operands))
-      return failure();
+    // Resolve input operands.
+  if (hasIterArgs) {
+    for (auto argOperandType :
+         llvm::zip(llvm::drop_begin(regionArgs), operands, result.types)) {
+      Type type = std::get<2>(argOperandType);
+      std::get<0>(argOperandType).type = type;
+      if (parser.resolveOperand(std::get<1>(argOperandType), type,
+                                result.operands))
+        return failure();
+    }
   }
 
   // Parse region
