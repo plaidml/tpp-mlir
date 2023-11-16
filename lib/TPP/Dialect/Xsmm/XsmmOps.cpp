@@ -277,6 +277,11 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
 
 template <typename OpTy>
 static LogicalResult verifyInputs(OpTy op, size_t expected) {
+  static_assert(llvm::is_one_of<OpTy, xsmm::UnaryDispatchOp,
+                                xsmm::BinaryDispatchOp, GemmDispatchOp,
+                                BrgemmDispatchOp, FusedBrgemmDispatchOp>::value,
+                "applies to xsmm dispatch operations only");
+
   // `inputs` are leading dimensions and sizes
   size_t numInputs = op.getInputs().size();
   if (numInputs != expected) {
