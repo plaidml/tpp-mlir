@@ -62,6 +62,15 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
                            "tensor::TensorDialect"];
 }
 
+def VerifyXsmmCalls : Pass<"verify-xsmm-calls", "func::FuncOp"> {
+  let summary = "Verify XSMM calls (dispatch and invoke)";
+  let description = [{
+    Make sure XSMM dispatch and invoke call are in a consistent
+    state and they do not contradict each others.
+  }];
+  let dependentDialects = [ "xsmm::XsmmDialect" ];
+}
+
 def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
   let summary = "Convert linalg to func";
   let description = [{

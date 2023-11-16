@@ -13,7 +13,14 @@ include "TPP/Dialect/Xsmm/XsmmDialect.td"
 include "TPP/Dialect/Xsmm/XsmmEnum.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, 
+class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
+    Type<And<[MemRefOf<allowedTypes>.predicate,
+              HasAnyRankOfPred<ranks>, HasStaticShapePred]>,
+         !interleave(!foreach(rank, ranks, rank # "D"), "/") # " static " #
+         MemRefOf<allowedTypes>.summary,
+         "::mlir::MemRefType">;
+
+def XsmmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, 
                             F32, BF16, I64]>;
 
 //===----------------------------------------------------------------------===//
@@ -35,6 +42,22 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary"> {
     $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
     attr-dict `:` functional-type($inputs, results)
   }];
+
+  let extraClassDeclaration = [{
+    Value getDispatch() { return getInputs()[0]; }
+  
+    bool hasScalarLhs() {
+      Type operand = getInputs()[1].getType();
+      return !operand.isa<ShapedType>();
+    }
+
+    bool hasScalarRhs() {
+      Type operand = getInputs()[2].getType();
+      return !operand.isa<ShapedType>();
+    }
+  }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -57,42 +80,54 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
   }];
 
   let extraClassDeclaration = [{
+    Value getDispatch() { return getInputs()[0]; }
+    
     bool hasScalarInput() {
-      // Skip the function pointer. The operand
-      // is at position 1.
       Type operand = getInputs()[1].getType();
-      if (!operand.isa<ShapedType>())
-        return true;
-      return false;
+      return !operand.isa<ShapedType>();
     }
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // GemmOp
 //===----------------------------------------------------------------------===//
 
+def GemmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [2, 3]>, I64]>;
+
 def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let summary = "matmul call operation.";
-  let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$data_type, Variadic<GemmMemRef>:$inputs);
   
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = [{  
+    Value getDispatch() { return getInputs()[0]; }
+    
+    Value getOperandA() { return getInputs()[1]; }
+    
+    Value getOperandB() { return getInputs()[2]; }
+    
     Value getOutput() { return getInputs()[3]; }
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // BrgemmOp
 //===----------------------------------------------------------------------===//
 
+def BrgemmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [2, 3, 4]>, I64]>;
+
 def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
   let summary = "brgemm call operation.";
-  let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
+  let arguments = (ins Xsmm_DataType:$data_type, Variadic<BrgemmMemRef>:$inputs);
 
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
@@ -100,8 +135,18 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
   }];
 
   let extraClassDeclaration = [{
+    Value getDispatch() { return getInputs()[0]; }
+    
+    Value getOperandA() { return getInputs()[1]; }
+    
+    Value getOperandB() { return getInputs()[2]; }
+    
     Value getOutput() { return getInputs()[3]; }
+    
+    Value getBatch() { return getInputs()[4]; }
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,8 +163,20 @@ def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
   }];
 
   let extraClassDeclaration = [{
+    Value getDispatch() { return getInputs()[0]; }
+    
+    Value getOperandA() { return getInputs()[1]; }
+    
+    Value getOperandB() { return getInputs()[2]; }
+    
     Value getOutput() { return getInputs()[3]; }
+    
+    Value getOperandD() { return getInputs()[4]; };
+    
+    Value getBatch() { return getInputs()[5]; }
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

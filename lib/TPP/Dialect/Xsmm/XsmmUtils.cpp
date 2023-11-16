@@ -182,24 +182,15 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
   }
 }
 
-// Return true if `type` is a scalar or a 'scalar' memref (i.e., memref<f32> or
-// memref<1x1xf32>).
-static bool isScalarType(Type type) {
-  if (!type.isa<ShapedType>())
-    return true;
-  ShapedType shapedType = type.cast<ShapedType>();
-  ArrayRef<int64_t> shapeInput = shapedType.getShape();
-  auto isOne = [](int64_t val) { return val == 1; };
-  return llvm::all_of(shapeInput, isOne) || shapedType.getRank() == 0;
-}
-
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(outputType.isa<ShapedType>() && "expect shaped type on output");
   assert(outputType.cast<ShapedType>().getRank() == 2 &&
          "expect rank 2 on output");
 
-  if (isScalarType(inputType))
+  if (!inputType.isa<ShapedType>() ||
+      inputType.cast<ShapedType>().getRank() == 0) {
     return xsmm::UnaryFlags::BCAST_SCALAR;
+  }
 
   ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
   ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
@@ -210,14 +201,21 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(shapeOutput.size() == bShapeInput.size());
   shapeInput = bShapeInput;
 
+  // Same shape for input and output, no bcast.
+  if (shapeInput == shapeOutput)
+    return xsmm::UnaryFlags::NONE;
+
+  // Input is a memref but it is all ones, bcast = scalar.
+  auto isOne = [](int64_t val) { return val == 1; };
+  if (llvm::all_of(shapeInput, isOne))
+    return xsmm::UnaryFlags::BCAST_SCALAR;
+
   if (shapeInput[1] == 1 && shapeOutput[1] > 1)
     return xsmm::UnaryFlags::BCAST_ROW;
 
   if (shapeInput[0] == 1 && shapeOutput[0] > 1)
     return xsmm::UnaryFlags::BCAST_COL;
 
-  if (shapeInput == shapeOutput)
-    return xsmm::UnaryFlags::NONE;
   return failure();
 }
 
@@ -227,7 +225,8 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   assert(outputType.cast<ShapedType>().getRank() == 2 &&
          "expect rank 2 on output");
 
-  if (isScalarType(operandType)) {
+  if (!operandType.isa<ShapedType>() ||
+      operandType.cast<ShapedType>().getRank() == 0) {
     if (operandNumber == 0)
       return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
     return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
@@ -273,12 +272,19 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
     assert(false && "unrechable");
   };
 
-  if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
-    return getBCastEnum(BCastType::ROW, operandNumber);
-  if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
-    return getBCastEnum(BCastType::COL, operandNumber);
   if (bOperandShape == shapeOutput)
     return getBCastEnum(BCastType::NONE, operandNumber);
+
+  auto isOne = [](int64_t val) { return val == 1; };
+  if (llvm::all_of(bOperandShape, isOne))
+    return getBCastEnum(BCastType::SCALAR, operandNumber);
+
+  if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
+    return getBCastEnum(BCastType::ROW, operandNumber);
+
+  if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
+    return getBCastEnum(BCastType::COL, operandNumber);
+
   return failure();
 }
 

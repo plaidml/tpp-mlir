@@ -8,8 +8,10 @@
 
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
+#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeUtilities.h"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOps.cpp.inc"
@@ -255,11 +257,18 @@ verifyUniquenessAndConsistency(ArrayAttr flags, Operation *op,
   return success();
 }
 
+template <typename OpTy>
 static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
-                                     Operation *op,
+                                     OpTy op,
                                      const std::string_view &flagsName) {
+  static_assert(llvm::is_one_of<OpTy, xsmm::BrgemmDispatchOp, GemmDispatchOp,
+                                xsmm::FusedBrgemmDispatchOp>::value,
+                "applies to xsmm gemms dispatch operations only");
+
+  // Verify flags.
   if (failed(verifyUniquenessAndConsistency<GemmFlags>(flags, op, flagsName)))
     return failure();
+
   SmallVector<int64_t> flagsAsInt;
   for (auto flag : flags) {
     flagsAsInt.push_back(flag.cast<IntegerAttr>().getInt());
@@ -272,6 +281,7 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
       })) {
     return op->emitOpError() << "VNNI flags but type is not bf16";
   }
+
   return success();
 }
 
@@ -299,6 +309,22 @@ template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
   size_t expected = (isBrgemm) ? 8 : 6;
   if (failed(verifyDispatchInputs(op, expected)))
     return failure();
+
+  // Verify leading dims.
+  ArrayRef<int64_t> inputs = op.getInputs();
+  int64_t n = inputs[1];
+  int64_t k = inputs[2];
+  int64_t lda = inputs[3];
+  int64_t ldb = inputs[4];
+  int64_t ldc = inputs[5];
+  if (lda < k)
+    return op.emitOpError() << "expect lda to be >= of dimension k\n";
+  if (ldb < n)
+    return op.emitOpError() << "expect ldb to be >= of dimension n\n";
+  if (ldc < n)
+    return op.emitOpError() << "expect ldc to be >= of dimension n\n";
+
+  // Verify dispatch flags.
   return verifyGemmFlags(op.getFlags(), op.getDataType(), op, FLAGS_NAME);
 }
 
@@ -335,8 +361,10 @@ LogicalResult FusedBrgemmDispatchOp::verify() {
           getUnaryFlags(), getOperation(), UNARY_FLAGS_NAME))) {
     return failure();
   }
+
   if (failed(verifyGemmLikeOp<FusedBrgemmDispatchOp>(*this)))
     return failure();
+
   // Verify the flags are consistent with the type of unary or binary specified.
   auto unaryKind = getUnaryKind();
   if (unaryKind == xsmm::UnaryKind::NONE) {
@@ -357,4 +385,123 @@ LogicalResult FusedBrgemmDispatchOp::verify() {
     }
   }
   return success();
+}
+
+template <typename OpTy>
+static LogicalResult verifyXsmmCommon(OpTy invokeOp,
+                                      const size_t expectedInputs) {
+  SmallVector<Value> inputs = invokeOp.getInputs();
+
+  if (inputs.size() != expectedInputs) {
+    return invokeOp.emitOpError() << "expect " << expectedInputs
+                                  << " inputs but got " << inputs.size();
+  }
+
+  Value dispatch = invokeOp.getDispatch();
+  if (!dispatch.getType().isInteger(64)) {
+    return invokeOp.emitOpError()
+           << "expect an i64 but got " << dispatch.getType()
+           << " for operand 0 (dispatch)";
+  }
+
+  auto isCompatible = [](xsmm::DataType dataType, Type type) {
+    if (dataType == xsmm::DataType::F32)
+      return type.isF32();
+    return type.isBF16();
+  };
+
+  // Skip dispatch at index 0. In case of a brgemm operation
+  // skip the last operand (batch).
+  size_t upTo = inputs.size();
+  if (llvm::is_one_of<OpTy, xsmm::BrgemmOp, xsmm::FusedBrgemmOp>::value)
+    upTo--;
+
+  for (size_t idx = 1; idx < upTo; idx++) {
+    Type elementType = getElementTypeOrSelf(inputs[idx].getType());
+    if (!isCompatible(invokeOp.getDataType(), elementType)) {
+      return invokeOp.emitOpError()
+             << "expect " << xsmm::stringifyDataType(invokeOp.getDataType())
+             << " but got: " << elementType << " for operand at index: " << idx;
+    }
+  }
+  return success();
+}
+
+LogicalResult GemmOp::verify() {
+  if (failed(verifyXsmmCommon(*this, /*expectedInputs=*/4)))
+    return failure();
+
+  // Verify the rank of the shaped operands.
+  SmallVector<Value> memrefOperands = {getOperandA(), getOperandB(),
+                                       getOutput()};
+
+  for (size_t idx = 0; idx < memrefOperands.size(); idx++) {
+    size_t actualIdx = idx + 1 /*skip dispatch*/;
+    auto memref = dyn_cast<MemRefType>(memrefOperands[idx].getType());
+    assert(memref && (memref.getRank() == 2 || memref.getRank() == 3));
+
+    if (memref.getRank() == 3 &&
+        !vnni::utils::isInVnniLayout(vnni::utils::VnniOp::GEMM, memref)) {
+      return emitOpError() << "expect VNNI layout for operand: " << actualIdx;
+    }
+  }
+  return success();
+}
+
+template <typename OpTy>
+static LogicalResult verifyBrgemmLikeOpCommon(OpTy brgemmOp,
+                                              const size_t expectedInputs) {
+  static_assert(
+      llvm::is_one_of<OpTy, xsmm::BrgemmOp, xsmm::FusedBrgemmOp>::value);
+
+  if (failed(verifyXsmmCommon(brgemmOp, expectedInputs)))
+    return failure();
+
+  // Verify the rank of the shaped operands.
+  SmallVector<Value> memrefOperands = {
+      brgemmOp.getOperandA(), brgemmOp.getOperandB(), brgemmOp.getOutput()};
+
+  for (size_t idx = 0; idx < memrefOperands.size(); idx++) {
+    size_t actualIdx = idx + 1 /*skip dispatch*/;
+    auto memref = dyn_cast<MemRefType>(memrefOperands[idx].getType());
+    // Output memref. Must be of rank 2 or in VNNI layout with rank 3.
+    if (idx == 2 && (memref.getRank() != 2 &&
+                     (memref.getRank() == 3 &&
+                      !vnni::utils::isInVnniLayout(
+                          vnni::utils::VnniOp::BRGEMM_INS, memref)))) {
+      return brgemmOp.emitOpError()
+             << "expect a 2d or 3d VNNI layout for operand: " << actualIdx;
+    }
+    // Input memref. Must be of rank 3 or in VNNI layout with rank 4.
+    if (idx != 2 && (memref.getRank() != 3 &&
+                     (memref.getRank() != 4 &&
+                      !vnni::utils::isInVnniLayout(
+                          vnni::utils::VnniOp::BRGEMM_OUTS, memref)))) {
+      return brgemmOp.emitOpError()
+             << "expect a 3d or 4d VNNI memref for operand: " << actualIdx;
+    }
+  }
+  // Verify the batch to be an i64.
+  Value batch = brgemmOp.getBatch();
+  if (!batch.getType().isInteger(64)) {
+    return brgemmOp.emitOpError() << "expect an i64 but got " << batch.getType()
+                                  << " for last operand (batch)";
+  }
+  return success();
+}
+
+LogicalResult BrgemmOp::verify() {
+  return verifyBrgemmLikeOpCommon(*this, /*expectedInputs=*/5);
+}
+
+LogicalResult FusedBrgemmOp::verify() {
+  return verifyBrgemmLikeOpCommon(*this, /*expectedInputs=*/6);
+}
+
+LogicalResult UnaryOp::verify() {
+  return verifyXsmmCommon(*this, /*expectedInputs=*/3);
+}
+
+LogicalResult BinaryOp::verify() {
+  return verifyXsmmCommon(*this, /*expectedInputs=*/4);
 }

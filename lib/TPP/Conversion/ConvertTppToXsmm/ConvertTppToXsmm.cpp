@@ -97,7 +97,7 @@ getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
     return failure();
   }
   auto expectedVNNIRank =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM : vnni::utils::VnniOp::GEMM;
+      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM_INS : vnni::utils::VnniOp::GEMM;
   int64_t ldb = (vnni::utils::isInVnniLayout(expectedVNNIRank, memrefB))
                     ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
                     : *ldbDim;
@@ -131,7 +131,7 @@ static ArrayAttr getGemmFlags(RewriterBase &rewriter, OpTy opTy) {
   bool isBrgemm = std::is_same<OpTy, tpp::BrgemmOp>::value ||
                   std::is_same<OpTy, tpp::FusedBrgemmOp>::value;
   auto expectedVnniRank =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM : vnni::utils::VnniOp::GEMM;
+      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM_INS : vnni::utils::VnniOp::GEMM;
   auto memrefB = opTy.getMemRefInputType(1);
   xsmm::GemmFlagsAttr gemmFlag =
       (vnni::utils::isInVnniLayout(expectedVnniRank, memrefB))

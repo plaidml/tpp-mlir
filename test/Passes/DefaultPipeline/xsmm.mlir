@@ -15,9 +15,10 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
 
-  // CHECK: call @xsmm_binary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
   %0 = xsmm.binary.dispatch add [3, 3, 3, 3, 3] flags = (none) data_type = f32
-  xsmm.binary add(data_type = f32, %0, %arg0, %arg1) : (i64, memref<3x3xf32>, memref<3x3xf32>) -> ()
+  xsmm.binary add(data_type = f32, %0, %arg0, %arg0, %arg1) 
+    : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
 
   return
 }
@@ -34,11 +35,12 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   // CHECK: call @xsmm_binary_dispatch
   // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
-  // CHECK: call @xsmm_binary_invoke({{.*}}%[[ptr0]], %[[of]], %[[ptr1]], %[[of]]
+  // CHECK: call @xsmm_binary_invoke({{.*}}%[[ptr0]], %[[of]], %[[ptr0]], %[[of]], %[[ptr1]], %[[of]]
   %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
-  xsmm.binary add(data_type = f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32>, memref<10x10xf32>) -> ()
+  xsmm.binary add(data_type = f32, %0, %subview, %subview, %subview_0) 
+    : (i64, memref<10x10xf32>, memref<10x10xf32>, memref<10x10xf32>) -> ()
 
   return
 }
@@ -53,18 +55,20 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
   // CHECK: scf.parallel
   // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
   // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr<f32>
-  // CHECK:   call @xsmm_binary_invoke({{.*}}%[[ptr0]], {{.*}}, %[[ptr1]], {{.+}}
+  // CHECK:   call @xsmm_binary_invoke({{.*}}%[[ptr0]], {{.*}}, %[[ptr0]], {{.*}}, %[[ptr1]], {{.+}}
   %c0 = arith.constant 0 : index
   %c10 = arith.constant 10 : index
   %c1 = arith.constant 1 : index
   scf.parallel (%arg2) = (%c0) to (%c10) step (%c1) {
-    %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
-    %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
+    %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1]
+      : memref<10x10x10xf32> to memref<10x10xf32, #map>
+    %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] 
+      : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
-    xsmm.binary add(data_type = f32, %0, %subview, %subview_0) : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
+    xsmm.binary add(data_type = f32, %0, %subview, %subview, %subview_0) 
+      : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
     scf.yield
   }
-
   return
 }
 
