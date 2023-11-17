@@ -1,0 +1,35 @@
+[
+  {
+    "torch_dynamo" : {
+      "mlp_3x1024_fp32" : { 
+        "type": "MLIR",
+        "benchmark": "torch_dynamo/mlp-fp32-3x1024.mlir",
+        "environment": {}, 
+        "flags": [ "-n", "50" ],
+        "extensions": [ ] 
+      },
+      "mlp_3x1024_bf16" : { 
+        "type": "MLIR",
+        "benchmark": "torch_dynamo/mlp-bf16-3x1024.mlir",
+        "environment": {}, 
+        "flags": [ "-n", "50" ],
+        "extensions": [ ] 
+      },
+      "gemm_3x1024_fp32" : { 
+        "type": "MLIR",
+        "benchmark": "torch_dynamo/gemm-fp32-3x1024.mlir",
+        "environment": {}, 
+        "flags": [ "-n", "50" ],
+        "extensions": [ ] 
+      },
+      "gemm_3x1024_bf16" : { 
+        "type": "MLIR",
+        "benchmark": "torch_dynamo/gemm-bf16-3x1024.mlir",
+        "environment": {}, 
+        "flags": [ "-n", "50" ],
+        "extensions": [ ] 
+      }
+    }
+  }
+]
+
