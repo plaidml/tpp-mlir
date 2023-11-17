@@ -180,3 +180,24 @@ func.func @matmuls(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor
 // CHECK: %[[FILL_1:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %{{.+}} = linalg.matmul ins(%[[ARG0]], %[[MUL]] : tensor<32x32xf32>, tensor<32x32xf32>) 
 // CHECK-SAME:  outs(%[[FILL_1]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+
+// -----
+
+// CHECK-LABEL: matmuls_1
+func.func @matmuls_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor<32x32xf32> {
+  // BUFF-COUNT-3: memref.alloc
+  // BUFF-COUNT-1: memref.copy
+  // BUFFNOTDUP-COUNT-3: memref.alloc
+  // BUFFNOTDUP-COUNT-1: memref.copy
+  // CHECK-COUNT-2: linalg.fill
+  %0 = tensor.empty() : tensor<32x32xf32>
+  %cst = arith.constant 0.0 : f32
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
+                     outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %3 = linalg.add ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>) 
+                  outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %4 = linalg.matmul ins(%3, %2 : tensor<32x32xf32>, tensor<32x32xf32>)
+                     outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  return %4 : tensor<32x32xf32>
+}

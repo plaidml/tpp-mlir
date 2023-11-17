@@ -96,20 +96,21 @@ void DuplicateFill::runOnOperation() {
     getForwardSlice(fillVal, &forwardSlice);
     for (size_t idx = /*Skip first user. Use the current fill*/ 1;
          idx < forwardSlice.size(); idx++)
-      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(forwardSlice[idx]))
-        if (succeeded(linalgx::utils::isContraction(linalgOp))) {
-          assert(linalgOp.getNumDpsInits() == 1);
-          Value outLinalg = linalgOp.getDpsInits()[0];
-          if (outLinalg == fillVal) {
-            rewriter.setInsertionPoint(linalgOp);
-            Operation *clonedOp = rewriter.clone(*fillOp.getOperation());
-            rewriter.replaceUsesWithIf(fillOp->getResults(),
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(forwardSlice[idx])) {
+        if (failed(linalgx::utils::isContraction(linalgOp)))
+          continue;
+        assert(linalgOp.getNumDpsInits() == 1);
+        Value outLinalg = linalgOp.getDpsInits()[0];
+        if (outLinalg == fillVal) {
+          rewriter.setInsertionPoint(linalgOp);
+          Operation *clonedOp = rewriter.clone(*fillOp.getOperation());
+          rewriter.replaceUsesWithIf(fillOp->getResults(),
                                        clonedOp->getResults(),
                                        [&](OpOperand &operand) {
                                          return operand.getOwner() == linalgOp;
                                        });
-          }
         }
+      }
     return WalkResult::advance();
   });
 }
