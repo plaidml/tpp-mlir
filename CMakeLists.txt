@@ -118,7 +118,7 @@ endif()
 
 # Run PyTorch Dynamo generated models as benchmarks
 set(BENCH_PT_CFGS
-  ${CONFIG_DIR}/torch_dynamo/torch_dynamo.json
+  ${CONFIG_DIR}/pytorch/torch_dynamo.json
 )
 string(JOIN ',' BENCH_PT_CFGS_STR ${BENCH_PT_CFGS})
 add_custom_target(benchmarks-pt ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10

@@ -10,9 +10,10 @@ SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
 source "${SCRIPT_DIR}/ci/common.sh"
 
 die_syntax() {
-  echo "Syntax: $0 [-b] [-o] [-m] [-f]"
+  echo "Syntax: $0 [-b] [-p] [-o] [-m] [-f]"
   echo ""
   echo "  -b: Optional, runs Base benchmarks"
+  echo "  -p: Optional, runs MLIR of PyTorch models as benchmarks"
   echo "  -o: Optional, runs OpenMP benchmarks"
   echo "  -m: Optional, runs Matmul benchmarks"
   echo "  -f: Optional, runs Fully-Connected benchmarks"
@@ -21,6 +22,7 @@ die_syntax() {
 
 # Options
 BENCH_BASE=
+BENCH_PT=
 BENCH_OMP=
 BENCH_MM=
 BENCH_FC=
@@ -38,6 +40,9 @@ while getopts "bomf" arg; do
     f)
       BENCH_FC=1
       ;;
+    p)
+      BENCH_PT=1
+      ;;
     ?)
       echo "Invalid option: ${OPTARG}"
       die_syntax
@@ -46,7 +51,7 @@ while getopts "bomf" arg; do
 done
 
 # At least one must be enabled
-if [ ! "$BENCH_BASE" ] && [ ! "$BENCH_OMP" ] &&
+if [ ! "$BENCH_BASE" ] && [ ! "$BENCH_PT" ] && [ ! "$BENCH_OMP" ] &&
    [ ! "$BENCH_MM" ] && [ ! "$BENCH_FC" ]; then
   echo "At least one benchmark must be enabled"
   exit 1
@@ -87,6 +92,11 @@ if [ "$BENCH_BASE" ]; then
   benchmark base/base.json "Base Benchmarks"
   benchmark base/pack.json "Pack Benchmarks"
   benchmark base/mha.json "MHA Benchmarks"
+fi
+
+# PyTorch model benchmarks
+if [ "$BENCH_PT" ]; then
+  benchmark pytorch/torch_dynamo.json "PyTorch-Dynamo Benchmarks"
 fi
 
 # OpenMP Benchmarks
