@@ -1,4 +1,4 @@
-option(USE_OneDNN "Use OneDNN" ON)
+option(USE_OneDNN "Use OneDNN" OFF)
 
 if(USE_OneDNN)
   include (ExternalProject)

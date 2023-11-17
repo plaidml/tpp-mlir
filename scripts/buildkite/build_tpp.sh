@@ -50,11 +50,12 @@ fi
 if [ ! "${LINKER}" ]; then
   LINKER=lld
 fi
-
 if [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
   source ${SCRIPT_DIR}/ci/setup_gpu_env.sh
 fi
+# Always build OpenMP and OneDNN in CI
+EXTENSIONS="-O -D"
 
 if [ "${CLEAN}" ]; then
   BUILD_DIR_RM=-R
@@ -81,6 +82,7 @@ if ! ${SCRIPT_DIR}/ci/cmake.sh \
   ${INSTALL_OPTION} \
   -t ${KIND} \
   ${SANITIZERS} \
+  ${EXTENSIONS} \
   ${GPU_OPTION} \
   -c ${COMPILER} \
   -l ${LINKER} \
