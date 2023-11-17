@@ -51,7 +51,8 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     }
 
     // Move perf.bench region inside the loop.
-    rewriter.mergeBlocks(&benchOp.getRegion().front(), loop.getBody());
+    rewriter.mergeBlocks(&benchOp.getRegion().front(), loop.getBody(),
+                         benchOp.getIterArgs());
 
     // Wrap the benchmark kernel in timer calls.
     OpBuilder::InsertionGuard guard(rewriter);
