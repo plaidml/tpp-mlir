@@ -98,13 +98,9 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
-     RangedTypesMatchWith<"result types match types of iter_args",
-                          "iterArgs",
-                          "bodyResults",
-                          "$_self">,
      RangedTypesMatchWith<"result types match types of yield",
                           "$_self",
-                          "bodyResults",
+                          "iterArgs",
                           "getRegion().front().getTerminator()->getOperandTypes()">]> {
   let summary = "Benchmark the enclosed code.";
   let description = [{

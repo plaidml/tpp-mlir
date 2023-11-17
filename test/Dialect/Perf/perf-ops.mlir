@@ -116,12 +116,13 @@ func.func @perf_yield_result(%a: i32, %b: i32, %n: i64) -> i32 {
   %bench_res = arith.constant 0 : i32
 
   // CHECK: %[[out:.*]] = perf.bench
-  %out = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%bench_res : i32) {
+  %out = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %bench_res) -> i32 {
     // CHECK: %[[c:.*]] = arith.addi
     %c = arith.addi %a, %b : i32
     // CHECK: perf.yield %[[c]]
     perf.yield %c : i32
-  } -> i32
+  }
+  // Unused iter_args, %out = %bench_res
 
   memref.dealloc %deltas : memref<?xf64>
   // CHECK: return %[[out]]
@@ -139,7 +140,7 @@ func.func @perf_example(%A: tensor<4x8xf32>,
   %output = arith.constant 0 : i64
 
   // CHECK: %[[res:.*]] = perf.bench
-  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%output : i64) {
+  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %output) -> i64 {
     // CHECK: %[[mulres:.*]] = linalg.matmul
     // CHECK: perf.sink(%[[mulres]])
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
@@ -147,11 +148,12 @@ func.func @perf_example(%A: tensor<4x8xf32>,
     perf.sink(%D) : tensor<4x4xf32>
 
     // CHECK: %[[sum:.*]] = arith.addi
-    %sum = arith.addi %n, %n : i64
+    %sum = arith.addi %arg0, %n : i64
 
     // CHECK: perf.yield %[[sum]]
     perf.yield %sum : i64
-  } -> i64
+  }
+  // Used iter_args, %res = %output + sum(n)
 
   // CHECK: %[[mean:.*]] = perf.mean
   // CHECK: %[[stdev:.*]] = perf.stdev
@@ -199,7 +201,7 @@ func.func @perf_example_lowered(%A: tensor<4x8xf32>,
     func.call @perf_sink_tensor_f32(%Dcast) : (tensor<*xf32>) -> ()
 
     // CHECK: %[[sum:.*]] = arith.addi
-    %sum = arith.addi %n, %n : i64
+    %sum = arith.addi %arg0, %n : i64
 
     // CHECK: %[[delta:.*]] = func.call @perf_stop_timer(%[[timer]])
     // CHECK: memref.store %[[delta]], %[[buff]]

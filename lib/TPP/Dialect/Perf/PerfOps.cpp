@@ -178,14 +178,15 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
       return failure();
   }
 
-  if (regionArgs.size() != result.types.size() + 1)
-    return parser.emitError(parser.getNameLoc(),
+  if (regionArgs.size() != result.types.size())
+    return parser.emitError(
+        parser.getNameLoc(),
         "mismatch in number of loop-carried values and defined values");
 
-    // Resolve input operands.
+  // Resolve input operands.
   if (hasIterArgs) {
     for (auto argOperandType :
-         llvm::zip(llvm::drop_begin(regionArgs), operands, result.types)) {
+         llvm::zip(regionArgs, operands, result.types)) {
       Type type = std::get<2>(argOperandType);
       std::get<0>(argOperandType).type = type;
       if (parser.resolveOperand(std::get<1>(argOperandType), type,
@@ -195,21 +196,14 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   }
 
   // Parse region
-  auto region = std::make_unique<Region>();
-  if (parser.parseRegion(*region))
+  Region *body = result.addRegion();
+  if (parser.parseRegion(*body, regionArgs))
     return failure();
-  ensureTerminator(*region, parser.getBuilder(), result.location);
-  result.addRegion(std::move(region));
+  ensureTerminator(*body, parser.getBuilder(), result.location);
 
   // Attributes, if any
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
-
-  // Return type
-  SmallVector<Type> resultTypes;
-  if (parser.parseOptionalArrowTypeList(resultTypes))
-    return failure();
-  result.addTypes(resultTypes);
 
   return success();
 }
