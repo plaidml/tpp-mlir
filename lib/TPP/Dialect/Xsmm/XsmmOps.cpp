@@ -276,7 +276,7 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
 }
 
 template <typename OpTy>
-static LogicalResult verifyInputs(OpTy op, size_t expected) {
+static LogicalResult verifyDispatchInputs(OpTy op, size_t expected) {
   static_assert(llvm::is_one_of<OpTy, xsmm::UnaryDispatchOp,
                                 xsmm::BinaryDispatchOp, GemmDispatchOp,
                                 BrgemmDispatchOp, FusedBrgemmDispatchOp>::value,
@@ -297,7 +297,7 @@ template <typename OpTy> static LogicalResult verifyGemmLikeOp(OpTy op) {
   bool isBrgemm = isa<BrgemmDispatchOp>(op.getOperation()) ||
                   isa<FusedBrgemmDispatchOp>(op.getOperation());
   size_t expected = (isBrgemm) ? 8 : 6;
-  if (failed(verifyInputs(op, expected)))
+  if (failed(verifyDispatchInputs(op, expected)))
     return failure();
   return verifyGemmFlags(op.getFlags(), op.getDataType(), op, FLAGS_NAME);
 }
@@ -316,7 +316,7 @@ LogicalResult UnaryDispatchOp::verify() {
     return failure();
   }
   // 'inputs' = [m, n, lda, ldo]
-  return verifyInputs(*this, /*expected=*/4);
+  return verifyDispatchInputs(*this, /*expected=*/4);
 }
 
 LogicalResult BinaryDispatchOp::verify() {
@@ -325,7 +325,7 @@ LogicalResult BinaryDispatchOp::verify() {
     return failure();
   }
   // 'inputs' = [m, n, lda, ldb, ldo]
-  return verifyInputs(*this, /*expected=*/5);
+  return verifyDispatchInputs(*this, /*expected=*/5);
 }
 
 LogicalResult FusedBrgemmDispatchOp::verify() {
