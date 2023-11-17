@@ -26,7 +26,7 @@ BENCH_PT=
 BENCH_OMP=
 BENCH_MM=
 BENCH_FC=
-while getopts "bomf" arg; do
+while getopts "bomfp" arg; do
   case ${arg} in
     b)
       BENCH_BASE=1
