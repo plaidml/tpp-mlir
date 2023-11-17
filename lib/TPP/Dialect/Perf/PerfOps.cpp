@@ -90,11 +90,14 @@ void BenchOp::print(OpAsmPrinter &printer) {
   }
   printer << ")";
   if (!getIterArgs().empty()) {
-    printer << " iter_args";
-    printer << "(";
-    printer << getIterArgs();
-    printer << " : ";
-    printer << getIterArgs().getTypes();
+    auto blockArgs = getRegion().getArguments();
+    auto initArgs = ValueRange{getIterArgs()};
+    assert(blockArgs.size() == initArgs.size() &&
+           "expected same length of arguments and initializers");
+    printer << " iter_args (";
+    llvm::interleaveComma(llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
+      printer << std::get<0>(it) << " = " << std::get<1>(it);
+    });
     printer << ")";
   }
   printer << ' ';
@@ -113,10 +116,6 @@ void BenchOp::print(OpAsmPrinter &printer) {
   }
   ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
   printer.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
-  if (!getBodyResults().empty()) {
-    printer << " -> ";
-    printer << getBodyResults().getTypes();
-  }
 }
 
 ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -185,8 +184,7 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
 
   // Resolve input operands.
   if (hasIterArgs) {
-    for (auto argOperandType :
-         llvm::zip(regionArgs, operands, result.types)) {
+    for (auto argOperandType : llvm::zip(regionArgs, operands, result.types)) {
       Type type = std::get<2>(argOperandType);
       std::get<0>(argOperandType).type = type;
       if (parser.resolveOperand(std::get<1>(argOperandType), type,
