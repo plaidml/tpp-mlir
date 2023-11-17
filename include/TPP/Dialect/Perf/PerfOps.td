@@ -98,7 +98,7 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
-     RangedTypesMatchWith<"result types match types of yield",
+     RangedTypesMatchWith<"iter_args types match types of yield",
                           "$_self",
                           "iterArgs",
                           "getRegion().front().getTerminator()->getOperandTypes()">]> {
