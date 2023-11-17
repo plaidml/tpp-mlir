@@ -11,4 +11,4 @@ steps:
   - label: "TPP-MLIR-bench"
     command: "${SRUN} --partition=spr --time=0:30:00 --constraint=\"notrb\" -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o'"
+              scripts/buildkite/benchmark.sh -b -o -p'"
