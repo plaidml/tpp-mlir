@@ -8,7 +8,7 @@ source $(realpath $(dirname $0))/common.sh
 die_syntax() {
   echo "Syntax: $0 -s SRC_DIR -b BLD_DIR -m MLIR_DIR [-i INST_DIR]"
   echo "          [-t (Release|Debug|RelWithDebInfo)] [-c (clang|gcc)] [-g (gcc toolchain)]"
-  echo "          [-l (ld|lld|gold|mold)] [-R] [-S] [-n N]"
+  echo "          [-l (ld|lld|gold|mold)] [-R] [-S] [-O] [-D] [-n N]"
   echo ""
   echo "  -i: Optional install dir, defaults to system"
   echo "  -t: Optional build type flag, defaults to Release"
@@ -17,12 +17,14 @@ die_syntax() {
   echo "  -R: Optional request to remove BLD_DIR before CMake"
   echo "  -S: Optional sanitizer flag, defaults to none"
   echo "  -G: Optional GPU support flag, defaults to none"
+  echo "  -O: Optional OpenMP support flag, defaults to none"
+  echo "  -D: Optional OneDNN support flag, defaults to none"
   echo "  -n: Optional link job flag, defaults to nproc"
   exit 1
 }
 
 # Cmd-line opts
-while getopts "s:b:i:m:t:c:l:n:G:RS" arg; do
+while getopts "s:b:i:m:t:c:l:n:G:RSOD" arg; do
   case ${arg} in
     s)
       SRC_DIR=$(realpath ${OPTARG})
@@ -103,6 +105,12 @@ while getopts "s:b:i:m:t:c:l:n:G:RS" arg; do
       ;;
     G)
       ENABLE_GPU="-DTPP_GPU=${OPTARG}"
+      ;;
+    O)
+      BUILD_OPTIONS="${BUILD_OPTIONS} -DUSE_OpenMP=ON"
+      ;;
+    D)
+      BUILD_OPTIONS="${BUILD_OPTIONS} -DUSE_OneDNN=ON"
       ;;
     n)
       PROCS=$(nproc)
