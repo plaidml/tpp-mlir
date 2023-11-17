@@ -130,13 +130,6 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
   if (yieldOp->getNumOperands() != 1)
     return false;
   Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-  if (!isa<arith::MaximumFOp>(innerOp))
-    return false;
-  if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-    return false;
-  auto maxfOp = cast<arith::MaximumFOp>(innerOp);
-  Value maxfLhs = maxfOp.getLhs();
-  Value maxfRhs = maxfOp.getRhs();
 
   // If lhs is a zero get rhs as input for the relu if it is a block argument,
   // return false otherwise.
@@ -155,7 +148,81 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
     }
     return false;
   };
-  return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
+
+  // Multiple patterns map to Relu.
+  if (auto maxfOp = dyn_cast<arith::MaximumFOp>(innerOp)) {
+    // Pattern 1 - arith.maximumf(tensor, const 0)
+    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+      return false;
+    Value maxfLhs = maxfOp.getLhs();
+    Value maxfRhs = maxfOp.getRhs();
+
+    return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
+  } else if (auto cmpfOp = dyn_cast<arith::CmpFOp>(innerOp)) {
+    // Pattern 2 - arith.cmpf, arith.select
+    //
+    // x = arith.cmpf ugt, value, 0
+    // y = arith.select x, value, 0
+    //
+    // NOTE: ugt - unsigned greater than, one of the predicates
+    if (linalgOp.getBlock()->getOperations().size() != 3)
+      return false;
+
+    auto opIterator = linalgOp.getBlock()->getOperations().begin();
+    Operation *cmpOp = &*opIterator;
+    opIterator++;
+
+    if (!isa<arith::SelectOp>(&*opIterator))
+      return false;
+
+    Operation *selectOp = &*opIterator;
+    opIterator++;
+    if (yieldOp != &*opIterator)
+      return false;
+
+    if (yieldOp->getOperand(0).getDefiningOp() != selectOp)
+      return false;
+
+    if (selectOp->getOperand(0).getDefiningOp() != cmpOp)
+      return false;
+
+    auto cmpPredicate = cmpfOp.getPredicate();
+    Value cmpLhs = cmpfOp.getLhs();
+    Value cmpRhs = cmpfOp.getRhs();
+
+    auto selOp = cast<arith::SelectOp>(selectOp);
+    auto trueVal = selOp.getTrueValue();
+    auto falseVal = selOp.getFalseValue();
+
+    if (cmpPredicate == arith::CmpFPredicate::UGT ||
+        cmpPredicate == arith::CmpFPredicate::UGE) {
+      if (cmpLhs == trueVal &&
+          mlir::utils::isZeroTensor(cmpRhs) &&
+          mlir::utils::isZeroTensor(falseVal)) {
+        // case: %in > 0 ? %in : 0
+        return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
+      } else if (mlir::utils::isZeroTensor(cmpLhs) &&
+                 mlir::utils::isZeroTensor(trueVal) &&
+                 cmpRhs == falseVal) {
+        // case: 0 > %in ? 0 : %in
+        return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
+      }
+    } else if (cmpPredicate == arith::CmpFPredicate::ULT ||
+               cmpPredicate == arith::CmpFPredicate::ULE) {
+      if (cmpLhs == falseVal &&
+          mlir::utils::isZeroTensor(cmpRhs) &&
+          mlir::utils::isZeroTensor(trueVal)) {
+        // case: %in < 0 ? 0 : %in
+        return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
+      } else if (mlir::utils::isZeroTensor(cmpLhs) &&
+                 mlir::utils::isZeroTensor(falseVal) &&
+                 cmpRhs == trueVal) {
+        // case: 0 < %in ? %in : 0
+        return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
+      }
+    }
+  }
+  return false;
 }
 
 namespace {
