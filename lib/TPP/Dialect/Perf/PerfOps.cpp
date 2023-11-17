@@ -74,6 +74,7 @@ YieldOp BenchOp::getYieldOp() {
 }
 
 void BenchOp::print(OpAsmPrinter &printer) {
+  // Print base args
   printer << "(";
   printer << getNumIters();
   printer << ", ";
@@ -89,19 +90,22 @@ void BenchOp::print(OpAsmPrinter &printer) {
       printer << type;
   }
   printer << ")";
+
+  // Print iter_args
   if (!getIterArgs().empty()) {
     auto blockArgs = getRegion().getArguments();
     auto initArgs = ValueRange{getIterArgs()};
     assert(blockArgs.size() == initArgs.size() &&
            "expected same length of arguments and initializers");
-    printer << " iter_args (";
+    printer << " iter_args(";
     llvm::interleaveComma(llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
       printer << std::get<0>(it) << " = " << std::get<1>(it);
     });
-    printer << ")";
+    printer << ") -> " << initArgs.getTypes();
   }
   printer << ' ';
 
+  // Print region body
   {
     bool printTerminator = true;
     if (auto *term = getRegion().empty()
@@ -111,7 +115,7 @@ void BenchOp::print(OpAsmPrinter &printer) {
                         term->getNumOperands() != 0 ||
                         term->getNumResults() != 0;
     }
-    printer.printRegion(getRegion(), /*printEntryBlockArgs=*/true,
+    printer.printRegion(getRegion(), /*printEntryBlockArgs=*/false,
                         /*printBlockTerminators=*/printTerminator);
   }
   ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
