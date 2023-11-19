@@ -9,21 +9,21 @@ steps:
   - wait
 
   - label: "TPP-MLIR-gcc-rel"
-    command: "${SRUN} --partition=spr --time=0:30:00 -- \
+    command: "${SRUN} --partition=spr-all --time=0:30:00 -- \
               'KIND=Release COMPILER=gcc CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
 
   - label: "TPP-MLIR-gcc-deb"
-    command: "${SRUN} --partition=spr --time=0:30:00 -- \
+    command: "${SRUN} --partition=spr-all --time=0:30:00 -- \
               'KIND=Debug COMPILER=gcc CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
 
   - label: "TPP-MLIR-clang-rel"
-    command: "${SRUN} --partition=spr --time=0:30:00 -- \
+    command: "${SRUN} --partition=spr-all --time=0:30:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
 
   - label: "TPP-MLIR-clang-deb"
-    command: "${SRUN} --partition=spr --time=0:30:00 -- \
+    command: "${SRUN} --partition=spr-all --time=0:30:00 -- \
               'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 \
               scripts/buildkite/build_tpp.sh'"
