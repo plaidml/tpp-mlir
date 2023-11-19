@@ -92,108 +92,17 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
       return failure();
 
     // First, match the required fused ops
-    struct FusedMatch {
-      xsmm::BinaryOp binaryOp;
-      xsmm::BinaryKind binaryKind;
-      xsmm::UnaryOp unaryOp;
-      xsmm::UnaryKind unaryKind;
-    } fusedMatch;
-
-    for (auto *user : output->getUsers()) {
-      if (auto binOp = (dyn_cast<xsmm::BinaryOp>(user))) {
-        // TODO: Add more types
-        switch (binOp.getCallee()) {
-        case xsmm::BinaryKind::ADD:
-          break;
-        default:
-          continue;
-        }
-        // Every operand is a different user, op can appear multiple times
-        if (fusedMatch.binaryOp && fusedMatch.binaryOp == binOp)
-          continue;
-        // But still, there should be only one binary
-        if (fusedMatch.binaryOp && fusedMatch.binaryOp != binOp)
-          return failure();
-
-        // We found the binary op
-        fusedMatch.binaryOp = binOp;
-        fusedMatch.binaryKind = binOp.getCallee();
-        continue;
-      }
-
-      if (auto unOp = dyn_cast<xsmm::UnaryOp>(user)) {
-        // TODO: Add more types
-        switch (unOp.getCallee()) {
-        case xsmm::UnaryKind::RELU:
-          break;
-        default:
-          continue;
-        }
-
-        // Every operand is a different user, op can appear multiple times
-        if (fusedMatch.unaryOp && fusedMatch.unaryOp == unOp)
-          continue;
-        // But still, there should be only one binary
-        if (fusedMatch.unaryOp && fusedMatch.unaryOp != unOp)
-          return failure();
-        fusedMatch.unaryOp = unOp;
-        fusedMatch.unaryKind = unOp.getCallee();
-        continue;
-      }
-    }
-
-    // Here we're only matching the two together, but XSMM can fuse either or.
-    // TODO: Implement the cases where we only have add or relu.
-    if (!fusedMatch.binaryOp || !fusedMatch.unaryOp) {
+    auto result = xsmm::utils::getFusedBrgemmSequenceFromProducer(output);
+    if (failed(result))
       return failure();
-    }
+    auto fusedMatch = *result;
 
-    // Now, we check for the broadcast unary flags
-    auto dispatchUnaryOp = dyn_cast<xsmm::UnaryDispatchOp>(
-        fusedMatch.unaryOp.getOperand(0).getDefiningOp());
-    assert(dispatchUnaryOp &&
-           dispatchUnaryOp.getKind() == fusedMatch.unaryKind &&
-           "Invoke and dispatch must be the same kind");
-    auto unaryFlags = dispatchUnaryOp.getFlags();
-
-    // Must have only one, even if it's NONE
-    if ((unaryFlags.size() != 1))
+    // Validate broadcast flags
+    if (failed(xsmm::utils::validateUnaryBroadcastFlags(fusedMatch.unaryOp)))
       return failure();
-
-    // We do not support row/col broadcast for unary yet
-    switch (unaryFlags[0].cast<mlir::xsmm::UnaryFlagsAttr>().getValue()) {
-    case mlir::xsmm::UnaryFlags::BCAST_SCALAR:
-    case mlir::xsmm::UnaryFlags::NONE:
-      break;
-    default:
+    if (failed(xsmm::utils::validateBinaryBroadcastFlags(fusedMatch.binaryOp)))
       return failure();
-    }
-
-    // Now, we check for the broadcast binary flags
-    auto dispatchBinaryOp = dyn_cast<xsmm::BinaryDispatchOp>(
-        fusedMatch.binaryOp.getOperand(0).getDefiningOp());
-    assert(dispatchBinaryOp &&
-           dispatchBinaryOp.getKind() == fusedMatch.binaryKind &&
-           "Invoke and dispatch must be the same kind");
-    auto binaryFlags = dispatchBinaryOp.getFlags();
-
-    // Must have only one, even if it's NONE
-    // TODO: Implement more than one flag
-    if ((binaryFlags.size() != 1))
-      return failure();
-
-    // We only support row/col broadcast for binary (or NONE)
-    // TODO: Check if the arguments shapes match the flags in each case
-    switch (binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue()) {
-    case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0:
-    case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1:
-    case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_0:
-    case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_1:
-    case mlir::xsmm::BinaryFlags::NONE:
-      break;
-    default:
-      return failure();
-    }
+    auto binaryFlags = xsmm::utils::getBinaryDispatchFlags(fusedMatch.binaryOp);
 
     // Now, replace the ops with a fused BRGEMM
     auto dtype =

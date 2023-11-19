@@ -9,8 +9,11 @@
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 
 namespace mlir {
 namespace xsmm {
@@ -280,6 +283,227 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
     return getBCastEnum(BCastType::COL, operandNumber);
 
   return failure();
+}
+
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op) {
+  // The loop is in reverse order, so we deduplicate the list making sure we
+  // only have one type of each
+  SmallVector<Operation *, 3> chain;
+  Operation *prev = nullptr;
+  for (auto *user : op->getUsers()) {
+    // Deduplicate, only take each operation once
+    if (user == prev)
+      continue;
+    chain.push_back(user);
+    prev = user;
+
+    // BRGEMM is the last one, we can stop looking
+    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
+      // Make sure the BRGEMM outputs to the chain value
+      // (it could be one of BRGEMM's inputs in the chain)
+      if (brgemmOp.getOperand(3).getDefiningOp() != op)
+        return failure();
+      break;
+    }
+
+    // Make sure this is a chain, ie. at least once in inputs and outputs
+    int inInput = std::count(user->getOperands().begin(),
+                             user->getOperands().end(), op->getResult(0));
+    int inOutput = std::count(user->getResults().begin(),
+                              user->getResults().end(), op->getResult(0));
+    if (!inInput || !inOutput)
+      return failure();
+  }
+  // We don't know how to fuse more than two tail ops after the BRGEMM
+  if (chain.size() > 3)
+    return failure();
+  // List is in reverse order, put the brgemm at the top
+  llvm::reverse(chain);
+  // If we haven't found a BRGEMM, this are not the droids we're looking for
+  if (!isa<xsmm::BrgemmOp>(chain[0]))
+    return failure();
+
+  // New, we're sure we have a chain, but not yet if it has the right types
+  // and in the right order: BRGEMM -> BINARY -> UNARY
+  // Allowed patterns are:
+  //  - GEMM + BINARY
+  //  - GEMM + UNARY
+  //  - GEMM + BINARY + UNARY
+  xsmm::FusedMatch fusedMatch;
+  for (auto *user : chain) {
+    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
+      // We only accept one of each
+      if (fusedMatch.brgemmOp)
+        return failure();
+
+      fusedMatch.brgemmOp = brgemmOp;
+      continue;
+    }
+
+    if (auto binOp = (dyn_cast<xsmm::BinaryOp>(user))) {
+      // We only accept one of each
+      if (fusedMatch.binaryOp)
+        return failure();
+
+      // We must have seen the BRGEMM already
+      if (!fusedMatch.brgemmOp)
+        return failure();
+
+      // We cannot accept binary *after* unary
+      if (fusedMatch.unaryOp)
+        return failure();
+
+      // For now we only support ADD as binary
+      if (binOp.getCallee() != BinaryKind::ADD)
+        return failure();
+
+      // Make sure the op is new or the same as before
+      fusedMatch.binaryOp = binOp;
+      fusedMatch.binaryKind = binOp.getCallee();
+      continue;
+    }
+
+    if (auto unOp = dyn_cast<xsmm::UnaryOp>(user)) {
+      // We only accept one of each
+      if (fusedMatch.unaryOp)
+        return failure();
+
+      // We must have seen the BRGEMM already
+      if (!fusedMatch.brgemmOp)
+        return failure();
+
+      // Binary op may have come earlier, we don't know
+      // We have already made sure it didn't come before this
+      // unary in the binary check above
+
+      // For now we only support RELU as unary
+      if (unOp.getCallee() != UnaryKind::RELU)
+        return failure();
+
+      // Make sure the op is new or the same as before
+      fusedMatch.unaryOp = unOp;
+      fusedMatch.unaryKind = unOp.getCallee();
+      continue;
+    }
+
+    // If found anything else in the users, bail
+    return failure();
+  }
+
+  return fusedMatch;
+}
+
+ArrayAttr getUnaryDispatchFlags(UnaryOp op) {
+  auto opKind = op.getCallee();
+  auto dispatchUnaryOp =
+      dyn_cast<xsmm::UnaryDispatchOp>(op.getOperand(0).getDefiningOp());
+  assert(dispatchUnaryOp && dispatchUnaryOp.getKind() == opKind &&
+         "Invoke and dispatch must be the same kind");
+  return dispatchUnaryOp.getFlags();
+}
+
+ArrayAttr getBinaryDispatchFlags(BinaryOp op) {
+  auto opKind = op.getCallee();
+  auto dispatchBinaryOp =
+      dyn_cast<xsmm::BinaryDispatchOp>(op.getOperand(0).getDefiningOp());
+  assert(dispatchBinaryOp && dispatchBinaryOp.getKind() == opKind &&
+         "Invoke and dispatch must be the same kind");
+  return dispatchBinaryOp.getFlags();
+}
+
+LogicalResult validateUnaryBroadcastFlags(UnaryOp op) {
+  // Now, we check for the broadcast unary flags
+  auto unaryFlags = getUnaryDispatchFlags(op);
+
+  // Must have only one, even if it's NONE
+  if ((unaryFlags.size() != 1))
+    return failure();
+
+  // Operand types
+  auto opTy = op.getOperand(0).getType();
+
+  // We do not support row/col broadcast for unary yet
+  switch (unaryFlags[0].cast<mlir::xsmm::UnaryFlagsAttr>().getValue()) {
+  case mlir::xsmm::UnaryFlags::NONE:
+    break;
+  case mlir::xsmm::UnaryFlags::BCAST_SCALAR:
+    // To be a scalar broadcast, the type cannot be shaped
+    if (isa<ShapedType>(opTy))
+      return failure();
+    break;
+  default:
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult validateBinaryBroadcastFlags(BinaryOp op) {
+  // Now, we check for the broadcast binary flags
+  auto binaryFlags = getBinaryDispatchFlags(op);
+
+  // Must have only one, even if it's NONE
+  // TODO: Implement more than one flag
+  if ((binaryFlags.size() != 1))
+    return failure();
+
+  // Operand types
+  auto lhsTy = op.getOperand(0).getType();
+  auto rhsTy = op.getOperand(1).getType();
+
+  // We only support row/col broadcast for binary (or NONE)
+  switch (binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue()) {
+  case mlir::xsmm::BinaryFlags::NONE:
+    break;
+  case mlir::xsmm::BinaryFlags::BCAST_SCALAR_IN_0:
+    if (isa<ShapedType>(lhsTy) && !isa<ShapedType>(rhsTy))
+      return failure();
+    break;
+  case mlir::xsmm::BinaryFlags::BCAST_SCALAR_IN_1:
+    if (!isa<ShapedType>(lhsTy) && isa<ShapedType>(rhsTy))
+      return failure();
+    break;
+  case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_0: {
+    auto lhs = dyn_cast<ShapedType>(lhsTy);
+    auto rhs = dyn_cast<ShapedType>(rhsTy);
+    if (!lhs || !rhs)
+      return failure();
+    if (lhs.getRank() != rhs.getRank() + 1)
+      return failure();
+    break;
+  }
+  case mlir::xsmm::BinaryFlags::BCAST_ROW_IN_1: {
+    auto lhs = dyn_cast<ShapedType>(lhsTy);
+    auto rhs = dyn_cast<ShapedType>(rhsTy);
+    if (!lhs || !rhs)
+      return failure();
+    if (lhs.getRank() + 1 != rhs.getRank())
+      return failure();
+    break;
+  }
+  case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0: {
+    auto lhs = dyn_cast<ShapedType>(lhsTy);
+    auto rhs = dyn_cast<ShapedType>(rhsTy);
+    if (!lhs || !rhs)
+      return failure();
+    if (lhs.getRank() != rhs.getRank())
+      return failure();
+    if (lhs.getDimSize(lhs.getRank() - 1) != 1)
+      return failure();
+    break;
+  }
+  case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1: {
+    auto lhs = dyn_cast<ShapedType>(lhsTy);
+    auto rhs = dyn_cast<ShapedType>(rhsTy);
+    if (!lhs || !rhs)
+      return failure();
+    if (lhs.getRank() != rhs.getRank())
+      return failure();
+    if (rhs.getDimSize(rhs.getRank() - 1) != 1)
+      return failure();
+    break;
+  }
+  }
+  return success();
 }
 
 } // namespace utils
