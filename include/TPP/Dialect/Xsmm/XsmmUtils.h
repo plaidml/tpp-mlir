@@ -78,6 +78,18 @@ enum class OperandPos { LHS = 0, RHS = 1 };
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber);
 
+FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
+
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation* op);
+
+ArrayAttr getUnaryDispatchFlags(UnaryOp op);
+
+ArrayAttr getBinaryDispatchFlags(BinaryOp op);
+
+LogicalResult validateUnaryBroadcastFlags(UnaryOp op);
+
+LogicalResult validateBinaryBroadcastFlags(BinaryOp op);
+
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

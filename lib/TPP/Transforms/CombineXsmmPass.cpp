@@ -52,7 +52,7 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   if (failed(ldbDim)) {
     return failure();
   }
-  int64_t ldb = (vnni::utils::isInVnniLayout(memrefB.cast<MemRefType>()))
+  int64_t ldb = (vnni::utils::isInVnniLayout(vnni::utils::VnniOp::BRGEMM, memrefB.cast<MemRefType>()))
                     ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
                     : *ldbDim;
 
@@ -75,7 +75,7 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
 static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   auto memrefB = opTy.getOperand(2).getType().cast<MemRefType>();
   xsmm::GemmFlagsAttr gemmFlag =
-      (vnni::utils::isInVnniLayout(memrefB))
+      (vnni::utils::isInVnniLayout(vnni::utils::VnniOp::BRGEMM, memrefB))
           ? xsmm::GemmFlagsAttr::get(rewriter.getContext(),
                                      xsmm::GemmFlags::VNNI_B)
           : xsmm::GemmFlagsAttr::get(rewriter.getContext(),
@@ -97,12 +97,23 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
       return failure();
     auto fusedMatch = *result;
 
+    // TODO: Support BRGEMM + BINARY && BRGEMM + UNARY patterns
+    if (!fusedMatch.binaryOp || !fusedMatch.unaryOp)
+      return failure();
+
     // Validate broadcast flags
     if (failed(xsmm::utils::validateUnaryBroadcastFlags(fusedMatch.unaryOp)))
       return failure();
+    
+    // TODO: Support more than just COL_0 BCAST
+    auto binaryFlags = xsmm::utils::getBinaryFlags(fusedMatch.binaryOp.getOperand(0).getType(), fusedMatch.binaryOp.getOperand(2).getType(), 0);
+    if (binaryFlags != mlir::xsmm::BinaryFlags::BCAST_COL_IN_0 && binaryFlags!= mlir::xsmm::BinaryFlags::NONE)
+      return failure();
     if (failed(xsmm::utils::validateBinaryBroadcastFlags(fusedMatch.binaryOp)))
       return failure();
-    auto binaryFlags = xsmm::utils::getBinaryDispatchFlags(fusedMatch.binaryOp);
+
+    // Get the non chained operand from the bias add
+    Value bias = mlir::xsmm::utils::getBiasTerm(fusedMatch.binaryOp);
 
     // Now, replace the ops with a fused BRGEMM
     auto dtype =
@@ -116,14 +127,14 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
 
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
         loc, integer64, *dims,
-        xsmm::BinaryKindAttr::get(rewriter.getContext(), xsmm::BinaryKind::ADD),
-        xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::RELU),
+        xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
+        xsmm::UnaryKindAttr::get(rewriter.getContext(), fusedMatch.unaryKind),
         getBrgemmFlags(rewriter, brgemmOp),
         rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
             rewriter.getContext(), xsmm::UnaryFlags::NONE)),
         rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
             rewriter.getContext(),
-            binaryFlags[0].cast<mlir::xsmm::BinaryFlagsAttr>().getValue())),
+	    *binaryFlags)),
         dtype);
 
     Value batchDim = rewriter.create<arith::ConstantOp>(
