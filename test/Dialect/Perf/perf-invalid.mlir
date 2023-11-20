@@ -5,7 +5,7 @@ func.func @perf_no_outs(%n: i64) {
   %deltas = memref.alloc(%size) : memref<?xf64>
   %out = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of iter_args}}
+  // expected-error @below {{cannot name an operation with no results}}
   %val = perf.bench (%n, %deltas : i64, memref<?xf64>) {
     perf.sink(%n) : i64
   } -> i64
@@ -21,11 +21,11 @@ func.func @perf_invalid_outs_types(%a: i32, %b: i32, %n: i64) {
   %deltas = memref.alloc(%size) : memref<?xf64>
   %out = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of iter_args}}
-  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out : i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that iter_args types match types of yield}}
+  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out) -> i64 {
     %c = arith.addi %a, %b : i32
     perf.yield %c : i32
-  } -> i32
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -39,11 +39,11 @@ func.func @perf_invalid_outs_order(%a: i32, %b: i32, %n: i64) {
   %out = arith.constant 0 : i32
   %out1 = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of iter_args}}
-  %val, %val1 = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out1, %out : i64, i32) {
+  // expected-error @below {{'perf.bench' op failed to verify that iter_args types match types of yield}}
+  %val, %val1 = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out1, %arg1 = %out) -> (i64, i32) {
     %c = arith.addi %a, %b : i32
     perf.yield %c, %n : i32, i64
-  } -> (i32, i64)
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -56,10 +56,10 @@ func.func @perf_no_yield(%n: i64) {
   %deltas = memref.alloc(%size) : memref<?xf64>
   %out = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of yield}}
-  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out : i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that iter_args types match types of yield}}
+  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out) -> i64 {
     perf.sink(%n) : i64
-  } -> i64
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -73,11 +73,11 @@ func.func @perf_invalid_yield_op(%a: i32, %b: i32, %n: i64) {
   %out = arith.constant 0 : i32
 
   // expected-error @below {{perf.bench' op expects region to terminate with 'perf.yield'}}
-  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out : i32) {
+  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out) -> i32 {
     %c = arith.addi %a, %b : i32
     // expected-note @below {{terminator here}}
     scf.yield %c : i32
-  } -> i32
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -90,11 +90,11 @@ func.func @perf_invalid_yield_types(%a: i32, %b: i32, %n: i64) {
   %deltas = memref.alloc(%size) : memref<?xf64>
   %out = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of yield}}
-  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out : i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that iter_args types match types of yield}}
+  %val = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out) -> i64 {
     %c = arith.addi %a, %b : i32
     perf.yield %c : i32
-  } -> i64
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return
@@ -108,11 +108,11 @@ func.func @perf_invalid_yield_order(%a: i32, %b: i32, %n: i64) {
   %out = arith.constant 0 : i32
   %out1 = arith.constant 0 : i64
 
-  // expected-error @below {{'perf.bench' op failed to verify that result types match types of yield}}
-  %val, %val1 = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%out, %out1 : i32, i64) {
+  // expected-error @below {{'perf.bench' op failed to verify that iter_args types match types of yield}}
+  %val, %val1 = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %out, %arg1 = %out1) -> (i32, i64) {
     %c = arith.addi %a, %b : i32
     perf.yield %n, %c : i64, i32
-  } -> (i32, i64)
+  }
 
   memref.dealloc %deltas : memref<?xf64>
   return

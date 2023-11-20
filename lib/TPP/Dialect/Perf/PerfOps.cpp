@@ -74,6 +74,7 @@ YieldOp BenchOp::getYieldOp() {
 }
 
 void BenchOp::print(OpAsmPrinter &printer) {
+  // Print base args
   printer << "(";
   printer << getNumIters();
   printer << ", ";
@@ -89,16 +90,23 @@ void BenchOp::print(OpAsmPrinter &printer) {
       printer << type;
   }
   printer << ")";
+
+  // Print iter_args
   if (!getIterArgs().empty()) {
-    printer << " iter_args";
-    printer << "(";
-    printer << getIterArgs();
-    printer << " : ";
-    printer << getIterArgs().getTypes();
-    printer << ")";
+    auto blockArgs = getRegion().getArguments();
+    auto initArgs = ValueRange{getIterArgs()};
+    assert(blockArgs.size() == initArgs.size() &&
+           "expected same length of arguments and initializers");
+    printer << " iter_args(";
+    llvm::interleaveComma(
+        llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
+          printer << std::get<0>(it) << " = " << std::get<1>(it);
+        });
+    printer << ") -> " << initArgs.getTypes();
   }
   printer << ' ';
 
+  // Print region body
   {
     bool printTerminator = true;
     if (auto *term = getRegion().empty()
@@ -108,15 +116,11 @@ void BenchOp::print(OpAsmPrinter &printer) {
                         term->getNumOperands() != 0 ||
                         term->getNumResults() != 0;
     }
-    printer.printRegion(getRegion(), /*printEntryBlockArgs=*/true,
+    printer.printRegion(getRegion(), /*printEntryBlockArgs=*/false,
                         /*printBlockTerminators=*/printTerminator);
   }
   ::llvm::SmallVector<::llvm::StringRef, 2> elidedAttrs;
   printer.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
-  if (!getBodyResults().empty()) {
-    printer << " -> ";
-    printer << getBodyResults().getTypes();
-  }
 }
 
 ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -170,47 +174,42 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   locs.clear();
 
   // Parse iter_args, if any
-  if (succeeded(parser.parseOptionalKeyword("iter_args"))) {
-    if (parser.parseLParen())
-      return failure();
-
-    locs.push_back(parser.getCurrentLocation());
-    if (parser.parseOperandList(operands))
-      return failure();
-    if (parser.parseColon())
-      return failure();
-
-    // Avoid using parseTypeList because it crashes on GCC
-    if (parser.parseCommaSeparatedList(parseType))
-      return failure();
-    if (parser.parseRParen())
-      return failure();
-
-    // Validate operands
-    if (!operands.size())
-      return parser.emitError(parser.getCurrentLocation(), "expect arguments");
-    if (operands.size() != types.size())
-      return parser.emitError(locs[0], "expect same number of types as args");
-    if (parser.resolveOperands(operands, types, locs[0], result.operands))
+  SmallVector<OpAsmParser::Argument, 4> regionArgs;
+  bool hasIterArgs = succeeded(parser.parseOptionalKeyword("iter_args"));
+  if (hasIterArgs) {
+    if (parser.parseAssignmentList(regionArgs, operands) ||
+        parser.parseArrowTypeList(result.types))
       return failure();
   }
 
+  if (regionArgs.size() != result.types.size()) {
+    return parser.emitError(
+        parser.getNameLoc(),
+        "mismatch in number of loop-carried values and defined values");
+  }
+
+  // Resolve input operands.
+  if (hasIterArgs) {
+    for (auto argOperandType :
+         llvm::zip_equal(regionArgs, operands, result.types)) {
+      Type type = std::get<2>(argOperandType);
+      std::get<0>(argOperandType).type = type;
+      if (parser.resolveOperand(std::get<1>(argOperandType), type,
+                                result.operands)) {
+        return failure();
+      }
+    }
+  }
+
   // Parse region
-  auto region = std::make_unique<Region>();
-  if (parser.parseRegion(*region))
+  Region *body = result.addRegion();
+  if (parser.parseRegion(*body, regionArgs))
     return failure();
-  ensureTerminator(*region, parser.getBuilder(), result.location);
-  result.addRegion(std::move(region));
+  ensureTerminator(*body, parser.getBuilder(), result.location);
 
   // Attributes, if any
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
-
-  // Return type
-  SmallVector<Type> resultTypes;
-  if (parser.parseOptionalArrowTypeList(resultTypes))
-    return failure();
-  result.addTypes(resultTypes);
 
   return success();
 }

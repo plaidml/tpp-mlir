@@ -31,10 +31,10 @@ func.func @perf_dialect(%A: tensor<4x8xf32>,
   %deltas = memref.alloc(%size) : memref<?xf64>
   %output = arith.constant 0 : i64
 
-  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%output : i64) {
+  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %output) -> i64 {
     %sum = arith.addi %n, %n : i64
     perf.yield %sum : i64
-  } -> i64
+  }
 
   %mean = perf.mean(%deltas : memref<?xf64>) : f64
   %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
