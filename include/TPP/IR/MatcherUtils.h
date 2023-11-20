@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_MATCHER_UTILS_H
-#define TPP_MATCHER_UTILS_H
+#ifndef TPP_IR_MATCHERUTILS_H
+#define TPP_IR_MATCHERUTILS_H
 
 namespace mlir {
 class Value;
@@ -63,4 +63,4 @@ bool isTwoDFillOpWithZeros(linalg::LinalgOp linalgOp,
 } // namespace structured_match
 } // namespace mlir
 
-#endif // TPP_MATCHER_UTILS_H
+#endif // TPP_IR_MATCHERUTILS_H

@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef XSMM_TPP_DIALECT_H
-#define XSMM_TPP_DIALECT_H
+#ifndef TPP_DIALECT_XSMM_XSMMDIALECT_H
+#define TPP_DIALECT_XSMM_XSMMDIALECT_H
 
 #include "mlir/IR/Dialect.h"
 
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOpsDialect.h.inc"
 
-#endif // XSMM_TPP_DIALECT_H
+#endif // TPP_DIALECT_XSMM_XSMMDIALECT_H

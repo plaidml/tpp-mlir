@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef XSMM_DIALECT_XSMM_XSMMUTILS_H
-#define XSMM_DIALECT_XSMM_XSMMUTILS_H
+#ifndef TPP_DIALECT_XSMM_XSMMUTILS_H
+#define TPP_DIALECT_XSMM_XSMMUTILS_H
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 
@@ -56,4 +56,4 @@ void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
 } // namespace xsmm
 } // namespace mlir
 
-#endif // XSMM_DIALECT_XSMM_XSMMUTILS_H
+#endif // TPP_DIALECT_XSMM_XSMMUTILS_H
