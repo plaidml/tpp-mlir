@@ -9,6 +9,9 @@
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
 
+#include "TPP/Transforms/Utils/TransformUtils.h"
+#include "TPP/Transforms/Utils/ValueUtils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -42,6 +45,8 @@ namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_BUFFERIZE
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_DUPLICATEFILL
+#include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -72,12 +77,52 @@ struct Bufferize : public tpp::impl::BufferizeBase<Bufferize> {
   void runOnOperation() override;
 };
 
+struct DuplicateFill : public tpp::impl::DuplicateFillBase<DuplicateFill> {
+  void runOnOperation() override;
+};
+
+void DuplicateFill::runOnOperation() {
+  IRRewriter rewriter(&getContext());
+
+  (void)getOperation()->walk([&](linalg::FillOp fillOp) {
+    if (!fillOp.hasTensorSemantics())
+      return WalkResult::advance();
+    Value fillVal = fillOp.getResult(0);
+    // We can fold only zero initialization. We duplicate only
+    // if the fill has multiple uses.
+    if (!utils::isZeroTensor(fillVal) || fillOp->hasOneUse())
+      return WalkResult::advance();
+    SetVector<Operation *> forwardSlice;
+    getForwardSlice(fillVal, &forwardSlice);
+    for (size_t idx = /*Skip first user. Use the current fill*/ 1;
+         idx < forwardSlice.size(); idx++)
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(forwardSlice[idx])) {
+        if (failed(linalgx::utils::isContraction(linalgOp)))
+          continue;
+        assert(linalgOp.getNumDpsInits() == 1);
+        Value outLinalg = linalgOp.getDpsInits()[0];
+        if (outLinalg == fillVal) {
+          rewriter.setInsertionPoint(linalgOp);
+          Operation *clonedOp = rewriter.clone(*fillOp.getOperation());
+          rewriter.replaceUsesWithIf(fillOp->getResults(),
+                                       clonedOp->getResults(),
+                                       [&](OpOperand &operand) {
+                                         return operand.getOwner() == linalgOp;
+                                       });
+        }
+      }
+    return WalkResult::advance();
+  });
+}
+
 void Bufferize::runOnOperation() {
   ModuleOp moduleOp = getOperation();
 
   OpPassManager passManager;
 
   // Pre-processing.
+  if (this->duplicateFill)
+    passManager.addNestedPass<func::FuncOp>(tpp::createDuplicateFill());
   passManager.addPass(bufferization::createEmptyTensorEliminationPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
 

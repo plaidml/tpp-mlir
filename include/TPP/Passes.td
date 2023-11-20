@@ -292,8 +292,8 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let options = [
-    Option<"dealloc", "dealloc",
-           "bool", /*default=*/"1",
+    Option<"dealloc", "dealloc", "bool", 
+            /*default=*/"true",
            "Enables automatic deallocation.">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
             /*default=*/"false",
@@ -301,7 +301,20 @@ def Bufferize : Pass<"bufferize", "ModuleOp"> {
     Option<"printConflicts", "print-conflicts", "bool",
             /*default=*/"false",
            "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
+    Option<"duplicateFill", "duplicate-fill", "bool",
+           /*default=*/"true",
+           "Enable duplication of fill operation (for testing only).">
   ];
+}
+
+def DuplicateFill : Pass<"duplicate-fill", "func::FuncOp"> {
+  let summary = "Duplicate fill operations";
+  let description = [{
+    Duplicate linalg.fill operations to avoid memref.copy after
+    bufferization. This can trigger later folding of the fill.
+    We duplicate only zero fill on contraction operations.
+  }];
+  let dependentDialects = [ "linalg::LinalgDialect" ];
 }
 
 def Cleanup : Pass<"cleanup", "func::FuncOp"> {
