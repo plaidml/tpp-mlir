@@ -13,9 +13,8 @@ include "TPP/Dialect/Xsmm/XsmmDialect.td"
 include "TPP/Dialect/Xsmm/XsmmEnum.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, F32, BF16, I64]>;
-def Xsmm2DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [2]>]>;
-def Xsmm4DMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [4]>]>;
+def XsmmMemRef : AnyTypeOf<[MemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, 
+                            F32, BF16, I64]>;
 
 //===----------------------------------------------------------------------===//
 // BinaryOp
