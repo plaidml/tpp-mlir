@@ -1,16 +1,12 @@
 // RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
 
-// RUN: tpp-opt %s -default-tpp-passes | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-// RUN: tpp-opt %s -default-tpp-passes="tpp-to-loops" | \
-// RUN: tpp-run -print \
+// RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
-
-// XFAIL: *
 
 #map = affine_map<(d0, d1, d2, d3) -> (d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
