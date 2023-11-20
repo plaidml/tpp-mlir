@@ -98,9 +98,10 @@ void BenchOp::print(OpAsmPrinter &printer) {
     assert(blockArgs.size() == initArgs.size() &&
            "expected same length of arguments and initializers");
     printer << " iter_args(";
-    llvm::interleaveComma(llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
-      printer << std::get<0>(it) << " = " << std::get<1>(it);
-    });
+    llvm::interleaveComma(
+        llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
+          printer << std::get<0>(it) << " = " << std::get<1>(it);
+        });
     printer << ") -> " << initArgs.getTypes();
   }
   printer << ' ';
@@ -181,19 +182,22 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
       return failure();
   }
 
-  if (regionArgs.size() != result.types.size())
+  if (regionArgs.size() != result.types.size()) {
     return parser.emitError(
         parser.getNameLoc(),
         "mismatch in number of loop-carried values and defined values");
+  }
 
   // Resolve input operands.
   if (hasIterArgs) {
-    for (auto argOperandType : llvm::zip(regionArgs, operands, result.types)) {
+    for (auto argOperandType :
+         llvm::zip_equal(regionArgs, operands, result.types)) {
       Type type = std::get<2>(argOperandType);
       std::get<0>(argOperandType).type = type;
       if (parser.resolveOperand(std::get<1>(argOperandType), type,
-                                result.operands))
+                                result.operands)) {
         return failure();
+      }
     }
   }
 
