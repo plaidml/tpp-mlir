@@ -344,6 +344,19 @@ void CreateNdDescOp::print(::mlir::OpAsmPrinter &printer) {
   printer << getTensorDesc().getType();
 }
 
+static std::string getValueAsString(::mlir::Value op, bool asOperand = false) {
+  std::string buf;
+  buf.clear();
+  llvm::raw_string_ostream os(buf);
+  auto flags = ::mlir::OpPrintingFlags().assumeVerified();
+  if (asOperand)
+    op.printAsOperand(os, flags);
+  else
+    op.print(os, flags);
+  os.flush();
+  return buf;
+}
+
 mlir::LogicalResult CreateNdDescOp::verify() {
   llvm::dbgs() << "Op: " << getValueAsString(*this)
                << "\n\tstatic offsets: " << makeString(getStaticOffsets())

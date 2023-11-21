@@ -9,7 +9,6 @@
 #include "TPP/Passes.h"
 
 #include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
-#include "TPP/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

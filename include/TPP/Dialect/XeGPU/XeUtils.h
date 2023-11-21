@@ -18,19 +18,6 @@
 
 #include "mlir/IR/Value.h"
 
-static std::string getValueAsString(::mlir::Value op, bool asOperand = false) {
-  std::string buf;
-  buf.clear();
-  llvm::raw_string_ostream os(buf);
-  auto flags = ::mlir::OpPrintingFlags().assumeVerified();
-  if (asOperand)
-    op.printAsOperand(os, flags);
-  else
-    op.print(os, flags);
-  os.flush();
-  return buf;
-}
-
 template <typename T> static std::string makeString(llvm::ArrayRef<T> array) {
   std::string buf;
   buf.clear();
