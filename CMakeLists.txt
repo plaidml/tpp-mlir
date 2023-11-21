@@ -116,6 +116,17 @@ if (TPP_GPU)
   COMMENT Run Quick GPU Benchmarks)
 endif()
 
+# Run PyTorch Dynamo generated models as benchmarks
+set(BENCH_PT_CFGS
+  ${CONFIG_DIR}/pytorch/torch_dynamo.json
+)
+string(JOIN ',' BENCH_PT_CFGS_STR ${BENCH_PT_CFGS})
+add_custom_target(benchmarks-pt ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
+                  -c ${BENCH_PT_CFGS_STR}
+                  DEPENDS tpp-opt tpp-run
+                  WORKING_DIRECTORY ${BENCHMARK_DIR}
+                  COMMENT Run PyTorch Models)
+
 # Code reformat
 set(CI_DIR "${PROJECT_SOURCE_DIR}/scripts/ci")
 add_custom_target(reformat-python ${CI_DIR}/lint-python.sh -i)
