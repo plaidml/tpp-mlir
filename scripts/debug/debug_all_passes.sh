@@ -11,7 +11,7 @@ DIFF=${SCRIPT_DIR}/debug/diff.py
 ROOT_DIR=$(git_root)
 DIFF_TOOL=diff
 BIN_DIR=$ROOT_DIR/build/bin
-while getopts "b:d:" arg; do
+while getopts "b:d:m:o:" arg; do
   case ${arg} in
     b)
       BIN_DIR=$(realpath ${OPTARG})
@@ -24,6 +24,12 @@ while getopts "b:d:" arg; do
       DIFF_TOOL=${OPTARG}
       check_program ${DIFF_TOOL}
       ;;
+    m)
+      MLIR_GEN_FLAGS=${OPTARG}
+      ;;
+    o)
+      TPP_OPT_FLAGS=${OPTARG}
+      ;;
     *)
       echo "Invalid option: ${OPTARG}"
       exit 1
@@ -34,8 +40,9 @@ TPP_OPT=${BIN_DIR}/tpp-opt
 
 ## Get IR dump
 echo "Producing dump at ${TMP_DIR}"
-${MLIR_GEN} --bias --relu | \
+${MLIR_GEN} --bias --relu ${MLIR_GEN_FLAGS} | \
     ${TPP_OPT} \
+      ${TPP_OPT_FLAGS} \
       --default-tpp-passes \
       --mlir-print-ir-after-all \
       > /dev/null 2> ${DUMP_FILE}
