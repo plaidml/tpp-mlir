@@ -19,14 +19,6 @@ def Xsmm_DataType: I64EnumAttr<
    let cppNamespace = "mlir::xsmm";
 }
 
-def Xsmm_TernaryKind : I64EnumAttr<
-    "TernaryKind", "see: libxsmm_meltw_ternary_type",
-    [
-      I64EnumAttrCase<"NONE", 0, "none">,
-    ]> {
-  let cppNamespace = "mlir::xsmm";
-}
-
 def Xsmm_BinaryKind : I64EnumAttr<
     "BinaryKind", "see: libxsmm_meltw_binary_type",
     [
@@ -73,14 +65,6 @@ def Xsmm_BinaryFlags : I64EnumAttr<
       I64EnumAttrCase<"BCAST_COL_IN_1", 8, "bcast_col_in1">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_0", 16, "bcast_scalar_in0">,
       I64EnumAttrCase<"BCAST_SCALAR_IN_1", 32, "bcast_scalar_in1">
-    ]> {
-  let cppNamespace = "mlir::xsmm";
-}
-
-def Xsmm_TernaryFlags : I64EnumAttr<
-    "TernaryFlags", "see: libxsmm_meltw_ternary_flags",
-    [
-      I64EnumAttrCase<"NONE", 0, "none">
     ]> {
   let cppNamespace = "mlir::xsmm";
 }
