@@ -8,13 +8,6 @@
         "flags": [ "-n", "10", "--linalg-to-xsmm", "1" ],
         "extensions": [ "(avx2|asimd)" ]
       },
-      "fp32_mha_tensorflow_seq_len_1024": {
-        "type": "MLIR",
-        "benchmark": "fp32-mha-tensorflow-seq-len-1024.mlir",
-        "environment": {},
-        "flags": [ "-n", "10", "--linalg-to-xsmm", "1" ],
-        "extensions": [ "(avx2|asimd)" ]
-      },
       "fp32_projection": {
         "type": "MLIR",
         "benchmark": "fp32-projection.mlir",
