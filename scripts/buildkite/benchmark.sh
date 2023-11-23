@@ -61,6 +61,12 @@ BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
 BUILD_DIR=$(realpath "${BUILD_DIR:-build-${COMPILER}}")
 CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
 
+# CI jobs can make the run extra long
+NUM_ITER=100
+if [ "${BUILDKITE_BENCHMARK_NUM_ITER}" ]; then
+  NUM_ITER=${BUILDKITE_BENCHMARK_NUM_ITER}
+fi
+
 # Build
 eval "${SCRIPT_DIR}/buildkite/build_tpp.sh"
 
@@ -80,7 +86,7 @@ benchmark () {
   echo "--- BENCHMARK '${NAME}'"
   pushd "${BENCH_DIR}" || exit 1
   echo_run ./driver.py -v \
-           -n 100 \
+           -n ${NUM_ITER} \
            -c "${CONFIG_DIR}/${JSON}" \
            --build "${BUILD_DIR}" || exit 1
 
