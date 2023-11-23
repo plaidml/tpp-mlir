@@ -5,12 +5,12 @@
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "0", "F", "64", "64", "64", "0", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "0", "1024", "1024", "1024", "1024" ],
       "extensions": []
     },
     "gemm_fp32_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
@@ -19,19 +19,19 @@
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "0", "F", "64", "64", "64", "1", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
       "extensions": [ "avx2" ]
     },
     "gemm_bf16_dp2_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=2" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=2" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "avx2" ]
     },
     "gemm_bf16_dp4_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=4" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=4" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "svebf16" ]
@@ -40,12 +40,12 @@
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "5", "F", "64", "64", "64", "0", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "5", "F", "32", "32", "32", "0", "1024", "1024", "1024", "1024" ],
       "extensions": []
     },
     "mlp_fp32_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "(avx2|asimd)" ]
@@ -54,19 +54,19 @@
       "type": "XSMM-DNN",
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
-      "flags": [ "100", "256", "5", "F", "64", "64", "64", "1", "1024", "1024", "1024", "1024" ],
+      "flags": [ "100", "256", "5", "F", "32", "32", "32", "1", "1024", "1024", "1024", "1024" ],
       "extensions": [ "avx2" ]
     },
     "mlp_bf16_dp2_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=2" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=2" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "avx2" ]
     },
     "mlp_bf16_dp4_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=64,64,64 --vnni=4" ],
+      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=4" ],
       "environment": {},
       "flags": [ "-n", "100" ],
       "extensions": [ "svebf16" ]
