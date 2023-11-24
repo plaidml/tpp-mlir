@@ -108,9 +108,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     around the enclosed region.
 
     The performance results are gathered over the specified
-    number of iterations and stored in the user provided memory.
-    The operation assumes that the provided memory space is large
-    enough to store results from all benchmarking iterations.
+    number of iterations and returned as an f64.
 
     If no extra return values are defined, then the yield terminator may be
     left out in the custom syntax and the builders will insert one implicitly.
@@ -118,8 +116,7 @@ def Perf_BenchOp : Perf_Op<"bench",
     For example - a simple benchmark:
 
     ```mlir
-    %deltas = memref.alloc(%size) : memref<?xf64>
-    perf.bench (%n, %deltas : i64, memref<?xf64>) {
+    %delta = perf.bench (%n : i64) -> f64 {
       ... // body - ops under measurement
     }
     ```
@@ -139,48 +136,37 @@ def Perf_BenchOp : Perf_Op<"bench",
     An example of a benchmark with an output result:
 
     ```mlir
-    %sum = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %val) -> i32 {
+    %delta, %sum = perf.bench (%n : i64) iter_args(%arg0 = %val) -> (f64, i32) {
       %sum_next = arith.addi %arg0, %cst : i32
       perf.yield %sum_next : i32
     } -> i32
-    memref.store %sum, %buff[] : memref<i32>
     ```
 
     `perf.bench` is essentially a utility operation that generates
     a benchmarking loop.
     For example, the following input:
     ```mlir
-    %res, ... = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(...) -> ... {
+    %delta, %res, ... = perf.bench (%n : i64) iter_args(...) -> ... {
       ... // body - ops under measurement
 
       // Yield current iteration values to the next iteration iter_args (%x, ...)
       // or to the bench op results (%res, ...) if it is the final iteration.
       perf.yield %x, ...
-    } -> type(%res), ...
+    }
     ```
     is materialized as:
     ```mlir
+    %timer = perf.timer_start() : i64
     %res, ... = loop %iv from 0 to %n step 1
         iter_args(%x, ...) -> type(%res), ... {
-      // Begin time measurement.
-      start_timer
       ... // body - ops under measurement
-      // Capture elapsed time.
-      %delta = stop_timer
-
-      // Store measured time delta.
-      store %delta, %deltas[%iv]
-
-      // Yield current iteration values to the next iteration iter_args (%x, ...)
-      // or to the loop results (%res, ...) if it is the final iteration.
       yield %x, ...
     }
+    %delta = perf.stop_timer(%timer) : f64
     ```
   }];
 
-  let arguments = (ins I64:$numIters,
-                       RankedOrUnrankedMemRefOf<[F64]>:$deltas,
-                       Variadic<AnyType>:$iterArgs);
+  let arguments = (ins I64:$numIters, Variadic<AnyType>:$iterArgs);
   let results = (outs Variadic<AnyType>:$bodyResults);
   let regions = (region SizedRegion<1>:$region);
 
@@ -188,7 +174,7 @@ def Perf_BenchOp : Perf_Op<"bench",
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "Value":$numIters, "Value":$deltas,
+    OpBuilder<(ins "Value":$numIters,
       CArg<"ValueRange", "std::nullopt">:$iterArgs)>
   ];
 
@@ -222,89 +208,6 @@ def Perf_YieldOp : Perf_Op<"yield", [ HasParent<"BenchOp">,
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
   let hasCustomAssemblyFormat = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// MeanOp
-//===----------------------------------------------------------------------===//
-
-def Perf_MeanOp : Perf_Op<"mean", []> {
-  let summary = "Compute mean value.";
-  let description = [{
-    The `perf.mean` operation computes mean value of the provided
-    time deltas.
-
-    Example:
-
-    ```mlir
-    %n = arith.constant 10 : i64
-    %size = arith.index_cast %n : i64 to index
-    %deltas = memref.alloc(%size) : memref<?xf64>
-
-    perf.bench (%n, %deltas: i64, memref<?xf64>) {
-      ... // benchmarked code
-    }
-
-    %mean = perf.mean(%deltas : memref<?xf64>) : f64
-    memref.dealloc %deltas : memref<?xf64>
-    ```
-  }];
-
-  let arguments = (ins RankedOrUnrankedMemRefOf<[F64]>:$input);
-  let results = (outs F64:$mean);
-
-  let assemblyFormat = [{
-    `(` $input `:` type($input) `)` attr-dict
-    `:` type($mean)
-  }];
-
-  let extraClassDeclaration = [{
-    static std::string getLibraryCallName() {
-      return "perf_mean";
-    }
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// StdevOp
-//===----------------------------------------------------------------------===//
-
-def Perf_StdevOp : Perf_Op<"stdev", []> {
-  let summary = "Compute standard deviation.";
-  let description = [{
-    The `perf.stdev` operation computes standard deviation of the provided
-    time deltas.
-
-    Example:
-
-    ```mlir
-    %n = arith.constant 10 : i64
-    %size = arith.index_cast %n : i64 to index
-    %deltas = memref.alloc(%size) : memref<?xf64>
-
-    perf.bench (%n, %deltas: i64, memref<?xf64>) {
-      ... // benchmarked code
-    }
-
-    %mean = perf.mean(%deltas : memref<?xf64>) : f64
-    %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
-    memref.dealloc %deltas : memref<?xf64>
-    ```
-  }];
-
-  let arguments = (ins RankedOrUnrankedMemRefOf<[F64]>:$input, F64:$mean);
-  let results = (outs F64:$stdev);
-
-  let assemblyFormat = [{
-    `(` $input `:` type($input) `,` $mean `:` type($mean) `)` attr-dict
-    `:` type($stdev)
-  }];
-
-  let extraClassDeclaration = [{
-    static std::string getLibraryCallName() {
-      return "perf_stdev";
-    }
-  }];
 }
 
 //===----------------------------------------------------------------------===//

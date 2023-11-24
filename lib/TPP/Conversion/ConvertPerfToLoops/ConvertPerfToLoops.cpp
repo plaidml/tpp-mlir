@@ -37,63 +37,60 @@ struct ConvertBenchToLoops : public OpRewritePattern<perf::BenchOp> {
     assert(dyn_cast_or_null<perf::YieldOp>(benchYield) &&
            "expect perf.yield in perf.bench");
 
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     auto numIters = rewriter.create<arith::IndexCastOp>(
         loc, rewriter.getIndexType(), benchOp.getNumIters());
 
     // Create benchmark loop up to perf.bench numIters.
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    // Wrap the benchmark kernel in timer calls.
+    auto timer = rewriter.create<perf::StartTimerOp>(
+        loc, TimerType::get(rewriter.getContext()));
     auto loop = rewriter.create<scf::ForOp>(loc, zero, numIters, one,
                                             benchOp.getIterArgs());
+    auto delta = rewriter.create<perf::StopTimerOp>(loc, rewriter.getF64Type(),
+                                                    timer.getTimer());
+
     if (benchOp.getIterArgs().empty()) {
       // Erase the default loop yield, it will be inserted later.
-      rewriter.eraseOp(loop.getRegion().front().getTerminator());
+      auto *yield = loop.getRegion().front().getTerminator();
+      assert(isa<scf::YieldOp>(yield) && "Last op must be yield");
+      rewriter.eraseOp(yield);
     }
 
     // Move perf.bench region inside the loop.
     rewriter.mergeBlocks(&benchOp.getRegion().front(), loop.getBody(),
                          benchOp.getIterArgs());
 
-    // Wrap the benchmark kernel in timer calls.
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(loop.getBody());
-    auto timer = rewriter.create<perf::StartTimerOp>(
-        loc, TimerType::get(rewriter.getContext()));
-    rewriter.setInsertionPointToEnd(loop.getBody());
-    auto delta = rewriter.create<perf::StopTimerOp>(loc, rewriter.getF64Type(),
-                                                    timer.getTimer());
-
-    // Move all perf.sink ops after the timer to prevent influencing
-    // measurements.
-    for (auto &op : loop.getRegion().getOps()) {
-      if (isa<perf::SinkOp>(op))
-        op.moveAfter(delta.getOperation());
-    }
-
-    // Store measured time delta on each iteration.
-    rewriter.create<memref::StoreOp>(loc, delta.getDelta(), benchOp.getDeltas(),
-                                     loop.getInductionVar());
-
     // Replace uses of bench args within the benchmark body with their
     // equivalent loop-carried variables.
     assert((benchOp.getIterArgs().size() == loop.getRegionIterArgs().size()) &&
-           "expect equal number of loop-carried variables");
+           "expect equal number of iter_args variables");
     for (auto [benchArg, loopArg] :
          llvm::zip_equal(benchOp.getIterArgs(), loop.getRegionIterArgs()))
       replaceAllUsesInRegionWith(benchArg, loopArg, loop.getRegion());
 
     // Pass perf.yield values through the scf.yield.
+    OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(loop.getBody());
     rewriter.create<scf::YieldOp>(loc, benchYield->getOperands());
     rewriter.eraseOp(benchYield);
 
     // Swap bench results with loop results.
-    assert((benchOp.getBodyResults().size() == loop.getResults().size()) &&
-           "expect equal number of loop-carried variables");
+    assert((benchOp.getBodyResults().size() == loop.getResults().size() + 1) &&
+           "expect equal number of return variables");
+
+    // First, we add the timer delta as a loop result
+    SmallVector<Value> loopResults;
+    loopResults.push_back(delta);
+    // Then we add the rest of the iter args
+    loopResults.append(loop.getResults().begin(), loop.getResults().end());
+    // And replace everything
     for (auto [benchRes, loopRes] :
-         llvm::zip_equal(benchOp.getBodyResults(), loop.getResults()))
+         llvm::zip_equal(benchOp.getBodyResults(), loopResults))
       benchRes.replaceAllUsesWith(loopRes);
 
+    // Erase bench op & return
     rewriter.eraseOp(benchOp);
     return success();
   }

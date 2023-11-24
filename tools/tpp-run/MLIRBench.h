@@ -40,24 +40,6 @@ struct MLIRBenchConfig {
   TensorInitType initType = TensorInitType::Auto;
 };
 
-struct MLIRBenchTimerLoop {
-  MLIRBenchTimerLoop(Value deltas, int numBenchIters, int numWarmupIters)
-      : deltas(deltas), numBenchIters(numBenchIters),
-        numWarmupIters(numWarmupIters), valid(true) {}
-
-  /// Buffer that holds measured time deltas
-  Value deltas;
-
-  /// Number of benchmark iterations
-  int numBenchIters;
-
-  /// Number of warmup iterations
-  int numWarmupIters;
-
-  /// True if the stored buffer is accessible.
-  bool valid;
-};
-
 /// MLIRBench - Creates wrapper for calling kernel methods.
 ///
 /// Note: This class is a mix between a utility class and a driver
@@ -97,9 +79,6 @@ class MLIRBench {
 
   /// Global variables for all arguments (in order)
   llvm::SmallVector<llvm::StringRef> globals;
-
-  /// Benchmarking loops
-  llvm::SmallVector<MLIRBenchTimerLoop> benchLoops;
 
   /// Seed for the random tensor filling
   int seed;
@@ -144,20 +123,16 @@ public:
   /// Creates and returns a call to the kernel.
   Operation *callKernel();
 
-  /// Returns the result of a kernel call, which is either
-  /// the return value (if any) or the last argument (outs).
-  Value getKernelResult(Operation *kernelCall);
-
-  /// Computes compile-time number of warmup iters
-  unsigned getNumWarmupIters(unsigned iters);
-
   /// Create a benchmarking region around the kernel call
-  /// Returns the ID of the created benchmarking loop
-  unsigned createTimerLoop(unsigned);
+  /// Returns the timer delta
+  Value createTimerLoop(unsigned);
 
   /// Get the timer average/deviation of the specified benchmarking loop
   /// The stored deltas get invalidated afterwards
-  Value getTimerStats(unsigned);
+  Value getTimerStats(Value);
+
+  /// Prints the stats of the bench loop
+  void printMean(Value);
 
   /// Prints a float value (used for mean/dev)
   void printVector(Value);

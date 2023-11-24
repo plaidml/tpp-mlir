@@ -52,6 +52,8 @@
 #include "TPP/GPU/Utils.h"
 #include "TPP/Passes.h"
 
+#include <algorithm>
+
 using namespace mlir;
 
 // Number of loops for benchmarks
@@ -171,21 +173,32 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.createKernelArgs()))
     return bench.emitError("Cannot create kernel inputs");
 
-  if (benchNumLoops == 1) {
-    // Call kernel once
-    auto *call = bench.callKernel();
-    if (!call)
-      return bench.emitError("Cannot generate a call to the kernel");
-    // Print the result
-    if (printKernelResult && failed(bench.printResult(call)))
+  // Call kernel once to compile xsmm and print results
+  auto *call = bench.callKernel();
+  if (!call)
+    return bench.emitError("Cannot generate a call to the kernel");
+
+  // Print the result
+  if (printKernelResult) {
+    if (!call->getResults().size())
+      return bench.emitError("Cannot print functions with void return");
+    if (failed(bench.printResult(call)))
       return bench.emitError("Cannot print result memref");
-  } else {
-    // This is the main loop, if N > 1
-    auto acc = bench.createTimerLoop(benchNumLoops);
-    auto stats = bench.getTimerStats(acc);
-    if (!stats)
-      return bench.emitError("Cannot get timer stats");
-    bench.printVector(stats);
+  }
+
+  if (benchNumLoops > 1) {
+    // Warmup to 1% of the total runs, but no less than 2 and no more than 50
+    int warmupIter = benchNumLoops / 100;
+    warmupIter = std::max(warmupIter, 2);
+    warmupIter = std::min(warmupIter, 50);
+
+    // This is the warmup loop, if N > 1, ignore the result
+    bench.createTimerLoop(warmupIter);
+
+    // This is the warmup loop, if N > 1
+    auto delta = bench.createTimerLoop(benchNumLoops);
+    auto stats = bench.getTimerStats(delta);
+    bench.printMean(stats);
   }
 
   // Finally lower to LLVM Dialect
