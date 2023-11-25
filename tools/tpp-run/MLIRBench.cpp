@@ -103,7 +103,7 @@ LogicalResult MLIRBench::findKernel(StringRef name) {
     return module.emitError("No valid entry point, use mlir-cpu-runner");
   }
 
-  // Ignore functions that do not return one result
+  // Ignore functions that return more than one result
   auto funcType = kernel.getFunctionType();
   if (funcType.getNumResults() > 1)
     return module.emitError("Multiple return values, use mlir-cpu-runner");
