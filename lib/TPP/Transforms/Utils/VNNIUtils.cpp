@@ -27,8 +27,7 @@ std::optional<int64_t> getVnniBlockingFactor(Type type) {
 bool isInVnniLayout(MemRefType memref) {
   if (memref.getRank() < 3 || !memref.getElementType().isBF16())
     return false;
-  return memref.getShape()[memref.getRank() - 1] ==
-         vnni::utils::getVnniBlockingFactor(memref);
+  return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
 }
 
 } // namespace utils
