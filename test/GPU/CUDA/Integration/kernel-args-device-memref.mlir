@@ -14,11 +14,11 @@
 module {
   func.func @entry(%arg0: memref<8x8xf32>,
                    %arg1: memref<8x8xf32>,
-                   %arg2: memref<8x8xf32>) {
+                   %arg2: memref<8x8xf32>) -> memref<8x8xf32>{
     // Kernel arguments are already allocated on GPU - use directly
     linalg.matmul ins(%arg0, %arg1 : memref<8x8xf32>, memref<8x8xf32>)
                   outs(%arg2 : memref<8x8xf32>)
-    return
+    return %arg2 : memref<8x8xf32>
   }
 }
 

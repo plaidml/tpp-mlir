@@ -9,7 +9,7 @@
 module {
   func.func @entry(%arg0: memref<8x8xf32>,
                    %arg1: memref<8x8xf32>,
-                   %arg2: memref<8x8xf32>) {
+                   %arg2: memref<8x8xf32>) -> memref<8x8xf32> {
     // Kernel arguments are allocated on host
     // Copy data to device
     %0, %t0 = gpu.alloc async () : memref<8x8xf32>
@@ -36,7 +36,7 @@ module {
     %tD2 = gpu.dealloc async %2 : memref<8x8xf32>
     gpu.wait [%tD2]
 
-    return
+    return %arg2 : memref<8x8xf32>
   }
 }
 
