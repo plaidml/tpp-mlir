@@ -977,7 +977,7 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
     MemRefType outType = out.getType().cast<MemRefType>();
     MemRefType sourceType = source.getType().cast<MemRefType>();
     if (!outType.hasStaticShape() || !sourceType.hasStaticShape() ||
-        outType.getRank() != 3 || !vnni::utils::isInVnniLayout(outType)) {
+        !vnni::utils::isInVnniLayout(vnni::utils::VnniOp::TRANSPOSE, outType)) {
       return failure();
     }
 
