@@ -19,11 +19,13 @@ class MemRefType;
 namespace vnni {
 namespace utils {
 
+enum class VnniOp { TRANSPOSE = 3, GEMM = 3, BRGEMM = 4 };
+
 // Returns the VNNI blocking factor: 2 for BF16 and 4 for BF8.
 std::optional<int64_t> getVnniBlockingFactor(Type type);
 
-// Return true if the memref is in VNNI layout.
-bool isInVnniLayout(MemRefType memref);
+// Return true if the memref is in VNNI layout with rank `expectedRank`.
+bool isInVnniLayout(VnniOp expectedRank, MemRefType memref);
 
 } // namespace utils
 } // namespace vnni
