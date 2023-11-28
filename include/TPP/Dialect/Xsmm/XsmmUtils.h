@@ -52,6 +52,15 @@ void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
                         ArrayRef<Value> operands, UnaryInfo unaryInfo,
                         ArrayAttr flags, UnaryKindAttr kind);
 
+// Compute the broadcasting flags for 'inputType' based 'outputType'.
+// Rules for broadcasting follows Numpy-style, and are only allowed in
+// 'inputType'. see: https://numpy.org/doc/stable/user/basics.broadcasting.html
+FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType);
+
+// Compute the broadcasting flags for 'operandType' based on 'outputType'.
+FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
+                                      size_t operandNumber);
+
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

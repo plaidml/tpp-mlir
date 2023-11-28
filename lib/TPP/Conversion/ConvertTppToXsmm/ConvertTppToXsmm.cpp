@@ -62,40 +62,6 @@ static FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0) {
   return strides[pos];
 }
 
-// Examples:
-// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
-// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
-// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
-// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
-// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
-static void
-computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
-                       ArrayRef<int64_t> lowerRankShape,
-                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
-  // Initialize new shapes with [1] * higherRank.
-  int64_t higherRank = higherRankShape.size();
-  int64_t lowerRank = lowerRankShape.size();
-
-  reshapeOutputShape.assign(higherRank, 1);
-
-  int64_t higherRankDim;
-  int64_t lowerRankDim;
-
-  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    higherRankDim = higherRankShape[i];
-    lowerRankDim = lowerRankShape[j];
-
-    if (lowerRankDim == 1 && higherRankDim > 1)
-      reshapeOutputShape[i] = 1;
-    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
-             (lowerRankDim == higherRankDim))
-      reshapeOutputShape[i] = lowerRankDim;
-    else if (higherRankDim != lowerRankDim)
-      assert(false && "bCast semantics for identity op broken");
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Conversions
 //===----------------------------------------------------------------------===//
@@ -249,11 +215,6 @@ struct ConvertTppBrgemmOp : public OpRewritePattern<tpp::BrgemmOp> {
   }
 };
 
-// Forward decl.
-static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
-                                        MemRefType outputType,
-                                        size_t operandNumber);
-
 struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
   using OpRewritePattern<tpp::FusedBrgemmOp>::OpRewritePattern;
 
@@ -268,9 +229,11 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
     auto binaryInputType =
         brgemmOp.getBiasOperand().getType().cast<MemRefType>();
     auto outputType = brgemmOp.getOutputType();
-    return rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
-        rewriter.getContext(),
-        getBinaryBCast(binaryInputType, outputType, /*operandNumber=*/0)));
+    auto flags = xsmm::utils::getBinaryFlags(binaryInputType, outputType,
+                                             /*operandNumber=*/0);
+    assert(succeeded(flags));
+    return rewriter.getArrayAttr(
+        xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *flags));
   }
 
   xsmm::BinaryKindAttr getBinaryKind(RewriterBase &rewriter,
@@ -381,40 +344,6 @@ static LogicalResult lowerTPPtoXSMM(tpp::TppOp op, PatternRewriter &rewriter,
   return success();
 }
 
-static xsmm::UnaryFlags getUnaryFlags(tpp::TppOp tppOp) {
-  Type inputType = tppOp.getInputs()[0].getType();
-
-  // There are multiple ways to define a scalar.  f32, memref<1x1xf32> or
-  // memref<f32>. Handle f32, and memref<1x1xf32>. memref<f32> is not allowed
-  // in tpp at the moment.
-  if (!inputType.isa<ShapedType>())
-    return xsmm::UnaryFlags::BCAST_SCALAR;
-  ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
-  auto isOne = [](int64_t val) { return val == 1; };
-  if (llvm::all_of(shapeInput, isOne))
-    return xsmm::UnaryFlags::BCAST_SCALAR;
-
-  Type outputType = tppOp.getOutputType();
-  ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
-  assert(shapeOutput.size() >= shapeInput.size() &&
-         "output rank must be >= input rank");
-  SmallVector<int64_t> bShapeInput;
-  computeBcastShapeInput(shapeOutput, shapeInput, bShapeInput);
-  assert(shapeOutput.size() == bShapeInput.size());
-  shapeInput = bShapeInput;
-
-  if (shapeInput[1] == 1 && shapeOutput[1] > 1)
-    return xsmm::UnaryFlags::BCAST_ROW;
-
-  if (shapeInput[0] == 1 && shapeOutput[0] > 1)
-    return xsmm::UnaryFlags::BCAST_COL;
-
-  if (shapeInput[0] == shapeOutput[0] && shapeInput[1] == shapeOutput[1])
-    return xsmm::UnaryFlags::NONE;
-
-  assert(false && "failed to get bCast for tpp op");
-}
-
 static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
                                          Operation *op, xsmm::UnaryKind kind) {
   auto tppOp = cast<tpp::TppOp>(op);
@@ -430,12 +359,15 @@ static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
   auto ldi = getLeadingDim(tppOp.getInputs()[0].getType());
   if (failed(ldi))
     return rewriter.notifyMatchFailure(tppOp, "cannot compute ldi");
-  xsmm::UnaryFlags flags = getUnaryFlags(tppOp);
+  auto flags = xsmm::utils::getUnaryFlags(tppOp.getInputs()[0].getType(),
+                                          tppOp.getOutputType());
+  if (failed(flags))
+    return failure();
   return lowerTPPtoXSMM<xsmm::UnaryKind, xsmm::UnaryFlags, xsmm::UnaryKindAttr,
                         xsmm::UnaryFlagsAttr, xsmm::UnaryDispatchOp,
                         xsmm::UnaryOp>(tppOp, rewriter,
                                        outputMemRef.getElementType(), kind,
-                                       flags, {m, n, *ldi, *ldo});
+                                       *flags, {m, n, *ldi, *ldo});
 }
 
 static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
@@ -480,69 +412,6 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
   }
 };
 
-// Given the operand type and the output type return the broadcast
-// to use in the XSMM call.
-static xsmm::BinaryFlags getBinaryBCast(MemRefType operandType,
-                                        MemRefType outputType,
-                                        size_t operandNumber) {
-
-  enum class BCastType { NONE = 0, SCALAR, ROW, COL };
-
-  auto shapeOutput = outputType.getShape();
-  auto shapeOperand = operandType.getShape();
-  assert(shapeOutput.size() >= shapeOperand.size() &&
-         "Output rank must be >= operand rank");
-  SmallVector<int64_t> bOperandShape;
-  computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
-  assert(shapeOutput.size() == bOperandShape.size());
-  assert(shapeOutput.size() == 2);
-
-  auto getBCastEnum = [](BCastType bCastType,
-                         std::optional<unsigned> operand) -> xsmm::BinaryFlags {
-    switch (bCastType) {
-    case BCastType::NONE:
-      return xsmm::BinaryFlags::NONE;
-    case BCastType::SCALAR:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
-      if (*operand == 0)
-        return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
-      else
-        return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
-    case BCastType::ROW:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
-      if (*operand == 0)
-        return xsmm::BinaryFlags::BCAST_ROW_IN_0;
-      else
-        return xsmm::BinaryFlags::BCAST_ROW_IN_1;
-    case BCastType::COL:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
-      if (*operand == 0)
-        return xsmm::BinaryFlags::BCAST_COL_IN_0;
-      else
-        return xsmm::BinaryFlags::BCAST_COL_IN_1;
-    }
-    assert(false && "unrechable");
-  };
-
-  // Multiple way to define a scalar. Check if the memref
-  // is a scalar here.
-  auto isOne = [](int64_t val) { return val == 1; };
-  if (llvm::all_of(bOperandShape, isOne))
-    return getBCastEnum(BCastType::SCALAR, operandNumber);
-
-  if (bOperandShape[1] == 1 && shapeOutput[1] > 1)
-    return getBCastEnum(BCastType::ROW, operandNumber);
-  if (bOperandShape[0] == 1 && shapeOutput[0] > 1)
-    return getBCastEnum(BCastType::COL, operandNumber);
-  if (bOperandShape == shapeOutput)
-    return getBCastEnum(BCastType::NONE, operandNumber);
-
-  assert(false && "failed to get bCast for tpp.add");
-}
-
 struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
   using OpRewritePattern<tpp::AddOp>::OpRewritePattern;
 
@@ -575,14 +444,16 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
     int64_t ldo = *ldoDim;
 
-    xsmm::BinaryFlags bCastOnLhs = getBinaryBCast(lhsMemRef, outputMemRef, 0);
-    xsmm::BinaryFlags bCastOnRhs = getBinaryBCast(rhsMemRef, outputMemRef, 1);
+    auto bCastOnLhs = xsmm::utils::getBinaryFlags(lhsMemRef, outputMemRef, 0);
+    auto bCastOnRhs = xsmm::utils::getBinaryFlags(rhsMemRef, outputMemRef, 1);
+    if (failed(bCastOnLhs) || failed(bCastOnRhs))
+      return failure();
 
-    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(bCastOnLhs) << "\n");
-    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(bCastOnRhs) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(*bCastOnLhs) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(*bCastOnRhs) << "\n");
 
     xsmm::BinaryFlags bCast =
-        (bCastOnLhs != xsmm::BinaryFlags::NONE) ? bCastOnLhs : bCastOnRhs;
+        (bCastOnLhs != xsmm::BinaryFlags::NONE) ? *bCastOnLhs : *bCastOnRhs;
 
     return lowerBinaryTPPtoXSMM(addOp, rewriter, outputMemRef.getElementType(),
                                 xsmm::BinaryKind::ADD, bCast,
