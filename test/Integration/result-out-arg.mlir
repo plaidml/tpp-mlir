@@ -31,7 +31,7 @@ memref.global "private" constant @__constant_db : memref<2x2xf32> =
         [ 1.0, 2.0 ]
   ]>
 
-func.func @entry(%out : memref<2x2xf32>) {
+func.func @entry(%out : memref<2x2xf32>) -> memref<2x2xf32> {
   %c0 = arith.constant 0.0 : f32
   linalg.fill ins(%c0 : f32) outs(%out : memref<2x2xf32>)
 
@@ -41,7 +41,7 @@ func.func @entry(%out : memref<2x2xf32>) {
   // Call kernel.
   call @gemm_tpp(%A, %B, %out) : (memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
-  return
+  return %out : memref<2x2xf32>
 }
 
 // CHECK: ( 4, 5 )

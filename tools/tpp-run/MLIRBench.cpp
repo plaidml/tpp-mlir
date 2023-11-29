@@ -284,101 +284,41 @@ Operation *MLIRBench::callKernel() {
   return builder.create<func::CallOp>(unkLoc, kernel, kernelArgs);
 }
 
-Value MLIRBench::getKernelResult(Operation *kernelCall) {
-  // Set the result to either the return value or the last argument, if the
-  // kernel return is void.
-  auto funcType = kernel.getFunctionType();
-
-  return funcType.getNumResults() == 0 ? kernelArgs.back()
-                                       : kernelCall->getOpResult(0);
-}
-
-unsigned MLIRBench::getNumWarmupIters(unsigned iters) {
-  return std::max(MLIRBench::minIters, std::min(iters / MLIRBench::warmupRatio,
-                                                MLIRBench::maxIters));
-}
-
-unsigned MLIRBench::createTimerLoop(unsigned iters) {
-  const int warmupIters = getNumWarmupIters(iters);
-  const int n = iters + warmupIters;
-
+Value MLIRBench::createTimerLoop(unsigned iters) {
   // Allocates buffer for results
-  auto count = getConstInt(builder, n, 64);
-  auto memrefType = MemRefType::get({n}, builder.getF64Type());
-  auto acc = builder.create<memref::AllocOp>(unkLoc, memrefType);
+  auto count = getConstInt(builder, iters, 64);
 
   // Create perf benchmarking region, set insertion to inside the body
-  auto loop = builder.create<perf::BenchOp>(unkLoc, count, acc);
-  builder.setInsertionPointToStart(loop.getBody());
+  auto bench = builder.create<perf::BenchOp>(unkLoc, count);
+  builder.setInsertionPointToStart(bench.getBody());
 
   // Call the kernel, ignore output
   auto *call = callKernel();
   assert(call && "Failed to generate a kernel call");
 
   // Revert insertion point and return the accumulation ID
-  builder.setInsertionPointAfter(loop);
+  builder.setInsertionPointAfter(bench);
 
-  // Store benchmarking loop
-  MLIRBenchTimerLoop benchLoop(acc, iters, warmupIters);
-  benchLoops.push_back(benchLoop);
-
-  return benchLoops.size() - 1;
+  // The first result is the timer deltas
+  return bench.getResults()[0];
 }
 
-Value MLIRBench::getTimerStats(unsigned loopId) {
-  assert(loopId < benchLoops.size() && "Invalid bench loop ID");
+Value MLIRBench::getTimerStats(Value deltas) {
+  // Num iterations is in the perf.bench op
+  auto *bench = deltas.getDefiningOp();
+  assert(isa<perf::BenchOp>(bench) && "Invalid delta definition");
+  auto iters = cast<perf::BenchOp>(bench)->getOperand(0);
 
-  auto &benchLoop = benchLoops[loopId];
-  assert(benchLoop.valid && "Bench loop already invalidated");
+  // Mean is deltas / iters
+  auto fIters =
+      builder.create<arith::UIToFPOp>(unkLoc, builder.getF64Type(), iters);
+  auto div = builder.create<arith::DivFOp>(unkLoc, deltas, fIters);
+  return div.getResult();
+}
 
-  Value accBuf = benchLoop.deltas;
-
-  // Skip the warmup loops in stats calculation
-  auto dimIdx = builder.create<arith::ConstantIndexOp>(unkLoc, 0);
-  auto len = builder.create<memref::DimOp>(unkLoc, accBuf, dimIdx);
-  auto offset =
-      builder.create<arith::ConstantIndexOp>(unkLoc, benchLoop.numWarmupIters);
-  auto size = builder.create<arith::SubIOp>(unkLoc, len, offset);
-  auto stride = builder.create<arith::ConstantIndexOp>(unkLoc, 1);
-  auto subview = builder.create<memref::SubViewOp>(
-      unkLoc, accBuf, ValueRange{offset}, ValueRange{size}, ValueRange{stride});
-
-  // Copy the deltas into an separate smaller buffer to ensure
-  // that perf functions do not read the warmup loop deltas
-  auto accType =
-      MemRefType::get({mlir::ShapedType::kDynamic}, builder.getF64Type());
-  auto acc = builder.create<memref::AllocOp>(unkLoc, accType, ValueRange{size});
-  builder.create<memref::CopyOp>(unkLoc, subview, acc);
-
-  // Compute timer stats
-  auto callMean =
-      builder.create<perf::MeanOp>(unkLoc, builder.getF64Type(), acc);
-  auto mean = callMean.getMean();
-  auto callDev =
-      builder.create<perf::StdevOp>(unkLoc, builder.getF64Type(), acc, mean);
-  auto dev = callDev.getStdev();
-
-  // Create a vector<2xf64> so we can print
-  auto zeroF = getConstFloat(builder, 0.0, 64);
-  auto vectorType = VectorType::get({2}, builder.getF64Type());
-  auto stats = builder.create<vector::SplatOp>(unkLoc, vectorType, zeroF);
-
-  // Insert mean, dev (as a chain) into vector, return end of chain
-  auto zeroIAttr = builder.getIntegerAttr(builder.getI64Type(), 0);
-  auto zeroI = builder.create<arith::ConstantOp>(unkLoc, builder.getI64Type(),
-                                                 zeroIAttr);
-  auto insMean =
-      builder.create<vector::InsertElementOp>(unkLoc, mean, stats, zeroI);
-  auto oneIAttr = builder.getIntegerAttr(builder.getI64Type(), 1);
-  auto oneI =
-      builder.create<arith::ConstantOp>(unkLoc, builder.getI64Type(), oneIAttr);
-  auto insDev =
-      builder.create<vector::InsertElementOp>(unkLoc, dev, insMean, oneI);
-
-  // Invalidate the bench loop
-  benchLoop.valid = false;
-
-  return insDev;
+void MLIRBench::printMean(Value mean) {
+  assert(isa<mlir::Float64Type>(mean.getType()) && "Invalid mean type");
+  builder.create<vector::PrintOp>(unkLoc, mean);
 }
 
 void MLIRBench::printVector(Value vector) {
@@ -443,7 +383,8 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   // Build print logic directly after the kernel call.
   builder.setInsertionPointAfter(kernelCall);
 
-  Value result = getKernelResult(kernelCall);
+  // Kernels must return a single result
+  Value result = kernelCall->getResult(0);
   if (defGpuBackend == "cuda" && defGpuArgs) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
@@ -510,4 +451,8 @@ Block &MLIRBench::getMainBlock() { return main.getBody().front(); }
 
 LogicalResult MLIRBench::emitError(llvm::Twine desc) {
   return module.emitError(desc);
+}
+
+std::string MLIRBench::getGPUName() {
+  return defGpuBackend;
 }

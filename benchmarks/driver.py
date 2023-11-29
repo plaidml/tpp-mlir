@@ -263,7 +263,8 @@ class XSMMDNNRun(BaseRun):
             )
             return False
 
-        self.stdout = match.group(1) + " +- 0.00 gflops"
+        gflops = float(match.group(1))
+        self.stdout = f"{(gflops):9.3f} gflops"
         return True
 
 

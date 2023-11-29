@@ -8,7 +8,7 @@
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
-func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memref<32x32xf16>) {
+func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memref<32x32xf16>) -> memref<32x32xf16> {
     %alloc = gpu.alloc() {alignment = 64 : i64} : memref<2x2x16x16xf16>
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2, 3]] : memref<32x32xf16> into memref<2x16x2x16xf16>
     %alloc_0 = gpu.alloc() {alignment = 64 : i64} : memref<2x2x16x16xf16>
@@ -32,7 +32,7 @@ func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memr
     gpu.dealloc %alloc_0 : memref<2x2x16x16xf16>
     gpu.dealloc %alloc_2 : memref<2x2x16x16xf16>
     gpu.dealloc %alloc_4 : memref<2x16x2x16xf16>
-    return
+    return %arg2 : memref<32x32xf16>
   }
 
 // CHECK: ( 0.036{{[0-9]+}}, 0.089{{[0-9]+}}, 0.086{{[0-9]+}}, 0.35{{[0-9]+}}

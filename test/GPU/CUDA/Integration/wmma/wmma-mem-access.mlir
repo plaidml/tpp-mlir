@@ -43,7 +43,7 @@ module attributes {gpu.container_module} {
     ]
   ]>
 
-  func.func @entry(%arg0: memref<16x16xf16>) {
+  func.func @entry(%arg0: memref<16x16xf16>) -> memref<16x16xf16> {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index
@@ -64,7 +64,7 @@ module attributes {gpu.container_module} {
     gpu.dealloc %gpuA : memref<2x16x16xf16>
     gpu.dealloc %gpuB : memref<2x16x16xf16>
 
-    return
+    return %arg0 : memref<16x16xf16>
   }
 
   gpu.module @entry_kernel {

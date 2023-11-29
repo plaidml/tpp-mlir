@@ -1,77 +1,14 @@
 // RUN: tpp-opt %s -convert-perf-to-loops -convert-perf-to-func -split-input-file -canonicalize | FileCheck %s
 
 // CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} 
-// CHECK-LABEL: @func_start_timer
-func.func @func_start_timer() {
-  // CHECK: call @perf_start_timer()
-  %t = perf.start_timer : !perf.timer
-  return
-}
-
-// -----
-
-// CHECK-DAG: func.func private @perf_start_timer() -> {{.*}} 
 // CHECK-DAG: func.func private @perf_stop_timer({{.*}}) -> {{.*}} 
 // CHECK-LABEL: @func_stop_timer
-func.func @func_stop_timer() {
+func.func @func_stop_timer() -> f64 {
   // CHECK: %[[timer:.*]] = call @perf_start_timer()
   %t = perf.start_timer : !perf.timer
   // CHECK: call @perf_stop_timer(%[[timer]])
   %delta = perf.stop_timer(%t : !perf.timer) : f64
-  return
-}
-
-// -----
-
-// CHECK:     func.func private @perf_mean(%[[arg0:.*]]: memref<*xf64>) -> f64 {
-// CHECK-DAG:   %[[lb:.*]] = arith.constant 0 : index
-// CHECK-DAG:   %[[step:.*]] = arith.constant 1 : index
-// CHECK-DAG:   %[[sum:.*]] = arith.constant 0.000000e+00 : f64
-// CHECK:       %[[deltas:.*]] = memref.cast %[[arg0]] : memref<*xf64> to memref<?xf64>
-// CHECK:       %[[dim:.*]] = memref.dim %[[deltas]], {{.*}} : memref<?xf64>
-// CHECK:       %[[sum_loop:.*]] = scf.for %[[iv:.*]] = %[[lb]] to %[[dim]] step %[[step]] iter_args(%[[iter:.*]] = %[[sum]]) -> (f64) {
-// CHECK:         %[[val:.*]] = memref.load %[[deltas]][%[[iv]]] : memref<?xf64>
-// CHECK:         %[[sum_iter:.*]] = arith.addf %[[val]], %[[iter]] : f64
-// CHECK:         scf.yield %[[sum_iter]] : f64
-// CHECK:       }
-// CHECK:       %[[dim_int:.*]] = arith.index_cast %[[dim]]
-// CHECK:       %[[size:.*]] = arith.sitofp %[[dim_int]]
-// CHECK:       %[[mean:.*]] = arith.divf %[[sum_loop]], %[[size]] : f64
-// CHECK:       return %[[mean]] : f64
-// CHECK:     }
-// CHECK-LABEL: @func_mean
-func.func @func_mean(%arg0: memref<?xf64>) {
-  // CHECK: call @perf_mean({{.*}})
-  %mean = perf.mean(%arg0 : memref<?xf64>) : f64
-  return
-}
-
-// -----
-
-// CHECK:     func.func private @perf_stdev(%[[arg0:.*]]: memref<*xf64>, %[[mean:.*]]: f64) -> f64 {
-// CHECK-DAG:   %[[lb:.*]] = arith.constant 0 : index
-// CHECK-DAG:   %[[step:.*]] = arith.constant 1 : index
-// CHECK-DAG:   %[[sum:.*]] = arith.constant 0.000000e+00 : f64
-// CHECK:       %[[deltas:.*]] = memref.cast %[[arg0]] : memref<*xf64> to memref<?xf64>
-// CHECK:       %[[dim:.*]] = memref.dim %[[deltas]], {{.*}} : memref<?xf64>
-// CHECK:       %[[sum_loop:.*]] = scf.for %[[iv:.*]] = %[[lb]] to %[[dim]] step %[[step]] iter_args(%[[iter:.*]] = %[[sum]]) -> (f64) {
-// CHECK:         %[[val:.*]] = memref.load %[[deltas]][%[[iv]]] : memref<?xf64>
-// CHECK:         %[[delta:.*]] = arith.subf %[[val]], %[[mean]] : f64
-// CHECK:         %[[delta_sqr:.*]] = arith.mulf %[[delta]], %[[delta]] : f64
-// CHECK:         %[[sum_iter:.*]] = arith.addf %[[delta_sqr]], %[[iter]] : f64
-// CHECK:         scf.yield %[[sum_iter]] : f64
-// CHECK:       }
-// CHECK:       %[[dim_int:.*]] = arith.index_cast %[[dim]]
-// CHECK:       %[[size:.*]] = arith.sitofp %[[dim_int]]
-// CHECK:       %[[variance:.*]] = arith.divf %[[sum_loop]], %[[size]] : f64
-// CHECK:       %[[stdev:.*]] = math.sqrt %[[variance]] : f64
-// CHECK:       return %[[stdev]] : f64
-// CHECK:     }
-// CHECK-LABEL: @func_stdev
-func.func @func_stdev(%arg0: memref<?xf64>, %mean: f64) {
-  // CHECK: call @perf_stdev({{.*}})
-  %stdev = perf.stdev(%arg0 : memref<?xf64>, %mean : f64) : f64
-  return
+  return %delta : f64
 }
 
 // -----
@@ -123,34 +60,28 @@ func.func @func_sink_variants(%arg0: memref<?xi64>, %arg1: memref<?xi32>,
 // -----
 
 // An example of perf dialect usage.
-// CHECK-DAG: func.func private @perf_stdev({{.*}}: memref<*xf64>, {{.*}}: f64) -> f64
-// CHECK-DAG: func.func private @perf_mean({{.*}}: memref<*xf64>) -> f64
 // CHECK-DAG: func.func private @perf_sink_tensor_f32({{.*}}: tensor<*xf32>) attributes {passthrough = ["optnone", "noinline"]}
 // CHECK-DAG: func.func private @perf_stop_timer(i64) -> f64 
 // CHECK-DAG: func.func private @perf_start_timer() -> i64 
 // CHECK-LABEL: @perf_example
 func.func @perf_example(%A: tensor<4x8xf32>,
-          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, i64) {
   // CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[output:.*]] = arith.constant 0 : i64
-  // CHECK: %[[deltas:.*]] = memref.alloc
-  %size = arith.index_cast %n : i64 to index
-  %deltas = memref.alloc(%size) : memref<?xf64>
   %output = arith.constant 0 : i64
 
   // CHECK: %[[ub:.*]] = arith.index_cast %arg3 : i64 to index
+  // CHECK: %[[timer:.*]] = call @perf_start_timer()
   // CHECK: %[[res:.*]] = scf.for %[[i:.*]] = %[[lb]] to %[[ub]] step %[[step]] iter_args(%[[iarg0:.*]] = %[[output]]) -> (i64) {
-  // CHECK:   %[[timer:.*]] = func.call @perf_start_timer()
   // CHECK:   %[[mulres:.*]] = linalg.matmul
-  // CHECK:   %[[sum:.*]] = arith.addi
-  // CHECK:   %[[delta:.*]] = func.call @perf_stop_timer(%[[timer]])
   // CHECK:   %[[tcast0:.*]] = tensor.cast %[[mulres]]
-  // CHECK:   func.call @perf_sink_tensor_f32(%[[tcast0]])
-  // CHECK:   memref.store %[[delta]], %[[deltas]][%[[i]]]
+  // CHECK:   call @perf_sink_tensor_f32(%[[tcast0]])
+  // CHECK:   %[[sum:.*]] = arith.addi
   // CHECK:   scf.yield %[[sum]]
   // CHECK: }
-  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %output) -> i64 {
+  // CHECK: %[[stats:.*]] = call @perf_stop_timer(%[[timer]])
+  %stats, %res = perf.bench (%n : i64) iter_args(%arg0 = %output) -> (f64, i64) {
     %D = linalg.matmul ins(%A, %B: tensor<4x8xf32>, tensor<8x4xf32>)
                        outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
     perf.sink(%D) : tensor<4x4xf32>
@@ -158,12 +89,6 @@ func.func @perf_example(%A: tensor<4x8xf32>,
     perf.yield %sum : i64
   }
 
-  // CHECK: %[[mean:.*]] = call @perf_mean({{.*}})
-  // CHECK: %[[stdev:.*]] = call @perf_stdev({{.*}}, %[[mean]])
-  %mean = perf.mean(%deltas : memref<?xf64>) : f64
-  %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
-
-  memref.dealloc %deltas : memref<?xf64>
-  // CHECK: return %[[mean]], %[[stdev]], %[[res]]
-  return %mean, %stdev, %res : f64, f64, i64
+  // CHECK: return %[[stats]], %[[res]]
+  return %stats, %res : f64, i64
 }

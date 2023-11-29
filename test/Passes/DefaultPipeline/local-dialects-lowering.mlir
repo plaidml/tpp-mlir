@@ -26,30 +26,22 @@ func.func @check_dialect() {
 // -----
 
 func.func @perf_dialect(%A: tensor<4x8xf32>,
-          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, f64, i64) {
-  %size = arith.index_cast %n : i64 to index
-  %deltas = memref.alloc(%size) : memref<?xf64>
+          %B: tensor<8x4xf32>, %C: tensor<4x4xf32>, %n: i64) -> (f64, i64) {
   %output = arith.constant 0 : i64
 
-  %res = perf.bench (%n, %deltas : i64, memref<?xf64>) iter_args(%arg0 = %output) -> i64 {
+  %stats, %res = perf.bench (%n : i64) iter_args(%arg0 = %output) -> (f64, i64) {
     %sum = arith.addi %n, %n : i64
     perf.yield %sum : i64
   }
 
-  %mean = perf.mean(%deltas : memref<?xf64>) : f64
-  %stdev = perf.stdev(%deltas : memref<?xf64>, %mean : f64) : f64
-
-  return %mean, %stdev, %res : f64, f64, i64
+  return %stats, %res : f64, i64
 }
 
 // CHECK-LABEL: func.func @perf_dialect(
 // CHECK-NOT: perf.bench
+// CHECK: {{[\w]*\.?}}call @perf_start_timer
 // CHECK: scf.for
-// CHECK:   {{[\w]*\.?}}call
-// CHECK-NOT: perf.mean
-// CHECK-NOT: perf.stdev
-// CHECK: {{[\w]*\.?}}call
-// CHECK: {{[\w]*\.?}}call
+// CHECK: {{[\w]*\.?}}call @perf_stop_timer
 
 // -----
 

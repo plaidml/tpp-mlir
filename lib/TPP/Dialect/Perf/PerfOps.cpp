@@ -47,9 +47,12 @@ LogicalResult StopTimerOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void BenchOp::build(OpBuilder &builder, OperationState &result, Value numIters,
-                    Value deltas, ValueRange iterArgs) {
-  result.addOperands({numIters, deltas});
+                    ValueRange iterArgs) {
+  result.addOperands({numIters});
   result.addOperands(iterArgs);
+
+  // First result is always the deltas
+  result.addTypes(builder.getF64Type());
 
   // Results have to match the input arguments
   for (Value v : iterArgs)
@@ -77,18 +80,8 @@ void BenchOp::print(OpAsmPrinter &printer) {
   // Print base args
   printer << "(";
   printer << getNumIters();
-  printer << ", ";
-  printer << getDeltas();
   printer << " : ";
   printer << getNumIters().getType();
-  printer << ", ";
-  {
-    auto type = getDeltas().getType();
-    if (auto validType = type.dyn_cast<::mlir::BaseMemRefType>())
-      printer.printStrippedAttrOrType(validType);
-    else
-      printer << type;
-  }
   printer << ")";
 
   // Print iter_args
@@ -102,9 +95,9 @@ void BenchOp::print(OpAsmPrinter &printer) {
         llvm::zip(blockArgs, initArgs), printer, [&](auto it) {
           printer << std::get<0>(it) << " = " << std::get<1>(it);
         });
-    printer << ") -> " << initArgs.getTypes();
+    printer << ")";
   }
-  printer << ' ';
+  printer << " -> " << getResultTypes() << " ";
 
   // Print region body
   {
@@ -143,32 +136,21 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   locs.push_back(parser.getCurrentLocation());
   if (parser.parseOperand(operands.emplace_back()))
     return failure();
-  if (parser.parseComma())
-    return failure();
-
-  locs.push_back(parser.getCurrentLocation());
-  if (parser.parseOperand(operands.emplace_back()))
-    return failure();
   if (parser.parseColon())
     return failure();
-
-  if (parser.parseCommaSeparatedList(parseType)) {
+  if (parser.parseCommaSeparatedList(parseType))
     return failure();
-  }
   if (parser.parseRParen())
     return failure();
 
   // Validate arguments
-  if (operands.size() != 2)
-    return parser.emitError(locs[0], "expect two arguments");
-  if (types.size() != 2)
-    return parser.emitError(locs[0], "expect two types for arguments");
+  if (operands.size() != 1)
+    return parser.emitError(locs[0], "expect one argument");
+  if (types.size() != 1)
+    return parser.emitError(locs[0], "expect one types for argument");
   if (parser.resolveOperand(operands[0], types[0], result.operands) ||
       !types[0].isa<IntegerType>())
     return parser.emitError(locs[0], "expect integer number of iterations");
-  if (parser.resolveOperand(operands[1], types[1], result.operands) ||
-      !types[1].isa<MemRefType>())
-    return parser.emitError(locs[1], "expect memref for results");
   operands.clear();
   types.clear();
   locs.clear();
@@ -176,22 +158,25 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   // Parse iter_args, if any
   SmallVector<OpAsmParser::Argument, 4> regionArgs;
   bool hasIterArgs = succeeded(parser.parseOptionalKeyword("iter_args"));
-  if (hasIterArgs) {
-    if (parser.parseAssignmentList(regionArgs, operands) ||
-        parser.parseArrowTypeList(result.types))
-      return failure();
-  }
+  if (hasIterArgs && parser.parseAssignmentList(regionArgs, operands))
+    return failure();
 
-  if (regionArgs.size() != result.types.size()) {
+  // Must have at least one return type (stats), more if iter_args
+  if (parser.parseArrowTypeList(result.types))
+    return failure();
+
+  // First return type is %stat, rest is iter_args
+  if (regionArgs.size() + 1 != result.types.size()) {
     return parser.emitError(
         parser.getNameLoc(),
         "mismatch in number of loop-carried values and defined values");
   }
+  SmallVector<Type> opTypes(result.types.begin() + 1, result.types.end());
 
   // Resolve input operands.
   if (hasIterArgs) {
     for (auto argOperandType :
-         llvm::zip_equal(regionArgs, operands, result.types)) {
+         llvm::zip_equal(regionArgs, operands, opTypes)) {
       Type type = std::get<2>(argOperandType);
       std::get<0>(argOperandType).type = type;
       if (parser.resolveOperand(std::get<1>(argOperandType), type,

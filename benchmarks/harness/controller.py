@@ -55,7 +55,6 @@ class BenchmarkController(object):
         self.programs = self.helper.findTPPProgs(self.build_dir)
         self.output = ""
         self.mean = 0.0
-        self.stdev = 0.0
         # Output is always in seconds, we need to convert anyway
         self.unit = "ms"  # or 'gflops'
         self.benchmark = self._read_input(args.benchmark)
@@ -168,7 +167,7 @@ class BenchmarkController(object):
         return True
 
     def verifyStats(self):
-        """Verify the results, should be in format '( mean, stdev )'"""
+        """Verify the results, should be in format 'mean'"""
 
         if not self.output:
             self.logger.error(
@@ -177,30 +176,25 @@ class BenchmarkController(object):
             return False
 
         # Parse results (always in seconds, as per timer)
-        m = re.search(r"([\d\.\-e]+), ([\d\.\-e]+)", self.output)
+        m = re.search(r"([\d\.\-e]+)", self.output)
         if m:
             self.mean = float(m.group(1))
-            self.stdev = float(m.group(2))
             self.logger.info(
-                f"Mean time: {self.mean*1000} ms +- {self.stdev*1000} ms"
+                f"Mean time: {self.mean*1000} ms"
             )
         else:
-            self.logger.error("Cannot find mean/stdev in output")
+            self.logger.error("Cannot find mean in output")
             return False
 
         # If we asked for flops, we need to convert
         if self.args.flops:
             mean = self.args.flops / self.mean
-            stdev = self.args.flops * self.stdev / (self.mean * self.mean)
             self.mean = mean
-            self.stdev = stdev
             # We annotate in flops (easier to calculate / compare) but we display in Gflops
             self.mean /= 1e9
-            self.stdev /= 1e9
         else:
             # Output is in seconds, but we display in milliseconds
             self.mean *= 1000
-            self.stdev *= 1000
 
         return True
 
@@ -321,10 +315,6 @@ if __name__ == "__main__":
 
     # Success prints basic stats
     if args.flops:
-        print(
-            f"{(controller.mean):9.3f} +- {(controller.stdev):9.3f} {controller.unit}"
-        )
+        print(f"{(controller.mean):9.3f} {controller.unit}")
     else:
-        print(
-            f"{(controller.mean):3.9f} +- {(controller.stdev):3.9f} {controller.unit}"
-        )
+        print(f"{(controller.mean):3.9f} {controller.unit}")

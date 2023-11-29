@@ -4,14 +4,14 @@
 // RUN: FileCheck %s
 
 module attributes {gpu.container_module} {
-  func.func @entry(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %arg2: memref<16x16xf16>) {
+  func.func @entry(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %arg2: memref<16x16xf16>) -> memref<16x16xf16> {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index
     gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c32, %c1, %c1)
     args(%c1 : index, %c0 : index, %arg0 : memref<16x16xf16>, %arg1 : memref<16x16xf16>, %arg2 : memref<16x16xf16>)
 
-    return
+    return %arg2 : memref<16x16xf16>
   }
 
   gpu.module @entry_kernel {

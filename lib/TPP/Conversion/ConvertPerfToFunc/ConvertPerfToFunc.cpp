@@ -111,137 +111,6 @@ static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
   return funcOp;
 }
 
-// Generate function implementation for perf.mean operation.
-static LogicalResult buildPerfMeanFunc(Location loc, std::string funcName,
-                                       Operation *op,
-                                       PatternRewriter &rewriter) {
-  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
-
-  // Create function body.
-  Block *block = funcOp.addEntryBlock();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToEnd(block);
-
-  // Check assumptions on function arguments.
-  auto argTypes = funcOp.getFunctionType().getInputs();
-  if (argTypes.size() != 1)
-    return op->emitError("expected only 1 function argument, but received ")
-           << argTypes.size();
-  if (!argTypes[0].isa<UnrankedMemRefType>())
-    return op->emitError(
-               "expected unranked memref function argument, but received ")
-           << argTypes[0];
-
-  // Cast the buffer to something directly iteratable.
-  auto buff = block->getArguments()[0];
-  auto memRefType = MemRefType::get(
-      ShapedType::kDynamic,
-      buff.getType().cast<UnrankedMemRefType>().getElementType());
-  auto deltas = rewriter.create<memref::CastOp>(loc, memRefType, buff);
-
-  // Iterate over the whole buffer and sum up all time delta values.
-  // Implemented directly as scf to keep further lowering simple.
-  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  auto len = rewriter.create<memref::DimOp>(loc, deltas, zero);
-  auto floatType = rewriter.getF64Type();
-  auto result = rewriter.create<arith::ConstantFloatOp>(
-      loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-
-  auto loopNest = scf::buildLoopNest(
-      rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
-      /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
-      [&](OpBuilder &b, Location loc, ValueRange localIvs,
-          ValueRange iterArgs) -> scf::ValueVector {
-        auto timeDelta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
-        auto sum = rewriter.create<arith::AddFOp>(loc, timeDelta, iterArgs[0]);
-
-        return scf::ValueVector({sum});
-      });
-
-  // Compute average delta value.
-  auto lenInt = rewriter.create<arith::IndexCastOp>(
-      loc, rewriter.getIntegerType(64), len);
-  auto size = rewriter.create<arith::SIToFPOp>(loc, floatType, lenInt);
-  auto mean =
-      rewriter.create<arith::DivFOp>(loc, floatType, loopNest.results[0], size);
-
-  // Return the computed mean value.
-  rewriter.create<func::ReturnOp>(loc, ValueRange{mean});
-
-  return success();
-}
-
-// Generate function implementation for perf.stdev operation.
-static LogicalResult buildPerfStdevFunc(Location loc, std::string funcName,
-                                        Operation *op,
-                                        PatternRewriter &rewriter) {
-  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
-
-  // Create function body.
-  Block *block = funcOp.addEntryBlock();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToEnd(block);
-
-  // Check assumptions on function arguments.
-  auto argTypes = funcOp.getFunctionType().getInputs();
-  if (argTypes.size() != 2)
-    return op->emitError("expected only 2 function argument, but received ")
-           << argTypes.size();
-  if (!argTypes[0].isa<UnrankedMemRefType>())
-    return op->emitError("expected unranked memref as the first function "
-                         "argument, but received ")
-           << argTypes[0];
-  if (!argTypes[1].isa<FloatType>())
-    return op->emitError("expected unranked memref as the second function "
-                         "argument, but received ")
-           << argTypes[1];
-
-  // Cast the buffer to something directly iteratable.
-  auto buff = block->getArguments()[0];
-  auto memRefType = MemRefType::get(
-      ShapedType::kDynamic,
-      buff.getType().cast<UnrankedMemRefType>().getElementType());
-  auto deltas = rewriter.create<memref::CastOp>(loc, memRefType, buff);
-
-  // Iterate over the whole buffer and compute the standard deviation of the
-  // measured time delta values.
-  // Implemented directly as scf to keep further lowering simple.
-  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  auto len = rewriter.create<memref::DimOp>(loc, deltas, zero);
-  auto floatType = rewriter.getF64Type();
-  auto result = rewriter.create<arith::ConstantFloatOp>(
-      loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-  auto mean = block->getArguments()[1];
-
-  auto loopNest = scf::buildLoopNest(
-      rewriter, loc, /*lbs=*/ValueRange{zero}, /*ubs=*/ValueRange{len},
-      /*steps=*/ValueRange{one}, /*iterArgs=*/ValueRange{result},
-      [&](OpBuilder &b, Location loc, ValueRange localIvs,
-          ValueRange iterArgs) -> scf::ValueVector {
-        auto timeDelta = rewriter.create<memref::LoadOp>(loc, deltas, localIvs);
-        auto delta = rewriter.create<arith::SubFOp>(loc, timeDelta, mean);
-        auto deltaSqr = rewriter.create<arith::MulFOp>(loc, delta, delta);
-        auto sum = rewriter.create<arith::AddFOp>(loc, deltaSqr, iterArgs[0]);
-
-        return scf::ValueVector({sum});
-      });
-
-  // Compute standard deviation.
-  auto lenInt = rewriter.create<arith::IndexCastOp>(
-      loc, rewriter.getIntegerType(64), len);
-  auto size = rewriter.create<arith::SIToFPOp>(loc, floatType, lenInt);
-  auto variance =
-      rewriter.create<arith::DivFOp>(loc, floatType, loopNest.results[0], size);
-  auto stdev = rewriter.create<math::SqrtOp>(loc, variance);
-
-  // Return the computed stdev value.
-  rewriter.create<func::ReturnOp>(loc, ValueRange{stdev});
-
-  return success();
-}
-
 // Generate function implementation for perf.sink operation.
 static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
                                        Operation *op,
@@ -293,12 +162,6 @@ static LogicalResult buildPerfFuncCall(Location loc, std::string funcName,
   // If a function is not available yet, call its builder.
   if (!module.lookupSymbol(fnName.getAttr())) {
     auto res = TypeSwitch<Operation *, LogicalResult>(op)
-                   .Case<perf::MeanOp>([&](Operation *op) {
-                     return buildPerfMeanFunc(loc, funcName, op, rewriter);
-                   })
-                   .Case<perf::StdevOp>([&](Operation *op) {
-                     return buildPerfStdevFunc(loc, funcName, op, rewriter);
-                   })
                    .Case<perf::SinkOp>([&](Operation *op) {
                      return buildPerfSinkFunc(loc, funcName, op, rewriter);
                    })
@@ -347,32 +210,6 @@ struct ConvertStopTimerOp : public OpRewritePattern<perf::StopTimerOp> {
   }
 };
 
-struct ConvertMeanOp : public OpRewritePattern<perf::MeanOp> {
-  using OpRewritePattern<perf::MeanOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(perf::MeanOp meanOp,
-                                PatternRewriter &rewriter) const override {
-    auto res = buildPerfFuncCall(meanOp.getLoc(), meanOp.getLibraryCallName(),
-                                 meanOp, rewriter);
-    if (succeeded(res))
-      rewriter.eraseOp(meanOp);
-    return res;
-  }
-};
-
-struct ConvertStdevOp : public OpRewritePattern<perf::StdevOp> {
-  using OpRewritePattern<perf::StdevOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(perf::StdevOp stdevOp,
-                                PatternRewriter &rewriter) const override {
-    auto res = buildPerfFuncCall(stdevOp.getLoc(), stdevOp.getLibraryCallName(),
-                                 stdevOp, rewriter);
-    if (succeeded(res))
-      rewriter.eraseOp(stdevOp);
-    return res;
-  }
-};
-
 struct ConvertSinkOp : public OpRewritePattern<perf::SinkOp> {
   using OpRewritePattern<perf::SinkOp>::OpRewritePattern;
 
@@ -392,8 +229,8 @@ struct ConvertSinkOp : public OpRewritePattern<perf::SinkOp> {
 };
 
 void populatePerfToFuncPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertStartTimerOp, ConvertStopTimerOp, ConvertMeanOp,
-               ConvertStdevOp, ConvertSinkOp>(patterns.getContext());
+  patterns.add<ConvertStartTimerOp, ConvertStopTimerOp, ConvertSinkOp>(
+      patterns.getContext());
 }
 
 struct ConvertPerfToFunc
