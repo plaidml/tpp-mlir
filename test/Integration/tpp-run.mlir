@@ -150,7 +150,6 @@ func.func @entry(%A: tensor<4x8xf32>,
 
 // BENCH_STATS_2-LABEL: @entry
 // BENCH_STATS_2-DAG: %[[c2:.+]] = arith.constant 2 : index
-// BENCH_STATS_2: call @_entry
 // BENCH_STATS_2: scf.for{{.*}}to %[[c2]]
 // BENCH_STATS_2: call @_entry
 // BENCH_STATS_2-NOT: call @_entry
@@ -158,7 +157,6 @@ func.func @entry(%A: tensor<4x8xf32>,
 
 // BENCH_STATS_10-LABEL: @entry
 // BENCH_STATS_10-DAG: %[[c10:.+]] = arith.constant 10 : index
-// BENCH_STATS_10: call @_entry
 // BENCH_STATS_10: scf.for{{.*}}to %[[c10]]
 // BENCH_STATS_10: call @_entry
 // BENCH_STATS_10-NOT: call @_entry

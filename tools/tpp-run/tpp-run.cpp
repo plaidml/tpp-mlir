@@ -145,6 +145,12 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   MLIRBenchConfig config(seed, tensorInitType);
   MLIRBench bench(op, config);
 
+  // Can only either print or run benchmarks, make this clear before we try to
+  // run
+  if (printKernelResult && benchNumLoops > 1)
+    return bench.emitError(
+        "Cannot print while running benchmarks, pick one or the other");
+
   // Basic checks
   if (options.mainFuncType != "void")
     return bench.emitError(
@@ -173,29 +179,34 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   if (failed(bench.createKernelArgs()))
     return bench.emitError("Cannot create kernel inputs");
 
-  // Call kernel once to compile xsmm and print results
-  auto *call = bench.callKernel();
-  if (!call)
-    return bench.emitError("Cannot generate a call to the kernel");
+  // Either run once or run benchmarks
+  if (benchNumLoops == 1) {
+    // Call kernel once to compile xsmm and print results
+    auto *call = bench.callKernel();
+    if (!call)
+      return bench.emitError("Cannot generate a call to the kernel");
 
-  // Print the result
-  if (printKernelResult) {
-    if (!call->getResults().size())
-      return bench.emitError("Cannot print functions with void return");
-    if (failed(bench.printResult(call)))
-      return bench.emitError("Cannot print result memref");
-  }
+    if (printKernelResult) {
+      if (!call->getResults().size())
+        return bench.emitError("Cannot print functions with void return");
 
-  if (benchNumLoops > 1) {
-    // Warmup to 1% of the total runs, but no less than 2 and no more than 50
-    int warmupIter = benchNumLoops / 100;
-    warmupIter = std::max(warmupIter, 2);
-    warmupIter = std::min(warmupIter, 50);
+      if (failed(bench.printResult(call)))
+        return bench.emitError("Cannot print result memref");
+    }
 
-    // This is the warmup loop, if N > 1, ignore the result
-    bench.createTimerLoop(warmupIter);
+  } else {
+    // Warmup on GPUs are currently breaking buffer allocation on GPUs
+    if (bench.getGPUName().empty()) {
+      // Warmup to 1% of the total runs, but no less than 1 and no more than 50
+      int warmupIter = benchNumLoops / 100;
+      warmupIter = std::max(warmupIter, 1);
+      warmupIter = std::min(warmupIter, 50);
 
-    // This is the warmup loop, if N > 1
+      // This is the warmup loop, if N > 1, ignore the result
+      bench.createTimerLoop(warmupIter);
+    }
+
+    // This is the benchmark loop
     auto delta = bench.createTimerLoop(benchNumLoops);
     auto stats = bench.getTimerStats(delta);
     bench.printMean(stats);

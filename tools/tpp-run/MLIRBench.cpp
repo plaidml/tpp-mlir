@@ -452,3 +452,7 @@ Block &MLIRBench::getMainBlock() { return main.getBody().front(); }
 LogicalResult MLIRBench::emitError(llvm::Twine desc) {
   return module.emitError(desc);
 }
+
+std::string MLIRBench::getGPUName() {
+  return defGpuBackend;
+}

@@ -148,6 +148,9 @@ public:
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);
+
+  /// Return the GPU name, if any (empty for CPU)
+  std::string getGPUName();
 };
 
 } // namespace mlir
