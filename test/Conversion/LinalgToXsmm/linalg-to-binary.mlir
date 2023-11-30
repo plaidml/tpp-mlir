@@ -677,3 +677,51 @@ func.func @mul_bcast_row_1(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) 
 // CHECK-NOT: xsmm.binary sub
 // We need to lift this restriction:
 // https://github.com/plaidml/tpp-mlir/blob/6f475924b5cd97ed636da796fef4305af4a20e6a/lib/TPP/MatcherUtils.cpp#L75
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+
+func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
+  linalg.generic {
+    indexing_maps = [#map1, #map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : memref<10xf32>, memref<10x10xf32>)
+    outs(%arg1 : memref<10x10xf32>) {
+    ^bb0(%in: f32, %in_6: f32, %out: f32):
+      %6 = arith.mulf %in, %in_6 : f32
+      linalg.yield %6 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: mul_bcast_row_2
+// CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
+// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 1, 10, 10] flags = (bcast_row_in0) data_type = f32
+// CHECK: xsmm.binary mul(data_type = f32, %[[DIS]], %[[EXP]], %[[ARG1]], %[[ARG1]])
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+
+func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg1, %arg0 : memref<10x10xf32>, memref<10xf32>)
+    outs(%arg1 : memref<10x10xf32>) {
+    ^bb0(%in: f32, %in_6: f32, %out: f32):
+      %6 = arith.mulf %in, %in_6 : f32
+      linalg.yield %6 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: mul_bcast_row_2
+// CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
+// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 10, 1, 10] flags = (bcast_row_in1) data_type = f32
+// CHECK: xsmm.binary mul(data_type = f32, %[[DIS]], %[[ARG1]], %[[EXP]], %[[ARG1]])
