@@ -234,6 +234,15 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
+def CombineXsmmOpPass : Pass<"combine-xsmm-op-optimization", "func::FuncOp"> {
+  let summary = "Fuse xsmm layers into a bigger xsmm op";
+  let description =
+      [{Fuse xsmm layers into a bigger xsmm op }];
+
+  let dependentDialects = ["xsmm::XsmmDialect"];
+}
+
+
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let summary = "Collection of default TPP passes";
   let description = [{

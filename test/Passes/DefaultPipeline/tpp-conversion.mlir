@@ -65,4 +65,3 @@ func.func @linalg_dialect_expect_fused_brgemm(
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<3x3xf32>, %[[ARG3:.+]]: tensor<1x3xf32>
 // CHECK: %{{.+}} = tpp.fused_brgemm [unary = relu, binary = add]
 // CHECK-SAME:  (%[[ARG0]] : tensor<1x3x2xf32>, %[[ARG1]] : tensor<1x2x3xf32>, %[[ARG2]] : tensor<3x3xf32>, %[[ARG3]] : tensor<1x3xf32>) -> (tensor<3x3xf32>)
-
