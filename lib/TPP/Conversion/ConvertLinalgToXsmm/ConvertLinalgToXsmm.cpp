@@ -248,7 +248,6 @@ static Value makeOperandShapeRowBroadCastable(RewriterBase &rewriter,
   assert(output.getType().isa<ShapedType>());
   assert(operand.getType().isa<ShapedType>());
 
-  OpBuilder::InsertionGuard guard(rewriter);
   ShapedType shapedOutput = output.getType().cast<ShapedType>();
   if (shapedOutput.getRank() != 2)
     return operand;
@@ -347,30 +346,30 @@ static LogicalResult rewriteBinaryOp(RewriterBase &rewriter,
                                      xsmm::BinaryKind xsmmTy) {
   assert(operands.size() == 3);
   Location loc = genericOp.getLoc();
+  auto &lhs = operands[0];
+  auto &rhs = operands[1];
+  auto &output = operands[2];
 
-  OpOperand *lhsOperand = getOperandFromValue(genericOp, operands[0]);
+  OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
   auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
       genericOp.getMatchingIndexingMap(lhsOperand), /*operandIdx=*/0);
   if (failed(broadCastFlagLhs))
     return failure();
   if (*broadCastFlagLhs == xsmm::BinaryFlags::BCAST_ROW_IN_0) {
-    operands[0] = makeOperandShapeRowBroadCastable(rewriter, loc, operands[2],
-                                                   operands[0]);
+    lhs = makeOperandShapeRowBroadCastable(rewriter, loc, output, lhs);
   }
 
-  OpOperand *rhsOperand = getOperandFromValue(genericOp, operands[1]);
+  OpOperand *rhsOperand = getOperandFromValue(genericOp, rhs);
   auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
       genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
   if (failed(broadCastFlagRhs))
     return failure();
   if (*broadCastFlagRhs == xsmm::BinaryFlags::BCAST_ROW_IN_1) {
-    operands[1] = makeOperandShapeRowBroadCastable(rewriter, loc, operands[2],
-                                                   operands[1]);
+    operands[1] = makeOperandShapeRowBroadCastable(rewriter, loc, output, rhs);
   }
 
-  auto binaryInfo =
-      xsmm::utils::getBinaryInfo(operands[0], *broadCastFlagLhs, operands[1],
-                                 *broadCastFlagRhs, operands[2]);
+  auto binaryInfo = xsmm::utils::getBinaryInfo(lhs, *broadCastFlagLhs, rhs,
+                                               *broadCastFlagRhs, output);
   if (failed(binaryInfo))
     return failure();
 

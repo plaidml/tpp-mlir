@@ -683,7 +683,7 @@ func.func @mul_bcast_row_1(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 
-func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
+func.func @mul_bcast_row_in0(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
   linalg.generic {
     indexing_maps = [#map1, #map, #map],
     iterator_types = ["parallel", "parallel"]}
@@ -696,7 +696,7 @@ func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
   return
 }
 
-// CHECK-LABEL: mul_bcast_row_2
+// CHECK-LABEL: mul_bcast_row_in0
 // CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
 // CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
 // CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 1, 10, 10] flags = (bcast_row_in0) data_type = f32
@@ -707,7 +707,7 @@ func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 
-func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
+func.func @mul_bcast_row_in1(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map],
     iterator_types = ["parallel", "parallel"]}
@@ -720,7 +720,7 @@ func.func @mul_bcast_row_2(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
   return
 }
 
-// CHECK-LABEL: mul_bcast_row_2
+// CHECK-LABEL: mul_bcast_row_in1
 // CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
 // CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
 // CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 10, 1, 10] flags = (bcast_row_in1) data_type = f32

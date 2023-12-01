@@ -423,7 +423,7 @@ func.func @identity_5(%arg0 : memref<10xf32>, %arg1 : memref<10x10xf32>) {
 
 // -----
 
-func.func @identity_5_1(%arg0 : memref<10x1xf32>, %arg1 : memref<10x10xf32>) {
+func.func @identity_bcast_row(%arg0 : memref<10x1xf32>, %arg1 : memref<10x10xf32>) {
   linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, 0)>, affine_map<(d0, d1) -> (d0, d1)>], 
     iterator_types = ["parallel", "parallel"]} 
@@ -434,7 +434,7 @@ func.func @identity_5_1(%arg0 : memref<10x1xf32>, %arg1 : memref<10x10xf32>) {
   return 
 }
 
-// CHECK-LABEL: identity_5_1
+// CHECK-LABEL: identity_bcast_row
 // CHECK-SAME: %[[ARG0:.+]]: memref<10x1xf32>, %[[ARG1:.+]]: memref<10x10xf32>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [10, 10, 1, 10] flags = (bcast_row) data_type = f32
 // CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
