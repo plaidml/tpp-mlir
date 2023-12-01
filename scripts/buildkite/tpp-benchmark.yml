@@ -9,44 +9,50 @@ steps:
     command: "BUILD=1 scripts/buildkite/check_llvm.sh"
   - wait
 
-  - label: "TPP-MLIR-SPR"
+  - label: "TPP-MLIR-SPR-BASE"
     command: "${SRUN} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
+              scripts/buildkite/benchmark.sh -b -p'"
     if: build.env("RUN_SPR_BENCH") == "1"
 
-  - label: "TPP-MLIR-SPRQ"
-    command: "${SRUN} --partition=sprh-quad --time=2:00:00 --constraint=\"notrb\" -- \
-              'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
-    if: build.env("RUN_SPRQ_BENCH") == "1"
-
-  - label: "TPP-MLIR-SPRS"
-    command: "${SRUN} --partition=sprh-snc4 --time=2:00:00 --constraint=\"notrb\" -- \
-              'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
-    if: build.env("RUN_SPRS_BENCH") == "1"
-
-  - label: "TPP-MLIR-SPRC"
-    command: "${SRUN} --partition=sprh-cache --time=2:00:00 --constraint=\"notrb\" -- \
-              'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
-    if: build.env("RUN_SPRC_BENCH") == "1"
-
-  - label: "TPP-MLIR-ZEN4"
+  - label: "TPP-MLIR-ZEN4-BASE"
     command: "${SRUN} --partition=zen4 --time=2:00:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
+              scripts/buildkite/benchmark.sh -b -p'"
     if: build.env("RUN_ZEN4_BENCH") == "1"
 
-  - label: "TPP-MLIR-CLX"
+  - label: "TPP-MLIR-CLX-BASE"
     command: "${SRUN} --partition=clxap --time=2:00:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
+              scripts/buildkite/benchmark.sh -b -p'"
     if: build.env("RUN_CLX_BENCH") == "1"
 
-  - label: "TPP-MLIR-ADL"
+  - label: "TPP-MLIR-ADL-BASE"
     command: "${SRUN} --partition=rpl --time=2:00:00 -- \
               'KIND=Release COMPILER=clang LINKER=lld \
-              scripts/buildkite/benchmark.sh -b -o -p'"
+              scripts/buildkite/benchmark.sh -b -p'"
+    if: build.env("RUN_ADL_BENCH") == "1"
+
+  - label: "TPP-MLIR-SPR-OMP"
+    command: "${SRUN} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: build.env("RUN_SPR_BENCH") == "1"
+
+  - label: "TPP-MLIR-ZEN4-OMP"
+    command: "${SRUN} --partition=zen4 --time=2:00:00 -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: build.env("RUN_ZEN4_BENCH") == "1"
+
+  - label: "TPP-MLIR-CLX-OMP"
+    command: "${SRUN} --partition=clxap --time=2:00:00 -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: build.env("RUN_CLX_BENCH") == "1"
+
+  - label: "TPP-MLIR-ADL-OMP"
+    command: "${SRUN} --partition=rpl --time=2:00:00 -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
     if: build.env("RUN_ADL_BENCH") == "1"

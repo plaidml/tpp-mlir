@@ -111,6 +111,7 @@ if [ "$BENCH_OMP" ]; then
   benchmark omp/dnn-bf16.json "OpenMP XSMM-DNN BF16"
   benchmark omp/mlir-fp32.json "OpenMP TPP-MLIR FP32"
   benchmark omp/mlir-bf16.json "OpenMP TPP-MLIR BF16"
+  benchmark omp/torch-dynamo.json "OpenMP TPP-MLIR PyTorch"
 fi
 
 # Matmul Benchmarks

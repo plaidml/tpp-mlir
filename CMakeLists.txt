@@ -87,6 +87,7 @@ set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/dnn-bf16.json
   ${CONFIG_DIR}/omp/mlir-fp32.json
   ${CONFIG_DIR}/omp/mlir-bf16.json
+  ${CONFIG_DIR}/omp/torch-dynamo.json
 )
 string(JOIN ',' BENCH_OMP_CFGS_STR ${BENCH_OMP_CFGS})
 add_custom_target(benchmarks-omp ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10
