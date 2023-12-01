@@ -3,7 +3,7 @@
 //
 
 
-  memref.global "private" constant @arg1 : memref<128x512x2xbf16> = dense<1.00e+00> 
+  memref.global "private" constant @arg1 : memref<128x512x2xbf16> = dense<1.00e+00>
   memref.global "private" constant @arg3 : memref<256x1024x2xbf16> = dense<1.00e+00>
   memref.global "private" constant @arg5 : memref<512x2048x2xbf16> = dense<1.00e+00>
   memref.global "private" constant @arg7 : memref<1024x1000x2xbf16> = dense<1.00e+00>
@@ -13,7 +13,7 @@
     %relayout_arg0 = memref.get_global @arg1:memref<128x512x2xbf16>
     tpp.gemm ins(%arg0 : memref<128x256xbf16>, %relayout_arg0 : memref<128x512x2xbf16>, %arg9 : memref<128x512xbf16>) outs(%arg9 : memref<128x512xbf16>)
     tpp.relu ins(%arg9 : memref<128x512xbf16>) outs(%arg9 : memref<128x512xbf16>)
- 
+
     tpp.identity ins(%arg4 : memref<1024xbf16>) outs(%arg10 : memref<128x1024xbf16>)
     %relayout_arg12 = memref.get_global @arg3:memref<256x1024x2xbf16>
     tpp.gemm ins(%arg9 : memref<128x512xbf16>, %relayout_arg12 : memref<256x1024x2xbf16>, %arg10 : memref<128x1024xbf16>) outs(%arg10 : memref<128x1024xbf16>)

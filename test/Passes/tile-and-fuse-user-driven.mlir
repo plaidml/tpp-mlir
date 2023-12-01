@@ -9,8 +9,8 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>)
     outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %1 = linalg.generic {indexing_maps = [#map], 
-                       iterator_types = ["parallel", "parallel"]} 
+  %1 = linalg.generic {indexing_maps = [#map],
+                       iterator_types = ["parallel", "parallel"]}
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
         %2 = arith.maximumf %out, %c0 : f32
@@ -41,11 +41,11 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 #map5 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d4)>
 #map6 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 
-func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x32xi64>, 
+func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x32xi64>,
                      %arg2: tensor<1x2x56x56x32xi64>, %cst: tensor<2x32xi64>) -> tensor<1x2x56x56x32xi64> {
   %0 = linalg.generic {
-    indexing_maps = [#map2, #map3, #map4], 
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]} 
+    indexing_maps = [#map2, #map3, #map4],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]}
     ins(%arg0, %arg1 : tensor<1x2x56x56x32xi64>, tensor<2x2x1x1x32x32xi64>) outs(%arg2 : tensor<1x2x56x56x32xi64>) {
     ^bb0(%in: i64, %in_51: i64, %out: i64):
       %151 = arith.muli %in, %in_51 : i64
@@ -54,16 +54,16 @@ func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x3
   } -> tensor<1x2x56x56x32xi64>
   %2 = tensor.empty() : tensor<1x2x56x56x32xi64>
   %3 = linalg.generic {
-    indexing_maps = [#map5, #map6], 
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+    indexing_maps = [#map5, #map6],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
     ins(%cst : tensor<2x32xi64>) outs(%2 : tensor<1x2x56x56x32xi64>) {
     ^bb0(%in: i64, %out: i64):
       linalg.yield %in : i64
   } -> tensor<1x2x56x56x32xi64>
   %4 = tensor.empty() : tensor<1x2x56x56x32xi64>
   %5 = linalg.generic {
-    indexing_maps = [#map6, #map6, #map6], 
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+    indexing_maps = [#map6, #map6, #map6],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
     ins(%0, %3 : tensor<1x2x56x56x32xi64>, tensor<1x2x56x56x32xi64>) outs(%4 : tensor<1x2x56x56x32xi64>) {
     ^bb0(%in: i64, %in_51: i64, %out: i64):
       %151 = arith.addi %in, %in_51 : i64
@@ -88,11 +88,11 @@ func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x3
 // CONF2: %[[EMPTY_OUT_ADD:.+]] = tensor.empty() : tensor<1x2x56x56x32xi64>
 // CONF2: %[[LOOP:.+]] = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]]
 // CONF2-NEXT: %[[LOOP1:.+]] = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C56]] step %[[C1]]
-// CONF2: %[[SLICE1:.+]] = tensor.extract_slice 
-// CONF2-SAME:  %[[ARG1]][%[[ARG4]], 0, 0, 0, 0, 0] [1, 2, 1, 1, 32, 32] [1, 1, 1, 1, 1, 1] 
+// CONF2: %[[SLICE1:.+]] = tensor.extract_slice
+// CONF2-SAME:  %[[ARG1]][%[[ARG4]], 0, 0, 0, 0, 0] [1, 2, 1, 1, 32, 32] [1, 1, 1, 1, 1, 1]
 // CONF2-SAME:  : tensor<2x2x1x1x32x32xi64> to tensor<2x32x32xi64>
-// CONF2: %[[SLICE2:.+]] = tensor.extract_slice 
-// CONF2-SAME:  %[[ARG2]][0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] 
+// CONF2: %[[SLICE2:.+]] = tensor.extract_slice
+// CONF2-SAME:  %[[ARG2]][0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
 // CONF2-SAME:  : tensor<1x2x56x56x32xi64> to tensor<56x32xi64>
 // CONF2: %[[SLICE:.+]] = tensor.extract_slice
 // CONF2-SAME:  %[[ARG0]][0, 0, %[[ARG6]], 0, 0] [1, 2, 1, 56, 32] [1, 1, 1, 1, 1]
@@ -102,8 +102,8 @@ func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x3
 // CONF2-SAME:  iterator_types = ["parallel", "parallel", "reduction", "reduction"]
 // CONF2-SAME:  ins(%[[SLICE]], %[[SLICE1]]
 // CONF2-SAME:  outs(%[[SLICE2]]
-// CONF2: %[[SLICE3:.+]] = tensor.extract_slice 
-// CONF2-SAME:  %[[ARG3]][%[[ARG4]], 0] [1, 32] [1, 1] 
+// CONF2: %[[SLICE3:.+]] = tensor.extract_slice
+// CONF2-SAME:  %[[ARG3]][%[[ARG4]], 0] [1, 32] [1, 1]
 // CONF2-SAME:  : tensor<2x32xi64> to tensor<32xi64>
 // CONF2: %[[EMPTY_OUT_BIAS:.+]] = tensor.empty() : tensor<56x32xi64>
 // CONF2: %[[BIAS:.+]] = linalg.generic
@@ -111,14 +111,14 @@ func.func @blck_conv(%arg0: tensor<1x2x56x56x32xi64>, %arg1: tensor<2x2x1x1x32x3
 // CONF2-SAME:  iterator_types = ["parallel", "parallel"]
 // CONF2-SAME:  ins(%[[SLICE3]]
 // CONF2-SAME:  outs(%[[EMPTY_OUT_BIAS]]
-// CONF2: %[[SLICE4:.+]] = tensor.extract_slice 
-// CONF2-SAME:  %{{.+}}[0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] 
+// CONF2: %[[SLICE4:.+]] = tensor.extract_slice
+// CONF2-SAME:  %{{.+}}[0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
 // CONF2-SAME:  : tensor<1x2x56x56x32xi64> to tensor<56x32xi64>
 // CONF2: %[[ADD:.+]] = linalg.generic
 // CONF2-SAME:  indexing_maps = [#[[MAP4]], #[[MAP4]], #[[MAP4]]]
 // CONF2-SAME:  iterator_types = ["parallel", "parallel"]
 // CONF2-SAME:  ins(%[[CONV]], %[[BIAS]]
 // CONF2-SAME:  outs(%[[SLICE4]]
-// CONF2: %[[INSERT:.+]] = tensor.insert_slice 
-// CONF2-SAME: %[[ADD]] into %{{.+}}[0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] 
+// CONF2: %[[INSERT:.+]] = tensor.insert_slice
+// CONF2-SAME: %[[ADD]] into %{{.+}}[0, %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
 // CONF2-SAME:  : tensor<56x32xi64> into tensor<1x2x56x56x32xi64>

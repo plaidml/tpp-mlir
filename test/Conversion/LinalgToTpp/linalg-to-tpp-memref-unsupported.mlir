@@ -27,8 +27,8 @@ func.func @gemm_lowering(%arg0: memref<8x9xf32>,
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @add_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
   linalg.generic {
-    indexing_maps = [#map, #map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0: memref<1x1xf32>) outs(%arg1: memref<1x1xf32>) {
       ^bb0(%in: f32, %out: f32):
         %0 = arith.addf %in, %out : f32
@@ -46,8 +46,8 @@ func.func @add_mapping(%arg0: memref<1x1xf32>, %arg1: memref<1x1xf32>) {
 func.func @relu_mapping(%arg0: memref<10x10xf32>) {
   %c0 = arith.constant 0.0 : f32
   linalg.generic {
-    indexing_maps = [#map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map],
+    iterator_types = ["parallel", "parallel"]}
     outs(%arg0: memref<10x10xf32>) {
       ^bb0(%out : f32):
         %0 = arith.maximumf %out, %c0 : f32

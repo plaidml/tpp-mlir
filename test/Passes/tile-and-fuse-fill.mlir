@@ -52,12 +52,12 @@ func.func @fuse_fill(%arg0: tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32> {
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x32x32x32xf32>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<8x32x32x32xf32>
 // CHECK: %[[LAYER:.+]] = scf.forall (%[[ARG1:.+]], %[[ARG2:.+]]) in (8, 32) shared_outs(%[[ARG3:.+]] = %[[EMPTY]])
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG1]], %[[ARG2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG1]], %[[ARG2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1]
 // CHECK-SAME:  : tensor<8x32x32x32xf32> to tensor<32x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE]] : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG1]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] 
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG1]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1]
 // CHECK-SAME:  : tensor<8x32x32x32xf32> to tensor<32x32x32xf32>
-// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE_1]], %{{.+}} : tensor<32x32x32xf32>, tensor<32x32x32xf32>) 
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE_1]], %{{.+}} : tensor<32x32x32xf32>, tensor<32x32x32xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %[[ADD:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel"]
@@ -76,7 +76,7 @@ func.func @fuse_fill(%arg0: tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32> {
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[LAYER]][%[[ARG1]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1]
 // CHECK-SAME:  : tensor<8x32x32x32xf32> to tensor<32x32x32xf32>
-// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE_1]], %{{.+}} : tensor<32x32x32xf32>, tensor<32x32x32xf32>)    
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE_1]], %{{.+}} : tensor<32x32x32xf32>, tensor<32x32x32xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %[[ADD:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel"]

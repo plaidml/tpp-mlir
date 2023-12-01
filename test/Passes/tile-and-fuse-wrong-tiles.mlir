@@ -10,7 +10,7 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>)
     outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %1 = linalg.generic {indexing_maps = [#map], 
+  %1 = linalg.generic {indexing_maps = [#map],
                        iterator_types = ["parallel", "parallel"]}
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
@@ -31,9 +31,9 @@ func.func @matmul_eletwise(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
 // TILE: %{{.+}} = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // TILE: linalg.matmul ins(%{{.+}}, %{{.+}} : tensor<2x64xf32>, tensor<64x32xf32>)
 // TILE-SAME:          outs(%{{.+}} : tensor<2x32xf32>)
-// TILE: %{{.+}} = linalg.generic 
-// TILE-SAME: indexing_maps = [#[[MAP]]], 
-// TILE-SAME: iterator_types = ["parallel", "parallel"] 
+// TILE: %{{.+}} = linalg.generic
+// TILE-SAME: indexing_maps = [#[[MAP]]],
+// TILE-SAME: iterator_types = ["parallel", "parallel"]
 // TILE-SAME: outs(%{{.+}} : tensor<2x32xf32>)
 
 // -----

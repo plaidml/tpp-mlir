@@ -131,11 +131,11 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   func.func @alloc_only_host_users() {
     %cst = arith.constant 5.0 : f32
-    
+
     %0 = memref.alloc() : memref<8x8xf32>
     linalg.fill ins(%cst : f32) outs(%0 : memref<8x8xf32>)
     memref.dealloc %0 : memref<8x8xf32>
-    
+
     return
   }
 }
@@ -263,10 +263,10 @@ module attributes {gpu.container_module} {
   memref.global "private" @__global : memref<8x8xf32> = dense<1.0>
   func.func @global_only_host_users() {
     %cst = arith.constant 5.0 : f32
-    
+
     %0 = memref.get_global @__global : memref<8x8xf32>
     linalg.fill ins(%cst : f32) outs(%0 : memref<8x8xf32>)
-    
+
     return
   }
 }

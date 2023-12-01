@@ -33,7 +33,7 @@ func.func @entry() {
   %C = arith.constant dense<0.0> : tensor<8x16x2xbf16>
   %0 = call @vnni_packing(%da, %C) : (tensor<16x16xbf16>, tensor<8x16x2xbf16>) -> tensor<8x16x2xbf16>
   %v0 = vector.transfer_read %0[%c0, %c0, %c0], %d1 : tensor<8x16x2xbf16>, vector<8x16x2xbf16>
- 
+
   // CHECK: ( 1, 17 ), ( 2, 18 ), ( 3, 19 )
   vector.print %v0 : vector<8x16x2xbf16>
   return

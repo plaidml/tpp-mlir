@@ -35,7 +35,7 @@ func.func @fill_op_i32(%arg0: memref<3x3xi32>) {
 // -----
 
 func.func @gemm_with_zero(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
-  %cst = arith.constant 0.0 : f32  
+  %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<3x3xf32>
   %fill = linalg.fill ins(%cst : f32) outs(%0 : tensor<3x3xf32>) -> tensor<3x3xf32>
   %mul = linalg.matmul ins(%arg0, %arg1 : tensor<3x3xf32>, tensor<3x3xf32>)

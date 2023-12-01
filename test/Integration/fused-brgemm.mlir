@@ -3,19 +3,19 @@
 // RUN: FileCheck %s
 
 func.func @fused_brgemm_tpp(%A: tensor<1x4x8xf32>,
-                            %B: tensor<1x8x4xf32>, 
+                            %B: tensor<1x8x4xf32>,
                             %C: tensor<4x4xf32>, %E: tensor<1x4xf32>) -> tensor<4x4xf32>  {
-  %D = tpp.fused_brgemm [unary = none, binary = add] 
-                        (%A: tensor<1x4x8xf32>, %B: tensor<1x8x4xf32>, 
+  %D = tpp.fused_brgemm [unary = none, binary = add]
+                        (%A: tensor<1x4x8xf32>, %B: tensor<1x8x4xf32>,
                          %C: tensor<4x4xf32>, %E: tensor<1x4xf32>) -> tensor<4x4xf32>
   return %D: tensor<4x4xf32>
 }
 
 func.func @fused_brgemm_tpp_neg(%A: tensor<1x4x8xf32>,
-                                %B: tensor<1x8x4xf32>, 
+                                %B: tensor<1x8x4xf32>,
                                 %C: tensor<4x4xf32>, %E: tensor<1x4xf32>) -> tensor<4x4xf32>  {
-  %D = tpp.fused_brgemm [unary = relu, binary = add] 
-                        (%A: tensor<1x4x8xf32>, %B: tensor<1x8x4xf32>, 
+  %D = tpp.fused_brgemm [unary = relu, binary = add]
+                        (%A: tensor<1x4x8xf32>, %B: tensor<1x8x4xf32>,
                          %C: tensor<4x4xf32>, %E: tensor<1x4xf32>) -> tensor<4x4xf32>
   return %D: tensor<4x4xf32>
 }
@@ -45,9 +45,9 @@ func.func @entry() {
 
   // Call kernel - test add.
   %C = arith.constant dense<0.0> : tensor<4x4xf32>
-  %E = arith.constant dense<1.0> : tensor<1x4xf32> 
+  %E = arith.constant dense<1.0> : tensor<1x4xf32>
   %0 = call @fused_brgemm_tpp(%da, %db, %C, %E)
-      : (tensor<1x4x8xf32>, tensor<1x8x4xf32>, 
+      : (tensor<1x4x8xf32>, tensor<1x8x4xf32>,
          tensor<4x4xf32>, tensor<1x4xf32>) -> tensor<4x4xf32>
 
   //
@@ -58,7 +58,7 @@ func.func @entry() {
   //
   %v0 = vector.transfer_read %0[%c0, %c0], %d1 : tensor<4x4xf32>, vector<4x4xf32>
   vector.print %v0 : vector<4x4xf32>
- 
+
   // Initialize various tensors.
   %da_neg = arith.constant dense<[[
         [ -1.1, -2.1, -3.1, -4.1, -5.1, -6.1, -7.1, -8.1 ],
@@ -66,12 +66,12 @@ func.func @entry() {
         [ 1.3, 2.3, 3.3, 4.3, 5.3, 6.3, 7.3, 8.3 ],
         [ 1.4, 2.4, 3.4, 4.4, 5.4, 6.4, 7.4, 8.4 ]
   ]]> : tensor<1x4x8xf32>
-  
+
   // Call kernel - test relu.
   %1 = call @fused_brgemm_tpp_neg(%da_neg, %db, %C, %E)
       : (tensor<1x4x8xf32>, tensor<1x8x4xf32>,
          tensor<4x4xf32>, tensor<1x4xf32>) -> tensor<4x4xf32>
- 
+
   //
   // CHECK:    ( ( 0,      0,      0,      0 ),
   // CHECK-SAME: ( 398.12, 435.72, 473.32, 510.92 ),

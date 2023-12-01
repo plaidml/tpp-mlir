@@ -1,7 +1,7 @@
 // DEFINE: %{option} = entry
 // DEFINE: %{command} = tpp-run %s -e %{option} -entry-point-result=void
 
-// RUN: %{command} 
+// RUN: %{command}
 
 // XFAIL:*
 
@@ -121,7 +121,7 @@ func.func @entry9(){
 func.func @entry10(){
   %one = arith.constant 1.0 : f32
   %zero = arith.constant 0.0 : f32
-  %div = arith.divf %one, %zero: f32 
+  %div = arith.divf %one, %zero: f32
   %alloc = tensor.empty() : tensor<4x4xf32>
   %0 = linalg.fill ins(%div:f32) outs(%alloc: tensor<4x4xf32>) -> tensor<4x4xf32>
   check.expect_sane(%0):tensor<4x4xf32>

@@ -44,11 +44,11 @@ func.func @empty_fully_dynamic(%tile1: index, %tile2: index, %tile3: index, %til
 // CHECK-SAME: %[[ARG0:.+]]: tensor<32x32xbf16>, %[[ARG1:.+]]: tensor<1x1x32x32xbf16>
 func.func @noop_pack(%arg0: tensor<32x32xbf16>, %arg1: tensor<1x1x32x32xbf16>) -> tensor<1x1x32x32xbf16> {
   // CHECK-NOT: tensor.pack
-  %0 = tensor.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 
+  %0 = tensor.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1
     : tensor<32x32xbf16> -> tensor<1x1x32x32xbf16>
-  // CHECK: %[[EXP:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1, 2], [3]] 
+  // CHECK: %[[EXP:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1, 2], [3]]
   // CHECK-SAME:  : tensor<32x32xbf16> into tensor<1x1x32x32xbf16>
-  // CHECK-NEXT: return %[[EXP]] : tensor<1x1x32x32xbf16> 
+  // CHECK-NEXT: return %[[EXP]] : tensor<1x1x32x32xbf16>
   return %0 : tensor<1x1x32x32xbf16>
 }
 
@@ -72,7 +72,7 @@ func.func @noop_pack_1(%arg0: tensor<32x32xbf16>, %arg1: tensor<1x1x32x32xbf16>)
 func.func @op_pack_2(%arg0: tensor<30x30xbf16>, %arg1: tensor<1x1x32x32xbf16>) -> tensor<1x1x32x32xbf16> {
   %pad = arith.constant 0.0 : bf16
   // CHECK: tensor.pack
-  %0 = tensor.pack %arg0 padding_value(%pad : bf16) outer_dims_perm = [1, 0] 
+  %0 = tensor.pack %arg0 padding_value(%pad : bf16) outer_dims_perm = [1, 0]
     inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1
     : tensor<30x30xbf16> -> tensor<1x1x32x32xbf16>
   // CHECK-NOT: tensor.expand_shape
@@ -127,12 +127,12 @@ func.func @op_pack_5(%arg0: tensor<?x32xbf16>, %arg1: tensor<1x1x32x32xbf16>) ->
 // CHECK-SAME: %[[ARG0:.+]]: tensor<32x32xbf16>, %[[ARG1:.+]]: tensor<1x16x32x2xbf16>
 func.func @rank_reduce_pack(%arg0: tensor<32x32xbf16>, %arg1: tensor<1x16x32x2xbf16>) -> tensor<1x16x32x2xbf16> {
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x32x2xbf16>
-  // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG0]] inner_dims_pos = [0] inner_tiles = [2] into %[[EMPTY]] 
+  // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG0]] inner_dims_pos = [0] inner_tiles = [2] into %[[EMPTY]]
   // CHECK-SAME:  : tensor<32x32xbf16> -> tensor<16x32x2xbf16>
   // CHECK: %[[EXP:.+]] = tensor.expand_shape %[[PACK]] {{\[}}[0, 1], [2], [3]]
   // CHECK-SAME:  : tensor<16x32x2xbf16> into tensor<1x16x32x2xbf16>
   %expanded = tensor.expand_shape %arg0 [[0, 1], [2]] : tensor<32x32xbf16> into tensor<1x32x32xbf16>
-  %pack = tensor.pack %expanded inner_dims_pos = [1] inner_tiles = [2] into %arg1 
+  %pack = tensor.pack %expanded inner_dims_pos = [1] inner_tiles = [2] into %arg1
     : tensor<1x32x32xbf16> -> tensor<1x16x32x2xbf16>
   return %pack : tensor<1x16x32x2xbf16>
 }
@@ -170,10 +170,10 @@ func.func @vnni_pack(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x32x16x32x2xb
 // CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (%[[C16]], %[[C32]]) shared_outs(%[[ARG4:.+]] = %[[ARG1]])
 // CHECK: %[[AFFINE_APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]])
 // CHECK: %[[AFFINE_APPLY_1:.+]] = affine.apply #[[MAP]](%[[ARG2]])
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %arg0[%[[AFFINE_APPLY]], %[[AFFINE_APPLY_1]]] [32, 32] [1, 1] 
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %arg0[%[[AFFINE_APPLY]], %[[AFFINE_APPLY_1]]] [32, 32] [1, 1]
 // CHECK-SAME:  : tensor<1024x512xbf16> to tensor<32x32xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x32x2xbf16>
-// CHECK: %[[PACK:.+]] = tensor.pack %[[SLICE]] inner_dims_pos = [0] inner_tiles = [2] into %[[EMPTY]] 
+// CHECK: %[[PACK:.+]] = tensor.pack %[[SLICE]] inner_dims_pos = [0] inner_tiles = [2] into %[[EMPTY]]
 // CHECK-SAME:  : tensor<32x32xbf16> -> tensor<16x32x2xbf16>
 
 // -----
@@ -189,7 +189,7 @@ func.func @fold_pack_in_insert_slice(%arg0: tensor<2x4x32x32xbf16>, %arg1: tenso
       tensor.parallel_insert_slice %4 into %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
     }
   }
-  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest 
+  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   return %unpack : tensor<64x64xbf16>
 }
@@ -204,7 +204,7 @@ func.func @fold_pack_in_insert_slice(%arg0: tensor<2x4x32x32xbf16>, %arg1: tenso
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
 // CHECK: %[[SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
 // CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG6]][%[[AFFINE_I]], %[[AFFINE_J]]] [32, 32] [1, 1] : tensor<64x64xbf16> to tensor<32x32xbf16>
-// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE]], %[[SLICE_0]] : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>) 
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE]], %[[SLICE_0]] : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>)
 // CHECK-SAME:  outs(%[[SLICE_1]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
 // CHECK: tensor.parallel_insert_slice %[[GEMM]] into %[[ARG6]][%[[AFFINE_I]], %[[AFFINE_J]]] [32, 32] [1, 1] : tensor<32x32xbf16> into tensor<64x64xbf16>
 
@@ -223,7 +223,7 @@ func.func @expect_to_fail_fold_pack_in_insert_slice(
     }
   }
   // We do not handle outer dims.
-  %unpack = tensor.unpack %0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest 
+  %unpack = tensor.unpack %0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   return %unpack : tensor<64x64xbf16>
 }
@@ -246,7 +246,7 @@ func.func @expect_to_fail_fold_pack_in_insert_slice(
       tensor.parallel_insert_slice %4 into %arg6[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
     }
   }
-  %unpack = tensor.unpack %0#1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest 
+  %unpack = tensor.unpack %0#1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   return %unpack : tensor<64x64xbf16>
 }
@@ -322,7 +322,7 @@ func.func @fold_pack_expect_to_fail_multiple_uses(
   %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   %use = call @some_use(%0) : (tensor<2x2x32x32xbf16>) -> (tensor<64x64xbf16>)
-  %add = linalg.add ins(%use, %unpack : tensor<64x64xbf16>, tensor<64x64xbf16>) 
+  %add = linalg.add ins(%use, %unpack : tensor<64x64xbf16>, tensor<64x64xbf16>)
                     outs(%dest: tensor<64x64xbf16>) -> tensor<64x64xbf16>
   return %add : tensor<64x64xbf16>
 }

@@ -7,7 +7,7 @@
 func.func @tpp_gemm(%arg0: memref<3x6xf32>, %arg1: memref<6x3xf32>, %arg2: memref<3x3xf32>) {
   // CHECK: call @xsmm_gemm_dispatch
   // CHECK: call @xsmm_gemm_invoke
-  tpp.gemm ins(%arg0: memref<3x6xf32>, %arg1: memref<6x3xf32>, %arg2: memref<3x3xf32>) 
+  tpp.gemm ins(%arg0: memref<3x6xf32>, %arg1: memref<6x3xf32>, %arg2: memref<3x3xf32>)
            outs(%arg2: memref<3x3xf32>)
   return
 }

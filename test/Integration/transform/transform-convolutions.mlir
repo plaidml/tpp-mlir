@@ -60,30 +60,30 @@ func.func @walk(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<3x3x8x8xf32>, %arg2: t
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
-    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op 
-    
+    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op
+
     // Propagate all the packs
     %f = transform.structured.match ops{["func.func"]} in %arg1
-      : (!transform.any_op) -> !transform.any_op 
+      : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %f : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_convolutions %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
     %blocked_matmuls:2 = split_handle %4
-      : (!transform.op<"linalg.generic">) 
+      : (!transform.op<"linalg.generic">)
       -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
     %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
     %second_relu = transform.get_consumers_of_result %blocked_matmuls#1[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
-    %casted_first_relu = transform.cast %first_relu 
+    %casted_first_relu = transform.cast %first_relu
       : !transform.op<"linalg.generic"> to !transform.any_op
-    %casted_second_relu = transform.cast %second_relu 
+    %casted_second_relu = transform.cast %second_relu
       : !transform.op<"linalg.generic"> to !transform.any_op
     %relus = transform.merge_handles %casted_first_relu, %casted_second_relu : !transform.any_op
 
@@ -97,7 +97,7 @@ transform.sequence failures(propagate) {
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
     %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8]
-      : (!transform.any_op) -> !transform.any_op 
+      : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %conv1 : !transform.any_op
 
     // Map the conv to linalg.batch_reduce_matmul
@@ -106,7 +106,7 @@ transform.sequence failures(propagate) {
       : !transform.any_op -> !transform.any_op
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]]
       : !transform.any_op -> !transform.any_op
-    %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5] 
+    %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5]
       : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %9 : !transform.any_op
 }

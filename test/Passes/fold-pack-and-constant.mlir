@@ -22,7 +22,7 @@ func.func @expect_not_to_fold_cst(%dest : tensor<8x2x1x1x32x32xi64>) -> tensor<8
 // CHECK-LABEL: expect_not_to_fold_cst
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x2x1x1x32x32xi64>
 // CHECK: %[[CST:.+]] = arith.constant dense<1> : tensor<1x1x64x256xi64>
-// CHECK-NEXT: %[[PACK:.+]] = tensor.pack %[[CST]] outer_dims_perm = [3, 2, 0, 1] 
+// CHECK-NEXT: %[[PACK:.+]] = tensor.pack %[[CST]] outer_dims_perm = [3, 2, 0, 1]
 // CHECK-SAME:  inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[ARG0]] : tensor<1x1x64x256xi64> -> tensor<8x2x1x1x32x32xi64>
 // CHECK: return %[[PACK]] : tensor<8x2x1x1x32x32xi64>
 
@@ -40,6 +40,6 @@ func.func @expect_to_fold_fill() -> tensor<1x8x56x56x32xi64> {
 // CHECK-LABEL: func.func @expect_to_fold_fill(
 // CHECK: %[[CST:.+]] = arith.constant 0 : i64
 // CHECK-NEXT: %[[EMPTY:.+]] = tensor.empty() : tensor<1x8x56x56x32xi64>
-// CHECK-NEXT: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : i64) 
+// CHECK-NEXT: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : i64)
 // CHECK-SAME:  outs(%[[EMPTY]] : tensor<1x8x56x56x32xi64>) -> tensor<1x8x56x56x32xi64>
 // CHECK-NEXT: return %[[FILL]] : tensor<1x8x56x56x32xi64>

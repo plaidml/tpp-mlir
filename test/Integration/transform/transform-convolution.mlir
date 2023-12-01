@@ -42,7 +42,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
-    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     // Propagate all the packs
     transform.structured.packing_propagation %2 : !transform.any_op
@@ -54,7 +54,7 @@ transform.sequence failures(propagate) {
       : !transform.any_op -> !transform.any_op
     %5 = transform.structured.collapse %4 [[0], [1], [2, 3], [4], [5], [6]]
       : !transform.any_op -> !transform.any_op
-    %6 = transform.structured.interchange %5 iterator_interchange = [0, 1, 4, 2, 3, 5] 
+    %6 = transform.structured.interchange %5 iterator_interchange = [0, 1, 4, 2, 3, 5]
       : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %6 : !transform.any_op
 }

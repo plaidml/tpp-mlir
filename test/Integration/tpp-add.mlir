@@ -48,8 +48,8 @@ func.func @entry() {
       %out_slice = tensor.empty() : tensor<56x32xf32>
       %fill = linalg.fill ins(%c0_cst : f32) outs(%out_slice : tensor<56x32xf32>) -> tensor<56x32xf32>
       %res = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, 
-                       affine_map<(d0, d1) -> (d0, d1)>], 
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
       ins(%b0, %b0 : tensor<56x32xf32>, tensor<56x32xf32>)
       outs(%fill : tensor<56x32xf32>) {
@@ -57,7 +57,7 @@ func.func @entry() {
           %0 = arith.addf %in, %in_0 : f32
           linalg.yield %0 : f32
       } -> tensor<56x32xf32>
-      %inserted_slice = tensor.insert_slice %res into %ia2 [%arg3, %arg4, 0, 0] [1, 1, 56, 32] [1, 1, 1, 1] 
+      %inserted_slice = tensor.insert_slice %res into %ia2 [%arg3, %arg4, 0, 0] [1, 1, 56, 32] [1, 1, 1, 1]
         : tensor<56x32xf32> into tensor<2x56x56x32xf32>
       scf.yield %inserted_slice : tensor<2x56x56x32xf32>
     }

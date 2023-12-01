@@ -42,14 +42,14 @@ func.func @first_conv2d_1x1_biasadd_relu(
     // 1x1 Conv2D
     %0 = tensor.empty() : !first_conv1x1_output_tensor_t
     %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : !first_conv1x1_output_tensor_t) -> !first_conv1x1_output_tensor_t
-    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
-                ins(%input, %filter : !first_conv1x1_input_tensor_t, !first_conv1x1_filter_tensor_t) 
+    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+                ins(%input, %filter : !first_conv1x1_input_tensor_t, !first_conv1x1_filter_tensor_t)
                 outs(%1 : !first_conv1x1_output_tensor_t) -> !first_conv1x1_output_tensor_t
-    
+
     // BiasAdd
     %3 = tensor.empty() : !first_conv1x1_output_tensor_t
     %4 = linalg.generic {
-            indexing_maps = [#map, #map1], 
+            indexing_maps = [#map, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%bias : !first_conv1x1_bias_tensor_t)
@@ -60,10 +60,10 @@ func.func @first_conv2d_1x1_biasadd_relu(
 
     %5 = tensor.empty() : !first_conv1x1_output_tensor_t
     %6 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-        } 
-        ins(%2, %4 : !first_conv1x1_output_tensor_t, !first_conv1x1_output_tensor_t) 
+        }
+        ins(%2, %4 : !first_conv1x1_output_tensor_t, !first_conv1x1_output_tensor_t)
         outs(%5 : !first_conv1x1_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
             %1591 = arith.addf %in, %in_34 : f32
@@ -73,7 +73,7 @@ func.func @first_conv2d_1x1_biasadd_relu(
     // ReLU
     %7 = tensor.empty() : !first_conv1x1_output_tensor_t
     %8 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%6, %cst_9 : !first_conv1x1_output_tensor_t, !first_conv1x1_output_tensor_t)
@@ -98,14 +98,14 @@ func.func @conv2d_3x3_biasadd_relu(
     // 3x3 Conv2D
     %0 = tensor.empty() : !conv3x3_output_tensor_t
     %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : !conv3x3_output_tensor_t) -> !conv3x3_output_tensor_t
-    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
-                ins(%input, %filter : !conv3x3_input_tensor_t, !conv3x3_filter_tensor_t) 
+    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+                ins(%input, %filter : !conv3x3_input_tensor_t, !conv3x3_filter_tensor_t)
                 outs(%1 : !conv3x3_output_tensor_t) -> !conv3x3_output_tensor_t
-    
+
     // BiasAdd
     %3 = tensor.empty() : !conv3x3_output_tensor_t
     %4 = linalg.generic {
-            indexing_maps = [#map, #map1], 
+            indexing_maps = [#map, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%bias : !conv3x3_bias_tensor_t)
@@ -116,10 +116,10 @@ func.func @conv2d_3x3_biasadd_relu(
 
     %5 = tensor.empty() : !conv3x3_output_tensor_t
     %6 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-        } 
-        ins(%2, %4 : !conv3x3_output_tensor_t, !conv3x3_output_tensor_t) 
+        }
+        ins(%2, %4 : !conv3x3_output_tensor_t, !conv3x3_output_tensor_t)
         outs(%5 : !conv3x3_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
             %1591 = arith.addf %in, %in_34 : f32
@@ -129,7 +129,7 @@ func.func @conv2d_3x3_biasadd_relu(
     // ReLU
     %7 = tensor.empty() : !conv3x3_output_tensor_t
     %8 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%6, %cst_9 : !conv3x3_output_tensor_t, !conv3x3_output_tensor_t)
@@ -155,14 +155,14 @@ func.func @second_conv2d_1x1_biasadd_relu(
     // 1x1 Conv2D
     %0 = tensor.empty() : !second_conv1x1_output_tensor_t
     %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t
-    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
-                ins(%input, %filter : !second_conv1x1_input_tensor_t, !second_conv1x1_filter_tensor_t) 
+    %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+                ins(%input, %filter : !second_conv1x1_input_tensor_t, !second_conv1x1_filter_tensor_t)
                 outs(%1 : !second_conv1x1_output_tensor_t) -> !second_conv1x1_output_tensor_t
-    
+
     // BiasAdd
     %3 = tensor.empty() : !second_conv1x1_output_tensor_t
     %4 = linalg.generic {
-            indexing_maps = [#map, #map1], 
+            indexing_maps = [#map, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%bias : !second_conv1x1_bias_tensor_t)
@@ -173,10 +173,10 @@ func.func @second_conv2d_1x1_biasadd_relu(
 
     %5 = tensor.empty() : !second_conv1x1_output_tensor_t
     %6 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-        } 
-        ins(%2, %4 : !second_conv1x1_output_tensor_t, !second_conv1x1_output_tensor_t) 
+        }
+        ins(%2, %4 : !second_conv1x1_output_tensor_t, !second_conv1x1_output_tensor_t)
         outs(%5 : !second_conv1x1_output_tensor_t) {
             ^bb0(%in: f32, %in_34: f32, %out: f32):
             %1591 = arith.addf %in, %in_34 : f32
@@ -186,7 +186,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
     // ReLU
     %7 = tensor.empty() : !second_conv1x1_output_tensor_t
     %8 = linalg.generic {
-            indexing_maps = [#map1, #map1, #map1], 
+            indexing_maps = [#map1, #map1, #map1],
             iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
         ins(%6, %cst_9 : !second_conv1x1_output_tensor_t, !second_conv1x1_output_tensor_t)
@@ -195,7 +195,7 @@ func.func @second_conv2d_1x1_biasadd_relu(
                 %1591 = arith.maximumf %in, %in_34 : f32
                 linalg.yield %1591 : f32
     } -> !second_conv1x1_output_tensor_t
-    
+
     return %8 : !second_conv1x1_output_tensor_t
 }
 
@@ -236,7 +236,7 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
     // Call first 1x1 Conv
     %first_conv1x1_output = call @first_conv2d_1x1_biasadd_relu(%input) :
         (!first_conv1x1_input_tensor_t) -> !first_conv1x1_output_tensor_t
-    
+
 
     // Pad tensor to feed to Conv 3x3.
     %padded_first_conv1x1_output = call @padding_for_3x3(%first_conv1x1_output) :
@@ -246,12 +246,12 @@ func.func @resnet50_bottleneck_block(%input : !first_conv1x1_input_tensor_t, %ou
     // Call 3x3 Conv2D
     %conv3x3_output = call @conv2d_3x3_biasadd_relu(%padded_first_conv1x1_output) :
         (!conv3x3_input_tensor_t) -> !conv3x3_output_tensor_t
-    
+
 
     // Call 2nd 1x1 Conv2D
     %second_conv1x1_output = call @second_conv2d_1x1_biasadd_relu(%conv3x3_output) :
         (!second_conv1x1_input_tensor_t) -> !second_conv1x1_output_tensor_t
-    
+
 
     // Skip connection
     %skip = call @skip_connection(%input, %second_conv1x1_output) :

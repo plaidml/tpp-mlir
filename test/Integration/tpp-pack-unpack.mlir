@@ -36,17 +36,17 @@ func.func @entry(){
   %2 = call @pack1(%0,%1) : (tensor<4x4xf32>, tensor<2x2x2x2xf32>) -> tensor<2x2x2x2xf32>
   %d1 = arith.constant -1.0 : f32
   %v0 = vector.transfer_read %1[%c0, %c0, %c0, %c0], %d1 : tensor<2x2x2x2xf32>, vector<2x2x2x2xf32>
-  vector.print %v0 : vector<2x2x2x2xf32> 
-  // CHECK: ( ( ( ( 0, 1 ), ( 4, 5 ) ), ( ( 2, 3 ), ( 6, 7 ) ) ), ( ( ( 8, 9 ), ( 12, 13 ) ), ( ( 10, 11 ), ( 14, 15 ) ) ) ) 
-  
+  vector.print %v0 : vector<2x2x2x2xf32>
+  // CHECK: ( ( ( ( 0, 1 ), ( 4, 5 ) ), ( ( 2, 3 ), ( 6, 7 ) ) ), ( ( ( 8, 9 ), ( 12, 13 ) ), ( ( 10, 11 ), ( 14, 15 ) ) ) )
+
   %3 = arith.constant dense <[[[[0.0, 1.0, 2.0, 3.0],  [4.0, 5.0, 6.0, 7.0]],
                                 [[8.0, 9.0, 10.0, 11.0],[12.0, 13.0, 14.0, 15.0]]]]>: tensor<1x2x2x4xf32>
   %4 = tensor.empty():tensor<1x2x2x2x2xf32>
   %5 = call @pack2(%3, %4):(tensor<1x2x2x4xf32>,  tensor<1x2x2x2x2xf32>)->(tensor<1x2x2x2x2xf32>)
   %v1 = vector.transfer_read %5[%c0, %c0, %c0, %c0, %c0], %d1 : tensor<1x2x2x2x2xf32>, vector<1x2x2x2x2xf32>
   vector.print %v1 : vector<1x2x2x2x2xf32>
-  // CHECK: ( ( ( ( ( 0, 1 ), ( 4, 5 ) ), ( ( 8, 9 ), ( 12, 13 ) ) ), ( ( ( 2, 3 ), ( 6, 7 ) ), ( ( 10, 11 ), ( 14, 15 ) ) ) ) ) 
-  
+  // CHECK: ( ( ( ( ( 0, 1 ), ( 4, 5 ) ), ( ( 8, 9 ), ( 12, 13 ) ) ), ( ( ( 2, 3 ), ( 6, 7 ) ), ( ( 10, 11 ), ( 14, 15 ) ) ) ) )
+
   %6 = arith.constant dense<[[[[0.0, 1.0], [2.0, 3.0]],
                             [[3.0, 4.0], [5.0, 6.0]]],
                             [[[7.0, 8.0], [9.0,10.0]],

@@ -23,27 +23,27 @@ func.func @non_constant_fill(%arg0: tensor<1x56x56x64xf32>, %arg1: f32, %arg2: t
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d3)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: func.func @non_constant_fill(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>, 
-// CHECK-SAME:  %[[ARG1:.+]]: f32, 
-// CHECK-SAME:  %[[ARG2:.+]]: tensor<1x1x64x64xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: f32,
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<1x1x64x64xf32>,
 // CHECK-SAME:  %[[ARG3:.+]]: tensor<64xf32>)
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x56x56x64xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[ARG1]] : f32) 
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[ARG1]] : f32)
 // CHECK-SAME:  outs(%[[EMPTY]] : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-// CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
-// CHECK-SAME:  {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} 
-// CHECK-SAME:  ins(%[[ARG0]], %[[ARG2]] : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) 
+// CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:  {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME:  ins(%[[ARG0]], %[[ARG2]] : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-// CHECK: %[[BROAD:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]]] 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+// CHECK: %[[BROAD:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]]]
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
 // CHECK-SAME:  ins(%[[ARG3]] : tensor<64xf32>) outs(%[[EMPTY]] : tensor<1x56x56x64xf32>)
 // CHECK: ^bb0(
 // CHECK-NEXT:  linalg.yield
-// CHECK: {{.+}} = linalg.generic 
+// CHECK: {{.+}} = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]]]
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
-// CHECK-SAME:  ins(%[[CONV]], %[[BROAD]] : tensor<1x56x56x64xf32>, tensor<1x56x56x64xf32>) 
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME:  ins(%[[CONV]], %[[BROAD]] : tensor<1x56x56x64xf32>, tensor<1x56x56x64xf32>)
 // CHECK-SAME:  outs(%[[EMPTY]] : tensor<1x56x56x64xf32>)
 // CHECK: ^bb0(
 // CHECK-NEXT: %{{.+}} = arith.addf
@@ -73,17 +73,17 @@ func.func @expect_opt(%arg0: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x64xf32
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d3)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: func.func @expect_opt(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>, 
-// CHECK-SAME:  %[[ARG1:.+]]: tensor<1x1x64x64xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<1x1x64x64xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<64xf32>)
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x56x56x64xf32>
-// CHECK: %[[BIAS:.+]] = linalg.generic 
+// CHECK: %[[BIAS:.+]] = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]]]
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"] 
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:  ins(%[[ARG2]] : tensor<64xf32>) outs(%[[EMPTY]] : tensor<1x56x56x64xf32>)
 // CHECK: ^bb0(
 // CHECK-NEXT:  linalg.yield
-// CHECK: %{{.+}} = linalg.conv_2d_nhwc_hwcf 
+// CHECK: %{{.+}} = linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:  dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>
 // CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]] : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>)
 // CHECK-SAME:  outs(%[[BIAS]] : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
@@ -111,12 +111,12 @@ func.func @simple_copy(%arg0: tensor<1x56x56x64xf32>, %arg2: tensor<1x1x64x64xf3
 }
 
 // CHECK: func.func @simple_copy(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>, 
-// CHECK-SAME:  %[[ARG1:.+]]: tensor<1x1x64x64xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x56x56x64xf32>,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<1x1x64x64xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<1x56x56x64xf32>)
-// CHECK: %{{.+}} = linalg.conv_2d_nhwc_hwcf 
+// CHECK: %{{.+}} = linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:  dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>
-// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]] : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) 
+// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]] : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>)
 // CHECK-SAME:  outs(%[[ARG2]] : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
 // CHECK-NOT: linalg.generic
 

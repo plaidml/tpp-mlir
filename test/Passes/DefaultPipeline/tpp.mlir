@@ -157,17 +157,17 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
   // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
-  
+
   // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
   // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
-  
+
   // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
-  
+
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>)
              outs(%arg2: memref<3x3xf32>)
 
   return
@@ -196,7 +196,7 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<bf16>
 
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, %arg2: memref<4x4xbf16>) 
+  tpp.brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, %arg2: memref<4x4xbf16>)
              outs(%arg2: memref<4x4xbf16>)
 
   return
@@ -215,16 +215,16 @@ func.func @gemm(%A: memref<4x8xf32>,
   // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
   // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr<f32>
-  
+
   // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
   // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr<f32>
-  
+
   // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C : memref<4x4xf32>) 
+  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C : memref<4x4xf32>)
            outs(%C : memref<4x4xf32>)
 
   return
@@ -251,9 +251,9 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
-                   %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
-                   %subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>) 
+    tpp.brgemm ins(%subview : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
+                   %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
+                   %subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
                outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
     scf.yield
   }
@@ -287,9 +287,9 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   scf.for %arg1 = %c0 to %c7 step %c1 {
     %subview = memref.subview %arg0[0, %arg1, 0, 0] [1, 1, 7, 2048] [1, 1, 1, 1] : memref<1x7x7x2048xf32> to memref<7x2048xf32, strided<[2048, 1], offset: ?>>
     %subview_0 = memref.subview %alloc[0, %arg1, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : memref<1x7x7x512xf32> to memref<7x512xf32, strided<[512, 1], offset: ?>>
-    tpp.gemm ins(%subview : memref<7x2048xf32, strided<[2048, 1], offset: ?>>, 
+    tpp.gemm ins(%subview : memref<7x2048xf32, strided<[2048, 1], offset: ?>>,
                    %0 : memref<2048x512xf32>,
-                   %subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>) 
+                   %subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
                outs(%subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
   }
 
@@ -333,13 +333,13 @@ func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
   // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr<f32>
-    
+
   // CHECK: %[[ptr3:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
   // CHECK-NEXT: %[[ptr_cast3:.*]] = arith.index_cast %[[ptr3]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr_cast3]] : i64 to !llvm.ptr<f32>
 
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-  tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>) 
+  tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>)
            outs(%arg3 : memref<128x512xf32>)
 
   // Relu

@@ -12,12 +12,12 @@ func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memr
     %alloc = gpu.alloc() {alignment = 64 : i64} : memref<2x2x16x16xf16>
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2, 3]] : memref<32x32xf16> into memref<2x16x2x16xf16>
     %alloc_0 = gpu.alloc() {alignment = 64 : i64} : memref<2x2x16x16xf16>
-    linalg.transpose ins(%expand_shape : memref<2x16x2x16xf16>) outs(%alloc_0 : memref<2x2x16x16xf16>) permutation = [0, 2, 1, 3] 
+    linalg.transpose ins(%expand_shape : memref<2x16x2x16xf16>) outs(%alloc_0 : memref<2x2x16x16xf16>) permutation = [0, 2, 1, 3]
     %expand_shape_1 = memref.expand_shape %arg1 [[0, 1], [2, 3]] : memref<32x32xf16> into memref<2x16x2x16xf16>
     %alloc_2 = gpu.alloc() {alignment = 64 : i64} : memref<2x2x16x16xf16>
-    linalg.transpose ins(%expand_shape_1 : memref<2x16x2x16xf16>) outs(%alloc_2 : memref<2x2x16x16xf16>) permutation = [2, 0, 1, 3] 
+    linalg.transpose ins(%expand_shape_1 : memref<2x16x2x16xf16>) outs(%alloc_2 : memref<2x2x16x16xf16>) permutation = [2, 0, 1, 3]
     %expand_shape_3 = memref.expand_shape %arg2 [[0, 1], [2, 3]] : memref<32x32xf16> into memref<2x16x2x16xf16>
-    linalg.transpose ins(%expand_shape_3 : memref<2x16x2x16xf16>) outs(%alloc : memref<2x2x16x16xf16>) permutation = [0, 2, 1, 3] 
+    linalg.transpose ins(%expand_shape_3 : memref<2x16x2x16xf16>) outs(%alloc : memref<2x2x16x16xf16>) permutation = [0, 2, 1, 3]
     scf.forall (%arg3, %arg4) in (2, 2) {
       %subview = memref.subview %alloc_0[%arg3, 0, 0, 0] [1, 2, 16, 16] [1, 1, 1, 1] : memref<2x2x16x16xf16> to memref<2x16x16xf16, strided<[256, 16, 1], offset: ?>>
       %subview_5 = memref.subview %alloc_2[%arg4, 0, 0, 0] [1, 2, 16, 16] [1, 1, 1, 1] : memref<2x2x16x16xf16> to memref<2x16x16xf16, strided<[256, 16, 1], offset: ?>>
@@ -25,7 +25,7 @@ func.func @entry(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %arg2: memr
       linalg.batch_reduce_matmul ins(%subview, %subview_5 : memref<2x16x16xf16, strided<[256, 16, 1], offset: ?>>, memref<2x16x16xf16, strided<[256, 16, 1], offset: ?>>) outs(%subview_6 : memref<16x16xf16, strided<[16, 1], offset: ?>>)
     }
     %alloc_4 = gpu.alloc() {alignment = 64 : i64} : memref<2x16x2x16xf16>
-    linalg.transpose ins(%alloc : memref<2x2x16x16xf16>) outs(%alloc_4 : memref<2x16x2x16xf16>) permutation = [0, 2, 1, 3] 
+    linalg.transpose ins(%alloc : memref<2x2x16x16xf16>) outs(%alloc_4 : memref<2x16x2x16xf16>) permutation = [0, 2, 1, 3]
     %collapse_shape = memref.collapse_shape %alloc_4 [[0, 1], [2, 3]] : memref<2x16x2x16xf16> into memref<32x32xf16>
     linalg.copy ins(%collapse_shape : memref<32x32xf16>) outs(%arg2 : memref<32x32xf16>)
     gpu.dealloc %alloc : memref<2x2x16x16xf16>

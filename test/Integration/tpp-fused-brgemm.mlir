@@ -11,9 +11,9 @@ memref.global "private" constant @__biasBcast2 : memref<4xf32> =
 memref.global "private" constant @__bias2D : memref<4x4xf32> =
   dense<[[1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0]]>
 
-func.func @entry(%arg0: memref<64x4x4xf32>, %arg1: memref<64x4x4xf32>, 
+func.func @entry(%arg0: memref<64x4x4xf32>, %arg1: memref<64x4x4xf32>,
     %arg2: memref<4x4xf32>, %arg3: memref<4x4xf32>, %arg4: memref<4x4xf32>) {
-  
+
   %bias1 = memref.get_global @__biasBcast : memref<1x4xf32>
   tpp.fused_brgemm [unary = relu, binary = add]
     ins(%arg0 : memref<64x4x4xf32>, %arg1 : memref<64x4x4xf32>,

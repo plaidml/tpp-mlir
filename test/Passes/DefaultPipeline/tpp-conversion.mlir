@@ -3,7 +3,7 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @tpp_sequence(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
-               %arg2: tensor<5x5xf32>, %arg3: tensor<5x5xf32>) -> tensor<5x5xf32> {  
+               %arg2: tensor<5x5xf32>, %arg3: tensor<5x5xf32>) -> tensor<5x5xf32> {
   %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<3x5x4xf32>, tensor<3x4x5xf32>)
                                   outs(%arg2: tensor<5x5xf32>) -> tensor<5x5xf32>
   %c0 = arith.constant 0.0 : f32
@@ -34,7 +34,7 @@ func.func @tpp_sequence(%arg0: tensor<3x5x4xf32>, %arg1: tensor<3x4x5xf32>,
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 
 func.func @linalg_dialect_expect_fused_brgemm(
-    %arg0: tensor<1x3x2xf32>, %arg1: tensor<1x2x3xf32>, 
+    %arg0: tensor<1x3x2xf32>, %arg1: tensor<1x2x3xf32>,
     %arg2: tensor<3x3xf32>, %bias: tensor<1x3xf32>) -> tensor<3x3xf32> {
   %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<1x3x2xf32>, tensor<1x2x3xf32>)
                                   outs(%arg2: tensor<3x3xf32>) -> tensor<3x3xf32>
@@ -61,8 +61,8 @@ func.func @linalg_dialect_expect_fused_brgemm(
 }
 
 // CHECK-LABEL: linalg_dialect_expect_fused_brgemm
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x3x2xf32>, %[[ARG1:.+]]: tensor<1x2x3xf32>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<1x3x2xf32>, %[[ARG1:.+]]: tensor<1x2x3xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<3x3xf32>, %[[ARG3:.+]]: tensor<1x3xf32>
-// CHECK: %{{.+}} = tpp.fused_brgemm [unary = relu, binary = add] 
+// CHECK: %{{.+}} = tpp.fused_brgemm [unary = relu, binary = add]
 // CHECK-SAME:  (%[[ARG0]] : tensor<1x3x2xf32>, %[[ARG1]] : tensor<1x2x3xf32>, %[[ARG2]] : tensor<3x3xf32>, %[[ARG3]] : tensor<1x3xf32>) -> (tensor<3x3xf32>)
 

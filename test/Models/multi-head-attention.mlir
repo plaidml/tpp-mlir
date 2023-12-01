@@ -8,7 +8,7 @@
 
 //////////////////////////////////////////////////////////////////////////////
 // This multi-head attention layer is extracted out from TensorFlow's
-// pre-trained BERT model. The BERT model is obtained from here - 
+// pre-trained BERT model. The BERT model is obtained from here -
 // https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-128_A-2/2
 //
 // The number of heads in the MHA layer is 2.
@@ -56,7 +56,7 @@ func.func @multi_head_attention(
     %transformer_layer_0_self_attention_query_kernel = arith.constant dense<1.6> : tensor<128x2x64xf32>
     %transformer_layer_0_self_attention_value_bias = arith.constant dense<1.7> : tensor<2x64xf32>
     %transformer_layer_0_self_attention_value_kernel = arith.constant dense<1.8> : tensor<128x2x64xf32>
-    
+
     // Using a dummy value for mask - TBD the right value
     %input_mask = arith.constant dense <0.0>: tensor<32x1x8x8xf32>
 
@@ -66,10 +66,10 @@ func.func @multi_head_attention(
     // Encoder 1 - Linear layer (MatMul + Bias) for Key tensor
     %collapsed_21 = tensor.collapse_shape %transformer_layer_0_self_attention_key_kernel [[0], [1, 2]] : tensor<128x2x64xf32> into tensor<128x128xf32>
     %81 = tensor.empty() : tensor<256x128xf32>
-    %82 = linalg.fill ins(%cst_1 : f32) outs(%81 : tensor<256x128xf32>) -> tensor<256x128xf32> 
+    %82 = linalg.fill ins(%cst_1 : f32) outs(%81 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %83 = linalg.matmul ins(%collapsed_20, %collapsed_21 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%82 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %expanded_22 = tensor.expand_shape %83 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
-    %84 = tensor.empty() : tensor<32x8x2x64xf32> 
+    %84 = tensor.empty() : tensor<32x8x2x64xf32>
     %85 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%transformer_layer_0_self_attention_key_bias : tensor<2x64xf32>) outs(%84 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
@@ -87,18 +87,18 @@ func.func @multi_head_attention(
     %89 = linalg.fill ins(%cst_1 : f32) outs(%88 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %90 = linalg.matmul ins(%collapsed_20, %collapsed_23 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%89 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %expanded_24 = tensor.expand_shape %90 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
-    %91 = tensor.empty() : tensor<32x8x2x64xf32> 
+    %91 = tensor.empty() : tensor<32x8x2x64xf32>
     %92 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%transformer_layer_0_self_attention_query_bias : tensor<2x64xf32>) outs(%91 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x2x64xf32>
-    %93 = tensor.empty() : tensor<32x8x2x64xf32> 
+    %93 = tensor.empty() : tensor<32x8x2x64xf32>
     %94 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_24, %92 : tensor<32x8x2x64xf32>, tensor<32x8x2x64xf32>) outs(%93 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
       %490 = arith.addf %in, %in_74 : f32
       linalg.yield %490 : f32
     } -> tensor<32x8x2x64xf32>
-    
+
     // Encoder 1 - Multi-head attention layer - 2 heads (logical)
     // That is why [batch_size, embedding_size, seq_length] output of linear layers gets split into [batch_size, embedding_size, number_of_heads, seq_length/number_of_heads]
     %95 = tensor.empty() : tensor<32x8x2x64xf32>
@@ -130,12 +130,12 @@ func.func @multi_head_attention(
     %104 = linalg.fill ins(%cst_1 : f32) outs(%103 : tensor<64x8x8xf32>) -> tensor<64x8x8xf32>
     %105 = linalg.batch_matmul ins(%collapsed_25, %collapsed_26 : tensor<64x8x64xf32>, tensor<64x64x8xf32>) outs(%104 : tensor<64x8x8xf32>) -> tensor<64x8x8xf32>
     %expanded_27 = tensor.expand_shape %105 [[0, 1], [2], [3]] : tensor<64x8x8xf32> into tensor<32x2x8x8xf32>
-    %106 = tensor.empty() : tensor<32x2x8x8xf32> 
+    %106 = tensor.empty() : tensor<32x2x8x8xf32>
     %107 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_27 : tensor<32x2x8x8xf32>) outs(%106 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
-    } -> tensor<32x2x8x8xf32> 
-    %108 = tensor.empty() : tensor<32x2x8x8xf32> 
+    } -> tensor<32x2x8x8xf32>
+    %108 = tensor.empty() : tensor<32x2x8x8xf32>
     %109 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, 0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%input_mask : tensor<32x1x8x8xf32>) outs(%108 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
@@ -146,7 +146,7 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %in_74: f32, %out: f32):
       %490 = arith.addf %in, %in_74 : f32
       linalg.yield %490 : f32
-    } -> tensor<32x2x8x8xf32> 
+    } -> tensor<32x2x8x8xf32>
 
     // Encoder 1 - not sure what this block is.. looks like some form of activation
     %112 = tensor.empty() : tensor<32x2x8xf32>
@@ -157,11 +157,11 @@ func.func @multi_head_attention(
       linalg.yield %490 : f32
     } -> tensor<32x2x8xf32>
     %expanded_28 = tensor.expand_shape %114 [[0], [1], [2, 3]] : tensor<32x2x8xf32> into tensor<32x2x8x1xf32>
-    %115 = tensor.empty() : tensor<32x2x8x8xf32> 
+    %115 = tensor.empty() : tensor<32x2x8x8xf32>
     %116 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, 0)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_28 : tensor<32x2x8x1xf32>) outs(%115 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
-    } -> tensor<32x2x8x8xf32> 
+    } -> tensor<32x2x8x8xf32>
     %117 = tensor.empty() : tensor<32x2x8x8xf32>
     %118 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%111, %116 : tensor<32x2x8x8xf32>, tensor<32x2x8x8xf32>) outs(%117 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -185,11 +185,11 @@ func.func @multi_head_attention(
       linalg.yield %490 : f32
     } -> tensor<32x2x8xf32>
     %expanded_29 = tensor.expand_shape %123 [[0], [1], [2, 3]] : tensor<32x2x8xf32> into tensor<32x2x8x1xf32>
-    %124 = tensor.empty() : tensor<32x2x8x8xf32> 
+    %124 = tensor.empty() : tensor<32x2x8x8xf32>
     %125 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, 0)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_29 : tensor<32x2x8x1xf32>) outs(%124 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
-    } -> tensor<32x2x8x8xf32> 
+    } -> tensor<32x2x8x8xf32>
     %126 = tensor.empty() : tensor<32x2x8x8xf32>
     %127 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%120, %125 : tensor<32x2x8x8xf32>, tensor<32x2x8x8xf32>) outs(%126 : tensor<32x2x8x8xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
@@ -200,7 +200,7 @@ func.func @multi_head_attention(
     // Encoder 1 - Linear layer (MatMul + Bias) for Value tensor
     %collapsed_30 = tensor.collapse_shape %transformer_layer_0_self_attention_value_kernel [[0], [1, 2]] : tensor<128x2x64xf32> into tensor<128x128xf32>
     %128 = tensor.empty() : tensor<256x128xf32>
-    %129 = linalg.fill ins(%cst_1 : f32) outs(%128 : tensor<256x128xf32>) -> tensor<256x128xf32> 
+    %129 = linalg.fill ins(%cst_1 : f32) outs(%128 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %130 = linalg.matmul ins(%collapsed_20, %collapsed_30 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%129 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %expanded_31 = tensor.expand_shape %130 [[0, 1], [2, 3]] : tensor<256x128xf32> into tensor<32x8x2x64xf32>
     %131 = tensor.empty() : tensor<32x8x2x64xf32>
@@ -208,7 +208,7 @@ func.func @multi_head_attention(
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x2x64xf32>
-    %133 = tensor.empty() : tensor<32x8x2x64xf32> 
+    %133 = tensor.empty() : tensor<32x8x2x64xf32>
     %134 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_31, %132 : tensor<32x8x2x64xf32>, tensor<32x8x2x64xf32>) outs(%133 : tensor<32x8x2x64xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
       %490 = arith.addf %in, %in_74 : f32
@@ -240,12 +240,12 @@ func.func @multi_head_attention(
     %143 = linalg.fill ins(%cst_1 : f32) outs(%142 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %144 = linalg.matmul ins(%collapsed_35, %collapsed_36 : tensor<256x128xf32>, tensor<128x128xf32>) outs(%143 : tensor<256x128xf32>) -> tensor<256x128xf32>
     %expanded_37 = tensor.expand_shape %144 [[0, 1], [2]] : tensor<256x128xf32> into tensor<32x8x128xf32>
-    %145 = tensor.empty() : tensor<32x8x128xf32> 
+    %145 = tensor.empty() : tensor<32x8x128xf32>
     %146 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%transformer_layer_0_self_attention_attention_output_bias : tensor<128xf32>) outs(%145 : tensor<32x8x128xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     } -> tensor<32x8x128xf32>
-    %147 = tensor.empty() : tensor<32x8x128xf32> 
+    %147 = tensor.empty() : tensor<32x8x128xf32>
     %148 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded_37, %146 : tensor<32x8x128xf32>, tensor<32x8x128xf32>) outs(%147 : tensor<32x8x128xf32>) {
     ^bb0(%in: f32, %in_74: f32, %out: f32):
       %490 = arith.addf %in, %in_74 : f32

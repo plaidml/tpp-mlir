@@ -53,24 +53,24 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>, %arg2: te
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Block matmul i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32]
-      : !transform.any_op -> !transform.any_op 
-    
+      : !transform.any_op -> !transform.any_op
+
     %f = transform.structured.match ops{["func.func"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Propagate packing
     transform.structured.packing_propagation %f : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_matmuls %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
 
     // Get the last one, and fuse the outermost dimensions with all the producers
-    %blocked_matmuls:4 = split_handle %4 : (!transform.op<"linalg.generic">) 
+    %blocked_matmuls:4 = split_handle %4 : (!transform.op<"linalg.generic">)
       -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     %relu = transform.get_consumers_of_result %blocked_matmuls#3[0]
       : (!transform.any_op) -> (!transform.any_op)
@@ -78,21 +78,21 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Clean-up outer 1's dims, and re-annotate IR (fusion lost attributes info)
-    %6 = transform.structured.match ops{["func.func"]} in %arg1 
+    %6 = transform.structured.match ops{["func.func"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    
+
     transform.apply_patterns to %6 {
       transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
-    } : !transform.any_op    
+    } : !transform.any_op
 
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     %8 = transform.structured.get_blocked_matmuls %7
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
     %rematch_blocked_matmuls:4 = split_handle %8
       : (!transform.op<"linalg.generic">)
       -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-    
+
     %first_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#0[0]
       : (!transform.any_op) -> (!transform.any_op)
     %second_relu = transform.get_consumers_of_result %rematch_blocked_matmuls#1[0]
@@ -135,7 +135,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0  blocking_factors = [32, 32, 32]
       : !transform.any_op -> !transform.any_op
-    
+
     %f = transform.structured.match ops{["func.func"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %f : !transform.any_op
@@ -152,14 +152,14 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // clean-up IR after fusion
-    %6 = transform.structured.match ops{["func.func"]} in %arg1 
+    %6 = transform.structured.match ops{["func.func"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %6 {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
 
     // map a packed matmul to a brgemm
-    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+    %7 = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %7 : !transform.any_op
 }
@@ -176,7 +176,7 @@ func.func @mlp_single_layer_with_fusion(%A : !A_tensor_t, %B : !B_tensor_t, %C :
   // CHECK: scf.for {{.*}} {
   // CHECK: scf.for {{.*}} {
   // CHECK: linalg.batch_reduce_matmul
-  // CHECK: linalg.generic 
+  // CHECK: linalg.generic
   // CHECK: }
   // CHECK: }
   %matmul = linalg.matmul ins(%A, %B : !A_tensor_t, !B_tensor_t)
