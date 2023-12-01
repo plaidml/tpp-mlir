@@ -54,8 +54,12 @@ if [ "${GPU}" ]; then
   GPU_OPTION="-G ${GPU}"
   source ${SCRIPT_DIR}/ci/setup_gpu_env.sh
 fi
-# Always build OpenMP and OneDNN in CI
-EXTENSIONS="-O -D"
+# Always build OpenMP in CI
+EXTENSIONS="-O"
+# Enable OneDNN build
+if [ "${ONEDNN}" ]; then
+  EXTENSIONS="${EXTENSIONS} -D"
+fi
 
 if [ "${CLEAN}" ]; then
   BUILD_DIR_RM=-R
