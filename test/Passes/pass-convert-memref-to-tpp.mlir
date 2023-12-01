@@ -49,16 +49,16 @@ func.func @copy_3d(%arg0: memref<2x2x2xf32>, %arg1: memref<2x2x2xf32>) {
 func.func @copy_1d(%arg0: memref<5xf32>, %arg1: memref<5xf32>) {
   // CHECK-NOT: xsmm.unary identity
   memref.copy %arg0, %arg1 : memref<5xf32> to memref<5xf32>
-  return 
+  return
 }
 
 // -----
 
 // CHECK-LABEL: unknow_size
-func.func @unknow_size(%arg0: memref<?x?xf32, strided<[2, 1], offset: ?>>, 
+func.func @unknow_size(%arg0: memref<?x?xf32, strided<[2, 1], offset: ?>>,
                        %arg1: memref<?x?xf32, strided<[15, 1], offset: ?>>) {
   // CHECK-NOT: xsmm.unary identity
-  memref.copy %arg0, %arg1 : memref<?x?xf32, strided<[2, 1], offset: ?>> 
+  memref.copy %arg0, %arg1 : memref<?x?xf32, strided<[2, 1], offset: ?>>
     to memref<?x?xf32, strided<[15, 1], offset: ?>>
   return
 }

@@ -15,7 +15,7 @@
 // IR-LABEL: matmul_static
 func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] :
-    !A_tensor_t into tensor<2x2x2x4xf32> 
+    !A_tensor_t into tensor<2x2x2x4xf32>
   %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] :
     !B_tensor_t into tensor<2x4x2x8xf32>
   %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] :
@@ -33,9 +33,9 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   // IR-NOT: xsmm_unary_dispatch
   // IR: xsmm_gemm_dispatch(%[[C1]], %[[C2]], %[[C8]], %[[C4]], %[[C8]], %[[C16]], %[[C8]], %[[C4]])
   %gemm = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]} 
-    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x4x2x8xf32>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]}
+    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x4x2x8xf32>)
     outs(%fill : tensor<2x2x2x8xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %4 = arith.mulf %in, %in_2 : f32
@@ -50,9 +50,9 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   %v0 = vector.transfer_read %gemm_clps[%cst, %cst], %d1 : tensor<4x16xf32>, vector<4x16xf32>
 
   //
-  // CHECK:     ( ( 13.5, 23.9, 34.3, 44.7, 55.1, 65.5, 75.9, 86.3, 14, 24.8, 35.6, 46.4, 57.2, 68, 78.8, 89.6 ), 
-  // CHECK-SAME:  ( 244.7, 271.1, 297.5, 323.9, 350.3, 376.7, 403.1, 429.5, 248.4, 275.2, 302, 328.8, 355.6, 382.4, 409.2, 436 ), 
-  // CHECK-SAME:  ( 18.98, 30.18, 41.38, 52.58, 63.78, 74.98, 86.18, 97.38, 19.64, 31.24, 42.84, 54.44, 66.04, 77.64, 89.24, 100.84 ), 
+  // CHECK:     ( ( 13.5, 23.9, 34.3, 44.7, 55.1, 65.5, 75.9, 86.3, 14, 24.8, 35.6, 46.4, 57.2, 68, 78.8, 89.6 ),
+  // CHECK-SAME:  ( 244.7, 271.1, 297.5, 323.9, 350.3, 376.7, 403.1, 429.5, 248.4, 275.2, 302, 328.8, 355.6, 382.4, 409.2, 436 ),
+  // CHECK-SAME:  ( 18.98, 30.18, 41.38, 52.58, 63.78, 74.98, 86.18, 97.38, 19.64, 31.24, 42.84, 54.44, 66.04, 77.64, 89.24, 100.84 ),
   // CHECK-SAME:  ( 262.98, 290.18, 317.38, 344.58, 371.78, 398.98, 426.18, 453.38, 266.84, 294.44, 322.04, 349.64, 377.24, 404.84, 432.44, 460.04 ) )
   //
   vector.print %v0 : vector<4x16xf32>

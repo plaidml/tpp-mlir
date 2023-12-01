@@ -29,8 +29,8 @@ func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tens
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>)
     outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %1 = linalg.generic {indexing_maps = [#map], 
-                       iterator_types = ["parallel", "parallel"]} 
+  %1 = linalg.generic {indexing_maps = [#map],
+                       iterator_types = ["parallel", "parallel"]}
     outs(%0: tensor<32x32xf32>) {
       ^bb0(%out: f32):
         %2 = arith.maximumf %out, %c0 : f32
@@ -47,9 +47,9 @@ func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tens
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK: linalg.matmul
-// CHECK: linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel"]} 
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel"]}
 // CHECK-SAME:  outs({{.+}} : tensor<2x2xf32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -67,9 +67,9 @@ func.func @matmul_eletwise_blk_matmul(%arg0: tensor<4x4x32x32xf32>, %arg1: tenso
     %arg2: tensor<4x4x32x32xf32>) -> tensor<4x4x32x32xf32> {
   %c0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
-      indexing_maps = [#map, #map1, #map2], 
-      iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
-      ins(%arg0, %arg1 : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>) 
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>)
       outs(%arg2 : tensor<4x4x32x32xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %1 = arith.mulf %in, %in_2 : f32
@@ -136,9 +136,9 @@ func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: ten
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK: linalg.matmul
-// CHECK: linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel"] 
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:  outs({{.+}} : tensor<2x2xf32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -287,9 +287,9 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32x
 // CHECK: %[[LOOP:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK-NEXT: %[[LOOP1:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C2]]
 // CHECK: linalg.matmul
-// CHECK: linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel"]} 
+// CHECK: linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel"]}
 // CHECK-SAME:  ins({{.+}}: tensor<2x2xf32>) outs({{.+}} : tensor<2x2xf32>)
 // CHECK: scf.yield %{{.+}} : tensor<32x32xf32>
 // CHECK-NEXT: }
@@ -311,19 +311,19 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32x
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 
 // CHECK-LABEL: func.func @mlp
-func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16>, 
-    %arg2: tensor<3584xbf16>, %arg3: tensor<8x112x32x32xbf16>, %arg4: tensor<112x112x32x32xbf16>, 
-    %arg5: tensor<3584xbf16>, %arg6: tensor<8x112x32x32xbf16>, %arg7: tensor<112x112x32x32xbf16>, 
-    %arg8: tensor<3584xbf16>, %arg9: tensor<8x112x32x32xbf16> , %arg10: tensor<112x112x32x32xbf16>, 
-    %arg11: tensor<3584xbf16>, %arg12: tensor<8x112x32x32xbf16> , %arg13: tensor<112x112x32x32xbf16>, 
-    %arg14: tensor<3584xbf16>, %arg15: tensor<8x112x32x32xbf16> , %arg16: tensor<112x112x32x32xbf16>, 
-    %arg17: tensor<3584xbf16>, %arg18: tensor<8x112x32x32xbf16>, %arg19: tensor<112x112x32x32xbf16>, 
-    %arg20: tensor<3584xbf16>, %arg21: tensor<8x112x32x32xbf16>  , %arg22: tensor<112x112x32x32xbf16>, 
-    %arg23: tensor<3584xbf16>, %arg24: tensor<8x112x32x32xbf16>  , %arg25: tensor<112x112x32x32xbf16>, 
-    %arg26: tensor<3584xbf16>, %arg27: tensor<8x112x32x32xbf16> , %arg28: tensor<112x112x32x32xbf16>, 
+func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16>,
+    %arg2: tensor<3584xbf16>, %arg3: tensor<8x112x32x32xbf16>, %arg4: tensor<112x112x32x32xbf16>,
+    %arg5: tensor<3584xbf16>, %arg6: tensor<8x112x32x32xbf16>, %arg7: tensor<112x112x32x32xbf16>,
+    %arg8: tensor<3584xbf16>, %arg9: tensor<8x112x32x32xbf16> , %arg10: tensor<112x112x32x32xbf16>,
+    %arg11: tensor<3584xbf16>, %arg12: tensor<8x112x32x32xbf16> , %arg13: tensor<112x112x32x32xbf16>,
+    %arg14: tensor<3584xbf16>, %arg15: tensor<8x112x32x32xbf16> , %arg16: tensor<112x112x32x32xbf16>,
+    %arg17: tensor<3584xbf16>, %arg18: tensor<8x112x32x32xbf16>, %arg19: tensor<112x112x32x32xbf16>,
+    %arg20: tensor<3584xbf16>, %arg21: tensor<8x112x32x32xbf16>  , %arg22: tensor<112x112x32x32xbf16>,
+    %arg23: tensor<3584xbf16>, %arg24: tensor<8x112x32x32xbf16>  , %arg25: tensor<112x112x32x32xbf16>,
+    %arg26: tensor<3584xbf16>, %arg27: tensor<8x112x32x32xbf16> , %arg28: tensor<112x112x32x32xbf16>,
     %arg29: tensor<3584xbf16>, %arg30: tensor<8x112x32x32xbf16>  ) -> tensor<8x112x32x32xbf16> {
-  
-  %cst = arith.constant 0.000000e+00 : bf16 
+
+  %cst = arith.constant 0.000000e+00 : bf16
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x112x32x32xbf16>, tensor<112x112x32x32xbf16>) outs(%arg3 : tensor<8x112x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %mul = arith.mulf %in, %in_0 : bf16

@@ -69,7 +69,7 @@ func.func @tpp_identity_invalid(%arg0: memref<3x3xf32>, %arg1: memref<2x3xf32>) 
 func.func @tpp_gemm_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
                               %arg2: memref<5x5xf32>) -> memref<5x5xf32> {
   // expected-error @below {{operand 0 fails to verify expected shape}}
-  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, %arg2: memref<5x5xf32>) 
+  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>, %arg2: memref<5x5xf32>)
            outs(%arg2: memref<5x5xf32>)
   return %arg2: memref<5x5xf32>
 }
@@ -80,7 +80,7 @@ func.func @tpp_gemm_invalid(%arg0: memref<3x2xf32>, %arg1: memref<4x3xf32>,
 func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>,
                               %arg2: memref<2x2xf32>) -> memref<2x2xf32> {
   // expected-error @below {{operand 1 fails to verify expected shape}}
-  tpp.brgemm ins(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>, %arg2: memref<2x2xf32>) 
+  tpp.brgemm ins(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>, %arg2: memref<2x2xf32>)
              outs(%arg2: memref<2x2xf32>)
   return %arg2: memref<2x2xf32>
 }
@@ -90,7 +90,7 @@ func.func @tpp_brgemm_invalid(%arg0: memref<7x2x3xf32>, %arg1: memref<8x3x2xf32>
 func.func @tpp_matmul_invalid(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>,
                               %arg2: memref<6x6xbf16>) -> memref<6x6xbf16> {
   // expected-error @below {{operand 1 fails to verify expected shape}}
-  tpp.gemm ins(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xbf16>) 
+  tpp.gemm ins(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xbf16>)
            outs(%arg2: memref<6x6xbf16>)
   return %arg2: memref<6x6xbf16>
 }
@@ -101,7 +101,7 @@ func.func @tpp_matmul_invalid(%arg0: memref<6x5xbf16>, %arg1: memref<5x6x2xbf16>
 func.func @tpp_matmul_invalid(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
                               %arg2: memref<6x6xf32>) -> memref<6x6xf32> {
   // expected-error @below {{requires the same element type for all operands}}
-  tpp.gemm ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xf32>) 
+  tpp.gemm ins(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>, %arg2: memref<6x6xf32>)
            outs(%arg2: memref<6x6xf32>)
   return %arg2: memref<6x6xf32>
 }
@@ -111,7 +111,7 @@ func.func @tpp_matmul_invalid(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16
 func.func @tpp_gemm_mixed_types(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>,
                                 %arg2: memref<3x3xbf16>) -> memref<3x3xbf16> {
   // expected-error @below {{requires the same element type for all operands}}
-  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>, %arg2: memref<3x3xbf16>) 
+  tpp.gemm ins(%arg0: memref<3x2xf32>, %arg1: memref<2x3xf32>, %arg2: memref<3x3xbf16>)
              outs(%arg2: memref<3x3xbf16>)
   return %arg2: memref<3x3xbf16>
 }
@@ -129,12 +129,12 @@ func.func @tpp_add_check_broadcast_operand(%arg0: memref<2x3xf32>, %arg1: memref
 func.func @tpp_add_check_broadcast_result(%arg0: memref<8x1xf32>, %arg1: memref<8x8xf32>) {
   // expected-error @below {{result type not broadcast compatible with broadcasted operands's shapes}}
   tpp.add ins(%arg1: memref<8x8xf32>, %arg1: memref<8x8xf32>) outs(%arg0: memref<8x1xf32>)
-  return 
+  return
 }
 
 // -----
 
-func.func @tpp_add_stride_inner_dim(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>, 
+func.func @tpp_add_stride_inner_dim(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>,
                                     %arg1: memref<8x8xf32>) {
   // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
   tpp.add ins(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>, %arg1: memref<8x8xf32>) outs(%arg1: memref<8x8xf32>)
@@ -147,7 +147,7 @@ func.func @tpp_add_non_constant_stride(%arg0: memref<8x8xf32, strided<[?, ?], of
                                        %arg1: memref<8x8xf32>) {
   // expected-error @below {{non-unit stride in the innermost varying dimension for operand 0}}
   tpp.add ins(%arg0: memref<8x8xf32, strided<[?, ?], offset: 0>>, %arg1: memref<8x8xf32>) outs(%arg1: memref<8x8xf32>)
-  return 
+  return
 }
 
 // -----
@@ -263,7 +263,7 @@ func.func @tpp_add_check_broadcast_operand(%arg0: tensor<2x3xf32>, %arg1: tensor
 
 func.func @tpp_gemm(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) {
   // expected-error @below {{expect memref type}}
-  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>) 
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>, %arg2: tensor<2x2xf32>)
              outs(%arg2: tensor<2x2xf32>)
   return
 }
@@ -288,7 +288,7 @@ func.func @tpp_relu_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
 
 func.func @tpp_gemm_invalid_number_of_operands(%arg0: memref<2x2xf32>) {
   // expected-error @below {{expect 3 input operands, but got: 2}}
-  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>) 
+  tpp.gemm ins(%arg0: memref<2x2xf32>, %arg0: memref<2x2xf32>)
              outs(%arg0: memref<2x2xf32>)
   return
 }
@@ -335,7 +335,7 @@ func.func @unary_invalid_operands(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
 
 // -----
 
-func.func @vnni_gemm_b_operand_wrong_type(%arg0: tensor<32x32xf32>,        
+func.func @vnni_gemm_b_operand_wrong_type(%arg0: tensor<32x32xf32>,
                                           %arg1: tensor<16x32x2xf32>,
                                           %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
   // expected-error @below {{operand 1 invalid element type for VNNI layout expect bf16, but got: 'f32'}}
@@ -346,7 +346,7 @@ func.func @vnni_gemm_b_operand_wrong_type(%arg0: tensor<32x32xf32>,
 
 // -----
 
-func.func @vnni_wrong_layout(%arg0: tensor<32x32xbf16>,        
+func.func @vnni_wrong_layout(%arg0: tensor<32x32xbf16>,
                              %arg1: tensor<16x32x3xbf16>,
                              %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
   // expected-error @below {{operand 1 invalid VNNI layout expect inner dims to be 2 or 4, but got: 3}}
@@ -357,7 +357,7 @@ func.func @vnni_wrong_layout(%arg0: tensor<32x32xbf16>,
 
 // -----
 
-func.func @vnni_gemm_b_operand_wrong_shape(%arg0: tensor<32x32xbf16>,        
+func.func @vnni_gemm_b_operand_wrong_shape(%arg0: tensor<32x32xbf16>,
                                            %arg1: tensor<15x32x2xbf16>,
                                            %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
   // expected-error @below {{operand 1 fails to verify expected shape}}
@@ -368,7 +368,7 @@ func.func @vnni_gemm_b_operand_wrong_shape(%arg0: tensor<32x32xbf16>,
 
 // -----
 
-func.func @tied_type_result_to_arg2(%arg0: tensor<32x32xf32>,        
+func.func @tied_type_result_to_arg2(%arg0: tensor<32x32xf32>,
                                     %arg1: tensor<16x32x2xf32>,
                                     %arg2: tensor<1x32xf32>) -> tensor<32x32xf32> {
   // expected-error @below {{result type differs from destination operand type}}
@@ -379,12 +379,12 @@ func.func @tied_type_result_to_arg2(%arg0: tensor<32x32xf32>,
 
 // -----
 
-func.func @fused_brgemm_invalid_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>, 
+func.func @fused_brgemm_invalid_bias(%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
     %arg2: tensor<32x32xf32>, %bias: tensor<32x32x32x32xf32>) -> tensor<32x32xf32> {
   // expected-error @below {{expected shaped type with rank 1 or 2 for bias}}
   %0 = tpp.fused_brgemm [unary = relu, binary = add]
                         (%arg0: tensor<3x32x32xf32>, %arg1: tensor<3x32x32xf32>,
-                         %arg2: tensor<32x32xf32>, 
+                         %arg2: tensor<32x32xf32>,
                          %bias: tensor<32x32x32x32xf32>) -> tensor<32x32xf32>
   return %0 : tensor<32x32xf32>
 }

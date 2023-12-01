@@ -30,13 +30,13 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   // IR-DAG: %[[C8:.+]] = arith.constant 8 : i64
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
   // IR-DAG: %[[C0:.+]] = arith.constant 0 : i64
-  // The unary dispatch in this case is the transpose. 
+  // The unary dispatch in this case is the transpose.
   // IR-COUNT-1: xsmm_unary_dispatch
-  // IR: xsmm_gemm_dispatch(%[[C1]], %[[C8]], %[[C2]], %[[C4]], %[[C8]], %[[C2]], %[[C2]], %[[C4]]) 
+  // IR: xsmm_gemm_dispatch(%[[C1]], %[[C8]], %[[C2]], %[[C4]], %[[C8]], %[[C2]], %[[C2]], %[[C4]])
   %gemm = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]} 
-    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x8x2x4xf32>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel"]}
+    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x8x2x4xf32>)
     outs(%fill : tensor<2x2x8x2xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %4 = arith.mulf %in, %in_2 : f32
@@ -50,12 +50,12 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
   %d1 = arith.constant -1.0 : f32
   %v0 = vector.transfer_read %gemm_clps[%cst, %cst], %d1 : tensor<4x16xf32>, vector<4x16xf32>
 
-  // 
-  // CHECK:     ( ( 32.04, 33.08, 33.08, 34.16, 34.12, 35.24, 35.16, 36.32, 36.2, 37.4, 37.24, 38.48, 38.28, 39.56, 39.32, 40.64 ), 
-  // CHECK-SAME:  ( 179.24, 181.88, 181.88, 184.56, 184.52, 187.24, 187.16, 189.92, 189.8, 192.6, 192.44, 195.28, 195.08, 197.96, 197.72, 200.64 ), 
-  // CHECK-SAME:  ( 43.08, 44.44, 34.12, 35.16, 34.232, 35.276, 34.344, 35.392, 34.456, 35.508, 34.568, 35.624, 34.68, 35.74, 34.792, 35.856 ), 
+  //
+  // CHECK:     ( ( 32.04, 33.08, 33.08, 34.16, 34.12, 35.24, 35.16, 36.32, 36.2, 37.4, 37.24, 38.48, 38.28, 39.56, 39.32, 40.64 ),
+  // CHECK-SAME:  ( 179.24, 181.88, 181.88, 184.56, 184.52, 187.24, 187.16, 189.92, 189.8, 192.6, 192.44, 195.28, 195.08, 197.96, 197.72, 200.64 ),
+  // CHECK-SAME:  ( 43.08, 44.44, 34.12, 35.16, 34.232, 35.276, 34.344, 35.392, 34.456, 35.508, 34.568, 35.624, 34.68, 35.74, 34.792, 35.856 ),
   // CHECK-SAME:  ( 206.28, 209.24, 184.52, 187.16, 184.792, 187.436, 185.064, 187.712, 185.336, 187.988, 185.608, 188.264, 185.88, 188.54, 186.152, 188.816 ) )
-  // 
+  //
   vector.print %v0 : vector<4x16xf32>
 
   return

@@ -99,7 +99,7 @@ func.func @static_matmul_double(%arg0: memref<3x4xf64>, %arg1: memref<4x5xf64>, 
 
 // -----
 
-func.func @static_matmul_3(%arg0: memref<2048x2048xf32>, %arg1: memref<2048x2048xf32>, 
+func.func @static_matmul_3(%arg0: memref<2048x2048xf32>, %arg1: memref<2048x2048xf32>,
                            %arg2: memref<2048x2048xf32>) {
   linalg.matmul ins(%arg0, %arg1 : memref<2048x2048xf32>, memref<2048x2048xf32>)
                 outs(%arg2 : memref<2048x2048xf32>)

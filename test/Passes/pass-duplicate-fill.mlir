@@ -11,7 +11,7 @@
 // CHECK-LABEL: duplicate_zero_fill_on_contractions
 // BUFF-LABEL: duplicate_zero_fill_on_contractions
 // BUFFNOTDUP-LABEL: duplicate_zero_fill_on_contractions
-func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>, 
+func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
       %arg1: tensor<512x64xf32>) -> tensor<32x64xf32> {
   // BUFF-COUNT-2: memref.alloc
   // BUFF-COUNT-1: memref.dealloc
@@ -26,8 +26,8 @@ func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
   // CHECK: linalg.fill
   // CHECK-NEXT: linalg.generic
   %3 = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "reduction", "parallel"]} 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "reduction", "parallel"]}
     ins(%arg0, %arg1 : tensor<32x512xf32>, tensor<512x64xf32>) outs(%1 : tensor<32x64xf32>) {
       ^bb0(%in: f32, %in_5: f32, %out: f32):
         %9 = arith.mulf %in, %in_5 : f32
@@ -44,11 +44,11 @@ func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
         %9 = arith.mulf %in, %in_5 : f32
         %10 = arith.addf %out, %9 : f32
         linalg.yield %10 : f32
-  } -> tensor<32x64xf32> 
+  } -> tensor<32x64xf32>
   // CHECK-NOT: linalg.fill
-  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>) 
+  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
                   outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  return %5 : tensor<32x64xf32> 
+  return %5 : tensor<32x64xf32>
 }
 
 // -----
@@ -60,7 +60,7 @@ func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
 #map4 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map5 = affine_map<(d0, d1, d2) -> (d2, d0)>
 
-func.func @mha_contractions(%arg0: tensor<64x32x512xf32>, %arg1: tensor<64x32x512xf32>, 
+func.func @mha_contractions(%arg0: tensor<64x32x512xf32>, %arg1: tensor<64x32x512xf32>,
                             %arg2: tensor<64x32x512xf32>) -> tensor<64x8x32x32xf32> {
   %cst = arith.constant dense<2.000000e-01> : tensor<512x64xf32>
   %cst_0 = arith.constant dense<1.000000e-01> : tensor<512x64xf32>
@@ -123,7 +123,7 @@ func.func @mha_contractions(%arg0: tensor<64x32x512xf32>, %arg1: tensor<64x32x51
 // CHECK-LABEL: duplicate_non_zero_fill_on_contractions
 // BUFF-LABEL: duplicate_non_zero_fill_on_contractions
 // BUFFNOTDUP-LABEL: duplicate_non_zero_fill_on_contractions
-func.func @duplicate_non_zero_fill_on_contractions(%arg0: tensor<32x512xf32>, 
+func.func @duplicate_non_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
       %arg1: tensor<512x64xf32>) -> tensor<32x64xf32> {
   %cst_2 = arith.constant 1.0 : f32
   %0 = tensor.empty() : tensor<32x64xf32>
@@ -131,8 +131,8 @@ func.func @duplicate_non_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
   // CHECK: linalg.fill
   // CHECK-NEXT: linalg.generic
   %3 = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "reduction", "parallel"]} 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "reduction", "parallel"]}
     ins(%arg0, %arg1 : tensor<32x512xf32>, tensor<512x64xf32>) outs(%1 : tensor<32x64xf32>) {
       ^bb0(%in: f32, %in_5: f32, %out: f32):
         %9 = arith.mulf %in, %in_5 : f32
@@ -149,11 +149,11 @@ func.func @duplicate_non_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
         %9 = arith.mulf %in, %in_5 : f32
         %10 = arith.addf %out, %9 : f32
         linalg.yield %10 : f32
-  } -> tensor<32x64xf32> 
+  } -> tensor<32x64xf32>
   // CHECK-NOT: linalg.fill
-  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>) 
+  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
                   outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  return %5 : tensor<32x64xf32> 
+  return %5 : tensor<32x64xf32>
 }
 
 // -----
@@ -164,7 +164,7 @@ func.func @matmuls(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor
   %0 = tensor.empty() : tensor<32x32xf32>
   %cst = arith.constant 0.0 : f32
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>) 
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %3 = linalg.matmul ins(%arg0, %2 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
@@ -175,10 +175,10 @@ func.func @matmuls(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor
 // CHECK-SAME: %[[ARG0:.+]]: tensor<32x32xf32>, %[[ARG1:.+]]: tensor<32x32xf32>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<32x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]] : tensor<32x32xf32>, tensor<32x32xf32>) 
+// CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]] : tensor<32x32xf32>, tensor<32x32xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %[[FILL_1:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: %{{.+}} = linalg.matmul ins(%[[ARG0]], %[[MUL]] : tensor<32x32xf32>, tensor<32x32xf32>) 
+// CHECK: %{{.+}} = linalg.matmul ins(%[[ARG0]], %[[MUL]] : tensor<32x32xf32>, tensor<32x32xf32>)
 // CHECK-SAME:  outs(%[[FILL_1]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 
 // -----
@@ -195,7 +195,7 @@ func.func @matmuls_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tens
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %3 = linalg.add ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>) 
+  %3 = linalg.add ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
                   outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %4 = linalg.matmul ins(%3, %2 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>

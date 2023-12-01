@@ -1,5 +1,5 @@
 // RUN: tpp-opt %s -convert-perf-to-loops -split-input-file -canonicalize | FileCheck %s
-// XFAIL:* 
+// XFAIL:*
 // See: #277
 
 // CHECK-LABEL: @perf_single_op

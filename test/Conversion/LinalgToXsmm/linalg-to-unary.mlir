@@ -103,8 +103,8 @@ func.func @transpose_op(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
 func.func @relu(%arg0: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
-    indexing_maps = [#map, #map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<4x3xf32>) outs(%arg0 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.maximumf %in, %cst : f32
@@ -126,8 +126,8 @@ func.func @relu(%arg0: memref<4x3xf32>) {
 func.func @relu_1(%arg0: memref<1x3xf32>, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
-    indexing_maps = [#map1, #map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<1x3xf32>) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.maximumf %in, %cst : f32
@@ -149,8 +149,8 @@ func.func @relu_1(%arg0: memref<1x3xf32>, %arg1: memref<4x3xf32>) {
 func.func @relu_2(%arg0: memref<4x1xf32>, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
-    indexing_maps = [#map1, #map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<4x1xf32>) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.maximumf %in, %cst : f32
@@ -172,8 +172,8 @@ func.func @relu_2(%arg0: memref<4x1xf32>, %arg1: memref<4x3xf32>) {
 func.func @relu_3(%arg0: f32, %arg1: memref<4x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.generic {
-    indexing_maps = [#map1, #map], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map1, #map],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : f32) outs(%arg1 : memref<4x3xf32>) {
     ^bb0(%in: f32, %out: f32):
       %0 = arith.maximumf %in, %cst : f32
@@ -238,8 +238,8 @@ func.func @relu_5(%arg1: memref<4x3xf32>) {
 
 func.func @identity_1(%arg0: memref<512xf32>, %arg1: memref<128x512xf32>) {
   linalg.generic {
-    indexing_maps = [#map0, #map1], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map0, #map1],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<512xf32>) outs(%arg1 : memref<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
@@ -258,8 +258,8 @@ func.func @identity_1(%arg0: memref<512xf32>, %arg1: memref<128x512xf32>) {
 
 func.func @identity_2(%arg0: memref<128x512xf32>, %arg1: memref<128x512xf32>) {
   linalg.generic {
-    indexing_maps = [#map0, #map0], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map0, #map0],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<128x512xf32>) outs(%arg1 : memref<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
@@ -297,16 +297,16 @@ func.func @identity_3(%arg0: memref<128x1xf32>, %arg1: memref<128x512xf32>) {
 
 func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>,
                         %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
-  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] 
-    : memref<32x32xbf16, strided<[512, 1], offset: ?>> 
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]]
+    : memref<32x32xbf16, strided<[512, 1], offset: ?>>
     into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
-  linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>) 
+  linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>)
     outs(%arg1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) permutation = [0, 2, 1]
   return
 }
 
 // CHECK-LABEL: vnni_packing
-// CHECK-SAME:  %[[ARG0:.+]]: memref<32x32xbf16, strided<[512, 1], offset: ?>>, 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<32x32xbf16, strided<[512, 1], offset: ?>>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 512, 32] flags = (none) data_type = bf16
 // CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]])
@@ -315,10 +315,10 @@ func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>
 
 func.func @not_vnni_packing(%arg0 : memref<32x32xf32, strided<[512, 1], offset: ?>>,
                             %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
-  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] 
-    : memref<32x32xf32, strided<[512, 1], offset: ?>> 
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]]
+    : memref<32x32xf32, strided<[512, 1], offset: ?>>
     into memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>
-  linalg.transpose ins(%expand_shape : memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>) 
+  linalg.transpose ins(%expand_shape : memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>)
     outs(%arg1 : memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) permutation = [0, 2, 1]
   return
 }
@@ -351,19 +351,19 @@ func.func @identity_4(%arg0: memref<1024xbf16>, %arg1: memref<128x1024xbf16>) {
 
 #map = affine_map<(d0) -> (d0 * 32)>
 
-func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2xbf16>) { 
+func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2xbf16>) {
   scf.forall (%arg3, %arg4) in (4, 4) {
     %0 = affine.apply #map(%arg4)
     %1 = affine.apply #map(%arg3)
-    %subview = memref.subview %arg1[%0, %1] [32, 32] [1, 1] 
+    %subview = memref.subview %arg1[%0, %1] [32, 32] [1, 1]
       : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
-    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] 
+    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1]
       : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-    %expand_shape = memref.expand_shape %subview [[0, 1], [2]] 
+    %expand_shape = memref.expand_shape %subview [[0, 1], [2]]
       : memref<32x32xbf16, strided<[128, 1], offset: ?>> into memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>
-    linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>) 
-                     outs(%subview_1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) 
-                     permutation = [0, 2, 1] 
+    linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>)
+                     outs(%subview_1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>)
+                     permutation = [0, 2, 1]
   }
   return
 }
@@ -375,9 +375,9 @@ func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2
 // CHECK: scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (4, 4)
 // CHECK: %[[OFF:.+]] = affine.apply #[[MAP]](%[[ARG3]])
 // CHECK: %[[OFF_1:.+]] = affine.apply #[[MAP]](%[[ARG2]])
-// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[OFF]], %[[OFF_1]]] [32, 32] [1, 1] 
+// CHECK: %[[SUB:.+]] = memref.subview %[[ARG0]][%[[OFF]], %[[OFF_1]]] [32, 32] [1, 1]
 // CHECK-SAME:  : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
-// CHECK: %[[SUB_0:.+]] = memref.subview %[[ARG1]][%[[ARG2]], %[[ARG3]], 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] 
+// CHECK: %[[SUB_0:.+]] = memref.subview %[[ARG1]][%[[ARG2]], %[[ARG3]], 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch vnni_2 [32, 32, 128, 32] flags = (none) data_type = bf16
 // CHECK: xsmm.unary vnni_2(data_type = bf16, %[[DIS]], %[[SUB]], %[[SUB_0]])
@@ -394,7 +394,7 @@ func.func @relu_no_input(%arg0: memref<10x10xf32>) {
     %13 = arith.maximumf %out, %cst_1 : f32
     linalg.yield %13 : f32
   }
-  return 
+  return
 }
 
 // CHECK-LABEL: relu_no_input
@@ -406,13 +406,13 @@ func.func @relu_no_input(%arg0: memref<10x10xf32>) {
 
 func.func @identity_5(%arg0 : memref<10xf32>, %arg1 : memref<10x10xf32>) {
   linalg.generic {
-    indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<10xf32>) outs(%arg1 : memref<10x10xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
   }
-  return 
+  return
 }
 
 // CHECK-LABEL: identity_5
@@ -474,8 +474,8 @@ func.func @identity_8(%arg0: f32, %arg1: memref<6x9xf32>) {
 
 func.func @identity_9(%arg0: memref<6xf32, strided<[1]>>, %arg1: memref<6x9xf32>) {
   linalg.generic {
-    indexing_maps = [#map, #map1], 
-    iterator_types = ["parallel", "parallel"]} 
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
     ins(%arg0 : memref<6xf32, strided<[1]>>) outs(%arg1 : memref<6x9xf32>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32

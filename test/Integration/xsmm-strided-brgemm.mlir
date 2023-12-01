@@ -16,7 +16,7 @@
 
 func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %D : !D_tensor_t) {
   %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] :
-    !A_tensor_t into tensor<2x2x2x4xf32> 
+    !A_tensor_t into tensor<2x2x2x4xf32>
   %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] :
     !B_tensor_t into tensor<2x4x8x2xf32>
   %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] :
@@ -24,8 +24,8 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %
   %D_exp = tensor.expand_shape %D [[0, 1], [2, 3]] :
     !D_tensor_t into tensor<2x2x8x2xf32>
 
-  // IR: %[[C1:.+]] = arith.constant 1 : i64      
-  // IR-DAG: %[[C2:.+]] = arith.constant 2 : i64  
+  // IR: %[[C1:.+]] = arith.constant 1 : i64
+  // IR-DAG: %[[C2:.+]] = arith.constant 2 : i64
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
   // IR-DAG: %[[C8:.+]] = arith.constant 8 : i64
   // IR-DAG: %[[C16:.+]] = arith.constant 16 : i64
@@ -33,7 +33,7 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %
   // IR-DAG: %[[C0:.+]] = arith.constant 0 : i64
   // IR: xsmm_brgemm_dispatch(%[[C1]], %[[C2]], %[[C2]], %[[C4]], %[[C8]], %[[C16]], %[[C2]], %[[C4]], %[[C64]], %[[C0]])
   // Parameters:
-  // 1) kind 
+  // 1) kind
   // 2) m = 2
   // 3) n = 2
   // 4) k = 4
@@ -44,9 +44,9 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %
   // 9) stride on B = 64
   // 10) data type
   %gemm = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel"]} 
-    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x4x8x2xf32>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel"]}
+    ins(%A_exp, %B_exp : tensor<2x2x2x4xf32>, tensor<2x4x8x2xf32>)
     outs(%C_exp : tensor<2x2x8x2xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %4 = arith.mulf %in, %in_2 : f32

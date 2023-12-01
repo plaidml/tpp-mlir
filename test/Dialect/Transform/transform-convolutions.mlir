@@ -4,7 +4,7 @@
 // Unit filter.
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
         : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
     //
@@ -30,8 +30,8 @@ transform.sequence failures(propagate) {
     //
     // You can now see the matmul: image[*][*][W][C] * filter[*][*][C][K]
     //
-    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-        : (!transform.any_op) -> !transform.any_op 
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
 }
 
@@ -61,8 +61,8 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
-    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
-        : (!transform.any_op) -> !transform.any_op 
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
 }
 
@@ -97,7 +97,7 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
-        : (!transform.any_op) -> !transform.any_op 
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
 }
 
@@ -135,11 +135,11 @@ transform.sequence failures(propagate) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Original layout: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
     // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     // Collapse       : [N][K'][P * Q][k] = [N][C'][H * W][c] * [K'][C'][c][k]
-    %2 = transform.structured.collapse %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]] 
+    %2 = transform.structured.collapse %1 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
       : !transform.any_op -> !transform.any_op
-    %3 = transform.structured.collapse %2 [[0], [1], [2, 3], [4], [5], [6]] 
+    %3 = transform.structured.collapse %2 [[0], [1], [2, 3], [4], [5], [6]]
       : !transform.any_op -> !transform.any_op
     //
     // N        [parallel]
@@ -161,7 +161,7 @@ transform.sequence failures(propagate) {
     //        output[N][K'][P + Q][k] += image[N][C'][H + W][c] * filter[K'][C'][c][k]
     //
     %4 = transform.structured.interchange %3 iterator_interchange = [0, 1, 4, 2, 3, 5]
-        : (!transform.any_op) -> !transform.any_op 
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %4 : !transform.any_op
 }
 
@@ -231,8 +231,8 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
   // CHECK:     linalg.batch_reduce_matmul
   %3 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg0 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%2 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK:     linalg.generic 
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
+  // CHECK:     linalg.generic
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
   %c0 = arith.constant 0.0 : f32
   %4 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%3 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -250,7 +250,7 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
       linalg.yield %in : f32
   } -> tensor<1x56x56x64xf32>
   // CHECK-NOT: {{.*}} = linalg.conv_2d_nhwc_hwcf
-  // CHECK: linalg.generic 
+  // CHECK: linalg.generic
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK: scf.for {{.*}} = %[[C0]] to %[[C2]] step %[[C1]] iter_args
   // CHECK-NEXT:   scf.for {{.*}} = %[[C0]] to %[[C56]] step %[[C1]] iter_args
@@ -261,8 +261,8 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   // CHECK-NEXT:              scf.for %{{.*}} = %[[C0]] to %[[C3]] step %[[C1]] iter_args
   // CHECK:           linalg.matmul
   %7 = linalg.conv_2d_nhwc_hwcf ins(%padded, %arg1 : tensor<1x58x58x64xf32>, tensor<3x3x64x64xf32>) outs(%6 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  // CHECK:     linalg.generic  
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
+  // CHECK:     linalg.generic
+  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
   // CHECK-SAME:  outs(%{{.*}} : tensor<1x1x1x1x1xf32>)
   %9 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%7 : tensor<1x56x56x64xf32>) {
     ^bb0(%out: f32):
@@ -274,39 +274,39 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
 
 transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
-    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 
+    %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
-   
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
+
     %f = transform.structured.match ops{["func.func"]} in %arg1
-      : (!transform.any_op) -> !transform.any_op 
+      : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %f : !transform.any_op
 
-    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 
+    %3 = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_convolutions %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
-    %blocked_matmuls:2 = split_handle %4 
-      : (!transform.op<"linalg.generic">) 
+    %blocked_matmuls:2 = split_handle %4
+      : (!transform.op<"linalg.generic">)
       -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
     %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
     %second_relu = transform.get_consumers_of_result %blocked_matmuls#1[0]
       : (!transform.op<"linalg.generic">) -> (!transform.op<"linalg.generic">)
-    %casted_first_relu = transform.cast %first_relu 
+    %casted_first_relu = transform.cast %first_relu
       : !transform.op<"linalg.generic"> to !transform.any_op
-    %casted_second_relu = transform.cast %second_relu 
+    %casted_second_relu = transform.cast %second_relu
       : !transform.op<"linalg.generic"> to !transform.any_op
     %relus = transform.merge_handles %casted_first_relu, %casted_second_relu : !transform.any_op
 
     // Fuse relu and conv on the three outermost loops
-    %5, %loop:5 = transform.structured.fuse %relus { tile_sizes = [1, 1, 1, 1, 1] } 
-      : (!transform.any_op) -> (!transform.any_op, 
-                                !transform.any_op, 
-                                !transform.any_op, 
+    %5, %loop:5 = transform.structured.fuse %relus { tile_sizes = [1, 1, 1, 1, 1] }
+      : (!transform.any_op) -> (!transform.any_op,
                                 !transform.any_op,
-                                !transform.any_op, 
+                                !transform.any_op,
+                                !transform.any_op,
+                                !transform.any_op,
                                 !transform.any_op)
     %6 = get_producer_of_operand %5[0] : (!transform.any_op) -> !transform.any_op
     %convs:2 = split_handle %6 : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -314,16 +314,16 @@ transform.sequence failures(propagate) {
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
     %conv1 = transform.structured.interchange %convs#1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8]
-        : (!transform.any_op) -> !transform.any_op 
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %conv1 : !transform.any_op
 
     // Map the conv to linalg.batch_reduce_matmul
     // With R = S = 1 we map to linalg.batch_reduce_matmul
-    %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]] 
+    %7 = transform.structured.collapse %convs#0 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
       : !transform.any_op -> !transform.any_op
     %8 = transform.structured.collapse %7 [[0], [1], [2, 3], [4], [5], [6]] : !transform.any_op -> !transform.any_op
     %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5]
-        : (!transform.any_op) -> !transform.any_op 
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %9 : !transform.any_op
 }
 
@@ -371,8 +371,8 @@ transform.sequence failures(propagate) {
   ^bb0(%arg1: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
-    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8] 
-        : (!transform.any_op) -> !transform.any_op 
+    %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8]
+        : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
 }
 
@@ -407,7 +407,7 @@ func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x2
 // CHECK: %[[LOOP3:.+]] = scf.for %[[ARG9:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG10:.+]] = %[[ARG8]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[LOOP4:.+]] = scf.for %[[ARG11:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG12:.+]] = %[[ARG10]]) -> (tensor<1x8x56x56x32xf32>) {
 // CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG5]], %[[ARG9]])
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[PACK_ARG0]][0, %[[ARG7]], %[[APPLY]], %[[ARG11]], 0] [1, 1, 1, 56, 32] [1, 1, 1, 2, 1] : tensor<1x2x113x113x32xf32> to tensor<56x32xf32> 
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[PACK_ARG0]][0, %[[ARG7]], %[[APPLY]], %[[ARG11]], 0] [1, 1, 1, 56, 32] [1, 1, 1, 2, 1] : tensor<1x2x113x113x32xf32> to tensor<56x32xf32>
 // CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[PACK_ARG1]][%[[ARG3]], %[[ARG7]], %[[ARG9]], %[[ARG11]], 0, 0] [1, 1, 1, 1, 32, 32] [1, 1, 1, 1, 1, 1] : tensor<8x2x3x3x32x32xf32> to tensor<32x32xf32>
 // CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG12]][0, %[[ARG3]], %[[ARG5]], 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1] : tensor<1x8x56x56x32xf32> to tensor<56x32xf32>
 // CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[SLICE]], %[[SLICE0]] : tensor<56x32xf32>, tensor<32x32xf32>) outs(%[[SLICE1]] : tensor<56x32xf32>) -> tensor<56x32xf32>

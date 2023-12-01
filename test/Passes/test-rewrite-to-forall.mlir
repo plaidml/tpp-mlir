@@ -40,7 +40,7 @@ func.func @no_extract_slice(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> t
 }
 
 // CHECK-LABEL: expect_to_convert_3d
-func.func @expect_to_convert_3d(%arg0: tensor<3x3x3xf32>, 
+func.func @expect_to_convert_3d(%arg0: tensor<3x3x3xf32>,
                                             %arg1: tensor<3x3x3xf32>) -> tensor<3x3x3xf32> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
@@ -61,7 +61,7 @@ func.func @expect_to_convert_3d(%arg0: tensor<3x3x3xf32>,
 }
 
 // CHECK-LABEL: expect_to_convert_2d
-func.func @expect_to_convert_2d(%arg0: tensor<3x3xf32>, 
+func.func @expect_to_convert_2d(%arg0: tensor<3x3xf32>,
                                             %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
@@ -79,7 +79,7 @@ func.func @expect_to_convert_2d(%arg0: tensor<3x3xf32>,
 }
 
 // CHECK-LABEL: expect_to_convert_1d
-func.func @expect_to_convert_1d(%arg0: tensor<3xf32>, 
+func.func @expect_to_convert_1d(%arg0: tensor<3xf32>,
                                    %arg1: tensor<3xf32>) -> tensor<3xf32> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
@@ -94,7 +94,7 @@ func.func @expect_to_convert_1d(%arg0: tensor<3xf32>,
 }
 
 // CHECK-LABEL: no_top_level
-func.func @no_top_level(%arg0: tensor<3x3xf32>, 
+func.func @no_top_level(%arg0: tensor<3x3xf32>,
                         %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index

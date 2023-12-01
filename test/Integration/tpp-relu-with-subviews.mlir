@@ -47,7 +47,7 @@ func.func @entry() {
         linalg.yield %in : f32
   } ->  tensor<12x2x56x56x32xf32>
 
-  // Check if subview extraction gives us the same result when comparing with the second relu op. 
+  // Check if subview extraction gives us the same result when comparing with the second relu op.
   %relu1 = scf.for %arg3 = %c0 to %c12 step %c1 iter_args(%ia1 = %0) -> tensor<12x2x56x56x32xf32> {
     %2 = scf.for %arg4 = %c0 to %c2 step %c1 iter_args(%ia2 = %ia1) -> tensor<12x2x56x56x32xf32> {
       %3 = scf.for %arg5 = %c0 to %c56 step %c1 iter_args(%ia3 = %ia2) -> tensor<12x2x56x56x32xf32> {

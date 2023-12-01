@@ -98,7 +98,7 @@ func.func @pack_matmul(
 // CHECK-COUNT-2: tensor.pack
 // Packed matmul
 // CHECK:    %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (4, 4)
-// CHECK:     %{{.+}} = linalg.batch_reduce_matmul ins(%{{.+}}, %{{.+}} : tensor<4x32x32xf32>, tensor<4x32x32xf32>) 
+// CHECK:     %{{.+}} = linalg.batch_reduce_matmul ins(%{{.+}}, %{{.+}} : tensor<4x32x32xf32>, tensor<4x32x32xf32>)
 // CHECK-SAME:          outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
 
 // -----

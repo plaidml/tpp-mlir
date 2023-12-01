@@ -98,7 +98,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -140,7 +140,7 @@ func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2:
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -185,7 +185,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -226,7 +226,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -271,7 +271,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -318,7 +318,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }
@@ -370,7 +370,7 @@ func.func @conv(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32>, %ar
 transform.sequence failures(propagate) {
   ^bb0(%arg0: !transform.any_op):
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op 
+    %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     transform.structured.packing_propagation %2 : !transform.any_op
 }

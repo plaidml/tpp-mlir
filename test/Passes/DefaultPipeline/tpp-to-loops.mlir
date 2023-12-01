@@ -61,7 +61,7 @@ func.func @tpp_brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2:
   // CHECK:       scf.for
   // CHECK:         arith.mulf
   // CHECK:         arith.addf
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>) 
+  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>)
              outs(%arg2: memref<3x3xf32>)
 
   return
@@ -78,7 +78,7 @@ func.func @tpp_gemm(%A: memref<4x8xf32>,
   // CHECK:     scf.for
   // CHECK:       arith.mulf
   // CHECK:       arith.addf
-  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C: memref<4x4xf32>) 
+  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C: memref<4x4xf32>)
              outs(%C : memref<4x4xf32>)
 
   return
@@ -117,8 +117,8 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
   // CHECK:           arith.mulf
   // CHECK:           arith.addf
   %1 = linalg.generic {
-    indexing_maps = [#map0, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
     ins(%arg0, %arg1 : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%arg2 : tensor<4x8x32x32xf32>) {
     ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
       %8 = arith.mulf %arg3, %arg4 : f32
@@ -182,10 +182,10 @@ func.func @conv2d_1x1_decomposed(
   // 1x1 Conv2D
   // CHECK: linalg.fill
   // CHECK: scf.for
-  // CHECK: scf.parallel  
-  // CHECK: scf.for       
-  // CHECK: scf.for       
-  // CHECK: scf.for       
+  // CHECK: scf.parallel
+  // CHECK: scf.for
+  // CHECK: scf.for
+  // CHECK: scf.for
   // CHECK: arith.mulf
   // CHECK: arith.addf
   %cst_0 = arith.constant 0.000000e+00 : f32

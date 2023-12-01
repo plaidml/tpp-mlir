@@ -86,13 +86,13 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %layer_52_conv_weights  = arith.constant dense<1.0> : tensor<1x1x320x1280xf32>
 
   %layer_54_logits_conv_biases  = arith.constant dense<0.5> : tensor<1001xf32>
-  %layer_54_logits_conv_weights = arith.constant dense<1.0> : tensor<1x1x1280x1001xf32> 
+  %layer_54_logits_conv_weights = arith.constant dense<1.0> : tensor<1x1x1280x1001xf32>
 
   // Expand block in a bottleneck block refers to 1st 1x1 Conv2D in the bottleneck block.
   // Project block in a bottleneck block refers to 2nd 1x1 Conv2D in the bottleneck block.
   %bottleneck_block_1_depthwise_depthwise_weights = arith.constant dense<1.0> : tensor<3x3x32x1xf32>
   %bottleneck_block_1_project_weights  = arith.constant dense<1.0> : tensor<1x1x32x16xf32>
-  
+
   %bottleneck_block_2_depthwise_depthwise_weights  = arith.constant dense<1.0> : tensor<3x3x96x1xf32>
   %bottleneck_block_2_expand_weights  = arith.constant dense<1.0> : tensor<1x1x16x96xf32>
   %bottleneck_block_2_project_weights  = arith.constant dense<1.0> : tensor<1x1x96x24xf32>
@@ -141,7 +141,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
   %bottleneck_block_10_depthwise_depthwise_weights  = arith.constant dense<1.0> : tensor<3x3x384x1xf32>
   %bottleneck_block_10_expand_weights  = arith.constant dense<1.0> : tensor<1x1x64x384xf32>
   %bottleneck_block_10_project_weights  = arith.constant dense<1.0> : tensor<1x1x384x64xf32>
-  
+
   %0 = tensor.empty() : tensor<1x224x224x3xf32>
   %1 = linalg.generic {indexing_maps = [#map1, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst_5 : tensor<f32>) outs(%0 : tensor<1x224x224x3xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -164,7 +164,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.subf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x224x224x3xf32>
-  
+
   %8 = tensor.empty() : tensor<1x112x112x32xf32>
   %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
   %padded = tensor.pad %7 low[0, 0, 0, 0] high[0, 1, 1, 0] {
@@ -181,7 +181,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x112x112x32xf32>
-  
+
   // Layer 2 - Bottleneck block 1 - depthwise Conv2D, 3x3, stride 1, ReLU6
   %padded_18 = tensor.pad %32 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
@@ -252,7 +252,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x56x56x144xf32>
-  
+
   %padded_21 = tensor.pad %178 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
     tensor.yield %cst : f32
@@ -373,7 +373,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  
+
   %padded_27 = tensor.pad %401 low[0, 1, 1, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
     tensor.yield %cst : f32
@@ -416,7 +416,7 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1308 = arith.minimumf %1307, %in_53 : f32
     linalg.yield %1308 : f32
   } -> tensor<1x28x28x192xf32>
-  
+
   %padded_29 = tensor.pad %476 low[0, 0, 0, 0] high[0, 1, 1, 0] {
   ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
     tensor.yield %cst : f32
@@ -874,12 +874,12 @@ func.func @mobilenet(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1001xf32> {
     %1307 = arith.divf %in, %in_52 : f32
     linalg.yield %1307 : f32
   } -> tensor<1x1x1x1280xf32>
-  
+
   // Layer 54 - Conv2D, 1x1 filter, stride 1
   %1302 = tensor.empty() : tensor<1x1x1x1001xf32>
   %1303 = linalg.fill ins(%cst : f32) outs(%1302 : tensor<1x1x1x1001xf32>) -> tensor<1x1x1x1001xf32>
   %1304 = linalg.conv_2d_nhwc_hwcf {dilations  = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%1301, %layer_54_logits_conv_weights : tensor<1x1x1x1280xf32>, tensor<1x1x1280x1001xf32>) outs(%1303 : tensor<1x1x1x1001xf32>) -> tensor<1x1x1x1001xf32>
-  
+
   %expanded = tensor.expand_shape %layer_54_logits_conv_biases [[0, 1, 2, 3]] : tensor<1001xf32> into tensor<1x1x1x1001xf32>
   %1305 = tensor.empty() : tensor<1x1x1x1001xf32>
   %1306 = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%1304, %expanded : tensor<1x1x1x1001xf32>, tensor<1x1x1x1001xf32>) outs(%1305 : tensor<1x1x1x1001xf32>) {

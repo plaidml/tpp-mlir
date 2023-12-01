@@ -113,7 +113,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %cst_14 = arith.constant dense<0.000000e+00> : tensor<1x56x56x256xf32>
   %cst_15 = arith.constant dense<0.000000e+00> : tensor<1x56x56x64xf32>
   %cst_16 = arith.constant dense<0.000000e+00> : tensor<1x112x112x64xf32>
-  
+
   %layer-2.kernel = arith.constant dense<1.000000e+00> : tensor<7x7x3x64xf32>
   %layer-2.bias = arith.constant dense<5.000000e-01> : tensor<64xf32>
   %layer-7.kernel = arith.constant dense<0.142857149> : tensor<1x1x64x64xf32>
@@ -243,7 +243,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
     %1591 = arith.addf %in, %in_34 : f32
     linalg.yield %1591 : f32
   } -> tensor<1x112x112x64xf32>
-  
+
   // ReLU
   %27 = tensor.empty() : tensor<1x112x112x64xf32>
   %28 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%6, %cst_16 : tensor<1x112x112x64xf32>, tensor<1x112x112x64xf32>) outs(%27 : tensor<1x112x112x64xf32>) {
@@ -262,7 +262,7 @@ func.func @resnet50v1(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> {
   %30 = tensor.empty() : tensor<1x56x56x64xf32>
   %31 = linalg.fill ins(%cst : f32) outs(%30 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   %32 = linalg.pooling_nhwc_max {dilations = dense<1> : vector<2xi64>, strides =  dense<2> : vector<2xi64>} ins(%padded_17, %29 : tensor<1x114x114x64xf32>, tensor<3x3xf32>) outs(%31 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-  
+
   // Layer 3 - Conv block 1 - Conv2D, 1x1 filter, stride 1, BiasAdd
   %33 = tensor.empty() : tensor<1x56x56x256xf32>
   %34 = linalg.fill ins(%cst_0 : f32) outs(%33 : tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32>
