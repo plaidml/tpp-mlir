@@ -242,6 +242,32 @@ static FailureOr<xsmm::UnaryFlags> getBroadCastUnaryFlagFromMap(AffineMap map) {
   }
 }
 
+static Value makeOperandShapeRowBroadCastable(RewriterBase &rewriter,
+                                              Location loc, Value output,
+                                              Value operand) {
+  assert(output.getType().isa<ShapedType>());
+  assert(operand.getType().isa<ShapedType>());
+
+  ShapedType shapedOutput = output.getType().cast<ShapedType>();
+  if (shapedOutput.getRank() != 2)
+    return operand;
+
+  ShapedType shapedOperand = operand.getType().cast<ShapedType>();
+  if (shapedOperand.getRank() != 1)
+    return operand;
+
+  SmallVector<int64_t> shapeOperand = llvm::to_vector(shapedOperand.getShape());
+  shapeOperand.push_back(1);
+  auto newShapedOperand =
+      MemRefType::get(shapeOperand, shapedOperand.getElementType());
+  auto reassoc =
+      getReassociationIndicesForReshape(shapedOperand, newShapedOperand);
+  assert(reassoc.has_value());
+  return linalgx::utils::expand(
+      rewriter, loc, operand, newShapedOperand,
+      getReassociationIndicesAttribute(rewriter, *reassoc));
+}
+
 // Convert linalg.generic to xsmm unary relu or identity op.
 struct ConvertGenericToUnary : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -270,6 +296,16 @@ struct ConvertGenericToUnary : public OpRewritePattern<linalg::GenericOp> {
         genericOp.getMatchingIndexingMap(inputOperand));
     if (failed(broadCastFlag))
       return failure();
+
+    // Make shape broadcast compatible.
+    // For later XSMM verification we need to introduce back
+    // unit dimension if we are dealing with a row broadcast.
+    // Example: memref<10xf32> -> memref<10x1xf32>
+    if (*broadCastFlag == xsmm::UnaryFlags::BCAST_ROW) {
+      operands[0] = makeOperandShapeRowBroadCastable(
+          rewriter, genericOp.getLoc(), operands[1], operands[0]);
+    }
+
     auto unaryInfo =
         xsmm::utils::getUnaryInfo(operands[0], operands[1], *broadCastFlag);
     if (failed(unaryInfo))
@@ -306,24 +342,31 @@ getBroadCastBinaryFlagFromMap(AffineMap map, unsigned operandIdx) {
 
 static LogicalResult rewriteBinaryOp(RewriterBase &rewriter,
                                      linalg::GenericOp genericOp,
-                                     ArrayRef<Value> operands,
+                                     MutableArrayRef<Value> operands,
                                      xsmm::BinaryKind xsmmTy) {
   assert(operands.size() == 3);
-  auto lhs = operands[0];
-  auto rhs = operands[1];
-  auto output = operands[2];
+  Location loc = genericOp.getLoc();
+  auto &lhs = operands[0];
+  auto &rhs = operands[1];
+  auto &output = operands[2];
 
   OpOperand *lhsOperand = getOperandFromValue(genericOp, lhs);
   auto broadCastFlagLhs = getBroadCastBinaryFlagFromMap(
       genericOp.getMatchingIndexingMap(lhsOperand), /*operandIdx=*/0);
   if (failed(broadCastFlagLhs))
     return failure();
+  if (*broadCastFlagLhs == xsmm::BinaryFlags::BCAST_ROW_IN_0) {
+    lhs = makeOperandShapeRowBroadCastable(rewriter, loc, output, lhs);
+  }
 
   OpOperand *rhsOperand = getOperandFromValue(genericOp, rhs);
   auto broadCastFlagRhs = getBroadCastBinaryFlagFromMap(
       genericOp.getMatchingIndexingMap(rhsOperand), /*operandIdx=*/1);
   if (failed(broadCastFlagRhs))
     return failure();
+  if (*broadCastFlagRhs == xsmm::BinaryFlags::BCAST_ROW_IN_1) {
+    operands[1] = makeOperandShapeRowBroadCastable(rewriter, loc, output, rhs);
+  }
 
   auto binaryInfo = xsmm::utils::getBinaryInfo(lhs, *broadCastFlagLhs, rhs,
                                                *broadCastFlagRhs, output);

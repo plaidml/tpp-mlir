@@ -27,6 +27,7 @@ namespace utils {
 // Given a value `val` expand it's shape based on `reassociationMap`.
 Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
              ArrayAttr reassociationMap) {
+  OpBuilder::InsertionGuard guard(builder);
   if (newType == val.getType())
     return val;
   if (newType.isa<RankedTensorType>()) {
