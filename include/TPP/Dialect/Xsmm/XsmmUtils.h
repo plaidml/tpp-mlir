@@ -40,18 +40,14 @@ struct BinaryInfo {
 
 namespace utils {
 
-// TODO: doc.
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
 
-// TODO: doc.
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
                                   UnaryFlags inputFlag);
 
-// TODO: doc.
 FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
                                     BinaryFlags rhsFlag, Value output);
 
-// TODO doc.
 void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
                         ArrayRef<Value> operands, UnaryInfo unaryInfo,
                         ArrayAttr flags, UnaryKindAttr kind);
