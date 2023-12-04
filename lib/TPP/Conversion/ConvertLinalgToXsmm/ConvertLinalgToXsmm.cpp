@@ -1095,12 +1095,37 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+struct ConvertCopyOp : public OpRewritePattern<linalg::CopyOp> {
+  using OpRewritePattern<linalg::CopyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    if (!copyOp.hasBufferSemantics())
+      return failure();
+    Value source = copyOp.getInputs()[0];
+    Value dest = copyOp.getOutputs()[0];
+    auto unaryInfo =
+        xsmm::utils::getUnaryInfo(source, dest, xsmm::UnaryFlags::NONE);
+    if (failed(unaryInfo))
+      return failure();
+    auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
+        rewriter.getContext(), xsmm::UnaryFlags::NONE));
+    xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
+        rewriter.getContext(), xsmm::UnaryKind::IDENTITY);
+    SmallVector<Value> operands{source, dest};
+    xsmm::utils::replaceOpWithUnary(rewriter, copyOp, operands, *unaryInfo,
+                                    flags, kind);
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<
-      ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-      ConvertGenericToUnary, ConvertGenericToBinary, ConvertGenericToBrgemm,
-      ConvertBatchReduceMatmulToBatchReduceMatmul, ConvertMatmulToMatmul,
-      ConvertVnniPacking, ConvertGenericToVnniBrgemm>(patterns.getContext());
+  patterns
+      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+           ConvertGenericToUnary, ConvertGenericToBinary,
+           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
+           ConvertMatmulToMatmul, ConvertVnniPacking,
+           ConvertGenericToVnniBrgemm, ConvertCopyOp>(patterns.getContext());
 }

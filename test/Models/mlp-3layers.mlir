@@ -65,12 +65,12 @@ func.func @mlp_3layers(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32> {
 // CHECK-SAME:  %[[ARG0:.+]]: memref<256x1024xf32>)
 // CHECK: tpp.zero ins({{.+}}) outs(%[[zeroBuf:.+]] : memref<256x1024xf32>)
 // layer 1
-// CHECK: memref.copy %[[zeroBuf]], %[[out1:.+]] : memref<256x1024xf32> to memref<256x1024xf32>
+// CHECK: linalg.copy ins(%{{.+}}: memref<256x1024xf32>) outs(%{{.+}}: memref<256x1024xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]]{{.+}}) outs(%[[out1:.+]] : memref<256x1024xf32>)
 // CHECK: tpp.add ins(%[[out1]]{{.+}}) outs(%[[out1]] : memref<256x1024xf32>)
 // CHECK: tpp.relu ins(%[[out1]] : memref<256x1024xf32>) outs(%[[out1]] : memref<256x1024xf32>)
 // layer 2
-// CHECK: memref.copy %[[zeroBuf]], %[[out2:.+]] : memref<256x1024xf32> to memref<256x1024xf32>
+// CHECK: linalg.copy ins(%{{.+}}: memref<256x1024xf32>) outs(%{{.+}}: memref<256x1024xf32>)
 // CHECK: tpp.gemm ins(%[[out1]]{{.+}}) outs(%[[out2:.+]] : memref<256x1024xf32>)
 // CHECK: tpp.add ins(%[[out2]]{{.+}}) outs(%[[out2]] : memref<256x1024xf32>)
 // CHECK: tpp.relu ins(%[[out2]] : memref<256x1024xf32>) outs(%[[out2]] : memref<256x1024xf32>)

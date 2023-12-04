@@ -224,7 +224,7 @@ func.func @sequence_of_adds_on_rhs(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32
 // CHECK-LABEL: func.func @sequence_of_adds_on_rhs
 // CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<3x3xf32>
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
-// CHECK: memref.copy %[[ARG1]], %[[ALLOC]] : memref<3x3xf32> to memref<3x3xf32>
+// CHECK: linalg.copy ins(%[[ARG1]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>)
 // CHECK-SAME:    outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK: tpp.add ins(%[[ALLOC]] : memref<3x3xf32>, %[[ARG1]] : memref<3x3xf32>)
@@ -291,7 +291,7 @@ func.func @test_mlp_bf16_3_layer_1024(%arg0: tensor<256x1024xbf16>,
 // CHECK-SAME:  %[[ARG0:.+]]: memref<256x1024xbf16>, %[[ARG1:.+]]: memref<256x1024xbf16>
 // CHECK: %[[CST:.+]] = memref.get_global @__constant_1024x1024xbf16 : memref<1024x1024xbf16>
 // CHECK-NEXT: %[[ALLOC:.+]] = memref.alloc
-// CHECK-NEXT: memref.copy %[[ARG1]], %[[ALLOC]] : memref<256x1024xbf16> to memref<256x1024xbf16>
+// CHECK-NEXT: linalg.copy ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ALLOC]] : memref<256x1024xbf16>)
 // CHECK-NEXT: tpp.gemm ins(%[[ARG0]] : memref<256x1024xbf16>, %[[CST]] : memref<1024x1024xbf16>, %[[ALLOC]] : memref<256x1024xbf16>) outs(%[[ALLOC]] : memref<256x1024xbf16>)
 // CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<256x1024xbf16>, %[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
 // CHECK-NEXT: tpp.relu ins(%[[ARG1]] : memref<256x1024xbf16>) outs(%[[ARG1]] : memref<256x1024xbf16>)
@@ -391,7 +391,7 @@ func.func @mlp_single_layer(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32>
 
 // CHECK-LABEL: mlp_single_layer
 // CHECK-SAME:  %[[ARG0:.+]]: memref<256x1024xf32>
-// CHECK-NOT: memref.copy
+// CHECK-NOT: linalg.copy
 // CHECK: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[GLOBAL1:.+]] = memref.get_global @__constant_32x32xf32 : memref<32x32xf32>
 // CHECK: %[[GLOBAL:.+]] = memref.get_global @__constant_1024x32xf32 : memref<1024x32xf32>
@@ -412,7 +412,7 @@ func.func @mlp_single_layer(%arg0: tensor<256x1024xf32>) -> tensor<256x1024xf32>
 // -----
 
 // CHECK-LABEL: splitted_init
-// CHECK-NOT: memref.copy
+// CHECK-NOT: linalg.copy
 // CHECK-COUNT-3: memref.alloc
 // Splitting initialization for each layer avoids copies but we have a
 // number of allocations = number of layers.
@@ -732,7 +732,7 @@ func.func @conflicting_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
 // CHECK-LABEL: conflicting_in_place
 // CHECK-SAME: %[[ARG0:.+]]: memref<3x3xf32>
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<3x3xf32>
-// CHECK-NEXT: memref.copy %[[ARG0]], %[[ALLOC]] : memref<3x3xf32> to memref<3x3xf32>
+// CHECK-NEXT: linalg.copy ins(%[[ARG0]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK-NEXT: tpp.add ins(%[[ALLOC]] : memref<3x3xf32>, %[[ARG0]] : memref<3x3xf32>) outs(%[[ARG0]] : memref<3x3xf32>)
 // CHECK-NEXT: memref.dealloc %[[ALLOC]] : memref<3x3xf32>
@@ -748,7 +748,7 @@ func.func @conflicting_in_place(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
 // CHECK-LABEL: conflicting_in_place
 // CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<3x3xf32>
-// CHECK-NEXT: memref.copy %[[ARG0]], %[[ALLOC]] : memref<3x3xf32> to memref<3x3xf32>
+// CHECK-NEXT: linalg.copy ins(%[[ARG0]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK-NEXT: tpp.add ins(%[[ARG0]] : memref<3x3xf32>, %[[ALLOC]] : memref<3x3xf32>) outs(%[[ALLOC]] : memref<3x3xf32>)
 // CHECK-NEXT: return %[[ALLOC]] : memref<3x3xf32>
@@ -781,7 +781,7 @@ func.func @gemm_back_to_back(%arg0: tensor<10x10xf32>) -> tensor<10x10xf32> {
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
 // CHECK: tpp.zero ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: %[[ALLOC_1:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
-// CHECK: memref.copy %[[ALLOC]], %[[ALLOC_1]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: linalg.copy ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %{{.+}} : memref<10x10xf32>, %[[ALLOC_1]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ALLOC_1]] : memref<10x10xf32>, %{{.+}} : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 
@@ -802,7 +802,7 @@ func.func @gemm_back_to_back(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>,
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
 // CHECK: tpp.zero ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: %[[ALLOC_1:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
-// CHECK: memref.copy %[[ALLOC]], %[[ALLOC_1]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: linalg.copy ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %[[ARG1]] : memref<10x10xf32>, %[[ALLOC_1]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ALLOC_1]] : memref<10x10xf32>, %[[ARG2]] : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 
@@ -819,7 +819,7 @@ func.func @gemm_back_to_back(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>,
 // CHECK-LABEL: gemm_back_to_back
 // CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>, %[[ARG1:.+]]: memref<10x10xf32>, %[[ARG2:.+]]: memref<10x10xf32>, %[[ARG3:.+]]: memref<10x10xf32>
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
-// CHECK: memref.copy %[[ARG3]], %[[ALLOC]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: linalg.copy ins(%[[ARG3]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %[[ARG1]] : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ALLOC]] : memref<10x10xf32>, %[[ARG2]] : memref<10x10xf32>, %[[ARG3]] : memref<10x10xf32>) outs(%[[ARG3]] : memref<10x10xf32>)
 
@@ -837,7 +837,7 @@ func.func @gemm_back_to_back(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>,
 // CHECK-LABEL: gemm_back_to_back
 // CHECK-SAME:  %[[ARG0:.+]]: memref<10x10xf32>, %[[ARG1:.+]]: memref<10x10xf32>, %[[ARG2:.+]]: memref<10x10xf32>, %[[ARG3:.+]]: memref<10x10xf32>, %[[ARG4:.+]]: memref<10x10xf32>
 // CHECK-NOT: memref.alloc
-// CHECK-NOT: memref.copy
+// CHECK-NOT: linalg.copy
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %[[ARG1]] : memref<10x10xf32>, %[[ARG3]] : memref<10x10xf32>) outs(%[[ARG3]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG3]] : memref<10x10xf32>, %[[ARG2]] : memref<10x10xf32>, %[[ARG4]] : memref<10x10xf32>) outs(%[[ARG4]] : memref<10x10xf32>)
 
@@ -858,7 +858,7 @@ func.func @gemms(%arg0: tensor<10x10xf32>, %arg1: tensor<10x10xf32>,
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
 // CHECK: tpp.zero ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: %[[ALLOC_1:.+]] = memref.alloc() {{.+}} : memref<10x10xf32>
-// CHECK: memref.copy %[[ALLOC]], %[[ALLOC_1]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: linalg.copy ins(%[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG0]] : memref<10x10xf32>, %[[ARG1]] : memref<10x10xf32>, %[[ALLOC_1]] : memref<10x10xf32>) outs(%[[ALLOC_1]] : memref<10x10xf32>)
 // CHECK: tpp.gemm ins(%[[ARG2]] : memref<10x10xf32>, %[[ARG3]] : memref<10x10xf32>, %[[ALLOC]] : memref<10x10xf32>) outs(%[[ALLOC]] : memref<10x10xf32>)
 
@@ -944,7 +944,7 @@ func.func @same_repetitive_region_but_cst() -> tensor<10x10xf32> {
 // CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
 // CHECK: linalg.fill ins(%[[CST]] : f32) outs(%[[ALLOC]] : memref<10x10xf32>)
 // CHECK: %[[ALLOC_0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<10x10xf32>
-// CHECK: memref.copy %[[GB]], %[[ALLOC_0]] : memref<10x10xf32> to memref<10x10xf32>
+// CHECK: linalg.copy ins(%[[GB]] : memref<10x10xf32>) outs(%[[ALLOC_0]] : memref<10x10xf32>)
 // CHECK: scf.for %{{.+}} = %[[C0]] to %[[C2]] step %[[C1]]
 // CHECK: tpp.add ins(%[[ALLOC]] : memref<10x10xf32>, %[[ALLOC_0]] : memref<10x10xf32>)
 // CHECK-SAME:  outs(%[[ALLOC_0]] : memref<10x10xf32>)
