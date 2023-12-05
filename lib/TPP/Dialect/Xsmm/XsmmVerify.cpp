@@ -41,7 +41,7 @@ static FailureOr<DispatchTy> verifyDispatch(InvokeTy invokeOp) {
 }
 
 template <typename DispatchTy, typename InvokeTy>
-static LogicalResult verifyGemmLikeOp(InvokeTy gemmOp) {
+static LogicalResult verifyGemmDispatchAndInvokeLikeOp(InvokeTy gemmOp) {
   static_assert(llvm::is_one_of<InvokeTy, xsmm::FusedBrgemmOp, xsmm::BrgemmOp,
                                 xsmm::GemmOp>::value);
   static_assert(
@@ -225,7 +225,8 @@ struct VerifyXsmmCalls
     : public tpp::impl::VerifyXsmmCallsBase<VerifyXsmmCalls> {
   void runOnOperation() override {
     auto walkResult = getOperation()->walk([](xsmm::GemmOp gemmOp) {
-      if (failed(verifyGemmLikeOp<xsmm::GemmDispatchOp, xsmm::GemmOp>(gemmOp)))
+      if (failed(verifyGemmDispatchAndInvokeLikeOp<xsmm::GemmDispatchOp,
+                                                   xsmm::GemmOp>(gemmOp)))
         return WalkResult::interrupt();
       return WalkResult::advance();
     });
@@ -233,8 +234,8 @@ struct VerifyXsmmCalls
       return signalPassFailure();
 
     walkResult = getOperation()->walk([](xsmm::BrgemmOp brgemmOp) {
-      if (failed(verifyGemmLikeOp<xsmm::BrgemmDispatchOp, xsmm::BrgemmOp>(
-              brgemmOp))) {
+      if (failed(verifyGemmDispatchAndInvokeLikeOp<xsmm::BrgemmDispatchOp,
+                                                   xsmm::BrgemmOp>(brgemmOp))) {
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
@@ -243,8 +244,8 @@ struct VerifyXsmmCalls
       return signalPassFailure();
 
     walkResult = getOperation()->walk([&](xsmm::FusedBrgemmOp brgemmOp) {
-      if (failed(verifyGemmLikeOp<xsmm::FusedBrgemmDispatchOp,
-                                  xsmm::FusedBrgemmOp>(brgemmOp))) {
+      if (failed(verifyGemmDispatchAndInvokeLikeOp<
+                 xsmm::FusedBrgemmDispatchOp, xsmm::FusedBrgemmOp>(brgemmOp))) {
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
