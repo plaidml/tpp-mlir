@@ -441,7 +441,8 @@ LogicalResult GemmOp::verify() {
     assert(memref && (memref.getRank() == 2 || memref.getRank() == 3));
 
     if (memref.getRank() == 3 &&
-        !vnni::utils::isInVnniLayout(vnni::utils::VnniOp::GEMM, memref)) {
+        !vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::GEMM,
+                                     memref)) {
       return emitOpError() << "expect VNNI layout for operand: " << actualIdx;
     }
   }
@@ -468,15 +469,16 @@ static LogicalResult verifyBrgemmLikeOpCommon(OpTy brgemmOp,
     if (idx == 2 && (memref.getRank() != 2 &&
                      (memref.getRank() == 3 &&
                       !vnni::utils::isInVnniLayout(
-                          vnni::utils::VnniOp::BRGEMM_INS, memref)))) {
+                          vnni::utils::VnniOperandRank::BRGEMM_INS, memref)))) {
       return brgemmOp.emitOpError()
              << "expect a 2d or 3d VNNI layout for operand: " << actualIdx;
     }
     // Input memref. Must be of rank 3 or in VNNI layout with rank 4.
-    if (idx != 2 && (memref.getRank() != 3 &&
-                     (memref.getRank() != 4 &&
-                      !vnni::utils::isInVnniLayout(
-                          vnni::utils::VnniOp::BRGEMM_OUTS, memref)))) {
+    if (idx != 2 &&
+        (memref.getRank() != 3 &&
+         (memref.getRank() != 4 &&
+          !vnni::utils::isInVnniLayout(
+              vnni::utils::VnniOperandRank::BRGEMM_OUTS, memref)))) {
       return brgemmOp.emitOpError()
              << "expect a 3d or 4d VNNI memref for operand: " << actualIdx;
     }

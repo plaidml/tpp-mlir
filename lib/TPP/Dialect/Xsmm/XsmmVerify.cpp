@@ -63,10 +63,12 @@ static LogicalResult verifyGemmLikeOp(InvokeTy gemmOp) {
 
   bool isBrgemm = std::is_same<InvokeTy, xsmm::BrgemmOp>::value ||
                   std::is_same<InvokeTy, xsmm::FusedBrgemmOp>::value;
-  auto expectedVnniRankIns =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM_INS : vnni::utils::VnniOp::GEMM;
-  auto expectedVnniRankOuts =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM_OUTS : vnni::utils::VnniOp::GEMM;
+  auto expectedVnniRankIns = (isBrgemm)
+                                 ? vnni::utils::VnniOperandRank::BRGEMM_INS
+                                 : vnni::utils::VnniOperandRank::GEMM;
+  auto expectedVnniRankOuts = (isBrgemm)
+                                  ? vnni::utils::VnniOperandRank::BRGEMM_OUTS
+                                  : vnni::utils::VnniOperandRank::GEMM;
 
   // VNNI flags must be consistent with the memref shapes.
   ArrayAttr flags = dispatchOp->getFlags();
