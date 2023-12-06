@@ -340,28 +340,28 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
 
   Type outElmType = outputType.getElementType();
 
+  // TODO: Support more than 2D sizes
+  auto rank = outputType.getRank();
+  assert((rank == 1 || rank == 2) && "Only supports 1D/2D tensors for now");
+
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
   // so we pick the inner dimension and iterate through the outer ones.
   VectorType vecType;
   auto lastDim = outputType.getRank() - 1;
-  ArrayRef<int64_t> outerDims(1);
-  if (outputType.getRank() > 1) {
-    ArrayRef<int64_t> innerDims(&outputType.getShape()[lastDim], 1);
-    vecType = VectorType::get(innerDims, outElmType);
-    outerDims =
-        ArrayRef<int64_t>(&outputType.getShape()[0], outputType.getRank() - 1);
-  } else {
-    vecType = VectorType::get(outputType.getShape(), outElmType);
-  }
-  assert(outerDims.size() == 1 && "Only supports 2D tensors for now");
+  int64_t innerDims = outputType.getShape()[lastDim];
+  vecType = VectorType::get(innerDims, outElmType);
+
+  int64_t outerDim = 1;
+  if (outputType.getRank() > 1)
+    outerDim = outputType.getShape()[0];
 
   // Vector undefined value
   Value minusOne = builder.create<arith::ConstantOp>(
       unkLoc, getTypedAttr(builder, outElmType, -1.0));
 
   // Loop through the shaped type, transfer each dim to vector
-  auto count = getConstIndex(builder, outerDims[0]);
+  auto count = getConstIndex(builder, outerDim);
   auto zero = getConstIndex(builder, 0);
   auto one = getConstIndex(builder, 1);
   auto loop = builder.create<scf::ForOp>(unkLoc, zero, count, one);
@@ -453,6 +453,4 @@ LogicalResult MLIRBench::emitError(llvm::Twine desc) {
   return module.emitError(desc);
 }
 
-std::string MLIRBench::getGPUName() {
-  return defGpuBackend;
-}
+std::string MLIRBench::getGPUName() { return defGpuBackend; }
