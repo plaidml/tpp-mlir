@@ -249,21 +249,21 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
       return xsmm::BinaryFlags::NONE;
     case BCastType::SCALAR:
       assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
+      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
       if (*operand == 0)
         return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
       else
         return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
     case BCastType::ROW:
       assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
+      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
       if (*operand == 0)
         return xsmm::BinaryFlags::BCAST_ROW_IN_0;
       else
         return xsmm::BinaryFlags::BCAST_ROW_IN_1;
     case BCastType::COL:
       assert(operand != std::nullopt && "Require operand idx");
-      assert(*operand == 1 || *operand == 0 && "Expect idx to be 1 or 0");
+      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
       if (*operand == 0)
         return xsmm::BinaryFlags::BCAST_COL_IN_0;
       else
