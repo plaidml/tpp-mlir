@@ -46,6 +46,7 @@ bool TensorInitInt::isDataTypeSigned(TensorInitInt::DataType type) {
   case DataType::AUTO:
     return true;
   }
+  llvm_unreachable("unknown type");
 }
 
 void TensorInitInt::insert(size_t index, uint64_t value) {

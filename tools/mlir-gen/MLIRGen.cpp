@@ -80,8 +80,8 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
 
   // Parse tile sizes
   parseStringList(tilesStr, tiles);
-  assert(tiles.size() == 0 ||
-         tiles.size() == 3 && "Must have 3 tile sizes (or none)");
+  assert((tiles.size() == 0 || tiles.size() == 3) &&
+         "Must have 3 tile sizes (or none)");
 
   // Pick data type
   switch (typeWidth) {
@@ -164,8 +164,9 @@ Value MLIRGenerator::createLayer(LayerArgs &args) {
 }
 
 void MLIRGenerator::createKernel() {
-  assert((kernelType == KernelType::Model) ||
-         (kernelType == KernelType::Layer) && "Invalid kernel type");
+  assert(((kernelType == KernelType::Model) ||
+          (kernelType == KernelType::Layer)) &&
+         "Invalid kernel type");
   OpBuilder::InsertionGuard guard(builder);
 
   // Get all kernel types first
@@ -303,7 +304,7 @@ Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
   for (int i = 0, max = inputShape.getRank(); i < max; i++)
     mkFlops *= inputShape.getDimSize(i);
   int outRank = outShape.getRank();
-  assert(outRank == 2 || outRank == 4 && "Invalid outRank");
+  assert((outRank == 2 || outRank == 4) && "Invalid outRank");
   // Tiled: N = NB * n = outShape[0] + outShape[3]
   int64_t nFlops = outShape.getDimSize(outRank - 1);
   if (outRank > 2)

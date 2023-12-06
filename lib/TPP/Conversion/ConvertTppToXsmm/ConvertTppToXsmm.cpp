@@ -96,8 +96,8 @@ getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
     LLVM_DEBUG(llvm::dbgs() << "Cannot compute ldb\n");
     return failure();
   }
-  auto expectedVNNIRank =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM : vnni::utils::VnniOp::GEMM;
+  auto expectedVNNIRank = (isBrgemm) ? vnni::utils::VnniOperandRank::BRGEMM_INS
+                                     : vnni::utils::VnniOperandRank::GEMM;
   int64_t ldb = (vnni::utils::isInVnniLayout(expectedVNNIRank, memrefB))
                     ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
                     : *ldbDim;
@@ -130,8 +130,8 @@ static ArrayAttr getGemmFlags(RewriterBase &rewriter, OpTy opTy) {
 
   bool isBrgemm = std::is_same<OpTy, tpp::BrgemmOp>::value ||
                   std::is_same<OpTy, tpp::FusedBrgemmOp>::value;
-  auto expectedVnniRank =
-      (isBrgemm) ? vnni::utils::VnniOp::BRGEMM : vnni::utils::VnniOp::GEMM;
+  auto expectedVnniRank = (isBrgemm) ? vnni::utils::VnniOperandRank::BRGEMM_INS
+                                     : vnni::utils::VnniOperandRank::GEMM;
   auto memrefB = opTy.getMemRefInputType(1);
   xsmm::GemmFlagsAttr gemmFlag =
       (vnni::utils::isInVnniLayout(expectedVnniRank, memrefB))

@@ -27,7 +27,7 @@ std::optional<int64_t> getVnniBlockingFactor(Type type) {
 // Until we have a better way to express the VNNI layout (see: #563), it is up
 // to the callee to specify the expected rank in the VNNI layout as the rank
 // depends on the operations we are dealing with.
-bool isInVnniLayout(VnniOp expectedRank, MemRefType memref) {
+bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
   if (memref.getRank() != static_cast<int64_t>(expectedRank) ||
       !memref.getElementType().isBF16()) {
     return false;

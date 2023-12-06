@@ -311,6 +311,7 @@ private:
         pm.addPass(createConvertTppToXsmm());
       }
       pm.addPass(createFoldXsmmFlags());
+      pm.addPass(createVerifyXsmmCalls());
     }
   }
 };
