@@ -15,11 +15,11 @@ func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
       %arg1: tensor<512x64xf32>) -> tensor<32x64xf32> {
   // BUFF-COUNT-2: memref.alloc
   // BUFF-COUNT-1: memref.dealloc
-  // BUFF-NOT: memref.copy
+  // BUFF-NOT: linalg.copy
   //
   // BUFFNOTDUP-COUNT-2: memref.alloc
   // BUFFNOTDUP-COUNT-1: memref.dealloc
-  // BUFFNOTDUP-NOT: memref.copy
+  // BUFFNOTDUP-NOT: linalg.copy
   %cst_2 = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<32x64xf32>
   %1 = linalg.fill ins(%cst_2 : f32) outs(%0 : tensor<32x64xf32>) -> tensor<32x64xf32>
@@ -186,9 +186,9 @@ func.func @matmuls(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor
 // CHECK-LABEL: matmuls_1
 func.func @matmuls_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tensor<32x32xf32> {
   // BUFF-COUNT-3: memref.alloc
-  // BUFF-COUNT-1: memref.copy
+  // BUFF-COUNT-1: linalg.copy
   // BUFFNOTDUP-COUNT-3: memref.alloc
-  // BUFFNOTDUP-COUNT-1: memref.copy
+  // BUFFNOTDUP-COUNT-1: linalg.copy
   // CHECK-COUNT-2: linalg.fill
   %0 = tensor.empty() : tensor<32x32xf32>
   %cst = arith.constant 0.0 : f32

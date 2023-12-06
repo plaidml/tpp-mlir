@@ -508,3 +508,26 @@ func.func @identity_9(%arg0: memref<6xf32, strided<[1]>>, %arg1: memref<6x9xf32>
 // CHECK: linalg.generic
 // C_HECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [6, 9, 1, 9] flags = (bcast_row) data_type = f32
 // C_HECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @linalg_copy(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) {
+  linalg.copy ins(%arg0 : memref<2x2xf32>) outs(%arg1 : memref<2x2xf32>)
+  return
+}
+
+// CHECK-LABEL: linalg_copy
+// CHECK-SAME: %[[ARG0:.+]]: memref<2x2xf32>, %[[ARG1:.+]]: memref<2x2xf32>
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [2, 2, 2, 2] flags = (none) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+
+// -----
+
+func.func @linalg_copy_mixed_sem(%arg0: memref<2x2xf32>, %arg1: tensor<2x2xf32>) -> tensor<2x2xf32> {
+  %0 = linalg.copy ins(%arg0 : memref<2x2xf32>) outs(%arg1 : tensor<2x2xf32>) -> tensor<2x2xf32>
+  return %0 : tensor<2x2xf32>
+}
+
+// CHECK-LABEL: linalg_copy_mixed_sem
+// CHECK-NOT: xsmm.unary
+// CHECK: linalg.copy

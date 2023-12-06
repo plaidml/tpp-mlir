@@ -230,3 +230,17 @@ func.func @batch_matmul_rewrite(%arg0: tensor<512x32x64xf32>, %arg1: tensor<512x
                            outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
   return %1 : tensor<512x32x32xf32>
 }
+
+// -----
+
+func.func @linalg_copy(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) {
+  linalg.copy ins(%arg0 : memref<2x2xf32>) outs(%arg1 : memref<2x2xf32>)
+  return
+}
+
+// CHECK-LABEL: linalg_copy
+// CHECK-SAME: %[[ARG0:.+]]: memref<2x2xf32>, %[[ARG1:.+]]: memref<2x2xf32>
+// CHECK: xsmm_unary_dispatch
+// CHECK: %[[PTR_0:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+// CHECK: %[[PTR_1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+// CHECK: xsmm_unary_invoke

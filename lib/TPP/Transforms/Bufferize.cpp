@@ -115,6 +115,12 @@ void DuplicateFill::runOnOperation() {
   });
 }
 
+static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
+                                     Value from, Value to) {
+  builder.create<linalg::CopyOp>(loc, from, to);
+  return success();
+}
+
 void Bufferize::runOnOperation() {
   ModuleOp moduleOp = getOperation();
 
@@ -131,6 +137,7 @@ void Bufferize::runOnOperation() {
   buffOpts.bufferizeFunctionBoundaries = true;
   buffOpts.setFunctionBoundaryTypeConversion(
       bufferization::LayoutMapOption::IdentityLayoutMap);
+  buffOpts.memCpyFn = defaultMemCpyFn;
   bool runOnlyAnalysis = this->testAnalysisOnly || this->printConflicts;
   if (runOnlyAnalysis) {
     buffOpts.printConflicts = this->printConflicts;
