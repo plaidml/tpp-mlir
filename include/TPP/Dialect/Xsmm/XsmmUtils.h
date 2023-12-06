@@ -9,8 +9,8 @@
 #ifndef TPP_DIALECT_XSMM_XSMMUTILS_H
 #define TPP_DIALECT_XSMM_XSMMUTILS_H
 
-#include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
+#include "TPP/Dialect/Xsmm/XsmmOps.h"
 
 namespace mlir {
 class Type;
@@ -80,15 +80,11 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
 
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
 
-FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation* op);
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op);
 
 ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
-
-LogicalResult validateUnaryBroadcastFlags(UnaryOp op);
-
-LogicalResult validateBinaryBroadcastFlags(BinaryOp op);
 
 } // namespace utils
 } // namespace xsmm

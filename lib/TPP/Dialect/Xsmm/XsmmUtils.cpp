@@ -309,7 +309,8 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op) {
     int numUses = std::count(user->getOperands().begin(),
                              user->getOperands().end(), op->getResult(0));
     // At least one input and the last operand (output) is the same buffer
-    if (numUses < 2 || user->getOperands()[user->getOperands().size()-1] != op->getResult(0))
+    if (numUses < 2 ||
+        user->getOperands()[user->getOperands().size() - 1] != op->getResult(0))
       return failure();
   }
   // We don't know how to fuse more than two tail ops after the BRGEMM
@@ -404,35 +405,6 @@ FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
       }))
     return failure();
   return strides[pos];
-}
-
-LogicalResult validateUnaryBroadcastFlags(UnaryOp op) {
-  // Now, we check for the broadcast unary flags
-  auto unaryFlags = getUnaryFlags(op.getOperand(0).getType(), op.getOperand(2).getType());
-  if(unaryFlags == mlir::xsmm::UnaryFlags::BCAST_SCALAR|| unaryFlags == mlir::xsmm::UnaryFlags::NONE){
-  	return success();
-  }
-  return failure();
-
-}
-
-LogicalResult validateBinaryBroadcastFlags(BinaryOp op) {
-  // Now, we check for the broadcast binary flags
-  auto binaryFlags = getBinaryFlags(op.getOperand(0).getType(), op.getOperand(2).getType(), 0);
-
-  if (binaryFlags == mlir::xsmm::BinaryFlags::NONE || binaryFlags ==  mlir::xsmm::BinaryFlags::BCAST_COL_IN_0){
-    return success();
-  }
-  return failure();
-}
-
-Value getBiasTerm(BinaryOp op) {
-  auto output = op.getOperands()[op.getOperands().size()-1];
-  for (auto operand : op.getOperands()) {
-    if (operand != output)
-      return operand;
-  }
-  return nullptr;
 }
 
 } // namespace utils

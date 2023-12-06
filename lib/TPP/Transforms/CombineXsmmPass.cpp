@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 using namespace mlir;
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
@@ -52,9 +51,11 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   if (failed(ldbDim)) {
     return failure();
   }
-  int64_t ldb = (vnni::utils::isInVnniLayout(vnni::utils::VnniOp::BRGEMM, memrefB.cast<MemRefType>()))
-                    ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
-                    : *ldbDim;
+  int64_t ldb =
+      (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
+                                   memrefB.cast<MemRefType>()))
+          ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
+          : *ldbDim;
 
   auto ldcDim = xsmm::utils::getLeadingDim(memrefC);
   if (failed(ldcDim)) {
@@ -75,7 +76,8 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
 static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   auto memrefB = opTy.getOperand(2).getType().cast<MemRefType>();
   xsmm::GemmFlagsAttr gemmFlag =
-      (vnni::utils::isInVnniLayout(vnni::utils::VnniOp::BRGEMM, memrefB))
+      (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
+                                   memrefB))
           ? xsmm::GemmFlagsAttr::get(rewriter.getContext(),
                                      xsmm::GemmFlags::VNNI_B)
           : xsmm::GemmFlagsAttr::get(rewriter.getContext(),
@@ -96,24 +98,24 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     if (failed(result))
       return failure();
     auto fusedMatch = *result;
-
     // TODO: Support BRGEMM + BINARY && BRGEMM + UNARY patterns
     if (!fusedMatch.binaryOp || !fusedMatch.unaryOp)
       return failure();
-
     // Validate broadcast flags
-    if (failed(xsmm::utils::validateUnaryBroadcastFlags(fusedMatch.unaryOp)))
-      return failure();
-    
-    // TODO: Support more than just COL_0 BCAST
-    auto binaryFlags = xsmm::utils::getBinaryFlags(fusedMatch.binaryOp.getOperand(0).getType(), fusedMatch.binaryOp.getOperand(2).getType(), 0);
-    if (binaryFlags != mlir::xsmm::BinaryFlags::BCAST_COL_IN_0 && binaryFlags!= mlir::xsmm::BinaryFlags::NONE)
-      return failure();
-    if (failed(xsmm::utils::validateBinaryBroadcastFlags(fusedMatch.binaryOp)))
+    auto unaryFlags =
+        xsmm::utils::getUnaryFlags(fusedMatch.unaryOp.getOperand(0).getType(),
+                                   fusedMatch.unaryOp.getOperand(2).getType());
+    if (unaryFlags != mlir::xsmm::UnaryFlags::BCAST_SCALAR &&
+        unaryFlags != mlir::xsmm::UnaryFlags::NONE)
       return failure();
 
-    // Get the non chained operand from the bias add
-    Value bias = mlir::xsmm::utils::getBiasTerm(fusedMatch.binaryOp);
+    // TODO: Support more than just COL_0 BCAST
+    auto binaryFlags =
+        xsmm::utils::getBinaryFlags(fusedMatch.binaryOp.getOperand(1).getType(),
+                                    fusedMatch.binaryOp.getOperand(3).getType(),
+                                    mlir::xsmm::utils::OperandPos::LHS);
+    if (binaryFlags != mlir::xsmm::BinaryFlags::BCAST_COL_IN_0)
+      return failure();
 
     // Now, replace the ops with a fused BRGEMM
     auto dtype =
@@ -125,6 +127,8 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     auto memrefB = brgemmOp.getOperand(2);
     int64_t batchSize = memrefB.getType().cast<ShapedType>().getShape()[0];
 
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointAfter(fusedMatch.binaryOp);
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
         loc, integer64, *dims,
         xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
@@ -132,9 +136,8 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
         getBrgemmFlags(rewriter, brgemmOp),
         rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
             rewriter.getContext(), xsmm::UnaryFlags::NONE)),
-        rewriter.getArrayAttr(xsmm::BinaryFlagsAttr::get(
-            rewriter.getContext(),
-	    *binaryFlags)),
+        rewriter.getArrayAttr(
+            xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *binaryFlags)),
         dtype);
 
     Value batchDim = rewriter.create<arith::ConstantOp>(
@@ -146,6 +149,7 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     invokeOperands.append(opItr, brgemmOp->getOperands().end());
     // Drop the aliasing output operand.
     invokeOperands.pop_back();
+    invokeOperands.push_back(fusedMatch.binaryOp->getOperand(2));
     invokeOperands.push_back(batchDim);
 
     // Replace and delete the old invokes and their dispatches
