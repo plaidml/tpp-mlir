@@ -35,6 +35,7 @@ unsigned TensorInitInt::getDataTypeBitWidth(TensorInitInt::DataType type) {
   case DataType::AUTO:
     return 32;
   }
+  llvm_unreachable("unknown type");
 }
 
 bool TensorInitInt::isDataTypeSigned(TensorInitInt::DataType type) {
