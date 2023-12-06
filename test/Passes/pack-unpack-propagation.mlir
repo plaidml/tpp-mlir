@@ -478,7 +478,7 @@ func.func @matmul_with_relu_and_bias(%arg0: tensor<256x512xf32>, %arg1: tensor<5
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:  outs(%[[MATMUL]]
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[RELU]] inner_dims_pos = [0, 1]
-// CHECK-SAME:  inner_tiles = [32, 32] into %[[BCAST]] : tensor<8x32x32x32xf32> -> tensor<256x1024xf32>
+// CHECK-SAME:  inner_tiles = [32, 32] into %[[ARG2]] : tensor<8x32x32x32xf32> -> tensor<256x1024xf32>
 
 
 // -----
