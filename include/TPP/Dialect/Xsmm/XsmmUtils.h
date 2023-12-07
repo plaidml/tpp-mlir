@@ -58,8 +58,9 @@ void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType);
 
 // Compute the broadcasting flags for 'operandType' based on 'outputType'.
+enum class OperandPos { LHS = 0, RHS = 1 };
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
-                                      size_t operandNumber);
+                                      OperandPos operandNumber);
 
 } // namespace utils
 } // namespace xsmm
