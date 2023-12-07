@@ -220,14 +220,14 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
 }
 
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
-                                      size_t operandNumber) {
+                                      OperandPos operandNumber) {
   assert(outputType.isa<ShapedType>() && "expect shaped type on output");
   assert(outputType.cast<ShapedType>().getRank() == 2 &&
          "expect rank 2 on output");
 
   if (!operandType.isa<ShapedType>() ||
       operandType.cast<ShapedType>().getRank() == 0) {
-    if (operandNumber == 0)
+    if (operandNumber == OperandPos::LHS)
       return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
     return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
   }
@@ -243,28 +243,22 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   assert(shapeOutput.size() == 2);
 
   auto getBCastEnum = [](BCastType bCastType,
-                         std::optional<unsigned> operand) -> xsmm::BinaryFlags {
+                         OperandPos operandPos) -> xsmm::BinaryFlags {
     switch (bCastType) {
     case BCastType::NONE:
       return xsmm::BinaryFlags::NONE;
     case BCastType::SCALAR:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
-      if (*operand == 0)
+      if (operandPos == OperandPos::LHS)
         return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
       else
         return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
     case BCastType::ROW:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
-      if (*operand == 0)
+      if (operandPos == OperandPos::LHS)
         return xsmm::BinaryFlags::BCAST_ROW_IN_0;
       else
         return xsmm::BinaryFlags::BCAST_ROW_IN_1;
     case BCastType::COL:
-      assert(operand != std::nullopt && "Require operand idx");
-      assert((*operand == 1 || *operand == 0) && "Expect idx to be 1 or 0");
-      if (*operand == 0)
+      if (operandPos == OperandPos::LHS)
         return xsmm::BinaryFlags::BCAST_COL_IN_0;
       else
         return xsmm::BinaryFlags::BCAST_COL_IN_1;

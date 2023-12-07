@@ -132,10 +132,10 @@ static LogicalResult verifyFlags(xsmm::BinaryOp invokeBinaryOp,
                                  xsmm::BinaryDispatchOp dispatchBinaryOp) {
   auto expectedFlagsLhs = xsmm::utils::getBinaryFlags(
       invokeBinaryOp.getInputs()[1].getType(),
-      invokeBinaryOp.getInputs()[3].getType(), /*operandNumber=*/0);
+      invokeBinaryOp.getInputs()[3].getType(), xsmm::utils::OperandPos::LHS);
   auto expectedFlagsRhs = xsmm::utils::getBinaryFlags(
       invokeBinaryOp.getInputs()[2].getType(),
-      invokeBinaryOp.getInputs()[3].getType(), /*operandNumber=*/1);
+      invokeBinaryOp.getInputs()[3].getType(), xsmm::utils::OperandPos::RHS);
   assert(succeeded(expectedFlagsLhs) && succeeded(expectedFlagsRhs));
 
   auto flags = dispatchBinaryOp.getFlags();

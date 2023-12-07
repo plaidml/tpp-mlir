@@ -230,7 +230,7 @@ struct ConvertTppFusedBrgemmOp : public OpRewritePattern<tpp::FusedBrgemmOp> {
         brgemmOp.getBiasOperand().getType().cast<MemRefType>();
     auto outputType = brgemmOp.getOutputType();
     auto flags = xsmm::utils::getBinaryFlags(binaryInputType, outputType,
-                                             /*operandNumber=*/0);
+                                             xsmm::utils::OperandPos::LHS);
     assert(succeeded(flags));
     return rewriter.getArrayAttr(
         xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *flags));
@@ -444,8 +444,10 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
     int64_t ldo = *ldoDim;
 
-    auto bCastOnLhs = xsmm::utils::getBinaryFlags(lhsMemRef, outputMemRef, 0);
-    auto bCastOnRhs = xsmm::utils::getBinaryFlags(rhsMemRef, outputMemRef, 1);
+    auto bCastOnLhs = xsmm::utils::getBinaryFlags(lhsMemRef, outputMemRef,
+                                                  xsmm::utils::OperandPos::LHS);
+    auto bCastOnRhs = xsmm::utils::getBinaryFlags(rhsMemRef, outputMemRef,
+                                                  xsmm::utils::OperandPos::RHS);
     if (failed(bCastOnLhs) || failed(bCastOnRhs))
       return failure();
 
