@@ -36,6 +36,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -316,6 +317,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::perf::PerfDialect>();
   mlir::linalgx::registerTransformDialectExtension(registry);
   registerAllDialects(registry);
+  registerAllExtensions(registry);
   registerAllToLLVMIRTranslations(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::tensor::registerTransformDialectExtension(registry);
