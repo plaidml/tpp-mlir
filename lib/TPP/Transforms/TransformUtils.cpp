@@ -38,6 +38,7 @@ Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
                                                  reassociationMap);
   }
   assert(false && "expect tensor or memref");
+  abort();
 }
 
 // Given a value `val` collapse it's shape based on  `reassociationMap`.
@@ -53,6 +54,7 @@ Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
                                                    reassociationMap);
   }
   assert(false && "expect tensor or memref");
+  abort();
 }
 
 // Given localIvs being outermost dimensions of the current linalg operation,
@@ -127,7 +129,7 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                       ArrayRef<OpFoldResult> strides,
                       unsigned desiredResultRank) {
   ShapedType operandType = operand.getType().cast<ShapedType>();
-  size_t rank = operandType.getRank();
+  [[maybe_unused]] size_t rank = operandType.getRank();
 
   assert(rank == offsets.size() && "expect rank == offsets");
   assert(rank == sizes.size() && "expect rank == sizes");

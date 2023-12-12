@@ -171,9 +171,8 @@ struct ConstantFoldPack
           }
         });
 
-    bool detectSpalt = false;
     assert(DenseElementsAttr::isValidRawBuffer(packOp.getDestType(),
-                                               destRawData, detectSpalt));
+                                               destRawData, false));
     auto newDense =
         DenseElementsAttr::getFromRawBuffer(packOp.getDestType(), destRawData);
     rewriter.setInsertionPoint(cstOp);

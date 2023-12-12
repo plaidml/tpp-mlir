@@ -35,7 +35,7 @@ void parseStringList(StringRef str, SmallVector<int64_t> &list) {
     str.getAsInteger(10, i);
     auto val = i.getZExtValue();
     assert(val != 0 && "Size cannot be zero");
-    list.push_back(i.getZExtValue());
+    list.push_back(val);
   }
 }
 
