@@ -192,8 +192,7 @@ private:
     pm.addPass(createConvertMathToLLVMPass());
 
     pm.addNestedPass<func::FuncOp>(createGpuAsyncRegionPass());
-    // TODO: FIX me.
-    // pm.addPass(createGpuToLLVMConversionPass());
+    pm.addPass(createGpuToLLVMConversionPass());
     GpuModuleToBinaryPassOptions gpuModuleToBinaryPassOptions;
     gpuModuleToBinaryPassOptions.compilationTarget = "fatbin";
     pm.addPass(createGpuModuleToBinaryPass(gpuModuleToBinaryPassOptions));
