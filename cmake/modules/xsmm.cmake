@@ -32,12 +32,12 @@ endif()
 
 set(XSMM_INCLUDE_DIRS ${LIBXSMMROOT}/include)
 
-add_library(xsmm STATIC ${XSMM_SRCS})
-target_include_directories(xsmm PUBLIC ${XSMM_INCLUDE_DIRS})
-target_compile_definitions(xsmm PRIVATE
-  __BLAS=0
+add_mlir_library(xsmm STATIC ${XSMM_SRCS})
+target_include_directories(xsmm PUBLIC
+  $<BUILD_INTERFACE:${XSMM_INCLUDE_DIRS}>
+  $<INSTALL_INTERFACE:include/xsmm>
 )
-add_definitions(-DLIBXSMM_DEFAULT_CONFIG -U_DEBUG)
+add_definitions(-DLIBXSMM_DEFAULT_CONFIG -U_DEBUG -D__BLAS=0)
 
 set_property(TARGET xsmm PROPERTY COMPILE_WARNING_AS_ERROR ON)
 

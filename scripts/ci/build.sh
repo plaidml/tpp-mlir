@@ -9,7 +9,7 @@ source ${SCRIPT_DIR}/ci/common.sh
 die_syntax() {
   echo "Syntax: $0 -b BLD_DIR [-c] [-i] [-p] [-B]"
   echo ""
-  echo "  -c: Optional, runs check-all"
+  echo "  -c: Optional, runs tpp-check-all"
   echo "  -i: Optional, installs"
   echo "  -p: Optional, post-install (copy all build stuff to install dir)"
   echo "  -B: Optional, runs benchmarks"
@@ -28,7 +28,7 @@ while getopts "b:cipB" arg; do
       fi
       ;;
     c)
-      TARGETS="${TARGETS} check-all"
+      TARGETS="${TARGETS} tpp-check-all"
       ;;
     i)
       TARGETS="${TARGETS} install"

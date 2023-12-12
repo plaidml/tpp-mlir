@@ -87,7 +87,7 @@ cmake -G Ninja .. \
    -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit \
    -DCMAKE_C_COMPILER=clang \
    -DCMAKE_CXX_COMPILER=clang++ 
-cmake --build . --target check-all
+cmake --build . --target tpp-check-all
 
 popd
 ```
