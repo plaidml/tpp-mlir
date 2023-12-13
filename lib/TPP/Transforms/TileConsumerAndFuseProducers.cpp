@@ -165,19 +165,16 @@ static bool isIdentityMapWithZeros(AffineMap map) {
     return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
-    bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
-                           .Case<AffineDimExpr>([&dimsSeen](auto dimExpr) {
-                             if (dimExpr.getPosition() != dimsSeen)
-                               return false;
-                             dimsSeen++;
-                             return true;
-                           })
-                           .Case<AffineConstantExpr>([](auto constExpr) {
-                             return constExpr.getValue() == 0;
-                           })
-                           .Default([](AffineExpr) { return false; });
-    if (!isValidExpr)
-      return false;
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(result)) {
+      if (dimExpr.getPosition() != dimsSeen)
+        return false;
+      dimsSeen++;
+      return true;
+    }
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(result)) {
+      return constExpr.getValue() == 0;
+    }
+    return false;
   }
   return dimsSeen == map.getNumDims();
 }
