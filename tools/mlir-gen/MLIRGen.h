@@ -109,6 +109,7 @@ class MLIRGenerator {
   enum MapType {
     MAP_PARALLEL,
     MAP_REDUCTION,
+    MAP_BROADCAST,
     MAP_MATMUL_INPUT,
     MAP_MATMUL_WEIGHT,
     MAP_MATMUL_OUTPUT,
