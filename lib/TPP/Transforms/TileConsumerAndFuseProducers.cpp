@@ -168,10 +168,11 @@ static bool isIdentityMapWithZeros(AffineMap map) {
       if (dimExpr.getPosition() != dimsSeen)
         return false;
       dimsSeen++;
-      return true;
+      continue;
     }
     if (auto constExpr = dyn_cast<AffineConstantExpr>(result)) {
-      return constExpr.getValue() == 0;
+      if (constExpr.getValue() == 0)
+        continue;
     }
     return false;
   }
