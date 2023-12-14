@@ -953,7 +953,6 @@ struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
     rewriter.setInsertionPoint(forallOp);
 
     // Create a new scf.forall operation, updating its output.
-    assert(forallOp->getNumResults() == 1);
     Value loopOperand =
         forallOp.getTiedOpOperand(forallOp->getResult(0))->get();
     tensor::PackOp packOp =
