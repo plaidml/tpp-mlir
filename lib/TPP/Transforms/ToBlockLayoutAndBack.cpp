@@ -915,6 +915,20 @@ struct FoldCollapseShapeInExtractSliceOp
 };
 
 // Fold a tensor.unpack into an scf.parallel_insert.
+//
+// The pattern looks like:
+//
+// %p = tensor.pack %a into %b
+// %l = scf.forall ... iter_args(%0 = %p) {
+// ...
+// }
+// %u = tensor.unpack %l into %c
+//
+// We will rewrite as:
+//
+// %l = scf.forall ... iter_args(%0 = %a) {
+// ...
+// }
 struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
   using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
 
@@ -933,18 +947,24 @@ struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
     if (!isa_and_nonnull<scf::ForallOp>(loop))
       return failure();
     auto forallOp = cast<scf::ForallOp>(loop);
-    if (!forallOp->hasOneUse())
+    if (!forallOp->hasOneUse() || forallOp->getNumResults() != 1)
       return failure();
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(forallOp);
 
     // Create a new scf.forall operation, updating its output.
-    Value unPackOpOutput = unPackOp.getDest();
+    Value loopOperand =
+        forallOp.getTiedOpOperand(forallOp->getResult(0))->get();
+    tensor::PackOp packOp =
+        dyn_cast_or_null<tensor::PackOp>(loopOperand.getDefiningOp());
+    if (!packOp)
+      return failure();
+    Value newLoopOperand = packOp.getSource();
     SmallVector<Value> newOuts(forallOp.getOutputs());
     if (newOuts.size() != 1)
       return failure();
 
-    newOuts.push_back(unPackOpOutput);
+    newOuts.push_back(newLoopOperand);
     auto newForallOp = rewriter.create<scf::ForallOp>(
         forallOp.getLoc(), forallOp.getMixedLowerBound(),
         forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newOuts,

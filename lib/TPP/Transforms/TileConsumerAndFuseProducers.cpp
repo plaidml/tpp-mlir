@@ -20,7 +20,6 @@
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include <queue>
 
@@ -165,19 +164,17 @@ static bool isIdentityMapWithZeros(AffineMap map) {
     return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
-    bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
-                           .Case<AffineDimExpr>([&dimsSeen](auto dimExpr) {
-                             if (dimExpr.getPosition() != dimsSeen)
-                               return false;
-                             dimsSeen++;
-                             return true;
-                           })
-                           .Case<AffineConstantExpr>([](auto constExpr) {
-                             return constExpr.getValue() == 0;
-                           })
-                           .Default([](AffineExpr) { return false; });
-    if (!isValidExpr)
-      return false;
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(result)) {
+      if (dimExpr.getPosition() != dimsSeen)
+        return false;
+      dimsSeen++;
+      continue;
+    }
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(result)) {
+      if (constExpr.getValue() == 0)
+        continue;
+    }
+    return false;
   }
   return dimsSeen == map.getNumDims();
 }
@@ -236,7 +233,7 @@ static FailureOr<llvm::SmallBitVector> getTileConfigProducer(
   llvm::SmallBitVector tileConfigProducer(numLoopsProd);
   SmallVector<OpFoldResult> tileProducer(numLoopsProd);
   for (auto expr : llvm::enumerate(consumerOperandMap->getResults())) {
-    auto dim = expr.value().cast<AffineDimExpr>();
+    auto dim = cast<AffineDimExpr>(expr.value());
     tileConfigProducer[expr.index()] = tileSpecConsumer[dim.getPosition()];
     tileProducer[expr.index()] = tileSizes.at(consumer)[dim.getPosition()];
   }
@@ -645,7 +642,7 @@ getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
   SmallVector<OpFoldResult> eltWiseTiles;
   for (auto expr : outputMap.getResults()) {
     eltWiseTiles.push_back(
-        tilesProducer[expr.cast<AffineDimExpr>().getPosition()]);
+        tilesProducer[cast<AffineDimExpr>(expr).getPosition()]);
   }
   return eltWiseTiles;
 }

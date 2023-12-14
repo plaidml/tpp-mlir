@@ -49,9 +49,9 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
 // cst * dim.
 static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
                                         AffineExpr &multiplicativeFactor) {
-  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>())
+  if (auto dimExpr = dyn_cast<AffineDimExpr>(expr))
     return success();
-  if (auto mulExpr = expr.dyn_cast<AffineBinaryOpExpr>()) {
+  if (auto mulExpr = dyn_cast<AffineBinaryOpExpr>(expr)) {
     if (mulExpr.getKind() != AffineExprKind::Mul)
       return failure();
     auto lhs = mulExpr.getLHS();
@@ -59,20 +59,20 @@ static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
     // Assert if we find a symbol. We need to check that we don't have them in
     // the preconditions for this pattern. `verifyConvolutionInterface` allows
     // them.
-    if (auto symbol = lhs.dyn_cast<AffineSymbolExpr>())
+    if (auto symbol = dyn_cast<AffineSymbolExpr>(lhs))
       assert(false && "unexpected symbol expr");
-    if (auto symbol = rhs.dyn_cast<AffineSymbolExpr>())
+    if (auto symbol = dyn_cast<AffineSymbolExpr>(rhs))
       assert(false && "unexpected symbol expr");
     // If the lhs is a constant the rhs is a dim and viceversa.
-    if (auto constant = lhs.dyn_cast<AffineConstantExpr>()) {
-      if (auto dim = rhs.dyn_cast<AffineDimExpr>()) {
+    if (auto constant = dyn_cast<AffineConstantExpr>(lhs)) {
+      if (auto dim = dyn_cast<AffineDimExpr>(rhs)) {
         multiplicativeFactor = multiplicativeFactor * constant.getValue();
         return success();
       }
       return failure();
     }
-    if (auto constant = rhs.dyn_cast<AffineConstantExpr>()) {
-      if (auto dim = lhs.dyn_cast<AffineDimExpr>()) {
+    if (auto constant = dyn_cast<AffineConstantExpr>(rhs)) {
+      if (auto dim = dyn_cast<AffineDimExpr>(lhs)) {
         multiplicativeFactor = multiplicativeFactor * constant.getValue();
         return success();
       }
@@ -86,9 +86,9 @@ static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
 // Walk `convExpr` in pre-order and extract a constant if any.
 static LogicalResult walkConvExpr(AffineExpr convExpr,
                                   AffineExpr &multiplicativeFactor) {
-  if (auto dimExpr = convExpr.dyn_cast<AffineDimExpr>())
+  if (auto dimExpr = dyn_cast<AffineDimExpr>(convExpr))
     return success();
-  if (auto binExpr = convExpr.dyn_cast<AffineBinaryOpExpr>()) {
+  if (auto binExpr = dyn_cast<AffineBinaryOpExpr>(convExpr)) {
     if (binExpr.getKind() != AffineExprKind::Add)
       return failure();
     return success(
@@ -149,7 +149,7 @@ static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
     assert(succeeded(walkConvExpr(wExpr, multiplicativeFactor)) &&
            "something went really wrong");
     strides[strides.size() - 2] = builder.getIndexAttr(
-        multiplicativeFactor.cast<AffineConstantExpr>().getValue());
+        cast<AffineConstantExpr>(multiplicativeFactor).getValue());
   }
   return linalgx::utils::getSliceOperand(builder, linalgOp, operandToUse,
                                          offsets, sizes, strides,

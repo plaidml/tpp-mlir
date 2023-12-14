@@ -11,6 +11,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -52,6 +53,7 @@ int main(int argc, char **argv) {
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated.
   registerAllDialects(registry);
+  registerAllExtensions(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::tensor::registerTransformDialectExtension(registry);
   registerAllToLLVMIRTranslations(registry);

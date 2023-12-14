@@ -179,8 +179,11 @@ func.func @vnni_pack(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x32x16x32x2xb
 // -----
 
 func.func @fold_pack_in_insert_slice(%arg0: tensor<2x4x32x32xbf16>, %arg1: tensor<2x4x32x32xbf16>,
-                                     %arg2: tensor<2x2x32x32xbf16>, %dest: tensor<64x64xbf16>) -> tensor<64x64xbf16> {
-  %0 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %arg2) -> (tensor<2x2x32x32xbf16>) {
+                                     %arg2: tensor<64x64xbf16>, %dest: tensor<64x64xbf16>) -> tensor<64x64xbf16> {
+  %packed_layout = tensor.empty() : tensor<2x2x32x32xbf16>
+  %pack = tensor.pack %arg2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %packed_layout
+    : tensor<64x64xbf16> -> tensor<2x2x32x32xbf16>
+  %0 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %pack) -> (tensor<2x2x32x32xbf16>) {
     %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
     %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
     %extracted_slice_3 = tensor.extract_slice %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
@@ -197,8 +200,9 @@ func.func @fold_pack_in_insert_slice(%arg0: tensor<2x4x32x32xbf16>, %arg1: tenso
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
 
 // CHECK-LABEL: fold_pack_in_insert_slice
-// CHECK-SAME: %[[ARG0:.+]]: tensor<2x4x32x32xbf16>, %[[ARG1:.+]]: tensor<2x4x32x32xbf16>, %[[ARG2:.+]]: tensor<2x2x32x32xbf16>, %[[ARG3:.+]]: tensor<64x64xbf16>
-// CHECK: scf.forall (%[[ARG4:.+]], %[[ARG5:.+]]) in (2, 2) shared_outs(%[[ARG6:.+]] = %[[ARG3]])
+// CHECK-SAME: %[[ARG0:.+]]: tensor<2x4x32x32xbf16>, %[[ARG1:.+]]: tensor<2x4x32x32xbf16>, 
+// CHECK-SAME:  %[[ARG2:.+]]: tensor<64x64xbf16>, %[[ARG3:.+]]: tensor<64x64xbf16>
+// CHECK: scf.forall (%[[ARG4:.+]], %[[ARG5:.+]]) in (2, 2) shared_outs(%[[ARG6:.+]] = %[[ARG2]])
 // CHECK: %[[AFFINE_I:.+]] = affine.apply #[[MAP]](%[[ARG4]])
 // CHECK: %[[AFFINE_J:.+]] = affine.apply #[[MAP]](%[[ARG5]])
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
@@ -329,3 +333,51 @@ func.func @fold_pack_expect_to_fail_multiple_uses(
 
 // CHECK-LABEL: fold_pack_expect_to_fail_multiple_uses
 // CHECK: tensor.unpack
+
+// -----
+
+// CHECK-LABEL: expect_to_fail_fold_pack_in_insert_slice_1
+func.func @expect_to_fail_fold_pack_in_insert_slice_1(
+        %arg0: tensor<2x4x32x32xbf16>, %arg1: tensor<2x4x32x32xbf16>,
+        %arg2: tensor<2x2x32x32xbf16>, %dest: tensor<64x64xbf16>) -> tensor<64x64xbf16> {
+  // We don't have a pack that match with the unpack. Fail to apply the folding pattern.
+  %0 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %arg2) -> (tensor<2x2x32x32xbf16>) {
+    %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_3 = tensor.extract_slice %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
+    %4 = linalg.batch_reduce_matmul ins(%extracted_slice, %extracted_slice_2 : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>) outs(%extracted_slice_3 : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %4 into %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
+    }
+  }
+  // CHECK: tensor.unpack
+  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest 
+    : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
+  return %unpack : tensor<64x64xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: expect_to_fail_fold_pack_in_insert_slice_2
+func.func @expect_to_fail_fold_pack_in_insert_slice_2(
+        %arg0: tensor<2x4x32x32xbf16>, %arg1: tensor<2x4x32x32xbf16>,
+        %arg2: tensor<64x64xbf16>, %dest: tensor<64x64xbf16>, %dest_t: tensor<2x2x32x32xbf16>) -> tensor<64x64xbf16> {
+  %packed_layout = tensor.empty() : tensor<2x2x32x32xbf16>
+  %pack = tensor.pack %arg2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %packed_layout
+    : tensor<64x64xbf16> -> tensor<2x2x32x32xbf16>
+  // Multiple results fail to apply the folding pattern.
+  %0:2 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %pack, %arg6 = %dest_t) 
+      -> (tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>) {
+    %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+    %extracted_slice_3 = tensor.extract_slice %arg5[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
+    %4 = linalg.batch_reduce_matmul ins(%extracted_slice, %extracted_slice_2 : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>) outs(%extracted_slice_3 : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %4 into %arg6[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
+    }
+  }
+  // CHECK: tensor.unpack
+  %unpack = tensor.unpack %0#0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
+    : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
+  return %unpack : tensor<64x64xbf16>
+}
