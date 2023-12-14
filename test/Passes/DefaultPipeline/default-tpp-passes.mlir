@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
 
 // CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,

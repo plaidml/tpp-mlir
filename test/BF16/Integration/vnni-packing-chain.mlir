@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: FileCheck %s -check-prefix=IR
 
-// RUN: tpp-run %s -linalg-to-xsmm \
+// RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
 func.func @vnni_packing(%arg0: tensor<32x32xbf16>, %arg1: tensor<2x2x8x16x2xbf16>) -> tensor<2x2x8x16x2xbf16> {

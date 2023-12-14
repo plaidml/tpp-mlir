@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-pipeline -linalg-to-xsmm -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-pipeline -split-input-file | FileCheck %s
 
 module {
   ml_program.global private mutable @unused_global(dense<0> : tensor<i64>) : tensor<i64>

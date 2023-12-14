@@ -5,28 +5,28 @@
         "type": "MLIR",
         "benchmark": "fp32-mha-tensorflow-seq-len-32.mlir",
         "environment": {},
-        "flags": [ "-n", "10", "--linalg-to-xsmm", "1" ],
+        "flags": [ "-n", "10" ],
         "extensions": [ "(avx2|asimd)" ]
       },
       "fp32_projection": {
         "type": "MLIR",
         "benchmark": "fp32-projection.mlir",
         "environment": {},
-        "flags": [ "-n", "100", "--linalg-to-xsmm", "1" ],
+        "flags": [ "-n", "100" ],
         "extensions": [ "(avx2|asimd)" ]
       },
       "fp32_query_times_keys": {
         "type": "MLIR",
         "benchmark": "fp32-query-times-key.mlir",
         "environment": {},
-        "flags": [ "-n", "100", "--linalg-to-xsmm", "1" ],
+        "flags": [ "-n", "100" ],
         "extensions": [ "(avx2|asimd)" ]
       },
       "fp32_out_softmax_times_value.mlir": {
         "type": "MLIR",
         "benchmark": "fp32-out-softmax-times-value.mlir",
         "environment": {},
-        "flags": [ "-n", "100", "--linalg-to-xsmm", "1" ],
+        "flags": [ "-n", "100" ],
         "extensions": [ "(avx2|asimd)" ]
       }
     }}

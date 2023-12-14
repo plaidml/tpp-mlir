@@ -4,8 +4,6 @@
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late  2>&1 | FileCheck %s --check-prefix=LATE
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=llvm  2>&1 | FileCheck %s --check-prefix=LLVM
 
-// Loops options (should be the same for both cases in this small example)
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -tpp-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=late -linalg-to-loops 2>&1 | FileCheck %s --check-prefix=LOOPS
 
 // Benchmark options

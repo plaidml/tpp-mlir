@@ -2,10 +2,6 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s -check-prefix=EXE
 
-// RUN: tpp-run %s -linalg-to-xsmm="false" -tpp-to-loops -print \
-// RUN:  -e entry -entry-point-result=void | \
-// RUN: FileCheck %s -check-prefix=EXE
-
 // RUN: tpp-opt %s -convert-linalg-to-loops | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \

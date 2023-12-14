@@ -9,10 +9,16 @@ func.func @entry(%arg0: memref<2x8x32x32xf32>, %arg1: memref<8x8x32x32xf32>, %ar
   %c8 = arith.constant 8 : index
   %c1 = arith.constant 1 : index
   scf.parallel (%arg3, %arg4) = (%c0, %c0) to (%c2, %c8) step (%c1, %c1) {
-    %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<2x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-    %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<2x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %subview_0 : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, %subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>) outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+    %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] 
+      : memref<2x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 8, 32, 32] [1, 1, 1, 1] 
+      : memref<8x8x32x32xf32> to memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] 
+      : memref<2x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+    linalg.batch_reduce_matmul ins(%subview, %subview_0 : 
+                                   memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
+                                   memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>) 
+                 outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
     scf.yield
   }
 

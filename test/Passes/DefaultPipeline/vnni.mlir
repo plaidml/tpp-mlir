@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm=false" -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
 
 // CHECK: func.func @matmul_tensor(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<128x1024xbf16>,

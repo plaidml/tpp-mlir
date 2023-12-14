@@ -1,7 +1,7 @@
-// RUN: tpp-run %s -linalg-to-xsmm -e entry -entry-point-result=void | FileCheck %s
+// RUN: tpp-run %s -e entry -entry-point-result=void | FileCheck %s
 // RUN: tpp-run %s -linalg-to-loops -e entry -entry-point-result=void | FileCheck %s
 
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: FileCheck %s -check-prefix=IR
 
 !A_tensor_t = tensor<4x8xf32>

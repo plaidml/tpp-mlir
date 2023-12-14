@@ -67,16 +67,6 @@ llvm::cl::opt<bool> linalgToLoops("linalg-to-loops",
                                   llvm::cl::desc("Lower linalg to loops"),
                                   llvm::cl::init(false));
 
-// Lower TPP to loops (for validation purposes)
-llvm::cl::opt<bool> tppToLoops("tpp-to-loops",
-                               llvm::cl::desc("Lower TPP to loops"),
-                               llvm::cl::init(false));
-
-// Lower linalg to XSMM directly.
-llvm::cl::opt<bool> linalgToXsmm("linalg-to-xsmm",
-                                 llvm::cl::desc("Lower linalg to xsmm"),
-                                 llvm::cl::init(true));
-
 // Control parallelism.
 llvm::cl::opt<bool>
     defParallel("def-parallel",
@@ -159,8 +149,7 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{tppToLoops, linalgToLoops,
-                                                linalgToXsmm};
+      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

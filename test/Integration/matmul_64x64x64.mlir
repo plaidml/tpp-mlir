@@ -2,13 +2,6 @@
 // RUN:  -e entry -entry-point-result=void -print | \
 // RUN: FileCheck %s
 
-// RUN: tpp-run %s -linalg-to-xsmm \
-// RUN:  -e entry -entry-point-result=void -print | \
-// RUN: FileCheck %s
-
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" | \
-// RUN: FileCheck %s -check-prefix=IR
-
 // RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: FileCheck %s -check-prefix=IR
 
