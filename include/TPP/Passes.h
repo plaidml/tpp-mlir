@@ -68,10 +68,6 @@ namespace spirv {
 class SPIRVDialect;
 } // namespace spirv
 
-namespace tensor {
-class TensorDialect;
-} // namespace tensor
-
 namespace xegpu {
 class XeGPUDialect;
 } // namespace xegpu

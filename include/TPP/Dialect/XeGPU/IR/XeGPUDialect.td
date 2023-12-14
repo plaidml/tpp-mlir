@@ -34,13 +34,19 @@ def XeGPUDialect : Dialect {
         }];
 
     // The C++ namespace that the dialect class definition resides in.
-    let cppNamespace = "::mlir::xegpu";
+    let cppNamespace = "::imex::xegpu";
 
     let dependentDialects = ["::mlir::memref::MemRefDialect"];
+
+    // let extraClassDeclaration = [{
+    //     mlir::Attribute parseAttribute(mlir::DialectAsmParser &parser, mlir::Type type) const;
+    //     void printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter &printer) const;
+    // }];
 
     // TODO: temporary disable it.
     let useDefaultTypePrinterParser = true;
     let useDefaultAttributePrinterParser = true;
+    // let useDefaultAttributePrinterParser = false;
 }
 
 #endif //XEGPU_DIALECT

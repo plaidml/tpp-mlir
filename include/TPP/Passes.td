@@ -533,8 +533,7 @@ def LinalgToXegpu : Pass<"linalg-to-xegpu", "func::FuncOp"> {
                            "scf::SCFDialect",
                            "memref::MemRefDialect",
                            "gpu::GPUDialect",
-                           "arith::ArithDialect",
-                           "xegpu::XeGPUDialect"];
+                           "arith::ArithDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

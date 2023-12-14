@@ -26,6 +26,7 @@
 
 using namespace mlir;
 using namespace mlir::tpp;
+using namespace imex;
 
 namespace mlir {
 namespace tpp {
@@ -79,127 +80,131 @@ static LogicalResult gemmToXegpu(linalg::LinalgOp linalgOp,
 
   // If there is no parallel loop, create a unit blocks wrapper around the
   // current op. This allows for kernel outlining later on.
-  auto blocksLoop = createGpuBlocksWrapper(linalgOp, {1, 1}, rewriter);
-  if (blocksLoop)
-    rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
+  // auto blocksLoop = createGpuBlocksWrapper(linalgOp, {1, 1}, rewriter);
+  // if (blocksLoop)
+  //   rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
 
-  auto matA = linalgOp.getDpsInputs()[0];
-  auto matB = linalgOp.getDpsInputs()[1];
-  auto matC = linalgOp.getDpsInits()[0];
+  // auto matA = linalgOp.getDpsInputs()[0];
+  // auto matB = linalgOp.getDpsInputs()[1];
+  // auto matC = linalgOp.getDpsInits()[0];
 
-  auto typeA = matA.getType().cast<ShapedType>();
-  auto typeB = matB.getType().cast<ShapedType>();
-  auto typeC = matC.getType().cast<ShapedType>();
+  // auto typeA = matA.getType().cast<ShapedType>();
+  // auto typeB = matB.getType().cast<ShapedType>();
+  // auto typeC = matC.getType().cast<ShapedType>();
 
-  // Skip batch dimension stride in case of brgemm.
-  auto tileTypeA = xegpu::TileType::get(typeA.getShape().take_back(2),
-                                        typeA.getElementType());
-  auto tileTypeB = xegpu::TileType::get(typeB.getShape().take_back(2),
-                                        typeB.getElementType());
-  auto tileTypeC =
-      xegpu::TileType::get(typeC.getShape(), typeC.getElementType());
+  // // Skip batch dimension stride in case of brgemm.
+  // auto tileTypeA = xegpu::TileType::get(typeA.getShape().take_back(2),
+  //                                       typeA.getElementType());
+  // auto tileTypeB = xegpu::TileType::get(typeB.getShape().take_back(2),
+  //                                       typeB.getElementType());
+  // auto tileTypeC =
+  //     xegpu::TileType::get(typeC.getShape(), typeC.getElementType());
 
-  bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
+  // bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
 
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  // Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  // Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
 
-  OpBuilder::InsertionGuard guard(rewriter);
+  // OpBuilder::InsertionGuard guard(rewriter);
 
-  // Fetch the inital value of the output element.
-  auto tileC = rewriter.create<xegpu::InitTileOp>(
-      loc, tileTypeC, matC, ValueRange{}, ValueRange{}, ValueRange{},
-      SmallVector<int64_t>{0, 0}, tileTypeC.getShape(),
-      SmallVector<int64_t>{1, 1});
-  auto vecTypeC =
-      VectorType::get(tileTypeC.getShape(), tileTypeC.getElementType());
+  // // Fetch the inital value of the output element.
+  // auto tileC = rewriter.create<imex::xegpu::InitTileOp>(
+  //     loc, tileTypeC, matC, ValueRange{}, ValueRange{}, ValueRange{},
+  //     SmallVector<int64_t>{0, 0}, tileTypeC.getShape(),
+  //     SmallVector<int64_t>{1, 1});
+  // auto vecTypeC =
+  //     VectorType::get(tileTypeC.getShape(), tileTypeC.getElementType());
 
-  // No operands need transposition for now. Just present for API to be happy.
-  auto transpose = BoolAttr::get(rewriter.getContext(), false);
+  // // No operands need transposition for now. Just present for API to be
+  // happy. auto transpose = BoolAttr::get(rewriter.getContext(), false);
 
-  auto vnniAxisC = IntegerAttr::get(rewriter.getI32Type(), 0);
-  Value loadC = rewriter.create<xegpu::Load2DOp>(loc, vecTypeC, tileC,
-                                                 vnniAxisC, transpose);
+  // auto vnniAxisC = IntegerAttr::get(rewriter.getI32Type(), 0);
+  // Value loadC = rewriter.create<imex::xegpu::Load2DOp>(loc, vecTypeC, tileC,
+  //                                                      vnniAxisC, transpose);
 
-  scf::ForOp batchLoop;
-  Value batchIv;
-  if (isBrgemm) {
-    Value batch =
-        rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
-    batchLoop =
-        rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{loadC});
-    rewriter.setInsertionPointToStart(batchLoop.getBody());
-    batchIv = batchLoop.getInductionVar();
-    loadC = batchLoop.getRegionIterArg(0);
-  }
+  // scf::ForOp batchLoop;
+  // Value batchIv;
+  // if (isBrgemm) {
+  //   Value batch =
+  //       rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
+  //   batchLoop =
+  //       rewriter.create<scf::ForOp>(loc, zero, batch, one,
+  //       ValueRange{loadC});
+  //   rewriter.setInsertionPointToStart(batchLoop.getBody());
+  //   batchIv = batchLoop.getInductionVar();
+  //   loadC = batchLoop.getRegionIterArg(0);
+  // }
 
-  SmallVector<Value> inputStrides{one, one};
-  if (isBrgemm)
-    inputStrides.push_back(one);
+  // SmallVector<Value> inputStrides{one, one};
+  // if (isBrgemm)
+  //   inputStrides.push_back(one);
 
-  // In case of brgemm, the batch offset is dynamic.
-  SmallVector<int64_t> staticOffsets;
-  if (isBrgemm)
-    staticOffsets.push_back(ShapedType::kDynamic);
-  staticOffsets.push_back(0);
-  staticOffsets.push_back(0);
+  // // In case of brgemm, the batch offset is dynamic.
+  // SmallVector<int64_t> staticOffsets;
+  // if (isBrgemm)
+  //   staticOffsets.push_back(ShapedType::kDynamic);
+  // staticOffsets.push_back(0);
+  // staticOffsets.push_back(0);
 
-  // Always assume unit strides for loading. If a buffer is strided, the info
-  // will be encoded in the input memref type directly e.g., memref subview.
-  SmallVector<int64_t> staticStrides{1, 1};
-  if (isBrgemm)
-    staticStrides.push_back(1);
+  // // Always assume unit strides for loading. If a buffer is strided, the info
+  // // will be encoded in the input memref type directly e.g., memref subview.
+  // SmallVector<int64_t> staticStrides{1, 1};
+  // if (isBrgemm)
+  //   staticStrides.push_back(1);
 
-  // Loaded tile is rank reduced in the batch dimension in case of brgemm.
-  SmallVector<int64_t> staticSizesA;
-  if (isBrgemm)
-    staticSizesA.push_back(1);
-  staticSizesA.push_back(tileTypeA.getShape()[0]);
-  staticSizesA.push_back(tileTypeA.getShape()[1]);
-  SmallVector<int64_t> staticSizesB;
-  if (isBrgemm)
-    staticSizesB.push_back(1);
-  staticSizesB.push_back(tileTypeB.getShape()[0]);
-  staticSizesB.push_back(tileTypeB.getShape()[1]);
+  // // Loaded tile is rank reduced in the batch dimension in case of brgemm.
+  // SmallVector<int64_t> staticSizesA;
+  // if (isBrgemm)
+  //   staticSizesA.push_back(1);
+  // staticSizesA.push_back(tileTypeA.getShape()[0]);
+  // staticSizesA.push_back(tileTypeA.getShape()[1]);
+  // SmallVector<int64_t> staticSizesB;
+  // if (isBrgemm)
+  //   staticSizesB.push_back(1);
+  // staticSizesB.push_back(tileTypeB.getShape()[0]);
+  // staticSizesB.push_back(tileTypeB.getShape()[1]);
 
-  constexpr int vnniFactor = 2;
+  // constexpr int vnniFactor = 2;
 
-  auto tileA = rewriter.create<xegpu::InitTileOp>(
-      loc, tileTypeA, matA, isBrgemm ? ValueRange{batchIv} : ValueRange{},
-      ValueRange{}, ValueRange{}, staticOffsets, staticSizesA, staticStrides);
-  auto shapeA = tileTypeA.getShape();
-  auto vecTypeA =
-      VectorType::get({shapeA[0], shapeA[1] / vnniFactor, vnniFactor},
-                      tileTypeA.getElementType());
+  // auto tileA = rewriter.create<imex::xegpu::InitTileOp>(
+  //     loc, tileTypeA, matA, isBrgemm ? ValueRange{batchIv} : ValueRange{},
+  //     ValueRange{}, ValueRange{}, staticOffsets, staticSizesA,
+  //     staticStrides);
+  // auto shapeA = tileTypeA.getShape();
+  // auto vecTypeA =
+  //     VectorType::get({shapeA[0], shapeA[1] / vnniFactor, vnniFactor},
+  //                     tileTypeA.getElementType());
 
-  auto tileB = rewriter.create<xegpu::InitTileOp>(
-      loc, tileTypeB, matB, isBrgemm ? ValueRange{batchIv} : ValueRange{},
-      ValueRange{}, ValueRange{}, staticOffsets, staticSizesB, staticStrides);
-  auto shapeB = tileTypeB.getShape();
-  auto vecTypeB =
-      VectorType::get({shapeB[0] / vnniFactor, shapeB[1], vnniFactor},
-                      tileTypeB.getElementType());
+  // auto tileB = rewriter.create<imex::xegpu::InitTileOp>(
+  //     loc, tileTypeB, matB, isBrgemm ? ValueRange{batchIv} : ValueRange{},
+  //     ValueRange{}, ValueRange{}, staticOffsets, staticSizesB,
+  //     staticStrides);
+  // auto shapeB = tileTypeB.getShape();
+  // auto vecTypeB =
+  //     VectorType::get({shapeB[0] / vnniFactor, shapeB[1], vnniFactor},
+  //                     tileTypeB.getElementType());
 
-  auto vnniAxisA = IntegerAttr::get(rewriter.getI32Type(), 0);
-  auto vnniAxisB = IntegerAttr::get(rewriter.getI32Type(), 1);
+  // auto vnniAxisA = IntegerAttr::get(rewriter.getI32Type(), 0);
+  // auto vnniAxisB = IntegerAttr::get(rewriter.getI32Type(), 1);
 
-  auto loadA = rewriter.create<xegpu::Load2DOp>(loc, vecTypeA, tileA, vnniAxisA,
-                                                transpose);
-  auto loadB = rewriter.create<xegpu::Load2DOp>(loc, vecTypeB, tileB, vnniAxisB,
-                                                transpose);
+  // auto loadA = rewriter.create<imex::xegpu::Load2DOp>(loc, vecTypeA, tileA,
+  //                                                     vnniAxisA, transpose);
+  // auto loadB = rewriter.create<imex::xegpu::Load2DOp>(loc, vecTypeB, tileB,
+  //                                                     vnniAxisB, transpose);
 
-  Value result =
-      rewriter.create<xegpu::DpasOp>(loc, vecTypeC, loadA, loadB, loadC);
+  // Value result =
+  //     rewriter.create<imex::xegpu::DpasOp>(loc, vecTypeC, loadA, loadB,
+  //     loadC);
 
-  if (isBrgemm) {
-    rewriter.setInsertionPointToEnd(batchLoop.getBody());
-    rewriter.create<scf::YieldOp>(loc, ValueRange{result});
-    result = batchLoop.getResults()[0];
-    rewriter.setInsertionPointAfter(batchLoop);
-  }
+  // if (isBrgemm) {
+  //   rewriter.setInsertionPointToEnd(batchLoop.getBody());
+  //   rewriter.create<scf::YieldOp>(loc, ValueRange{result});
+  //   result = batchLoop.getResults()[0];
+  //   rewriter.setInsertionPointAfter(batchLoop);
+  // }
 
-  // Write back the total sum to the output buffer.
-  rewriter.create<xegpu::Store2DOp>(loc, tileC, result);
+  // // Write back the total sum to the output buffer.
+  // rewriter.create<imex::xegpu::Store2DOp>(loc, tileC, result);
 
   rewriter.eraseOp(linalgOp);
 

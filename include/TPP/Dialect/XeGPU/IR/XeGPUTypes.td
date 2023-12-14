@@ -23,13 +23,16 @@ include "TPP/Dialect/XeGPU/IR/XeGPUDialect.td"
 // An Integer array attribute with fixed 2 elements.
 def XeGPU_IntArrayAttr2: ConfinedAttr<DenseI64ArrayAttr, [DenseArrayCount<2>]>;
 def XeGPU_IntType: AnyTypeOf<[I1, I8, I16, I32, I64, SI1, SI8, SI16, SI32, SI64, UI1, UI8, UI16, UI32, UI64]>;
-def XeGPU_FloatType: AnyTypeOf<[F16, F32, F64, BF16, F8E4M3FN, F8E5M2, F8E4M3FNUZ, F8E4M3B11FNUZ, F8E5M2FNUZ]>;
+def XeGPU_FloatType: AnyTypeOf<[F16, F32, F64, BF16, TF32]>;
 def XeGPU_ScalarType: AnyTypeOf<[XeGPU_IntType, XeGPU_FloatType]>;
-def XeGPU_BaseAddrType: AnyTypeOf<[MemRefRankOf<[XeGPU_ScalarType], [1, 2]>, UI64]>;
-def XeGPU_VectorType: VectorOfRankAndType<[1,2,3], [XeGPU_ScalarType]>;
-def XeGPU_Vector3DType: VectorOfRankAndType<[3], [XeGPU_ScalarType]>;
+def XeGPU_BaseAddrType: AnyTypeOf<[MemRefRankOf<[XeGPU_ScalarType], [1, 2]>, UI64, UI32, I64, I32]>;
+def XeGPU_DpasOpType: VectorOfRankAndType<[2, 3], [XeGPU_ScalarType]>;
+// def XeGPU_OffsetType: AnyTypeOf<[VectorOfRankAndType<[1], [Index]>, Index]>;
+def XeGPU_OffsetType: VectorOfRankAndType<[1], [Index]>;
+def XeGPU_MaskType: AnyTypeOf<[VectorOfRankAndType<[1,2], [I1]>, I1]>;
+def XeGPU_ValueType: AnyTypeOf<[VectorOfRankAndType<[1,2,3], [XeGPU_ScalarType]>, XeGPU_ScalarType]>;
+
 def XeGPU_Vector2DType: VectorOfRankAndType<[2], [XeGPU_ScalarType]>;
-def XeGPU_Vector1DType: VectorOfRankAndType<[1], [XeGPU_ScalarType]>;
 
 // common base class for types in XeGPU dialect
 class XeGPUTypeDef<string name, string typeMnemonic,
@@ -38,7 +41,7 @@ class XeGPUTypeDef<string name, string typeMnemonic,
   let mnemonic = typeMnemonic;
 }
 
-// TODO:
+// TensorDesc contains dim and element type info
 def XeGPU_TensorDesc: XeGPUTypeDef<"TensorDesc", "tensor_desc",
         [ShapedTypeInterface], "::mlir::TensorType"> {
   let summary = "TensorDesc type describing all kinds of memory and tensors scatter tensor, 1d tensor, 2d tensor, … 5d tensor";
@@ -67,15 +70,20 @@ def XeGPU_TensorDesc: XeGPUTypeDef<"TensorDesc", "tensor_desc",
 
   let parameters = (ins ArrayRefParameter<"int64_t">:$shape,
                         "::mlir::Type":$elementType,
-                        OptionalParameter<"::mlir::Attribute"> :$encoding);
+                        DefaultValuedParameter<"::imex::xegpu::MemoryScope", "xegpu::MemoryScope::GLOBAL">: $memory_scope,
+                        OptionalParameter<"::mlir::Attribute">: $encoding,
+                        OptionalParameter<"::mlir::Attribute">: $mapping
+                        );
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
       "::llvm::ArrayRef<int64_t>":$shape,
       "::mlir::Type":$elementType,
-      CArg<"::mlir::Attribute", "{}">:$encoding
+      CArg<"::imex::xegpu::MemoryScope", "xegpu::MemoryScope::GLOBAL">: $memory_scope,
+      CArg<"::mlir::Attribute", "{}">:$encoding,
+      CArg<"::mlir::Attribute", "{}">:$mapping
     ), [{
-      return $_get(elementType.getContext(), shape, elementType, encoding);
+      return $_get(elementType.getContext(), shape, elementType, memory_scope, encoding, mapping);
     }]>
   ];
 
@@ -95,7 +103,18 @@ def XeGPU_TensorDesc: XeGPUTypeDef<"TensorDesc", "tensor_desc",
     }
   }];
 
-  let assemblyFormat = "`<` custom<ShapeAndType>($shape, $elementType) (`,` $encoding^)? `>`";
+  let assemblyFormat = "`<` custom<ShapeAndType>($shape, $elementType)``custom<TensorDescAttr>($memory_scope, $encoding, $mapping)`>`";
+}
+
+
+def XeGPU_Nbarrier: XeGPUTypeDef<"Nbarrier", "nbarrier", [], "mlir::Type"> {
+  let summary = "!xegpu.nbarrier a custom XeGPU type representing a barrier.";
+
+  let extraClassDeclaration = [{
+    static NbarrierType get(mlir::MLIRContext *context) {
+      return Base::get(context);
+    };
+  }];
 }
 
 #endif // _XEGPU_TYPES_TD_INCLUDED_

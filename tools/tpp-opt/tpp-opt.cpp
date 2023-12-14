@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
-  registry.insert<mlir::xegpu::XeGPUDialect>();
+  registry.insert<imex::xegpu::XeGPUDialect>();
   mlir::linalgx::registerTransformDialectExtension(registry);
   mlir::check::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
