@@ -26,6 +26,7 @@
 #include <string>
 
 #include "MLIRGen.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
 
@@ -131,13 +132,13 @@ void MLIRGenerator::getKernelTypes(KernelArgs &args) {
     // Output to the layer is current size
     unsigned outputSize = layers[i];
 
-    // Types: {MB, input} X {input, output} + {MB, output} -> ReLU
+    // Types: {MB, input} X {input, output} + Bcast(MB, {output}) -> ReLU
     LayerArgs arg;
     arg.index = i;
     arg.input.type = currentType;
     arg.weight.type = getShape({inputSize, outputSize}, PACK_WEIGHT);
-    arg.bias.type = getShape({batch, outputSize}, PACK_OUTPUT);
-    arg.output.type = arg.bias.type;
+    arg.bias.type = getShape({outputSize}, PACK_OUTPUT);
+    arg.output.type = getShape({batch, outputSize}, PACK_OUTPUT);
     args.push_back(arg);
 
     // Update next input type with the output type of this layer
@@ -319,12 +320,13 @@ Value MLIRGenerator::lowerBiasAdd(Value input, Value bias, Value output) {
     return input;
 
   auto outTy = input.getType().cast<ShapedType>();
-  auto map = getMap(input, MAP_PARALLEL);
+  auto mapA = getMap(input, MAP_BROADCAST);
+  auto mapB = getMap(input, MAP_PARALLEL);
   auto sum =
       builder
           .create<linalg::GenericOp>(
               loc, outTy, ValueRange{bias}, ValueRange{input},
-              ArrayRef<AffineMap>{map, map}, getIterators(MAP_PARALLEL),
+              ArrayRef<AffineMap>{mapA, mapB}, getIterators(MAP_PARALLEL),
               [&](OpBuilder &nestedBuilder, Location nestedLoc,
                   ValueRange blockArgs) {
                 auto arg0 = blockArgs[0];
@@ -450,41 +452,50 @@ TensorType MLIRGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
   if (dims.size() > 2)
     return RankedTensorType::get(dims, dataType);
 
+  // Unpacked type, just return 2D tensor
+  if (!tiles.size())
+    return RankedTensorType::get(dims, dataType);
+
   // Packed types block by tile size
-  if (tiles.size()) {
-    auto n = tiles[0];
-    auto k = tiles[1];
-    auto c = tiles[2];
-    auto x = dims[0];
-    auto y = dims[1];
-    switch (type) {
-    case PACK_INPUT:
-      assert(x % n == 0 && "Invalid tile size for N dim");
-      assert(y % c == 0 && "Invalid tile size for C dim");
-      // N x C -> BN x BC x bn x bc
-      return RankedTensorType::get({x / n, y / c, n, c}, dataType);
-    case PACK_WEIGHT:
-      // VNNI packing can be done via tpp-opt --vnni-pack
-      assert(x % k == 0 && "Invalid tile size for K dim");
-      assert(y % c == 0 && "Invalid tile size for C dim");
+  assert(tiles.size() == 3 && "Invalid tile size format");
+  auto n = tiles[0];
+  auto k = tiles[1];
+  auto c = tiles[2];
+  auto x = dims[0];
+  // Broadcast is 1D
+  auto y = dims.size() == 2 ? dims[1] : 0;
 
-      // VNNI: C x K -> BK x BC x bc/vnni x bk x vnni
-      if (vnniFactor != 0)
-        return RankedTensorType::get(
-            {y / k, x / c, c / vnniFactor, k, vnniFactor}, dataType);
+  switch (type) {
+  case PACK_INPUT:
+    assert(x % n == 0 && "Invalid tile size for N dim");
+    assert(y % c == 0 && "Invalid tile size for C dim");
+    // N x C -> BN x BC x bn x bc
+    return RankedTensorType::get({x / n, y / c, n, c}, dataType);
+  case PACK_WEIGHT:
+    // VNNI packing can be done via tpp-opt --vnni-pack
+    assert(x % k == 0 && "Invalid tile size for K dim");
+    assert(y % c == 0 && "Invalid tile size for C dim");
 
-      // C x K -> BK x BC x bc x bk
-      return RankedTensorType::get({y / k, x / c, c, k}, dataType);
-    case PACK_OUTPUT:
-      assert(x % n == 0 && "Invalid tile size for N dim");
-      assert(y % k == 0 && "Invalid tile size for K dim");
-      // N x K -> BN x BK x bn x bk
-      return RankedTensorType::get({x / n, y / k, n, k}, dataType);
-    }
+    // VNNI: C x K -> BK x BC x bc/vnni x bk x vnni
+    if (vnniFactor != 0)
+      return RankedTensorType::get(
+          {y / k, x / c, c / vnniFactor, k, vnniFactor}, dataType);
+
+    // C x K -> BK x BC x bc x bk
+    return RankedTensorType::get({y / k, x / c, c, k}, dataType);
+  case PACK_OUTPUT:
+    assert(x % n == 0 && "Invalid tile size for N dim");
+
+    // Broadcast 1D -> 2D is Bk x bk only
+    if (!y)
+      return RankedTensorType::get({x / k, k}, dataType);
+
+    // N x K -> BN x BK x bn x bk
+    assert(y % k == 0 && "Invalid tile size for K dim");
+    return RankedTensorType::get({x / n, y / k, n, k}, dataType);
   }
 
-  // Unpacked type, just return 2D tensor
-  return RankedTensorType::get(dims, dataType);
+  llvm_unreachable("Unknown packing type");
 }
 
 AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
@@ -526,6 +537,12 @@ AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
     for (unsigned i = 0; i < n - 1; i++)
       pushDim(i, iter);
     list.push_back(zero);
+    break;
+  case MAP_BROADCAST:
+    // Broadcast from ND to (N+1)D is (0, 1) -> (1)
+    // Packed broadcast (BN, bn) is (0, 1, 2, 3) -> (1, 3)
+    for (unsigned i = 1; i < n; i+=2)
+      pushDim(i, iter);
     break;
   case MAP_MATMUL_INPUT:
     // Packed tensors have 4/5 dims and 6 loops (ppr-ppr)
@@ -575,6 +592,7 @@ SmallVector<utils::IteratorType> MLIRGenerator::getIterators(MapType type) {
   bool vnniPacked = packed && vnniFactor != 0;
   switch (type) {
   case MAP_PARALLEL:
+  case MAP_BROADCAST:
     if (packed)
       return {utils::IteratorType::parallel, utils::IteratorType::parallel,
               utils::IteratorType::parallel, utils::IteratorType::parallel};
