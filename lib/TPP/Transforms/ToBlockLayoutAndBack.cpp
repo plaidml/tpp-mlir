@@ -423,7 +423,6 @@ static bool isInVnniLayout(OpOperand &operand, linalg::GenericOp linalgOp,
       continue;
     if (blockeDim.getKind() != AffineExprKind::FloorDiv)
       continue;
-
     auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
     auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
     if (!lhsDim || !rhsCst)
