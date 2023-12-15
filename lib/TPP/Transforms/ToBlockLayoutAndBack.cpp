@@ -401,6 +401,41 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter,
   return packMatmulOpImpl<linalg::BatchMatmulOp>(rewriter, matmulOp, tiles);
 }
 
+// Check if the affine map associated to `operand` is already in VNNI format.
+static bool isInVnniLayout(OpOperand &operand, linalg::GenericOp linalgOp,
+                           int64_t blockingFactor) {
+  assert(operand.getOwner() == linalgOp);
+  AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
+  ArrayRef<AffineExpr> results = map.getResults();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
+
+  AffineExpr vnniDim = results.back();
+  auto dimExpr = dyn_cast<AffineDimExpr>(vnniDim);
+  if (!dimExpr ||
+      iteratorTypes[dimExpr.getPosition()] != utils::IteratorType::reduction) {
+    return false;
+  }
+
+  for (auto result : results) {
+    if (auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result)) {
+      if (blockeDim.getKind() == AffineExprKind::FloorDiv) {
+        auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
+        auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
+        if (!lhsDim || !rhsCst)
+          continue;
+        if (iteratorTypes[lhsDim.getPosition()] !=
+            utils::IteratorType::reduction)
+          continue;
+        if (rhsCst.getValue() != blockingFactor)
+          continue;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // MatmulOp (VNNI packing)
 //===----------------------------------------------------------------------===//
@@ -426,21 +461,22 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   if (failed(linalgx::utils::isContraction(matmulOp)))
     return rewriter.notifyMatchFailure(matmulOp, "require matmul semantics");
 
-  Value operandB = matmulOp.getInputs()[1];
-  if (operandB.getType().cast<ShapedType>().getRank() != 4)
-    return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
-
-  Location loc = matmulOp.getLoc();
-  auto blockingFactor = vnni::utils::getVnniBlockingFactor(operandB.getType());
+  OpOperand &operandB = matmulOp->getOpOperand(1);
+  auto blockingFactor =
+      vnni::utils::getVnniBlockingFactor(operandB.get().getType());
   if (!blockingFactor) {
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
   }
-  SmallVector<OpFoldResult, 1> tilesOnSmallK = {
+  if (isInVnniLayout(operandB, matmulOp, *blockingFactor))
+    return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
+
+  Location loc = matmulOp.getLoc();
+  SmallVector<OpFoldResult> tilesOnSmallK = {
       rewriter.getI64IntegerAttr(*blockingFactor)};
   // reshape input B.
   Value packedMatrixB =
-      toPackLayout_VNNI(rewriter, loc, operandB, tilesOnSmallK);
+      toPackLayout_VNNI(rewriter, loc, operandB.get(), tilesOnSmallK);
   MLIRContext *ctx = matmulOp.getContext();
   AffineExpr p1, p2, r1, p3, p4, r2, r3;
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
