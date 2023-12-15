@@ -81,7 +81,7 @@ func.func @pack_vnni(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, %ar
 
 // CHECK-LABEL: func.func @pack_vnni(
 // CHECK-NOT: linalg.batch_reduce_matmul
-// CHECK: tpp.brgemm
+// CHECK: linalg.generic
 
 // -----
 
