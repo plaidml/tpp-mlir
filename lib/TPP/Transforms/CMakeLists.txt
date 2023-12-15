@@ -19,6 +19,7 @@ add_mlir_library(TPPTransforms
   SCFParallelLoopTiling.cpp
   IntelAMXTileConfig.cpp
   IntelAMXTileConfigHoisting.cpp
+  XegpuFoldMemRef.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

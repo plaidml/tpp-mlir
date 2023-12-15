@@ -72,6 +72,10 @@ namespace xegpu {
 class XeGPUDialect;
 } // namespace xegpu
 
+namespace affine {
+class AffineDialect;
+} // namespace affine
+
 namespace tpp {
 
 // Testing passes.

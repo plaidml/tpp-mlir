@@ -536,4 +536,15 @@ def LinalgToXegpu : Pass<"linalg-to-xegpu", "func::FuncOp"> {
                            "arith::ArithDialect"];
 }
 
+def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "func::FuncOp"> {
+  let summary = "Fold memref alias ops into consumer XeGPU load/store ops.";
+  let description = [{
+    The pass folds loading/storing from/to memref aliasing ops to loading/storing
+    from/to the original memref.
+  }];
+  let dependentDialects = ["affine::AffineDialect",
+                           "memref::MemRefDialect",
+                           "vector::VectorDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
