@@ -418,20 +418,21 @@ static bool isInVnniLayout(OpOperand &operand, linalg::GenericOp linalgOp,
   }
 
   for (auto result : results) {
-    if (auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result)) {
-      if (blockeDim.getKind() == AffineExprKind::FloorDiv) {
-        auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
-        auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
-        if (!lhsDim || !rhsCst)
-          continue;
-        if (iteratorTypes[lhsDim.getPosition()] !=
-            utils::IteratorType::reduction)
-          continue;
-        if (rhsCst.getValue() != blockingFactor)
-          continue;
-        return true;
-      }
-    }
+    auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result);
+    if (!blockeDim)
+      continue;
+    if (blockeDim.getKind() != AffineExprKind::FloorDiv)
+      continue;
+
+    auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
+    auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
+    if (!lhsDim || !rhsCst)
+      continue;
+    if (iteratorTypes[lhsDim.getPosition()] != utils::IteratorType::reduction)
+      continue;
+    if (rhsCst.getValue() != blockingFactor)
+      continue;
+    return true;
   }
   return false;
 }
