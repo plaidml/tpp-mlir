@@ -25,22 +25,36 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
          linalgOp.getLibraryCallName() == target;
 }
 
+// Return position of 'pure' iterators in `indexingMap` for the specific
+// linalg operation given the iterator type `iter`. 'pure' iterator are
+// only AffineDimExpr.
+static llvm::SmallVector<int64_t>
+getIteratorPos(linalg::LinalgOp linalgOp, AffineMap indexingMap,
+               mlir::utils::IteratorType iter) {
+  llvm::SmallVector<int64_t> res;
+  for (AffineExpr e : indexingMap.getResults()) {
+    if (auto d = dyn_cast<AffineDimExpr>(e)) {
+      if (linalgOp.getIteratorTypesArray()[d.getPosition()] == iter &&
+          llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
+            return e.isFunctionOfDim(d.getPosition());
+          }) == 1)
+        res.push_back(d.getPosition());
+    }
+  }
+  return res;
+}
+
 // Return true if the linalg.generic an be mapped to a tpp.brgemm in VNNI
 // format.
 bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
                     SmallVectorImpl<Value> *operands) {
-  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-  AffineExpr r1, p4, p5, r2, r3;
-  bindDims(linalgOp.getContext(), r1, r2, p4, p5, r3);
+
   auto blockingFactor =
       vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
   if (!blockingFactor)
     return false;
-  SmallVector<AffineMap> mapList;
-  mapList = infer(
-      {{r1, p4, r3}, {r1, r3.floorDiv(*blockingFactor), p5, r2}, {p4, p5}});
 
+  AffineMap mapOperandA, mapOperandB, mapOperandC;
   using namespace structured_match;
   // clang-format off
   auto matmulMatcher =
@@ -48,18 +62,54 @@ bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(EqualsTo(2)))
           .operation(NumRegions(EqualsTo(1)))
-          .dim(MatchAll(), {mlir::utils::IteratorType::reduction,
-                            mlir::utils::IteratorType::parallel,
-                            mlir::utils::IteratorType::parallel,
-                            mlir::utils::IteratorType::reduction,
-                            mlir::utils::IteratorType::reduction})
-          .input(MatchOne(0), HasMap(EqualsTo(mapList[0])))
-          .input(MatchOne(1), HasMap(EqualsTo(mapList[1])))
-          .output(MatchOne(0), HasMap(EqualsTo(mapList[2])))
+          .operation(NumOfLoops(EqualsTo(5)))
+          .input(MatchAll(), HasStaticShape())
+          .output(MatchAll(), HasStaticShape())
+          .input(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandA))
+          .input(MatchOne(1), HasMap(Any(), &mapOperandB))
+          .output(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandC))
           .region(MatchOne(0),
                   WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
   // clang-format on
-  return matmulMatcher.match(linalgOp);
+  if (!matmulMatcher.match(linalgOp))
+    return false;
+
+  // Operand C: Two parallel iterators (i and j).
+  llvm::SmallVector<int64_t> operandCPosIterPar = getIteratorPos(
+      linalgOp, mapOperandC, mlir::utils::IteratorType::parallel);
+  if (operandCPosIterPar.size() != 2)
+    return false;
+  int64_t iParIter = operandCPosIterPar[0];
+  int64_t jParIter = operandCPosIterPar[1];
+
+  // Operand A: One parallel iterator (i) and two reduction ones (batch and k).
+  llvm::SmallVector<int64_t> operandAPosIterPar = getIteratorPos(
+      linalgOp, mapOperandA, mlir::utils::IteratorType::parallel);
+  if (operandAPosIterPar.size() != 1 || operandAPosIterPar[0] != iParIter)
+    return false;
+
+  llvm::SmallVector<int64_t> operandAPosIterRed = getIteratorPos(
+      linalgOp, mapOperandA, mlir::utils::IteratorType::reduction);
+  if (operandAPosIterRed.size() != 2)
+    return false;
+  int64_t batchRedIter = operandAPosIterRed[0];
+  int64_t kRedIter = operandAPosIterRed[1];
+
+  // Operand B: One parallel iterator (j) and three reduction ones (batch,
+  // k/VNNI and VNNI).
+  llvm::SmallVector<int64_t> operandBPosIterPar = getIteratorPos(
+      linalgOp, mapOperandB, mlir::utils::IteratorType::parallel);
+  if (operandBPosIterPar.size() != 1 || operandBPosIterPar[0] != jParIter)
+    return false;
+
+  llvm::SmallVector<int64_t> operandBPosIterRed = getIteratorPos(
+      linalgOp, mapOperandB, mlir::utils::IteratorType::reduction);
+  if (operandBPosIterRed.empty() || operandBPosIterRed[0] != batchRedIter)
+    return false;
+
+  auto vnniDim =
+      vnni::utils::isInVnniLayout(linalgOp, mapOperandB, *blockingFactor);
+  return succeeded(vnniDim) && vnniDim->getPosition() == kRedIter;
 }
 
 LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,

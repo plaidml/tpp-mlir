@@ -401,41 +401,6 @@ mlir::linalgx::packMatmulOp(RewriterBase &rewriter,
   return packMatmulOpImpl<linalg::BatchMatmulOp>(rewriter, matmulOp, tiles);
 }
 
-// Check if the affine map associated to `operand` is already in VNNI format.
-static bool isInVnniLayout(OpOperand &operand, linalg::GenericOp linalgOp,
-                           int64_t blockingFactor) {
-  assert(operand.getOwner() == linalgOp);
-  AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
-  ArrayRef<AffineExpr> results = map.getResults();
-  SmallVector<utils::IteratorType> iteratorTypes =
-      linalgOp.getIteratorTypesArray();
-
-  AffineExpr vnniDim = results.back();
-  auto dimExpr = dyn_cast<AffineDimExpr>(vnniDim);
-  if (!dimExpr ||
-      iteratorTypes[dimExpr.getPosition()] != utils::IteratorType::reduction) {
-    return false;
-  }
-
-  for (auto result : results) {
-    auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result);
-    if (!blockeDim)
-      continue;
-    if (blockeDim.getKind() != AffineExprKind::FloorDiv)
-      continue;
-    auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
-    auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
-    if (!lhsDim || !rhsCst)
-      continue;
-    if (iteratorTypes[lhsDim.getPosition()] != utils::IteratorType::reduction)
-      continue;
-    if (rhsCst.getValue() != blockingFactor)
-      continue;
-    return true;
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // MatmulOp (VNNI packing)
 //===----------------------------------------------------------------------===//
@@ -468,8 +433,12 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
   }
-  if (isInVnniLayout(operandB, matmulOp, *blockingFactor))
+
+  AffineMap mapOperandB = matmulOp.getMatchingIndexingMap(&operandB);
+  if (succeeded(vnni::utils::isInVnniLayout(matmulOp, mapOperandB,
+                                            *blockingFactor))) {
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
+  }
 
   Location loc = matmulOp.getLoc();
   SmallVector<OpFoldResult> tilesOnSmallK = {
@@ -477,13 +446,15 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   // reshape input B.
   Value packedMatrixB =
       toPackLayout_VNNI(rewriter, loc, operandB.get(), tilesOnSmallK);
+
   MLIRContext *ctx = matmulOp.getContext();
   AffineExpr p1, p2, r1, p3, p4, r2, r3;
   SmallVector<Value> packedInputs = {matmulOp.getInputs()[0], packedMatrixB};
   AffineMap mapA, mapB, mapC;
   Value matrixC = matmulOp.getOutputs()[0];
 
-  bindDims(ctx, p1, p2, r1, r3, p3, p4, r2);
+  //            IB  JB  KB  ib  jb  kb  VNNI
+  bindDims(ctx, p1, p2, r1, p3, p4, r2, r3);
   mapA = AffineMap::get(/*dims=*/7, /*symbols=*/0, {p1, r1, p3, r2}, ctx);
   mapB = AffineMap::get(/*dims=*/7, /*symbols=*/0,
                         {p2, r1, r2.floorDiv(*blockingFactor), p4, r3}, ctx);
@@ -494,9 +465,9 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
       ArrayRef<mlir::utils::IteratorType>{mlir::utils::IteratorType::parallel,
                                           mlir::utils::IteratorType::parallel,
                                           mlir::utils::IteratorType::reduction,
+                                          mlir::utils::IteratorType::parallel,
+                                          mlir::utils::IteratorType::parallel,
                                           mlir::utils::IteratorType::reduction,
-                                          mlir::utils::IteratorType::parallel,
-                                          mlir::utils::IteratorType::parallel,
                                           mlir::utils::IteratorType::reduction},
       /*doc=*/"", /*libraryCall=*/"");
 

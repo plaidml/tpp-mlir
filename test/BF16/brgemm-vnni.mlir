@@ -53,9 +53,9 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
   return %1 : tensor<4x4x32x32xbf16>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5 floordiv 2, d4, d6)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>
 
 // CHECK-LABEL: prepacked_matmul
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<4x4x32x32xbf16>, %[[ARG1:.+]]: tensor<4x4x32x32xbf16>, 
@@ -65,7 +65,7 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
 // CHECK-SAME:  : tensor<4x4x32x32xbf16> -> tensor<4x4x16x32x2xbf16>
 // CHECK: {{.+}} = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]
 // CHECK-SAME: ins(%[[ARG0]], %[[PACK]]
 // CHECK-SAME: outs(%[[ARG2]]
 
