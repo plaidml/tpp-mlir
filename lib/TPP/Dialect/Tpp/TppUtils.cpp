@@ -27,7 +27,8 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
 
 // Return true if the linalg.generic an be mapped to a tpp.brgemm in VNNI
 // format.
-bool isTppVnniOp(linalg::GenericOp linalgOp, SmallVectorImpl<Value> *operands) {
+bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
+                    SmallVectorImpl<Value> *operands) {
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
   auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
   AffineExpr r1, p4, p5, r2, r3;
