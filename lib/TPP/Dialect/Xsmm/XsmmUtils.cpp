@@ -321,7 +321,7 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op) {
   // If we haven't found a BRGEMM, this are not the droids we're looking for
   assert(isa<xsmm::BrgemmOp>(chain[0]) && "First op must be brgemm");
 
-  // New, we're sure we have a chain, but not yet if it has the right types
+  // Now, we're sure we have a chain, but not yet if it has the right types
   // and in the right order: BRGEMM -> BINARY -> UNARY
   // Allowed patterns are:
   //  - GEMM + BINARY
@@ -385,11 +385,9 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op) {
 
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
   // Not shaped type, the leading dimension is the single scalar.
-  if (!isa<ShapedType>(type))
+  auto memref = dyn_cast<MemRefType>(type);
+  if (!memref)
     return 1;
-  if (!isa<MemRefType>(type))
-    return 1;
-  MemRefType memref = type.cast<MemRefType>();
   // For 1d memref we cannot use the stride as leading dimension, but the
   // leading dimension is the dimension itself.
   if (memref.getRank() == 1)

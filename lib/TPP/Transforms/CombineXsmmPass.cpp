@@ -29,14 +29,14 @@ namespace {
 static FailureOr<DenseI64ArrayAttr>
 getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
 
-  auto memrefC = opTy.getOperand(3).getType();
   auto memrefA = opTy.getOperand(1).getType();
   auto memrefB = opTy.getOperand(2).getType();
+  auto memrefC = opTy.getOperand(3).getType();
 
-  int64_t m, n, k;
   if (!isa<ShapedType>(memrefC) || !isa<ShapedType>(memrefA)) {
     return failure();
   }
+  int64_t m, n, k;
   m = memrefC.cast<ShapedType>().getShape()[0];
   n = memrefC.cast<ShapedType>().getShape()[1];
   k = memrefA.cast<ShapedType>().getShape()[2];
