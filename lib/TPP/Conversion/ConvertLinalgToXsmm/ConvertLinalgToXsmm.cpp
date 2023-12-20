@@ -1054,13 +1054,19 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
   }
 };
 
-struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
+// Converts linalg.generic with the following layout:
+// [i][j] = [i][k] [k/VNNI][j][VNNI] -> xsmm.matmul
+// [i][j] = [b][i][k] [b][k/VNNI][j][VNNI] -> xsmm.brgemm
+struct ConvertGenericToVnniMatmulLikeOp
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
+    bool hasBatch = false;
     if (!genericOp.hasBufferSemantics() ||
-        !tpp::utils::isBrgemmVnniOp(genericOp, /*captures=*/nullptr)) {
+        !tpp::utils::isBrgemmVnniOp(genericOp, hasBatch,
+                                    /*captures=*/nullptr)) {
       return failure();
     }
     Value bufferA = genericOp.getDpsInputs()[0];
@@ -1069,8 +1075,13 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
 
     int64_t m = bufferC.getType().cast<ShapedType>().getShape()[0];
     int64_t n = bufferC.getType().cast<ShapedType>().getShape()[1];
-    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[2];
-    int64_t batch = bufferA.getType().cast<ShapedType>().getShape()[0];
+    int64_t kPos = 1;
+    if (hasBatch)
+      kPos++;
+    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[kPos];
+    int64_t batch = std::numeric_limits<int64_t>::max();
+    if (hasBatch)
+      batch = bufferA.getType().cast<ShapedType>().getShape()[0];
 
     auto stridesOnLhs = utils::getStaticStrides(bufferA);
     auto stridesOnRhs = utils::getStaticStrides(bufferB);
@@ -1083,8 +1094,12 @@ struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
         stridesOnOutput->back() != 1) {
       return failure();
     }
-    int64_t lda = (*stridesOnLhs)[1];
-    int64_t ldb = (*stridesOnRhs)[1] /
+
+    int64_t leadingDimPosOnAandB = 0;
+    if (hasBatch)
+      leadingDimPosOnAandB++;
+    int64_t lda = (*stridesOnLhs)[leadingDimPosOnAandB];
+    int64_t ldb = (*stridesOnRhs)[leadingDimPosOnAandB] /
                   *vnni::utils::getVnniBlockingFactor(bufferB.getType());
     int64_t ldc = (*stridesOnOutput)[0];
 
@@ -1122,10 +1137,10 @@ struct ConvertCopyOp : public OpRewritePattern<linalg::CopyOp> {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns
-      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-           ConvertGenericToUnary, ConvertGenericToBinary,
-           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul, ConvertVnniPacking,
-           ConvertGenericToVnniBrgemm, ConvertCopyOp>(patterns.getContext());
+  patterns.add<
+      ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+      ConvertGenericToUnary, ConvertGenericToBinary, ConvertGenericToBrgemm,
+      ConvertBatchReduceMatmulToBatchReduceMatmul, ConvertMatmulToMatmul,
+      ConvertVnniPacking, ConvertGenericToVnniMatmulLikeOp, ConvertCopyOp>(
+      patterns.getContext());
 }

@@ -28,7 +28,7 @@ class FusedBrgemmOp;
 namespace utils {
 
 // Return true if the linalg.generic can convert to a brgemm in VNNI format.
-bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
+bool isBrgemmVnniOp(linalg::GenericOp linalgOp, bool &hasBatch,
                     SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Splits and replaces fused op with its individual components.
