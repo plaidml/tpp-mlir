@@ -71,8 +71,17 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
       ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
 }
 
-static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
+static FailureOr<ArrayAttr> getBrgemmFlags(RewriterBase &rewriter,
+                                           xsmm::BrgemmOp opTy) {
   auto memrefB = opTy.getOperand(2).getType().cast<MemRefType>();
+  auto flags =
+      dyn_cast<mlir::xsmm::BrgemmDispatchOp>(opTy.getOperand(0).getDefiningOp())
+          .getFlags();
+  for (auto flagItr : flags)
+    if (flagItr == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                            mlir::xsmm::GemmFlags::BETA_0))
+      return failure();
+
   xsmm::GemmFlagsAttr gemmFlag =
       (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
                                    memrefB))
@@ -126,6 +135,10 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     auto dims = getSizesAndLeadingDimForBrgemmOp(rewriter, brgemmOp);
     auto memrefB = brgemmOp.getOperand(2);
     int64_t batchSize = memrefB.getType().cast<ShapedType>().getShape()[0];
+    auto brgemmFlags = getBrgemmFlags(rewriter, brgemmOp);
+    if (failed(brgemmFlags))
+      // TODO: beta = 0
+      return failure();
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(fusedMatch.binaryOp);
@@ -133,7 +146,7 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
         loc, integer64, *dims,
         xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
         xsmm::UnaryKindAttr::get(rewriter.getContext(), fusedMatch.unaryKind),
-        getBrgemmFlags(rewriter, brgemmOp),
+        *brgemmFlags,
         rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
             rewriter.getContext(), xsmm::UnaryFlags::NONE)),
         rewriter.getArrayAttr(

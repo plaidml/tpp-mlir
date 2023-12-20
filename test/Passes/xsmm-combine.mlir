@@ -19,7 +19,7 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<8x4x32x32xf32>
   %3 = xsmm.unary.dispatch identity [32, 32, 128, 32] flags = (none) data_type = f32
   %alloc_0 = memref.alloc() {alignment = 64 : i64} : memref<8x8x32x32xf32>
-  %4 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (beta_0) data_type = f32
+  %4 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (none) data_type = f32
   %5 = xsmm.binary.dispatch add [32, 32, 32, 32, 32] flags = (bcast_col_in0) data_type = f32
   %6 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
   %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<256x512xf32>
@@ -36,8 +36,9 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
-// CHECK: xsmm.fused_brgemm
+// CHECK: %[[BIAS:.*]] = memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>> 
+// CHECK: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
+// CHECK: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 
 // -----
@@ -78,9 +79,9 @@ func.func @bcast_col_in1_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 
 // CHECK-LABEL: func.func @bcast_col_in1_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = f32
-// CHECK-NOT: xsmm.fused_brgemm
-
+// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = f32
+// CHECK-NOT: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 // -----
 
@@ -120,9 +121,9 @@ func.func @none_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>
 
 // CHECK-LABEL: func.func @none_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = f32
-// CHECK-NOT: xsmm.fused_brgemm
-
+// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (none)  unary_flags = (none) data_type = f32
+// CHECK-NOT: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 // -----
 
@@ -146,7 +147,7 @@ func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<8x4x32x32xbf16>
   %3 = xsmm.unary.dispatch identity [32, 32, 128, 32] flags = (none) data_type = bf16
   %alloc_0 = memref.alloc() {alignment = 64 : i64} : memref<8x8x32x32xbf16>
-  %4 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0) data_type = bf16
+  %4 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b) data_type = bf16
   %5 = xsmm.binary.dispatch add [32, 32, 32, 32, 32] flags = (bcast_col_in0) data_type = bf16
   %6 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = bf16
   %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<256x512xbf16>
@@ -163,8 +164,9 @@ func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
 
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = bf16
-// CHECK: xsmm.fused_brgemm
+// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = bf16
+// CHECK: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 // -----
 
@@ -205,8 +207,9 @@ func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
 
 // CHECK-LABEL: func.func @bcast_col_in1_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = bf16
-// CHECK-NOT: xsmm.fused_brgemm
+// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = bf16
+// CHECK-NOT: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]] , %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 
 // -----
@@ -248,7 +251,8 @@ func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x51
 
 // CHECK-LABEL: func.func @none_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = bf16
-// CHECK-NOT: xsmm.fused_brgemm
+// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (none)  unary_flags = (none) data_type = bf16
+// CHECK-NOT: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]] , %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 
