@@ -235,11 +235,12 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
 }
 
 def CombineXsmmOpPass : Pass<"combine-xsmm-op-optimization", "func::FuncOp"> {
-  let summary = "Fuse xsmm layers into a bigger xsmm op";
+  let summary = "Fuse brgemm-add-relu ops into a fused brgemm op";
   let description =
-      [{Fuse xsmm layers into a bigger xsmm op }];
+      [{Fuse brgemm-add-relu ops into a fused brgemm op}];
 
   let dependentDialects = ["xsmm::XsmmDialect"];
+
 }
 
 

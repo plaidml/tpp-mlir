@@ -1,10 +1,5 @@
 //RUN: tpp-opt -verify-xsmm-calls  --combine-xsmm-op-optimization  -verify-xsmm-calls %s --split-input-file | FileCheck %s
 
-// CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
-// CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
-// CHECK: xsmm.fused_brgemm
-
 memref.global "private" constant @__constant_4x32x32xf32 : memref<4x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x32x32xf32 :  memref<8x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32xf32:  memref<32xf32, strided<[32], offset:?>> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -39,12 +34,13 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
   return %alloc_1 : memref<256x512xf32>
  }
 
-// -----
-
-// CHECK-LABEL: func.func @bcast_col_in1_on_binary_add(
+// CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = f32
-// CHECK-NOT: xsmm.fused_brgemm
+// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
+// CHECK: xsmm.fused_brgemm
+
+
+// -----
 
 memref.global "private" constant @__constant_4x32x32xf32 : memref<4x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x32x32xf32 :  memref<8x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -80,11 +76,13 @@ func.func @bcast_col_in1_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
   return %alloc_1 : memref<256x512xf32>
  }
 
-// -----
-// CHECK-LABEL: func.func @none_on_binary_add(
+// CHECK-LABEL: func.func @bcast_col_in1_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = f32
+// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = f32
 // CHECK-NOT: xsmm.fused_brgemm
+
+
+// -----
 
 memref.global "private" constant @__constant_4x32x32xf32 : memref<4x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x32x32xf32 :  memref<8x32x32xf32> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -120,11 +118,13 @@ func.func @none_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>
   return %alloc_1 : memref<256x512xf32>
  }
 
+// CHECK-LABEL: func.func @none_on_binary_add(
+// CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
+// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = f32
+// CHECK-NOT: xsmm.fused_brgemm
+
+
 // -----
-// CHECK-LABEL: func.func @bcast_col_in0_on_binary_add_bf16(
-// CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = bf16
-// CHECK: xsmm.fused_brgemm
 
 memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -161,12 +161,12 @@ func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
   return %alloc_1 : memref<256x512xbf16>
 }
 
-// -----
-
-// CHECK-LABEL: func.func @bcast_col_in1_on_binary_add_bf16(
+// CHECK-LABEL: func.func @bcast_col_in0_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = bf16
-// CHECK-NOT: xsmm.fused_brgemm
+// CHECK: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = bf16
+// CHECK: xsmm.fused_brgemm
+
+// -----
 
 memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -203,12 +203,13 @@ func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
   return %alloc_1 : memref<256x512xbf16>
 }
 
-// -----
-
-// CHECK-LABEL: func.func @none_on_binary_add_bf16(
+// CHECK-LABEL: func.func @bcast_col_in1_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = bf16
+// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = bf16
 // CHECK-NOT: xsmm.fused_brgemm
+
+
+// -----
 
 memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
@@ -244,4 +245,10 @@ func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x51
   }
   return %alloc_1 : memref<256x512xbf16>
 }
+
+// CHECK-LABEL: func.func @none_on_binary_add_bf16(
+// CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
+// CHECK-NOT: %[[dispatch:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (none)  binary_flags = (none)  unary_flags = (none) data_type = bf16
+// CHECK-NOT: xsmm.fused_brgemm
+
 

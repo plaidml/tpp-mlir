@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-using namespace mlir;
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
@@ -24,6 +23,8 @@ namespace tpp {
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
+using namespace mlir;
+
 namespace {
 
 static FailureOr<DenseI64ArrayAttr>
@@ -33,24 +34,21 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   auto memrefB = opTy.getOperand(2).getType();
   auto memrefC = opTy.getOperand(3).getType();
 
-  if (!isa<ShapedType>(memrefC) || !isa<ShapedType>(memrefA)) {
-    return failure();
-  }
   int64_t m, n, k;
   m = memrefC.cast<ShapedType>().getShape()[0];
   n = memrefC.cast<ShapedType>().getShape()[1];
   k = memrefA.cast<ShapedType>().getShape()[2];
 
   auto ldaDim = xsmm::utils::getLeadingDim(memrefA, /*pos=*/1);
-  if (failed(ldaDim)) {
+  if (failed(ldaDim))
     return failure();
-  }
+
   int64_t lda = *ldaDim;
 
   auto ldbDim = xsmm::utils::getLeadingDim(memrefB, /*pos=*/1);
-  if (failed(ldbDim)) {
+  if (failed(ldbDim))
     return failure();
-  }
+
   int64_t ldb =
       (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
                                    memrefB.cast<MemRefType>()))
@@ -58,9 +56,9 @@ getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
           : *ldbDim;
 
   auto ldcDim = xsmm::utils::getLeadingDim(memrefC);
-  if (failed(ldcDim)) {
+  if (failed(ldcDim))
     return failure();
-  }
+
   int64_t ldc = *ldcDim;
 
   // If we are dealing with a BRGEMM we need to pass two extra dimensions:
@@ -86,7 +84,9 @@ static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
 }
 
 struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
+
   using OpRewritePattern<xsmm::BrgemmOp>::OpRewritePattern;
+
   LogicalResult matchAndRewrite(xsmm::BrgemmOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
     auto *output = brgemmOp.getOperand(3).getDefiningOp();
@@ -145,9 +145,10 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     SmallVector<Value, 6> invokeOperands;
     invokeOperands.push_back(dispatched);
     auto opItr = brgemmOp->getOperands().begin();
+    // Skipping dispatch operand
     std::advance(opItr, 1);
     invokeOperands.append(opItr, brgemmOp->getOperands().end());
-    // Drop the aliasing output operand.
+    // Drop the C operand
     invokeOperands.pop_back();
     invokeOperands.push_back(fusedMatch.binaryOp->getOperand(2));
     invokeOperands.push_back(batchDim);

@@ -37,32 +37,6 @@ namespace tpp {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Utils
-//===----------------------------------------------------------------------===//
-
-static FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0) {
-  // Not shaped type, the leading dimension is the single scalar.
-  if (!isa<ShapedType>(type))
-    return 1;
-  MemRefType memref = type.cast<MemRefType>();
-  // For 1d memref we cannot use the stride as leading dimension, but the
-  // leading dimension is the dimension itself.
-  if (memref.getRank() == 1)
-    return memref.getShape()[0];
-
-  SmallVector<int64_t> strides;
-  int64_t offset;
-  if (failed(getStridesAndOffset(memref, strides, offset)))
-    return failure();
-  // fail if the strides are non-constant
-  if (llvm::any_of(strides, [](int64_t stride) {
-        return stride == ShapedType::kDynamic;
-      }))
-    return failure();
-  return strides[pos];
-}
-
-//===----------------------------------------------------------------------===//
 // Conversions
 //===----------------------------------------------------------------------===//
 
@@ -82,16 +56,16 @@ getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
   int64_t n = memrefC.getShape()[1];
   int64_t k = (isBrgemm) ? memrefA.getShape()[2] : memrefA.getShape()[1];
 
-  auto ldaDim =
-      (isBrgemm) ? getLeadingDim(memrefA, /*pos=*/1) : getLeadingDim(memrefA);
+  auto ldaDim = (isBrgemm) ? xsmm::utils::getLeadingDim(memrefA, /*pos=*/1)
+                           : xsmm::utils::getLeadingDim(memrefA);
   if (failed(ldaDim)) {
     LLVM_DEBUG(llvm::dbgs() << "Cannot compute lda\n");
     return failure();
   }
   int64_t lda = *ldaDim;
 
-  auto ldbDim =
-      (isBrgemm) ? getLeadingDim(memrefB, /*pos=*/1) : getLeadingDim(memrefB);
+  auto ldbDim = (isBrgemm) ? xsmm::utils::getLeadingDim(memrefB, /*pos=*/1)
+                           : xsmm::utils::getLeadingDim(memrefB);
   if (failed(ldbDim)) {
     LLVM_DEBUG(llvm::dbgs() << "Cannot compute ldb\n");
     return failure();
@@ -102,7 +76,7 @@ getSizesAndLeadingDimsForGemmLikeOp(RewriterBase &rewriter, OpTy opTy) {
                     ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
                     : *ldbDim;
 
-  auto ldcDim = getLeadingDim(memrefC);
+  auto ldcDim = xsmm::utils::getLeadingDim(memrefC);
   if (failed(ldcDim)) {
     LLVM_DEBUG(llvm::dbgs() << "Cannot compute ldc\n");
     return failure();
@@ -353,10 +327,10 @@ static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
   MemRefType outputMemRef = tppOp.getOutputType();
   int64_t m = outputMemRef.getShape()[0];
   int64_t n = outputMemRef.getShape()[1];
-  auto ldo = getLeadingDim(outputMemRef);
+  auto ldo = xsmm::utils::getLeadingDim(outputMemRef);
   if (failed(ldo))
     return rewriter.notifyMatchFailure(tppOp, "cannot compute ldo");
-  auto ldi = getLeadingDim(tppOp.getInputs()[0].getType());
+  auto ldi = xsmm::utils::getLeadingDim(tppOp.getInputs()[0].getType());
   if (failed(ldi))
     return rewriter.notifyMatchFailure(tppOp, "cannot compute ldi");
   auto flags = xsmm::utils::getUnaryFlags(tppOp.getInputs()[0].getType(),
@@ -429,17 +403,17 @@ struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
     auto lhsMemRef = addOp.getInputs()[0].getType().cast<MemRefType>();
     auto rhsMemRef = addOp.getInputs()[1].getType().cast<MemRefType>();
 
-    auto ldiLhsDim = getLeadingDim(lhsMemRef);
+    auto ldiLhsDim = xsmm::utils::getLeadingDim(lhsMemRef);
     if (failed(ldiLhsDim))
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on lhs");
     int64_t ldiLhs = *ldiLhsDim;
 
-    auto ldiRhsDim = getLeadingDim(rhsMemRef);
+    auto ldiRhsDim = xsmm::utils::getLeadingDim(rhsMemRef);
     if (failed(ldiRhsDim))
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on rhs");
     int64_t ldiRhs = *ldiRhsDim;
 
-    auto ldoDim = getLeadingDim(outputMemRef);
+    auto ldoDim = xsmm::utils::getLeadingDim(outputMemRef);
     if (failed(ldoDim))
       return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
     int64_t ldo = *ldoDim;

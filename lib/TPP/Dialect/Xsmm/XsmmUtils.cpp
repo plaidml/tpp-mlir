@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 namespace mlir {
@@ -284,7 +285,7 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   return failure();
 }
 
-FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op) {
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   // The loop is in reverse order, so we deduplicate the list making sure we
   // only have one type of each
   SmallVector<Operation *, 3> chain;

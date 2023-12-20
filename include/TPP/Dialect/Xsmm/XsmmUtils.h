@@ -49,7 +49,7 @@ struct FusedMatch {
   // This is the (optional) binary op that follows the GEMM
   BinaryOp binaryOp;
   BinaryKind binaryKind;
-  // This is the (optional) binary op that follows the GEMM/Binary
+  // This is the (optional) unary op that follows the GEMM/Binary
   UnaryOp unaryOp;
   UnaryKind unaryKind;
 };
@@ -80,7 +80,7 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
 
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
 
-FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(mlir::Operation *op);
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
 
 ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
