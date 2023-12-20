@@ -27,10 +27,6 @@ class FusedBrgemmOp;
 
 namespace utils {
 
-// Returns true if the linalg operation is marked with 'target'.
-// FIXME: This should be unnecessary but it's still used by convolutions
-bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target);
-
 // Return true if the linalg.generic can convert to a brgemm in VNNI format.
 bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
                     SmallVectorImpl<Value> *capturedOperands = nullptr);

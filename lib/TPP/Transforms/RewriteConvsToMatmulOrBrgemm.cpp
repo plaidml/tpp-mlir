@@ -28,6 +28,11 @@ namespace tpp {
 
 namespace {
 
+bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
+  return isa<linalg::GenericOp>(linalgOp) &&
+         linalgOp.getLibraryCallName() == target;
+}
+
 // return true if all operands have static shape.
 static bool hasStaticShape(Value image, Value filter, Value output) {
   ShapedType imageType = image.getType().cast<ShapedType>();
@@ -97,7 +102,7 @@ struct RewriteConv2DNhwcHwcfToMatmul : OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (!tpp::utils::isMarkedWithTpp(genericOp, "tpp.Conv2DNhwcHwcfOp"))
+    if (!isMarkedWithTpp(genericOp, "tpp.Conv2DNhwcHwcfOp"))
       return failure();
 
     // Make sure we did loop re-ordering.
@@ -120,7 +125,7 @@ struct InterchangeIteratorsConv2DNhwcHwcf
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::isMarkedWithTpp(genericOp, "tpp.Conv2DNhwcHwcfOp"))
+    if (!isMarkedWithTpp(genericOp, "tpp.Conv2DNhwcHwcfOp"))
       return failure();
 
     // clang-format off
@@ -338,7 +343,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult collapseFilterPreconditions(linalg::GenericOp linalgOp) const {
-    if (!tpp::utils::isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
+    if (!isMarkedWithTpp(linalgOp, "tpp.BlockedConv2DNchwFchwOp"))
       return failure();
     OpOperand *filter = linalgOp.getDpsInputOperands()[1];
     if (!hasFilterWithRandSEqualOne(filter, /*Rpos=*/2, /*Spos=*/3))
@@ -470,8 +475,7 @@ struct InterchangeAfterBlockingAndCollapsing
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::isMarkedWithTpp(linalgOp,
-                                     "tpp.BlockedandCollapsedConv2DNchwFchwOp"))
+    if (!isMarkedWithTpp(linalgOp, "tpp.BlockedandCollapsedConv2DNchwFchwOp"))
       return failure();
 
     // clang-format off
@@ -514,8 +518,8 @@ struct MapToBRGEMM : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!tpp::utils::isMarkedWithTpp(
-            linalgOp, "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
+    if (!isMarkedWithTpp(linalgOp,
+                         "tpp.BlockedCollapsedAndInterConv2DNchwFchwOp"))
       return failure();
     FailureOr<SmallVector<Value>> maybeLoopsOrGenericRes =
         mlir::linalgx::rewriteToBRGemmOp(rewriter, linalgOp);
