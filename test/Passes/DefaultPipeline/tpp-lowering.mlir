@@ -30,11 +30,3 @@ func.func @tpp_ops(%arg0: memref<3x5x4xf32>, %arg1: memref<3x4x5xf32>, %arg2: me
 // LOOPS: scf.for
 // LOOPS:   arith.mulf
 // LOOPS:   arith.addf
-
-// XSMM-LABEL: copy_memref
-func.func @copy_memref(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) {
-  // XSMM: xsmm.unary.dispatch identity
-  // XSMM-NEXT: xsmm.unary identity
-  memref.copy %arg0, %arg1 : memref<2x2xf32> to memref<2x2xf32>
-  return
-}

@@ -302,7 +302,6 @@ private:
       pm.addPass(createConvertTppToLoops());
     else {
       // Memref to tpp conversion patterns.
-      pm.addPass(createConvertMemRefToXsmm());
       if (linalgToXsmm) {
         // Linalg to Xsmm conversion patterns.
         pm.addPass(createConvertLinalgToXsmm());
