@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
-#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"

@@ -109,14 +109,6 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
                            "tensor::TensorDialect"];
 }
 
-def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
-  let summary = "Combine tpps into bigger tpp";
-  let description = [{
-    Convert tpp bias + brgemm + relu op to a larger op.
-  }];
-  let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
-}
-
 def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
 }

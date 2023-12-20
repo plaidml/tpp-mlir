@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Tpp/TppOps.h"
-#include "TPP/Dialect/Tpp/TppUtils.h"
 #include "TPP/IR/MatcherUtils.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
@@ -83,17 +82,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    if (auto [isBrgemmOp, hasBatch] = structured_match::utils::isBrgemmVnniOp(
-            linalgOp, /*captures=*/nullptr);
-        isBrgemmOp == true) {
-      SmallVector<Value> operands = linalgOp.getDpsInputs();
-      SmallVector<Value> initOperands = linalgOp.getDpsInits();
-      operands.append(initOperands.begin(), initOperands.end());
-      rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(linalgOp, operands,
-                                                 operands.back().getType());
-      return success();
-    }
-
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match to a known tpp operation");
   }
@@ -109,61 +97,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, "Expect static shape when mapping to tpp");
     }
     return rewriteToTppOp(linalgOp, rewriter);
-  }
-};
-
-// Convert a linalg.batch_reduce_matmul to a tpp.brgemm.
-struct ConvertBrgemmToTpp
-    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
-  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brMatmulOp,
-                                PatternRewriter &rewriter) const override {
-    if (!brMatmulOp.hasTensorSemantics()) {
-      return rewriter.notifyMatchFailure(
-          brMatmulOp, "Expect tensor type when mapping to tpp");
-    }
-    if (brMatmulOp.hasDynamicShape()) {
-      return rewriter.notifyMatchFailure(
-          brMatmulOp, "Expect static shape when mapping to tpp");
-    }
-    SmallVector<Value> inputs = brMatmulOp.getDpsInputs();
-    inputs.push_back(brMatmulOp.getDpsInits()[0]);
-    Value output = brMatmulOp.getDpsInits()[0];
-    auto outType = dyn_cast<ShapedType>(output.getType());
-    if (!outType || !isa<FloatType>(outType.getElementType())) {
-      return rewriter.notifyMatchFailure(brMatmulOp,
-                                         "Expect shaped float type");
-    }
-
-    rewriter.replaceOpWithNewOp<tpp::BrgemmOp>(brMatmulOp, inputs, outType);
-    return success();
-  }
-};
-
-// Convert a linalg.matmul to a tpp.matmul.
-struct ConvertMatmulToTpp : public OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
-                                PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics()) {
-      return rewriter.notifyMatchFailure(
-          matmulOp, "Expect tensor type when mapping to tpp");
-    }
-    if (matmulOp.hasDynamicShape()) {
-      return rewriter.notifyMatchFailure(
-          matmulOp, "Expect static shape when mapping to tpp");
-    }
-    SmallVector<Value> inputs = matmulOp.getDpsInputs();
-    inputs.push_back(matmulOp.getDpsInits()[0]);
-    Value output = matmulOp.getDpsInits()[0];
-    auto outType = dyn_cast<ShapedType>(output.getType());
-    if (!outType || !isa<FloatType>(outType.getElementType()))
-      return rewriter.notifyMatchFailure(matmulOp, "Expect shaped float type");
-
-    rewriter.replaceOpWithNewOp<tpp::GemmOp>(matmulOp, inputs, outType);
-    return success();
   }
 };
 
@@ -217,8 +150,6 @@ void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
   // clang-format off
   patterns.add<ConvertGenericOpToTpp,
-               ConvertBrgemmToTpp,
-               ConvertMatmulToTpp,
                ConvertFillToTpp>(patterns.getContext());
   // clang-format on
 }

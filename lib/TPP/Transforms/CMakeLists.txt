@@ -2,7 +2,6 @@ add_subdirectory(Utils)
 
 add_mlir_library(TPPTransforms
   Bufferize.cpp
-  CombineTpp.cpp
   ConstantFoldPack.cpp
   ConvertForAllToParallelOp.cpp
   ConvInitSimplify.cpp

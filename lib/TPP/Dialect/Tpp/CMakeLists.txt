@@ -2,7 +2,6 @@ add_mlir_dialect_library(TPPTppDialect
   # Ops and dialects
     TppDialect.cpp
     TppOps.cpp
-    TppUtils.cpp
     TppAttr.cpp
     TppTraits.cpp
     TppInterface.cpp

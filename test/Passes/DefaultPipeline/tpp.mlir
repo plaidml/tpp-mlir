@@ -167,13 +167,17 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
   
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.brgemm ins(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: memref<3x3xf32>)
-             outs(%arg2: memref<3x3xf32>)
+  linalg.batch_reduce_matmul ins(%arg0, %arg1: memref<2x3x4xf32>, memref<2x4x3xf32>)
+                             outs(%arg2: memref<3x3xf32>)
 
   return
 }
 
 // -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: func.func @brgemm_bf16
 // CHECK-SAME:  %[[ARG0:.+]]: memref<64x4x4xbf16>,
@@ -196,9 +200,16 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.brgemm ins(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>, %arg2: memref<4x4xbf16>)
-             outs(%arg2: memref<4x4xbf16>)
-
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%arg0, %arg1 : memref<64x4x4xbf16>, memref<64x2x4x2xbf16>)
+    outs(%arg2 : memref<4x4xbf16>) {
+      ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
+        %5 = arith.mulf %in, %in_5 : bf16
+        %6 = arith.addf %out, %5 : bf16
+        linalg.yield %6 : bf16
+  }
   return
 }
 
@@ -225,8 +236,8 @@ func.func @gemm(%A: memref<4x8xf32>,
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  tpp.gemm ins(%A : memref<4x8xf32>, %B : memref<8x4xf32>, %C : memref<4x4xf32>)
-           outs(%C : memref<4x4xf32>)
+  linalg.matmul ins(%A, %B : memref<4x8xf32>, memref<8x4xf32>)
+                outs(%C : memref<4x4xf32>)
 
   return
 }
@@ -252,10 +263,10 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<4x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1] : memref<8x16x32x32xf32> to memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<4x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
-                   %subview_0 : memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
-                   %subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-               outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
+    linalg.batch_reduce_matmul ins(%subview, %subview_0 : 
+                                   memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
+                                   memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>)
+                               outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
     scf.yield
   }
 
@@ -288,10 +299,9 @@ func.func @conv2d_1x1(%arg0: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
   scf.for %arg1 = %c0 to %c7 step %c1 {
     %subview = memref.subview %arg0[0, %arg1, 0, 0] [1, 1, 7, 2048] [1, 1, 1, 1] : memref<1x7x7x2048xf32> to memref<7x2048xf32, strided<[2048, 1], offset: ?>>
     %subview_0 = memref.subview %alloc[0, %arg1, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : memref<1x7x7x512xf32> to memref<7x512xf32, strided<[512, 1], offset: ?>>
-    tpp.gemm ins(%subview : memref<7x2048xf32, strided<[2048, 1], offset: ?>>,
-                   %0 : memref<2048x512xf32>,
-                   %subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
-               outs(%subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
+    linalg.matmul ins(%subview, %0 : memref<7x2048xf32, strided<[2048, 1], offset: ?>>, 
+                                     memref<2048x512xf32>)
+                  outs(%subview_0 : memref<7x512xf32, strided<[512, 1], offset: ?>>)
   }
 
   // CHECK: return {{.*}} : memref<1x7x7x512xf32>
@@ -340,8 +350,8 @@ func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
   // CHECK-NEXT: %[[llvm_ptr3:.*]] = llvm.inttoptr %[[ptr_cast3]] : i64 to !llvm.ptr
 
   // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr2]], %[[C0]], %[[llvm_ptr3]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-  tpp.gemm ins(%arg0 : memref<128x256xf32>, %arg1 : memref<256x512xf32>, %arg3 : memref<128x512xf32>)
-           outs(%arg3 : memref<128x512xf32>)
+  linalg.matmul ins(%arg0, %arg1 : memref<128x256xf32>, memref<256x512xf32>)
+                outs(%arg3 : memref<128x512xf32>)
 
   // Relu
   // CHECK: call @xsmm_unary_dispatch

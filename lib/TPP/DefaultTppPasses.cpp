@@ -233,6 +233,7 @@ private:
 };
 
 // Convert all matching operations to TPP.
+// TODO: We can remove it now. It has a single pass inside.
 struct TppConversion : public tpp::impl::TppConversionBase<TppConversion>,
                        UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -262,7 +263,6 @@ private:
 
     // Convert all higher level dialects to TPP.
     pm.addPass(createConvertLinalgToTpp());
-    pm.addPass(createCombineTppOps());
   }
 };
 
