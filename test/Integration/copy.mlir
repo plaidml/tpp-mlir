@@ -30,7 +30,7 @@ func.func @copytppbrcast(%A: tensor<1x6xf32>) -> tensor<9x6xf32>  {
 // IR-LABEL: copytppbrcastother
 func.func @copytppbrcastother(%A: tensor<6x1xf32>) -> tensor<6x9xf32>  {
   %B = tensor.empty() : tensor<6x9xf32>
-  // IR: linalg.generic
+  // IR: xsmm_unary_invoke
   %O = linalg.generic { indexing_maps = [#map2, #map0],
                         iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<6x1xf32>) outs(%B: tensor<6x9xf32>) {

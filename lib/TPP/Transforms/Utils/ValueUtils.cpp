@@ -75,9 +75,6 @@ static bool isZeroOp(Operation *defOp) {
   if (!defOp)
     return false;
 
-  if (isa_and_nonnull<tpp::ZeroOp>(defOp))
-    return true;
-
   return TypeSwitch<Operation *, bool>(defOp)
       .Case<arith::ConstantOp>([&](auto op) {
         // Dense attributes don't match APFloat.isZero()

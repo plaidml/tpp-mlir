@@ -173,9 +173,7 @@ static bool isTppBinaryOp(linalg::LinalgOp linalgOp) {
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
-          .input(MatchAll(), HasMap(ProjectedPermutation()))
-          // TODO: This should not depend on TPPs.
-          .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+          .input(MatchAll(), HasMap(ProjectedPermutation()));
   // clang-format on
   return isTppOp(linalgOp) && binaryMatcher.match(linalgOp);
 }
@@ -355,9 +353,7 @@ bool isTwoDReluOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .output(MatchAll(), HasMap(Identity()))
     .input(MatchAll(), HasMap(ProjectedPermutation()))
-    .region(MatchOne(0), WithReluBody(operands))
-    // TODO: This should not depend from TPPs.
-    .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+    .region(MatchOne(0), WithReluBody(operands));
   // clang-format on
   return isTppUnaryOp(linalgOp) && reluMatcher.match(linalgOp);
 }
@@ -372,9 +368,7 @@ bool isTwoDIdentityOp(linalg::LinalgOp linalgOp,
     .output(MatchAll(), HasMap(Identity()))
     .input(MatchAll(), HasMap(ProjectedPermutation()))
     .region(
-      MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands))
-    // TODO: This should not depend from TPPs.
-    .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+      MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
   // clang-format on
 
   if (!isTppUnaryOp(linalgOp) || !identityMatcher.match(linalgOp) ||
@@ -395,9 +389,7 @@ bool isTwoDZeroOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .output(MatchAll(), HasMap(Identity()))
     .input(MatchAll(), HasMap(ProjectedPermutation()))
-    .region(MatchOne(0), WithSingleOp<linalg::YieldOp>())
-    // TODO: This should not depend from TPPs.
-    .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape));
+    .region(MatchOne(0), WithSingleOp<linalg::YieldOp>());
   // clang-format on
 
   if (!isTppUnaryOp(linalgOp) || !zeroMatcher.match(linalgOp))

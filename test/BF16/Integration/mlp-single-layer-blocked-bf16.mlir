@@ -5,6 +5,8 @@
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
 
 func.func @entry(){
   %f0 = arith.constant 1.0:bf16
@@ -35,7 +37,16 @@ func.func @entry(){
           %6 = arith.addf %out, %5 : bf16
         linalg.yield %6 : bf16
       }
-      tpp.relu ins(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>)
+
+      %c0_bf16 = arith.constant 0.0 : bf16
+      linalg.generic {
+        indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel"]}
+        ins(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) 
+        outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) {
+          ^bb0(%in: bf16, %out: bf16): 
+          %2 = arith.maximumf %in, %c0_bf16 : bf16
+          linalg.yield %2 : bf16
+      }
       %d1 = arith.constant -1.0 : bf16
       %v0 = vector.transfer_read %subview_4[%c0, %c0], %d1 : memref<4x4xbf16, strided<[4,1], offset:?>>, vector<4x4xbf16>
       %f1 = arith.extf %v0:vector<4x4xbf16> to vector<4x4xf32>

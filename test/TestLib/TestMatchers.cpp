@@ -167,7 +167,7 @@ void testCaptureAffineMaps(FunctionOpInterface funcOp) {
       .operation(NumDpsInits(EqualsTo(1)))
       .operation(NumDpsInputs(EqualsTo(2)))
       .input(MatchOne(0), HasMap(ProjectedPermutation(), &aMap))
-      .input(MatchOne(1), HasMap(ProjectedPermutation(), &bMap))
+      .input(MatchOne(1), HasMap(Any(), &bMap))
       .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap));
   // clang-format on
   funcOp->walk([&](linalg::LinalgOp linalgOp) {

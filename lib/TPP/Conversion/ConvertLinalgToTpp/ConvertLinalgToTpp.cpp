@@ -40,28 +40,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult rewriteToTppOp(linalg::GenericOp linalgOp,
                                PatternRewriter &rewriter) const {
-    SmallVector<Value> operands;
-    if (structured_match::utils::isTwoDZeroOp(linalgOp, &operands)) {
-      assert(operands.size() == 1 && "tpp.zero expects one operand");
-      rewriter.replaceOpWithNewOp<tpp::ZeroOp>(linalgOp, operands[0],
-                                               operands[0].getType());
-      return success();
-    }
-
-    if (structured_match::utils::isTwoDIdentityOp(linalgOp, &operands)) {
-      assert(operands.size() == 2 && "tpp.identity expects two operands");
-      rewriter.replaceOpWithNewOp<tpp::IdentityOp>(linalgOp, operands[0],
-                                                   operands[1].getType());
-      return success();
-    }
-
-    if (structured_match::utils::isTwoDReluOp(linalgOp, &operands)) {
-      assert(operands.size() == 2 && "tpp.relu expects two operands");
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, operands[0],
-                                               operands[1].getType());
-      return success();
-    }
-
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match to a known tpp operation");
   }
@@ -77,38 +55,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
           linalgOp, "Expect static shape when mapping to tpp");
     }
     return rewriteToTppOp(linalgOp, rewriter);
-  }
-};
-
-// Convert a linalg.fill to a tpp.zero.
-struct ConvertFillToTpp : public OpRewritePattern<linalg::FillOp> {
-  using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
-                                PatternRewriter &rewriter) const override {
-    if (!fillOp.hasTensorSemantics()) {
-      return rewriter.notifyMatchFailure(
-          fillOp, "Expect tensor type when mapping to tpp");
-    }
-    if (fillOp.hasDynamicShape()) {
-      return rewriter.notifyMatchFailure(
-          fillOp, "Expect static shape when mapping to tpp");
-    }
-
-    auto inputs = fillOp.getInputs();
-    if (!utils::isZeroTensor(inputs[0]))
-      return rewriter.notifyMatchFailure(fillOp, "Unsupported fill type");
-
-    auto output = fillOp.getOutputs()[0];
-    auto outType = dyn_cast<ShapedType>(output.getType());
-    if (!outType || !isa<FloatType>(outType.getElementType()))
-      return rewriter.notifyMatchFailure(fillOp, "Expect shaped float type");
-    auto outputRank = outType.getRank();
-    if (outputRank != 2)
-      return rewriter.notifyMatchFailure(fillOp, "Expect output rank 2");
-
-    rewriter.replaceOpWithNewOp<tpp::ZeroOp>(fillOp, output, outType);
-    return success();
   }
 };
 
@@ -129,7 +75,6 @@ struct ConvertLinalgToTpp
 void mlir::tpp::populateConvertLinalgToTppPatterns(
     RewritePatternSet &patterns) {
   // clang-format off
-  patterns.add<ConvertGenericOpToTpp,
-               ConvertFillToTpp>(patterns.getContext());
+  patterns.add<ConvertGenericOpToTpp>(patterns.getContext());
   // clang-format on
 }
