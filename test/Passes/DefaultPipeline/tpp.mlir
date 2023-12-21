@@ -13,8 +13,8 @@ func.func @add(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-  tpp.add ins(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) outs(%arg1: memref<3x3xf32>)
-
+  linalg.add ins(%arg0, %arg1: memref<3x3xf32>, memref<3x3xf32>) 
+             outs(%arg1: memref<3x3xf32>)
   return
 }
 
@@ -32,8 +32,8 @@ func.func @add_mapping(%arg0: memref<1x10x10xf32>, %arg1: memref<1x10x10xf32>) {
   // CHECK: call @xsmm_binary_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}
   %subview = memref.subview %arg0[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
   %subview_0 = memref.subview %arg1[0, 0, 0] [1, 10, 10] [1, 1, 1] : memref<1x10x10xf32> to memref<10x10xf32>
-  tpp.add ins(%subview : memref<10x10xf32>, %subview_0 : memref<10x10xf32>) outs(%subview_0 : memref<10x10xf32>)
-
+  linalg.add ins(%subview, %subview_0 : memref<10x10xf32>, memref<10x10xf32>) 
+             outs(%subview_0 : memref<10x10xf32>)
   return
 }
 
@@ -54,7 +54,8 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
   scf.parallel (%arg2) = (%c0) to (%c10) step (%c1) {
     %subview = memref.subview %arg0[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
-    tpp.add ins(%subview : memref<10x10xf32, #map>, %subview_0 : memref<10x10xf32, #map>) outs(%subview_0 : memref<10x10xf32, #map>)
+    linalg.add ins(%subview, %subview_0 : memref<10x10xf32, #map>, memref<10x10xf32, #map>) 
+               outs(%subview_0 : memref<10x10xf32, #map>)
     scf.yield
   }
 

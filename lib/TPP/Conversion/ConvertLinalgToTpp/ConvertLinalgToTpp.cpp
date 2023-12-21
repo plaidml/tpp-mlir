@@ -62,26 +62,6 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    if (structured_match::utils::isTwoDAddOp(linalgOp, &operands)) {
-      assert(operands.size() == 3 && "tpp.add expects three operands");
-      rewriter.replaceOpWithNewOp<tpp::AddOp>(
-          linalgOp, ValueRange{operands[0], operands[1]},
-          operands[2].getType());
-      return success();
-    }
-
-    if (structured_match::utils::isTwoDBiasReluOp(linalgOp, &operands)) {
-      assert(operands.size() == 3 && "tpp.add+tpp.relu expects three operands");
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointAfter(linalgOp);
-      auto add = rewriter.create<tpp::AddOp>(
-          linalgOp.getLoc(), ValueRange{operands[0], operands[1]},
-          operands[2].getType());
-      rewriter.replaceOpWithNewOp<tpp::ReluOp>(linalgOp, add.getResult(0),
-                                               operands[2].getType());
-      return success();
-    }
-
     return rewriter.notifyMatchFailure(
         linalgOp, "failed to match to a known tpp operation");
   }

@@ -1,24 +1,5 @@
 // RUN: tpp-opt %s -default-tpp-passes="linalg-to-loops" -split-input-file | FileCheck %s
 
-// Direct linalg lowering to loops should leave all TPP operations untouched.
-// CHECK-NOT: func.func private @xsmm_
-// CHECK: func.func @tpp_ops(
-// CHECK-SAME:  %[[ARG0:[^ ]+]]: memref<3x3xf32>,
-// CHECK-SAME:  %[[ARG1:[^ ]+]]: memref<3x3xf32>,
-// CHECK-SAME:  %[[ARG2:[^ ]+]]: memref<1x1xf32>)
-func.func @tpp_ops(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<1x1xf32>) {
-  // CHECK: tpp.identity
-  // CHECK: tpp.add
-  // CHECK: tpp.relu
-  tpp.identity ins(%arg2 : memref<1x1xf32>) outs(%arg0 : memref<3x3xf32>)
-  tpp.add ins(%arg0 : memref<3x3xf32>, %arg1 : memref<3x3xf32>) outs(%arg1 : memref<3x3xf32>)
-  tpp.relu ins(%arg0 : memref<3x3xf32>) outs(%arg0 : memref<3x3xf32>)
-
-  return
-}
-
-// -----
-
 // CHECK-NOT: func.func private @xsmm_
 // CHECK: func.func @matmul(
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x8xf32>,

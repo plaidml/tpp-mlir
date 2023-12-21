@@ -96,21 +96,6 @@ static LogicalResult lowerUnaryTPPtoXSMM(PatternRewriter &rewriter,
                                        *flags, {m, n, *ldi, *ldo});
 }
 
-static LogicalResult lowerBinaryTPPtoXSMM(Operation *op,
-                                          PatternRewriter &rewriter, Type elmTy,
-                                          xsmm::BinaryKind kind,
-                                          xsmm::BinaryFlags flags,
-                                          ArrayRef<int64_t> dims) {
-  assert(isa<tpp::TppOp>(op));
-  auto tppOp = cast<tpp::TppOp>(op);
-  if (!tppOp.hasBufferSemantics())
-    return rewriter.notifyMatchFailure(tppOp, "xsmm expects a memref type");
-  return lowerTPPtoXSMM<xsmm::BinaryKind, xsmm::BinaryFlags,
-                        xsmm::BinaryKindAttr, xsmm::BinaryFlagsAttr,
-                        xsmm::BinaryDispatchOp, xsmm::BinaryOp>(
-      tppOp, rewriter, elmTy, kind, flags, dims);
-}
-
 struct ConvertTppIdentityOp : public OpRewritePattern<tpp::IdentityOp> {
   using OpRewritePattern<tpp::IdentityOp>::OpRewritePattern;
 
@@ -138,63 +123,12 @@ struct ConvertTppZeroOp : public OpRewritePattern<tpp::ZeroOp> {
   }
 };
 
-struct ConvertTppAddOp : public OpRewritePattern<tpp::AddOp> {
-  using OpRewritePattern<tpp::AddOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tpp::AddOp addOp,
-                                PatternRewriter &rewriter) const override {
-    if (!addOp.hasBufferSemantics())
-      return rewriter.notifyMatchFailure(addOp, "xsmm expects a memref type");
-
-    MemRefType outputMemRef = addOp.getOutputType();
-    assert(outputMemRef.getRank() == 2 && "expect rank 2 for TPP ops");
-
-    int64_t m = outputMemRef.getShape()[0];
-    int64_t n = outputMemRef.getShape()[1];
-
-    auto lhsMemRef = addOp.getInputs()[0].getType().cast<MemRefType>();
-    auto rhsMemRef = addOp.getInputs()[1].getType().cast<MemRefType>();
-
-    auto ldiLhsDim = xsmm::utils::getLeadingDim(lhsMemRef);
-    if (failed(ldiLhsDim))
-      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on lhs");
-    int64_t ldiLhs = *ldiLhsDim;
-
-    auto ldiRhsDim = xsmm::utils::getLeadingDim(rhsMemRef);
-    if (failed(ldiRhsDim))
-      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldi on rhs");
-    int64_t ldiRhs = *ldiRhsDim;
-
-    auto ldoDim = xsmm::utils::getLeadingDim(outputMemRef);
-    if (failed(ldoDim))
-      return rewriter.notifyMatchFailure(addOp, "Cannot compute ldo");
-    int64_t ldo = *ldoDim;
-
-    auto bCastOnLhs = xsmm::utils::getBinaryFlags(lhsMemRef, outputMemRef,
-                                                  xsmm::utils::OperandPos::LHS);
-    auto bCastOnRhs = xsmm::utils::getBinaryFlags(rhsMemRef, outputMemRef,
-                                                  xsmm::utils::OperandPos::RHS);
-    if (failed(bCastOnLhs) || failed(bCastOnRhs))
-      return failure();
-
-    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(*bCastOnLhs) << "\n");
-    LLVM_DEBUG(llvm::dbgs() << stringifyBinaryFlags(*bCastOnRhs) << "\n");
-
-    xsmm::BinaryFlags bCast =
-        (bCastOnLhs != xsmm::BinaryFlags::NONE) ? *bCastOnLhs : *bCastOnRhs;
-
-    return lowerBinaryTPPtoXSMM(addOp, rewriter, outputMemRef.getElementType(),
-                                xsmm::BinaryKind::ADD, bCast,
-                                {m, n, ldiLhs, ldiRhs, ldo});
-  }
-};
-
 struct ConvertTppToXsmm
     : public tpp::impl::ConvertTppToXsmmBase<ConvertTppToXsmm> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp,
-                 ConvertTppAddOp>(patterns.getContext());
+    patterns.add<ConvertTppIdentityOp, ConvertTppReluOp, ConvertTppZeroOp>(
+        patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

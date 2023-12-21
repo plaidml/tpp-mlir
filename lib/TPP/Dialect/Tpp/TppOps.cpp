@@ -267,33 +267,3 @@ void ZeroOp::getEffects(
         &effects) {
   getEffectsImpl(*this, effects);
 }
-
-//===----------------------------------------------------------------------===//
-// AddOp
-//===----------------------------------------------------------------------===//
-
-// Builder for memref abstraction.
-void AddOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
-                  Value output) {
-  tppOpBuilderMemRef(builder, state, inputs, output);
-}
-
-// Builder for tensor abstraction.
-void AddOp::build(OpBuilder &builder, OperationState &state, ValueRange inputs,
-                  Type outputType) {
-  tppOpBuilderTensor(builder, state, inputs, outputType);
-}
-
-void AddOp::print(OpAsmPrinter &printer) {
-  printTppOp(printer, getInputs(), getOutputs(), getResultTypes(), *this);
-}
-
-ParseResult AddOp::parse(OpAsmParser &parser, OperationState &result) {
-  return parseTppOp(parser, result);
-}
-
-void AddOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  getEffectsImpl(*this, effects);
-}
