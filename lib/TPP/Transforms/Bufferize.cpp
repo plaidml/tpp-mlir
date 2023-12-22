@@ -33,8 +33,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 
@@ -67,12 +65,10 @@ struct Bufferize : public tpp::impl::BufferizeBase<Bufferize> {
                 check::CheckDialect,
                 perf::PerfDialect,
                 scf::SCFDialect,
-                tpp::TppDialect,
                 tensor::TensorDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
-    tpp::registerBufferizableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 };

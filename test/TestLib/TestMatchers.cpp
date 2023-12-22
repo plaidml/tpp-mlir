@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -116,22 +115,6 @@ void testPredicates(FunctionOpInterface funcOp) {
   });
 }
 
-void testInterfaces(FunctionOpInterface funcOp) {
-  // clang-format off
-  auto matcher =
-    StructuredOpMatcher::make<linalg::GenericOp>()
-      .operation(
-        VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop));
-  // clang-format on
-
-  funcOp->walk([&](linalg::LinalgOp linalgOp) {
-    if (matcher.match(linalgOp))
-      llvm::outs() << "match interface\n";
-    else
-      llvm::outs() << "not a match\n";
-  });
-}
-
 void testTppIdentity(FunctionOpInterface funcOp) {
   // clang-format off
   SmallVector<Value> operands;
@@ -146,8 +129,6 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasMap(Identity()))
       .input(MatchAll(), HasMap(ProjectedPermutation()))
-      .operation(VerifyOpProperty(OpTrait::tpp::checkUnitStrideInnerLoop))
-      .operation(VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape))
       .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&operands));
   // clang-format on
 
@@ -280,8 +261,6 @@ void TestStructuralMatchers::runOnOperation() {
     testTppAdd(f);
   if (f.getName() == "test_predicates")
     testPredicates(f);
-  if (f.getName() == "test_interfaces")
-    testInterfaces(f);
   if (f.getName() == "test_tpp_identity")
     testTppIdentity(f);
   if (f.getName() == "test_rank")

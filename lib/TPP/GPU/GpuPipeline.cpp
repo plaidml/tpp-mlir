@@ -31,8 +31,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
@@ -78,7 +76,6 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
   using GpuPipelineBase::GpuPipelineBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tpp::TppDialect>();
     registry.insert<linalg::LinalgDialect>();
     registry.insert<scf::SCFDialect>();
     registry.insert<memref::MemRefDialect>();
@@ -91,7 +88,6 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
-    tpp::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Add all core MLIR dialects to make the pipeline more robust with respect
     // to accepted input IR by preventing cryptic runtime crashes due to missing

@@ -194,41 +194,6 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
 }
 
 //===----------------------------------------------------------------------===//
-// ConvertLinalgToTpp
-//===----------------------------------------------------------------------===//
-
-// TODO: this does not compose as it invalidate all the handles.
-def ConvertLinalgToTpp : Op<Transform_Dialect,
-                            "structured.map_and_convert_linalg_to_tpp", [
-    FunctionalStyleTransformOpTrait,
-    MemoryEffectsOpInterface,
-    TransformEachOpTrait,
-    TransformOpInterface]> {
-
-  let description = [{
-    Wrapper around `populateConvertLinalgToTppPatterns`.
-
-    Note that this transformation is invalidating the handles to any payload IR
-    operation contained in the target operation.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = [{
-    $target attr-dict `:` type($target)
-  }];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-      ::mlir::transform::TransformRewriter &rewriter,
-      ::mlir::Operation *target,
-      ::mlir::transform::ApplyToEachResultList &results,
-      ::mlir::transform::TransformState &state);
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // GetBlockedConvolutions
 //===----------------------------------------------------------------------===//
 

@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppTraits.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"

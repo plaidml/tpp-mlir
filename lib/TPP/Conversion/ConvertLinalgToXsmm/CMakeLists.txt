@@ -15,4 +15,5 @@ add_mlir_conversion_library(TPPLinalgToXSMM
   MLIRTensorDialect
   MLIRMemRefDialect
   MLIRFuncDialect
+  TPPIR
   )

@@ -20,7 +20,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/PassUtils.h"
 
@@ -44,7 +43,6 @@ struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
   using GpuConversionBase::GpuConversionBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tpp::TppDialect>();
     registry.insert<linalg::LinalgDialect>();
     registry.insert<scf::SCFDialect>();
     registry.insert<memref::MemRefDialect>();

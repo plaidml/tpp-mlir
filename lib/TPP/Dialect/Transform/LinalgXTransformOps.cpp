@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
-#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/Transforms/Transforms.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
 #include "mlir/AsmParser/AsmParser.h"
@@ -150,31 +149,6 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
   // TODO: (lorenzo): Use `transform.apply_patterns` so that we can avoi
   // all this tracking issues. See `ApplyCastAwayVectorLeadingOneDimPatternsOp`
   // in `VectorTransformOps.td`.
-  TrackingListener listener(state, *this);
-  GreedyRewriteConfig config;
-  config.listener = &listener;
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns), config)))
-    return emitDefaultDefiniteFailure(target);
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===----------------------------------------------------------------------===//
-// ConvertLinalgToTpp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure transform::ConvertLinalgToTpp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    ApplyToEachResultList &results, TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    auto diag = this->emitOpError("requires isolated-from-above targets");
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return DiagnosedSilenceableFailure::definiteFailure();
-  }
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  mlir::tpp::populateConvertLinalgToTppPatterns(patterns);
-
   TrackingListener listener(state, *this);
   GreedyRewriteConfig config;
   config.listener = &listener;

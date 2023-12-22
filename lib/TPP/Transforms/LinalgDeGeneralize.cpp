@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppOps.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
