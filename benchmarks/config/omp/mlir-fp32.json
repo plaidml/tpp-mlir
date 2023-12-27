@@ -3,28 +3,28 @@
   "gemm_fp32_mlir": {
     "fp32_3x1024_omp_2_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "2", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_4_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_8_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_16_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
@@ -34,28 +34,28 @@
   "mlp_fp32_mlir": {
     "fp32_3x1024_omp_2_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "2", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_4_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_8_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "8", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_omp_16_mlir": {
       "type": "IR-GEN",
-      "benchmark": [ "mlir-gen", "--kernel=model --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
+      "benchmark": [ "mlir-gen", "--kernel=inference --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" }, 
       "flags": [ "-n", "100", "-run-args='-def-parallel'" ],
       "extensions": [ "(avx2|asimd)" ]
