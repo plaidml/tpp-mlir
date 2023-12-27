@@ -123,9 +123,18 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
         xsmm::utils::getBinaryFlags(fusedMatch.binaryOp.getOperand(1).getType(),
                                     fusedMatch.binaryOp.getOperand(3).getType(),
                                     mlir::xsmm::utils::OperandPos::LHS);
-    if (binaryFlags != mlir::xsmm::BinaryFlags::BCAST_COL_IN_0)
+    int binaryArg = 0;
+    switch (*binaryFlags) {
+    case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0:
+      binaryArg = 2;
+      break;
+    case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1:
+      binaryArg = 3;
+      binaryFlags = mlir::xsmm::BinaryFlags::BCAST_COL_IN_0;
+      break;
+    default:
       return failure();
-
+    }
     // Now, replace the ops with a fused BRGEMM
     auto dtype =
         xsmm::utils::getDataType(rewriter, brgemmOp.getOperand(1).getType());
@@ -163,7 +172,7 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     invokeOperands.append(opItr, brgemmOp->getOperands().end());
     // Drop the C operand
     invokeOperands.pop_back();
-    invokeOperands.push_back(fusedMatch.binaryOp->getOperand(2));
+    invokeOperands.push_back(fusedMatch.binaryOp->getOperand(binaryArg));
     invokeOperands.push_back(batchDim);
 
     // Replace and delete the old invokes and their dispatches

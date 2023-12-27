@@ -9,6 +9,7 @@
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -292,7 +293,7 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   Operation *prev = nullptr;
   for (auto *user : op->getUsers()) {
     // Deduplicate, only take each operation once
-    if (user == prev)
+    if (dyn_cast<func::ReturnOp>(user) || user == prev)
       continue;
     chain.push_back(user);
     prev = user;
@@ -303,7 +304,7 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
       // (it could be one of BRGEMM's inputs in the chain)
       if (brgemmOp.getOperand(3).getDefiningOp() != op)
         return failure();
-      break;
+      continue;
     }
 
     // Make sure this is a chain, ie. at least once in inputs and outputs
@@ -317,8 +318,10 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   // We don't know how to fuse more than two tail ops after the BRGEMM
   if (chain.size() > 3)
     return failure();
-  // List is in reverse order, put the brgemm at the top
-  std::reverse(chain.begin(), chain.end());
+  if (!isa<xsmm::BrgemmOp>(chain[0]))
+    // List is in reverse order, put the brgemm at the top
+    std::reverse(chain.begin(), chain.end());
+
   // If we haven't found a BRGEMM, this are not the droids we're looking for
   assert(isa<xsmm::BrgemmOp>(chain[0]) && "First op must be brgemm");
 
