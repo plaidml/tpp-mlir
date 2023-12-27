@@ -75,13 +75,9 @@ class MLIRGenerator {
   bool enableSoftmax;
 
   /// List of supported kernel types that can be generated
-  ///  * Model: Generates an entire model, with input handling, output creation,
-  ///           constant weight and bias, etc. This demonstrates the whole cost
-  ///           of packing, propagation, etc.
-  ///  * Layer: Generates a number of layers with all input/output/weight/bias
-  ///           pre-computed as arguments outside of the function call. This
-  ///           represents the `core` of each layer without any packing costs.
-  enum class KernelType { Model, Layer };
+  ///  * Inference: Generates weights and biases as constant (RO).
+  ///  * Training: Generates weights and biaseds as arguments (RW).
+  enum class KernelType { Inference, Training };
 
   /// Type of kernel to be generated
   KernelType kernelType;

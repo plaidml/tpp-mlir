@@ -1,6 +1,6 @@
-// RUN: mlir-gen --kernel=layer --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=0 2>&1 | FileCheck %s --check-prefix=BF16
-// RUN: mlir-gen --kernel=layer --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=2 2>&1 | FileCheck %s --check-prefix=DP2
-// RUN: mlir-gen --kernel=layer --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=4 2>&1 | FileCheck %s --check-prefix=DP4
+// RUN: mlir-gen --kernel=training --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=0 2>&1 | FileCheck %s --check-prefix=BF16
+// RUN: mlir-gen --kernel=training --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=2 2>&1 | FileCheck %s --check-prefix=DP2
+// RUN: mlir-gen --kernel=training --seed=0 --float-width=16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=4 2>&1 | FileCheck %s --check-prefix=DP4
 
 // BF16: // RUN{{.*}}tpp-run %s -n {{\d*}}
 // BF16: // RUN{{.*}}-e entry -entry-point-result=void
