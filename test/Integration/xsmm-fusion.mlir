@@ -2,7 +2,7 @@
 // RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s 
 
 // Check results
-// RUN: tpp-run %s -e entry -entry-point-result=void -seed=0 -print | FileCheck %s --check-prefix=RESULT
+// RUN: tpp-run %s -e entry -entry-point-result=void -seed=123 -print | FileCheck %s --check-prefix=RESULT
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -49,8 +49,8 @@ func.func @entry(%A: tensor<2x4x8xf32>,
 // CHECK:    %[[c1:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c0_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]])
 // CHECK:     call @xsmm_fused_brgemm_invoke(%c1_i64, %[[c1]], %{{.*}}, %[[c0]], %{{.*}}, %{{.*}}, %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]])
 
-// RESULT:( 32, 32, 32, 32 )
-// RESULT:( 32, 32, 32, 32 )
-// RESULT:( 32, 32, 32, 32 )
-// RESULT:( 32, 32, 32, 32 )
+// RESULT: ( 3.62953, 3.62953, 3.62953, 3.62953 )
+// RESULT: ( 1.34322, 1.34322, 1.34322, 1.34322 )
+// RESULT: ( 0.766812, 0.766812, 0.766812, 0.766812 )
+// RESULT: ( 2.66426, 2.66426, 2.66426, 2.66426 )
  
