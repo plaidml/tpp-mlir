@@ -293,7 +293,9 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   Operation *prev = nullptr;
   for (auto *user : op->getUsers()) {
     // Deduplicate, only take each operation once
-    if (dyn_cast<func::ReturnOp>(user) || user == prev)
+    if ((dyn_cast<xsmm::UnaryOp>(user) &&
+         dyn_cast<xsmm::UnaryOp>(user).getCallee() == UnaryKind::ZERO) ||
+        dyn_cast<func::ReturnOp>(user) || user == prev)
       continue;
     chain.push_back(user);
     prev = user;
