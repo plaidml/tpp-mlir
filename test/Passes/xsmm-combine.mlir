@@ -24,12 +24,12 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
   %6 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
   %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<256x512xf32>
   scf.parallel (%arg3, %arg2) = (%c0, %c0) to (%c8, %c8) step (%c1, %c1) {
-	%subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-	%subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-	xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
-	xsmm.binary add(data_type = f32, %5, %2, %subview, %subview) : (i64, memref<32xf32, strided<[32], offset:?>>, memref<32x32xf32, strided<[32,1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-	xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-	scf.yield
+	  %subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+	  %subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+	  xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
+	  xsmm.binary add(data_type = f32, %5, %2, %subview, %subview) : (i64, memref<32xf32, strided<[32], offset:?>>, memref<32x32xf32, strided<[32,1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+	  xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+	  scf.reduce
   }
   return %alloc_1 : memref<256x512xf32>
  }
@@ -73,12 +73,12 @@ func.func @bcast_col_in1_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
   %6 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
   %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<256x512xf32>
   scf.parallel (%arg3, %arg2) = (%c0, %c0) to (%c8, %c8) step (%c1, %c1) {
-	%subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-	%subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-	xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
-	xsmm.binary add(data_type = f32, %5,  %subview, %2, %subview) : (i64, memref<32x32xf32, strided<[32,1], offset: ?>>,  memref<32xf32, strided<[32], offset:?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-	xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-	scf.yield
+	  %subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+	  %subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+	  xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
+	  xsmm.binary add(data_type = f32, %5,  %subview, %2, %subview) : (i64, memref<32x32xf32, strided<[32,1], offset: ?>>,  memref<32xf32, strided<[32], offset:?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+	  xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+	  scf.reduce
   }
   return %alloc_1 : memref<256x512xf32>
  }
@@ -115,12 +115,12 @@ func.func @none_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>
   %6 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
   %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<256x512xf32>
   scf.parallel (%arg3, %arg2) = (%c0, %c0) to (%c8, %c8) step (%c1, %c1) {
-        %subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
-        %subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-        xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
-        xsmm.binary add(data_type = f32, %5, %subview, %2,  %subview) : (i64, memref<32x32xf32, strided<[32,1], offset: ?>>,  memref<32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-        xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
-        scf.yield
+    %subview = memref.subview %alloc_0[%arg3, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+    %subview_2 = memref.subview %alloc[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : memref<8x4x32x32xf32> to memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    xsmm.brgemm(data_type = f32, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<4x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
+    xsmm.binary add(data_type = f32, %5, %subview, %2,  %subview) : (i64, memref<32x32xf32, strided<[32,1], offset: ?>>,  memref<32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+    xsmm.unary relu(data_type = f32, %6, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+    scf.reduce
   }
   return %alloc_1 : memref<256x512xf32>
  }
@@ -137,7 +137,7 @@ memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xb
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32xbf16:  memref<32xbf16, strided<[32], offset:?>> = dense<1.000000e+00> {alignment = 128 : i64}
 
-//bcast_col_in0 flag set on binary add
+// Bcast_col_in0 flag set on binary add
 func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x512xbf16>  {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -163,7 +163,7 @@ func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
     xsmm.brgemm(data_type = bf16, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, memref<4x16x32x2xbf16>, memref<32x32xbf16, strided<[32, 1], offset: ?>>, i64) -> ()
     xsmm.binary add(data_type = bf16, %5, %2, %subview, %subview) : (i64, memref<32xbf16, strided<[32], offset:?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
     xsmm.unary relu(data_type = bf16, %6, %subview, %subview) : (i64, memref<32x32xbf16, strided<[32, 1], offset: ?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
-    scf.yield
+    scf.reduce
   }
   return %alloc_1 : memref<256x512xbf16>
 }
@@ -180,7 +180,7 @@ memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xb
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32xbf16:  memref<32xbf16, strided<[32], offset:?>> = dense<1.000000e+00> {alignment = 128 : i64}
 
-//bcast_col_in1 flag set on binary add 
+// Bcast_col_in1 flag set on binary add 
 func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x512xbf16>  {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -206,7 +206,7 @@ func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
     xsmm.brgemm(data_type = bf16, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, memref<4x16x32x2xbf16>, memref<32x32xbf16, strided<[32, 1], offset: ?>>, i64) -> ()
     xsmm.binary add(data_type = bf16, %5, %subview, %2,  %subview) : (i64 , memref<32x32xbf16, strided<[32, 1], offset: ?>>,memref<32xbf16, strided<[32], offset:?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
     xsmm.unary relu(data_type = bf16, %6, %subview, %subview) : (i64, memref<32x32xbf16, strided<[32, 1], offset: ?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
-    scf.yield
+    scf.reduce
   }
   return %alloc_1 : memref<256x512xbf16>
 }
@@ -224,7 +224,7 @@ memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xb
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32x32xbf16:  memref<32x32xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 
-//none flag set on binary add 
+// None flag set on binary add 
 func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x512xbf16>  {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -250,7 +250,7 @@ func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x51
     xsmm.brgemm(data_type = bf16, %4, %subview_2, %0, %subview, %c4_i64) : (i64, memref<4x32x32xbf16, strided<[1024, 32, 1], offset: ?>>, memref<4x16x32x2xbf16>, memref<32x32xbf16, strided<[32, 1], offset: ?>>, i64) -> ()
     xsmm.binary add(data_type = bf16, %5, %subview, %2,  %subview) : (i64 , memref<32x32xbf16, strided<[32, 1], offset: ?>>,memref<32x32xbf16>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
     xsmm.unary relu(data_type = bf16, %6, %subview, %subview) : (i64, memref<32x32xbf16, strided<[32, 1], offset: ?>>, memref<32x32xbf16, strided<[32, 1], offset: ?>>) -> ()
-    scf.yield
+    scf.reduce
   }
   return %alloc_1 : memref<256x512xbf16>
 }

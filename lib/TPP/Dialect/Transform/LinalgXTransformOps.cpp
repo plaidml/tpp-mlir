@@ -142,7 +142,7 @@ DiagnosedSilenceableFailure transform::PackingPropagationOp::applyToOne(
   MLIRContext *ctx = getContext();
   RewritePatternSet patterns(ctx);
   tpp::populateSinkPackPatterns(patterns);
-  tensor::populateSimplifyTensorPack(patterns);
+  tensor::populateSimplifyPackAndUnpackPatterns(patterns);
   tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
 

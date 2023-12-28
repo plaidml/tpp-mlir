@@ -40,14 +40,14 @@ func.func @entry(%A: tensor<2x4x8xf32>,
 
 // CHECK-LABEL: func.func @_entry(
 // CHECK: %[[ARG0:.*]]: memref<2x4x8xf32>, %[[ARG1:.*]]: memref<1x4xf32>) -> memref<4x4xf32> {
-// CHECK: %[[c0:.*]] = arith.constant 0 : index
-// CHECK: %[[c1_i64:.*]] = arith.constant 1 : i64
-// CHECK: %[[c4_i64:.*]] = arith.constant 4 : i64
-// CHECK: %[[c8_i64:.*]] = arith.constant 8 : i64
-// CHECK: %[[c32_i64:.*]] = arith.constant 32 : i64
-// CHECK: %[[c0_i64:.*]] = arith.constant 0 : i64
-// CHECK: %[[c5_i64:.*]] = arith.constant 5 : i64
-// CHECK: %[[c2_i64:.*]] = arith.constant 2 : i64
+// CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+// CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+// CHECK-DAG: %[[c8_i64:.*]] = arith.constant 8 : i64
+// CHECK-DAG: %[[c32_i64:.*]] = arith.constant 32 : i64
+// CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+// CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
+// CHECK-DAG: %[[c2_i64:.*]] = arith.constant 2 : i64
 // CHECK: %[[DISPATCH:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c4_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]]) 
 // CHECK:  call @xsmm_fused_brgemm_invoke(%[[c1_i64]], %[[DISPATCH]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]]) 
 

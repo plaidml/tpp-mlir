@@ -19,8 +19,8 @@ func.func @matmul(%arg0: memref<16x16xf16>,
 // CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
 // CHECK:             %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
 // CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.yield
-// CHECK:           scf.yield
+// CHECK:             scf.reduce
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----
@@ -49,8 +49,8 @@ func.func @batch_reduce_matmul(%arg0: memref<64x16x16xf16>,
 // CHECK:               scf.yield %[[part_sum]]
 // CHECK:             }
 // CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.yield
-// CHECK:           scf.yield
+// CHECK:             scf.reduce
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----
@@ -84,8 +84,8 @@ func.func @matmul_strided_memrefs(%arg0: memref<16x32x16xf16>, %arg1: memref<16x
 // CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[subB]]{{.*}}leadDimension = 1024
 // CHECK:             %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
 // CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[subC]]{{.*}}leadDimension = 32
-// CHECK:             scf.yield
-// CHECK:           scf.yield
+// CHECK:             scf.reduce
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----
@@ -178,6 +178,6 @@ func.func @matmul_add_relu(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %
 // CHECK:             %[[tileCstZero:.+]] = gpu.subgroup_mma_constant_matrix %[[zeroF16]]
 // CHECK:             %[[reluRes:.+]] = gpu.subgroup_mma_elementwise  maxf %[[addRes]], %[[tileCstZero]]
 // CHECK:             gpu.subgroup_mma_store_matrix %[[reluRes]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.yield
-// CHECK:           scf.yield
+// CHECK:             scf.reduce
+// CHECK:           scf.reduce
 // CHECK:         }

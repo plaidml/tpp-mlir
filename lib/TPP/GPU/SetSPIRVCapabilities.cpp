@@ -58,14 +58,12 @@ struct SetSPIRVCapabilities
         spirv::Capability::Float64,
         spirv::Capability::AtomicFloat32AddEXT,
         spirv::Capability::ExpectAssumeKHR,
-        spirv::Capability::CooperativeMatrixNV,
         spirv::Capability::StorageBuffer16BitAccess,
         // clang-format on
     };
     spirv::Capability caps_vulkan[] = {
         // clang-format off
         spirv::Capability::Shader,
-        spirv::Capability::CooperativeMatrixNV,
         spirv::Capability::Float16,
         spirv::Capability::StorageBuffer16BitAccess,
         // clang-format on

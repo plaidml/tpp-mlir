@@ -56,7 +56,7 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
     %subview_0 = memref.subview %arg1[%arg2, 0, 0] [1, 10, 10] [1, 1, 1] : memref<10x10x10xf32> to memref<10x10xf32, #map>
     linalg.add ins(%subview, %subview_0 : memref<10x10xf32, #map>, memref<10x10xf32, #map>) 
                outs(%subview_0 : memref<10x10xf32, #map>)
-    scf.yield
+    scf.reduce
   }
 
   return
@@ -108,7 +108,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
       ^bb0(%in: f32, %out: f32):
         linalg.yield %in : f32
     }
-    scf.yield
+    scf.reduce
   }
 
   return %alloc : memref<12x56x56x64xf32>
@@ -163,7 +163,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
       %2 = arith.maximumf %in, %c0_f32 : f32
       linalg.yield %2 : f32
     }
-    scf.yield
+    scf.reduce
   }
 
   return %arg0 : memref<64x32x32xf32>
@@ -291,7 +291,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
                                    memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
                                    memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>)
                                outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-    scf.yield
+    scf.reduce
   }
 
   return

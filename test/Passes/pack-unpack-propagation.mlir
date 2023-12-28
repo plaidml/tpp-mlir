@@ -244,7 +244,7 @@ func.func @conv_with_add_bcast(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x
       linalg.yield %6 : f32
   } -> tensor<1x2x56x56x32xf32>
   %unpack = tensor.unpack %3 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg2 : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
-    %4 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%unpack, %arg3 : tensor<1x56x56x64xf32>, tensor<64xf32>) outs(%arg2 : tensor<1x56x56x64xf32>) {
+  %4 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%unpack, %arg3 : tensor<1x56x56x64xf32>, tensor<64xf32>) outs(%arg2 : tensor<1x56x56x64xf32>) {
     ^bb0(%in: f32, %in_2: f32, %out: f32):
       %5 = arith.addf %in, %in_2 : f32
       linalg.yield %5 : f32
