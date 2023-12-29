@@ -130,10 +130,10 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     int binaryArg = 0;
     switch (*binaryFlags) {
     case mlir::xsmm::BinaryFlags::BCAST_COL_IN_0:
-      binaryArg = 2;
+      binaryArg = 1;
       break;
     case mlir::xsmm::BinaryFlags::BCAST_COL_IN_1:
-      binaryArg = 3;
+      binaryArg = 2;
       binaryFlags = mlir::xsmm::BinaryFlags::BCAST_COL_IN_0;
       break;
     default:

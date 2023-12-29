@@ -5,7 +5,7 @@ memref.global "private" constant @__constant_8x32x32xf32 :  memref<8x32x32xf32> 
 memref.global "private" constant @__constant_32xf32:  memref<32xf32, strided<[32], offset:?>> = dense<1.000000e+00> {alignment = 128 : i64}
 
 func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>  {
- %c0 = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
@@ -36,7 +36,7 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[BIAS:.*]] = memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>> 
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xf32 : memref<32xf32, strided<[32], offset: ?>> 
 // CHECK: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
 // CHECK: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
@@ -79,7 +79,7 @@ func.func @bcast_col_in1_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 
 // CHECK-LABEL: func.func @bcast_col_in1_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xf32 : memref<32xf32, strided<[32], offset: ?>>
 // CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = f32
 // CHECK-NOT: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
@@ -121,7 +121,7 @@ func.func @none_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>
 
 // CHECK-LABEL: func.func @none_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32x32xf32 : memref<32x32xf32>
 // CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (none)  unary_flags = (none) data_type = f32
 // CHECK-NOT: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
@@ -164,7 +164,7 @@ func.func @bcast_col_in0_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
 
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xbf16 : memref<32xbf16, strided<[32], offset: ?>>
 // CHECK: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = bf16
 // CHECK: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
@@ -207,7 +207,7 @@ func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memr
 
 // CHECK-LABEL: func.func @bcast_col_in1_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xbf16 : memref<32xbf16, strided<[32], offset: ?>>
 // CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (bcast_col_in1)  unary_flags = (none) data_type = bf16
 // CHECK-NOT: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]] , %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
@@ -251,7 +251,7 @@ func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x51
 
 // CHECK-LABEL: func.func @none_on_binary_add_bf16(
 // CHECK: %[[ARG0:.*]]: memref<256x128xbf16>) -> memref<256x512xbf16> {
-// CHECK: %[[BIAS:.*]] =  memref.subview %{{.*}}[%{{.*}}, %{{.*}}, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x8x32x32xbf16> to memref<32x32xbf16, strided<[32, 1], offset: ?>>
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32x32xbf16 : memref<32x32xbf16>
 // CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (none)  unary_flags = (none) data_type = bf16
 // CHECK-NOT: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]] , %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
