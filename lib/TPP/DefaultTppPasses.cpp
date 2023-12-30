@@ -215,16 +215,6 @@ private:
 // Lower Linalg to into combination of standard and local dialects.
 struct LinalgLowering : public tpp::impl::LinalgLoweringBase<LinalgLowering>,
                         UtilityPassBase<func::FuncOp> {
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry
-        .insert<xsmm::XsmmDialect,
-                scf::SCFDialect,
-                memref::MemRefDialect>();
-    // clang-format on
-  }
-
   void runOnOperation() override {
     auto module = getOperation();
 

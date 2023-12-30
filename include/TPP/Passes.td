@@ -319,6 +319,8 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
 
 def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
   let summary = "Lower Linalg operations to XSMM operations.";
+  let dependentDialects = ["xsmm::XsmmDialect", "scf::SCFDialect", 
+                           "memref::MemRefDialect"];
 }
 
 def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
