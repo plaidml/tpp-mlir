@@ -55,10 +55,6 @@ namespace xsmm {
 class XsmmDialect;
 } // namespace xsmm
 
-namespace vnni {
-class VNNIDialect;
-} // namespace vnni
-
 namespace LLVM {
 class LLVMDialect;
 } // namespace LLVM
