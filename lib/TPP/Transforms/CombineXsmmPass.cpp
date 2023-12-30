@@ -170,7 +170,6 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     // Skipping dispatch operand
     std::advance(opItr, 1);
     invokeOperands.append(opItr, brgemmOp->getOperands().end());
-    // Drop the C operand
     invokeOperands.pop_back();
     invokeOperands.push_back(fusedMatch.binaryOp->getOperand(binaryArg));
     invokeOperands.push_back(batchDim);
