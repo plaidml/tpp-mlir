@@ -14,7 +14,9 @@ func.func @entry(%A: tensor<2x4x8xf32>,
                  %arg0: tensor<1x4xf32>) -> tensor<4x4xf32> {
   // Weight is defined locally as a dense
   %B = arith.constant dense<2.0> : tensor<2x8x4xf32>
-  %C = tensor.empty() : tensor<4x4xf32>
+  %C0 = tensor.empty() : tensor<4x4xf32>
+  %cst_1 = arith.constant 0.000000e+00 : f32
+  %C = linalg.fill ins(%cst_1 : f32) outs(%C0 : tensor<4x4xf32>) -> tensor<4x4xf32>
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<2x4x8xf32>, tensor<2x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
   %res = linalg.generic {
     indexing_maps = [#map4, #map5, #map4],
@@ -38,16 +40,16 @@ func.func @entry(%A: tensor<2x4x8xf32>,
 
 // CHECK-LABEL: func.func @_entry(
 // CHECK: %[[ARG0:.*]]: memref<2x4x8xf32>, %[[ARG1:.*]]: memref<1x4xf32>) -> memref<4x4xf32> {
-// CHECK:    %[[c0:.*]] = arith.constant 0 : index
-// CHECK:    %[[c1_i64:.*]] = arith.constant 1 : i64
-// CHECK:    %[[c4_i64:.*]] = arith.constant 4 : i64
-// CHECK:    %[[c8_i64:.*]] = arith.constant 8 : i64
-// CHECK:    %[[c32_i64:.*]] = arith.constant 32 : i64
-// CHECK:    %[[c0_i64:.*]] = arith.constant 0 : i64
-// CHECK:    %[[c5_i64:.*]] = arith.constant 5 : i64
-// CHECK:    %[[c2_i64:.*]] = arith.constant 2 : i64
-// CHECK:    %[[c1:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c0_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]])
-// CHECK:     call @xsmm_fused_brgemm_invoke(%c1_i64, %[[c1]], %{{.*}}, %[[c0]], %{{.*}}, %{{.*}}, %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]])
+// CHECK: %[[c0:.*]] = arith.constant 0 : index
+// CHECK: %[[c1_i64:.*]] = arith.constant 1 : i64
+// CHECK: %[[c4_i64:.*]] = arith.constant 4 : i64
+// CHECK: %[[c8_i64:.*]] = arith.constant 8 : i64
+// CHECK: %[[c32_i64:.*]] = arith.constant 32 : i64
+// CHECK: %[[c0_i64:.*]] = arith.constant 0 : i64
+// CHECK: %[[c5_i64:.*]] = arith.constant 5 : i64
+// CHECK: %[[c2_i64:.*]] = arith.constant 2 : i64
+// CHECK: %[[DISPATCH:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c4_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]]) 
+// CHECK:  call @xsmm_fused_brgemm_invoke(%[[c1_i64]], %[[DISPATCH]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]]) 
 
 // RESULT: ( 3.62953, 3.87851, 3.65424, 3.69154 )
 // RESULT: ( 1.34322, 1.59219, 1.36792, 1.40522 )
