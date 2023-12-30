@@ -14,7 +14,8 @@ func.func @entry(%A: tensor<2x4x8xf32>,
                  %arg0: tensor<1x4xf32>) -> tensor<4x4xf32> {
   // Weight is defined locally as a dense
   %B = arith.constant dense<2.0> : tensor<2x8x4xf32>
-  %C = tensor.empty() : tensor<4x4xf32>
+  %C0 = tensor.empty() : tensor<4x4xf32>
+  %C = linalg.fill ins(%cst_1 : f32) outs(%C0 : tensor<4x4xf32>) -> tensor<4x4xf32>
   %D = linalg.batch_reduce_matmul ins(%A, %B: tensor<2x4x8xf32>, tensor<2x8x4xf32>) outs(%C: tensor<4x4xf32>) -> tensor<4x4xf32>
   %res = linalg.generic {
     indexing_maps = [#map4, #map5, #map4],
