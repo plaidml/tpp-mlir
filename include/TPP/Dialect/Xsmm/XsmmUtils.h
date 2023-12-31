@@ -10,6 +10,7 @@
 #define TPP_DIALECT_XSMM_XSMMUTILS_H
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
+#include "TPP/Dialect/Xsmm/XsmmOps.h"
 
 namespace mlir {
 class Type;
@@ -38,6 +39,21 @@ struct BinaryInfo {
   int64_t ldo;
 };
 
+/// Represents a chain of XSMM ops that can be fused. All broadcast ops
+/// should have already been converted to flags. All stray allocations
+/// should have already been converted to in-place reuse. Init zero
+/// should have already been converted to Beta=0.
+struct FusedMatch {
+  // This is the BRGEMM op
+  BrgemmOp brgemmOp;
+  // This is the (optional) binary op that follows the GEMM
+  BinaryOp binaryOp;
+  BinaryKind binaryKind;
+  // This is the (optional) unary op that follows the GEMM/Binary
+  UnaryOp unaryOp;
+  UnaryKind unaryKind;
+};
+
 namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
@@ -61,6 +77,14 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType);
 enum class OperandPos { LHS = 0, RHS = 1 };
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber);
+
+FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
+
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
+
+ArrayAttr getUnaryDispatchFlags(UnaryOp op);
+
+ArrayAttr getBinaryDispatchFlags(BinaryOp op);
 
 } // namespace utils
 } // namespace xsmm

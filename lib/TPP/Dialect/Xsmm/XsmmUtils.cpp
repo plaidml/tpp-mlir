@@ -9,9 +9,13 @@
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 namespace mlir {
 namespace xsmm {
 namespace utils {
@@ -280,6 +284,131 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
     return getBCastEnum(BCastType::COL, operandNumber);
 
   return failure();
+}
+
+FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
+  // The loop is in reverse order, so we deduplicate the list making sure we
+  // only have one type of each
+  SmallVector<Operation *, 3> chain;
+  Operation *prev = nullptr;
+  for (auto *user : op->getUsers()) {
+    // Deduplicate, only take each operation once
+    if ((dyn_cast<xsmm::UnaryOp>(user) &&
+         dyn_cast<xsmm::UnaryOp>(user).getCallee() == UnaryKind::ZERO) ||
+        dyn_cast<func::ReturnOp>(user) || user == prev)
+      continue;
+    chain.push_back(user);
+    prev = user;
+
+    // BRGEMM is the last one, we can stop looking
+    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
+      // Make sure the BRGEMM outputs to the chain value
+      // (it could be one of BRGEMM's inputs in the chain)
+      if (brgemmOp.getOperand(3).getDefiningOp() != op)
+        return failure();
+      continue;
+    }
+
+    // Make sure this is a chain, ie. at least once in inputs and outputs
+    int numUses = std::count(user->getOperands().begin(),
+                             user->getOperands().end(), op->getResult(0));
+    // At least one input and the last operand (output) is the same buffer
+    if (numUses < 2 ||
+        user->getOperands()[user->getOperands().size() - 1] != op->getResult(0))
+      return failure();
+  }
+  // We don't know how to fuse more than two tail ops after the BRGEMM
+  if (chain.size() > 3)
+    return failure();
+  if (!isa<xsmm::BrgemmOp>(chain[0]))
+    // List is in reverse order, put the brgemm at the top
+    std::reverse(chain.begin(), chain.end());
+
+  // If we haven't found a BRGEMM, this are not the droids we're looking for
+  assert(isa<xsmm::BrgemmOp>(chain[0]) && "First op must be brgemm");
+
+  // Now, we're sure we have a chain, but not yet if it has the right types
+  // and in the right order: BRGEMM -> BINARY -> UNARY
+  // Allowed patterns are:
+  //  - GEMM + BINARY
+  //  - GEMM + UNARY
+  //  - GEMM + BINARY + UNARY
+  xsmm::FusedMatch fusedMatch;
+  for (auto *user : chain) {
+    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
+      // We only accept one of each
+      if (fusedMatch.brgemmOp)
+        return failure();
+
+      fusedMatch.brgemmOp = brgemmOp;
+      continue;
+    }
+
+    if (auto binOp = (dyn_cast<xsmm::BinaryOp>(user))) {
+      // We only accept one of each
+      if (fusedMatch.binaryOp)
+        return failure();
+
+      // We cannot accept binary *after* unary
+      if (fusedMatch.unaryOp)
+        return failure();
+
+      // For now we only support ADD as binary
+      if (binOp.getCallee() != BinaryKind::ADD)
+        return failure();
+
+      // Make sure the op is new or the same as before
+      fusedMatch.binaryOp = binOp;
+      fusedMatch.binaryKind = binOp.getCallee();
+      continue;
+    }
+
+    if (auto unOp = dyn_cast<xsmm::UnaryOp>(user)) {
+      // We only accept one of each
+      if (fusedMatch.unaryOp)
+        return failure();
+
+      // Binary op may have come earlier, we don't know
+      // We have already made sure it didn't come before this
+      // unary in the binary check above
+
+      // For now we only support RELU as unary
+      if (unOp.getCallee() != UnaryKind::RELU)
+        return failure();
+
+      // Make sure the op is new or the same as before
+      fusedMatch.unaryOp = unOp;
+      fusedMatch.unaryKind = unOp.getCallee();
+      continue;
+    }
+
+    // If found anything else in the users, bail
+    return failure();
+  }
+
+  return fusedMatch;
+}
+
+FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
+  // Not shaped type, the leading dimension is the single scalar.
+  auto memref = dyn_cast<MemRefType>(type);
+  if (!memref)
+    return 1;
+  // For 1d memref we cannot use the stride as leading dimension, but the
+  // leading dimension is the dimension itself.
+  if (memref.getRank() == 1)
+    return memref.getShape()[0];
+
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memref, strides, offset)))
+    return failure();
+  // fail if the strides are non-constant
+  if (llvm::any_of(strides, [](int64_t stride) {
+        return stride == ShapedType::kDynamic;
+      }))
+    return failure();
+  return strides[pos];
 }
 
 } // namespace utils

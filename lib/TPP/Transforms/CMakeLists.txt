@@ -17,6 +17,7 @@ add_mlir_library(TPPTransforms
   ToBlockLayoutAndBack.cpp
   TransformDialectInterpreter.cpp
   TransformUtils.cpp
+  CombineXsmmPass.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
