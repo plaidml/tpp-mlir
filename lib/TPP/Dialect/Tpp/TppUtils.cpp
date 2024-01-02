@@ -19,12 +19,6 @@ namespace mlir {
 namespace tpp {
 namespace utils {
 
-// TODO: Remove this once convolutions stop using it
-bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
-  return isa<linalg::GenericOp>(linalgOp) &&
-         linalgOp.getLibraryCallName() == target;
-}
-
 // Return position of 'pure' iterators in `indexingMap` for the specific
 // linalg operation given the iterator type `iter`. 'pure' iterator are
 // only AffineDimExpr.
