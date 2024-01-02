@@ -348,7 +348,7 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
     // Higher dims into dim 1, last dim remains flat
     SmallVector<ReassociationIndices> assocIdx;
     assocIdx.push_back(llvm::to_vector(llvm::seq<int64_t>(0, rank - 1)));
-    assocIdx.push_back(ReassociationIndices{rank-1});
+    assocIdx.push_back(ReassociationIndices{rank - 1});
 
     // Reshape output
     if (auto tensor = dyn_cast<RankedTensorType>(outputType))
