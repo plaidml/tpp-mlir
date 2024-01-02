@@ -354,7 +354,7 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
     if (auto tensor = dyn_cast<RankedTensorType>(outputType))
       val = builder.create<tensor::CollapseShapeOp>(unkLoc, val, assocIdx);
     else if (auto memref = dyn_cast<MemRefType>(outputType))
-    val = builder.create<memref::CollapseShapeOp>(unkLoc, val, assocIdx);
+      val = builder.create<memref::CollapseShapeOp>(unkLoc, val, assocIdx);
     else
       llvm_unreachable("Unsupported output shaped type");
 
