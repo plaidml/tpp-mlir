@@ -6,15 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppUtils.h"
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -29,13 +27,21 @@ namespace tpp {
 namespace {
 
 static bool isBroadCastOp(linalg::GenericOp linalgOp) {
-  if (linalgOp->getNumOperands() != 2 || linalgOp->getNumResults() != 1)
-    return false;
-  if (!tpp::utils::hasOnlyOp<linalg::YieldOp>(linalgOp.getRegion()))
-    return false;
+  // clang-format off
+  AffineMap inputMap;
+  using namespace mlir::structured_match;
+  auto bCastMatcher =
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+    .operation(NumDpsInits(EqualsTo(1)))
+    .operation(NumDpsInputs(EqualsTo(1)))
+    .output(MatchAll(), HasMap(Identity()))
+    .input(MatchOne(0), HasMap(ProjectedPermutation(), &inputMap))
+    .region(
+      MatchOne(0), WithSingleOp<linalg::YieldOp>(/*operands=*/nullptr));
+  // clan-format on
   SmallVector<unsigned> perm;
-  return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInputOperand(0))
-      .isPermutationOfMinorIdentityWithBroadcasting(perm);
+  return bCastMatcher.match(linalgOp) &&
+    inputMap.isPermutationOfMinorIdentityWithBroadcasting(perm);
 }
 
 static std::optional<linalg::GenericOp> getBroadCastProdcuer(OpOperand *rhs) {
@@ -43,6 +49,20 @@ static std::optional<linalg::GenericOp> getBroadCastProdcuer(OpOperand *rhs) {
   if (!broadcastOp || !isBroadCastOp(broadcastOp))
     return std::nullopt;
   return broadcastOp;
+}
+
+static bool isElemetWiseAdd(linalg::GenericOp linalgOp) {
+  // clang-format off
+  using namespace mlir::structured_match;
+  auto addMatcher =
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+    .input(MatchAll(), HasMap(Identity()))
+    .output(MatchAll(), HasMap(Identity()))
+    .dim(MatchAll(), mlir::utils::IteratorType::parallel)
+    .region(
+      MatchOne(0), WithSingleOp<arith::AddFOp>(/*operands=*/nullptr));
+  // clang-format on
+  return addMatcher.match(linalgOp);
 }
 
 // Instead of initializing the output of a convolution with zero and then add a
@@ -58,8 +78,7 @@ struct EliminateZeroInitAndAddBiasToInit
     if (linalgOp->getNumOperands() != 3 || linalgOp->getNumResults() != 1)
       return failure();
 
-    if (!linalg::isElementwise(linalgOp) ||
-        !tpp::utils::hasOnlyOp<arith::AddFOp>(linalgOp.getRegion()))
+    if (!isElemetWiseAdd(linalgOp))
       return failure();
 
     OpOperand *lhs = linalgOp.getDpsInputOperand(0);
