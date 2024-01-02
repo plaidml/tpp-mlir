@@ -347,24 +347,19 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   if (rank > 2) {
     // Higher dims into dim 1, last dim remains flat
     SmallVector<ReassociationIndices> assocIdx;
-    ReassociationIndices higherDims;
-    for (int i = 0; i < rank-1; i++)
-      higherDims.push_back(i);
-    assocIdx.push_back(higherDims);
+    assocIdx.push_back(llvm::to_vector(llvm::seq<int64_t>(0, rank - 1)));
     assocIdx.push_back(ReassociationIndices{rank-1});
 
     // Reshape output
-    if (auto tensor = dyn_cast<RankedTensorType>(outputType)) {
+    if (auto tensor = dyn_cast<RankedTensorType>(outputType))
       val = builder.create<tensor::CollapseShapeOp>(unkLoc, val, assocIdx);
-    } else if (auto memref = dyn_cast<MemRefType>(outputType)) {
-      val = builder.create<memref::CollapseShapeOp>(unkLoc, val, assocIdx);
-    } else {
+    else if (auto memref = dyn_cast<MemRefType>(outputType))
+    val = builder.create<memref::CollapseShapeOp>(unkLoc, val, assocIdx);
+    else
       llvm_unreachable("Unsupported output shaped type");
-    }
 
     // Update types
     outputType = cast<ShapedType>(val.getType());
-    outElmType = outputType.getElementType();
   }
 
   // Read into a vector and print output
