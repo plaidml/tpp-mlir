@@ -19,12 +19,6 @@ namespace mlir {
 namespace tpp {
 namespace utils {
 
-// TODO: Remove this once convolutions stop using it
-bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
-  return isa<linalg::GenericOp>(linalgOp) &&
-         linalgOp.getLibraryCallName() == target;
-}
-
 // Return true if the linalg.generic an be mapped to a tpp.brgemm in VNNI
 // format.
 bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
