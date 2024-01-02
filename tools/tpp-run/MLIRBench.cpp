@@ -19,6 +19,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -31,6 +32,7 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
@@ -340,9 +342,25 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
 
   Type outElmType = outputType.getElementType();
 
-  // TODO: Support more than 2D sizes
+  // Can only print up to 2D sizes. If it's higher, flatten it to 2D
   auto rank = outputType.getRank();
-  assert((rank == 1 || rank == 2) && "Only supports 1D/2D tensors for now");
+  if (rank > 2) {
+    // Higher dims into dim 1, last dim remains flat
+    SmallVector<ReassociationIndices> assocIdx;
+    assocIdx.push_back(llvm::to_vector(llvm::seq<int64_t>(0, rank - 1)));
+    assocIdx.push_back(ReassociationIndices{rank - 1});
+
+    // Reshape output
+    if (auto tensor = dyn_cast<RankedTensorType>(outputType))
+      val = builder.create<tensor::CollapseShapeOp>(unkLoc, val, assocIdx);
+    else if (auto memref = dyn_cast<MemRefType>(outputType))
+      val = builder.create<memref::CollapseShapeOp>(unkLoc, val, assocIdx);
+    else
+      llvm_unreachable("Unsupported output shaped type");
+
+    // Update types
+    outputType = cast<ShapedType>(val.getType());
+  }
 
   // Read into a vector and print output
   // We don't want to alloc the whole tensor as a vector,
