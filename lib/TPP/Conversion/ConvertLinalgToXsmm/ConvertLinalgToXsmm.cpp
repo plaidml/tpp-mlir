@@ -440,8 +440,6 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  bool hasBatch = (batch != std::numeric_limits<int64_t>::max());
-
   auto dtype =
       xsmm::utils::getDataType(rewriter, linalgOp.getDpsInits()[0].getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -457,7 +455,7 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   auto flags = rewriter.getArrayAttr(gemmFlags);
   SmallVector<Value> invokeOperands;
 
-  if (hasBatch) {
+  if (batch != 0) {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(),
         ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
@@ -524,7 +522,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
 // Access matcher.
 static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
                                          unsigned n, unsigned k,
-                                         unsigned batch) {
+                                         unsigned batchPos) {
   assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
   OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
   OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
@@ -561,8 +559,8 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on C: OK\n");
 
-  auto batchPosCodomainA = getPosInCodomain(batch, operandA, linalgOp);
-  auto batchPosCodomainB = getPosInCodomain(batch, operandB, linalgOp);
+  auto batchPosCodomainA = getPosInCodomain(batchPos, operandA, linalgOp);
+  auto batchPosCodomainB = getPosInCodomain(batchPos, operandB, linalgOp);
   int64_t strideA = 1;
   if (batchPosCodomainA) {
     auto stridesOnA = utils::getStaticStrides(operandA->get());
@@ -575,9 +573,8 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
   }
 
   auto loops = linalgOp.computeStaticLoopSizes();
-  int64_t batchVal = (batch != std::numeric_limits<unsigned>::max())
-                         ? loops[batch]
-                         : std::numeric_limits<int64_t>::max();
+  int64_t batchVal =
+      (batchPos != std::numeric_limits<unsigned>::max()) ? loops[batchPos] : 0;
 
   BrgemmInfo info{loops[m], loops[n], loops[k], batchVal, *lda,
                   *ldb,     *ldc,     strideA,  strideB};
@@ -1084,7 +1081,7 @@ struct ConvertGenericToVnniMatmulLikeOp
     if (hasBatch)
       kPos++;
     int64_t k = bufferA.getType().cast<ShapedType>().getShape()[kPos];
-    int64_t batch = std::numeric_limits<int64_t>::max();
+    int64_t batch = 0;
     if (hasBatch)
       batch = bufferA.getType().cast<ShapedType>().getShape()[0];
 
