@@ -483,7 +483,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 // Original layout: [I][J] += [R][I][K] * [R][K][J]
 // New      layout: [I][J] += [R][I][K] * [R][K/VNNI][J][VNNI]
-FailureOr<tpp::BrgemmOp>
+FailureOr<linalg::GenericOp>
 mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                 linalg::BatchReduceMatmulOp brgemmOp) {
   auto elementType = getElementTypeOrSelf(brgemmOp.getInputs()[0].getType());
@@ -503,17 +503,38 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(brgemmOp,
                                        "unsupported blocking factor for type");
   }
-  SmallVector<OpFoldResult, 1> tilesOnK = {rewriter.getI64IntegerAttr(2)};
+  SmallVector<OpFoldResult> tilesOnK = {rewriter.getI64IntegerAttr(2)};
 
   Location loc = brgemmOp.getLoc();
   // Reshape input B.
   Value packedMatrixB =
       toPackBRGemmLayout_VNNI(rewriter, loc, operandB, tilesOnK);
-  auto replacementOp = rewriter.create<tpp::BrgemmOp>(
-      loc,
-      ValueRange{brgemmOp.getInputs()[0], packedMatrixB,
-                 brgemmOp.getOutputs()[0]},
-      brgemmOp.getOutputs()[0].getType());
+
+  MLIRContext *ctx = brgemmOp.getContext();
+  AffineExpr r1, p1, p2, r3, r4;
+  AffineMap mapA, mapB, mapC;
+  bindDims(ctx, r1, p1, p2, r3, r4);
+  mapA = AffineMap::get(/*dims=*/5, /*symbols=*/0, {r1, p1, r3}, ctx);
+  mapB = AffineMap::get(/*dims=*/5, /*symbols=*/0,
+                        {r1, r3.floorDiv(*blockingFactor), p2, r4}, ctx);
+  mapC = AffineMap::get(/*dims=*/5, /*symbols=*/0, {p1, p2}, ctx);
+
+  auto replacementOp = rewriter.create<linalg::GenericOp>(
+      loc, brgemmOp.getOutputs()[0].getType(),
+      ValueRange{brgemmOp.getInputs()[0], packedMatrixB},
+      ValueRange{brgemmOp.getOutputs()[0]},
+      ArrayRef<AffineMap>{mapA, mapB, mapC},
+      ArrayRef<mlir::utils::IteratorType>{
+          mlir::utils::IteratorType::reduction,  // b
+          mlir::utils::IteratorType::parallel,   // i
+          mlir::utils::IteratorType::parallel,   // j
+          mlir::utils::IteratorType::reduction,  // k
+          mlir::utils::IteratorType::reduction}, // k/VNNI
+      /*doc=*/"", /*libraryCall=*/"");
+
+  rewriter.inlineRegionBefore(brgemmOp.getRegion(), replacementOp.getRegion(),
+                              replacementOp.getRegion().begin());
+
   rewriter.replaceOp(brgemmOp, replacementOp.getResult(0));
   return replacementOp;
 }
@@ -714,7 +735,7 @@ struct VNNIOnBRGemm : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
       : OpRewritePattern<linalg::BatchReduceMatmulOp>(context, benefit) {}
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<tpp::BrgemmOp> packedBRGemm =
+    FailureOr<linalg::GenericOp> packedBRGemm =
         mlir::linalgx::packVNNIBRGemmOp(rewriter, brgemmOp);
     if (failed(packedBRGemm))
       return failure();
