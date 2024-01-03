@@ -150,7 +150,7 @@ func.func @mha_projection(%arg0: memref<512x8x64xf32>, %arg1: memref<64x32x512xf
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-func.func @vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
@@ -165,7 +165,7 @@ func.func @vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   return
 }
 
-// CHECK-LABEL: vnni_gemm
+// CHECK-LABEL: square_vnni_gemm
 // CHECK-SAME:  %[[ARG0:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>, 
 // CHECK-SAME:  %[[ARG1:.+]]: memref<32x64x2xbf16>, 
 // CHECK-SAME:  %[[ARG2:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>
@@ -178,7 +178,7 @@ func.func @vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
-// Require a transpose on C.
+// Require a transpose on C, before mapping to vnni Gemm.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
@@ -204,7 +204,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 5, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
-// Not VNNI layout.
+// Not VNNI layout. A factor of 5 is not VNNI.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
@@ -230,7 +230,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
-// Require a transpose on A.
+// Require a transpose on A, before mapping to vnni Gemm.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
@@ -256,6 +256,8 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d2 floordiv 2, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 
+// Make sure we can handle interchange on the iterators, but with the right
+// access patterns.
 func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
@@ -284,7 +286,7 @@ func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], off
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3 floordiv 2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
-// Not VNNI layout.
+// Not VNNI layout. The VNNI is not innermost in the access pattern for B.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
@@ -311,7 +313,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-func.func @vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
+func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map2], 
@@ -326,7 +328,7 @@ func.func @vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
   return
 }
 
-// CHECK-LABEL: vnni_gemm
+// CHECK-LABEL: non_square_vnni_gemm
 // CHECK-SAME:  %[[ARG0:.+]]: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x64x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>
@@ -339,7 +341,7 @@ func.func @vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-func.func @vnni_gemm(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
+func.func @non_square_vnni_gemm_1(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<8x64x2xbf16>, %arg2: memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
@@ -354,7 +356,7 @@ func.func @vnni_gemm(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
   return
 }
 
-// CHECK-LABEL: vnni_gemm
+// CHECK-LABEL: non_square_vnni_gemm_1
 // CHECK-SAME:  %[[ARG0:.+]]: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x64x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x64xbf16, strided<[64, 1], offset: ?>>
