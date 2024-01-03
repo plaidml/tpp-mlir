@@ -1063,12 +1063,17 @@ struct ConvertGenericToVnniMatmulLikeOp
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    bool hasBatch = false;
-    if (!genericOp.hasBufferSemantics() ||
-        !tpp::utils::isBrgemmVnniOp(genericOp, hasBatch,
-                                    /*captures=*/nullptr)) {
-      return failure();
+    if (!genericOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(genericOp, "expects buffer semantics");
     }
+
+    auto [isBrgemmOp, hasBatch] =
+        tpp::utils::isBrgemmVnniOp(genericOp, /*operands=*/nullptr);
+    if (!isBrgemmOp) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "expects an operation mappable to brgemm");
+    }
+
     Value bufferA = genericOp.getDpsInputs()[0];
     Value bufferB = genericOp.getDpsInputs()[1];
     Value bufferC = genericOp.getDpsInits()[0];
@@ -1088,11 +1093,12 @@ struct ConvertGenericToVnniMatmulLikeOp
     auto stridesOnOutput = utils::getStaticStrides(bufferC);
     if (failed(stridesOnLhs) || failed(stridesOnRhs) ||
         failed(stridesOnOutput)) {
-      return failure();
+      return rewriter.notifyMatchFailure(genericOp, "expects static strides");
     }
     if (stridesOnLhs->back() != 1 || stridesOnRhs->back() != 1 ||
         stridesOnOutput->back() != 1) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          genericOp, "expect stride 1 in the fastest-varying dimension");
     }
 
     int64_t leadingDimPosOnAandB = 0;
