@@ -12,9 +12,9 @@ func.func @matmul_static(
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
-// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: matmul_static
 // CHECK-SAME: %[[ARG0:.+]]: tensor<256x512xbf16>, %[[ARG1:.+]]: tensor<512x1024xbf16>, %[[ARG2:.+]]: tensor<256x1024xbf16>
@@ -38,4 +38,4 @@ func.func @matmul_static(
 // CHECK-SAME:  : tensor<256x1024xbf16> to tensor<32x32xbf16>
 // CHECK: %[[GEMM:.+]] = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]],
-// CHECK-SAME:  iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]
+// CHECK-SAME:  iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]

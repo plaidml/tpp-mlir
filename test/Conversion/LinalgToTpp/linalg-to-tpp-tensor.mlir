@@ -877,15 +877,15 @@ func.func @linalg_matmul_i32(%arg0: tensor<16x16xi32>, %arg1: tensor<16x16xi32>,
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
-#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 func.func @brgemm_tpp(%arg0: tensor<32x32x32xbf16>, %arg1: tensor<32x16x32x2xbf16>,
                       %arg2: tensor<32x32xbf16>) -> tensor<32x32xbf16> {
   %0 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]}
+    iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
     ins(%arg0, %arg1 : tensor<32x32x32xbf16>, tensor<32x16x32x2xbf16>) outs(%arg2 : tensor<32x32xbf16>) {
       ^bb0(%in: bf16, %in_7: bf16, %out: bf16):
         %6 = arith.mulf %in, %in_7 : bf16

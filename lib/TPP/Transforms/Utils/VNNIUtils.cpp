@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -33,6 +34,39 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
     return false;
   }
   return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
+}
+
+FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
+                                        AffineMap map, int64_t blockingFactor) {
+  ArrayRef<AffineExpr> results = map.getResults();
+  SmallVector<mlir::utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
+
+  AffineExpr vnniDim = results.back();
+  auto dimExpr = dyn_cast<AffineDimExpr>(vnniDim);
+  if (!dimExpr || iteratorTypes[dimExpr.getPosition()] !=
+                      mlir::utils::IteratorType::reduction) {
+    return failure();
+  }
+
+  for (auto result : results) {
+    auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result);
+    if (!blockeDim)
+      continue;
+    if (blockeDim.getKind() != AffineExprKind::FloorDiv)
+      continue;
+    auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
+    auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
+    if (!lhsDim || !rhsCst)
+      continue;
+    if (iteratorTypes[lhsDim.getPosition()] !=
+        mlir::utils::IteratorType::reduction)
+      continue;
+    if (rhsCst.getValue() != blockingFactor)
+      continue;
+    return lhsDim;
+  }
+  return failure();
 }
 
 } // namespace utils
