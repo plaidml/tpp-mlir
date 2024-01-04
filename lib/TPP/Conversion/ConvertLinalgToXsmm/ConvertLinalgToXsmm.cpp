@@ -522,7 +522,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
 // Access matcher.
 static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
                                          unsigned n, unsigned k,
-                                         unsigned batchPos) {
+                                         std::optional<unsigned> batchPos) {
   assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
   OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
   OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
@@ -559,22 +559,22 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on C: OK\n");
 
-  auto batchPosCodomainA = getPosInCodomain(batchPos, operandA, linalgOp);
-  auto batchPosCodomainB = getPosInCodomain(batchPos, operandB, linalgOp);
   int64_t strideA = 1;
-  if (batchPosCodomainA) {
+  int64_t strideB = 1;
+  if (batchPos) {
+    auto batchPosCodomainA =
+        getPosInCodomain(batchPos.value(), operandA, linalgOp);
     auto stridesOnA = utils::getStaticStrides(operandA->get());
     strideA = (*stridesOnA)[*batchPosCodomainA];
-  }
-  int64_t strideB = 1;
-  if (batchPosCodomainB) {
+
+    auto batchPosCodomainB =
+        getPosInCodomain(batchPos.value(), operandB, linalgOp);
     auto stridesOnB = utils::getStaticStrides(operandB->get());
     strideB = (*stridesOnB)[*batchPosCodomainB];
   }
 
   auto loops = linalgOp.computeStaticLoopSizes();
-  int64_t batchVal =
-      (batchPos != std::numeric_limits<unsigned>::max()) ? loops[batchPos] : 0;
+  int64_t batchVal = (batchPos) ? loops[batchPos.value()] : 0;
 
   BrgemmInfo info{loops[m], loops[n], loops[k], batchVal, *lda,
                   *ldb,     *ldc,     strideA,  strideB};
@@ -601,16 +601,19 @@ static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
   unsigned m = contractionDims->m[0];
   unsigned n = contractionDims->n[0];
   unsigned k = contractionDims->k.back();
-  unsigned batch = (contractionDims->k.size() == 2)
-                       ? contractionDims->k.front()
-                       : std::numeric_limits<unsigned>::max();
+  std::optional<unsigned> batch;
+  if (contractionDims->k.size() == 2)
+    batch = contractionDims->k.front();
 
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Candidate dims: "
                           << "\n");
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] m: " << m << "\n");
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] n: " << n << "\n");
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] k: " << k << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] batch: " << batch << "\n");
+  if (batch)
+    LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] batch: " << batch << "\n");
+  else
+    LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] no batch dim\n");
 
   return checkAccess(linalgOp, m, n, k, batch);
 }
@@ -801,9 +804,10 @@ void ConvertLinalgToXsmm::runOnOperation() {
     unsigned m = contractionDims->m[0];
     unsigned n = contractionDims->n[0];
     unsigned k = contractionDims->k.back();
-    unsigned batch = (contractionDims->k.size() == 2)
-                         ? contractionDims->k.front()
-                         : std::numeric_limits<unsigned>::max();
+    std::optional<unsigned> batch;
+    if (contractionDims->k.size() == 2)
+      contractionDims->k.front();
+
     if (failed(checkAccess(genericOp, m, n, k, batch))) {
       // The generic is a Brgemm but the strides of the selected dims (m, n, k)
       // are not unit strides. Inject transposes to bring them innermost.
