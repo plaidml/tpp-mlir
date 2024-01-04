@@ -83,8 +83,8 @@ struct ConvertGenericOpToTpp : public OpRewritePattern<linalg::GenericOp> {
       return success();
     }
 
-    if (auto [isBrgemmOp, hasBatch] =
-            tpp::utils::isBrgemmVnniOp(linalgOp, /*captures=*/nullptr);
+    if (auto [isBrgemmOp, hasBatch] = structured_match::utils::isBrgemmVnniOp(
+            linalgOp, /*captures=*/nullptr);
         isBrgemmOp == true) {
       SmallVector<Value> operands = linalgOp.getDpsInputs();
       SmallVector<Value> initOperands = linalgOp.getDpsInits();

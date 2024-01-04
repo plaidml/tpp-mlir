@@ -1064,8 +1064,8 @@ struct ConvertGenericToVnniMatmulLikeOp
       return rewriter.notifyMatchFailure(genericOp, "expects buffer semantics");
     }
 
-    auto [isBrgemmOp, hasBatch] =
-        tpp::utils::isBrgemmVnniOp(genericOp, /*operands=*/nullptr);
+    auto [isBrgemmOp, hasBatch] = structured_match::utils::isBrgemmVnniOp(
+        genericOp, /*operands=*/nullptr);
     if (!isBrgemmOp) {
       return rewriter.notifyMatchFailure(
           genericOp, "expects an operation mappable to brgemm");
