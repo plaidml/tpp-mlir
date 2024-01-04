@@ -38,15 +38,15 @@ getIteratorPos(linalg::LinalgOp linalgOp, AffineMap indexingMap,
   return res;
 }
 
-// Return true if the linalg.generic an be mapped to a tpp.brgemm in VNNI
+// Return true if the linalg.generic can be mapped to a brgemm in VNNI
 // format.
-bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
-                    SmallVectorImpl<Value> *operands) {
-
+std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
+                                     SmallVectorImpl<Value> *operands) {
+  bool hasBatch = false;
   auto blockingFactor =
       vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
   if (!blockingFactor)
-    return false;
+    return std::make_pair(false, hasBatch);
 
   AffineMap mapOperandA, mapOperandB, mapOperandC;
   using namespace structured_match;
@@ -56,7 +56,7 @@ bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
           .operation(NumDpsInits(EqualsTo(1)))
           .operation(NumDpsInputs(EqualsTo(2)))
           .operation(NumRegions(EqualsTo(1)))
-          .operation(NumOfLoops(EqualsTo(5)))
+          .operation(NumOfLoops(_OR(EqualsTo(5), EqualsTo(4))))
           .input(MatchAll(), HasStaticShape())
           .output(MatchAll(), HasStaticShape())
           .input(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandA))
@@ -66,44 +66,59 @@ bool isBrgemmVnniOp(linalg::GenericOp linalgOp,
                   WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
   // clang-format on
   if (!matmulMatcher.match(linalgOp))
-    return false;
+    return std::make_pair(false, hasBatch);
 
   // Operand C: Two parallel iterators (i and j).
   llvm::SmallVector<int64_t> operandCPosIterPar = getIteratorPos(
       linalgOp, mapOperandC, mlir::utils::IteratorType::parallel);
   if (operandCPosIterPar.size() != 2)
-    return false;
+    return std::make_pair(false, hasBatch);
   int64_t iParIter = operandCPosIterPar[0];
   int64_t jParIter = operandCPosIterPar[1];
 
   // Operand A: One parallel iterator (i) and two reduction ones (batch and k).
+  // The batch dimension is optional.
   llvm::SmallVector<int64_t> operandAPosIterPar = getIteratorPos(
       linalgOp, mapOperandA, mlir::utils::IteratorType::parallel);
   if (operandAPosIterPar.size() != 1 || operandAPosIterPar[0] != iParIter)
-    return false;
+    return std::make_pair(false, hasBatch);
 
   llvm::SmallVector<int64_t> operandAPosIterRed = getIteratorPos(
       linalgOp, mapOperandA, mlir::utils::IteratorType::reduction);
-  if (operandAPosIterRed.size() != 2)
-    return false;
-  int64_t batchRedIter = operandAPosIterRed[0];
-  int64_t kRedIter = operandAPosIterRed[1];
+  if (operandAPosIterRed.size() != 2 && operandAPosIterRed.size() != 1)
+    return std::make_pair(false, hasBatch);
+
+  int64_t batchRedIter = std::numeric_limits<int64_t>::max();
+  int64_t kRedIter = std::numeric_limits<int64_t>::max();
+  if (operandAPosIterRed.size() == 2) {
+    batchRedIter = operandAPosIterRed[0];
+    kRedIter = operandAPosIterRed[1];
+    hasBatch = true;
+  } else {
+    kRedIter = operandAPosIterRed[0];
+  }
 
   // Operand B: One parallel iterator (j) and three reduction ones (batch,
   // k/VNNI and VNNI).
+  // The batch dimension is optional.
   llvm::SmallVector<int64_t> operandBPosIterPar = getIteratorPos(
       linalgOp, mapOperandB, mlir::utils::IteratorType::parallel);
   if (operandBPosIterPar.size() != 1 || operandBPosIterPar[0] != jParIter)
-    return false;
+    return std::make_pair(false, hasBatch);
 
   llvm::SmallVector<int64_t> operandBPosIterRed = getIteratorPos(
       linalgOp, mapOperandB, mlir::utils::IteratorType::reduction);
-  if (operandBPosIterRed.empty() || operandBPosIterRed[0] != batchRedIter)
-    return false;
+  if (operandBPosIterRed.empty())
+    return std::make_pair(false, hasBatch);
+  if (batchRedIter != std::numeric_limits<int64_t>::max() &&
+      operandBPosIterRed[0] != batchRedIter) {
+    return std::make_pair(false, hasBatch);
+  }
 
   auto vnniDim =
       vnni::utils::isInVnniLayout(linalgOp, mapOperandB, *blockingFactor);
-  return succeeded(vnniDim) && vnniDim->getPosition() == kRedIter;
+  bool isBrgemmOp = succeeded(vnniDim) && vnniDim->getPosition() == kRedIter;
+  return std::make_pair(isBrgemmOp, hasBatch);
 }
 
 LogicalResult splitAndReplaceFusedOp(tpp::FusedBrgemmOp fusedBrgemmOp,

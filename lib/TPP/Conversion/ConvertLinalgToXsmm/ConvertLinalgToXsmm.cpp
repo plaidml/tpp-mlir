@@ -440,8 +440,6 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   int64_t strideA = brgemmInfo.strideA;
   int64_t strideB = brgemmInfo.strideB;
 
-  bool hasBatch = (batch != std::numeric_limits<int64_t>::max());
-
   auto dtype =
       xsmm::utils::getDataType(rewriter, linalgOp.getDpsInits()[0].getType());
   IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
@@ -457,7 +455,7 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   auto flags = rewriter.getArrayAttr(gemmFlags);
   SmallVector<Value> invokeOperands;
 
-  if (hasBatch) {
+  if (batch != 0) {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(),
         ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
@@ -524,7 +522,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
 // Access matcher.
 static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
                                          unsigned n, unsigned k,
-                                         unsigned batch) {
+                                         unsigned batchPos) {
   assert(linalgOp.getNumDpsInputs() == 2 && linalgOp.getNumDpsInits() == 1);
   OpOperand *operandA = linalgOp.getDpsInputOperands()[0];
   OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
@@ -561,8 +559,8 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Strides on C: OK\n");
 
-  auto batchPosCodomainA = getPosInCodomain(batch, operandA, linalgOp);
-  auto batchPosCodomainB = getPosInCodomain(batch, operandB, linalgOp);
+  auto batchPosCodomainA = getPosInCodomain(batchPos, operandA, linalgOp);
+  auto batchPosCodomainB = getPosInCodomain(batchPos, operandB, linalgOp);
   int64_t strideA = 1;
   if (batchPosCodomainA) {
     auto stridesOnA = utils::getStaticStrides(operandA->get());
@@ -575,9 +573,8 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
   }
 
   auto loops = linalgOp.computeStaticLoopSizes();
-  int64_t batchVal = (batch != std::numeric_limits<unsigned>::max())
-                         ? loops[batch]
-                         : std::numeric_limits<int64_t>::max();
+  int64_t batchVal =
+      (batchPos != std::numeric_limits<unsigned>::max()) ? loops[batchPos] : 0;
 
   BrgemmInfo info{loops[m], loops[n], loops[k], batchVal, *lda,
                   *ldb,     *ldc,     strideA,  strideB};
@@ -1054,37 +1051,58 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
   }
 };
 
-struct ConvertGenericToVnniBrgemm : public OpRewritePattern<linalg::GenericOp> {
+// Converts linalg.generic with the following layout:
+// [i][j] = [i][k] [k/VNNI][j][VNNI] -> xsmm.matmul
+// [i][j] = [b][i][k] [b][k/VNNI][j][VNNI] -> xsmm.brgemm
+struct ConvertGenericToVnniMatmulLikeOp
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!genericOp.hasBufferSemantics() ||
-        !tpp::utils::isBrgemmVnniOp(genericOp, /*captures=*/nullptr)) {
-      return failure();
+    if (!genericOp.hasBufferSemantics()) {
+      return rewriter.notifyMatchFailure(genericOp, "expects buffer semantics");
     }
+
+    auto [isBrgemmOp, hasBatch] =
+        tpp::utils::isBrgemmVnniOp(genericOp, /*operands=*/nullptr);
+    if (!isBrgemmOp) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "expects an operation mappable to brgemm");
+    }
+
     Value bufferA = genericOp.getDpsInputs()[0];
     Value bufferB = genericOp.getDpsInputs()[1];
     Value bufferC = genericOp.getDpsInits()[0];
 
     int64_t m = bufferC.getType().cast<ShapedType>().getShape()[0];
     int64_t n = bufferC.getType().cast<ShapedType>().getShape()[1];
-    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[2];
-    int64_t batch = bufferA.getType().cast<ShapedType>().getShape()[0];
+    int64_t kPos = 1;
+    if (hasBatch)
+      kPos++;
+    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[kPos];
+    int64_t batch = 0;
+    if (hasBatch)
+      batch = bufferA.getType().cast<ShapedType>().getShape()[0];
 
     auto stridesOnLhs = utils::getStaticStrides(bufferA);
     auto stridesOnRhs = utils::getStaticStrides(bufferB);
     auto stridesOnOutput = utils::getStaticStrides(bufferC);
     if (failed(stridesOnLhs) || failed(stridesOnRhs) ||
         failed(stridesOnOutput)) {
-      return failure();
+      return rewriter.notifyMatchFailure(genericOp, "expects static strides");
     }
     if (stridesOnLhs->back() != 1 || stridesOnRhs->back() != 1 ||
         stridesOnOutput->back() != 1) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          genericOp, "expect stride 1 in the fastest-varying dimension");
     }
-    int64_t lda = (*stridesOnLhs)[1];
-    int64_t ldb = (*stridesOnRhs)[1] /
+
+    int64_t leadingDimPosOnAandB = 0;
+    if (hasBatch)
+      leadingDimPosOnAandB++;
+    int64_t lda = (*stridesOnLhs)[leadingDimPosOnAandB];
+    int64_t ldb = (*stridesOnRhs)[leadingDimPosOnAandB] /
                   *vnni::utils::getVnniBlockingFactor(bufferB.getType());
     int64_t ldc = (*stridesOnOutput)[0];
 
@@ -1122,10 +1140,10 @@ struct ConvertCopyOp : public OpRewritePattern<linalg::CopyOp> {
 } // namespace
 
 void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns
-      .add<ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-           ConvertGenericToUnary, ConvertGenericToBinary,
-           ConvertGenericToBrgemm, ConvertBatchReduceMatmulToBatchReduceMatmul,
-           ConvertMatmulToMatmul, ConvertVnniPacking,
-           ConvertGenericToVnniBrgemm, ConvertCopyOp>(patterns.getContext());
+  patterns.add<
+      ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
+      ConvertGenericToUnary, ConvertGenericToBinary, ConvertGenericToBrgemm,
+      ConvertBatchReduceMatmulToBatchReduceMatmul, ConvertMatmulToMatmul,
+      ConvertVnniPacking, ConvertGenericToVnniMatmulLikeOp, ConvertCopyOp>(
+      patterns.getContext());
 }
