@@ -59,14 +59,6 @@ namespace LLVM {
 class LLVMDialect;
 } // namespace LLVM
 
-namespace math {
-class MathDialect;
-} // namespace math
-
-namespace tensor {
-class TensorDialect;
-} // namespace tensor
-
 namespace gpu {
 class GPUModuleOp;
 class GPUDialect;
