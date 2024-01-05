@@ -261,7 +261,8 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
     Value maxfRhs = maxfOp.getRhs();
 
     return (getOperand(maxfLhs, maxfRhs) || getOperand(maxfRhs, maxfLhs));
-  } else if (auto cmpfOp = dyn_cast<arith::CmpFOp>(innerOp)) {
+  }
+  if (auto cmpfOp = dyn_cast<arith::CmpFOp>(innerOp)) {
     // Pattern 2 - arith.cmpf, arith.select
     //
     // x = arith.cmpf ugt, value, 0
