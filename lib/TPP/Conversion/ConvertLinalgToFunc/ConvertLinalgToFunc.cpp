@@ -124,7 +124,7 @@ struct ConvertMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 struct ConvertLinalgToFunc
     : public tpp::impl::ConvertLinalgToFuncBase<ConvertLinalgToFunc> {
   void runOnOperation() override {
-    auto ctx = &getContext();
+    auto *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<ConvertMatmulOp>(ctx);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
