@@ -68,10 +68,6 @@ namespace spirv {
 class SPIRVDialect;
 } // namespace spirv
 
-namespace xegpu {
-class XeGPUDialect;
-} // namespace xegpu
-
 namespace affine {
 class AffineDialect;
 } // namespace affine
