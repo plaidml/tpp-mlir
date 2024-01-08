@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_PERF_DIALECT_H
-#define TPP_PERF_DIALECT_H
+#ifndef TPP_DIALECT_PERF_PERFDIALECT_H
+#define TPP_DIALECT_PERF_PERFDIALECT_H
 
 // clang-format off
 #include "mlir/IR/Dialect.h"
 #include "TPP/Dialect/Perf/PerfOpsDialect.h.inc"
 // clang-format on
 
-#endif // TPP_PERF_DIALECT_H
+#endif // TPP_DIALECT_PERF_PERFDIALECT_H

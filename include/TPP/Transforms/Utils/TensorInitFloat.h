@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TENSORINITFLOAT_H
-#define TPP_TENSORINITFLOAT_H
+#ifndef TPP_TRANSFORMS_UTILS_TENSORINITFLOAT_H
+#define TPP_TRANSFORMS_UTILS_TENSORINITFLOAT_H
 
 #include "TPP/Transforms/Utils/TensorInit.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -151,4 +151,4 @@ private:
   std::normal_distribution<float> distribution;
 };
 
-#endif // TPP_TENSORINITFLOAT_H
+#endif // TPP_TRANSFORMS_UTILS_TENSORINITFLOAT_H

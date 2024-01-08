@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H
-#define MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H
+#ifndef TPP_DIALECT_TRANSFORM_LINALGXTRANSFORMOPS_H
+#define TPP_DIALECT_TRANSFORM_LINALGXTRANSFORMOPS_H
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
@@ -35,4 +35,4 @@ void registerTransformDialectExtension(DialectRegistry &registry);
 } // namespace linalgx
 } // namespace mlir
 
-#endif // MLIR_DIALECT_LINALGX_TRANSFORMOPS_LINALGTRANSFORMOPS_H
+#endif // TPP_DIALECT_TRANSFORM_LINALGXTRANSFORMOPS_H

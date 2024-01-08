@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TENSORINIT_H
-#define TPP_TENSORINIT_H
+#ifndef TPP_TRANSFORMS_UTILS_TENSORINIT_H
+#define TPP_TRANSFORMS_UTILS_TENSORINIT_H
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Types.h"
@@ -103,4 +103,4 @@ TensorInitPtr getTensorInit(TensorInitType type, mlir::Type elmType,
 TensorInitPtr getTensorInit(llvm::StringRef type, mlir::Type elmType,
                             int seed = 0);
 
-#endif // TPP_TENSORINIT_H
+#endif // TPP_TRANSFORMS_UTILS_TENSORINIT_H

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CHECK_DIALECT_H_
-#define CHECK_DIALECT_H_
+#ifndef TPP_DIALECT_CHECK_CHECKDIALECT_H
+#define TPP_DIALECT_CHECK_CHECKDIALECT_H
 
 #include "mlir/IR/Dialect.h"
 
@@ -23,4 +23,4 @@ public:
 } // namespace check
 } // namespace mlir
 
-#endif // CHECK_DIALECT_H_
+#endif // TPP_DIALECT_CHECK_CHECKDIALECT_H
