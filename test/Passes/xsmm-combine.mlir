@@ -37,7 +37,13 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
 // CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xf32 : memref<32xf32, strided<[32], offset: ?>> 
+// CHECK-NOT: xsmm.brgemm.dispatch
+// CHECK-NOT: xsmm.unary.dispatch
+// CHECK-NOT: xsmm.binary.dispatch
 // CHECK: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
+// CHECK-NOT: xsmm.brgemm(
+// CHECK-NOT: xsmm.binary add
+// CHECK-NOT: xsmm.unary relu
 // CHECK: xsmm.fused_brgemm(data_type = f32, %[[DISPATCH]], %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
 

@@ -176,12 +176,13 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
 
     // Replace and delete the old invokes and their dispatches
     rewriter.create<xsmm::FusedBrgemmOp>(loc, dtype, invokeOperands);
-    brgemmOp.erase();
-    brgemmOp.getOperand(0).getDefiningOp()->erase();
-    fusedMatch.binaryOp->erase();
-    fusedMatch.binaryOp->getOperand(0).getDefiningOp()->erase();
-    fusedMatch.unaryOp->erase();
-    fusedMatch.unaryOp->getOperand(0).getDefiningOp()->erase();
+    rewriter.eraseOp(brgemmOp);
+    rewriter.eraseOp(brgemmOp.getOperand(0).getDefiningOp());
+    rewriter.eraseOp(fusedMatch.binaryOp);
+    rewriter.eraseOp(fusedMatch.binaryOp->getOperand(0).getDefiningOp());
+    rewriter.eraseOp(fusedMatch.unaryOp);
+    rewriter.eraseOp(fusedMatch.unaryOp->getOperand(0).getDefiningOp());
+
     return success();
   }
 };
