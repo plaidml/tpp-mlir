@@ -40,7 +40,7 @@ struct SetSPIRVCapabilities
 
   void runOnOperation() override {
     namespace spirv = mlir::spirv;
-    auto context = &getContext();
+    auto *context = &getContext();
     spirv::Capability caps_opencl[] = {
         // clang-format off
         spirv::Capability::Addresses,
