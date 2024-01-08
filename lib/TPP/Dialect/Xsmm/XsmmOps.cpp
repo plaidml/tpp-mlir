@@ -179,7 +179,7 @@ static void printerDataTypeImpl(OpAsmPrinter &printer, OpTy op) {
 
 template <typename AttrTy>
 static void printerFlagsImpl(OpAsmPrinter &printer,
-                             std::function<ArrayAttr()> fn,
+                             const std::function<ArrayAttr()>& fn,
                              const std::string_view &flagsName) {
   printer << " " << flagsName << " = (";
   llvm::interleaveComma(fn(), printer, [&](auto &flag) {
