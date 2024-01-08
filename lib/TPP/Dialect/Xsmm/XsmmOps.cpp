@@ -119,7 +119,7 @@ ParseResult FusedBrgemmDispatchOp::parse(OpAsmParser &parser,
       parser.parseRSquare()) {
     return failure();
   }
-  auto ctx = parser.getBuilder().getContext();
+  auto *ctx = parser.getBuilder().getContext();
   result.addAttribute(BINARY_KIND, BinaryKindAttr::get(ctx, binaryKind));
   result.addAttribute(UNARY_KIND, UnaryKindAttr::get(ctx, unaryKind));
   // Parse different flags (gemm, binary and unary).
