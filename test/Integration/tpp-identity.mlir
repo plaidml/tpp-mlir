@@ -3,9 +3,6 @@
 // RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
-// RUN: tpp-run %s -tpp-to-loops \
-// RUN:  -e entry -entry-point-result=void
-
 // RUN: tpp-run %s -linalg-to-loops \
 // RUN:  -e entry -entry-point-result=void
 

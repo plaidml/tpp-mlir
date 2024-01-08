@@ -67,11 +67,6 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Lower TPP ops to GPU-compatible format.
-    ConvertTppToLoopsOptions tppToLoopOptions;
-    tppToLoopOptions.parallel = true;
-    pm.addNestedPass<func::FuncOp>(createConvertTppToLoops(tppToLoopOptions));
-
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());

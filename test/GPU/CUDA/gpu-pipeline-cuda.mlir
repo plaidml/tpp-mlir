@@ -43,8 +43,8 @@ func.func private @printMemrefF32(memref<*xf32>)
 // -----
 
 func.func @tpp_gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memref<8x10xf32>) {
-  tpp.gemm ins(%arg0 : memref<8x9xf32>, %arg1 : memref<9x10xf32>, %arg2: memref<8x10xf32>)
-           outs(%arg2: memref<8x10xf32>)
+  linalg.matmul ins(%arg0, %arg1 : memref<8x9xf32>, memref<9x10xf32>)
+                outs(%arg2: memref<8x10xf32>)
   return
 }
 
@@ -68,7 +68,10 @@ func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x6
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 64, 64] [1, 1, 1, 1] : memref<4x16x64x64xf32> to memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 64, 64] [1, 1, 1, 1] : memref<16x16x64x64xf32> to memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 64, 64] [1, 1, 1, 1] : memref<4x16x64x64xf32> to memref<64x64xf32, strided<[64, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, %subview_0 : memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, %subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>) outs(%subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>)
+    linalg.batch_reduce_matmul ins(%subview, %subview_0 : 
+      memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, 
+      memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>) 
+                               outs(%subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>)
     scf.yield
   }
   return
@@ -91,7 +94,10 @@ func.func @forall_loop(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64x
     %subview = memref.subview %arg0[%arg3, 0, 0, 0] [1, 16, 64, 64] [1, 1, 1, 1] : memref<4x16x64x64xf32> to memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>
     %subview_0 = memref.subview %arg1[%arg4, 0, 0, 0] [1, 16, 64, 64] [1, 1, 1, 1] : memref<16x16x64x64xf32> to memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0] [1, 1, 64, 64] [1, 1, 1, 1] : memref<4x16x64x64xf32> to memref<64x64xf32, strided<[64, 1], offset: ?>>
-    tpp.brgemm ins(%subview : memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, %subview_0 : memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, %subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>) outs(%subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>)
+    linalg.batch_reduce_matmul ins(%subview, %subview_0 : 
+      memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, 
+      memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>) 
+                               outs(%subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>)
   }
   return
 }

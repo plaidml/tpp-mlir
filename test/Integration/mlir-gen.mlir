@@ -1,10 +1,8 @@
 // MLP with Softmax version
 // RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 --softmax | tpp-run -e entry -entry-point-result=void
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 --softmax | tpp-run -e entry -entry-point-result=void --tpp-to-loops
 
 // MLP without softmax
 // RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 | tpp-run -e entry -entry-point-result=void
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 | tpp-run -e entry -entry-point-result=void --tpp-to-loops
 
 // Matmul only
 // RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void
@@ -21,7 +19,6 @@
 // Packed versions
 // RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
 // RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=123 --batch=10 --layers=10,10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 --tpp-to-loops | FileCheck %s --check-prefix=PERF
 
 // CONSTANT:( 11, 11, 11, 11, 11, 11, 11, 11, 11, 11 )
 

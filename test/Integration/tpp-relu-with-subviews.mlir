@@ -5,9 +5,6 @@
 // RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
 
-// RUN: tpp-run %s -tpp-to-loops -print \
-// RUN:  -e entry -entry-point-result=void
-
 // RUN: tpp-run %s -linalg-to-loops -print \
 // RUN:  -e entry -entry-point-result=void
 

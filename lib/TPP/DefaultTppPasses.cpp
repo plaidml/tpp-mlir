@@ -297,22 +297,13 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Lower all TPP ops.
-    if (tppToLoops)
-      pm.addPass(createConvertTppToLoops());
-    else {
-      // Memref to tpp conversion patterns.
-      if (linalgToXsmm) {
-        // Linalg to Xsmm conversion patterns.
-        pm.addPass(createConvertLinalgToXsmm());
-        pm.addPass(createCombineXsmmOpPass());
-      } else {
-        // Tpp to Xsmm conversion patterns.
-        pm.addPass(createConvertTppToXsmm());
-      }
-      pm.addPass(createFoldXsmmFlags());
-      pm.addPass(createVerifyXsmmCalls());
-    }
+    // Linalg to Xsmm conversion patterns.
+    pm.addPass(createConvertLinalgToXsmm());
+    pm.addPass(createCombineXsmmOpPass());
+    // Tpp to Xsmm conversion patterns.
+    pm.addPass(createConvertTppToXsmm());
+    pm.addPass(createFoldXsmmFlags());
+    pm.addPass(createVerifyXsmmCalls());
   }
 };
 
@@ -382,18 +373,11 @@ private:
       // bufferization.
       pm.addNestedPass<func::FuncOp>(createDecomposeAggregatedOps());
 
-      // Lower linalg operations to TPP.
-      if (!linalgToXsmm) {
-        pm.addNestedPass<func::FuncOp>(createTppConversion());
-        pm.addNestedPass<func::FuncOp>(createCleanup());
-      }
-
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
       // Lower all Tile operations.
-      pm.addNestedPass<func::FuncOp>(
-          createTppLowering(TppLoweringOptions{tppToLoops, linalgToXsmm}));
+      pm.addNestedPass<func::FuncOp>(createTppLowering());
       pm.addNestedPass<func::FuncOp>(createCleanup());
     }
 

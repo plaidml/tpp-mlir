@@ -1,5 +1,5 @@
 // Validate default pipeline
-// RUN: tpp-run %s -linalg-to-xsmm="false" \
+// RUN: tpp-run %s  \
 // RUN:  -e entry -entry-point-result=void
 
 func.func @entry(){

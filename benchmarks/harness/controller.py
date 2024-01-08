@@ -150,8 +150,6 @@ class BenchmarkController(object):
             runCmd.extend(["--seed", str(self.args.seed)])
         if self.args.splat_to_random != 0:
             runCmd.append("--splat-to-random")
-        if self.args.linalg_to_xsmm != 0:
-            runCmd.append("--linalg-to-xsmm")
         if self.args.init_type:
             runCmd.extend(["--init-type", self.args.init_type])
         if self.args.gpu is not None:

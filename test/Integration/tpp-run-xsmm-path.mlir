@@ -1,6 +1,6 @@
-// RUN: tpp-run %s -linalg-to-xsmm -e entry -entry-point-result=void | FileCheck %s
+// RUN: tpp-run %s -e entry -entry-point-result=void | FileCheck %s
 
-// RUN: tpp-opt %s -default-tpp-passes="linalg-to-xsmm" | \
+// RUN: tpp-opt %s -default-tpp-passes | \
 // RUN: FileCheck %s -check-prefix=IR
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
