@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <utility>
+
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -90,7 +92,7 @@ static SmallVector<Value> getNormalizedOperands(OpBuilder &b, Location loc,
 }
 
 // Create a perf function prototype.
-static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
+static func::FuncOp createPerfFuncPrototype(Location loc, const std::string& funcName,
                                             Operation *op,
                                             PatternRewriter &rewriter) {
   // Insert before module terminator.
@@ -115,7 +117,7 @@ static func::FuncOp createPerfFuncPrototype(Location loc, std::string funcName,
 static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
                                        Operation *op,
                                        PatternRewriter &rewriter) {
-  auto funcOp = createPerfFuncPrototype(loc, funcName, op, rewriter);
+  auto funcOp = createPerfFuncPrototype(loc, std::move(funcName), op, rewriter);
 
   // Add function attributes which ensure that the passed data and its producers
   // operations cannot be optimized away such that the time measured by a
@@ -141,7 +143,7 @@ static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
 static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
                                           Operation *op,
                                           PatternRewriter &rewriter) {
-  (void)createPerfFuncPrototype(loc, funcName, op, rewriter);
+  (void)createPerfFuncPrototype(loc, std::move(funcName), op, rewriter);
   return success();
 }
 
