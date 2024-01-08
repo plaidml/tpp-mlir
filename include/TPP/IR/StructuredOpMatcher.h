@@ -13,6 +13,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <functional>
+#include <utility>
 
 namespace mlir {
 class Operation;
@@ -58,7 +59,7 @@ struct MatchRange : public MatchSelector {
 // Callable object to check if the number of loops in `op` satisfies `fun`.
 struct NumOfLoops {
   NumOfLoops() = delete;
-  explicit NumOfLoops(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumOfLoops(std::function<bool(size_t)> fun) : fun(std::move(fun)){};
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
@@ -74,9 +75,9 @@ struct NumOfLoops {
 // `fun`.
 struct HasMap {
   HasMap() = delete;
-  explicit HasMap(std::function<bool(AffineMap)> fun) : fun(fun){};
+  explicit HasMap(std::function<bool(AffineMap)> fun) : fun(std::move(fun)){};
   explicit HasMap(std::function<bool(AffineMap)> fun, AffineMap *ptrMap)
-      : fun(fun), ptrMap(ptrMap){};
+      : fun(std::move(fun)), ptrMap(ptrMap){};
 
   bool operator()(OpOperand *operand, Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op)) {
@@ -247,7 +248,7 @@ struct HasBufferSemantics {
 // Callable object to validate number of init operands for `op`.
 struct NumDpsInits {
   NumDpsInits() = delete;
-  explicit NumDpsInits(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumDpsInits(std::function<bool(size_t)> fun) : fun(std::move(fun)){};
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
@@ -261,7 +262,7 @@ struct NumDpsInits {
 // Callable object to check the number of affine map for `op`.
 struct NumAffineMaps {
   NumAffineMaps() = delete;
-  explicit NumAffineMaps(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumAffineMaps(std::function<bool(size_t)> fun) : fun(std::move(fun)){};
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
@@ -275,7 +276,7 @@ struct NumAffineMaps {
 // Callable object to validate number of input operands for `op`.
 struct NumDpsInputs {
   NumDpsInputs() = delete;
-  explicit NumDpsInputs(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumDpsInputs(std::function<bool(size_t)> fun) : fun(std::move(fun)){};
 
   bool operator()(Operation *op) {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
@@ -289,7 +290,7 @@ struct NumDpsInputs {
 // Callable object to validate number of regions for `op`.
 struct NumRegions {
   NumRegions() = delete;
-  explicit NumRegions(std::function<bool(size_t)> fun) : fun(fun){};
+  explicit NumRegions(std::function<bool(size_t)> fun) : fun(std::move(fun)){};
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
@@ -304,7 +305,7 @@ struct NumRegions {
 struct _OR {
   _OR() = delete;
   _OR(std::function<bool(size_t)> lhs, std::function<bool(size_t)> rhs)
-      : lhs(lhs), rhs(rhs) {}
+      : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
 
   bool operator()(size_t num) { return (lhs(num) || rhs(num)); }
 
@@ -317,7 +318,7 @@ struct _OR {
 struct VerifyOpProperty {
   VerifyOpProperty() = delete;
   explicit VerifyOpProperty(std::function<LogicalResult(Operation *op)> fun)
-      : fun(fun){};
+      : fun(std::move(fun)){};
 
   bool operator()(Operation *op) {
     if (succeeded(fun(op)))
