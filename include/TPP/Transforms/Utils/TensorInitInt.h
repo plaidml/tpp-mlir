@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_TENSORINITINT_H
-#define TPP_TENSORINITINT_H
+#ifndef TPP_TRANSFORMS_UTILS_TENSORINITINT_H
+#define TPP_TRANSFORMS_UTILS_TENSORINITINT_H
 
 #include "TPP/Transforms/Utils/TensorInit.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -142,4 +142,4 @@ private:
   std::binomial_distribution<uint64_t> distribution;
 };
 
-#endif // TPP_TENSORINITINT_H
+#endif // TPP_TRANSFORMS_UTILS_TENSORINITINT_H

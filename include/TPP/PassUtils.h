@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_PASS_UTILS_H
-#define TPP_PASS_UTILS_H
+#ifndef TPP_PASSUTILS_H
+#define TPP_PASSUTILS_H
 
 #include "mlir/Pass/PassManager.h"
 
@@ -36,4 +36,4 @@ protected:
 } // namespace tpp
 } // namespace mlir
 
-#endif // TPP_PASS_UTILS_H
+#endif // TPP_PASSUTILS_H

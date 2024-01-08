@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MLIR_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H
-#define MLIR_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H
+#ifndef TPP_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H
+#define TPP_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H
 
 namespace mlir {
 class DialectRegistry;
@@ -19,4 +19,4 @@ void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry);
 } // namespace check
 } // namespace mlir
 
-#endif // MLIR_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H
+#endif // TPP_DIALECT_CHECK_BUFFERIZABLEOPINTERFACEIMPL_H

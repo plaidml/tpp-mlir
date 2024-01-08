@@ -2,8 +2,8 @@
 // Utilities to help build MLIR
 //
 //===----------------------------------------------------------------------===//
-#ifndef TPP_BUILDER_UTILS_H
-#define TPP_BUILDER_UTILS_H
+#ifndef TPP_TRANSFORMS_UTILS_BUILDERUTILS_H
+#define TPP_TRANSFORMS_UTILS_BUILDERUTILS_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -48,4 +48,4 @@ TypedAttr getTypedAttr(OpBuilder &builder, Type type, double value);
 
 } // namespace mlir
 
-#endif // TPP_BUILDER_UTILS_H
+#endif // TPP_TRANSFORMS_UTILS_BUILDERUTILS_H
