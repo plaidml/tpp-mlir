@@ -543,8 +543,7 @@ struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
 
     if (useWmma && supportsMMACompute(matmulOp))
       return gemmToGpuMMA(matmulOp, rewriter);
-    else
-      return gemmToGpuLoops(matmulOp, rewriter);
+    return gemmToGpuLoops(matmulOp, rewriter);
   }
 
 private:
@@ -572,8 +571,7 @@ struct ConvertBrgemmToGpu
 
     if (useWmma && supportsMMACompute(brgemmOp))
       return gemmToGpuMMA(brgemmOp, rewriter);
-    else
-      return gemmToGpuLoops(brgemmOp, rewriter);
+    return gemmToGpuLoops(brgemmOp, rewriter);
   }
 
 private:
