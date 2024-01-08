@@ -26,13 +26,13 @@ using namespace mlir::perf;
 //===----------------------------------------------------------------------===//
 
 LogicalResult StopTimerOp::verify() {
-  auto timerSrc = getTimer().getDefiningOp();
+  auto *timerSrc = getTimer().getDefiningOp();
   if (!timerSrc || !isa<StartTimerOp>(timerSrc))
     return emitOpError("invalid timer input");
 
   // Any timer can only be stopped once. It is unusable afterwards.
   int numStopTimers = 0;
-  for (auto user : timerSrc->getUsers()) {
+  for (auto *user : timerSrc->getUsers()) {
     if (isa<StopTimerOp>(*user))
       ++numStopTimers;
   }
