@@ -48,7 +48,7 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
 
   auto loc = op->getLoc();
 
-  auto parentOp = op->getParentOp();
+  auto *parentOp = op->getParentOp();
   if (isa<scf::ParallelOp>(parentOp))
     return std::nullopt;
 
@@ -242,7 +242,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                                        Operation *rootStoreOp,
                                        ValueRange storeIndices,
                                        PatternRewriter &rewriter) {
-  auto parentOp = rootOp->getParentOp();
+  auto *parentOp = rootOp->getParentOp();
   auto rootOutput = rootOp.getDpsInits()[0];
 
   // Traverse other ops within the same region and collect consumers.
