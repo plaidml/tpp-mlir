@@ -78,21 +78,6 @@ private:
 struct LocalDialectsLowering
     : public tpp::impl::LocalDialectsLoweringBase<LocalDialectsLowering>,
       UtilityPassBase<ModuleOp> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry
-        .insert<affine::AffineDialect,
-                arith::ArithDialect,
-                func::FuncDialect,
-                memref::MemRefDialect,
-                check::CheckDialect,
-                perf::PerfDialect,
-                scf::SCFDialect,
-                tensor::TensorDialect,
-                xsmm::XsmmDialect,
-                LLVM::LLVMDialect>();
-    // clang-format on
-  }
 
   void runOnOperation() override {
     auto module = getOperation();

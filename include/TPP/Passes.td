@@ -289,6 +289,16 @@ def Cleanup : Pass<"cleanup", "func::FuncOp"> {
 
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
   let summary = "Lower all local dialects (XSMM, check etc.).";
+  let dependentDialects = ["affine::AffineDialect",
+                           "arith::ArithDialect",
+                           "func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "check::CheckDialect",
+                           "perf::PerfDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "xsmm::XsmmDialect",
+                           "LLVM::LLVMDialect"];
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {

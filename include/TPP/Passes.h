@@ -14,9 +14,17 @@
 namespace mlir {
 class ModuleOp;
 
+namespace affine {
+class AffineDialect;
+} // namespace affine
+
 namespace arith {
 class ArithDialect;
 } // namespace arith
+
+namespace check {
+class CheckDialect;
+} // namespace check
 
 namespace bufferization {
 class BufferizationDialect;
@@ -47,6 +55,10 @@ class MathDialect;
 namespace memref {
 class MemRefDialect;
 } // namespace memref
+
+namespace perf {
+class PerfDialect;
+} // namespace perf
 
 namespace scf {
 class SCFDialect;
