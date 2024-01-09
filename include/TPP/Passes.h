@@ -61,7 +61,6 @@ class TensorDialect;
 } // namespace tensor
 
 namespace tpp {
-class TppDialect;
 
 // Testing passes.
 void registerTestStructuralMatchers();
