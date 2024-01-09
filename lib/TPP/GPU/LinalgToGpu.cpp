@@ -48,7 +48,7 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
 
   auto loc = op->getLoc();
 
-  auto parentOp = op->getParentOp();
+  auto *parentOp = op->getParentOp();
   if (isa<scf::ParallelOp>(parentOp))
     return std::nullopt;
 
@@ -242,7 +242,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                                        Operation *rootStoreOp,
                                        ValueRange storeIndices,
                                        PatternRewriter &rewriter) {
-  auto parentOp = rootOp->getParentOp();
+  auto *parentOp = rootOp->getParentOp();
   auto rootOutput = rootOp.getDpsInits()[0];
 
   // Traverse other ops within the same region and collect consumers.
@@ -543,8 +543,7 @@ struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
 
     if (useWmma && supportsMMACompute(matmulOp))
       return gemmToGpuMMA(matmulOp, rewriter);
-    else
-      return gemmToGpuLoops(matmulOp, rewriter);
+    return gemmToGpuLoops(matmulOp, rewriter);
   }
 
 private:
@@ -572,8 +571,7 @@ struct ConvertBrgemmToGpu
 
     if (useWmma && supportsMMACompute(brgemmOp))
       return gemmToGpuMMA(brgemmOp, rewriter);
-    else
-      return gemmToGpuLoops(brgemmOp, rewriter);
+    return gemmToGpuLoops(brgemmOp, rewriter);
   }
 
 private:
