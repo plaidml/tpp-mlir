@@ -33,7 +33,7 @@ Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
   if (newType.isa<RankedTensorType>()) {
     return builder.create<tensor::ExpandShapeOp>(loc, newType, val,
                                                  reassociationMap);
-  } else if (newType.isa<MemRefType>()) {
+  } if (newType.isa<MemRefType>()) {
     return builder.create<memref::ExpandShapeOp>(loc, newType, val,
                                                  reassociationMap);
   }
@@ -48,7 +48,7 @@ Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
   if (newType.isa<RankedTensorType>()) {
     return builder.create<tensor::CollapseShapeOp>(loc, newType, val,
                                                    reassociationMap);
-  } else if (newType.isa<MemRefType>()) {
+  } if (newType.isa<MemRefType>()) {
     return builder.create<memref::CollapseShapeOp>(loc, newType, val,
                                                    reassociationMap);
   }
