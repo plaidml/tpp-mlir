@@ -302,9 +302,9 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
           mlir::utils::isZeroTensor(falseVal)) {
         // case: %in > 0 ? %in : 0
         return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
-      } else if (mlir::utils::isZeroTensor(cmpLhs) &&
-                 mlir::utils::isZeroTensor(trueVal) &&
-                 cmpRhs == falseVal) {
+      }
+      if (mlir::utils::isZeroTensor(cmpLhs) &&
+          mlir::utils::isZeroTensor(trueVal) && cmpRhs == falseVal) {
         // case: 0 > %in ? 0 : %in
         return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
       }
@@ -315,9 +315,9 @@ static bool hasReluBody(Operation *op, SmallVectorImpl<Value> *captured) {
           mlir::utils::isZeroTensor(trueVal)) {
         // case: %in < 0 ? 0 : %in
         return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
-      } else if (mlir::utils::isZeroTensor(cmpLhs) &&
-                 mlir::utils::isZeroTensor(falseVal) &&
-                 cmpRhs == trueVal) {
+      }
+      if (mlir::utils::isZeroTensor(cmpLhs) &&
+          mlir::utils::isZeroTensor(falseVal) && cmpRhs == trueVal) {
         // case: 0 < %in ? %in : 0
         return (getOperand(cmpLhs, cmpRhs) || getOperand(cmpRhs, cmpLhs));
       }
