@@ -179,7 +179,7 @@ static bool isIdentityMapWithZeros(AffineMap map) {
 }
 
 // Helper fuction to print a bit vector.
-static void printBitVector(std::string banner,
+static void printBitVector(const std::string &banner,
                            const llvm::SmallBitVector &bitVector,
                            llvm::raw_ostream &os) {
   os << banner << "  ";
