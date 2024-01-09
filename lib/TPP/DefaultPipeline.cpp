@@ -37,8 +37,6 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
@@ -108,14 +106,12 @@ struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
-    registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
-    tpp::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Add all core MLIR dialects as the default pipeline may contain any
     // combination of other passes.

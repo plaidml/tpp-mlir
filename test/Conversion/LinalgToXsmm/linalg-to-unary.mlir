@@ -502,12 +502,10 @@ func.func @identity_9(%arg0: memref<6xf32, strided<[1]>>, %arg1: memref<6x9xf32>
   return
 }
 
-// We need to lift: VerifyOpProperty(OpTrait::tpp::checkBroadcastableShape in the matcher.
 // CHECK-LABEL: identity_9
 // CHECK-SAME: %[[ARG0:.+]]: memref<6xf32, strided<[1]>>, %[[ARG1:.+]]: memref<6x9xf32>
-// CHECK: linalg.generic
-// C_HECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [6, 9, 1, 9] flags = (bcast_row) data_type = f32
-// C_HECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[ARG0]], %[[ARG1]])
+// CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [6, 9, 1, 9] flags = (bcast_row) data_type = f32
+// CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %{{.+}}, %[[ARG1]])
 
 // -----
 

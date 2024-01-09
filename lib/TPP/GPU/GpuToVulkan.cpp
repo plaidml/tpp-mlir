@@ -23,7 +23,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

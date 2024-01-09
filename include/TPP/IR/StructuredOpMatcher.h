@@ -96,11 +96,31 @@ struct HasMap {
 };
 
 // Callble object to verify if `map` is a projected permutation map.
+// We require the dimensions to be in sorted order this avoid filtering
+// projected permutation without broadcasting semantics, for example
+// affine_map<(d0, d1) -> (d1, d0)> is rejected.
 struct ProjectedPermutation {
   ProjectedPermutation() = default;
 
   bool operator()(AffineMap map) const {
-    return map.isProjectedPermutation(/*allowZeroInResults=*/true);
+    if (map.getNumSymbols() > 0 || map.getNumResults() > map.getNumInputs())
+      return false;
+
+    SmallVector<bool> seen(map.getNumInputs(), false);
+    SmallVector<int64_t> pos;
+    for (auto expr : map.getResults()) {
+      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+        if (seen[dim.getPosition()])
+          return false;
+        seen[dim.getPosition()] = true;
+        pos.push_back(dim.getPosition());
+      } else if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
+        if (constExpr.getValue() != 0)
+          return false;
+      } else
+        return false;
+    }
+    return llvm::is_sorted(pos);
   }
 };
 

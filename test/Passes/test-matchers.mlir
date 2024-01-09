@@ -198,32 +198,6 @@ func.func @test_predicates(%arg0: memref<3x3xf32>) {
   return
 }
 
-// CHECK-LABEL: test_interfaces
-func.func @test_interfaces(%arg0: memref<8x8xf32, strided<[8, 2], offset: 0>>,
-                           %arg1: memref<8x8xf32>) {
-  // CHECK: not a match
-  // CHECK-NOT: match interface
-  linalg.generic {
-    indexing_maps = [#map7],
-    iterator_types = ["parallel", "parallel"]}
-    outs(%arg0: memref<8x8xf32, strided<[8, 2], offset:0>>) {
-      ^bb0(%out: f32):
-        %0 = arith.addf %out, %out : f32
-        linalg.yield %0 : f32
-  }
-  // CHECK: match interface
-  // CHECK-NOT: not a match
-  linalg.generic {
-    indexing_maps = [#map7],
-    iterator_types = ["parallel", "parallel"]}
-    outs(%arg1: memref<8x8xf32>) {
-      ^bb0(%out: f32):
-        %0 = arith.addf %out, %out : f32
-        linalg.yield %0 : f32
-  }
-  return
-}
-
 #map11 = affine_map<(d0, d1) -> (d0, d1)>
 #map12 = affine_map<(d0, d1) -> (d1)>
 

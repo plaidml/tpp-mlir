@@ -11,26 +11,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertLinalgToTpp : Pass<"convert-linalg-to-tpp", "func::FuncOp"> {
-  let summary = "Convert linalg to tpp.";
-  let description = [{
-    Convert linalg.generic (or named) operations to tpp operations. 
-    Linalg generic operations are converted using simple pattern 
-    matching (i.e., see `isTppAdd`).
-  }];
-  let dependentDialects = ["linalg::LinalgDialect", "tpp::TppDialect"]; 
-}
-
-def ConvertTppToXsmm : Pass<"convert-tpp-to-xsmm", "func::FuncOp"> {
-  let summary = "Convert tpp to xsmm";
-  let description = [{
-    Convert tpp operations to XSMM operations.
-  }];
-  let dependentDialects = ["func::FuncDialect", 
-                           "memref::MemRefDialect",
-                           "xsmm::XsmmDialect"];
-}
-
 def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
   let summary = "Convert linalg to xsmm";
   let description = [{
@@ -109,14 +89,6 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
                            "tensor::TensorDialect"];
 }
 
-def CombineTppOps : Pass<"tpp-combine", "func::FuncOp"> {
-  let summary = "Combine tpps into bigger tpp";
-  let description = [{
-    Convert tpp bias + brgemm + relu op to a larger op.
-  }];
-  let dependentDialects = ["func::FuncDialect", "memref::MemRefDialect"];
-}
-
 def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
   let summary = "Drop the transform schedule";
 }
@@ -130,7 +102,7 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
       [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb/VNNI][jb][VNNI]
     - VNNI BRGemm as: C[M][N]= A[R][M][K] * B[R][K/VNNI][N][VNNI]
   }];
-  let dependentDialects = ["tensor::TensorDialect", "tpp::TppDialect"];
+  let dependentDialects = ["tensor::TensorDialect"];
 }
 
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
@@ -196,7 +168,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
     Option<"useForAll", "use-for-all", "bool", "true", "Use parallel forAll">
   ];
   let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect",
-                           "tensor::TensorDialect", "tpp::TppDialect"];
+                           "tensor::TensorDialect"];
 }
 
 def LowerPacksAndUnPacks : Pass<"lower-packs-unpacks", "func::FuncOp"> {

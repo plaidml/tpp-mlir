@@ -1,6 +1,3 @@
-// This should really be in the passes directory, not here
-// RUN: tpp-opt %s -convert-linalg-to-tpp | FileCheck -check-prefix=TPP %s
-
 // We don't need to print because we use the check dialect
 // RUN: tpp-run %s \
 // RUN:  -e entry -entry-point-result=void
@@ -50,7 +47,6 @@ func.func @entry() {
       %3 = scf.for %arg5 = %c0 to %c56 step %c1 iter_args(%ia3 = %ia2) -> tensor<12x2x56x56x32xf32> {
         %extracted_slice = tensor.extract_slice %ia3[%arg3, %arg4, %arg5, 0, 0] [1, 1, 1, 56, 32] [1, 1, 1, 1, 1]
           : tensor<12x2x56x56x32xf32> to tensor<56x32xf32>
-        // TPP: tpp.relu
         %4 = linalg.generic {indexing_maps = [#map3], iterator_types = ["parallel", "parallel"]} outs(%extracted_slice : tensor<56x32xf32>) {
           ^bb0(%out: f32):
             %5 = arith.maximumf %out, %cf : f32

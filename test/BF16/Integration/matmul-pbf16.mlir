@@ -2,10 +2,22 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+
 func.func @matmultpp(%A: memref<4x8xbf16>,
           %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>)  {
-  tpp.gemm ins(%A: memref<4x8xbf16>, %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>)
-           outs(%C: memref<4x4xbf16>)
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map2], 
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
+    ins(%A, %B : memref<4x8xbf16>, memref<4x4x2xbf16>) 
+    outs(%C : memref<4x4xbf16>) {
+      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+        %1 = arith.mulf %in, %in_2 : bf16
+        %2 = arith.addf %out, %1 : bf16
+        linalg.yield %2 : bf16
+    }
   return
 }
 

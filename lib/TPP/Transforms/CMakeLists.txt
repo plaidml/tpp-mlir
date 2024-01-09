@@ -2,7 +2,6 @@ add_subdirectory(Utils)
 
 add_mlir_library(TPPTransforms
   Bufferize.cpp
-  CombineTpp.cpp
   ConstantFoldPack.cpp
   ConvertForAllToParallelOp.cpp
   ConvInitSimplify.cpp
@@ -24,9 +23,6 @@ add_mlir_library(TPPTransforms
   
   DEPENDS
     MLIRPerfOpsIncGen
-    MLIRTppOpsIncGen
-    MLIRTppAttrDefIncGen
-    MLIRTppInterfaceIncGen
     MLIRXsmmOpsIncGen
     MLIRXsmmAttrDefIncGen
     TPPCompilerPassIncGen
@@ -37,4 +33,5 @@ add_mlir_library(TPPTransforms
     MLIRBufferizationToMemRef
     MLIRBufferizationPipelines
     TPPTransformsUtils
+    TPPIR
   )

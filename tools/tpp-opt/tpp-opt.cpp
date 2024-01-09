@@ -27,8 +27,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/Passes.h"
@@ -38,14 +36,12 @@ int main(int argc, char **argv) {
   mlir::tpp::registerTppCompilerPasses();
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::tpp::TppDialect>();
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
   mlir::linalgx::registerTransformDialectExtension(registry);
   mlir::check::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::perf::registerBufferizableOpInterfaceExternalModels(registry);
-  mlir::tpp::registerBufferizableOpInterfaceExternalModels(registry);
   mlir::tpp::registerTestStructuralMatchers();
   mlir::tpp::registerTestForToForAllRewrite();
 

@@ -9,11 +9,6 @@ add_mlir_library(TPPTransformsUtils
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
 
-  DEPENDS
-    MLIRTppOpsIncGen
-    MLIRTppAttrDefIncGen
-    MLIRTppInterfaceIncGen
-
   LINK_LIBS PUBLIC
     MLIRLinalgUtils
   )

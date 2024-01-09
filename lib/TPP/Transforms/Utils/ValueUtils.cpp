@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Tpp/TppOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -74,9 +73,6 @@ bool isZeroTensor(Value val) {
 static bool isZeroOp(Operation *defOp) {
   if (!defOp)
     return false;
-
-  if (isa_and_nonnull<tpp::ZeroOp>(defOp))
-    return true;
 
   return TypeSwitch<Operation *, bool>(defOp)
       .Case<arith::ConstantOp>([&](auto op) {

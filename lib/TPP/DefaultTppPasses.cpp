@@ -19,8 +19,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Tpp/BufferizableOpInterfaceImpl.h"
-#include "TPP/Dialect/Tpp/TppDialect.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
@@ -181,8 +179,7 @@ struct TppMapping : public tpp::impl::TppMappingBase<TppMapping>,
         .insert<linalg::LinalgDialect,
                 memref::MemRefDialect,
                 scf::SCFDialect,
-                tensor::TensorDialect,
-                tpp::TppDialect>();
+                tensor::TensorDialect>();
     // clang-format on
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -233,14 +230,14 @@ private:
 };
 
 // Convert all matching operations to TPP.
+// TODO: We can remove it now. It has a single pass inside.
 struct TppConversion : public tpp::impl::TppConversionBase<TppConversion>,
                        UtilityPassBase<func::FuncOp> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
         .insert<linalg::LinalgDialect,
-                scf::SCFDialect,
-                tpp::TppDialect>();
+                scf::SCFDialect>();
     // clang-format on
   }
 
@@ -257,13 +254,7 @@ struct TppConversion : public tpp::impl::TppConversionBase<TppConversion>,
   }
 
 private:
-  void constructPipeline() override {
-    pm.clear();
-
-    // Convert all higher level dialects to TPP.
-    pm.addPass(createConvertLinalgToTpp());
-    pm.addPass(createCombineTppOps());
-  }
+  void constructPipeline() override { pm.clear(); }
 };
 
 // Lower TPP to into combination of standard and local dialects.
@@ -276,8 +267,7 @@ struct TppLowering : public tpp::impl::TppLoweringBase<TppLowering>,
     registry
         .insert<xsmm::XsmmDialect,
                 scf::SCFDialect,
-                memref::MemRefDialect,
-                tpp::TppDialect>();
+                memref::MemRefDialect>();
     // clang-format on
   }
 
@@ -297,11 +287,8 @@ private:
   void constructPipeline() override {
     pm.clear();
 
-    // Linalg to Xsmm conversion patterns.
     pm.addPass(createConvertLinalgToXsmm());
     pm.addPass(createCombineXsmmOpPass());
-    // Tpp to Xsmm conversion patterns.
-    pm.addPass(createConvertTppToXsmm());
     pm.addPass(createFoldXsmmFlags());
     pm.addPass(createVerifyXsmmCalls());
   }
@@ -315,14 +302,12 @@ struct DefaultTppPasses
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
-    registry.insert<tpp::TppDialect>();
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
-    tpp::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Add all core MLIR dialects as the default TPP passes may contain any
     // combination of other passes.

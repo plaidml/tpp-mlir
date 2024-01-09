@@ -75,7 +75,6 @@ collapseIterators(RewriterBase &rewriter, linalg::GenericOp genericOp,
 } // namespace linalgx
 
 namespace tpp {
-void populateConvertLinalgToTppPatterns(RewritePatternSet &patterns);
 void populateLinalgToXsmmPatterns(RewritePatternSet &patterns);
 void populateSimplifyPacking(RewritePatternSet &patterns);
 void populateSinkPackPatterns(RewritePatternSet &patterns);

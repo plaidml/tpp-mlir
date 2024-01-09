@@ -16,7 +16,6 @@ add_mlir_library(TPPGPU
 
   DEPENDS
     MLIRPerfOpsIncGen
-    MLIRTppOpsIncGen
     MLIRXsmmOpsIncGen
     TPPCompilerPassIncGen
     TPPLinalgXTransformOpsIncGen
@@ -29,6 +28,7 @@ add_mlir_library(TPPGPU
     MLIRMathToSPIRV
     MLIRControlFlowToSPIRV
     MLIRMemRefTransforms
+    TPPIR
 )
 
 if (TPP_GPU MATCHES "cuda")
