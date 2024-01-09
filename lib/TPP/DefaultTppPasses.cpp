@@ -32,7 +32,7 @@ namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTTPPPASSES
 #include "TPP/Passes.h.inc"
-#define GEN_PASS_DEF_TPPLOWERING
+#define GEN_PASS_DEF_LINALGLOWERING
 #include "TPP/Passes.h.inc"
 #define GEN_PASS_DEF_CLEANUP
 #include "TPP/Passes.h.inc"
@@ -41,8 +41,6 @@ namespace tpp {
 #define GEN_PASS_DEF_POSTPROCESSING
 #include "TPP/Passes.h.inc"
 #define GEN_PASS_DEF_TPPMAPPING
-#include "TPP/Passes.h.inc"
-#define GEN_PASS_DEF_TPPCONVERSION
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
@@ -229,38 +227,9 @@ private:
   }
 };
 
-// Convert all matching operations to TPP.
-// TODO: We can remove it now. It has a single pass inside.
-struct TppConversion : public tpp::impl::TppConversionBase<TppConversion>,
-                       UtilityPassBase<func::FuncOp> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry
-        .insert<linalg::LinalgDialect,
-                scf::SCFDialect>();
-    // clang-format on
-  }
-
-  void runOnOperation() override {
-    auto module = getOperation();
-
-    // Initialize the pipeline if needed.
-    // Otherwise, just run the cached one.
-    if (pm.empty())
-      constructPipeline();
-
-    if (failed(runPipeline(pm, module)))
-      return signalPassFailure();
-  }
-
-private:
-  void constructPipeline() override { pm.clear(); }
-};
-
-// Lower TPP to into combination of standard and local dialects.
-struct TppLowering : public tpp::impl::TppLoweringBase<TppLowering>,
-                     UtilityPassBase<func::FuncOp> {
-  using TppLoweringBase::TppLoweringBase;
+// Lower Linalg to into combination of standard and local dialects.
+struct LinalgLowering : public tpp::impl::LinalgLoweringBase<LinalgLowering>,
+                        UtilityPassBase<func::FuncOp> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -362,7 +331,7 @@ private:
       pm.addPass(createBufferize());
 
       // Lower all Tile operations.
-      pm.addNestedPass<func::FuncOp>(createTppLowering());
+      pm.addNestedPass<func::FuncOp>(createLinalgLowering());
       pm.addNestedPass<func::FuncOp>(createCleanup());
     }
 

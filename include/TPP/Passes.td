@@ -307,19 +307,8 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
   }];
 }
 
-def TppConversion : Pass<"tpp-conversion", "func::FuncOp"> {
-  let summary = "Convert operations to TPP";
-  let description = [{
-    Convert all eligble operations into TPP operations.
-  }];
-}
-
-def TppLowering : Pass<"tpp-lowering", "func::FuncOp"> {
-  let summary = "Lower TPP operations";
-  let description = [{
-    Lower all TPP operations into combination of operations from
-    standard and local dialects.
-  }]; 
+def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
+  let summary = "Lower Linalg operations to XSMM operations.";
 }
 
 def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
