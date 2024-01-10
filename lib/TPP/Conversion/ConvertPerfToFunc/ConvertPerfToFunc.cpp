@@ -114,7 +114,8 @@ static func::FuncOp createPerfFuncPrototype(Location loc, const std::string& fun
 }
 
 // Generate function implementation for perf.sink operation.
-static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
+static LogicalResult buildPerfSinkFunc(Location loc,
+                                       const std::string &funcName,
                                        Operation *op,
                                        PatternRewriter &rewriter) {
   auto funcOp = createPerfFuncPrototype(loc, std::move(funcName), op, rewriter);
@@ -140,7 +141,8 @@ static LogicalResult buildPerfSinkFunc(Location loc, std::string funcName,
 
 // Create a perf runtime function prototype.
 // The function implementation has to be provided externally by the end user.
-static LogicalResult buildPerfRuntimeFunc(Location loc, std::string funcName,
+static LogicalResult buildPerfRuntimeFunc(Location loc,
+                                          const std::string &funcName,
                                           Operation *op,
                                           PatternRewriter &rewriter) {
   (void)createPerfFuncPrototype(loc, std::move(funcName), op, rewriter);
