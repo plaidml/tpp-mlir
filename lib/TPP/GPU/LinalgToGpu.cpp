@@ -84,18 +84,13 @@ static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
   auto bType = linalgOp.getDpsInputs()[1].getType().cast<ShapedType>();
   auto cType = linalgOp.getDpsInits()[0].getType().cast<ShapedType>();
 
-  ArrayRef<int64_t> shapeA = aType.getShape();
-  ArrayRef<int64_t> shapeC = cType.getShape();
-  int64_t m = shapeC[0];
-  int64_t n = shapeC[1];
-  // Buffer A might be 2D (gemm) or 3D (brgemm) but the last dimension will
-  // always be reduction.
-  int64_t k = shapeA.back();
+  auto elemTypeA = aType.getElementType();
+  auto elemTypeB = bType.getElementType();
+  auto elemTypeC = cType.getElementType();
 
-  // For now, only M-N-K F16[16] x F16[16] x F16[16] WMMA variant is supported.
   // TODO: add more WMMA combinations.
-  return aType.getElementType().isF16() && bType.getElementType().isF16() &&
-         cType.getElementType().isF16() && m == 16 && n == 16 && k == 16;
+  return (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
+         (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
 }
 
 // Fuse a consumer using WMMA operations.

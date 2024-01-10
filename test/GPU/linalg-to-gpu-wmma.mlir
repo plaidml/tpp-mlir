@@ -102,18 +102,6 @@ func.func @wrong_data_type(%arg0: memref<16x16xf32>,
 // CHECK-LABEL: func.func @wrong_data_type(
 // CHECK-NOT: gpu.{{.*}}_mma_
 
-// Operands' shapes do not match supported WMMA shapes.
-func.func @wrong_shapes(%arg0: memref<32x32xf16>,
-                 %arg1: memref<32x32xf16>,
-                 %arg2: memref<32x32xf16>) {
-  linalg.matmul ins(%arg0, %arg1 : memref<32x32xf16>, memref<32x32xf16>)
-                outs(%arg2 : memref<32x32xf16>)
-  return
-}
-
-// CHECK-LABEL: func.func @wrong_shapes(
-// CHECK-NOT: gpu.{{.*}}_mma_
-
 // -----
 
 // Dynamic shapes are not supported.
