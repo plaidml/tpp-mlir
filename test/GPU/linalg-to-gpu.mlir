@@ -23,7 +23,7 @@ func.func @matmul(%arg0: memref<256x2048xf32>,
 // CHECK:             scf.yield %[[res]] : f32
 // CHECK:           }
 // CHECK:           memref.store %[[sum]], %[[C]][%arg3, %arg4] : memref<256x1024xf32>
-// CHECK:           scf.yield
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----
@@ -55,7 +55,7 @@ func.func @batch_reduce_matmul(%arg0: memref<32x256x2048xf32>,
 // CHECK:             scf.yield %[[sum]] : f32
 // CHECK:           }
 // CHECK:           memref.store %[[res]], %[[C]][%arg3, %arg4] : memref<256x1024xf32>
-// CHECK:           scf.yield
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----
@@ -110,7 +110,7 @@ func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024x
       %0 = arith.maximumf %out, %cst : f32
       linalg.yield %0 : f32
     }
-    scf.yield
+    scf.reduce
   }
   return
 }
@@ -138,9 +138,9 @@ func.func @matmul_add_relu(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024x
 // CHECK:             %[[biasAdd:.+]] = arith.addf %[[sum]], %[[elemBias]]
 // CHECK:             %[[reluRes:.+]] = arith.maximumf %[[biasAdd]], %[[zero]]
 // CHECK:             memref.store %[[reluRes]], %[[outTile]]
-// CHECK:             scf.yield
+// CHECK:             scf.reduce
 // CHECK:           }
-// CHECK:           scf.yield
+// CHECK:           scf.reduce
 // CHECK:         }
 
 // -----

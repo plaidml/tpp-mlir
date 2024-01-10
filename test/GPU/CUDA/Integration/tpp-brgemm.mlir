@@ -19,7 +19,7 @@ func.func @entry(%arg0: memref<2x8x32x32xf32>, %arg1: memref<8x8x32x32xf32>, %ar
                                    memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>, 
                                    memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>>) 
                  outs(%subview_1 : memref<32x32xf32, strided<[32, 1], offset: ?>>)
-    scf.yield
+    scf.reduce
   }
 
   %out = memref.alloc() : memref<2x8x32x32xf32>

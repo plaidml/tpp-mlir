@@ -68,7 +68,7 @@ func.func @add_mapping_parallel(%arg0: memref<10x10x10xf32>, %arg1: memref<10x10
     %0 = xsmm.binary.dispatch add [10, 10, 10, 10, 10] flags = (none) data_type = f32
     xsmm.binary add(data_type = f32, %0, %subview, %subview, %subview_0) 
       : (i64, memref<10x10xf32, #map>, memref<10x10xf32, #map>, memref<10x10xf32, #map>) -> ()
-    scf.yield
+    scf.reduce
   }
   return
 }
@@ -118,7 +118,7 @@ func.func @identity_mapping(%arg0: memref<64xf32>) -> memref<12x56x56x64xf32> {
     %subview = memref.subview %alloc[%arg1, %arg2, 0, 0] [1, 1, 56, 64] [1, 1, 1, 1] : memref<12x56x56x64xf32> to memref<56x64xf32, #map>
     %0 = xsmm.unary.dispatch identity [56, 64, 64, 64] flags = (bcast_col) data_type = f32
     xsmm.unary identity(data_type = f32, %0, %arg0, %subview) : (i64, memref<64xf32>, memref<56x64xf32, #map>) -> ()
-    scf.yield
+    scf.reduce
   }
 
   return %alloc : memref<12x56x56x64xf32>
@@ -177,7 +177,7 @@ func.func @relu_3d(%arg0: memref<64x32x32xf32>) -> memref<64x32x32xf32> {
     %subview = memref.subview %arg0[%arg1, 0, 0] [1, 32, 32] [1, 1, 1] : memref<64x32x32xf32> to memref<32x32xf32, #map>
     %0 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
     xsmm.unary relu(data_type = f32, %0, %subview, %subview) : (i64, memref<32x32xf32, #map>, memref<32x32xf32, #map>) -> ()
-    scf.yield
+    scf.reduce
   }
 
   return %arg0 : memref<64x32x32xf32>
@@ -333,7 +333,7 @@ func.func @blocked_matmul(%arg0: memref<4x16x32x32xf32>, %arg1: memref<8x16x32x3
       : (i64, memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
          memref<16x32x32xf32, strided<[1024, 32, 1], offset: ?>>,
          memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
-    scf.yield
+    scf.reduce
   }
 
   return

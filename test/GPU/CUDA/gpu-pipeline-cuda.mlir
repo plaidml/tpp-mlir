@@ -72,7 +72,7 @@ func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x6
       memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>, 
       memref<16x64x64xf32, strided<[4096, 64, 1], offset: ?>>) 
                                outs(%subview_1 : memref<64x64xf32, strided<[64, 1], offset: ?>>)
-    scf.yield
+    scf.reduce
   }
   return
 }

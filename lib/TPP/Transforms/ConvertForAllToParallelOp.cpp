@@ -44,9 +44,8 @@ struct ConvertForAllToParallelOpImpl : public OpRewritePattern<scf::ForallOp> {
           IRMapping mapping;
           mapping.map(forallOp.getInductionVars(), regionArgs);
           Block *forallOpBlock = forallOp.getBody();
-          for (auto &nestedOp : forallOpBlock->without_terminator()) {
+          for (auto &nestedOp : forallOpBlock->without_terminator())
             nestedBuilder.clone(nestedOp, mapping);
-          }
         });
     return success();
   }

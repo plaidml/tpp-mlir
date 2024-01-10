@@ -24,7 +24,7 @@ func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %
   %D_exp = tensor.expand_shape %D [[0, 1], [2, 3]] :
     !D_tensor_t into tensor<2x2x8x2xf32>
 
-  // IR: %[[C1:.+]] = arith.constant 1 : i64
+  // IR-DAG: %[[C1:.+]] = arith.constant 1 : i64
   // IR-DAG: %[[C2:.+]] = arith.constant 2 : i64
   // IR-DAG: %[[C4:.+]] = arith.constant 4 : i64
   // IR-DAG: %[[C8:.+]] = arith.constant 8 : i64

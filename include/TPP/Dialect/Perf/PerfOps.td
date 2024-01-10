@@ -98,6 +98,7 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
+     DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>,
      RangedTypesMatchWith<"iter_args types match types of yield",
                           "$_self",
                           "iterArgs",

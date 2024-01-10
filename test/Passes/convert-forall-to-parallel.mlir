@@ -18,7 +18,7 @@ func.func @tensor_forall(%arg0: tensor<32x32xbf16>) -> tensor<8x112x32x32xbf16> 
 
 // CHECK-LABEL: func.func @memref_forall
 func.func @memref_forall(%arg0: memref<32x32xbf16>) -> memref<8x112x32x32xbf16> {
-  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
   // CHECK-DAG: %[[C112:.+]] = arith.constant 112 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -40,7 +40,7 @@ func.func @memref_forall(%arg0: memref<32x32xbf16>) -> memref<8x112x32x32xbf16> 
 // CHECK-SAME:  %{{.+}}: memref<?x?xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: index
 func.func @thread_forall(%arg0: memref<1x5xf32>, %arg1: memref<?x?xf32>, %arg2: index) -> index {
-  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
   %c1 = arith.constant 1 : index
   // CHECK: scf.parallel (%{{.+}}) = (%[[C0]]) to (%[[ARG2]]) step (%[[C1]])
