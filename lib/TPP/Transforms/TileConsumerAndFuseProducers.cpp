@@ -301,20 +301,6 @@ static bool hasCompatibleParallelLoops(
          isIdentityMapWithZeros(consumerProjectedMap);
 }
 
-// Tile the consumer and return the tiled result.
-static FailureOr<scf::SCFTilingResult>
-tileConsumer(RewriterBase &rewriter, TilingInterface consumer,
-             ArrayRef<OpFoldResult> tileSizes) {
-  assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
-  assert(canBeTiledWithCurrentSpec(consumer, tileSizes) &&
-         "expect valid tile sizes");
-
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
-  FailureOr<scf::SCFTilingResult> tilingResult =
-      scf::tileUsingSCFForOp(rewriter, consumer, options);
-  return tilingResult;
-}
-
 // Return true if the op has all users in the worklist. This is an important
 // condition as we want to fuse together 'isolated islands' of op. Basically
 // each op in the worklist must have users in the worklist. If this is not the
@@ -392,23 +378,6 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
   return worklist;
 }
 
-// Walk source and loops and return the defining op of 'source' if it exists.
-static Operation *
-getUntiledProducerFromSliceSource(OpOperand *source,
-                                  ArrayRef<scf::ForOp> loops) {
-  assert(source);
-  auto loopIt = loops.rbegin();
-  while (auto iterArg = source->get().dyn_cast<BlockArgument>()) {
-    scf::ForOp loop = *loopIt;
-    assert(loop);
-    if (iterArg.getOwner()->getParentOp() != loop)
-      break;
-    source = loop.getTiedLoopInit(iterArg);
-    loopIt++;
-  }
-  return source->get().getDefiningOp();
-}
-
 // Entry point for fusion with element-wise operations.
 static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
     RewriterBase &rewriter, TilingInterface consumer,
@@ -441,89 +410,37 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
   if (worklist.size() < 1)
     return failure();
 
-  // Step 4. Tile the consumer.
-  scf::SCFTileAndFuseResult tileAndFuseResult;
-  FailureOr<scf::SCFTilingResult> tilingResult =
-      tileConsumer(rewriter, consumer, tileSizes.at(consumer));
-  if (failed(tilingResult)) {
-    return rewriter.notifyMatchFailure(consumer,
-                                       "failed to tile base operation");
+  // Step 4. Tile the consumer and move the producers
+  // in the fusion domain.
+  scf::SCFTilingOptions options;
+  options.setTileSizes(tileSizes.at(consumer));
+  scf::SCFTileAndFuseOptions tileAndFuseOptions;
+  tileAndFuseOptions.setTilingOptions(options);
+  scf::SCFTileAndFuseOptions::ControlFnTy controlFn =
+      [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
+          bool isDestinationOperand) {
+        Operation *candidateOp = originalProducer.getOwner();
+        if (!candidateOp || worklist.count(candidateOp) == 0 ||
+            (alreadyFusedOps.count(candidateOp) &&
+             !isa<linalg::FillOp>(candidateOp))) {
+          return std::make_tuple(false, false);
+        }
+        return std::make_tuple(true, false);
+      };
+  tileAndFuseOptions.setFusionControlFn(controlFn);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(rewriter, consumer,
+                                                            tileAndFuseOptions);
+  if (failed(tileAndFuseResult)) {
+    return rewriter.notifyMatchFailure(
+        consumer, "failed to tile and fuse with op as root");
   }
-  for (auto *tiledOp : tilingResult->tiledOps) {
-    tileAndFuseResult.tiledAndFusedOps.insert(tiledOp);
-    alreadyFusedOps.insert(tiledOp);
-    LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledOp << "\n");
-  }
-  if (!tilingResult->loops.empty()) {
-    tilingResult->loops[0]->setAttr(
+  if (!tileAndFuseResult->loops.empty()) {
+    tileAndFuseResult->loops[0]->setAttr(
         linalgx::utils::kLoopParallel,
         rewriter.getStringAttr(linalgx::utils::kLoopRoot));
   }
-  tileAndFuseResult.loops = std::move(tilingResult->loops);
-  for (const auto &result : llvm::enumerate(llvm::zip_equal(
-           consumer->getResults(), tilingResult->replacements))) {
-    tileAndFuseResult.replacements[std::get<0>(result.value())] =
-        std::get<1>(result.value());
-  }
-
-  // If there are no loops generated (i.e., tile sizes all zeros), exit.
-  if (tileAndFuseResult.loops.empty())
-    return tileAndFuseResult;
-
-  // Step 5. Tile producers and fuse into the tiled consumer.
-  auto addCandidateSlices = [](Operation *fusedOp,
-                               std::queue<tensor::ExtractSliceOp> &candidates) {
-    for (Value operand : fusedOp->getOperands())
-      if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push(sliceOp);
-  };
-
-  auto forLoops = llvm::to_vector(
-      llvm::map_range(tileAndFuseResult.loops,
-                      [](Operation *op) { return cast<scf::ForOp>(op); }));
-  std::queue<tensor::ExtractSliceOp> frontier;
-  addCandidateSlices(tilingResult->tiledOps.back(), frontier);
-  OpBuilder::InsertionGuard g(rewriter);
-  while (!frontier.empty()) {
-    tensor::ExtractSliceOp candidateSliceOp = frontier.front();
-    frontier.pop();
-
-    // Find the candidate operation potentially walking bbArgs in scf.for.
-    // If we find a candidate we check if it is in our worklist and fuse it
-    // only if so. We do not consider the candidate if it is already fused.
-    Operation *candidateOp = getUntiledProducerFromSliceSource(
-        &candidateSliceOp->getOpOperand(0), forLoops);
-    if (!candidateOp || worklist.count(candidateOp) == 0 ||
-        (alreadyFusedOps.count(candidateOp) &&
-         !isa<linalg::FillOp>(candidateOp))) {
-      continue;
-    }
-
-    std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
-        scf::tileAndFuseProducerOfSlice(rewriter, candidateSliceOp, forLoops);
-    if (!fusedProducer)
-      continue;
-
-    if (Operation *tiledAndFusedOp =
-            fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
-      tileAndFuseResult.tiledAndFusedOps.insert(tiledAndFusedOp);
-      addCandidateSlices(tiledAndFusedOp, frontier);
-      if (alreadyFusedOps.count(consumer.getOperation()) == 0) {
-        alreadyFusedOps.insert(consumer.getOperation());
-        LLVM_DEBUG(llvm::dbgs()
-                   << "FUSED INSERT: " << consumer.getOperation() << "\n");
-      }
-      Operation *untiledProducer = fusedProducer->origProducer.getDefiningOp();
-      alreadyFusedOps.insert(untiledProducer);
-      LLVM_DEBUG(llvm::dbgs() << "FUSED INSERT: " << untiledProducer << "\n");
-      alreadyFusedOps.insert(tiledAndFusedOp);
-      LLVM_DEBUG(llvm::dbgs() << "NEW OP: " << tiledAndFusedOp << "\n");
-      // This is for debug.
-      if (auto metadata = untiledProducer->getAttr("metadata"))
-        tiledAndFusedOp->setAttr("metadata", metadata);
-    }
-  }
-  return tileAndFuseResult;
+  return *tileAndFuseResult;
 }
 
 // Trivial tile selection. If the dimension is statically known, it perfectly
