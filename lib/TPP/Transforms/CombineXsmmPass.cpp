@@ -10,19 +10,20 @@
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Passes.h"
-#include "TPP/Transforms/Utils/BuilderUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_COMBINEXSMMOPPASS
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
+
 using namespace mlir;
 
 namespace {
