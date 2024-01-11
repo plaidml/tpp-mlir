@@ -42,9 +42,7 @@ struct MatmulOpDeGeneralizationPattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  bool isMatmulOp(linalg::LinalgOp linalgOp) const {
-    if (isa_and_nonnull<linalg::MatmulOp>(linalgOp))
-      return true;
+  bool isMatmulOp(linalg::GenericOp linalgOp) const {
     using namespace mlir::structured_match;
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
@@ -84,9 +82,7 @@ struct BatchReduceOpDeGeneralizationPattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  bool isBrgemmOp(linalg::LinalgOp linalgOp) const {
-    if (isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp))
-      return true;
+  bool isBrgemmOp(linalg::GenericOp linalgOp) const {
     using namespace mlir::structured_match;
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
@@ -127,9 +123,7 @@ struct FillOpDeGeneralizationPattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  bool isFillOp(linalg::LinalgOp linalgOp) const {
-    if (isa_and_nonnull<linalg::FillOp>(linalgOp))
-      return true;
+  bool isFillOp(linalg::GenericOp linalgOp) const {
     using namespace mlir::structured_match;
     auto fillMatcher =
         StructuredOpMatcher::make<linalg::GenericOp>()
