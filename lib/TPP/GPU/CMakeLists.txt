@@ -10,7 +10,6 @@ add_mlir_library(TPPGPU
   GpuVulkanAbi.cpp
   LinalgToGpu.cpp
   GpuDataTransfer.cpp
-  GpuMapWMMA.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
