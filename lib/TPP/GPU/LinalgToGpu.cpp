@@ -69,8 +69,22 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
   return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
 }
 
+// Return true if hardware supports WMMA operations.
+static bool isMMASupported(llvm::StringRef triple, llvm::StringRef chip) {
+  auto getComputeCapability = [&](llvm::StringRef chip) -> int {
+    llvm::StringRef delim = "_";
+    llvm::StringRef ccToken =
+        chip.substr(chip.find(delim) + delim.size(), chip.size());
+    return std::stoi(ccToken.str());
+  };
+  if ((triple == "nvptx64-nvidia-cuda") && (getComputeCapability(chip) >= 70))
+    return true;
+
+  return false;
+}
+
 // Return true if the operation can be represented with WMMA compute.
-static bool supportsMMACompute(linalg::LinalgOp linalgOp) {
+static bool isMMACompatible(linalg::LinalgOp linalgOp) {
   if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
         isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp))) {
     return false;
@@ -518,64 +532,43 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   return success();
 }
 
-// Convert linalg.matmul to GPU-compatible kernel.
-struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+// Convert linalg.matmul or linalg.batch_reduce_matmul to GPU-compatible kernel.
+template <typename LinalgOpTy>
+struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
+  using OpRewritePattern<LinalgOpTy>::OpRewritePattern;
+  // Constrain conversion to the supported GEMM-like ops.
+  static_assert(llvm::is_one_of<LinalgOpTy, linalg::MatmulOp,
+                                linalg::BatchReduceMatmulOp>::value);
 
-  ConvertGemmToGpu(MLIRContext *ctx, bool useWmma)
-      : OpRewritePattern(ctx), useWmma(useWmma) {}
+  ConvertGemmLikeToGpu(MLIRContext *ctx, LinalgToGpuOptions options)
+      : OpRewritePattern<LinalgOpTy>(ctx), options(options) {}
 
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(LinalgOpTy gemmLikeOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasPureBufferSemantics()) {
+    if (!gemmLikeOp.hasPureBufferSemantics()) {
       return rewriter.notifyMatchFailure(
-          matmulOp, "Linalg gemm to GPU expects memref type");
+          gemmLikeOp, "Linalg brgemm to GPU expects memref type");
     }
-    if (matmulOp.hasDynamicShape()) {
+    if (gemmLikeOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
-          matmulOp, "Expect static shape when mapping to GPU");
+          gemmLikeOp, "Expect static shape when mapping to GPU");
     }
 
-    if (useWmma && supportsMMACompute(matmulOp))
-      return gemmToGpuMMA(matmulOp, rewriter);
-    return gemmToGpuLoops(matmulOp, rewriter);
+    if (options.useWmma && isMMASupported(options.gpuTriple, options.gpuChip) &&
+        isMMACompatible(gemmLikeOp))
+      return gemmToGpuMMA(gemmLikeOp, rewriter);
+    return gemmToGpuLoops(gemmLikeOp, rewriter);
   }
 
 private:
-  bool useWmma;
+  LinalgToGpuOptions options;
 };
 
-// Convert linalg.batch_reduce_matmul to GPU-compatible kernel.
-struct ConvertBrgemmToGpu
-    : public OpRewritePattern<linalg::BatchReduceMatmulOp> {
-  using OpRewritePattern<linalg::BatchReduceMatmulOp>::OpRewritePattern;
-
-  ConvertBrgemmToGpu(MLIRContext *ctx, bool useWmma)
-      : OpRewritePattern(ctx), useWmma(useWmma) {}
-
-  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
-                                PatternRewriter &rewriter) const override {
-    if (!brgemmOp.hasPureBufferSemantics()) {
-      return rewriter.notifyMatchFailure(
-          brgemmOp, "Linalg brgemm to GPU expects memref type");
-    }
-    if (brgemmOp.hasDynamicShape()) {
-      return rewriter.notifyMatchFailure(
-          brgemmOp, "Expect static shape when mapping to GPU");
-    }
-
-    if (useWmma && supportsMMACompute(brgemmOp))
-      return gemmToGpuMMA(brgemmOp, rewriter);
-    return gemmToGpuLoops(brgemmOp, rewriter);
-  }
-
-private:
-  bool useWmma;
-};
-
-void populateLinalgToGpuPatterns(RewritePatternSet &patterns, bool useWmma) {
-  patterns.add<ConvertGemmToGpu, ConvertBrgemmToGpu>(patterns.getContext(),
-                                                     useWmma);
+void populateLinalgToGpuPatterns(RewritePatternSet &patterns,
+                                 LinalgToGpuOptions options) {
+  patterns.add<ConvertGemmLikeToGpu<linalg::MatmulOp>,
+               ConvertGemmLikeToGpu<linalg::BatchReduceMatmulOp>>(
+      patterns.getContext(), options);
 }
 
 struct LinalgToGpu : public tpp::impl::LinalgToGpuBase<LinalgToGpu> {
@@ -583,7 +576,8 @@ struct LinalgToGpu : public tpp::impl::LinalgToGpuBase<LinalgToGpu> {
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateLinalgToGpuPatterns(patterns, useWmma);
+    populateLinalgToGpuPatterns(
+        patterns, LinalgToGpuOptions{useWmma, gpuTriple, gpuChip, gpuFeatures});
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

@@ -70,6 +70,31 @@ GpuType parseGpuOption(StringRef gpuStr) {
   return *type;
 }
 
+struct GpuOptions {
+  std::string triple;
+  std::string chip;
+  std::string features;
+};
+
+GpuOptions getGpuOptions(GpuType gpuType) {
+  GpuOptions options;
+
+  switch (gpuType) {
+  case GpuType::Cuda: {
+    options.triple = "nvptx64-nvidia-cuda";
+    options.chip = "sm_70";
+    options.features = "+ptx60";
+    break;
+  }
+  case GpuType::Vulkan: {
+    // No options needed at the moment.
+    break;
+  }
+  }
+
+  return options;
+}
+
 // GPU pipeline - map and lower operations to enable execution on a GPU.
 struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
                      UtilityPassBase<ModuleOp> {
@@ -112,6 +137,7 @@ private:
     pm.clear();
 
     GpuType gpuType = parseGpuOption(this->gpuBackend);
+    GpuOptions gpuOptions = getGpuOptions(gpuType);
 
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
@@ -128,21 +154,18 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(GpuConversionOptions{gpuWmma}));
+    pm.addPass(createGpuConversion(GpuConversionOptions{
+        gpuWmma, gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
     case GpuType::Cuda: {
-      std::string gpuTriple = "nvptx64-nvidia-cuda";
-      std::string gpuChip = "sm_70";
-      std::string gpuFeatures = "+ptx60";
-
       // Perform explicit GPU data transfers only for CUDA as the unified
       // memory is not currently used here.
       // Vulkan runner assumes usage of GPU unified memory.
       pm.addNestedPass<func::FuncOp>(createGpuDataTransfer());
-      pm.addPass(
-          createGpuToCuda(GpuToCudaOptions{gpuTriple, gpuChip, gpuFeatures}));
+      pm.addPass(createGpuToCuda(GpuToCudaOptions{
+          gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
       break;
     }
     case GpuType::Vulkan: {
