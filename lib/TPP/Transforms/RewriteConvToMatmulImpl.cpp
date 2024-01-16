@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Transforms/Transforms.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -208,17 +209,18 @@ getSlicedConvOperands(OpBuilder &builder, ValueRange localIvs,
 // Check if the three innermost loop can be mapped to a matmul operation. Check
 // also the body and make sure it is a matmul-like.
 static bool checkMappingToMatmul(linalg::LinalgOp linalgOp) {
-  if (!linalgx::utils::hasMulAddBody(linalgOp))
-    return false;
-  SmallVector<utils::IteratorType> iteratorTypes =
-      linalgOp.getIteratorTypesArray();
-  if (iteratorTypes.size() < 3)
-    return false;
-  size_t size = iteratorTypes.size() - 1;
-  bool match = linalg::isReductionIterator(iteratorTypes[size]) &&
-               linalg::isParallelIterator(iteratorTypes[size - 1]) &&
-               linalg::isParallelIterator(iteratorTypes[size - 2]);
-  return match;
+  // clang-format off
+  using namespace mlir::structured_match;
+  auto isMatmulLike = 
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+      .operation(NumOfLoops(GreaterThanOrEqualTo(3)))
+      .dim(MatchRange(/*lowerBound=*/0, /*upperBound=*/2),
+          {utils::IteratorType::reduction, utils::IteratorType::parallel,
+           utils::IteratorType::parallel})
+      .region(MatchOne(0), WithOpChain<KindMul, KindAdd>(
+                                     /*captures=*/nullptr));
+  // clang-format on
+  return isMatmulLike.match(linalgOp);
 }
 
 FailureOr<linalg::MatmulOp>

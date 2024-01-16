@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
@@ -96,7 +97,14 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
 
 // single region block with add, mul and linalg::yield.
 static LogicalResult checkBody(linalg::LinalgOp linalgOp) {
-  if (!linalgx::utils::hasMulAddBody(linalgOp))
+  // clang-format off
+  using namespace mlir::structured_match;
+  auto hasRightOpChain =
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+      .region(MatchOne(0), WithOpChain<KindMul, KindAdd>(
+                                     /*captures=*/nullptr));
+  // clang-format on
+  if (!hasRightOpChain.match(linalgOp))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << __func__ << " OK\n");
   return success();

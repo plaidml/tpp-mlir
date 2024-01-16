@@ -106,7 +106,7 @@ structured_match::StructuredOpMatcher::dim(
     size_t sizeRange = upperBound - lowerBound;
 
     auto iteratorTypes = linalgOp.getIteratorTypesArray();
-    if (iteratorTypes.size() != sizeRange)
+    if (iteratorTypes.size() < sizeRange)
       return false;
 
     // Reverse iterators to have the innermost one at index 0.
