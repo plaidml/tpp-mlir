@@ -262,7 +262,7 @@ struct HasTensorSemantics {
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
-      return linalgOp.hasTensorSemantics();
+      return linalgOp.hasPureTensorSemantics();
     return false;
   }
 };
@@ -273,7 +273,7 @@ struct HasBufferSemantics {
 
   bool operator()(Operation *op) const {
     if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op))
-      return linalgOp.hasBufferSemantics();
+      return linalgOp.hasPureBufferSemantics();
     return false;
   }
 };

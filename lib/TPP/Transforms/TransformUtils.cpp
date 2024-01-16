@@ -135,7 +135,7 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
 
   Location loc = linalgOp.getLoc();
   Type reducedType =
-      (linalgOp.hasTensorSemantics())
+      (linalgOp.hasPureTensorSemantics())
           ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
                 desiredResultRank, operandType.cast<RankedTensorType>(),
                 offsets, sizes, strides)
@@ -144,7 +144,7 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                 operandType.cast<MemRefType>(), offsets, sizes, strides);
 
   Operation *extractOperation =
-      (linalgOp.hasTensorSemantics())
+      (linalgOp.hasPureTensorSemantics())
           ? builder.create<tensor::ExtractSliceOp>(
                 loc, reducedType.cast<RankedTensorType>(), operand, offsets,
                 sizes, strides)

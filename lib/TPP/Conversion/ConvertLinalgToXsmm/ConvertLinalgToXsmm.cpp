@@ -274,7 +274,7 @@ struct ConvertGenericToUnary : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics())
+    if (!genericOp.hasPureBufferSemantics())
       return failure();
 
     xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr();
@@ -407,7 +407,7 @@ struct ConvertGenericToBinary : public OpRewritePattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> operands;
-    if (!genericOp.hasBufferSemantics())
+    if (!genericOp.hasPureBufferSemantics())
       return failure();
     xsmm::BinaryKind kind = xsmm::BinaryKind::NONE;
 
@@ -654,7 +654,7 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
 
   applyPermutationToVector<int64_t>(shape, permutation);
   Value buffer;
-  if (linalgOp.hasTensorSemantics()) {
+  if (linalgOp.hasPureTensorSemantics()) {
     buffer = rewriter.create<tensor::EmptyOp>(loc, shape,
                                               operandType.getElementType());
     buffer = rewriter
@@ -690,7 +690,7 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
                              return AffineMapAttr::get(map);
                            }))));
   });
-  if (linalgOp.hasBufferSemantics()) {
+  if (linalgOp.hasPureBufferSemantics()) {
     rewriter.setInsertionPointAfter(linalgOp);
     rewriter.create<memref::DeallocOp>(linalgOp.getLoc(), buffer);
   }
@@ -1012,7 +1012,7 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
-    if (!transposeOp.hasBufferSemantics())
+    if (!transposeOp.hasPureBufferSemantics())
       return failure();
 
     Value out = transposeOp.getInit();
@@ -1063,7 +1063,7 @@ struct ConvertGenericToVnniMatmulLikeOp
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!genericOp.hasBufferSemantics()) {
+    if (!genericOp.hasPureBufferSemantics()) {
       return rewriter.notifyMatchFailure(genericOp, "expects buffer semantics");
     }
 
@@ -1121,7 +1121,7 @@ struct ConvertCopyOp : public OpRewritePattern<linalg::CopyOp> {
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    if (!copyOp.hasBufferSemantics())
+    if (!copyOp.hasPureBufferSemantics())
       return failure();
     Value source = copyOp.getInputs()[0];
     Value dest = copyOp.getOutputs()[0];

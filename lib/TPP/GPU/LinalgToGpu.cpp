@@ -532,7 +532,7 @@ struct ConvertGemmToGpu : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasBufferSemantics()) {
+    if (!matmulOp.hasPureBufferSemantics()) {
       return rewriter.notifyMatchFailure(
           matmulOp, "Linalg gemm to GPU expects memref type");
     }
@@ -560,7 +560,7 @@ struct ConvertBrgemmToGpu
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
-    if (!brgemmOp.hasBufferSemantics()) {
+    if (!brgemmOp.hasPureBufferSemantics()) {
       return rewriter.notifyMatchFailure(
           brgemmOp, "Linalg brgemm to GPU expects memref type");
     }

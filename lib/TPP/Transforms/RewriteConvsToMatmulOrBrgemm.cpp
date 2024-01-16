@@ -218,7 +218,7 @@ struct BlockConv2DNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
       return failure();
 
     // tensor semantics.
-    if (convOp.hasBufferSemantics())
+    if (convOp.hasPureBufferSemantics())
       return failure();
 
     // blocking factors.

@@ -96,7 +96,7 @@ struct RewriteBatchMatmulToMatmul
     IRRewriter rewriter(&ctx);
     // Step 1. tiling.
     getOperation()->walk([&](linalg::BatchMatmulOp batchMatmulOp) {
-      if (batchMatmulOp.hasBufferSemantics())
+      if (batchMatmulOp.hasPureBufferSemantics())
         return signalPassFailure();
       SmallVector<OpFoldResult> tiles(
           batchMatmulOp.getNumLoops(),

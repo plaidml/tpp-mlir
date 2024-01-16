@@ -262,7 +262,7 @@ mlir::linalgx::rewriteConvToMatmul(RewriterBase &rewriter,
     SmallVector<Value> slicedOperands = *maybeSlicedOperands;
     assert(slicedOperands.size() == 3 && "expect three operands");
 
-    matmul = (linalgOp.hasTensorSemantics())
+    matmul = (linalgOp.hasPureTensorSemantics())
                  ? builder.create<linalg::MatmulOp>(
                        loc, slicedOperands[2].getType(),
                        ValueRange{slicedOperands[0], slicedOperands[1]},
@@ -277,7 +277,7 @@ mlir::linalgx::rewriteConvToMatmul(RewriterBase &rewriter,
   };
 
   Location loc = linalgOp.getLoc();
-  if (linalgOp.hasBufferSemantics()) {
+  if (linalgOp.hasPureBufferSemantics()) {
     linalg::GenerateLoopNest<scf::ParallelOp>::doit(
         rewriter, loc, loopRanges, linalgOp, linalgOp.getIteratorTypesArray(),
         gemmBuilder);

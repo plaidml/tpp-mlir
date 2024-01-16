@@ -81,7 +81,7 @@ void DuplicateFill::runOnOperation() {
   IRRewriter rewriter(&getContext());
 
   (void)getOperation()->walk([&](linalg::FillOp fillOp) {
-    if (!fillOp.hasTensorSemantics())
+    if (!fillOp.hasPureTensorSemantics())
       return WalkResult::advance();
     Value fillVal = fillOp.getResult(0);
     // We can fold only zero initialization. We duplicate only
