@@ -9,6 +9,7 @@
 #ifndef TPP_IR_STRUCTUREDOPMATCHER_H
 #define TPP_IR_STRUCTUREDOPMATCHER_H
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -18,6 +19,18 @@
 namespace mlir {
 class Operation;
 namespace structured_match {
+
+struct KindAdd {
+  static bool classof(const Operation *op) {
+    return isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op);
+  }
+};
+
+struct KindMul {
+  static bool classof(const Operation *op) {
+    return isa<arith::MulFOp>(op) || isa<arith::MulIOp>(op);
+  }
+};
 
 // Base class for the matcher predicates selection tag.
 struct MatchSelector {

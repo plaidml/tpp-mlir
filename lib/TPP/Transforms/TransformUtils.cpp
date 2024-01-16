@@ -55,95 +55,6 @@ Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
   assert(false && "expect tensor or memref");
 }
 
-// taken from LinalgInterfaces.cpp
-// Returns true if the use-def chain from `v` to `from` consists of 0 or more
-// unary single-operand operations.
-// TODO: relax to multi-operands with constants, which are technically unary ops
-// as needed (e.g. add5).
-static bool isChainOfUnaryOpsFrom(Value v, Value from) {
-  while (true) {
-    if (v == from)
-      return true;
-    Operation *op = v.getDefiningOp();
-    if (!op || op->getNumOperands() != 1)
-      return false;
-    v = op->getOperand(0);
-  };
-}
-
-// taken from LinalgInterfaces.cpp
-// Returns the unique instance of OpType in `block` if it is indeed unique.
-// Returns null if none or more than 1 instances exist.
-template <typename OpType> static OpType getSingleOpOfType(Block &block) {
-  OpType res = nullptr;
-  block.walk([&](OpType op) {
-    if (res) {
-      res = nullptr;
-      return WalkResult::interrupt();
-    }
-    res = op;
-    return WalkResult::advance();
-  });
-  return res;
-}
-
-// Taken from: LinalgInterfaces.cpp
-// Detect whether res is any permutation of `u5(u1(c) + u2(u3(a) * u4(b)))`
-// on the field (AddOpType, MulOpType), where u1, u2, u3, u4 and u5 represent
-// unary operations that may change the type.
-template <typename AddOpType, typename MulOpType>
-static bool isAddMul(linalg::LinalgOp linalgOp,
-                     SmallVectorImpl<Value> *capturedOperands) {
-  Block &block = linalgOp->getRegion(0).front();
-  if (block.getNumArguments() != 3)
-    return false;
-  Operation *yieldOp = block.getTerminator();
-  if (yieldOp->getNumOperands() != 1)
-    return false;
-
-  AddOpType addOp = getSingleOpOfType<AddOpType>(block);
-  MulOpType mulOp = getSingleOpOfType<MulOpType>(block);
-  if (!addOp || !mulOp)
-    return false;
-
-  BlockArgument argA = block.getArgument(0), argB = block.getArgument(1);
-  Value a = mulOp->getOperand(0), b = mulOp->getOperand(1);
-  Value mul = mulOp->getResult(0);
-  BlockArgument argC = block.getArgument(2);
-  Value c1 = addOp->getOperand(0), c2 = addOp->getOperand(1);
-  Value add = addOp->getResult(0);
-  Value res = yieldOp->getOperand(0);
-  // Result traces back to add.
-  auto un = isChainOfUnaryOpsFrom;
-  bool success = un(res, add);
-  // One of the operands of add traces back to argC, the other to the mul.
-  success |= (un(c1, argC) && un(c2, mul)) || ((un(c1, mul)) && un(c2, argC));
-  // One of the operands of mul traces back to argA, the other to argB.
-  success |= (un(a, argA) && un(b, argB)) || ((un(a, argB)) && un(b, argA));
-  if (capturedOperands) {
-    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argA)->get());
-    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argB)->get());
-    capturedOperands->push_back(linalgOp.getMatchingOpOperand(argC)->get());
-  }
-  return success;
-}
-
-bool hasMulAddBody(linalg::LinalgOp linalgOp,
-                   SmallVectorImpl<Value> *capturedOperands) {
-  if (linalgOp->getNumRegions() != 1)
-    return false;
-  Region &region = linalgOp->getRegion(0);
-  if (!region.hasOneBlock())
-    return false;
-  if (std::distance(region.front().begin(), region.front().end()) != 3)
-    return false;
-  bool isFloat =
-      isAddMul<arith::AddFOp, arith::MulFOp>(linalgOp, capturedOperands);
-  bool isInt =
-      isAddMul<arith::AddIOp, arith::MulIOp>(linalgOp, capturedOperands);
-  return (isFloat || isInt);
-}
-
 // Given localIvs being outermost dimensions of the current linalg operation,
 // return the dimensions used by a given operand looking at its access map. As
 // a simple example consider the following: map operand = (d0, d1, d2, d3, d4,
@@ -314,26 +225,31 @@ FailureOr<SmallVector<Range>> getLoopsToMaterialize(RewriterBase &rewriter,
 }
 
 bool isBlockedConvolution(Operation *op) {
-  if (!isa<linalg::LinalgOp>(op))
-    return false;
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-  auto iteratorTypes = linalgOp.getIteratorTypesArray();
-  if (iteratorTypes.size() != 9)
-    return false;
-  bool match = linalg::isParallelIterator(iteratorTypes[0]) &&
-               linalg::isParallelIterator(iteratorTypes[1]) &&
-               linalg::isParallelIterator(iteratorTypes[2]) &&
-               linalg::isParallelIterator(iteratorTypes[3]) &&
-               linalg::isParallelIterator(iteratorTypes[4]) &&
-               linalg::isReductionIterator(iteratorTypes[5]) &&
-               linalg::isReductionIterator(iteratorTypes[6]) &&
-               linalg::isReductionIterator(iteratorTypes[7]) &&
-               linalg::isReductionIterator(iteratorTypes[8]);
-  if (!match)
-    return false;
-  if (failed(mlir::linalg::detail::verifyConvolutionInterface(linalgOp)))
-    return false;
-  return hasMulAddBody(linalgOp, /*captures=*/nullptr);
+  // clang-format off
+  using namespace structured_match;
+  
+  auto isBlockedConv =
+    StructuredOpMatcher::make<linalg::LinalgOp>()
+      .operation(NumDpsInits(EqualsTo(1)))
+      .operation(NumDpsInputs(EqualsTo(2)))
+      .operation(NumAffineMaps(EqualsTo(3)))
+      .operation(NumOfLoops(EqualsTo(9)))
+      .operation(VerifyOpProperty(
+            mlir::linalg::detail::verifyConvolutionInterface))
+      .dim(MatchRange(/*lowerBound=*/0, /*upperBound=*/8),
+          {mlir::utils::IteratorType::reduction, 
+           mlir::utils::IteratorType::reduction,
+           mlir::utils::IteratorType::reduction, 
+           mlir::utils::IteratorType::reduction,
+           mlir::utils::IteratorType::parallel, 
+           mlir::utils::IteratorType::parallel,
+           mlir::utils::IteratorType::parallel, 
+           mlir::utils::IteratorType::parallel, 
+           mlir::utils::IteratorType::parallel})
+      .region(MatchOne(0),
+            WithOpChain<KindMul, KindAdd>(/*captures=*/nullptr));
+  // clang-format on
+  return isBlockedConv.match(op);
 }
 
 FailureOr<linalg::ContractionDimensions>
@@ -343,10 +259,10 @@ isContraction(linalg::LinalgOp linalgOp) {
   // clang-format off
   auto maybeContraction =
     StructuredOpMatcher::make<linalg::LinalgOp>()
-    .operation(NumDpsInits(EqualsTo(1)))
-    .operation(NumDpsInputs(EqualsTo(2)))
-    .operation(NumAffineMaps(EqualsTo(3)))
-    .region(MatchOne(0),
+      .operation(NumDpsInits(EqualsTo(1)))
+      .operation(NumDpsInputs(EqualsTo(2)))
+      .operation(NumAffineMaps(EqualsTo(3)))
+      .region(MatchOne(0),
             WithOpChain<arith::MulFOp,
                         arith::AddFOp>(/*captures=*/nullptr));
   // clang-format on

@@ -82,10 +82,6 @@ bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
                              ArrayRef<size_t> dims = {});
 
-// Returns true if the linalg operation has a MulAdd region.
-bool hasMulAddBody(linalg::LinalgOp linalgOp,
-                   SmallVectorImpl<Value> *capturedOperands = nullptr);
-
 // Rewrite scf.for to scf.forall. Assumes the loop to be parallel and
 // marked with `kLoopId`.
 constexpr const static llvm::StringLiteral kLoopParallel = "parallel";
