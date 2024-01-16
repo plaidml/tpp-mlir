@@ -625,7 +625,7 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
   func->walk<WalkOrder::PostOrder>([&](linalg::LinalgOp linalgOp) {
     if ((isConvolutionLike(linalgOp) ||
          succeeded(linalgx::utils::isContraction(linalgOp))) &&
-        linalgOp.hasTensorSemantics())
+        linalgOp.hasPureTensorSemantics())
       linalgContractionOperations.push_back(linalgOp);
   });
 

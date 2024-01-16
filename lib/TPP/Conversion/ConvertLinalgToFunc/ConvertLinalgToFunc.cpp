@@ -104,7 +104,7 @@ struct ConvertMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasBufferSemantics())
+    if (!matmulOp.hasPureBufferSemantics())
       return failure();
     SmallVector<Value> operands = matmulOp.getDpsInputs();
     operands.push_back(matmulOp.getDpsInits()[0]);

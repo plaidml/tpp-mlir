@@ -222,7 +222,7 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
     assert(slicedOperands.size() == 3 && "expect three operands");
 
     linalg::BatchReduceMatmulOp brgemm =
-        (linalgOp.hasTensorSemantics())
+        (linalgOp.hasPureTensorSemantics())
             ? builder.create<linalg::BatchReduceMatmulOp>(
                   loc, slicedOperands[2].getType(),
                   ValueRange{slicedOperands[0], slicedOperands[1]},
@@ -239,7 +239,7 @@ mlir::linalgx::rewriteToBRGemmOp(RewriterBase &rewriter,
     return scf::ValueVector(tensorResults.begin(), tensorResults.end());
   };
 
-  if (linalgOp.hasBufferSemantics()) {
+  if (linalgOp.hasPureBufferSemantics()) {
     // TODO: (lorenzo) this is legacy. It will be removed from linalg too.
     // Use the tiling interface.
     linalg::GenerateLoopNest<scf::ParallelOp>::doit(

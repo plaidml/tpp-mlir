@@ -193,7 +193,7 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
     return rewriter.notifyMatchFailure(convOp, "require 2 tile factors");
   if (convOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(convOp, "require static shape");
-  if (convOp.hasBufferSemantics())
+  if (convOp.hasPureBufferSemantics())
     return rewriter.notifyMatchFailure(convOp, "require tensor semantics");
 
   bool isConv2DNhwcHwcfOp =
@@ -320,7 +320,7 @@ packMatmulOpImpl(RewriterBase &rewriter, OpTy matmulOp,
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
 
-  if (matmulOp.hasBufferSemantics())
+  if (matmulOp.hasPureBufferSemantics())
     return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
   OpFoldResult tileOnI = tiles[0];
@@ -418,7 +418,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
   if (matmulOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(matmulOp, "require static shape");
 
-  if (matmulOp.hasBufferSemantics())
+  if (matmulOp.hasPureBufferSemantics())
     return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
 
   if (failed(linalgx::utils::isContraction(matmulOp)))
@@ -491,7 +491,7 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
   if (brgemmOp.hasDynamicShape())
     return rewriter.notifyMatchFailure(brgemmOp, "require static shape");
 
-  if (brgemmOp.hasBufferSemantics())
+  if (brgemmOp.hasPureBufferSemantics())
     return rewriter.notifyMatchFailure(brgemmOp, "require tensor semantics");
 
   Value operandB = brgemmOp.getInputs()[1];

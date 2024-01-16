@@ -73,7 +73,7 @@ struct EliminateZeroInitAndAddBiasToInit
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalgOp.hasTensorSemantics())
+    if (!linalgOp.hasPureTensorSemantics())
       return failure();
     if (linalgOp->getNumOperands() != 3 || linalgOp->getNumResults() != 1)
       return failure();
