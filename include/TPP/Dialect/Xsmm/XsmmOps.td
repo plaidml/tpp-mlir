@@ -20,7 +20,7 @@ class StaticMemRefRankOf<list<Type> allowedTypes, list<int> ranks> :
          MemRefOf<allowedTypes>.summary,
          "::mlir::MemRefType">;
 
-def XsmmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [1, 2, 3, 4]>, 
+def XsmmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [1, 2, 3, 4]>,
                             F32, BF16, I64]>;
 
 //===----------------------------------------------------------------------===//
@@ -31,21 +31,21 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary"> {
   let summary = "binary operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
-    difference is the number of operands for the computation is restricted to 
+    difference is the number of operands for the computation is restricted to
     two.
   }];
 
-  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_BinaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_BinaryKind:$callee,
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{
     Value getDispatch() { return getInputs()[0]; }
-  
+
     bool hasScalarLhs() {
       Type operand = getInputs()[1].getType();
       return !operand.isa<ShapedType>();
@@ -71,17 +71,17 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
     difference is the number of operands for the computation is restricted to one.
   }];
 
-  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_UnaryKind:$callee, 
+  let arguments = (ins Xsmm_DataType:$data_type, Xsmm_UnaryKind:$callee,
                        Variadic<XsmmMemRef>:$inputs);
 
   let assemblyFormat = [{
-    $callee `(` `data_type` `=` $data_type `,` $inputs `)` 
+    $callee `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{
     Value getDispatch() { return getInputs()[0]; }
-    
+
     bool hasScalarInput() {
       Type operand = getInputs()[1].getType();
       return !operand.isa<ShapedType>();
@@ -100,19 +100,19 @@ def GemmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [2, 3]>, I64]>;
 def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
   let summary = "matmul call operation.";
   let arguments = (ins Xsmm_DataType:$data_type, Variadic<GemmMemRef>:$inputs);
-  
+
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
     attr-dict `:` functional-type($inputs, results)
   }];
 
-  let extraClassDeclaration = [{  
+  let extraClassDeclaration = [{
     Value getDispatch() { return getInputs()[0]; }
-    
+
     Value getOperandA() { return getInputs()[1]; }
-    
+
     Value getOperandB() { return getInputs()[2]; }
-    
+
     Value getOutput() { return getInputs()[3]; }
   }];
 
@@ -136,13 +136,13 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
 
   let extraClassDeclaration = [{
     Value getDispatch() { return getInputs()[0]; }
-    
+
     Value getOperandA() { return getInputs()[1]; }
-    
+
     Value getOperandB() { return getInputs()[2]; }
-    
+
     Value getOutput() { return getInputs()[3]; }
-    
+
     Value getBatch() { return getInputs()[4]; }
   }];
 
@@ -164,15 +164,15 @@ def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
 
   let extraClassDeclaration = [{
     Value getDispatch() { return getInputs()[0]; }
-    
+
     Value getOperandA() { return getInputs()[1]; }
-    
+
     Value getOperandB() { return getInputs()[2]; }
-    
+
     Value getOutput() { return getInputs()[3]; }
-    
+
     Value getOperandD() { return getInputs()[4]; };
-    
+
     Value getBatch() { return getInputs()[5]; }
   }];
 
@@ -189,13 +189,13 @@ def Xsmm_BinaryDispatchOp : Xsmm_Op<"binary.dispatch", [Pure]> {
     See 'ternary.dispatch'.
   }];
 
-  let arguments = (ins 
+  let arguments = (ins
     Xsmm_BinaryKind:$kind,
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
     TypedArrayAttrBase<Xsmm_BinaryFlags, "binary flags">:$flags,
     Xsmm_DataType:$data_type);
-  
+
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
 
@@ -212,16 +212,16 @@ def Xsmm_UnaryDispatchOp : Xsmm_Op<"unary.dispatch", [Pure]> {
     See 'ternary.dispatch'.
   }];
 
-  let arguments = (ins 
-    Xsmm_UnaryKind:$kind, 
+  let arguments = (ins
+    Xsmm_UnaryKind:$kind,
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
-    TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$flags, 
+    TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$flags,
     Xsmm_DataType:$data_type);
-  
+
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
-  
+
   let hasVerifier = 1;
 }
 
@@ -240,18 +240,18 @@ class Xsmm_GemmLikeOp<string mnemonic, list<Trait> traits = []> :
     more details, see: `Xsmm_GemmFlags`.
   }];
 
-  let arguments = (ins 
+  let arguments = (ins
     ConfinedAttr<DenseI64ArrayAttr,
-                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs, 
-    TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags, 
+                [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
+    TypedArrayAttrBase<Xsmm_GemmFlags, "gemm flags">:$flags,
     Xsmm_DataType:$data_type);
-  
+
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
 }
 
 def Xsmm_GemmDispatchOp : Xsmm_GemmLikeOp<"gemm.dispatch"> {
-  let summary = "dispatch for matmul operation."; 
+  let summary = "dispatch for matmul operation.";
   let hasVerifier = 1;
 }
 
@@ -260,7 +260,7 @@ def Xsmm_GemmDispatchOp : Xsmm_GemmLikeOp<"gemm.dispatch"> {
 //===----------------------------------------------------------------------===//
 
 def Xsmm_BrgemmDispatchOp : Xsmm_GemmLikeOp<"brgemm.dispatch"> {
-  let summary = "dispatch for brgemm operation."; 
+  let summary = "dispatch for brgemm operation.";
   let hasVerifier = 1;
 }
 
@@ -280,7 +280,7 @@ def Xsmm_FusedBrgemmDispatchOp : Xsmm_Op<"fused_brgemm.dispatch", [Pure]> {
     and binary, respectively.
   }];
 
-  
+
   let arguments = (ins
     ConfinedAttr<DenseI64ArrayAttr,
                 [DenseArrayNonNegative<DenseI64ArrayAttr>]>:$inputs,
@@ -290,7 +290,7 @@ def Xsmm_FusedBrgemmDispatchOp : Xsmm_Op<"fused_brgemm.dispatch", [Pure]> {
     TypedArrayAttrBase<Xsmm_UnaryFlags, "unary flags">:$unary_flags,
     TypedArrayAttrBase<Xsmm_BinaryFlags, "binary flags">:$binary_flags,
     Xsmm_DataType:$data_type);
-  
+
   let results = (outs I64:$results);
   let hasCustomAssemblyFormat = 1;
 

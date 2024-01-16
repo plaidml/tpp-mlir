@@ -301,7 +301,7 @@ func.func @vnni_brgemm_interchanged(%arg0: memref<16x32x32xbf16>, %arg1: memref<
 }
 
 // CHECK-LABEL: vnni_brgemm_interchanged
-// CHECK-SAME:  %[[ARG0:.+]]: memref<16x32x32xbf16>, %[[ARG1:.+]]: memref<16x16x32x2xbf16>, 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<16x32x32xbf16>, %[[ARG1:.+]]: memref<16x16x32x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<32x32xbf16>
 // CHECK: %[[C16:.+]] = arith.constant 16 : i64
 // CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024]
@@ -329,10 +329,10 @@ func.func @vnni_brgemm(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf
 }
 
 // CHECK-LABEL: vnni_brgemm
-// CHECK-SAME:  %[[ARG0:.+]]: memref<16x32x32xbf16>, %[[ARG1:.+]]: memref<16x16x32x2xbf16>, 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<16x32x32xbf16>, %[[ARG1:.+]]: memref<16x16x32x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<32x32xbf16>
 // CHECK: %[[C16:.+]] = arith.constant 16 : i64
-// CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] 
+// CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024]
 // CHECK-SAME:  flags = (vnni_b) data_type = bf16
 // CHECK: xsmm.brgemm(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[C16]])
 
@@ -342,8 +342,8 @@ func.func @vnni_brgemm(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
-func.func @vnni_brgemm_strided(%arg0: memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>, 
-                               %arg1: memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>, 
+func.func @vnni_brgemm_strided(%arg0: memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>,
+                               %arg1: memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>,
                                %arg2: memref<8x8xbf16>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
@@ -359,11 +359,11 @@ func.func @vnni_brgemm_strided(%arg0: memref<8x8x8xbf16, strided<[64, 8, 1], off
 }
 
 // CHECK-LABEL: vnni_brgemm_strided
-// CHECK-SAME:  %[[ARG0:.+]]: memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>, 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<8x8xbf16>
 // CHECK: %[[C8:.+]] = arith.constant 8 : i64
-// CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [8, 8, 8, 8, 8, 8, 64, 64] 
+// CHECK: %[[DIS:.+]] = xsmm.brgemm.dispatch [8, 8, 8, 8, 8, 8, 64, 64]
 // CHECK-SAME:  flags = (vnni_b) data_type = bf16
 // CHECK: xsmm.brgemm(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[C8]])
 

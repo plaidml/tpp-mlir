@@ -112,7 +112,7 @@ func.func @fused_brgemm(%arg0: memref<1x3x3xf32>, %arg1: memref<3x3xf32>, %arg2:
 // -----
 
 func.func @brgemm(%arg0: memref<1x3x3xf32>, %arg1: memref<3x3xf32>) {
-  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu] 
+  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu]
     flags = (none) binary_flags = (none) unary_flags = (none) data_type = bf16
   // expected-error@+1 {{inconsistent data types}}
   xsmm.fused_brgemm(data_type = f32, %0, %arg0, %arg0, %arg1, %arg1, %0) :
@@ -123,7 +123,7 @@ func.func @brgemm(%arg0: memref<1x3x3xf32>, %arg1: memref<3x3xf32>) {
 // -----
 
 func.func @brgemm(%arg0: memref<1x3x3xbf16>, %arg1: memref<3x3xbf16>) {
-  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu] 
+  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu]
     flags = (vnni_a) binary_flags = (none) unary_flags = (none) data_type = bf16
   // expected-error@+1 {{expect VNNI layout for operand A or invalid VNNI_A flags}}
   xsmm.fused_brgemm(data_type = bf16, %0, %arg0, %arg0, %arg1, %arg1, %0) :
@@ -134,7 +134,7 @@ func.func @brgemm(%arg0: memref<1x3x3xbf16>, %arg1: memref<3x3xbf16>) {
 // -----
 
 func.func @brgemm(%arg0: memref<1x3x3xbf16>, %arg1: memref<3x3xbf16>) {
-  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu] 
+  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu]
     flags = (vnni_b) binary_flags = (none) unary_flags = (none) data_type = bf16
   // expected-error@+1 {{expect VNNI layout for operand B or invalid VNNI_B flags}}
   xsmm.fused_brgemm(data_type = bf16, %0, %arg0, %arg0, %arg1, %arg1, %0) :
@@ -145,7 +145,7 @@ func.func @brgemm(%arg0: memref<1x3x3xbf16>, %arg1: memref<3x3xbf16>) {
 // -----
 
 func.func @brgemm(%arg0: memref<1x3x3xbf16>, %arg1: memref<3x3xbf16>) {
-  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu] 
+  %0 = xsmm.fused_brgemm.dispatch [3, 3, 3, 3, 3, 3, 1, 1] [add, relu]
     flags = (vnni_c) binary_flags = (none) unary_flags = (none) data_type = bf16
   // expected-error@+1 {{expect VNNI layout for operand C or invalid VNNI_C flags}}
   xsmm.fused_brgemm(data_type = bf16, %0, %arg0, %arg0, %arg1, %arg1, %0) :

@@ -1,6 +1,6 @@
 // RUN: tpp-opt -pack-vnni -split-input-file %s | FileCheck %s
 
-func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>, 
+func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>,
                   %arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>{
   %0 = linalg.batch_reduce_matmul ins(%arg0, %arg1: tensor<32x4x4xbf16>, tensor<32x4x4xbf16>)
                                   outs(%arg2: tensor<4x4xbf16>) -> tensor<4x4xbf16>
@@ -12,11 +12,11 @@ func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>,
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: brgemm
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<32x4x4xbf16>, %[[ARG1:.+]]: tensor<32x4x4xbf16>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<32x4x4xbf16>, %[[ARG1:.+]]: tensor<32x4x4xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<32x2x4x2xbf16>
 // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]]
-// CHECK-SAME:  inner_dims_pos = [1] inner_tiles = [2] into %[[EMPTY]] 
+// CHECK-SAME:  inner_dims_pos = [1] inner_tiles = [2] into %[[EMPTY]]
 // CHECK-SAME:  : tensor<32x4x4xbf16> -> tensor<32x2x4x2xbf16>
 // CHECK: linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
@@ -48,9 +48,9 @@ func.func @matmul(%arg0: tensor<128x128xbf16>, %arg1: tensor<128x128xbf16>,
 func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x32x32xbf16>,
                            %pack_1: tensor<4x4x32x32xbf16>) -> tensor<4x4x32x32xbf16> {
   %1 = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
-    ins(%pack, %pack_0 : tensor<4x4x32x32xbf16>, tensor<4x4x32x32xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%pack, %pack_0 : tensor<4x4x32x32xbf16>, tensor<4x4x32x32xbf16>)
     outs(%pack_1 : tensor<4x4x32x32xbf16>) {
     ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
       %4 = arith.mulf %in, %in_2 : bf16
@@ -65,10 +65,10 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>
 
 // CHECK-LABEL: prepacked_matmul
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<4x4x32x32xbf16>, %[[ARG1:.+]]: tensor<4x4x32x32xbf16>, 
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<4x4x32x32xbf16>, %[[ARG1:.+]]: tensor<4x4x32x32xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4x32x32xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x16x32x2xbf16>
-// CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [2] inner_tiles = [2] into %[[EMPTY]] 
+// CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [2] inner_tiles = [2] into %[[EMPTY]]
 // CHECK-SAME:  : tensor<4x4x32x32xbf16> -> tensor<4x4x16x32x2xbf16>
 // CHECK: {{.+}} = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
@@ -85,9 +85,9 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
 func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x4x16x32x2xbf16>,
                                  %arg2: tensor<4x4x32x32xbf16>) -> tensor<4x4x32x32xbf16> {
   %1 = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} 
-    ins(%arg0, %arg1 : tensor<4x4x32x32xbf16>, tensor<4x4x16x32x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x4x32x32xbf16>, tensor<4x4x16x32x2xbf16>)
     outs(%arg2 : tensor<4x4x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %2 = arith.mulf %in, %in_0 : bf16
@@ -110,9 +110,9 @@ func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x
 func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x2x16x32x2x2xbf16>,
                                  %arg2: tensor<4x4x32x32xbf16>) -> tensor<4x4x32x32xbf16> {
   %1 = linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction", "reduction"]} 
-    ins(%arg0, %arg1 : tensor<4x4x32x32xbf16>, tensor<4x2x16x32x2x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%arg0, %arg1 : tensor<4x4x32x32xbf16>, tensor<4x2x16x32x2x2xbf16>)
     outs(%arg2 : tensor<4x4x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %2 = arith.mulf %in, %in_0 : bf16

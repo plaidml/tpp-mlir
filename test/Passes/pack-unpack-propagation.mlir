@@ -42,13 +42,13 @@ func.func @matmul_with_relu(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf3
 // CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF1]] : tensor<512x256xf32> -> tensor<8x16x32x32xf32>
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<4x8x32x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF2]] : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
-// CHECK: %[[VAL:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], 
+// CHECK: %[[VAL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
-// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) 
+// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2]] : tensor<4x8x32x32xf32>)
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]]], 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]]],
 // CHECK-SMAE:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:  outs(%[[VAL]] : tensor<4x8x32x32xf32>)
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL1]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
@@ -97,17 +97,17 @@ func.func @matmul_with_add(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32
 // CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF1]] : tensor<512x256xf32> -> tensor<8x16x32x32xf32>
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<4x8x32x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF2]] : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
-// CHECK: %[[VAL:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], 
+// CHECK: %[[VAL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]
-// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) 
+// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2]] : tensor<4x8x32x32xf32>)
 // CHECK: %[[BUFF2_2:.+]] = tensor.empty() : tensor<4x8x32x32xf32>
 // CHECK: %[[PACK2_2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUFF2_2]] : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]], 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]],
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:  ins(%[[VAL]] : tensor<4x8x32x32xf32>) 
+// CHECK-SAME:  ins(%[[VAL]] : tensor<4x8x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2_2]] : tensor<4x8x32x32xf32>)
 // CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL1]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
 // CHECK: return %[[OUT]] : tensor<128x256xf32>
@@ -157,8 +157,8 @@ func.func @conv_with_relu(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[VAL:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]} ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) outs(%[[PACK2]] : tensor<1x2x56x56x32xf32>)
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]]], 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]]],
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:  outs(%[[VAL]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[VAL1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
@@ -207,17 +207,17 @@ func.func @conv_with_add(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64x
 // CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[BUFF1]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
-// CHECK: %[[VAL:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], 
+// CHECK: %[[VAL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
-// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) 
+// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[BUFF2_2:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK2_2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2_2]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
-// CHECK-SAME:  ins(%[[VAL]] : tensor<1x2x56x56x32xf32>) 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP3]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:  ins(%[[VAL]] : tensor<1x2x56x56x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2_2]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[VAL1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
 // CHECK: return %[[UNPACK]] : tensor<1x56x56x64xf32>
@@ -272,10 +272,10 @@ func.func @conv_with_add_bcast(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x
 // CHECK: %[[BUFF3:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK3:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF3]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1]] : tensor<64xf32> into tensor<2x32xf32>
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
-// CHECK-SAME:  ins(%[[VAL]], %[[EXPAND]] : tensor<1x2x56x56x32xf32>, tensor<2x32xf32>) 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:  ins(%[[VAL]], %[[EXPAND]] : tensor<1x2x56x56x32xf32>, tensor<2x32xf32>)
 // CHECK-SAME:  outs(%[[PACK3]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[VAL1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
 
@@ -325,19 +325,19 @@ func.func @conv_with_add_bcast2(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1
 // CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[BUFF1]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
-// CHECK: %[[VAL:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"] 
-// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) 
+// CHECK: %[[VAL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
+// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[BUFF4:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK4:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF4]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
 // CHECK: %[[BUFF3:.+]] = tensor.empty() : tensor<2x56x32xf32>
 // CHECK: %[[PACK3:.+]] = tensor.pack %[[ARG3]] outer_dims_perm = [1, 0] inner_dims_pos = [1] inner_tiles = [32] into %[[BUFF3]] : tensor<56x64xf32> -> tensor<2x56x32xf32>
-// CHECK: %[[VAL1:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"] 
-// CHECK-SAME:  ins(%[[VAL]], %[[PACK3]] : tensor<1x2x56x56x32xf32>, tensor<2x56x32xf32>) 
+// CHECK: %[[VAL1:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP3]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:  ins(%[[VAL]], %[[PACK3]] : tensor<1x2x56x56x32xf32>, tensor<2x56x32xf32>)
 // CHECK-SAME:  outs(%[[PACK4]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[VAL1]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[ARG2]] : tensor<1x2x56x56x32xf32> -> tensor<1x56x56x64xf32>
 
@@ -389,10 +389,10 @@ func.func @conv_with_pad(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64x
 // CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [3, 2, 0, 1] inner_dims_pos = [2, 3] inner_tiles = [32, 32] into %[[BUFF1]] : tensor<1x1x64x64xf32> -> tensor<2x2x1x1x32x32xf32>
 // CHECK: %[[BUFF2:.+]] = tensor.empty() : tensor<1x2x56x56x32xf32>
 // CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %[[BUFF2]] : tensor<1x56x56x64xf32> -> tensor<1x2x56x56x32xf32>
-// CHECK: %[[VAL:.+]] = linalg.generic 
-// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], 
-// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"] 
-// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>) 
+// CHECK: %[[VAL:.+]] = linalg.generic
+// CHECK-SAME:  indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
+// CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
+// CHECK-SAME:  ins(%[[PACK0]], %[[PACK1]] : tensor<1x2x56x56x32xf32>, tensor<2x2x1x1x32x32xf32>)
 // CHECK-SAME:  outs(%[[PACK2]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[VAL1:.+]] = linalg.generic {indexing_maps = [#[[MAP3]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%[[VAL]] : tensor<1x2x56x56x32xf32>)
 // CHECK: %[[PADDED:.+]] = tensor.pad %[[VAL1]] low[0, 0, 1, 1, 0] high[0, 0, 1, 1, 0]

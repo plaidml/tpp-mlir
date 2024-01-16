@@ -175,16 +175,16 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   // Matmul
   // CHECK: %[[ptr2:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>> -> index
   // CHECK: %[[ptr2_cast:.+]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK: %[[llvm_ptr2:.+]] = llvm.inttoptr %[[ptr2_cast]] : i64 to !llvm.ptr  
-  
+  // CHECK: %[[llvm_ptr2:.+]] = llvm.inttoptr %[[ptr2_cast]] : i64 to !llvm.ptr
+
   // CHECK: %[[ptr3:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>> -> index
   // CHECK: %[[ptr3_cast:.+]] = arith.index_cast %[[ptr3]] : index to i64
-  // CHECK: %[[llvm_ptr3:.+]] = llvm.inttoptr %[[ptr3_cast]] : i64 to !llvm.ptr  
+  // CHECK: %[[llvm_ptr3:.+]] = llvm.inttoptr %[[ptr3_cast]] : i64 to !llvm.ptr
 
   // CHECK: %[[ptr4:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<32x32xf32, strided<[512, 1], offset: ?>> -> index
   // CHECK: %[[ptr4_cast:.+]] = arith.index_cast %[[ptr4]] : index to i64
   // CHECK: %[[llvm_ptr4:.+]] = llvm.inttoptr %[[ptr4_cast]] : i64 to !llvm.ptr
-  
+
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr2]], %{{.+}}, %[[llvm_ptr3]], %{{.+}}, %[[llvm_ptr4]], %{{.+}}
   %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):

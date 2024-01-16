@@ -10,7 +10,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 add_mlir_library(TPPPipeline
   DefaultPipeline.cpp
   DefaultTppPasses.cpp
-  
+
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/TPP
 

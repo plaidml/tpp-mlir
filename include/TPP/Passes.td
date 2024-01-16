@@ -19,7 +19,7 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
   let dependentDialects = ["func::FuncDialect",
                            "memref::MemRefDialect",
                            "linalg::LinalgDialect",
-                           "xsmm::XsmmDialect", 
+                           "xsmm::XsmmDialect",
                            "tensor::TensorDialect"];
 }
 
@@ -83,7 +83,7 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
   let description = [{
     Convert perf operations to function calls.
   }];
-  let dependentDialects = ["func::FuncDialect", 
+  let dependentDialects = ["func::FuncDialect",
                            "math::MathDialect",
                            "memref::MemRefDialect",
                            "tensor::TensorDialect"];
@@ -108,11 +108,11 @@ def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {
 def PackMatmul : Pass<"pack-matmul", "func::FuncOp"> {
   let summary = "Convert matmul to block layout and back";
   let description = [{
-    Block a linalg.matmul 
+    Block a linalg.matmul
     as: [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb].
   }];
   let options = [
-    ListOption<"blockingFactors", "block-factors", "int64_t", 
+    ListOption<"blockingFactors", "block-factors", "int64_t",
                "Blocking factor for relayout">
   ];
 }
@@ -147,7 +147,7 @@ def PackConv2DNhwcHwcf : Pass<"pack-conv2DNhwcHwcf", "func::FuncOp"> {
   ];
 }
 
-def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers", 
+def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
                                         "func::FuncOp"> {
   let summary = "Tile consumers and fuse producers";
   let description = [{
@@ -161,7 +161,7 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
   }];
   let options = [
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes">,
-    Option<"maxDepth", "max-depth", "int64_t", "5", 
+    Option<"maxDepth", "max-depth", "int64_t", "5",
            "Get producers till maxDepth">,
     Option<"numIters", "num-iters", "int64_t", "3",
            "Run fusion for the given number of iterations">,
@@ -172,11 +172,11 @@ def TileConsumerAndFuseProducers : Pass<"tile-consumer-and-fuse-producers",
 }
 
 def LowerPacksAndUnPacks : Pass<"lower-packs-unpacks", "func::FuncOp"> {
-  let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect", 
+  let dependentDialects = ["linalg::LinalgDialect", "scf::SCFDialect",
                            "tensor::TensorDialect"];
 }
 
-def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm", 
+def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
                                        "func::FuncOp"> {
   let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
   let description = [{
@@ -251,14 +251,14 @@ def ConvInitSimplify : Pass<"conv-init-simplify", "func::FuncOp"> {
   let description = [{
     Perform a graph-rewrite to simplify initialization for a Conv2DNhwcHwcfOp
     operation. Specifically, instead of initializing the output of a convolution
-    with zero and then adding the bias, initialize the output with the bias.  
+    with zero and then adding the bias, initialize the output with the bias.
   }];
 }
 
 def Bufferize : Pass<"bufferize", "ModuleOp"> {
   let summary = "Bufferize tensor to memref for the entire module";
   let options = [
-    Option<"dealloc", "dealloc", "bool", 
+    Option<"dealloc", "dealloc", "bool",
             /*default=*/"true",
            "Enables automatic deallocation.">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
@@ -319,11 +319,11 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
 
 def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
   let summary = "Lower Linalg operations to XSMM operations.";
-  let dependentDialects = ["xsmm::XsmmDialect", "scf::SCFDialect", 
+  let dependentDialects = ["xsmm::XsmmDialect", "scf::SCFDialect",
                            "memref::MemRefDialect"];
 }
 
-def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel", 
+def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
                                      "func::FuncOp"> {
   let summary = "Convert scf.forall to scf.parallel";
   let description = [{

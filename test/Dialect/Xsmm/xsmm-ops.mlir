@@ -28,10 +28,10 @@ func.func @xsmm_dialect(%arg0: memref<2x2xf32>,
   %1 = xsmm.unary.dispatch identity [3, 2, 1, 3] flags = (bcast_row) data_type = f32
 
   // CHECK: xsmm.gemm
-  xsmm.gemm (data_type = f32, %d, %arg0, %arg1, %arg2) 
+  xsmm.gemm (data_type = f32, %d, %arg0, %arg1, %arg2)
     : (i64, memref<2x2xf32>, memref<2x2xf32>, memref<2x2xf32>) -> ()
 
-  %b = arith.constant 1 : i64 
+  %b = arith.constant 1 : i64
   // CHECK: xsmm.fused_brgemm
   xsmm.fused_brgemm (data_type = f32, %d, %arg3, %arg3, %arg2, %arg2, %b)
     : (i64, memref<3x2x2xf32>, memref<3x2x2xf32>, memref<2x2xf32>, memref<2x2xf32>, i64) -> ()

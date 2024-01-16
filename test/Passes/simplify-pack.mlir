@@ -200,7 +200,7 @@ func.func @fold_pack_in_insert_slice(%arg0: tensor<2x4x32x32xbf16>, %arg1: tenso
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
 
 // CHECK-LABEL: fold_pack_in_insert_slice
-// CHECK-SAME: %[[ARG0:.+]]: tensor<2x4x32x32xbf16>, %[[ARG1:.+]]: tensor<2x4x32x32xbf16>, 
+// CHECK-SAME: %[[ARG0:.+]]: tensor<2x4x32x32xbf16>, %[[ARG1:.+]]: tensor<2x4x32x32xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<64x64xbf16>, %[[ARG3:.+]]: tensor<64x64xbf16>
 // CHECK: scf.forall (%[[ARG4:.+]], %[[ARG5:.+]]) in (2, 2) shared_outs(%[[ARG6:.+]] = %[[ARG2]])
 // CHECK: %[[AFFINE_I:.+]] = affine.apply #[[MAP]](%[[ARG4]])
@@ -351,7 +351,7 @@ func.func @expect_to_fail_fold_pack_in_insert_slice_1(
     }
   }
   // CHECK: tensor.unpack
-  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest 
+  %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   return %unpack : tensor<64x64xbf16>
 }
@@ -366,7 +366,7 @@ func.func @expect_to_fail_fold_pack_in_insert_slice_2(
   %pack = tensor.pack %arg2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %packed_layout
     : tensor<64x64xbf16> -> tensor<2x2x32x32xbf16>
   // Multiple results fail to apply the folding pattern.
-  %0:2 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %pack, %arg6 = %dest_t) 
+  %0:2 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %pack, %arg6 = %dest_t)
       -> (tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>) {
     %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
     %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>

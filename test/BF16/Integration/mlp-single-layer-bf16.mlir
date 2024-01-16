@@ -17,7 +17,7 @@ func.func @entry(){
   linalg.fill ins(%c1 : bf16) outs(%arg2 : memref<512xbf16>)
   %arg3 = memref.alloc() : memref<128x512xbf16>
   linalg.fill ins(%c1 : bf16) outs(%arg3 : memref<128x512xbf16>)
-  
+
   linalg.generic {
     indexing_maps = [#map4, #map3], iterator_types = ["parallel", "parallel"]}
     ins(%arg2: memref<512xbf16>) outs(%arg3: memref<128x512xbf16>) {
@@ -27,17 +27,17 @@ func.func @entry(){
 
   %wt = memref.alloc() : memref<128x512x2xbf16>
   linalg.fill ins(%c1 : bf16) outs(%wt : memref<128x512x2xbf16>)
-   
+
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
-    ins(%arg0, %wt : memref<128x256xbf16>, memref<128x512x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %wt : memref<128x256xbf16>, memref<128x512x2xbf16>)
     outs(%arg3 : memref<128x512xbf16>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
         %2 = arith.addf %out, %1 : bf16
         linalg.yield %2 : bf16
-  } 
+  }
 
   linalg.generic {
     indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel"]}

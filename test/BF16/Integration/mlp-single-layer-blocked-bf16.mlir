@@ -25,11 +25,11 @@ func.func @entry(){
     %subview_2 = memref.subview %alloc_1[%arg4, 0, 0, 0] [1, 128, 4, 4] [1, 1, 1, 1] : memref<32x128x4x4xbf16> to memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>>
     scf.for %arg5 = %c0 to %c16 step %c1 {
       %subview_3 = memref.subview %wt_alloc[%arg5, 0, 0, 0, 0] [1, 64, 2, 4, 2] [1, 1, 1, 1, 1] : memref<128x64x2x4x2xbf16> to memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>
-      %subview_4 = memref.subview %subview_2[%arg5, 0, 0] [1, 4, 4] [1, 1, 1] : memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>> to memref<4x4xbf16, strided<[4, 1], offset: ?>>  
+      %subview_4 = memref.subview %subview_2[%arg5, 0, 0] [1, 4, 4] [1, 1, 1] : memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>> to memref<4x4xbf16, strided<[4, 1], offset: ?>>
       linalg.generic {
         indexing_maps = [#map, #map1, #map2],
         iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-        ins(%subview, %subview_3 : memref<64x4x4xbf16, strided<[16, 4,1], offset:?>>, 
+        ins(%subview, %subview_3 : memref<64x4x4xbf16, strided<[16, 4,1], offset:?>>,
                                    memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>)
       outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) {
         ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
@@ -41,9 +41,9 @@ func.func @entry(){
       %c0_bf16 = arith.constant 0.0 : bf16
       linalg.generic {
         indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel"]}
-        ins(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) 
+        ins(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>)
         outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) {
-          ^bb0(%in: bf16, %out: bf16): 
+          ^bb0(%in: bf16, %out: bf16):
           %2 = arith.maximumf %in, %c0_bf16 : bf16
           linalg.yield %2 : bf16
       }

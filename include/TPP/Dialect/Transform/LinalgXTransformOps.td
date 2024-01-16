@@ -33,7 +33,7 @@ def PackOpExt : Op<Transform_Dialect, "structured.pack_ext", [
 
   let assemblyFormat = [{
     $target
-    (`blocking_factors` `=` $blocking_factors^)? 
+    (`blocking_factors` `=` $blocking_factors^)?
      attr-dict
     `:` type($target) `->` type($packed_linalg_op)
   }];
@@ -124,7 +124,7 @@ def RewriteToBrgemmOp : Op<Transform_Dialect, "structured.rewrite_to_brgemm", [
 // RewriteConvToMatmulOp
 //===----------------------------------------------------------------------===//
 
-def RewriteConvToMatmulOp : Op<Transform_Dialect, 
+def RewriteConvToMatmulOp : Op<Transform_Dialect,
     "structured.rewrite_conv_to_matmul", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
@@ -197,7 +197,7 @@ def PackingPropagationOp : Op<Transform_Dialect, "structured.packing_propagation
 // GetBlockedConvolutions
 //===----------------------------------------------------------------------===//
 
-def GetBlockedConvolutions : Op<Transform_Dialect, 
+def GetBlockedConvolutions : Op<Transform_Dialect,
                                 "structured.get_blocked_convolutions", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
@@ -207,7 +207,7 @@ def GetBlockedConvolutions : Op<Transform_Dialect,
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (
     outs Transform_ConcreteOpType<"linalg.generic">:$blocked_convolutions);
-  
+
   let assemblyFormat = [{
     $target attr-dict `:` functional-type(operands, results)
   }];
@@ -224,7 +224,7 @@ def GetBlockedConvolutions : Op<Transform_Dialect,
 // GetBlockedMatmuls
 //===----------------------------------------------------------------------===//
 
-def GetBlockedMatmuls : Op<Transform_Dialect, 
+def GetBlockedMatmuls : Op<Transform_Dialect,
                            "structured.get_blocked_matmuls", [
     FunctionalStyleTransformOpTrait,
     MemoryEffectsOpInterface,
@@ -234,7 +234,7 @@ def GetBlockedMatmuls : Op<Transform_Dialect,
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (
     outs Transform_ConcreteOpType<"linalg.generic">:$blocked_matmuls);
-  
+
   let assemblyFormat = [{
     $target attr-dict `:` functional-type(operands, results)
   }];

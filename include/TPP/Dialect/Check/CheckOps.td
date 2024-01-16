@@ -58,7 +58,7 @@ def CHECK_ExpectAlmostEqOp :
   );
 
   let assemblyFormat = [{
-    `(` $lhs `,` $rhs `,` $threshold `)` 
+    `(` $lhs `,` $rhs `,` $threshold `)`
     attr-dict `:` type($lhs) `,` type($rhs) `,` type($threshold)
   }];
 }
@@ -67,7 +67,7 @@ def CHECK_ExpectSaneOp :
     Op<CHECK_Dialect, "expect_sane"> {
   let summary = [{Checks that the operand is neither NaN nor infinite}];
   let description = [{
-    Verifies that the contents of tensor operand with float elements 
+    Verifies that the contents of tensor operand with float elements
     is neither NaN nor an infinite value.
 
     Results in an assertion failure if the verification fails.
