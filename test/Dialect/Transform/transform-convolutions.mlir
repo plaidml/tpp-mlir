@@ -1,9 +1,9 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter -canonicalize -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -transform-interpreter -canonicalize -split-input-file | FileCheck %s
 
 // Map a linalg.conv_2d_nhwc_hwcf to a matmul operation.
 // Unit filter.
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
         : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
@@ -33,6 +33,8 @@ transform.sequence failures(propagate) {
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: memref<1x4x4x8xf32>) {
@@ -57,13 +59,15 @@ func.func @conv1(%arg0: memref<1x4x4x3xf32>, %arg1: memref<1x1x3x8xf32>, %arg2: 
 
 // Map a linalg.conv_2d_nhwc_hwcf to a matmul operation.
 // Non-unit filter.
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: memref<1x3x3x8xf32>) {
@@ -92,13 +96,15 @@ func.func @conv2(%arg0: memref<1x4x4x3xf32>, %arg1: memref<2x2x3x8xf32>, %arg2: 
 // -----
 
 // Unit filter but non-static dims.
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
     %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: memref<?x?x?x?xf32>) {
@@ -130,8 +136,8 @@ func.func @conv3(%arg0: memref<?x?x?x?xf32>, %arg1: memref<1x1x?x?xf32>, %arg2: 
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Original layout: [N][K][P][Q] = [N][C][H][W] * [K][C][R][S]
     // New      layout: [N][K'][P][Q][k] = [N][C'][H][W][c] * [K'][C'][R][S][c][k]
@@ -163,6 +169,8 @@ transform.sequence failures(propagate) {
     %4 = transform.structured.interchange %3 iterator_interchange = [0, 1, 4, 2, 3, 5]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %4 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
@@ -272,8 +280,8 @@ func.func @walk(%arg0: tensor<1x1x64x64xf32>, %arg1: tensor<3x3x64x64xf32>, %arg
   return %9 : tensor<1x56x56x64xf32>
 }
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
@@ -287,7 +295,7 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_convolutions %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
-    %blocked_matmuls:2 = split_handle %4
+    %blocked_matmuls:2 = transform.split_handle %4
       : (!transform.op<"linalg.generic">)
       -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
     %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
@@ -308,8 +316,8 @@ transform.sequence failures(propagate) {
                                 !transform.any_op,
                                 !transform.any_op,
                                 !transform.any_op)
-    %6 = get_producer_of_operand %5[0] : (!transform.any_op) -> !transform.any_op
-    %convs:2 = split_handle %6 : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %6 = transform.get_producer_of_operand %5[0] : (!transform.any_op) -> !transform.any_op
+    %convs:2 = transform.split_handle %6 : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
@@ -325,17 +333,21 @@ transform.sequence failures(propagate) {
     %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %9 : !transform.any_op
+    transform.yield
+  }
 }
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
     %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 4, 5, 2, 3, 6]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
@@ -367,13 +379,15 @@ func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x2
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
     %2 = transform.structured.interchange %1 iterator_interchange = [0, 1, 2, 5, 6, 7, 3, 4, 8]
         : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv2d_stride(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {

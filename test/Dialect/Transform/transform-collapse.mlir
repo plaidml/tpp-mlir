@@ -1,9 +1,11 @@
-// RUN: tpp-opt -transform-dialect-interpreter -split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: tpp-opt -transform-interpreter -split-input-file -verify-diagnostics %s | FileCheck %s
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1], [2], [3, 4]] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -28,11 +30,13 @@ func.func @parallel(%arg0: tensor<5x5x4x3x3xf32>, %arg1: tensor<5x5x4x3x3xf32>) 
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1], [2]] : !transform.any_op -> !transform.any_op
-}
+    transform.yield
+  }
+} 
 
 // CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d1, d0)>
 // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0, d1)>
@@ -59,10 +63,12 @@ func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tenso
 // -----
 
 // This must fail as we attempt to collapse dimensions of different types.
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1, 2]] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -83,10 +89,12 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 // -----
 
 // This must fail as the reassociation dimensions do not match the number of loops.
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1]] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
@@ -106,10 +114,12 @@ func.func @matmul(%arg0: tensor<3x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1], [2]] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j, k)>
@@ -130,10 +140,12 @@ func.func @parallel(%arg0: tensor<3x3x3xf32> , %arg1: tensor<3x3x3xf32>) -> tens
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.collapse %0 [[0, 1], [2]] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 #map0 = affine_map<(i, j, k) -> (i, j)>
