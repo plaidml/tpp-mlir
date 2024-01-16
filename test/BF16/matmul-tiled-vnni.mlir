@@ -13,16 +13,16 @@ module {
     %0 = bufferization.alloc_tensor() : tensor<32x128x4x4xbf16>
     %1 = scf.for %arg4 = %c0 to %c32 step %c1 iter_args(%arg5 = %0) -> (tensor<32x128x4x4xbf16>) {
       %2 = scf.for %arg6 = %c0 to %c128 step %c1 iter_args(%arg7 = %arg5) -> (tensor<32x128x4x4xbf16>) {
-        %extracted_slice = tensor.extract_slice %arg0[%arg4, 0, 0, 0] [1, 64, 4, 4] [1, 1, 1, 1] 
+        %extracted_slice = tensor.extract_slice %arg0[%arg4, 0, 0, 0] [1, 64, 4, 4] [1, 1, 1, 1]
           : tensor<32x64x4x4xbf16> to tensor<64x4x4xbf16>
-        %extracted_slice_0 = tensor.extract_slice %arg1[%arg6, 0, 0, 0] [1, 64, 4, 4] [1, 1, 1, 1] 
+        %extracted_slice_0 = tensor.extract_slice %arg1[%arg6, 0, 0, 0] [1, 64, 4, 4] [1, 1, 1, 1]
           : tensor<128x64x4x4xbf16> to tensor<64x4x4xbf16>
-        %extracted_slice_1 = tensor.extract_slice %arg2[%arg4, %arg6, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1] 
+        %extracted_slice_1 = tensor.extract_slice %arg2[%arg4, %arg6, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]
           : tensor<32x128x4x4xbf16> to tensor<4x4xbf16>
         %3 = linalg.generic {
-          indexing_maps = [#map, #map1, #map2], 
-          iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
-          ins(%extracted_slice, %extracted_slice_0 : tensor<64x4x4xbf16>, tensor<64x4x4xbf16>) 
+          indexing_maps = [#map, #map1, #map2],
+          iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+          ins(%extracted_slice, %extracted_slice_0 : tensor<64x4x4xbf16>, tensor<64x4x4xbf16>)
           outs(%extracted_slice_1 : tensor<4x4xbf16>) {
         ^bb0(%in: bf16, %in_4: bf16, %out: bf16):
           %5 = arith.mulf %in, %in_4 : bf16

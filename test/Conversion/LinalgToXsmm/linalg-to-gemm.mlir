@@ -153,9 +153,9 @@ func.func @mha_projection(%arg0: memref<512x8x64xf32>, %arg1: memref<64x32x512xf
 func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -166,8 +166,8 @@ func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?
 }
 
 // CHECK-LABEL: square_vnni_gemm
-// CHECK-SAME:  %[[ARG0:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>, 
-// CHECK-SAME:  %[[ARG1:.+]]: memref<32x64x2xbf16>, 
+// CHECK-SAME:  %[[ARG0:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<32x64x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>
 // CHECK: %[[DIS:.+]] = xsmm.gemm.dispatch [64, 64, 64, 64, 64, 64] flags = (vnni_b) data_type = bf16
 // CHECK: xsmm.gemm(data_type = bf16, %[[DIS]], %[[ARG0]], %[[ARG1]], %[[ARG2]])
@@ -182,9 +182,9 @@ func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -261,7 +261,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
+    indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
     ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
@@ -316,7 +316,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
+    indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
     ins(%arg0, %arg1 : memref<64x16xbf16, strided<[64, 1], offset: ?>>, memref<8x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {

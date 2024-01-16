@@ -1,5 +1,5 @@
 // Verify IR
-// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s 
+// RUN: tpp-run %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s
 
 // Check results
 // RUN: tpp-run %s -e entry -entry-point-result=void -seed=123 -print | FileCheck %s --check-prefix=RESULT
@@ -10,7 +10,7 @@
 #map4 = affine_map<(d0, d1) -> (d0, d1)>
 #map5 = affine_map<(d0, d1) -> (0, d1)>
 
-func.func @entry(%A: tensor<2x4x8xf32>, 
+func.func @entry(%A: tensor<2x4x8xf32>,
                  %arg0: tensor<1x4xf32>) -> tensor<4x4xf32> {
   // Weight is defined locally as a dense
   %B = arith.constant dense<2.0> : tensor<2x8x4xf32>
@@ -48,10 +48,10 @@ func.func @entry(%A: tensor<2x4x8xf32>,
 // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
 // CHECK-DAG: %[[c2_i64:.*]] = arith.constant 2 : i64
-// CHECK: %[[DISPATCH:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c4_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]]) 
-// CHECK:  call @xsmm_fused_brgemm_invoke(%[[c1_i64]], %[[DISPATCH]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]]) 
+// CHECK: %[[DISPATCH:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c4_i64]], %[[c4_i64]], %[[c8_i64]], %[[c8_i64]], %[[c4_i64]], %[[c4_i64]], %[[c32_i64]], %[[c32_i64]], %[[c4_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]])
+// CHECK:  call @xsmm_fused_brgemm_invoke(%[[c1_i64]], %[[DISPATCH]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %{{.*}}, %[[c0]], %[[c2_i64]])
 
 // RESULT: ( 3.62953, 3.87851, 3.65424, 3.69154 )
 // RESULT: ( 1.34322, 1.59219, 1.36792, 1.40522 )
 // RESULT: ( 0.766812, 1.01579, 0.791519, 0.828817 )
-// RESULT: ( 2.66426, 2.91324, 2.68897, 2.72627 ) 
+// RESULT: ( 2.66426, 2.91324, 2.68897, 2.72627 )

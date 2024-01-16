@@ -322,7 +322,7 @@ func.func @zero_flag_fused_brgemm(%arg0: memref<1x32x32xf32>, %arg1: memref<1x32
 
   %1 = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 32, 32] [add, relu]
     flags = (none) binary_flags = (none) unary_flags = (none) data_type = f32
-  xsmm.fused_brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %arg2, %c32_i64) : 
+  xsmm.fused_brgemm(data_type = f32, %1, %arg0, %arg1, %alloc, %arg2, %c32_i64) :
     (i64, memref<1x32x32xf32>, memref<1x32x32xf32>, memref<32x32xf32>, memref<32x32xf32>, i64) -> ()
   return
 }

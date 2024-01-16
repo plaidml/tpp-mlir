@@ -4,12 +4,12 @@
 #map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
 #map6 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
 
-func.func @blocked_matmul(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, 
+func.func @blocked_matmul(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>,
                           %arg2: tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16> {
   %0 = linalg.generic {
-    indexing_maps = [#map4, #map5, #map6], 
-    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} 
-    ins(%arg0, %arg1 : tensor<32x64x4x4xbf16>, tensor<128x64x4x4xbf16>) 
+    indexing_maps = [#map4, #map5, #map6],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : tensor<32x64x4x4xbf16>, tensor<128x64x4x4xbf16>)
     outs(%arg2 : tensor<32x128x4x4xbf16>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
     %4 = arith.mulf %in, %in_0 : bf16

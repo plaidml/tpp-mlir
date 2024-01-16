@@ -9,9 +9,9 @@
 func.func @matmultpp(%A: memref<4x8xbf16>,
           %B: memref<4x4x2xbf16>, %C: memref<4x4xbf16>)  {
   linalg.generic {
-    indexing_maps = [#map, #map1, #map2], 
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]} 
-    ins(%A, %B : memref<4x8xbf16>, memref<4x4x2xbf16>) 
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%A, %B : memref<4x8xbf16>, memref<4x4x2xbf16>)
     outs(%C : memref<4x4xbf16>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16

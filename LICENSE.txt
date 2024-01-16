@@ -231,4 +231,4 @@ mechanisms:
    `LICENSE` file at the top containing the specific license and restrictions
    which apply to that software, or
 2) It will contain specific license and restriction terms at the top of every
-   file. 
+   file.

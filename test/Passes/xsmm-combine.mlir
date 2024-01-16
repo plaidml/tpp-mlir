@@ -36,7 +36,7 @@ func.func @bcast_col_in0_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256
 
 // CHECK-LABEL: func.func @bcast_col_in0_on_binary_add(
 // CHECK: %[[ARG0:.*]]: memref<256x128xf32>) -> memref<256x512xf32> {
-// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xf32 : memref<32xf32, strided<[32], offset: ?>> 
+// CHECK: %[[BIAS:.*]] = memref.get_global @__constant_32xf32 : memref<32xf32, strided<[32], offset: ?>>
 // CHECK-NOT: xsmm.brgemm.dispatch
 // CHECK-NOT: xsmm.unary.dispatch
 // CHECK-NOT: xsmm.binary.dispatch
@@ -180,7 +180,7 @@ memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xb
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32xbf16:  memref<32xbf16, strided<[32], offset:?>> = dense<1.000000e+00> {alignment = 128 : i64}
 
-// Bcast_col_in1 flag set on binary add 
+// Bcast_col_in1 flag set on binary add
 func.func @bcast_col_in1_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x512xbf16>  {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -224,7 +224,7 @@ memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xb
 memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 memref.global "private" constant @__constant_32x32xbf16:  memref<32x32xbf16> = dense<1.000000e+00> {alignment = 128 : i64}
 
-// None flag set on binary add 
+// None flag set on binary add
 func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x512xbf16>  {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index

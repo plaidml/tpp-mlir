@@ -484,7 +484,7 @@ func.func @sub_bcast_row_1(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) 
 
 // CHECK-LABEL: sub_bcast_row_1
 // CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256xf32>
-// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1, 1024] 
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch sub [256, 1024, 1024, 1, 1024]
 // CHECK-SAME:  flags = (bcast_row_in1) data_type = f32
 // CHECK: xsmm.binary sub(data_type = f32, %[[DIS]], %[[ARG0]], %{{.+}}, %[[ARG0]])
 
@@ -668,7 +668,7 @@ func.func @mul_bcast_row_1(%arg0: memref<256x1024xf32>, %arg1: memref<256xf32>) 
 
 // CHECK-LABEL: mul_bcast_row_1
 // CHECK-SAME: %[[ARG0:.+]]: memref<256x1024xf32>, %[[ARG1:.+]]: memref<256xf32>
-// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [256, 1024, 1024, 1, 1024] 
+// CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [256, 1024, 1024, 1, 1024]
 // CHECK-SAME:  flags = (bcast_row_in1) data_type = f32
 // CHECK: xsmm.binary mul(data_type = f32, %[[DIS]], %[[ARG0]], %{{.+}}, %[[ARG0]])
 
