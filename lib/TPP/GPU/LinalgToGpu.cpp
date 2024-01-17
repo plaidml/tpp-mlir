@@ -25,6 +25,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
+#include <optional>
+
 using namespace mlir;
 using namespace mlir::tpp;
 
@@ -69,30 +71,36 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
   return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
 }
 
-// Return true if hardware supports WMMA operations.
-static bool isMMASupported(llvm::StringRef triple, llvm::StringRef chip) {
-  auto getComputeCapability = [&](llvm::StringRef chip) -> int {
-    llvm::StringRef delim = "_";
-    llvm::StringRef ccToken =
-        chip.substr(chip.find(delim) + delim.size(), chip.size());
-    return std::stoi(ccToken.str());
-  };
-  if ((triple == "nvptx64-nvidia-cuda") && (getComputeCapability(chip) >= 70))
-    return true;
+static int getComputeCapability(llvm::StringRef chip) {
+  llvm::StringRef delim = "_";
+  llvm::StringRef ccToken =
+      chip.substr(chip.find(delim) + delim.size(), chip.size());
 
-  return false;
+  return std::stoi(ccToken.str());
 }
 
+// Return true if hardware supports WMMA operations.
+static bool isMMASupported(llvm::StringRef triple, llvm::StringRef chip) {
+  return (triple == "nvptx64-nvidia-cuda") &&
+         (getComputeCapability(chip) >= 70);
+}
+
+struct WMMASettings {
+  int m;
+  int n;
+  int k;
+};
+
 // Return true if the operation can be represented with WMMA compute.
-static bool isMMACompatible(linalg::LinalgOp linalgOp) {
+static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
   if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
         isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp))) {
-    return false;
+    return std::nullopt;
   }
 
   // Only static shapes are supported.
   if (linalgOp.hasDynamicShape())
-    return false;
+    return std::nullopt;
 
   auto aType = linalgOp.getDpsInputs()[0].getType().cast<ShapedType>();
   auto bType = linalgOp.getDpsInputs()[1].getType().cast<ShapedType>();
@@ -102,9 +110,26 @@ static bool isMMACompatible(linalg::LinalgOp linalgOp) {
   auto elemTypeB = bType.getElementType();
   auto elemTypeC = cType.getElementType();
 
-  // TODO: add more WMMA combinations.
-  return (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
-         (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
+  // TODO: Add more WMMA combinations.
+  bool isSupprtedPrecision =
+      (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
+      (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
+  if (!isSupprtedPrecision)
+    return std::nullopt;
+
+  auto mDim = cType.getShape()[0];
+  auto nDim = cType.getShape()[1];
+  auto kDim = aType.getShape().back();
+
+  // TODO: Add more possible tile sizes and choose optimal one.
+  int wmmaTileM = 16;
+  int wmmaTileN = 16;
+  int wmmaTileK = 16;
+  if ((mDim % wmmaTileM == 0) && (nDim % wmmaTileN == 0) &&
+      (kDim % wmmaTileK == 0))
+    return WMMASettings{wmmaTileM, wmmaTileN, wmmaTileK};
+
+  return std::nullopt;
 }
 
 // Fuse a consumer using WMMA operations.
@@ -302,6 +327,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
 
 // Create WMMA instructions out of matmul-like operation.
 static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
+                                  WMMASettings settings,
                                   PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
           isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
@@ -554,9 +580,10 @@ struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
           gemmLikeOp, "Expect static shape when mapping to GPU");
     }
 
-    if (options.useWmma && isMMASupported(options.gpuTriple, options.gpuChip) &&
-        isMMACompatible(gemmLikeOp))
-      return gemmToGpuMMA(gemmLikeOp, rewriter);
+    if (options.useWmma && isMMASupported(options.gpuTriple, options.gpuChip)) {
+      if (auto settings = getWMMASettings(gemmLikeOp))
+        return gemmToGpuMMA(gemmLikeOp, *settings, rewriter);
+    }
     return gemmToGpuLoops(gemmLikeOp, rewriter);
   }
 
