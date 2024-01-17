@@ -8,28 +8,10 @@
 
 #include "TPP/Passes.h"
 
-#include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Async/IR/Async.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/ValueRange.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LLVM.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
@@ -40,15 +22,8 @@
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
-#include "TPP/Transforms/Utils/BuilderUtils.h"
-#include "TPP/Transforms/Utils/TensorInit.h"
-#include "TPP/Transforms/Utils/TensorInitFloat.h"
-#include "TPP/Transforms/Utils/TensorInitInt.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 
-#include <algorithm>
 #include <string>
 
 using namespace mlir;
