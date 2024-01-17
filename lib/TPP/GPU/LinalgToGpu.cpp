@@ -604,7 +604,8 @@ struct LinalgToGpu : public tpp::impl::LinalgToGpuBase<LinalgToGpu> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateLinalgToGpuPatterns(
-        patterns, LinalgToGpuOptions{useWmma, gpuTriple, gpuChip, gpuFeatures});
+        patterns,
+        LinalgToGpuOptions{useWmma, gpuTriple, gpuChip, gpuFeatures, kTile});
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

@@ -477,6 +477,9 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
     Option<"gpuFeatures", "features", "std::string",
             /*default=*/"\"+ptx60\"",
            "GPU target features.">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for K dimension.">,
   ];
 }
 
