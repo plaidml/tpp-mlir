@@ -1,7 +1,7 @@
 // This should really be in the passes directory, not here
-// RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
+// RUN: tpp-opt %s -transform-interpreter | FileCheck %s -check-prefix=IR
 
-// RUN: tpp-opt %s -transform-drop-schedule | \
+// RUN: tpp-opt %s -transform-interpreter | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
@@ -38,18 +38,18 @@ func.func @conv(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<8xf32>, %conv_out: ten
   return %3 : tensor<1x6x6x8xf32>
 }
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
     %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2] : !transform.any_op -> !transform.any_op
-    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
+    %2 = transform.get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     // Propagate all the packs
     transform.structured.packing_propagation %2 : !transform.any_op
 
     %3 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // Here we match the generic ops in the entire module. The conv is the last one.
-    %generic:3 = split_handle %3 : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %generic:3 = transform.split_handle %3 : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     %4 = transform.structured.collapse %generic#2 [[0], [1], [2], [3], [4], [5, 6, 7], [8]]
       : !transform.any_op -> !transform.any_op
     %5 = transform.structured.collapse %4 [[0], [1], [2, 3], [4], [5], [6]]
@@ -57,6 +57,8 @@ transform.sequence failures(propagate) {
     %6 = transform.structured.interchange %5 iterator_interchange = [0, 1, 4, 2, 3, 5]
       : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %6 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @entry() {

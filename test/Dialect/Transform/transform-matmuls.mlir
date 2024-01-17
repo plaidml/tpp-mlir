@@ -1,9 +1,11 @@
-// RUN: tpp-opt -transform-dialect-interpreter -canonicalize -split-input-file %s | FileCheck %s
+// RUN: tpp-opt -transform-interpreter -canonicalize -split-input-file %s | FileCheck %s
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1, %loops:3 = transform.structured.tile_using_for %0 [4, 4, 4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 
 // CHECK-LABEL: func @tile_linalg_matmul(
@@ -36,10 +38,12 @@ func.func @tile_linalg_matmul(
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @block_linalg_matmul(
@@ -88,15 +92,15 @@ func.func @matmul_and_relu(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32
 }
 
 // Cooking recipe for matmul
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {    
     // Get the matmul
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Pack the matmul with blocking factors of 32 along i, j and k
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op
     // Get parent operation (aka func.func)
-    %2 = get_parent_op %1 : (!transform.any_op) -> !transform.any_op
+    %2 = transform.get_parent_op %1 : (!transform.any_op) -> !transform.any_op
     // Propagate the packing down through the relu
     transform.structured.packing_propagation %2 : !transform.any_op
 
@@ -130,7 +134,8 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
     %blk_casted = transform.cast %blk_gemm : !transform.op<"linalg.generic"> to !transform.any_op
     transform.structured.rewrite_to_brgemm %blk_casted : !transform.any_op
-
+    transform.yield
+  }
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>

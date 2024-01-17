@@ -62,14 +62,6 @@ def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let dependentDialects = ["scf::SCFDialect"];
 }
 
-def TransformDialectInterpreter : Pass<"transform-dialect-interpreter", "ModuleOp"> {
-  let summary = "Apply transform dialect operations one by one";
-  let description = [{
-    Copy and paste from 'TestTransformDialectInterpreter.cpp'. Apply the transform
-    schedule.
-  }];
-}
-
 def ConvertPerfToLoops : Pass<"convert-perf-to-loops", "func::FuncOp"> {
   let summary = "Convert perf to loops";
   let description = [{
@@ -87,10 +79,6 @@ def ConvertPerfToFunc : Pass<"convert-perf-to-func", "ModuleOp"> {
                            "math::MathDialect",
                            "memref::MemRefDialect",
                            "tensor::TensorDialect"];
-}
-
-def TransformDropSchedule : Pass<"transform-drop-schedule", "ModuleOp"> {
-  let summary = "Drop the transform schedule";
 }
 
 def PackVNNI : Pass<"pack-vnni", "func::FuncOp"> {

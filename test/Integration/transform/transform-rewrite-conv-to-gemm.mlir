@@ -1,7 +1,7 @@
 // Make sure we map to linalg.matmul
-// RUN: tpp-opt %s -transform-dialect-interpreter -transform-drop-schedule | FileCheck -check-prefix=LINALG %s
+// RUN: tpp-opt %s -transform-interpreter | FileCheck -check-prefix=LINALG %s
 
-// RUN: tpp-opt %s -transform-drop-schedule | \
+// RUN: tpp-opt %s -transform-interpreter | \
 // RUN: tpp-run -print \
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
@@ -10,13 +10,16 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.generalize %0 : (!transform.any_op) -> !transform.any_op
-    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] : (!transform.any_op) -> !transform.any_op
+    %2 = transform.structured.interchange %1 iterator_interchange = [ 0, 1, 4, 5, 2, 3, 6 ] 
+      : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_conv_to_matmul %2 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv(%img: tensor<1x4x4x3xf32>, %filt: tensor<2x2x3x8xf32>,

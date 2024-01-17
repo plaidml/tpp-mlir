@@ -14,7 +14,6 @@ add_mlir_library(TPPTransforms
   RewriteToBatchReduceGemm.cpp
   TileConsumerAndFuseProducers.cpp
   ToBlockLayoutAndBack.cpp
-  TransformDialectInterpreter.cpp
   TransformUtils.cpp
   CombineXsmmPass.cpp
 

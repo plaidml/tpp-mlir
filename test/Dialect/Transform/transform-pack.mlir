@@ -1,10 +1,12 @@
-// RUN: tpp-opt -transform-dialect-interpreter -verify-diagnostics -split-input-file %s | FileCheck %s
+// RUN: tpp-opt -transform-interpreter -verify-diagnostics -split-input-file %s | FileCheck %s
 
-transform.sequence failures(propagate) {
-^bb1(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  // CHECK: transform.structured.pack_ext
-  %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2, 2] : !transform.any_op -> !transform.any_op
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+    // CHECK: transform.structured.pack_ext
+    %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2, 2] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 // -----
@@ -21,20 +23,24 @@ func.func @parallel(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tenso
   return %0 : tensor<5x5x5xf32>
 }
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // expected-error @below {{Could not pack op}}
     %1 = transform.structured.pack_ext %0 blocking_factors = [2, 2, 2] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     // expected-error @below {{Could not pack op:}}
     %1 = transform.structured.pack_ext %0 blocking_factors = [200, 200, 200] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @block_linalg_matmul(
@@ -49,10 +55,12 @@ func.func @block_linalg_matmul(
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nchw_fchw"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1x1xf32>,
@@ -83,10 +91,12 @@ func.func @conv_2d_nchw_fchw(%i: tensor<14x512x28x28xf32>, %f: tensor<1024x512x1
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x64x256xf32>, %arg2: tensor<1x56x56x256xf32>) -> tensor<1x56x56x256xf32> {
@@ -117,10 +127,12 @@ func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 // test we properly pass stride information.
@@ -152,10 +164,12 @@ func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x113x113x64xf32>, %arg1: tensor<3x3x
 
 // -----
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     %1 = transform.structured.pack_ext %0 blocking_factors = [32, 32, 32] : !transform.any_op -> !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @matmul(%arg0: tensor<128x512xf32>, %arg1: tensor<512x256xf32>, %arg2: tensor<128x256xf32>) -> tensor<128x256xf32> {

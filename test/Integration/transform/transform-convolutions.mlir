@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -transform-dialect-interpreter | FileCheck %s -check-prefix=IR
+// RUN: tpp-opt %s -transform-interpreter | FileCheck %s -check-prefix=IR
 
 // RUN: tpp-run %s -print \
 // RUN:  -e entry -entry-point-result=void | \
@@ -58,8 +58,8 @@ func.func @walk(%arg0: tensor<1x1x8x8xf32>, %arg1: tensor<3x3x8x8xf32>, %arg2: t
   return %9 : tensor<1x6x6x8xf32>
 }
 
-transform.sequence failures(propagate) {
-  ^bb0(%arg1: !transform.any_op):
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
     // Blocks all the convs
@@ -74,7 +74,7 @@ transform.sequence failures(propagate) {
       : (!transform.any_op) -> !transform.any_op
     %4 = transform.structured.get_blocked_convolutions %3
       : (!transform.any_op) -> (!transform.op<"linalg.generic">)
-    %blocked_matmuls:2 = split_handle %4
+    %blocked_matmuls:2 = transform.split_handle %4
       : (!transform.op<"linalg.generic">)
       -> (!transform.op<"linalg.generic">, !transform.op<"linalg.generic">)
     %first_relu = transform.get_consumers_of_result %blocked_matmuls#0[0]
@@ -91,8 +91,8 @@ transform.sequence failures(propagate) {
     // Fuse relu and conv on the three outermost loops
     %5, %loop:3 = transform.structured.fuse %relus { tile_sizes = [1, 1, 1, 0, 0] }
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-    %6 = get_producer_of_operand %5[0] : (!transform.any_op) -> !transform.any_op
-    %convs:2 = split_handle %6 : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %6 = transform.get_producer_of_operand %5[0] : (!transform.any_op) -> !transform.any_op
+    %convs:2 = transform.split_handle %6 : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Map the conv to linalg.matmul
     // With R = S = 3 we map to linalg.matmul
@@ -109,6 +109,8 @@ transform.sequence failures(propagate) {
     %9 = transform.structured.interchange %8 iterator_interchange = [0, 1, 4, 2, 3, 5]
       : (!transform.any_op) -> !transform.any_op
     transform.structured.rewrite_to_brgemm %9 : !transform.any_op
+    transform.yield
+  }
 }
 
 func.func @entry() {
