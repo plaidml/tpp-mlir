@@ -536,9 +536,9 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   for (int k = 0; k < numTilesK; k++) {
     for (int m = 0; m < numTilesM; m++) {
       for (int n = 0; n < numTilesN; n++) {
-        int aIdx = m * numTilesM + k;
-        int bIdx = k * numTilesK + n;
-        int cIdx = m * numTilesM + n;
+        int aIdx = m * numTilesK + k;
+        int bIdx = k * numTilesN + n;
+        int cIdx = m * numTilesN + n;
 
         Value result = rewriter
                            .create<gpu::SubgroupMmaComputeOp>(
@@ -563,7 +563,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   SmallVector<gpu::SubgroupMmaStoreMatrixOp> storeOps;
   for (int m = 0; m < numTilesM; m++) {
     for (int n = 0; n < numTilesN; n++) {
-      int resIdx = m * numTilesM + n;
+      int resIdx = m * numTilesN + n;
 
       Value rowIdx =
           rewriter.create<arith::ConstantIndexOp>(loc, m * wmmaSettings.m);
