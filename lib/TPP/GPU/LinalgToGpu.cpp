@@ -134,82 +134,109 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
 
 // Fuse a consumer using WMMA operations.
 // Returns updated store op or nullopt if the fusion fails.
-static std::optional<gpu::SubgroupMmaStoreMatrixOp>
+static std::optional<SmallVector<gpu::SubgroupMmaStoreMatrixOp>>
 mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-          gpu::SubgroupMmaStoreMatrixOp rootStoreOp,
+          SmallVector<gpu::SubgroupMmaStoreMatrixOp> rootStoreOps,
           PatternRewriter &rewriter) {
+  assert(rootStoreOps.size() > 0 && "Requires at least one store op");
+
   Location loc = rootOp.getLoc();
 
   auto rootOutput = rootOp.getDpsInits()[0];
   auto outputType = rootOutput.getType().cast<ShapedType>();
+
   // Must be a floating point type.
+  // TODO: Add integer support.
   auto floatType = dyn_cast<FloatType>(outputType.getElementType());
   if (!floatType)
     return std::nullopt;
 
-  auto storeIndices = rootStoreOp.getIndices();
-
-  gpu::MMAMatrixType mmaOutputType = gpu::MMAMatrixType::get(
-      outputType.getShape(), outputType.getElementType(), "COp");
-  auto leadingDim = rootStoreOp.getLeadDimension();
-
   // Insert fused eltwise ops before the store and later replace the store
   // with a new result.
   OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(rootStoreOp);
+  rewriter.setInsertionPoint(rootStoreOps[0]);
 
-  std::optional<gpu::SubgroupMmaStoreMatrixOp> newStore = std::nullopt;
+  gpu::MMAMatrixType mmaOutputType = rootStoreOps[0].getSrc().getType();
+  auto leadingDim = rootStoreOps[0].getLeadDimension();
+
+  SmallVector<Value> mergedRes;
+
   SmallVector<Value> operands;
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added - load the tile first.
     // Must be a buffer of the same type - scalar broadcast is not supported.
+    // TODO: Consider adding support for eltwise with broadcast.
     auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
     if (addValue.getType() != rootOutput.getType())
       return std::nullopt;
-    // Fuse the add into the matmul body.
-    addValue = rewriter
-                   .create<gpu::SubgroupMmaLoadMatrixOp>(
-                       loc, mmaOutputType, addValue, storeIndices, leadingDim,
-                       /*transpose=*/UnitAttr())
-                   .getRes();
-    auto eltwiseAttr = gpu::MMAElementwiseOp::ADDF;
-    auto addRes =
-        rewriter
-            .create<gpu::SubgroupMmaElementwiseOp>(
-                loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), addValue},
-                eltwiseAttr)
-            .getRes();
-    // Store the new result.
-    newStore = rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-        rootStoreOp, addRes, rootStoreOp.getDstMemref(), storeIndices,
-        leadingDim,
-        /*transpose=*/UnitAttr());
+
+    for (gpu::SubgroupMmaStoreMatrixOp rootStoreOp : rootStoreOps) {
+      auto storeIndices = rootStoreOp.getIndices();
+
+      // Fuse the add into the matmul body.
+      auto loadOp =
+          rewriter
+              .create<gpu::SubgroupMmaLoadMatrixOp>(
+                  loc, mmaOutputType, addValue, storeIndices, leadingDim,
+                  /*transpose=*/UnitAttr())
+              .getRes();
+      auto eltwiseAttr = gpu::MMAElementwiseOp::ADDF;
+      auto addRes =
+          rewriter
+              .create<gpu::SubgroupMmaElementwiseOp>(
+                  loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), loadOp},
+                  eltwiseAttr)
+              .getRes();
+      mergedRes.push_back(addRes);
+    }
   } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
-    // Fuse the relu into the matmul body.
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
         loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-    Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
-        loc, mmaOutputType, zeroFloat);
-    auto eltwiseAttr = gpu::MMAElementwiseOp::MAXF;
-    auto maxRes =
-        rewriter
-            .create<gpu::SubgroupMmaElementwiseOp>(
-                loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), zeroTile},
-                eltwiseAttr)
-            .getRes();
-    // Store the new result.
-    newStore = rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-        rootStoreOp, maxRes, rootStoreOp.getDstMemref(), storeIndices,
-        leadingDim,
-        /*transpose=*/UnitAttr());
+
+    for (auto rootStoreOp : rootStoreOps) {
+      gpu::MMAMatrixType mmaOutputType = rootStoreOp.getSrc().getType();
+      auto leadingDim = rootStoreOp.getLeadDimension();
+
+      // Fuse the relu into the matmul body.
+      Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
+          loc, mmaOutputType, zeroFloat);
+      auto eltwiseAttr = gpu::MMAElementwiseOp::MAXF;
+      auto maxRes =
+          rewriter
+              .create<gpu::SubgroupMmaElementwiseOp>(
+                  loc, mmaOutputType,
+                  ValueRange{rootStoreOp.getSrc(), zeroTile}, eltwiseAttr)
+              .getRes();
+      mergedRes.push_back(maxRes);
+    }
   } else {
     // Not a fusable operation. Bail out.
     return std::nullopt;
   }
 
+  // Fusion must have failed, if number of new results is different.
+  // Bail out.
+  if (mergedRes.size() != rootStoreOps.size())
+    return std::nullopt;
+
+  // Store the new result.
+  SmallVector<gpu::SubgroupMmaStoreMatrixOp> newStores;
+  for (size_t i = 0; i < rootStoreOps.size(); i++) {
+    auto storeIndices = rootStoreOps[i].getIndices();
+
+    auto newStore = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
+        loc, mergedRes[i], rootStoreOps[i].getDstMemref(), storeIndices,
+        leadingDim,
+        /*transpose=*/UnitAttr());
+    newStores.push_back(newStore);
+  }
+
+  for (size_t i = 0; i < rootStoreOps.size(); i++)
+    rewriter.replaceOp(rootStoreOps[i], newStores[i]);
+
   rewriter.eraseOp(consumer);
 
-  return newStore;
+  return newStores;
 }
 
 // Fuse a consumer using scalar operations.
@@ -296,6 +323,7 @@ getFusableConsumers(linalg::LinalgOp rootOp) {
     auto outBuf = consumer.getDpsInitOperand(0)->get();
     // Check that the op reuses the same output buffer as the root op.
     // Otherwise, it is assumed that the op cannot be fused.
+    // TODO: Consider adding support for eltwise with broadcast.
     if (outBuf != rootOutput)
       break;
 
@@ -348,16 +376,16 @@ fuseEltwiseConsumersMMA(linalg::LinalgOp rootOp,
   auto consumers = getFusableConsumers(rootOp);
 
   for (auto op : consumers) {
-    // std::optional<SmallVector<Operation *>> updatedStoreOps = std::nullopt;
-    std::optional<gpu::SubgroupMmaStoreMatrixOp> updatedStoreOp = std::nullopt;
+    std::optional<SmallVector<gpu::SubgroupMmaStoreMatrixOp>> updatedStoreOps =
+        std::nullopt;
 
-    updatedStoreOp = mmaFusion(rootOp, op, rootStoreOps[0], rewriter);
+    updatedStoreOps = mmaFusion(rootOp, op, rootStoreOps, rewriter);
 
     // Failed to fuse operation. Bail out.
-    if (!updatedStoreOp)
+    if (!updatedStoreOps)
       break;
 
-    rootStoreOps[0] = *updatedStoreOp;
+    rootStoreOps = *updatedStoreOps;
   }
 
   return rootStoreOps;
@@ -437,10 +465,10 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Fetch the inital value of the output element.
   SmallVector<Value> tilesC;
-  for (int i = 0; i < dimM; i += wmmaSettings.m) {
-    for (int j = 0; j < dimN; j += wmmaSettings.n) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+  for (int m = 0; m < dimM; m += wmmaSettings.m) {
+    for (int n = 0; n < dimN; n += wmmaSettings.n) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
       Value tileC =
           rewriter
               .create<gpu::SubgroupMmaLoadMatrixOp>(
@@ -468,10 +496,10 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   }
 
   SmallVector<Value> tilesA;
-  for (int i = 0; i < dimM; i += wmmaSettings.m) {
-    for (int j = 0; j < dimK; j += wmmaSettings.k) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+  for (int m = 0; m < dimM; m += wmmaSettings.m) {
+    for (int k = 0; k < dimK; k += wmmaSettings.k) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, k);
       Value tileA = rewriter
                         .create<gpu::SubgroupMmaLoadMatrixOp>(
                             loc, mmaTypeA, matA,
@@ -485,10 +513,10 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   }
 
   SmallVector<Value> tilesB;
-  for (int i = 0; i < dimK; i += wmmaSettings.k) {
-    for (int j = 0; j < dimN; j += wmmaSettings.n) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+  for (int k = 0; k < dimK; k += wmmaSettings.k) {
+    for (int n = 0; n < dimN; n += wmmaSettings.n) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, k);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
       Value tileB = rewriter
                         .create<gpu::SubgroupMmaLoadMatrixOp>(
                             loc, mmaTypeB, matB,
@@ -500,16 +528,28 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
-  SmallVector<Value> results;
-  for (size_t i = 0; i < tilesC.size(); i++) {
-    Value result =
-        rewriter
-            .create<gpu::SubgroupMmaComputeOp>(loc, tilesC[i].getType(),
-                                               tilesA[i], tilesB[i], tilesC[i],
-                                               /*a_transpose=*/UnitAttr(),
-                                               /*b_transpose=*/UnitAttr())
-            .getRes();
-    results.push_back(result);
+  const int numTilesM = dimM / wmmaSettings.m;
+  const int numTilesN = dimN / wmmaSettings.n;
+  const int numTilesK = dimK / wmmaSettings.k;
+
+  SmallVector<Value> results = tilesC;
+  for (int k = 0; k < numTilesK; k++) {
+    for (int m = 0; m < numTilesM; m++) {
+      for (int n = 0; n < numTilesN; n++) {
+        int aIdx = m * numTilesM + k;
+        int bIdx = k * numTilesK + n;
+        int cIdx = m * numTilesM + n;
+
+        Value result = rewriter
+                           .create<gpu::SubgroupMmaComputeOp>(
+                               loc, tilesC[cIdx].getType(), tilesA[aIdx],
+                               tilesB[bIdx], results[cIdx],
+                               /*a_transpose=*/UnitAttr(),
+                               /*b_transpose=*/UnitAttr())
+                           .getRes();
+        results[cIdx] = result;
+      }
+    }
   }
 
   if (isBrgemm) {
@@ -521,14 +561,14 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Write back the total sum to the output buffer.
   SmallVector<gpu::SubgroupMmaStoreMatrixOp> storeOps;
-  for (int i = 0; i < dimM / wmmaSettings.m; i++) {
-    for (int j = 0; j < dimN / wmmaSettings.n; j++) {
-      int resIdx = (dimM / wmmaSettings.m) * i + j;
+  for (int m = 0; m < numTilesM; m++) {
+    for (int n = 0; n < numTilesN; n++) {
+      int resIdx = m * numTilesM + n;
 
       Value rowIdx =
-          rewriter.create<arith::ConstantIndexOp>(loc, i * wmmaSettings.m);
+          rewriter.create<arith::ConstantIndexOp>(loc, m * wmmaSettings.m);
       Value colIdx =
-          rewriter.create<arith::ConstantIndexOp>(loc, j * wmmaSettings.n);
+          rewriter.create<arith::ConstantIndexOp>(loc, n * wmmaSettings.n);
       auto storeOp = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
           loc, results[resIdx], matC, ValueRange{rowIdx, colIdx}, ldc,
           /*transpose=*/UnitAttr());
