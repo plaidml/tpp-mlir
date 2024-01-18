@@ -327,7 +327,7 @@ static Operation *fuseEltwiseConsumers(linalg::LinalgOp rootOp,
 
 // Create WMMA instructions out of matmul-like operation.
 static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
-                                  WMMASettings settings,
+                                  WMMASettings wmmaSettings,
                                   PatternRewriter &rewriter) {
   assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
           isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
@@ -351,13 +351,6 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   auto typeB = matB.getType().cast<ShapedType>();
   auto typeC = matC.getType().cast<ShapedType>();
 
-  gpu::MMAMatrixType mmaTypeA = gpu::MMAMatrixType::get(
-      typeA.getShape().take_back(2), typeA.getElementType(), "AOp");
-  gpu::MMAMatrixType mmaTypeB = gpu::MMAMatrixType::get(
-      typeB.getShape().take_back(2), typeB.getElementType(), "BOp");
-  gpu::MMAMatrixType mmaTypeC =
-      gpu::MMAMatrixType::get(typeC.getShape(), typeC.getElementType(), "COp");
-
   auto stridesA = utils::getStaticStrides(matA);
   auto stridesB = utils::getStaticStrides(matB);
   auto stridesC = utils::getStaticStrides(matC);
@@ -371,6 +364,17 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
         linalgOp,
         "Expect unit stride in the innermost dimension for MMA operations");
   }
+
+  int dimM = typeC.getShape()[0];
+  int dimN = typeC.getShape()[1];
+  int dimK = typeA.getShape().back();
+
+  gpu::MMAMatrixType mmaTypeA = gpu::MMAMatrixType::get(
+      {wmmaSettings.m, wmmaSettings.k}, typeA.getElementType(), "AOp");
+  gpu::MMAMatrixType mmaTypeB = gpu::MMAMatrixType::get(
+      {wmmaSettings.k, wmmaSettings.n}, typeB.getElementType(), "BOp");
+  gpu::MMAMatrixType mmaTypeC = gpu::MMAMatrixType::get(
+      {wmmaSettings.m, wmmaSettings.n}, typeC.getElementType(), "COp");
 
   bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
 
@@ -394,59 +398,107 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   rewriter.setInsertionPoint(parallelLoop.getBody()->getTerminator());
 
   // Fetch the inital value of the output element.
-  Value tileC = rewriter
-                    .create<gpu::SubgroupMmaLoadMatrixOp>(
-                        loc, mmaTypeC, matC, ValueRange{zero, zero}, ldc,
-                        /*transpose=*/UnitAttr())
-                    .getRes();
+  SmallVector<Value> tilesC;
+  for (int i = 0; i < dimM; i += wmmaSettings.m) {
+    for (int j = 0; j < dimN; j += wmmaSettings.n) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+      Value tileC =
+          rewriter
+              .create<gpu::SubgroupMmaLoadMatrixOp>(
+                  loc, mmaTypeC, matC, ValueRange{rowIdx, colIdx}, ldc,
+                  /*transpose=*/UnitAttr())
+              .getRes();
+      tilesC.push_back(tileC);
+    }
+  }
 
   scf::ForOp batchLoop;
   Value batchIv;
   if (isBrgemm) {
     Value batch =
         rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
-    batchLoop =
-        rewriter.create<scf::ForOp>(loc, zero, batch, one, ValueRange{tileC});
+    batchLoop = rewriter.create<scf::ForOp>(loc, zero, batch, one, tilesC);
     rewriter.setInsertionPointToStart(batchLoop.getBody());
     batchIv = batchLoop.getInductionVar();
-    tileC = batchLoop.getRegionIterArg(0);
+
+    SmallVector<Value> newTiles;
+    for (auto iterArgTile : batchLoop.getRegionIterArgs())
+      newTiles.push_back(iterArgTile);
+
+    tilesC = newTiles;
   }
 
-  Value tileA = rewriter
-                    .create<gpu::SubgroupMmaLoadMatrixOp>(
-                        loc, mmaTypeA, matA,
-                        isBrgemm ? ValueRange{batchIv, zero, zero}
-                                 : ValueRange{zero, zero},
-                        lda,
-                        /*transpose=*/UnitAttr())
-                    .getRes();
-  Value tileB = rewriter
-                    .create<gpu::SubgroupMmaLoadMatrixOp>(
-                        loc, mmaTypeB, matB,
-                        isBrgemm ? ValueRange{batchIv, zero, zero}
-                                 : ValueRange{zero, zero},
-                        ldb, /*transpose=*/UnitAttr())
-                    .getRes();
+  SmallVector<Value> tilesA;
+  for (int i = 0; i < dimM; i += wmmaSettings.m) {
+    for (int j = 0; j < dimK; j += wmmaSettings.k) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+      Value tileA = rewriter
+                        .create<gpu::SubgroupMmaLoadMatrixOp>(
+                            loc, mmaTypeA, matA,
+                            isBrgemm ? ValueRange{batchIv, rowIdx, colIdx}
+                                     : ValueRange{rowIdx, colIdx},
+                            lda,
+                            /*transpose=*/UnitAttr())
+                        .getRes();
+      tilesA.push_back(tileA);
+    }
+  }
 
-  Value result =
-      rewriter
-          .create<gpu::SubgroupMmaComputeOp>(loc, tileC.getType(), tileA, tileB,
-                                             tileC, /*a_transpose=*/UnitAttr(),
-                                             /*b_transpose=*/UnitAttr())
-          .getRes();
+  SmallVector<Value> tilesB;
+  for (int i = 0; i < dimK; i += wmmaSettings.k) {
+    for (int j = 0; j < dimN; j += wmmaSettings.n) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, j);
+      Value tileB = rewriter
+                        .create<gpu::SubgroupMmaLoadMatrixOp>(
+                            loc, mmaTypeB, matB,
+                            isBrgemm ? ValueRange{batchIv, rowIdx, colIdx}
+                                     : ValueRange{rowIdx, colIdx},
+                            ldb, /*transpose=*/UnitAttr())
+                        .getRes();
+      tilesB.push_back(tileB);
+    }
+  }
+
+  SmallVector<Value> results;
+  for (size_t i = 0; i < tilesC.size(); i++) {
+    Value result =
+        rewriter
+            .create<gpu::SubgroupMmaComputeOp>(loc, tilesC[i].getType(),
+                                               tilesA[i], tilesB[i], tilesC[i],
+                                               /*a_transpose=*/UnitAttr(),
+                                               /*b_transpose=*/UnitAttr())
+            .getRes();
+    results.push_back(result);
+  }
 
   if (isBrgemm) {
     rewriter.setInsertionPointToEnd(batchLoop.getBody());
-    rewriter.create<scf::YieldOp>(loc, ValueRange{result});
-    result = batchLoop.getResults()[0];
+    rewriter.create<scf::YieldOp>(loc, results);
+    results = batchLoop.getResults();
     rewriter.setInsertionPointAfter(batchLoop);
   }
 
   // Write back the total sum to the output buffer.
-  auto storeOp = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
-      loc, result, matC, ValueRange{zero, zero}, ldc, /*transpose=*/UnitAttr());
+  SmallVector<Operation *> storeOps;
+  for (int i = 0; i < dimM / wmmaSettings.m; i++) {
+    for (int j = 0; j < dimN / wmmaSettings.n; j++) {
+      int resIdx = (dimM / wmmaSettings.m) * i + j;
 
-  (void)fuseEltwiseConsumers(linalgOp, storeOp, ValueRange{zero, zero},
+      Value rowIdx =
+          rewriter.create<arith::ConstantIndexOp>(loc, i * wmmaSettings.m);
+      Value colIdx =
+          rewriter.create<arith::ConstantIndexOp>(loc, j * wmmaSettings.n);
+      auto storeOp = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
+          loc, results[resIdx], matC, ValueRange{rowIdx, colIdx}, ldc,
+          /*transpose=*/UnitAttr());
+      storeOps.push_back(storeOp);
+    }
+  }
+
+  (void)fuseEltwiseConsumers(linalgOp, storeOps[0], ValueRange{zero, zero},
                              rewriter);
 
   rewriter.eraseOp(linalgOp);
