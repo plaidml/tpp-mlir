@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -linalg-to-gpu=wmma -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -linalg-to-gpu=wmma -canonicalize -split-input-file | FileCheck %s
 
 func.func @matmul(%arg0: memref<16x16xf16>,
                  %arg1: memref<16x16xf16>,
@@ -11,15 +11,12 @@ func.func @matmul(%arg0: memref<16x16xf16>,
 // CHECK-LABEL: func.func @matmul(
 // CHECK-SAME:  %[[A:.+]]: memref<16x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<16x16xf16>
 // CHECK-DAG:     %[[subgroup_size:.+]] = arith.constant 32 : index
-// CHECK-DAG:     %[[one:.+]] = arith.constant 1 : index
-// CHECK:         scf.parallel {{.*}}to (%[[one]], %[[one]])
-// CHECK:           scf.parallel {{.*}}to (%[[subgroup_size]])
-// CHECK-DAG:         %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
-// CHECK-DAG:         %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
-// CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
-// CHECK:             %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
-// CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.reduce
+// CHECK:         scf.parallel {{.*}}to (%[[subgroup_size]])
+// CHECK-DAG:       %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
+// CHECK-DAG:       %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
+// CHECK-DAG:       %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
+// CHECK:           %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
+// CHECK:           gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
 // CHECK:           scf.reduce
 // CHECK:         }
 
@@ -80,6 +77,33 @@ func.func @matmul_2D_tiled(%arg0: memref<32x32xf16>, %arg1: memref<32x32xf16>, %
 
 // -----
 
+func.func @matmul_K_dim_tiled(%arg0: memref<16x64xf16>, %arg1: memref<64x16xf16>, %arg2: memref<16x16xf16>) {
+  linalg.matmul ins(%arg0, %arg1 : memref<16x64xf16>, memref<64x16xf16>) outs(%arg2 : memref<16x16xf16>)
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_K_dim_tiled(
+// CHECK-SAME:  %[[A:.+]]: memref<16x64xf16>, %[[B:.+]]: memref<64x16xf16>, %[[C:.+]]: memref<16x16xf16>
+// CHECK-DAG:     %[[zero:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[kStep:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[kUB:.+]] = arith.constant 64 : index
+// CHECK-DAG:     %[[wmmaSizeK:.+]] = arith.constant 16 : index
+// CHECK-COUNT-1: %[[cTile:.+]] = gpu.subgroup_mma_load_matrix %[[C]]
+// CHECK:         %[[loopRes:.+]] = scf.for %[[iv:.+]] = %[[zero]] to %[[kUB]] step %[[kStep]] iter_args(%[[acc_tile:.+]] = %[[cTile]])
+// CHECK:           gpu.subgroup_mma_load_matrix %[[A]]{{\[}}%[[zero]], %[[iv]]
+// CHECK:           %[[aCol:.+]] = arith.addi %[[iv]], %[[wmmaSizeK]]
+// CHECK:           gpu.subgroup_mma_load_matrix %[[A]]{{\[}}%[[zero]], %[[aCol]]
+// CHECK:           gpu.subgroup_mma_load_matrix %[[B]]{{\[}}%[[iv]], %[[zero]]
+// CHECK:           %[[bRow:.+]] = arith.addi %[[iv]], %[[wmmaSizeK]]
+// CHECK:           gpu.subgroup_mma_load_matrix %[[B]]{{\[}}%[[bRow]], %[[zero]]
+// CHECK:           gpu.subgroup_mma_compute
+// CHECK:           %[[res:.+]] = gpu.subgroup_mma_compute
+// CHECK:           scf.yield %[[res]]
+// CHECK:         }
+// CHECK:         gpu.subgroup_mma_store_matrix %[[loopRes]], %[[C]]
+
+// -----
+
 func.func @batch_reduce_matmul(%arg0: memref<64x16x16xf16>,
                  %arg1: memref<64x16x16xf16>,
                  %arg2: memref<16x16xf16>) {
@@ -93,17 +117,15 @@ func.func @batch_reduce_matmul(%arg0: memref<64x16x16xf16>,
 // CHECK-DAG:     %[[subgroup_size:.+]] = arith.constant 32 : index
 // CHECK-DAG:     %[[batch:.+]] = arith.constant 64 : index
 // CHECK-DAG:     %[[one:.+]] = arith.constant 1 : index
-// CHECK:         scf.parallel {{.*}}to (%[[one]], %[[one]])
-// CHECK:           scf.parallel {{.*}}to (%[[subgroup_size]])
-// CHECK:             %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
-// CHECK:             %[[res:.+]] = scf.for {{.*}}to %[[batch]] {{.*}}iter_args(%[[acc_tile:.*]] = %[[tileC]])
-// CHECK-DAG:           %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
-// CHECK-DAG:           %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
-// CHECK:               %[[part_sum:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[acc_tile]]
-// CHECK:               scf.yield %[[part_sum]]
-// CHECK:             }
-// CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.reduce
+// CHECK:         scf.parallel {{.*}}to (%[[subgroup_size]])
+// CHECK:           %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
+// CHECK:           %[[res:.+]] = scf.for {{.*}}to %[[batch]] {{.*}}iter_args(%[[acc_tile:.*]] = %[[tileC]])
+// CHECK-DAG:         %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
+// CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
+// CHECK:             %[[part_sum:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[acc_tile]]
+// CHECK:             scf.yield %[[part_sum]]
+// CHECK:           }
+// CHECK:           gpu.subgroup_mma_store_matrix %[[res]], %[[C]]{{.*}}leadDimension = 16
 // CHECK:           scf.reduce
 // CHECK:         }
 
@@ -153,14 +175,12 @@ func.func @matmul_strided_memrefs(%arg0: memref<16x32x16xf16>, %arg1: memref<16x
 // CHECK-DAG:     %[[subA:.+]] = memref.subview %[[A]]
 // CHECK-DAG:     %[[subB:.+]] = memref.subview %[[B]]
 // CHECK-DAG:     %[[subC:.+]] = memref.subview %[[C]]
-// CHECK:         scf.parallel {{.*}}to (%[[one]], %[[one]])
-// CHECK:           scf.parallel {{.*}}to (%[[subgroup_size]])
-// CHECK-DAG:         %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[subC]]{{.*}}leadDimension = 32
-// CHECK-DAG:         %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[subA]]{{.*}}leadDimension = 512
-// CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[subB]]{{.*}}leadDimension = 1024
-// CHECK:             %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
-// CHECK:             gpu.subgroup_mma_store_matrix %[[res]], %[[subC]]{{.*}}leadDimension = 32
-// CHECK:             scf.reduce
+// CHECK:         scf.parallel {{.*}}to (%[[subgroup_size]])
+// CHECK-DAG:       %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[subC]]{{.*}}leadDimension = 32
+// CHECK-DAG:       %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[subA]]{{.*}}leadDimension = 512
+// CHECK-DAG:       %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[subB]]{{.*}}leadDimension = 1024
+// CHECK:           %[[res:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
+// CHECK:           gpu.subgroup_mma_store_matrix %[[res]], %[[subC]]{{.*}}leadDimension = 32
 // CHECK:           scf.reduce
 // CHECK:         }
 
@@ -231,18 +251,16 @@ func.func @matmul_add_relu(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %
 // CHECK-DAG:     %[[subgroup_size:.+]] = arith.constant 32 : index
 // CHECK-DAG:     %[[one:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[zeroF16:.+]] = arith.constant 0.000000e+00 : f16
-// CHECK:         scf.parallel {{.*}}to (%[[one]], %[[one]])
-// CHECK:           scf.parallel {{.*}}to (%[[subgroup_size]])
-// CHECK-DAG:         %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
-// CHECK-DAG:         %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
-// CHECK-DAG:         %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
-// CHECK:             %[[compRes:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
-// CHECK:             %[[tileBias:.+]] = gpu.subgroup_mma_load_matrix %[[BIAS]]{{.*}}leadDimension = 16
-// CHECK:             %[[addRes:.+]] = gpu.subgroup_mma_elementwise  addf %[[compRes]], %[[tileBias]]
-// CHECK:             %[[tileCstZero:.+]] = gpu.subgroup_mma_constant_matrix %[[zeroF16]]
-// CHECK:             %[[reluRes:.+]] = gpu.subgroup_mma_elementwise  maxf %[[addRes]], %[[tileCstZero]]
-// CHECK:             gpu.subgroup_mma_store_matrix %[[reluRes]], %[[C]]{{.*}}leadDimension = 16
-// CHECK:             scf.reduce
+// CHECK:         scf.parallel {{.*}}to (%[[subgroup_size]])
+// CHECK-DAG:       %[[tileC:.+]] = gpu.subgroup_mma_load_matrix %[[C]]{{.*}}leadDimension = 16
+// CHECK-DAG:       %[[tileA:.+]] = gpu.subgroup_mma_load_matrix %[[A]]{{.*}}leadDimension = 16
+// CHECK-DAG:       %[[tileB:.+]] = gpu.subgroup_mma_load_matrix %[[B]]{{.*}}leadDimension = 16
+// CHECK:           %[[compRes:.+]] = gpu.subgroup_mma_compute %[[tileA]], %[[tileB]], %[[tileC]]
+// CHECK:           %[[tileBias:.+]] = gpu.subgroup_mma_load_matrix %[[BIAS]]{{.*}}leadDimension = 16
+// CHECK:           %[[addRes:.+]] = gpu.subgroup_mma_elementwise  addf %[[compRes]], %[[tileBias]]
+// CHECK:           %[[tileCstZero:.+]] = gpu.subgroup_mma_constant_matrix %[[zeroF16]]
+// CHECK:           %[[reluRes:.+]] = gpu.subgroup_mma_elementwise  maxf %[[addRes]], %[[tileCstZero]]
+// CHECK:           gpu.subgroup_mma_store_matrix %[[reluRes]], %[[C]]{{.*}}leadDimension = 16
 // CHECK:           scf.reduce
 // CHECK:         }
 
