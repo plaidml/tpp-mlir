@@ -96,7 +96,8 @@ struct WMMASettings {
 
 // Return true if the operation can be represented with WMMA compute.
 static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
-                                                   LinalgToGpuOptions options) {
+                                                   LinalgToGpuOptions options,
+                                                   int kTile) {
   if (!(isa<linalg::MatmulOp>(linalgOp) ||
         isa<linalg::BatchReduceMatmulOp>(linalgOp))) {
     return std::nullopt;
@@ -134,11 +135,12 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
   int wmmaTileM = 16;
   int wmmaTileN = 16;
   int wmmaTileK = 16;
-  if ((mDim % wmmaTileM == 0) && (nDim % wmmaTileN == 0) &&
-      (kDim % wmmaTileK == 0) && (options.kTile % wmmaTileK == 0))
-    return WMMASettings{wmmaTileM, wmmaTileN, wmmaTileK};
+  if ((mDim % wmmaTileM != 0) || (nDim % wmmaTileN != 0) ||
+      (kDim % wmmaTileK != 0) || (kTile % wmmaTileK != 0)) {
+    return std::nullopt;
+  }
 
-  return std::nullopt;
+  return WMMASettings{wmmaTileM, wmmaTileN, wmmaTileK};
 }
 
 // Fuse a consumer using WMMA operations.
@@ -380,7 +382,7 @@ static StoreTy fuseEltwiseConsumers(linalg::LinalgOp rootOp,
 
 // Create WMMA instructions out of matmul-like operation.
 static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
-                                  WMMASettings wmmaSettings,
+                                  WMMASettings wmmaSettings, int kTile,
                                   PatternRewriter &rewriter) {
   assert((isa<linalg::MatmulOp>(linalgOp) ||
           isa<linalg::BatchReduceMatmulOp>(linalgOp)) &&
@@ -466,28 +468,49 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
+  // Create a loop and step into it.
+  auto startLoop = [&](int lb, int ub, int step) -> scf::ForOp {
+    Value lbCst = rewriter.create<arith::ConstantIndexOp>(loc, lb);
+    Value ubCst = rewriter.create<arith::ConstantIndexOp>(loc, ub);
+    Value stepCst = rewriter.create<arith::ConstantIndexOp>(loc, step);
+    scf::ForOp loopOp =
+        rewriter.create<scf::ForOp>(loc, lbCst, ubCst, stepCst, tilesC);
+    rewriter.setInsertionPointToStart(loopOp.getBody());
+    return loopOp;
+  };
+  auto getLoopIterValues = [&](scf::ForOp loopOp) -> SmallVector<Value> {
+    SmallVector<Value> loopIterVals;
+    for (auto iterArg : loopOp.getRegionIterArgs())
+      loopIterVals.push_back(iterArg);
+    return loopIterVals;
+  };
+
+  // Construct and move into batch reduction loop.
+  // Propagate output values as iter args.
   scf::ForOp batchLoop;
   Value batchIv;
   if (isBrgemm) {
-    Value batch =
-        rewriter.create<arith::ConstantIndexOp>(loc, typeA.getShape()[0]);
-    batchLoop = rewriter.create<scf::ForOp>(loc, zero, batch, one, tilesC);
-    rewriter.setInsertionPointToStart(batchLoop.getBody());
+    batchLoop = startLoop(0, typeA.getShape()[0], 1);
     batchIv = batchLoop.getInductionVar();
-
-    SmallVector<Value> newTiles;
-    for (auto iterArgTile : batchLoop.getRegionIterArgs())
-      newTiles.push_back(iterArgTile);
-
-    tilesC = newTiles;
+    tilesC = getLoopIterValues(batchLoop);
   }
+
+  // Construct and move into GEMM reduction dimension tiling loop.
+  // Propagate output values as iter args.
+  scf::ForOp kDimLoop = startLoop(0, dimK, kTile);
+  Value kDimIv = kDimLoop.getInductionVar();
+  tilesC = getLoopIterValues(kDimLoop);
 
   // Load A sub-tiles.
   SmallVector<Value> tilesA;
   for (int m = 0; m < dimM; m += wmmaSettings.m) {
-    for (int k = 0; k < dimK; k += wmmaSettings.k) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, k);
+    for (int k = 0; k < kTile; k += wmmaSettings.k) {
+      Value rowOffset = rewriter.create<arith::ConstantIndexOp>(loc, m);
+      Value colOffset = rewriter.create<arith::ConstantIndexOp>(loc, k);
+
+      Value rowIdx = rowOffset;
+      Value colIdx = rewriter.create<arith::AddIOp>(loc, kDimIv, colOffset);
+
       Value tileA = rewriter
                         .create<gpu::SubgroupMmaLoadMatrixOp>(
                             loc, mmaTypeA, matA,
@@ -502,10 +525,14 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Load B sub-tiles.
   SmallVector<Value> tilesB;
-  for (int k = 0; k < dimK; k += wmmaSettings.k) {
+  for (int k = 0; k < kTile; k += wmmaSettings.k) {
     for (int n = 0; n < dimN; n += wmmaSettings.n) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, k);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
+      Value rowOffset = rewriter.create<arith::ConstantIndexOp>(loc, k);
+      Value colOffset = rewriter.create<arith::ConstantIndexOp>(loc, n);
+
+      Value rowIdx = rewriter.create<arith::AddIOp>(loc, kDimIv, rowOffset);
+      Value colIdx = colOffset;
+
       Value tileB = rewriter
                         .create<gpu::SubgroupMmaLoadMatrixOp>(
                             loc, mmaTypeB, matB,
@@ -519,7 +546,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   const int numTilesM = dimM / wmmaSettings.m;
   const int numTilesN = dimN / wmmaSettings.n;
-  const int numTilesK = dimK / wmmaSettings.k;
+  const int numTilesK = kTile / wmmaSettings.k;
 
   // Compute sub-tiles of the C tile.
   //
@@ -549,11 +576,21 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
+  // Create loop terminator and exit the loop.
+  auto terminateLoop = [&](scf::ForOp loopOp, SmallVector<Value> resultValues) {
+    rewriter.setInsertionPointToEnd(loopOp.getBody());
+    rewriter.create<scf::YieldOp>(loc, resultValues);
+    rewriter.setInsertionPointAfter(loopOp);
+  };
+
+  // Terminate and exit reduction dim loop.
+  terminateLoop(kDimLoop, results);
+  results = kDimLoop.getResults();
+
+  // Terminate and exit batch reduce loop.
   if (isBrgemm) {
-    rewriter.setInsertionPointToEnd(batchLoop.getBody());
-    rewriter.create<scf::YieldOp>(loc, results);
+    terminateLoop(batchLoop, results);
     results = batchLoop.getResults();
-    rewriter.setInsertionPointAfter(batchLoop);
   }
 
   // Write back the final C sub-tiles results to the output buffer.
@@ -707,9 +744,14 @@ struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
           gemmLikeOp, "Expect static shape when mapping to GPU");
     }
 
+    auto aType =
+        gemmLikeOp.getDpsInputs()[0].getType().template cast<ShapedType>();
+    auto kDim = aType.getShape().back();
+    auto kTile = kDim < options.kTile ? kDim : options.kTile;
+
     if (options.useWmma && isMMASupported(options)) {
-      if (auto settings = getWMMASettings(gemmLikeOp, options))
-        return gemmToGpuMMA(gemmLikeOp, *settings, rewriter);
+      if (auto settings = getWMMASettings(gemmLikeOp, options, kTile))
+        return gemmToGpuMMA(gemmLikeOp, *settings, kTile, rewriter);
     }
     return gemmToGpuLoops(gemmLikeOp, rewriter);
   }
