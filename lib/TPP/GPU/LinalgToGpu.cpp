@@ -71,6 +71,7 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
   return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
 }
 
+// Parse and return GPU computate capability.
 static int getComputeCapability(llvm::StringRef chip) {
   llvm::StringRef delim = "_";
   llvm::StringRef ccToken =
@@ -85,6 +86,8 @@ static bool isMMASupported(llvm::StringRef triple, llvm::StringRef chip) {
          (getComputeCapability(chip) >= 70);
 }
 
+// Helper struct containing hardware WMMA settings
+// such as tile sizes.
 struct WMMASettings {
   int m;
   int n;
@@ -93,8 +96,8 @@ struct WMMASettings {
 
 // Return true if the operation can be represented with WMMA compute.
 static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
-  if (!(isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
-        isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp))) {
+  if (!(isa<linalg::MatmulOp>(linalgOp) ||
+        isa<linalg::BatchReduceMatmulOp>(linalgOp))) {
     return std::nullopt;
   }
 
@@ -121,6 +124,9 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
   auto nDim = cType.getShape()[1];
   auto kDim = aType.getShape().back();
 
+  // Choose WMMA tile sizes.
+  // The computation dimensions must fit into the tiles.
+  //
   // TODO: Add more possible tile sizes and choose optimal one.
   int wmmaTileM = 16;
   int wmmaTileN = 16;
@@ -135,9 +141,9 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
 // Fuse a consumer using WMMA operations.
 // Returns updated store op or nullopt if the fusion fails.
 static std::optional<SmallVector<gpu::SubgroupMmaStoreMatrixOp>>
-mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-          SmallVector<gpu::SubgroupMmaStoreMatrixOp> rootStoreOps,
-          PatternRewriter &rewriter) {
+eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
+              SmallVector<gpu::SubgroupMmaStoreMatrixOp> rootStoreOps,
+              PatternRewriter &rewriter) {
   assert(rootStoreOps.size() > 0 && "Requires at least one store op");
 
   Location loc = rootOp.getLoc();
@@ -156,10 +162,14 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(rootStoreOps[0]);
 
+  // It is assumed that WMMA tile sizes do not vary between different
+  // operations i.e., the original workload has been split into
+  // a series of operations using the same WMMA configuration.
   gpu::MMAMatrixType mmaOutputType = rootStoreOps[0].getSrc().getType();
   auto leadingDim = rootStoreOps[0].getLeadDimension();
 
-  SmallVector<Value> mergedRes;
+  // Collect new results after fusion.
+  SmallVector<Value> fusedRes;
 
   SmallVector<Value> operands;
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
@@ -187,7 +197,7 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
                   loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), loadOp},
                   eltwiseAttr)
               .getRes();
-      mergedRes.push_back(addRes);
+      fusedRes.push_back(addRes);
     }
   } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
@@ -204,7 +214,7 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
                   loc, mmaOutputType,
                   ValueRange{rootStoreOp.getSrc(), zeroTile}, eltwiseAttr)
               .getRes();
-      mergedRes.push_back(maxRes);
+      fusedRes.push_back(maxRes);
     }
   } else {
     // Not a fusable operation. Bail out.
@@ -213,7 +223,7 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
 
   // Fusion must have failed, if number of new results is different.
   // Bail out.
-  if (mergedRes.size() != rootStoreOps.size())
+  if (fusedRes.size() != rootStoreOps.size())
     return std::nullopt;
 
   // Store the new result.
@@ -222,12 +232,13 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
     auto storeIndices = rootStoreOps[i].getIndices();
 
     auto newStore = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
-        loc, mergedRes[i], rootStoreOps[i].getDstMemref(), storeIndices,
+        loc, fusedRes[i], rootStoreOps[i].getDstMemref(), storeIndices,
         leadingDim,
         /*transpose=*/UnitAttr());
     newStores.push_back(newStore);
   }
 
+  // Replace store ops and cleanup standalone consumer.
   for (size_t i = 0; i < rootStoreOps.size(); i++)
     rewriter.replaceOp(rootStoreOps[i], newStores[i]);
 
@@ -237,15 +248,19 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
 }
 
 // Fuse a consumer using scalar operations.
+// TODO: Extend scalar fusion to support multiple stores.
+//
 // Returns updated store op or nullopt if the fusion fails.
-static std::optional<memref::StoreOp> scalarFusion(linalg::LinalgOp rootOp,
-                                                   linalg::LinalgOp consumer,
-                                                   memref::StoreOp rootStoreOp,
-                                                   PatternRewriter &rewriter) {
+static std::optional<memref::StoreOp> eltwiseFusion(linalg::LinalgOp rootOp,
+                                                    linalg::LinalgOp consumer,
+                                                    memref::StoreOp rootStoreOp,
+                                                    PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
   auto rootOutput = rootOp.getDpsInits()[0];
   auto outputType = rootOutput.getType().cast<ShapedType>();
+
   // Must be a floating point type.
+  // TODO: Add integer support.
   auto floatType = dyn_cast<FloatType>(outputType.getElementType());
   if (!floatType)
     return std::nullopt;
@@ -293,7 +308,7 @@ static std::optional<memref::StoreOp> scalarFusion(linalg::LinalgOp rootOp,
 
 // Find operations fusable with the given root op.
 //
-// A naive fusion strategy that looks at the other operations after the root
+// A simple fusion strategy that looks at the other operations after the root
 // linalg op and tries to fuse them.
 static SmallVector<linalg::LinalgOp>
 getFusableConsumers(linalg::LinalgOp rootOp) {
@@ -330,53 +345,25 @@ getFusableConsumers(linalg::LinalgOp rootOp) {
   return consumers;
 }
 
-// Fuse elementwise consumers within a scalar GPU kernel.
+// Fuse elementwise consumers within a GPU kernel.
 //
 // Fusion bails on the first mismatch.
-// Returns updated store op.
-static SmallVector<memref::StoreOp>
-fuseEltwiseConsumersScalar(linalg::LinalgOp rootOp,
-                           SmallVector<memref::StoreOp> rootStoreOps,
-                           PatternRewriter &rewriter) {
-  assert(rootStoreOps.size() > 0 && "Requires at least one store op");
-  // TODO: Extend scalar fusion.
-  assert(rootStoreOps.size() == 1 && "Multi store scalar fusion not supported");
+// Returns updated store ops.
+template <typename StoreTy>
+static StoreTy fuseEltwiseConsumers(linalg::LinalgOp rootOp,
+                                    StoreTy rootStoreOps,
+                                    PatternRewriter &rewriter) {
+  // Constrain conversion to the supported fusion types.
+  static_assert(
+      llvm::is_one_of<StoreTy, memref::StoreOp,
+                      SmallVector<gpu::SubgroupMmaStoreMatrixOp>>::value);
 
   auto consumers = getFusableConsumers(rootOp);
 
   for (auto op : consumers) {
-    // std::optional<SmallVector<Operation *>> updatedStoreOps = std::nullopt;
-    std::optional<memref::StoreOp> updatedStoreOp = std::nullopt;
+    std::optional<StoreTy> updatedStoreOps = std::nullopt;
 
-    updatedStoreOp = scalarFusion(rootOp, op, rootStoreOps[0], rewriter);
-
-    // Failed to fuse operation. Bail out.
-    if (!updatedStoreOp)
-      break;
-
-    rootStoreOps[0] = *updatedStoreOp;
-  }
-
-  return rootStoreOps;
-}
-
-// Fuse elementwise consumers within an MMA GPU kernel.
-//
-// Fusion bails on the first mismatch.
-// Returns updated store op.
-static SmallVector<gpu::SubgroupMmaStoreMatrixOp>
-fuseEltwiseConsumersMMA(linalg::LinalgOp rootOp,
-                        SmallVector<gpu::SubgroupMmaStoreMatrixOp> rootStoreOps,
-                        WMMASettings wmmaSettings, PatternRewriter &rewriter) {
-  assert(rootStoreOps.size() > 0 && "Requires at least one store op");
-
-  auto consumers = getFusableConsumers(rootOp);
-
-  for (auto op : consumers) {
-    std::optional<SmallVector<gpu::SubgroupMmaStoreMatrixOp>> updatedStoreOps =
-        std::nullopt;
-
-    updatedStoreOps = mmaFusion(rootOp, op, rootStoreOps, rewriter);
+    updatedStoreOps = eltwiseFusion(rootOp, op, rootStoreOps, rewriter);
 
     // Failed to fuse operation. Bail out.
     if (!updatedStoreOps)
@@ -392,8 +379,8 @@ fuseEltwiseConsumersMMA(linalg::LinalgOp rootOp,
 static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
                                   WMMASettings wmmaSettings,
                                   PatternRewriter &rewriter) {
-  assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
-          isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
+  assert((isa<linalg::MatmulOp>(linalgOp) ||
+          isa<linalg::BatchReduceMatmulOp>(linalgOp)) &&
          "Requires a matmul like op for MMA lowering");
 
   Location loc = linalgOp.getLoc();
@@ -492,6 +479,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     tilesC = newTiles;
   }
 
+  // Load A sub-tiles.
   SmallVector<Value> tilesA;
   for (int m = 0; m < dimM; m += wmmaSettings.m) {
     for (int k = 0; k < dimK; k += wmmaSettings.k) {
@@ -509,6 +497,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
+  // Load B sub-tiles.
   SmallVector<Value> tilesB;
   for (int k = 0; k < dimK; k += wmmaSettings.k) {
     for (int n = 0; n < dimN; n += wmmaSettings.n) {
@@ -529,6 +518,13 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   const int numTilesN = dimN / wmmaSettings.n;
   const int numTilesK = dimK / wmmaSettings.k;
 
+  // Compute sub-tiles of the C tile.
+  //
+  // Iterate over the reduction dimension sub-tiles as the outermost
+  // loop to minimize read after write conflicts between partial
+  // computations of the same C sub-tile.
+  //
+  // Initialize sub-tiles with the loaded C tiles.
   SmallVector<Value> results = tilesC;
   for (int k = 0; k < numTilesK; k++) {
     for (int m = 0; m < numTilesM; m++) {
@@ -544,6 +540,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
                                /*a_transpose=*/UnitAttr(),
                                /*b_transpose=*/UnitAttr())
                            .getRes();
+        // Update sub-tile partial result.
         results[cIdx] = result;
       }
     }
@@ -556,7 +553,7 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     rewriter.setInsertionPointAfter(batchLoop);
   }
 
-  // Write back the total sum to the output buffer.
+  // Write back the final C sub-tiles results to the output buffer.
   SmallVector<gpu::SubgroupMmaStoreMatrixOp> storeOps;
   for (int m = 0; m < numTilesM; m++) {
     for (int n = 0; n < numTilesN; n++) {
@@ -573,7 +570,8 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
-  (void)fuseEltwiseConsumersMMA(linalgOp, storeOps, wmmaSettings, rewriter);
+  (void)fuseEltwiseConsumers<SmallVector<gpu::SubgroupMmaStoreMatrixOp>>(
+      linalgOp, storeOps, rewriter);
 
   rewriter.eraseOp(linalgOp);
 
@@ -583,8 +581,8 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 // Create loops out of matmul-like operation.
 static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
                                     PatternRewriter &rewriter) {
-  assert((isa_and_nonnull<linalg::MatmulOp>(linalgOp) ||
-          isa_and_nonnull<linalg::BatchReduceMatmulOp>(linalgOp)) &&
+  assert((isa<linalg::MatmulOp>(linalgOp) ||
+          isa<linalg::BatchReduceMatmulOp>(linalgOp)) &&
          "Requires a matmul like op for loop lowering");
 
   Location loc = linalgOp.getLoc();
@@ -677,8 +675,7 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   auto storeOp =
       rewriter.create<memref::StoreOp>(loc, result, matC, parallelIvs);
 
-  (void)fuseEltwiseConsumersScalar(
-      linalgOp, SmallVector<memref::StoreOp>{storeOp}, rewriter);
+  (void)fuseEltwiseConsumers<memref::StoreOp>(linalgOp, storeOp, rewriter);
 
   rewriter.eraseOp(linalgOp);
 
