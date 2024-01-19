@@ -81,9 +81,9 @@ static int getComputeCapability(llvm::StringRef chip) {
 }
 
 // Return true if hardware supports WMMA operations.
-static bool isMMASupported(llvm::StringRef triple, llvm::StringRef chip) {
-  return (triple == "nvptx64-nvidia-cuda") &&
-         (getComputeCapability(chip) >= 70);
+static bool isMMASupported(LinalgToGpuOptions options) {
+  return (options.gpuTriple == "nvptx64-nvidia-cuda") &&
+         (getComputeCapability(options.gpuChip) >= 70);
 }
 
 // Helper struct containing hardware WMMA settings
@@ -95,7 +95,8 @@ struct WMMASettings {
 };
 
 // Return true if the operation can be represented with WMMA compute.
-static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
+static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
+                                                   LinalgToGpuOptions options) {
   if (!(isa<linalg::MatmulOp>(linalgOp) ||
         isa<linalg::BatchReduceMatmulOp>(linalgOp))) {
     return std::nullopt;
@@ -126,13 +127,15 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp) {
 
   // Choose WMMA tile sizes.
   // The computation dimensions must fit into the tiles.
+  // Reduction dimension tile size has to be compatible
+  // with the hardware sizes.
   //
   // TODO: Add more possible tile sizes and choose optimal one.
   int wmmaTileM = 16;
   int wmmaTileN = 16;
   int wmmaTileK = 16;
   if ((mDim % wmmaTileM == 0) && (nDim % wmmaTileN == 0) &&
-      (kDim % wmmaTileK == 0))
+      (kDim % wmmaTileK == 0) && (options.kTile % wmmaTileK == 0))
     return WMMASettings{wmmaTileM, wmmaTileN, wmmaTileK};
 
   return std::nullopt;
@@ -704,8 +707,8 @@ struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
           gemmLikeOp, "Expect static shape when mapping to GPU");
     }
 
-    if (options.useWmma && isMMASupported(options.gpuTriple, options.gpuChip)) {
-      if (auto settings = getWMMASettings(gemmLikeOp))
+    if (options.useWmma && isMMASupported(options)) {
+      if (auto settings = getWMMASettings(gemmLikeOp, options))
         return gemmToGpuMMA(gemmLikeOp, *settings, rewriter);
     }
     return gemmToGpuLoops(gemmLikeOp, rewriter);
