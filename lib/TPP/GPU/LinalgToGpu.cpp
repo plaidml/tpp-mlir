@@ -193,13 +193,10 @@ mmaFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
     Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
         loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
 
+    Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
+        loc, mmaOutputType, zeroFloat);
     for (auto rootStoreOp : rootStoreOps) {
-      gpu::MMAMatrixType mmaOutputType = rootStoreOp.getSrc().getType();
-      auto leadingDim = rootStoreOp.getLeadDimension();
-
       // Fuse the relu into the matmul body.
-      Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
-          loc, mmaOutputType, zeroFloat);
       auto eltwiseAttr = gpu::MMAElementwiseOp::MAXF;
       auto maxRes =
           rewriter
