@@ -153,6 +153,35 @@ func.func @batch_reduce_matmul_2D_tiled(%arg0: memref<64x32x32xf16>,
 
 // -----
 
+func.func @batch_reduce_matmul_K_dim_tiled(%arg0: memref<32x16x64xf16>,
+                       %arg1: memref<32x64x16xf16>,
+                       %arg2: memref<16x16xf16>) {
+  linalg.batch_reduce_matmul  ins(%arg0, %arg1 : memref<32x16x64xf16>, memref<32x64x16xf16>)
+                              outs(%arg2 : memref<16x16xf16>)
+  return
+}
+
+// CHECK-LABEL: func.func @batch_reduce_matmul_K_dim_tiled(
+// CHECK-SAME:  %[[A:.+]]: memref<32x16x64xf16>, %[[B:.+]]: memref<32x64x16xf16>, %[[C:.+]]: memref<16x16xf16>
+// CHECK-DAG:     %[[c0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[c1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[c16:.+]] = arith.constant 16 : index
+// CHECK-DAG:     %[[c32:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[c64:.+]] = arith.constant 64 : index
+// CHECK-COUNT-1: %[[cTile:.+]] = gpu.subgroup_mma_load_matrix %[[C]]
+// CHECK:         %[[batchLoopRes:.+]] = scf.for %[[iv:.+]] = %[[c0]] to %[[c32]] step %[[c1]] iter_args(%[[acc_batch:.+]] = %[[cTile]])
+// CHECK:           %[[kLoopRes:.+]] = scf.for %[[iv:.+]] = %[[zero]] to %[[kUB]] step %[[kStep]] iter_args(%[[acc_k_dim:.+]] = %[[acc_batch]])
+// CHECK-COUNT-2:     gpu.subgroup_mma_load_matrix %[[A]]
+// CHECK-COUNT-2:     gpu.subgroup_mma_load_matrix %[[B]]
+// CHECK:             gpu.subgroup_mma_compute
+// CHECK:             %[[res:.+]] = gpu.subgroup_mma_compute
+// CHECK:             scf.yield %[[res]]
+// CHECK:           scf.yield %[[kLoopRes]]
+// CHECK:         }
+// CHECK:         gpu.subgroup_mma_store_matrix %[[batchLoopRes]], %[[C]]
+
+// -----
+
 func.func @matmul_strided_memrefs(%arg0: memref<16x32x16xf16>, %arg1: memref<16x64x16xf16>, %arg2: memref<32x32xf16>) {
   %subview = memref.subview %arg0[0, 0, 0] [16, 1, 16] [1, 1, 1]
     : memref<16x32x16xf16> to memref<16x16xf16, strided<[512, 1], offset: 0>>
