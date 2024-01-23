@@ -509,26 +509,4 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
-def GpuMapWMMA : Pass<"gpu-map-wmma", "ModuleOp"> {
-  let summary = "Map GPU WMMA operations to hardware dimensions.";
-  let description = [{
-    Map GPU WMMA operation to sizes compatible with the target GPU.
-  }];
-  let dependentDialects = ["func::FuncDialect",
-                           "memref::MemRefDialect",
-                           "gpu::GPUDialect",
-                           "arith::ArithDialect"];
-  let options = [
-    Option<"gpuTriple", "triple", "std::string",
-            /*default=*/"\"nvptx64-nvidia-cuda\"",
-           "GPU target triple.">,
-    Option<"gpuChip", "chip", "std::string",
-            /*default=*/"\"sm_70\"",
-           "GPU target architecture.">,
-    Option<"gpuFeatures", "features", "std::string",
-            /*default=*/"\"+ptx60\"",
-           "GPU target features.">,
-  ];
-}
-
 #endif // TPP_DIALECT_TPP_PASSES
