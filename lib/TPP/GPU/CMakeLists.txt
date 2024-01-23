@@ -11,6 +11,7 @@ add_mlir_library(TPPGPU
   GpuDataTransfer.cpp
   GpuInlineConstants.cpp
   LinalgToXegpu.cpp
+  GPUToXeGPU.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
