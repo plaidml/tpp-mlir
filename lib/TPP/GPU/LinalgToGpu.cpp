@@ -116,10 +116,10 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
   auto elemTypeC = cType.getElementType();
 
   // TODO: Add more WMMA combinations.
-  bool isSupprtedPrecision =
+  bool isSupportedPrecision =
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
-  if (!isSupprtedPrecision)
+  if (!isSupportedPrecision)
     return std::nullopt;
 
   auto mDim = cType.getShape()[0];
