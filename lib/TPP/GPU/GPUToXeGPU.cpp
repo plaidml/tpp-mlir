@@ -57,7 +57,7 @@ struct ConvertWMMALoadToXeGPULoad
     }
 
     // Tensor descriptor.
-    gpu::MMAMatrixType mmaType = cast<gpu::MMAMatrixType>(loadOp.getType());
+    auto mmaType = cast<gpu::MMAMatrixType>(loadOp.getType());
     auto tensorDesc = xegpu::TensorDescType::get(mmaType.getShape(),
                                                  mmaType.getElementType());
 
@@ -66,7 +66,7 @@ struct ConvertWMMALoadToXeGPULoad
 
     mlir::SmallVector<mlir::OpFoldResult> loadOffsets{loadOp.getIndices()};
     auto ndTDescOp = rewriter.create<xegpu::CreateNdDescOp>(
-        loc, tensorDesc, srcMemref, /*offsets=*/loadOffsets,
+        loc, tensorDesc, srcMemref, loadOffsets,
         /*boundary_check=*/true, xegpuMode);
 
     // Apply VNNI to the input operands (A and B).
@@ -131,7 +131,11 @@ struct ConvertWMMAComputeToXeGPUDpas
     auto dpasResType =
         VectorType::get(outType.getShape(), FloatType::getF32(ctx));
 
+    // DPAS accumulator matrix.
     Value acc = matC;
+
+    // DPAS only works with F32 accumulators.
+    // Extend the accumulation values if needed.
     auto elmTypeC = matC.getType().getElementType();
     if (elmTypeC.isF16()) {
       auto extOp = rewriter.create<arith::ExtFOp>(loc, dpasResType, matC);
@@ -142,6 +146,7 @@ struct ConvertWMMAComputeToXeGPUDpas
                                                  acc, xegpuMode);
     Value newRes = dpasOp.getResult();
 
+    // Truncate the result values if needed.
     if (outElmType.isF16()) {
       auto truncType =
           VectorType::get(outType.getShape(), FloatType::getF16(ctx));
