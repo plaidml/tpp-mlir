@@ -45,7 +45,8 @@ struct ConvertWMMALoadToXeGPULoad
 
     auto isTranspose = loadOp.getTranspose();
     if (isTranspose && *isTranspose)
-      return rewriter.notifyMatchFailure(loadOp, "Transpose not supported");
+      return rewriter.notifyMatchFailure(loadOp,
+                                         "Transpose load is not supported");
 
     auto leadDim = loadOp.getLeadDimension();
     auto srcMemref = loadOp.getSrcMemref();
@@ -160,9 +161,60 @@ struct ConvertWMMAComputeToXeGPUDpas
   }
 };
 
+// Convert MMA store to XeGPU store.
+struct ConvertWMMAStoreToXeGPUStore
+    : public OpRewritePattern<gpu::SubgroupMmaStoreMatrixOp> {
+  using OpRewritePattern<gpu::SubgroupMmaStoreMatrixOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(gpu::SubgroupMmaStoreMatrixOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto loc = storeOp.getLoc();
+    auto *ctx = rewriter.getContext();
+
+    auto isTranspose = storeOp.getTranspose();
+    if (isTranspose && *isTranspose)
+      return rewriter.notifyMatchFailure(storeOp,
+                                         "Transpose store is not supported");
+
+    auto leadDim = storeOp.getLeadDimension();
+    auto dstMemref = storeOp.getDstMemref();
+    MemRefType memrefType = dstMemref.getType();
+
+    if (leadDim != memrefType.getShape().back()) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "Expected lead dim to be equal to full memref dimension");
+    }
+
+    // Tensor descriptor.
+    auto srcValue = storeOp.getSrc();
+    auto mmaType = cast<gpu::MMAMatrixType>(srcValue.getType());
+    auto tensorDesc = xegpu::TensorDescType::get(mmaType.getShape(),
+                                                 mmaType.getElementType());
+
+    // Instruction mode.
+    auto xegpuMode = xegpu::Mode::VC;
+
+    mlir::SmallVector<mlir::OpFoldResult> storeOffsets{storeOp.getIndices()};
+    auto ndTDescOp = rewriter.create<xegpu::CreateNdDescOp>(
+        loc, tensorDesc, dstMemref, storeOffsets,
+        /*boundary_check=*/true, xegpuMode);
+
+    // Fully write-back the values.
+    auto cacheHint =
+        xegpu::CacheWriteHintAttr::get(ctx, xegpu::CacheWriteHint::WRITE_BACK);
+
+    rewriter.replaceOpWithNewOp<xegpu::StoreNDOp>(
+        storeOp, ndTDescOp.getResult(), srcValue,
+        /*l1_hint=*/cacheHint,
+        /*l2_hint=*/cacheHint, /*l3_hint=*/cacheHint, ndTDescOp.getModeAttr());
+
+    return success();
+  }
+};
+
 void populateGPUToXeGPUPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertWMMALoadToXeGPULoad, ConvertWMMAComputeToXeGPUDpas>(
-      patterns.getContext());
+  patterns.add<ConvertWMMALoadToXeGPULoad, ConvertWMMAComputeToXeGPUDpas,
+               ConvertWMMAStoreToXeGPUStore>(patterns.getContext());
 }
 
 struct GPUToXeGPU : public tpp::impl::GPUToXeGPUBase<GPUToXeGPU> {
