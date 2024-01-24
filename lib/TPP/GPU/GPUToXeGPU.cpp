@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -261,10 +262,32 @@ struct ConvertWMMAEltwiseToXeGPUEltwise
   }
 };
 
+// Convert MMA constant to XeGPU constant.
+struct ConvertWMMAConstantToXeGPUConstant
+    : public OpRewritePattern<gpu::SubgroupMmaConstantMatrixOp> {
+  using OpRewritePattern<gpu::SubgroupMmaConstantMatrixOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(gpu::SubgroupMmaConstantMatrixOp constOp,
+                                PatternRewriter &rewriter) const override {
+    auto loc = constOp.getLoc();
+    auto *ctx = rewriter.getContext();
+
+    // Broadcast constant value directly into registers.
+    auto outType = cast<gpu::MMAMatrixType>(constOp.getRes().getType());
+    auto resType =
+        VectorType::get(outType.getShape(), outType.getElementType());
+
+    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(constOp, resType,
+                                                     constOp.getValue());
+
+    return success();
+  }
+};
+
 void populateGPUToXeGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertWMMALoadToXeGPULoad, ConvertWMMAComputeToXeGPUDpas,
-               ConvertWMMAStoreToXeGPUStore, ConvertWMMAEltwiseToXeGPUEltwise>(
-      patterns.getContext());
+               ConvertWMMAStoreToXeGPUStore, ConvertWMMAEltwiseToXeGPUEltwise,
+               ConvertWMMAConstantToXeGPUConstant>(patterns.getContext());
 }
 
 struct GPUToXeGPU : public tpp::impl::GPUToXeGPUBase<GPUToXeGPU> {

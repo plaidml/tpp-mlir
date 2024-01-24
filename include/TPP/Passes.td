@@ -532,7 +532,8 @@ def GPUToXeGPU : Pass<"gpu-to-xegpu", "ModuleOp"> {
   let dependentDialects = ["gpu::GPUDialect",
                            "imex::xegpu::XeGPUDialect",
                            "memref::MemRefDialect",
-                           "arith::ArithDialect"];
+                           "arith::ArithDialect",
+                           "vector::VectorDialect"];
 }
 
 def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "func::FuncOp"> {
