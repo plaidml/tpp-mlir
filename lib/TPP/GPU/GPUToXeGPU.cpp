@@ -40,6 +40,70 @@ struct ConvertWMMALoadToXeGPULoad
 
   LogicalResult matchAndRewrite(gpu::SubgroupMmaLoadMatrixOp loadOp,
                                 PatternRewriter &rewriter) const override {
+    auto loc = loadOp.getLoc();
+    auto *ctx = rewriter.getContext();
+
+    auto isTranspose = loadOp.getTranspose();
+    if (isTranspose && *isTranspose)
+      return rewriter.notifyMatchFailure(loadOp, "Transpose not supported");
+
+    auto leadDim = loadOp.getLeadDimension();
+    auto srcMemref = loadOp.getSrcMemref();
+    MemRefType memrefType = srcMemref.getType();
+
+    if (leadDim != memrefType.getShape().back()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "Expected lead dim to be equal to full memref dimension");
+    }
+
+    // Tensor descriptor.
+    gpu::MMAMatrixType mmaType = cast<gpu::MMAMatrixType>(loadOp.getType());
+    auto tensorDesc = xegpu::TensorDescType::get(mmaType.getShape(),
+                                                 mmaType.getElementType());
+
+    // Instruction mode.
+    auto xegpuMode = xegpu::Mode::VC;
+
+    mlir::SmallVector<mlir::OpFoldResult> loadOffsets{loadOp.getIndices()};
+    auto ndTDescOp = rewriter.create<xegpu::CreateNdDescOp>(
+        loc, tensorDesc, srcMemref, /*offsets=*/loadOffsets,
+        /*boundary_check=*/true, xegpuMode);
+
+    // Apply VNNI to the input operands (A and B).
+    StringLiteral mmaOperandA("AOp");
+    StringLiteral mmaOperandB("BOp");
+    StringLiteral mmaOperandC("COp");
+    auto mmaOperand = mmaType.getOperand();
+    auto vnniAxis =
+        llvm::StringSwitch<IntegerAttr>(mmaOperand)
+            .Case(mmaOperandA, IntegerAttr::get(rewriter.getI32Type(), 1))
+            .Case(mmaOperandB, IntegerAttr::get(rewriter.getI32Type(), 0))
+            .Default(nullptr);
+
+    SmallVector<int64_t> tensorShape{tensorDesc.getShape()};
+    auto resType = VectorType::get(tensorShape, tensorDesc.getElementType());
+    if (vnniAxis) {
+      const int vnniFactor = 2;
+      tensorShape[vnniAxis.getInt()] /= vnniFactor;
+      tensorShape.push_back(vnniFactor);
+      resType = VectorType::get(tensorShape, tensorDesc.getElementType());
+    }
+
+    // TODO: Handle transposition.
+    DenseI64ArrayAttr transpose = nullptr;
+
+    // Fully cache the input operands (A and B).
+    // Ignore the hint for the output (C).
+    xegpu::CacheReadHintAttr cacheHint =
+        mmaOperand == mmaOperandC
+            ? nullptr
+            : xegpu::CacheReadHintAttr::get(ctx, xegpu::CacheReadHint::CACHED);
+
+    rewriter.replaceOpWithNewOp<xegpu::LoadNDOp>(
+        loadOp, resType, ndTDescOp.getResult(), vnniAxis, transpose,
+        /*l1_hint=*/cacheHint,
+        /*l2_hint=*/cacheHint, /*l3_hint=*/cacheHint, ndTDescOp.getModeAttr());
+
     return success();
   }
 };
