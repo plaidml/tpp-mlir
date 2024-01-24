@@ -108,8 +108,56 @@ struct ConvertWMMALoadToXeGPULoad
   }
 };
 
+// Convert MMA compute to XeGPU dpas.
+struct ConvertWMMAComputeToXeGPUDpas
+    : public OpRewritePattern<gpu::SubgroupMmaComputeOp> {
+  using OpRewritePattern<gpu::SubgroupMmaComputeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(gpu::SubgroupMmaComputeOp computeOp,
+                                PatternRewriter &rewriter) const override {
+    auto loc = computeOp.getLoc();
+    auto *ctx = rewriter.getContext();
+
+    // Instruction mode.
+    auto xegpuMode = xegpu::Mode::VC;
+
+    auto matA = computeOp.getOpA();
+    auto matB = computeOp.getOpB();
+    auto matC = computeOp.getOpC();
+
+    auto outType = cast<gpu::MMAMatrixType>(computeOp.getRes().getType());
+    auto outElmType = outType.getElementType();
+
+    auto dpasResType =
+        VectorType::get(outType.getShape(), FloatType::getF32(ctx));
+
+    Value acc = matC;
+    auto elmTypeC = matC.getType().getElementType();
+    if (elmTypeC.isF16()) {
+      auto extOp = rewriter.create<arith::ExtFOp>(loc, dpasResType, matC);
+      acc = extOp.getOut();
+    }
+
+    auto dpasOp = rewriter.create<xegpu::DpasOp>(loc, dpasResType, matA, matB,
+                                                 acc, xegpuMode);
+    Value newRes = dpasOp.getResult();
+
+    if (outElmType.isF16()) {
+      auto truncType =
+          VectorType::get(outType.getShape(), FloatType::getF16(ctx));
+      auto truncOp = rewriter.create<arith::TruncFOp>(loc, truncType, newRes);
+      newRes = truncOp.getOut();
+    }
+
+    rewriter.replaceOp(computeOp, newRes);
+
+    return success();
+  }
+};
+
 void populateGPUToXeGPUPatterns(RewritePatternSet &patterns) {
-  patterns.add<ConvertWMMALoadToXeGPULoad>(patterns.getContext());
+  patterns.add<ConvertWMMALoadToXeGPULoad, ConvertWMMAComputeToXeGPUDpas>(
+      patterns.getContext());
 }
 
 struct GPUToXeGPU : public tpp::impl::GPUToXeGPUBase<GPUToXeGPU> {
