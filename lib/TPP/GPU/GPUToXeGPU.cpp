@@ -212,9 +212,59 @@ struct ConvertWMMAStoreToXeGPUStore
   }
 };
 
+// Convert MMA eltwise to XeGPU eltwise.
+// XeGPU load and dpas places data in registers which can be used
+// directly with standard SIMD instructions i.e., arith ops.
+struct ConvertWMMAEltwiseToXeGPUEltwise
+    : public OpRewritePattern<gpu::SubgroupMmaElementwiseOp> {
+  using OpRewritePattern<gpu::SubgroupMmaElementwiseOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(gpu::SubgroupMmaElementwiseOp eltwiseOp,
+                                PatternRewriter &rewriter) const override {
+    // Number of args is variadic so, constrain it to known cases.
+    auto args = eltwiseOp.getArgs();
+    if (args.size() > 2) {
+      return rewriter.notifyMatchFailure(
+          eltwiseOp, "Expected maximum of two eltwise arguments");
+    }
+
+    // Result will be stored directly in registers i.e., a vector type.
+    auto outType = cast<gpu::MMAMatrixType>(eltwiseOp.getRes().getType());
+    auto resType =
+        VectorType::get(outType.getShape(), outType.getElementType());
+
+    // Map eltwise operations into standard arith ops on vectors.
+    auto eltwiseType = eltwiseOp.getOpType();
+    switch (eltwiseType) {
+    case gpu::MMAElementwiseOp::ADDF: {
+      rewriter.replaceOpWithNewOp<arith::AddFOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::MULF: {
+      rewriter.replaceOpWithNewOp<arith::MulFOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::MAXF: {
+      rewriter.replaceOpWithNewOp<arith::MaximumFOp>(eltwiseOp, resType,
+                                                     args[0], args[1]);
+      break;
+    }
+    default: {
+      return rewriter.notifyMatchFailure(eltwiseOp,
+                                         "Unsupported eltwise operation");
+    }
+    }
+
+    return success();
+  }
+};
+
 void populateGPUToXeGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ConvertWMMALoadToXeGPULoad, ConvertWMMAComputeToXeGPUDpas,
-               ConvertWMMAStoreToXeGPUStore>(patterns.getContext());
+               ConvertWMMAStoreToXeGPUStore, ConvertWMMAEltwiseToXeGPUEltwise>(
+      patterns.getContext());
 }
 
 struct GPUToXeGPU : public tpp::impl::GPUToXeGPUBase<GPUToXeGPU> {
