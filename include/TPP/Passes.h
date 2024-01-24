@@ -11,6 +11,12 @@
 
 #include "mlir/Pass/Pass.h"
 
+namespace imex {
+namespace xegpu {
+class XeGPUDialect;
+} // namespace xegpu
+} // namespace imex
+
 namespace mlir {
 class ModuleOp;
 

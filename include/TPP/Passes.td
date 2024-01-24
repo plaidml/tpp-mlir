@@ -524,12 +524,13 @@ def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
-def GPUToXeGPU : Pass<"gpu-to-xegpu", "gpu::GPUModuleOp"> {
+def GPUToXeGPU : Pass<"gpu-to-xegpu", "ModuleOp"> {
   let summary = "Convert GPU dialect to XeGPU dialect.";
   let description = [{
     Lower GPU ops to XeGPU dialect.
   }];
   let dependentDialects = ["gpu::GPUDialect",
+                           "imex::xegpu::XeGPUDialect",
                            "memref::MemRefDialect",
                            "arith::ArithDialect"];
 }
