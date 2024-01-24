@@ -33,7 +33,7 @@ namespace tpp {
 
 namespace {
 
-// Convert linalg.batch_reduce_matmul to XeGPU kernel.
+// Convert MMA load to XeGPU load.
 struct ConvertWMMALoadToXeGPULoad
     : public OpRewritePattern<gpu::SubgroupMmaLoadMatrixOp> {
   using OpRewritePattern<gpu::SubgroupMmaLoadMatrixOp>::OpRewritePattern;
