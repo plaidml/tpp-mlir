@@ -336,7 +336,8 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
-           "Use WMMA operations">
+           "Use WMMA operations">,
+    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
   ];
 }
 
@@ -347,7 +348,7 @@ def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
             /*default=*/"\"nvptx64-nvidia-cuda\"",
            "GPU target triple.">,
     Option<"gpuChip", "chip", "std::string",
-            /*default=*/"\"sm_35\"",
+            /*default=*/"\"sm_70\"",
            "GPU target architecture.">,
     Option<"gpuFeatures", "features", "std::string",
             /*default=*/"\"+ptx60\"",
@@ -458,7 +459,11 @@ def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
-           "Use WMMA operations">
+           "Use WMMA operations">,
+    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
   ];
 }
 

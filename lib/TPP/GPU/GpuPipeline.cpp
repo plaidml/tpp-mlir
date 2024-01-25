@@ -46,6 +46,11 @@ llvm::cl::opt<bool> gpuWmma("gpu-wmma",
                             llvm::cl::desc("Enable GPU WMMA support"),
                             llvm::cl::init(false));
 
+llvm::cl::list<int64_t> wmmaTileSizes(
+    "wmma-tile-sizes", llvm::cl::desc("GPU WMMA tile sizes MxNxK"),
+    llvm::cl::list_init<int64_t>(SmallVector<int64_t>{16, 16, 16}),
+    llvm::cl::CommaSeparated);
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -68,6 +73,31 @@ GpuType parseGpuOption(StringRef gpuStr) {
   assert(type && "Unsupported GPU backend");
 
   return *type;
+}
+
+struct GpuOptions {
+  std::string triple;
+  std::string chip;
+  std::string features;
+};
+
+GpuOptions getGpuOptions(GpuType gpuType) {
+  GpuOptions options;
+
+  switch (gpuType) {
+  case GpuType::Cuda: {
+    options.triple = "nvptx64-nvidia-cuda";
+    options.chip = "sm_70";
+    options.features = "+ptx60";
+    break;
+  }
+  case GpuType::Vulkan: {
+    // No options needed at the moment.
+    break;
+  }
+  }
+
+  return options;
 }
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
@@ -112,6 +142,7 @@ private:
     pm.clear();
 
     GpuType gpuType = parseGpuOption(this->gpuBackend);
+    GpuOptions gpuOptions = getGpuOptions(gpuType);
 
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
@@ -128,21 +159,18 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(GpuConversionOptions{gpuWmma}));
+    pm.addPass(
+        createGpuConversion(GpuConversionOptions{gpuWmma, wmmaTileSizes}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
     case GpuType::Cuda: {
-      std::string gpuTriple = "nvptx64-nvidia-cuda";
-      std::string gpuChip = "sm_70";
-      std::string gpuFeatures = "+ptx60";
-
       // Perform explicit GPU data transfers only for CUDA as the unified
       // memory is not currently used here.
       // Vulkan runner assumes usage of GPU unified memory.
       pm.addNestedPass<func::FuncOp>(createGpuDataTransfer());
-      pm.addPass(
-          createGpuToCuda(GpuToCudaOptions{gpuTriple, gpuChip, gpuFeatures}));
+      pm.addPass(createGpuToCuda(GpuToCudaOptions{
+          gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
       break;
     }
     case GpuType::Vulkan: {

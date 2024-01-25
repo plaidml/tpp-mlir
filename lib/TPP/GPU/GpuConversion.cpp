@@ -69,7 +69,7 @@ private:
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
     pm.addNestedPass<func::FuncOp>(
-        createLinalgToGpu(LinalgToGpuOptions{useWmma}));
+        createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile}));
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
     // Map loops into GPU kernels.
