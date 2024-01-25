@@ -130,6 +130,7 @@ struct ConvertWMMAComputeToXeGPUDpas
     auto outType = cast<gpu::MMAMatrixType>(computeOp.getRes().getType());
     auto outElmType = outType.getElementType();
 
+    // TODO: Add integer support.
     if (!isa<FloatType>(outElmType)) {
       return rewriter.notifyMatchFailure(
           computeOp, "Only floating point dpas is currently supported");
