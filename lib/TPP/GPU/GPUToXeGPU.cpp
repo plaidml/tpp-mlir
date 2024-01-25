@@ -292,9 +292,6 @@ struct ConvertWMMAConstantToXeGPUConstant
 
   LogicalResult matchAndRewrite(gpu::SubgroupMmaConstantMatrixOp constOp,
                                 PatternRewriter &rewriter) const override {
-    auto loc = constOp.getLoc();
-    auto *ctx = rewriter.getContext();
-
     // Broadcast constant value directly into registers.
     auto outType = cast<gpu::MMAMatrixType>(constOp.getRes().getType());
     auto resType =
