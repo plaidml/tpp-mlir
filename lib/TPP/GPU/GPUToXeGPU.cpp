@@ -130,6 +130,11 @@ struct ConvertWMMAComputeToXeGPUDpas
     auto outType = cast<gpu::MMAMatrixType>(computeOp.getRes().getType());
     auto outElmType = outType.getElementType();
 
+    if (!isa<FloatType>(outElmType)) {
+      return rewriter.notifyMatchFailure(
+          computeOp, "Only floating point dpas is currently supported");
+    }
+
     auto dpasResType =
         VectorType::get(outType.getShape(), FloatType::getF32(ctx));
 
@@ -222,6 +227,8 @@ struct ConvertWMMAEltwiseToXeGPUEltwise
 
   LogicalResult matchAndRewrite(gpu::SubgroupMmaElementwiseOp eltwiseOp,
                                 PatternRewriter &rewriter) const override {
+    auto loc = eltwiseOp.getLoc();
+
     // Number of args is variadic so, constrain it to known cases.
     auto args = eltwiseOp.getArgs();
     if (args.size() > 2) {
@@ -267,17 +274,49 @@ struct ConvertWMMAEltwiseToXeGPUEltwise
                                                  args[1]);
       break;
     }
+    case gpu::MMAElementwiseOp::ADDI: {
+      rewriter.replaceOpWithNewOp<arith::AddIOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::MULI: {
+      rewriter.replaceOpWithNewOp<arith::MulIOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::SUBI: {
+      rewriter.replaceOpWithNewOp<arith::SubIOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::DIVS: {
+      rewriter.replaceOpWithNewOp<arith::DivSIOp>(eltwiseOp, resType, args[0],
+                                                  args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::DIVU: {
+      rewriter.replaceOpWithNewOp<arith::DivUIOp>(eltwiseOp, resType, args[0],
+                                                  args[1]);
+      break;
+    }
     case gpu::MMAElementwiseOp::NEGATEF: {
       rewriter.replaceOpWithNewOp<arith::NegFOp>(eltwiseOp, resType, args[0]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::NEGATES: {
+      // Assert added for clearer error.
+      assert(isa<IntegerType>(outType.getElementType()) &&
+             "Negates requires integer type");
+      auto denseZeroAttr = mlir::DenseElementsAttr::get(resType, 0);
+      auto zeroVec =
+          rewriter.create<mlir::arith::ConstantOp>(loc, resType, denseZeroAttr);
+      rewriter.replaceOpWithNewOp<arith::SubIOp>(eltwiseOp, resType, zeroVec,
+                                                 args[0]);
       break;
     }
     case gpu::MMAElementwiseOp::EXTF: {
       rewriter.replaceOpWithNewOp<arith::ExtFOp>(eltwiseOp, resType, args[0]);
       break;
-    }
-    default: {
-      return rewriter.notifyMatchFailure(eltwiseOp,
-                                         "Unsupported eltwise operation");
     }
     }
 
