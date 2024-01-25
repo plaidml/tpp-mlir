@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -linalg-to-gpu=wmma -canonicalize -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -linalg-to-gpu="wmma=1 warp-tile=16,16,16" -canonicalize -split-input-file | FileCheck %s
 
 func.func @matmul(%arg0: memref<16x16xf16>,
                  %arg1: memref<16x16xf16>,

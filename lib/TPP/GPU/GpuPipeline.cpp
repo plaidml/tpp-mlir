@@ -153,9 +153,12 @@ private:
     pm.addPass(createConvertForAllToParallelOp());
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
+    // Default warp tile sizes.
+    SmallVector<int64_t> warpTileSizes = {16, 16, 16};
+
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(GpuConversionOptions{
-        gpuWmma, gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
+    pm.addPass(
+        createGpuConversion(GpuConversionOptions{gpuWmma, warpTileSizes}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {

@@ -71,41 +71,20 @@ createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
   return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
 }
 
-// Parse and return GPU computate capability.
-static int getComputeCapability(llvm::StringRef chip) {
-  llvm::StringRef delim = "_";
-  llvm::StringRef ccToken =
-      chip.substr(chip.find(delim) + delim.size(), chip.size());
-
-  return std::stoi(ccToken.str());
-}
-
-// Return true if hardware supports WMMA operations.
-static bool isMMASupported(LinalgToGpuOptions options) {
-  return (options.gpuTriple == "nvptx64-nvidia-cuda") &&
-         (getComputeCapability(options.gpuChip) >= 70);
-}
-
-// Helper struct containing hardware WMMA settings
-// such as tile sizes.
-struct WMMASettings {
-  int m;
-  int n;
-  int k;
-};
-
 // Return true if the operation can be represented with WMMA compute.
-static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
-                                                   LinalgToGpuOptions options,
-                                                   int kTile) {
+static bool isMMACompatible(linalg::LinalgOp linalgOp,
+                            ArrayRef<int64_t> warpTile, int kTile) {
   if (!(isa<linalg::MatmulOp>(linalgOp) ||
         isa<linalg::BatchReduceMatmulOp>(linalgOp))) {
-    return std::nullopt;
+    return false;
   }
+
+  if (warpTile.empty())
+    return false;
 
   // Only static shapes are supported.
   if (linalgOp.hasDynamicShape())
-    return std::nullopt;
+    return false;
 
   auto aType = linalgOp.getDpsInputs()[0].getType().cast<ShapedType>();
   auto bType = linalgOp.getDpsInputs()[1].getType().cast<ShapedType>();
@@ -120,27 +99,25 @@ static std::optional<WMMASettings> getWMMASettings(linalg::LinalgOp linalgOp,
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
   if (!isSupportedPrecision)
-    return std::nullopt;
+    return false;
 
   auto mDim = cType.getShape()[0];
   auto nDim = cType.getShape()[1];
   auto kDim = aType.getShape().back();
 
-  // Choose WMMA tile sizes.
+  // Validate warp tile sizes.
   // The computation dimensions must fit into the tiles.
   // Reduction dimension tile size has to be compatible
-  // with the hardware sizes.
-  //
-  // TODO: Add more possible tile sizes and choose optimal one.
-  int wmmaTileM = 16;
-  int wmmaTileN = 16;
-  int wmmaTileK = 16;
+  // with the warp tile.
+  int wmmaTileM = warpTile[0];
+  int wmmaTileN = warpTile[1];
+  int wmmaTileK = warpTile[2];
   if ((mDim % wmmaTileM != 0) || (nDim % wmmaTileN != 0) ||
       (kDim % wmmaTileK != 0) || (kTile % wmmaTileK != 0)) {
-    return std::nullopt;
+    return false;
   }
 
-  return WMMASettings{wmmaTileM, wmmaTileN, wmmaTileK};
+  return true;
 }
 
 // Fuse a consumer using WMMA operations.
@@ -382,7 +359,7 @@ static StoreTy fuseEltwiseConsumers(linalg::LinalgOp rootOp,
 
 // Create WMMA instructions out of matmul-like operation.
 static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
-                                  WMMASettings wmmaSettings, int kTile,
+                                  ArrayRef<int64_t> warpTile, int kTile,
                                   PatternRewriter &rewriter) {
   assert((isa<linalg::MatmulOp>(linalgOp) ||
           isa<linalg::BatchReduceMatmulOp>(linalgOp)) &&
@@ -424,12 +401,16 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   int dimN = typeC.getShape()[1];
   int dimK = typeA.getShape().back();
 
+  int64_t wmmaTileM = warpTile[0];
+  int64_t wmmaTileN = warpTile[1];
+  int64_t wmmaTileK = warpTile[2];
+
   gpu::MMAMatrixType mmaTypeA = gpu::MMAMatrixType::get(
-      {wmmaSettings.m, wmmaSettings.k}, typeA.getElementType(), "AOp");
+      {wmmaTileM, wmmaTileK}, typeA.getElementType(), "AOp");
   gpu::MMAMatrixType mmaTypeB = gpu::MMAMatrixType::get(
-      {wmmaSettings.k, wmmaSettings.n}, typeB.getElementType(), "BOp");
+      {wmmaTileK, wmmaTileN}, typeB.getElementType(), "BOp");
   gpu::MMAMatrixType mmaTypeC = gpu::MMAMatrixType::get(
-      {wmmaSettings.m, wmmaSettings.n}, typeC.getElementType(), "COp");
+      {wmmaTileM, wmmaTileN}, typeC.getElementType(), "COp");
 
   bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
 
@@ -454,8 +435,8 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Fetch the inital value of the output element.
   SmallVector<Value> tilesC;
-  for (int m = 0; m < dimM; m += wmmaSettings.m) {
-    for (int n = 0; n < dimN; n += wmmaSettings.n) {
+  for (int m = 0; m < dimM; m += wmmaTileM) {
+    for (int n = 0; n < dimN; n += wmmaTileN) {
       Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
       Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
       Value tileC =
@@ -503,8 +484,8 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Load A sub-tiles.
   SmallVector<Value> tilesA;
-  for (int m = 0; m < dimM; m += wmmaSettings.m) {
-    for (int k = 0; k < kTile; k += wmmaSettings.k) {
+  for (int m = 0; m < dimM; m += wmmaTileM) {
+    for (int k = 0; k < kTile; k += wmmaTileK) {
       Value rowOffset = rewriter.create<arith::ConstantIndexOp>(loc, m);
       Value colOffset = rewriter.create<arith::ConstantIndexOp>(loc, k);
 
@@ -525,8 +506,8 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
 
   // Load B sub-tiles.
   SmallVector<Value> tilesB;
-  for (int k = 0; k < kTile; k += wmmaSettings.k) {
-    for (int n = 0; n < dimN; n += wmmaSettings.n) {
+  for (int k = 0; k < kTile; k += wmmaTileK) {
+    for (int n = 0; n < dimN; n += wmmaTileN) {
       Value rowOffset = rewriter.create<arith::ConstantIndexOp>(loc, k);
       Value colOffset = rewriter.create<arith::ConstantIndexOp>(loc, n);
 
@@ -544,9 +525,9 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
     }
   }
 
-  const int numTilesM = dimM / wmmaSettings.m;
-  const int numTilesN = dimN / wmmaSettings.n;
-  const int numTilesK = kTile / wmmaSettings.k;
+  const int numTilesM = dimM / wmmaTileM;
+  const int numTilesN = dimN / wmmaTileN;
+  const int numTilesK = kTile / wmmaTileK;
 
   // Compute sub-tiles of the C tile.
   //
@@ -600,9 +581,9 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
       int resIdx = m * numTilesN + n;
 
       Value rowIdx =
-          rewriter.create<arith::ConstantIndexOp>(loc, m * wmmaSettings.m);
+          rewriter.create<arith::ConstantIndexOp>(loc, m * wmmaTileM);
       Value colIdx =
-          rewriter.create<arith::ConstantIndexOp>(loc, n * wmmaSettings.n);
+          rewriter.create<arith::ConstantIndexOp>(loc, n * wmmaTileN);
       auto storeOp = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
           loc, results[resIdx], matC, ValueRange{rowIdx, colIdx}, ldc,
           /*transpose=*/UnitAttr());
@@ -744,15 +725,17 @@ struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
           gemmLikeOp, "Expect static shape when mapping to GPU");
     }
 
+    // Ensure that reduction dimension tiling also works for smaller workloads.
     auto aType =
         gemmLikeOp.getDpsInputs()[0].getType().template cast<ShapedType>();
     auto kDim = aType.getShape().back();
     auto kTile = kDim < options.kTile ? kDim : options.kTile;
 
-    if (options.useWmma && isMMASupported(options)) {
-      if (auto settings = getWMMASettings(gemmLikeOp, options, kTile))
-        return gemmToGpuMMA(gemmLikeOp, *settings, kTile, rewriter);
+    if (options.useWmma &&
+        isMMACompatible(gemmLikeOp, options.warpTile, kTile)) {
+      return gemmToGpuMMA(gemmLikeOp, options.warpTile, kTile, rewriter);
     }
+    // TODO: Add warp and K dim tiling to looped implementation.
     return gemmToGpuLoops(gemmLikeOp, rewriter);
   }
 
@@ -772,9 +755,8 @@ struct LinalgToGpu : public tpp::impl::LinalgToGpuBase<LinalgToGpu> {
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateLinalgToGpuPatterns(
-        patterns,
-        LinalgToGpuOptions{useWmma, gpuTriple, gpuChip, gpuFeatures, kTile});
+    populateLinalgToGpuPatterns(patterns,
+                                LinalgToGpuOptions{useWmma, warpTile, kTile});
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
