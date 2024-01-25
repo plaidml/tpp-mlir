@@ -46,16 +46,10 @@ llvm::cl::opt<bool> gpuWmma("gpu-wmma",
                             llvm::cl::desc("Enable GPU WMMA support"),
                             llvm::cl::init(false));
 
-// GPU WMMA tile sizes.
-llvm::cl::opt<int64_t> wmmaTileM("wmma-tile-M",
-                                 llvm::cl::desc("GPU WMMA tile dim M"),
-                                 llvm::cl::init(16));
-llvm::cl::opt<int64_t> wmmaTileN("wmma-tile-N",
-                                 llvm::cl::desc("GPU WMMA tile dim M"),
-                                 llvm::cl::init(16));
-llvm::cl::opt<int64_t> wmmaTileK("wmma-tile-K",
-                                 llvm::cl::desc("GPU WMMA tile dim M"),
-                                 llvm::cl::init(16));
+llvm::cl::list<int64_t> wmmaTileSizes(
+    "wmma-tile-sizes", llvm::cl::desc("GPU WMMA tile sizes MxNxK"),
+    llvm::cl::list_init<int64_t>(SmallVector<int64_t>{16, 16, 16}),
+    llvm::cl::CommaSeparated);
 
 namespace mlir {
 namespace tpp {
@@ -165,8 +159,9 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(
-        GpuConversionOptions{gpuWmma, {wmmaTileM, wmmaTileN, wmmaTileK}}));
+    assert(wmmaTileSizes.size() == 3 && "WMMA tile sizes require 3 dimensions");
+    pm.addPass(
+        createGpuConversion(GpuConversionOptions{gpuWmma, wmmaTileSizes}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
