@@ -157,7 +157,7 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added - load the tile first.
     // Must be a buffer of the same type - scalar broadcast is not supported.
-    // TODO: Consider adding support for eltwise with broadcast.
+    // TODO: Add support for eltwise with broadcast.
     auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
     if (addValue.getType() != rootOutput.getType())
       return std::nullopt;

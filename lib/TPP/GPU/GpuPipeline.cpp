@@ -46,6 +46,17 @@ llvm::cl::opt<bool> gpuWmma("gpu-wmma",
                             llvm::cl::desc("Enable GPU WMMA support"),
                             llvm::cl::init(false));
 
+// GPU WMMA tile sizes.
+llvm::cl::opt<int64_t> wmmaTileM("wmma-tile-M",
+                                 llvm::cl::desc("GPU WMMA tile dim M"),
+                                 llvm::cl::init(16));
+llvm::cl::opt<int64_t> wmmaTileN("wmma-tile-N",
+                                 llvm::cl::desc("GPU WMMA tile dim M"),
+                                 llvm::cl::init(16));
+llvm::cl::opt<int64_t> wmmaTileK("wmma-tile-K",
+                                 llvm::cl::desc("GPU WMMA tile dim M"),
+                                 llvm::cl::init(16));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -153,12 +164,9 @@ private:
     pm.addPass(createConvertForAllToParallelOp());
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
-    // Default warp tile sizes.
-    SmallVector<int64_t> warpTileSizes = {16, 16, 16};
-
     // Convert to generic GPU ops.
-    pm.addPass(
-        createGpuConversion(GpuConversionOptions{gpuWmma, warpTileSizes}));
+    pm.addPass(createGpuConversion(
+        GpuConversionOptions{gpuWmma, {wmmaTileM, wmmaTileN, wmmaTileK}}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
