@@ -159,7 +159,6 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Convert to generic GPU ops.
-    assert(wmmaTileSizes.size() == 3 && "WMMA tile sizes require 3 dimensions");
     pm.addPass(
         createGpuConversion(GpuConversionOptions{gpuWmma, wmmaTileSizes}));
 

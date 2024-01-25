@@ -79,7 +79,7 @@ static bool isMMACompatible(linalg::LinalgOp linalgOp,
     return false;
   }
 
-  if (warpTile.empty())
+  if (warpTile.size() != 3)
     return false;
 
   // Only static shapes are supported.
