@@ -247,9 +247,32 @@ struct ConvertWMMAEltwiseToXeGPUEltwise
                                                  args[1]);
       break;
     }
+    case gpu::MMAElementwiseOp::SUBF: {
+      rewriter.replaceOpWithNewOp<arith::SubFOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
     case gpu::MMAElementwiseOp::MAXF: {
       rewriter.replaceOpWithNewOp<arith::MaximumFOp>(eltwiseOp, resType,
                                                      args[0], args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::MINF: {
+      rewriter.replaceOpWithNewOp<arith::MinimumFOp>(eltwiseOp, resType,
+                                                     args[0], args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::DIVF: {
+      rewriter.replaceOpWithNewOp<arith::DivFOp>(eltwiseOp, resType, args[0],
+                                                 args[1]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::NEGATEF: {
+      rewriter.replaceOpWithNewOp<arith::NegFOp>(eltwiseOp, resType, args[0]);
+      break;
+    }
+    case gpu::MMAElementwiseOp::EXTF: {
+      rewriter.replaceOpWithNewOp<arith::ExtFOp>(eltwiseOp, resType, args[0]);
       break;
     }
     default: {
