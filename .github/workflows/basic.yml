@@ -1,0 +1,42 @@
+name: Basic TPP-MLIR Builder
+
+# For now, we do it manually, but this will need to be on commit
+on:
+  workflow_dispatch:
+#on:
+#  push:
+#    branches: [ "main" ]
+#  pull_request:
+#    branches: [ "main" ]
+
+# Always use bash
+defaults:
+  run:
+    shell: bash
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # Checks if LLVM needs to be built or not
+  check_llvm:
+    runs-on: pcl-tiergarten
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: LLVM commit
+        run: |
+          echo "LLVM_DIR=${{ end.LLVM_ROOT }}/$(cat build_tools/llvm_version.txt)" >> $GITHUB_ENV
+
+      - name: CMake
+        run: |
+          mkdir -p ${{ env.BLD_DIR }}
+          cmake -G Ninja -B${{ env.BLD_DIR }} . \
+                         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                         -DMLIR_DIR=${{ env.LLVM_DIR }}/lib/cmake/mlir \
+                         -DLLVM_EXTERNAL_LIT=${{ env.LLVM_DIR }}/bin/llvm-lit
+
+      - name: Build
+        run: ninja -C ${{ env.BLD_DIR }} all
+
+      - name: Test
+        run: ninja -C ${{ env.BLD_DIR }} check-all
