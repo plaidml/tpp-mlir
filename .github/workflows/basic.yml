@@ -3,40 +3,56 @@ name: Basic TPP-MLIR Builder
 # For now, we do it manually, but this will need to be on commit
 on:
   workflow_dispatch:
-#on:
-#  push:
-#    branches: [ "main" ]
-#  pull_request:
-#    branches: [ "main" ]
+  push:
+    branches: [ "ghactions" ]
+  pull_request:
+    branches: [ "ghactions" ]
 
-# Always use bash
-defaults:
-  run:
-    shell: bash
+env:
+  # clang, gcc
+  CC: clang
+  CXX: clang++
+  # ld, gold, lld
+  LD: lld
+  # Release, Debug, RelWithDebInfo
+  BUILD: RelWithDebInfo
+  # "Address;Memory;Leak;Undefined"
+  SAN: ""
+  # ON, OFF
+  OPENMP: OFF
+  ONEDNN: OFF
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # Checks if LLVM needs to be built or not
-  check_llvm:
-    runs-on: pcl-tiergarten
+  build_tpp_mlir:
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v3
 
       - name: LLVM commit
         run: |
-          echo "LLVM_DIR=${{ env.LLVM_ROOT }}/$(cat build_tools/llvm_version.txt)" >> $GITHUB_ENV
+          echo "LLVM_DIR=${{ secrets.LLVM_ROOT }}/$(cat build_tools/llvm_version.txt)" >> $GITHUB_ENV
+
+      - name: Install Python Requirements
+        run: |
+          pip install --upgrade --user lit
+          echo "LLVM_LIT=$HOME/.local/bin/lit" >> $GITHUB_ENV
 
       - name: CMake
         run: |
-          mkdir -p ${{ env.BLD_DIR }}
-          cmake -G Ninja -B${{ env.BLD_DIR }} . \
-                         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                         -DMLIR_DIR=${{ env.LLVM_DIR }}/lib/cmake/mlir \
-                         -DLLVM_EXTERNAL_LIT=${{ env.LLVM_DIR }}/bin/llvm-lit
+          mkdir -p build
+          cmake -G Ninja -B build . \
+                        -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} \
+                        -DCMAKE_BUILD_TYPE=${BUILD} \
+                        -DMLIR_DIR=${{ env.LLVM_DIR }}/lib/cmake/mlir \
+                        -DLLVM_EXTERNAL_LIT=${{ env.LLVM_LIT }} \
+                        -DLLVM_USE_LINKER=${LD} \
+                        -DUSE_SANITIZER=${SAN} \
+                        -DUSE_OpenMP=${OPENMP} \
+                        -DUSE_OneDNN=${ONEDNN}
 
       - name: Build
-        run: ninja -C ${{ env.BLD_DIR }} all
+        run: ninja -C build all
 
       - name: Test
-        run: ninja -C ${{ env.BLD_DIR }} check-all
+        run: ninja -C build check-all
