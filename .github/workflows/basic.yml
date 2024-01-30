@@ -25,7 +25,7 @@ jobs:
 
       - name: LLVM commit
         run: |
-          echo "LLVM_DIR=${{ end.LLVM_ROOT }}/$(cat build_tools/llvm_version.txt)" >> $GITHUB_ENV
+          echo "LLVM_DIR=${{ env.LLVM_ROOT }}/$(cat build_tools/llvm_version.txt)" >> $GITHUB_ENV
 
       - name: CMake
         run: |
