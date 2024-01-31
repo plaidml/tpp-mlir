@@ -58,7 +58,7 @@ static FailureOr<scf::SCFTilingResult> tileOp(RewriterBase &rewriter,
   auto options = scf::SCFTilingOptions().setTileSizes(
       getAsIndexOpFoldResult(rewriter.getContext(), tileSizes));
   FailureOr<scf::SCFTilingResult> tilingResult =
-      scf::tileUsingSCFForOp(rewriter, operation, options);
+      scf::tileUsingSCF(rewriter, operation, options);
   if (failed(tilingResult))
     return failure();
   if (!tilingResult->loops.empty()) {
@@ -103,7 +103,7 @@ static void fuseOrTilePacks(RewriterBase &rewriter, FunctionOpInterface func) {
     // Step 3. Fuse consumer and producer.
     auto forLoops =
         llvm::to_vector(llvm::map_range(tilingResult->loops, [](Operation *op) {
-          return cast<scf::ForOp>(op);
+          return cast<LoopLikeOpInterface>(op);
         }));
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         scf::tileAndFuseProducerOfSlice(
@@ -210,7 +210,7 @@ class LowerPacksAndUnPacks
         scf::SCFTilingOptions unpackTilingOptions;
         SmallVector<int64_t> tiles(unPackOp.getDestType().getRank(), 1);
         unpackTilingOptions.setTileSizes(getAsIndexOpFoldResult(ctx, tiles));
-        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
             rewriter, cast<TilingInterface>(unPackOp.getOperation()),
             unpackTilingOptions);
         if (failed(tilingResult))
@@ -221,7 +221,7 @@ class LowerPacksAndUnPacks
         SmallVector<int64_t> tiles(packOp.getSourceType().getRank(), 1);
         scf::SCFTilingOptions packTilingOptions;
         packTilingOptions.setTileSizes(getAsIndexOpFoldResult(ctx, tiles));
-        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
             rewriter, cast<TilingInterface>(packOp.getOperation()),
             packTilingOptions);
         if (failed(tilingResult))

@@ -16,6 +16,10 @@ def CHECK_Dialect : Dialect {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// ExpectTrueOp
+//===----------------------------------------------------------------------===//
+
 def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true",
     [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operand is true}];
@@ -37,12 +41,16 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// ExpectAlmostEqOp
+//===----------------------------------------------------------------------===//
+
 def CHECK_ExpectAlmostEqOp :
     Op<CHECK_Dialect, "expect_almost_eq",
     [TypesMatchWith<"Operand types match",
                     "lhs", "rhs",
                     "$_self.cast<ShapedType>()">,
-    MemoryEffects<[MemWrite, MemRead]>]> {
+     MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
     Verifies that the tensor operands with float elements are
@@ -66,6 +74,10 @@ def CHECK_ExpectAlmostEqOp :
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// ExpectSaneOp
+//===----------------------------------------------------------------------===//
+
 def CHECK_ExpectSaneOp :
     Op<CHECK_Dialect, "expect_sane", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operand is neither NaN nor infinite}];
@@ -87,6 +99,5 @@ def CHECK_ExpectSaneOp :
     `(` $operand `)` attr-dict `:` type($operand)
   }];
 }
-
 
 #endif

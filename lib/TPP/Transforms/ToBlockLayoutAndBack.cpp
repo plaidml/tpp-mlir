@@ -908,7 +908,7 @@ struct FoldExpandShapeInParallelInsertOp
         expandShapeOp.getResultType(), expandShapeOp.getSrcType());
     if (res != SliceVerificationResult::Success)
       return failure();
-    rewriter.updateRootInPlace(insertOp, [&]() {
+    rewriter.modifyOpInPlace(insertOp, [&]() {
       insertOp.setOperand(/*source=*/0, expandShapeOp.getSrc());
     });
     return success();
@@ -1000,7 +1000,7 @@ struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
     newForallOp.getBody()->addArgument(newOuts.back().getType(),
                                        newOuts.back().getLoc());
 
-    ArrayRef<BlockArgument> bbArgs = newForallOp.getOutputBlockArguments();
+    ArrayRef<BlockArgument> bbArgs = newForallOp.getRegionIterArgs();
     assert(bbArgs.size() == 2);
 
     rewriter.setInsertionPointToStart(newForallOp.getBody());
@@ -1078,9 +1078,9 @@ struct ForAllIterArgsFolder : public OpRewritePattern<scf::ForallOp> {
     llvm::DenseSet<size_t> unusedIndices;
 
     size_t idxUnused = 0;
-    for (auto it : llvm::zip_equal(forallOp.getDpsInitsMutable(),
-                                   forallOp.getOutputBlockArguments(),
-                                   forallOp.getResults())) {
+    for (auto it :
+         llvm::zip_equal(forallOp.getDpsInitsMutable(),
+                         forallOp.getRegionIterArgs(), forallOp.getResults())) {
       Value operand = std::get<0>(it).get();
       BlockArgument bbArg = std::get<1>(it);
       Value result = std::get<2>(it);

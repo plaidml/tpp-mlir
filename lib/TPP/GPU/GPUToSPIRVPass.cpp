@@ -80,7 +80,16 @@ class GPUToSPIRV : public tpp::impl::GPUToSPIRVBase<GPUToSPIRV> {
         spirv::MemorySpaceToStorageClassConverter converter(memorySpaceMap);
 
         RewritePatternSet patterns(context);
-        spirv::populateMemorySpaceToStorageClassPatterns(converter, patterns);
+        spirv::convertMemRefTypesAndAttrs(module, converter);
+
+        module->walk([&target, this](Operation *childOp) {
+          if (target->isIllegal(childOp)) {
+            childOp->emitOpError("failed to legalize memory space");
+            signalPassFailure();
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
 
         if (failed(
                 applyFullConversion(gpuModule, *target, std::move(patterns))))

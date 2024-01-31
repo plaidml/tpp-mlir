@@ -681,7 +681,7 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
                           << "\n");
   indexingMaps[operand->getOperandNumber()] = newMap;
   // TODO: We probably cannot update the result in place.
-  rewriter.updateRootInPlace(linalgOp, [&]() {
+  rewriter.modifyOpInPlace(linalgOp, [&]() {
     linalgOp->setOperand(operand->getOperandNumber(), buffer);
     linalgOp.setIndexingMapsAttr(
         ArrayAttr::get(linalgOp.getContext(),
@@ -758,7 +758,7 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
     OpOperand *operandB = linalgOp.getDpsInputOperands()[1];
     SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
     std::swap(indexingMaps[0], indexingMaps[1]);
-    rewriter.updateRootInPlace(linalgOp, [&]() {
+    rewriter.modifyOpInPlace(linalgOp, [&]() {
       Value operandATmp = operandA->get();
       linalgOp->setOperand(operandA->getOperandNumber(), operandB->get());
       linalgOp->setOperand(operandB->getOperandNumber(), operandATmp);
@@ -841,7 +841,7 @@ static void updateGemmOpFlags(RewriterBase &rewriter, XsmmDisTy gemmDispatchOp,
 
   auto clonedOp =
       cast<XsmmDisTy>(rewriter.clone(*gemmDispatchOp.getOperation()));
-  rewriter.updateRootInPlace(clonedOp, [&]() {
+  rewriter.modifyOpInPlace(clonedOp, [&]() {
     ArrayAttr flags = gemmDispatchOp.getFlags();
     SmallVector<Attribute> newFlags;
     for (auto flag : flags) {

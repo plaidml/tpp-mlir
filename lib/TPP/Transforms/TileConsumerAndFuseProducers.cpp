@@ -429,8 +429,8 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
       };
   tileAndFuseOptions.setFusionControlFn(controlFn);
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-      scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(rewriter, consumer,
-                                                            tileAndFuseOptions);
+      scf::tileConsumerAndFuseProducersUsingSCF(rewriter, consumer,
+                                                tileAndFuseOptions);
   if (failed(tileAndFuseResult)) {
     return rewriter.notifyMatchFailure(
         consumer, "failed to tile and fuse with op as root");

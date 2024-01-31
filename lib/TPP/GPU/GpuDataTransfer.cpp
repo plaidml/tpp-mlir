@@ -219,7 +219,7 @@ struct TransferDataToGpu : public OpRewritePattern<gpu::LaunchFuncOp> {
 
     // If there are any new operands, update the kernel launch.
     if (updatedOperands) {
-      rewriter.updateRootInPlace(launchFuncOp, [&]() {
+      rewriter.modifyOpInPlace(launchFuncOp, [&]() {
         launchFuncOp.getKernelOperandsMutable().assign(newOperands);
       });
     }
