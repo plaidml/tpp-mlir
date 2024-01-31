@@ -132,7 +132,7 @@ struct FillOpDeGeneralizationPattern
             .operation(NumRegions(EqualsTo(1)))
             .dim(MatchAll(), mlir::utils::IteratorType::parallel)
             .output(MatchAll(), HasMap(Identity()))
-            .input(MatchAll(), HasMap(ProjectedPermutation()))
+            .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()))
             .input(MatchAll(), HasRank({HasRank::SCALAR}))
             .region(MatchOne(0),
                     WithSingleOp<linalg::YieldOp>(/*captures=*/nullptr));

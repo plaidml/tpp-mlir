@@ -128,7 +128,7 @@ void testTppIdentity(FunctionOpInterface funcOp) {
       .output(MatchAll(), HasStaticShape())
       .input(MatchAll(), HasStaticShape())
       .output(MatchAll(), HasMap(Identity()))
-      .input(MatchAll(), HasMap(ProjectedPermutation()))
+      .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()))
       .region(MatchOne(0), WithSingleOp<linalg::YieldOp>(&operands));
   // clang-format on
 
@@ -147,9 +147,9 @@ void testCaptureAffineMaps(FunctionOpInterface funcOp) {
     StructuredOpMatcher::make<linalg::GenericOp>()
       .operation(NumDpsInits(EqualsTo(1)))
       .operation(NumDpsInputs(EqualsTo(2)))
-      .input(MatchOne(0), HasMap(ProjectedPermutation(), &aMap))
+      .input(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &aMap))
       .input(MatchOne(1), HasMap(Any(), &bMap))
-      .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap));
+      .output(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &cMap));
   // clang-format on
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
     if (matcher.match(linalgOp)) {
@@ -169,8 +169,8 @@ void testCaptureAffineMapsExpectToFail(FunctionOpInterface funcOp) {
       .operation(NumDpsInits(EqualsTo(1)))
       .operation(NumDpsInputs(EqualsTo(2)))
       .input(MatchOne(0), HasMap(Identity(), &aMap))
-      .input(MatchOne(1), HasMap(ProjectedPermutation(), &bMap))
-      .output(MatchOne(0), HasMap(ProjectedPermutation(), &cMap));
+      .input(MatchOne(1), HasMap(BroadcastableProjectedPermutation(), &bMap))
+      .output(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &cMap));
   // clang-format on
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
     if (matcher.match(linalgOp)) {

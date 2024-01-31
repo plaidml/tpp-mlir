@@ -108,12 +108,12 @@ struct HasMap {
   AffineMap *ptrMap = nullptr;
 };
 
-// Callble object to verify if `map` is a projected permutation map.
-// We require the dimensions to be in sorted order this avoid filtering
+// Callble object to verify if `map` is a broadcastable projected permutation
+// map. We require the dimensions to be in sorted order this avoid filtering
 // projected permutation without broadcasting semantics, for example
 // affine_map<(d0, d1) -> (d1, d0)> is rejected.
-struct ProjectedPermutation {
-  ProjectedPermutation() = default;
+struct BroadcastableProjectedPermutation {
+  BroadcastableProjectedPermutation() = default;
 
   bool operator()(AffineMap map) const {
     if (map.getNumSymbols() > 0 || map.getNumResults() > map.getNumInputs())
@@ -130,8 +130,9 @@ struct ProjectedPermutation {
       } else if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
         if (constExpr.getValue() != 0)
           return false;
-      } else
+      } else {
         return false;
+      }
     }
     return llvm::is_sorted(pos);
   }
