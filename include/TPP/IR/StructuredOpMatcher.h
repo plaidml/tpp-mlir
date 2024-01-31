@@ -138,6 +138,13 @@ struct BroadcastableProjectedPermutation {
   }
 };
 
+// Callable object to verify if `map` is a projected permutation.
+struct ProjectedPermutation {
+  ProjectedPermutation() = default;
+
+  bool operator()(AffineMap map) const { return map.isProjectedPermutation(); }
+};
+
 // Callable object to verify if `map` is an identity map.
 struct Identity {
   Identity() = default;

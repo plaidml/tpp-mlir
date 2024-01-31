@@ -74,10 +74,97 @@ func.func @degeneralize(%arg0: tensor<3x3x3xf32>, %arg1: tensor<3x3x3xf32>) -> t
   return %2 : tensor<3x3xf32>
 }
 
-// CHECK: degeneralize
+// CHECK-LABEL: degeneralize
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<3x3x3xf32>, %[[ARG1:.+]]: tensor<3x3x3xf32>
 // CHECK: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<3x3xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY]] : tensor<3x3xf32>) -> tensor<3x3xf32>
 // CHECK: %{{.+}} = linalg.batch_reduce_matmul ins(%[[ARG0]], %[[ARG1]] : tensor<3x3x3xf32>, tensor<3x3x3xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<3x3xf32>) -> tensor<3x3xf32>
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @transpose_degeneralize(%arg0 : tensor<128x262144xf32>, %arg1: tensor<262144x128xf32>) 
+    -> tensor<262144x128xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1], 
+    iterator_types = ["parallel", "parallel"]} 
+  ins(%arg0 : tensor<128x262144xf32>) outs(%arg1 : tensor<262144x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<262144x128xf32>
+  return %0 : tensor<262144x128xf32>
+}
+
+// CHECK-LABEL: transpose_degeneralize
+// CHECK-SAME: %[[ARG0:.+]]: tensor<128x262144xf32>, %[[ARG1:.+]]: tensor<262144x128xf32>
+// CHECK: %[[T:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<128x262144xf32>) outs(%[[ARG1]] : tensor<262144x128xf32>) 
+// CHECK-SAME:  permutation = [1, 0]
+// CHECK: return %[[T]] : tensor<262144x128xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
+func.func @transpose_degeneralize_1(%arg0 : tensor<1x2x3x4xf32>, %arg1 : tensor<1x3x2x4xf32>)
+    -> tensor<1x3x2x4xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  ins(%arg0 : tensor<1x2x3x4xf32>) outs(%arg1 : tensor<1x3x2x4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<1x3x2x4xf32>
+  return %0 : tensor<1x3x2x4xf32>
+}
+
+// CHECK-LABEL: transpose_degeneralize_1
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x2x3x4xf32>, %[[ARG1:.+]]: tensor<1x3x2x4xf32>
+// CHECK: %[[T:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<1x2x3x4xf32>) outs(%[[ARG1]] : tensor<1x3x2x4xf32>) 
+// CHECK-SAME:  permutation = [0, 2, 1, 3]
+// CHECK: return %[[T]] : tensor<1x3x2x4xf32>
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @transpose_degeneralize_memref(%arg0 : memref<128x262144xf32>, %arg1: memref<262144x128xf32>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+  ins(%arg0 : memref<128x262144xf32>) outs(%arg1 : memref<262144x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  return
+}
+
+// CHECK-LABEL: transpose_degeneralize_memref
+// CHECK-SAME: %[[ARG0:.+]]: memref<128x262144xf32>, %[[ARG1:.+]]: memref<262144x128xf32>
+// CHECK: linalg.transpose ins(%[[ARG0]] : memref<128x262144xf32>) outs(%[[ARG1]] : memref<262144x128xf32>) 
+// CHECK-SAME:  permutation = [1, 0]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @transpose_degeneralize_copy(%arg0 : tensor<128x262144xf32>, %arg1: tensor<128x262144xf32>) 
+    -> tensor<128x262144xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+  ins(%arg0 : tensor<128x262144xf32>) outs(%arg1 : tensor<128x262144xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<128x262144xf32>
+  return %0 : tensor<128x262144xf32>
+}
+
+// CHECK-LABEL: transpose_degeneralize_copy
+// CHECK-NOT: linalg.transpose
+// CHECK: linalg.generic

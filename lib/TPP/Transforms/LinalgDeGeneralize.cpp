@@ -118,6 +118,69 @@ struct BatchReduceOpDeGeneralizationPattern
   }
 };
 
+// From linalg.generic to linalg.transpose.
+struct TransposeOpPattern : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  bool isIdentityPermutation(ArrayRef<int64_t> permutation) const {
+    for (auto i : llvm::seq<int64_t>(0, permutation.size()))
+      if (permutation[i] != i)
+        return false;
+    return true;
+  }
+
+  FailureOr<SmallVector<int64_t>>
+  getPermutationFromMap(AffineMap map, int64_t numLoops) const {
+    assert(map.isProjectedPermutation());
+    if (numLoops != map.getNumResults())
+      return failure();
+
+    SmallVector<int64_t> perm;
+    for (auto dim : llvm::seq<int64_t>(0, numLoops)) {
+      auto dimExpr = getAffineDimExpr(dim, map.getContext());
+      for (auto [idx, result] : llvm::enumerate(map.getResults())) {
+        if (result == dimExpr)
+          perm.push_back(idx);
+      }
+    }
+
+    if (isIdentityPermutation(perm))
+      return failure();
+    return perm;
+  }
+
+  FailureOr<SmallVector<int64_t>>
+  isTransposeOp(linalg::GenericOp linalgOp) const {
+    using namespace mlir::structured_match;
+    AffineMap inputMap;
+    auto transposeMatcher =
+        StructuredOpMatcher::make<linalg::GenericOp>()
+            .operation(NumDpsInits(EqualsTo(1)))
+            .operation(NumDpsInputs(EqualsTo(1)))
+            .operation(NumRegions(EqualsTo(1)))
+            .dim(MatchAll(), mlir::utils::IteratorType::parallel)
+            .input(MatchOne(0), HasMap(ProjectedPermutation(), &inputMap))
+            .output(MatchOne(0), HasMap(Identity()))
+            .region(MatchOne(0),
+                    WithSingleOp<linalg::YieldOp>(/*captures=*/nullptr));
+    if (!transposeMatcher.match(linalgOp))
+      return failure();
+    return getPermutationFromMap(inputMap, linalgOp.getNumLoops());
+  }
+
+  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    auto maybePerm = isTransposeOp(linalgOp);
+    if (failed(maybePerm))
+      return failure();
+    Value inputOperand = linalgOp.getDpsInputs()[0];
+    Value outputOperand = linalgOp.getDpsInits()[0];
+    rewriter.replaceOpWithNewOp<linalg::TransposeOp>(linalgOp, inputOperand,
+                                                     outputOperand, *maybePerm);
+    return success();
+  }
+};
+
 // From linalg.generic to linalg.fillOp.
 struct FillOpDeGeneralizationPattern
     : public OpRewritePattern<linalg::GenericOp> {
@@ -156,5 +219,6 @@ struct FillOpDeGeneralizationPattern
 void mlir::linalg::populateLinalgDeGeneralizationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FillOpDeGeneralizationPattern, MatmulOpDeGeneralizationPattern,
-               BatchReduceOpDeGeneralizationPattern>(patterns.getContext());
+               BatchReduceOpDeGeneralizationPattern, TransposeOpPattern>(
+      patterns.getContext());
 }
