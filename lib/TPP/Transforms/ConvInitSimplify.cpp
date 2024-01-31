@@ -35,7 +35,7 @@ static bool isBroadCastOp(linalg::GenericOp linalgOp) {
     .operation(NumDpsInits(EqualsTo(1)))
     .operation(NumDpsInputs(EqualsTo(1)))
     .output(MatchAll(), HasMap(Identity()))
-    .input(MatchOne(0), HasMap(ProjectedPermutation(), &inputMap))
+    .input(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &inputMap))
     .region(
       MatchOne(0), WithSingleOp<linalg::YieldOp>(/*operands=*/nullptr));
   // clan-format on

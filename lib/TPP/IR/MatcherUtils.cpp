@@ -56,9 +56,9 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
           .operation(NumOfLoops(_OR(EqualsTo(5), EqualsTo(4))))
           .input(MatchAll(), HasStaticShape())
           .output(MatchAll(), HasStaticShape())
-          .input(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandA))
+          .input(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &mapOperandA))
           .input(MatchOne(1), HasMap(Any(), &mapOperandB))
-          .output(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandC))
+          .output(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &mapOperandC))
           .region(MatchOne(0),
                   WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
   // clang-format on
@@ -172,7 +172,7 @@ static bool isTppBinaryOp(linalg::LinalgOp linalgOp) {
           .dim(MatchAll(), mlir::utils::IteratorType::parallel)
           .operation(NumOfLoops(EqualsTo(2)))
           .output(MatchAll(), HasMap(Identity()))
-          .input(MatchAll(), HasMap(ProjectedPermutation()));
+          .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()));
   // clang-format on
   return isTppOp(linalgOp) && binaryMatcher.match(linalgOp);
 }
@@ -351,7 +351,7 @@ bool isTwoDReluOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
   auto reluMatcher =
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .output(MatchAll(), HasMap(Identity()))
-    .input(MatchAll(), HasMap(ProjectedPermutation()))
+    .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()))
     .region(MatchOne(0), WithReluBody(operands));
   // clang-format on
   return isTppUnaryOp(linalgOp) && reluMatcher.match(linalgOp);
@@ -365,7 +365,7 @@ bool isTwoDIdentityOp(linalg::LinalgOp linalgOp,
   auto identityMatcher = 
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .output(MatchAll(), HasMap(Identity()))
-    .input(MatchAll(), HasMap(ProjectedPermutation()))
+    .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()))
     .region(
       MatchOne(0), WithSingleOp<linalg::YieldOp>(&linalgOperands));
   // clang-format on
@@ -387,7 +387,7 @@ bool isTwoDZeroOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
   auto zeroMatcher = 
     StructuredOpMatcher::make<linalg::LinalgOp>()
     .output(MatchAll(), HasMap(Identity()))
-    .input(MatchAll(), HasMap(ProjectedPermutation()))
+    .input(MatchAll(), HasMap(BroadcastableProjectedPermutation()))
     .region(MatchOne(0), WithSingleOp<linalg::YieldOp>());
   // clang-format on
 
