@@ -1,12 +1,10 @@
+# This is an example of jobs, environments, secrets being used.
+# We keep it disabled, but in the repo as a reference.
 name: Basic TPP-MLIR Builder
 
 # For now, we do it manually, but this will need to be on commit
 on:
   workflow_dispatch:
-  push:
-    branches: [ "ghactions" ]
-  pull_request:
-    branches: [ "ghactions" ]
 
 env:
   # clang, gcc

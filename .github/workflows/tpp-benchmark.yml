@@ -1,0 +1,121 @@
+name: TPP-MLIR Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      RUN_SPR_BENCH:
+        description: "Run on Sapphire Rapids"
+        default: 1
+        required: true
+        type: string
+      RUN_ZEN_BENCH:
+        description: "Run on Zen4"
+        default: 0
+        required: true
+        type: string
+      RUN_ADL_BENCH:
+        description: "Run on Raptor Lake"
+        default: 0
+        required: true
+        type: string
+      RUN_CLX_BENCH:
+        description: "Run on Coffee Lake"
+        default: 0
+        required: true
+        type: string
+  push:
+    branches: [ "ghactions" ]
+  pull_request:
+    branches: [ "ghactions" ]
+
+env:
+  NPROCS_LIMIT_LINK: 8
+
+jobs:
+  Check_LLVM:
+    runs-on: self-hosted
+    steps:
+      - name: Check LLVM
+        run: "BUILD=1 scripts/buildkite/check_llvm.sh"
+
+  TPP-MLIR-SPR-BASE:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Sapphire Rapids Base
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -b -p'"
+    if: ${{ inputs.RUN_SPR_BENCH }} == "1"
+
+  TPP-MLIR-SPR-OMP:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Sapphire Rapids OpenMP
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: ${{ inputs.RUN_SPR_BENCH }} == "1"
+
+  TPP-MLIR-ZEN-BASE:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Zen4 Base
+        run: "${{ secrets.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -b -p'"
+    if: ${{ inputs.RUN_ZEN_BENCH }} == "1"
+
+  TPP-MLIR-ZEN-OMP:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Zen4 OpenMP
+        run: "${{ secrets.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: ${{ inputs.RUN_ZEN_BENCH }} == "1"
+
+  TPP-MLIR-CLX-BASE:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Coffee Lake Base
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -b -p'"
+    if: ${{ inputs.RUN_CLX_BENCH }} == "1"
+
+  TPP-MLIR-CLX-OMP:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Coffee Lake OpenMP
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: ${{ inputs.RUN_CLX_BENCH }} == "1"
+
+  TPP-MLIR-ADL-BASE:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Raptor Lake Base
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -b -p'"
+    if: ${{ inputs.RUN_ADL_BENCH }} == "1"
+
+  TPP-MLIR-ADL-OMP:
+    runs-on: self-hosted
+    needs: Check_LLVM
+    steps:
+      - name: Raptor Lake OpenMP
+        run: "${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- \
+              'KIND=Release COMPILER=clang LINKER=lld \
+              scripts/buildkite/benchmark.sh -o'"
+    if: ${{ inputs.RUN_ADL_BENCH }} == "1"
+
+
