@@ -27,7 +27,7 @@ def XsmmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [1, 2, 3, 4]>,
 // BinaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_BinaryOp : Xsmm_Op<"binary"> {
+def Xsmm_BinaryOp : Xsmm_Op<"binary", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = "binary operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
@@ -64,7 +64,7 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary"> {
 // UnaryOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
+def Xsmm_UnaryOp : Xsmm_Op<"unary", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = "unary call operation.";
   let description = [{
     Binary operation. See description for Xsmm_TernaryCallOp. The only
@@ -97,7 +97,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary"> {
 
 def GemmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [2, 3]>, I64]>;
 
-def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
+def Xsmm_GemmOp : Xsmm_Op<"gemm", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = "matmul call operation.";
   let arguments = (ins Xsmm_DataType:$data_type, Variadic<GemmMemRef>:$inputs);
 
@@ -125,7 +125,7 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm"> {
 
 def BrgemmMemRef : AnyTypeOf<[StaticMemRefRankOf<[F32, BF16], [2, 3, 4]>, I64]>;
 
-def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
+def Xsmm_BrgemmOp : Xsmm_Op<"brgemm", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = "brgemm call operation.";
   let arguments = (ins Xsmm_DataType:$data_type, Variadic<BrgemmMemRef>:$inputs);
 
@@ -153,7 +153,8 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm"> {
 // FusedBrgemmOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm"> {
+def Xsmm_FusedBrgemmOp : Xsmm_Op<"fused_brgemm", 
+                         [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = "fused brgemm call operation.";
   let arguments = (ins Xsmm_DataType:$data_type, Variadic<XsmmMemRef>:$inputs);
 
