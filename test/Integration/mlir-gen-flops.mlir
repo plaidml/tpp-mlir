@@ -1,19 +1,19 @@
 // Unit sizes
-// RUN: mlir-gen --kernel=training --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=MATMUL-UNIT
-// RUN: mlir-gen --kernel=training --bias --relu --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=FC-UNIT
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=MLP-UNIT
+// RUN: mlir-gen --kernel=args --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=MATMUL-UNIT
+// RUN: mlir-gen --kernel=args --bias --relu --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=FC-UNIT
+// RUN: mlir-gen --kernel=const --bias --relu --seed=0 --float-width=32 --batch=1 --layers=1,1 2>&1 | FileCheck %s --check-prefix=MLP-UNIT
 // Small sizes
-// RUN: mlir-gen --kernel=training --seed=0 --float-width=32 --batch=8 --layers=4,16 2>&1 | FileCheck %s --check-prefix=MATMUL-SMALL
-// RUN: mlir-gen --kernel=training --bias --relu --seed=0 --float-width=32 --batch=8 --layers=4,16 2>&1 | FileCheck %s --check-prefix=FC-SMALL
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=0 --float-width=32 --batch=8 --layers=4,8,16 2>&1 | FileCheck %s --check-prefix=MLP-SMALL
+// RUN: mlir-gen --kernel=args --seed=0 --float-width=32 --batch=8 --layers=4,16 2>&1 | FileCheck %s --check-prefix=MATMUL-SMALL
+// RUN: mlir-gen --kernel=args --bias --relu --seed=0 --float-width=32 --batch=8 --layers=4,16 2>&1 | FileCheck %s --check-prefix=FC-SMALL
+// RUN: mlir-gen --kernel=const --bias --relu --seed=0 --float-width=32 --batch=8 --layers=4,8,16 2>&1 | FileCheck %s --check-prefix=MLP-SMALL
 // Large sizes + no tiling
-// RUN: mlir-gen --kernel=training --seed=0 --float-width=32 --batch=128 --layers=1024,4096 2>&1 | FileCheck %s --check-prefix=MATMUL-LARGE
-// RUN: mlir-gen --kernel=training --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,4096 2>&1 | FileCheck %s --check-prefix=FC-LARGE
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,1024,1024 2>&1 | FileCheck %s --check-prefix=MLP-LARGE
+// RUN: mlir-gen --kernel=args --seed=0 --float-width=32 --batch=128 --layers=1024,4096 2>&1 | FileCheck %s --check-prefix=MATMUL-LARGE
+// RUN: mlir-gen --kernel=args --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,4096 2>&1 | FileCheck %s --check-prefix=FC-LARGE
+// RUN: mlir-gen --kernel=const --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,1024,1024 2>&1 | FileCheck %s --check-prefix=MLP-LARGE
 // Large sizes + tiling
-// RUN: mlir-gen --kernel=training --seed=0 --float-width=32 --batch=128 --layers=1024,4096 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=MATMUL-LARGE
-// RUN: mlir-gen --kernel=training --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,4096 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=FC-LARGE
-// RUN: mlir-gen --kernel=inference --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,1024,1024 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=MLP-LARGE
+// RUN: mlir-gen --kernel=args --seed=0 --float-width=32 --batch=128 --layers=1024,4096 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=MATMUL-LARGE
+// RUN: mlir-gen --kernel=args --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,4096 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=FC-LARGE
+// RUN: mlir-gen --kernel=const --bias --relu --seed=0 --float-width=32 --batch=128 --layers=1024,1024,1024 --tiles=64,64,64 2>&1 | FileCheck %s --check-prefix=MLP-LARGE
 
 // Validate that flops are computed correctly
 // MATMUL-UNIT: // BENCH_TOTAL_FLOPS: 2

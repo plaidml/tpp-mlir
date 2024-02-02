@@ -28,8 +28,8 @@ using namespace mlir;
 // Type of kernel to be generated
 llvm::cl::opt<std::string> kernel("kernel",
                                   llvm::cl::desc("Kernel type to be generated"),
-                                  llvm::cl::value_desc("inference,training"),
-                                  llvm::cl::init("inference"));
+                                  llvm::cl::value_desc("const,args"),
+                                  llvm::cl::init("const"));
 
 // Input layer
 llvm::cl::opt<unsigned> batch("batch", llvm::cl::desc("Mini batch size"),

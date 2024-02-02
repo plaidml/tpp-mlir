@@ -75,9 +75,9 @@ class MLIRGenerator {
   bool enableSoftmax;
 
   /// List of supported kernel types that can be generated
-  ///  * Inference: Generates weights and biases as constant (RO).
-  ///  * Training: Generates weights and biaseds as arguments (RW).
-  enum class KernelType { Inference, Training };
+  ///  * Const: Generates weights and biases as constant (RO).
+  ///  * Args: Generates weights and biaseds as arguments (RW).
+  enum class KernelType { Const, Args };
 
   /// Type of kernel to be generated
   KernelType kernelType;
