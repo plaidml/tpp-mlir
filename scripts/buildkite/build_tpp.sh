@@ -72,7 +72,7 @@ if [ ! "${PROJECT_DIR}" ]; then
   exit 1
 fi
 if [ ! "${BUILD_DIR}" ]; then
-  BUILD_DIR="/tmp/tpp"
+  BUILD_DIR="build-${COMPILER}"
 fi
 BUILD_DIR=$(realpath ${BUILD_DIR})
 BUILD_DIR=${BUILD_DIR:-build-${COMPILER}}

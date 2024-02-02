@@ -12,43 +12,48 @@ env:
 
 jobs:
   Check_LLVM:
-    runs-on: self-hosted
+    runs-on: pcl-tiergarten
     steps:
+      - uses: actions/checkout@v4
       - name: Check LLVM
         run: "BUILD=1 scripts/buildkite/check_llvm.sh"
 
   TPP-MLIR-gcc-rel:
-    runs-on: self-hosted
+    runs-on: pcl-tiergarten
     needs: Check_LLVM
     steps:
+      - uses: actions/checkout@v4
       - name: GCC Release
         run: "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
             'KIND=Release COMPILER=gcc CHECK=1 ONEDNN=1 \
-            scripts/buildkite/build_tpp.sh'"
+            ${{ github.workspace }}/scripts/buildkite/build_tpp.sh'"
 
   TPP-MLIR-gcc-deb:
-    runs-on: self-hosted
+    runs-on: pcl-tiergarten
     needs: Check_LLVM
     steps:
+      - uses: actions/checkout@v4
       - name: GCC Debug
         run: "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
             'KIND=Debug COMPILER=gcc CHECK=1 ONEDNN=1 \
-            scripts/buildkite/build_tpp.sh'"
+            ${{ github.workspace }}/scripts/buildkite/build_tpp.sh'"
 
   TPP-MLIR-clang-rel:
-    runs-on: self-hosted
+    runs-on: pcl-tiergarten
     needs: Check_LLVM
     steps:
+      - uses: actions/checkout@v4
       - name: Clang Release
         run: "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
             'KIND=Release COMPILER=clang LINKER=lld CHECK=1 ONEDNN=1 \
-            scripts/buildkite/build_tpp.sh'"
+            ${{ github.workspace }}/scripts/buildkite/build_tpp.sh'"
 
   TPP-MLIR-clang-deb:
-    runs-on: self-hosted
+    runs-on: pcl-tiergarten
     needs: Check_LLVM
     steps:
+      - uses: actions/checkout@v4
       - name: Clang Debug Sanitizers
         run: "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
                 'KIND=Debug COMPILER=clang LINKER=lld SANITIZERS=1 CHECK=1 ONEDNN=1 \
-                scripts/buildkite/build_tpp.sh'"
+                ${{ github.workspace }}/scripts/buildkite/build_tpp.sh'"
