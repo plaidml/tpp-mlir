@@ -57,8 +57,8 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
 
   // Parse kernel type
   auto optKernel = llvm::StringSwitch<std::optional<KernelType>>(kernelStr)
-                       .CaseLower("inference", KernelType::Inference)
-                       .CaseLower("training", KernelType::Training)
+                       .CaseLower("const", KernelType::Const)
+                       .CaseLower("args", KernelType::Args)
                        .Default(std::nullopt);
   assert(optKernel && "Invalid kernel type");
   kernelType = *optKernel;
@@ -156,8 +156,8 @@ Value MLIRGenerator::createLayer(LayerArgs &args) {
 }
 
 void MLIRGenerator::createKernel() {
-  assert(((kernelType == KernelType::Inference) ||
-          (kernelType == KernelType::Training)) &&
+  assert(((kernelType == KernelType::Const) ||
+          (kernelType == KernelType::Args)) &&
          "Invalid kernel type");
   OpBuilder::InsertionGuard guard(builder);
 
@@ -173,7 +173,7 @@ void MLIRGenerator::createKernel() {
   // We need to create the function type list first, to set the values from
   // the function's arguments on the kernel type `layer`.
   SmallVector<Type, 1> inputTypes{firstArg.input.type};
-  if (kernelType == KernelType::Training) {
+  if (kernelType == KernelType::Args) {
     for (auto &layer : args) {
       inputTypes.push_back(layer.weight.type);
       if (enableBias)
@@ -202,7 +202,7 @@ void MLIRGenerator::createKernel() {
       arg.input.value = lastOutput;
 
     // Initialize weights and biases
-    if (kernelType == KernelType::Training) {
+    if (kernelType == KernelType::Args) {
       arg.weight.value = func.getArgument(argPos++);
       if (enableBias)
         arg.bias.value = func.getArgument(argPos++);
