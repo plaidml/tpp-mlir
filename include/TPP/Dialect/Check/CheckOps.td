@@ -6,6 +6,7 @@
 #define CHECK_DIALECT_CHECK_OPS
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def CHECK_Dialect : Dialect {
   let name = "check";
@@ -15,7 +16,8 @@ def CHECK_Dialect : Dialect {
   }];
 }
 
-def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
+def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true",
+    [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operand is true}];
   let description = [{
     Verifies that the operand contains a true value, which is represented by
@@ -39,7 +41,8 @@ def CHECK_ExpectAlmostEqOp :
     Op<CHECK_Dialect, "expect_almost_eq",
     [TypesMatchWith<"Operand types match",
                     "lhs", "rhs",
-                    "$_self.cast<ShapedType>()">]> {
+                    "$_self.cast<ShapedType>()">,
+    MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
     Verifies that the tensor operands with float elements are
@@ -64,7 +67,7 @@ def CHECK_ExpectAlmostEqOp :
 }
 
 def CHECK_ExpectSaneOp :
-    Op<CHECK_Dialect, "expect_sane"> {
+    Op<CHECK_Dialect, "expect_sane", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operand is neither NaN nor infinite}];
   let description = [{
     Verifies that the contents of tensor operand with float elements
