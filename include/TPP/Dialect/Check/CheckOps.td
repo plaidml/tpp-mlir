@@ -67,7 +67,7 @@ def CHECK_ExpectAlmostEqOp :
 }
 
 def CHECK_ExpectSaneOp :
-    Op<CHECK_Dialect, "expect_sane", [MemoryEffects<[MemWite, MemRead]>]> {
+    Op<CHECK_Dialect, "expect_sane", [MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operand is neither NaN nor infinite}];
   let description = [{
     Verifies that the contents of tensor operand with float elements
