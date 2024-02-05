@@ -4,7 +4,6 @@ add_mlir_library(TPPGPU
   GpuConversion.cpp
   GpuToCuda.cpp
   GpuToVulkan.cpp
-  GPUToSPIRVPass.cpp
   SetSPIRVCapabilities.cpp
   SetSPIRVAbiAttribute.cpp
   GpuVulkanAbi.cpp

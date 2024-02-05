@@ -377,31 +377,6 @@ def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   ];
 }
 
-def GPUToSPIRV : Pass<"gpu-to-spirv", "ModuleOp"> {
-  let summary = "Convert GPU dialect to SPIR-V dialect";
-  let description = [{
-    This pass converts supported GPU device ops to SPIR-V ops. It does not
-    handle GPU host ops.
-
-    A `gpu.func` op can have parameters to pass in resources. But in SPIR-V
-    entry functions cannot take parameters; they use descriptors to access
-    resources. By default, parameters to a `gpu.func` op will be converted to
-    global variables. These global variables will be assigned sequential binding
-    numbers following their order in the original `gpu.func` op, starting from
-    0, in set 0. One can attach `spirv.interface_var_abi` to those parameters
-    to control the set and binding if wanted.
-  }];
-  let dependentDialects = ["spirv::SPIRVDialect"];
-  let options = [
-    Option<"use64bitIndex", "use-64bit-index",
-           "bool", /*default=*/"false",
-           "Use 64-bit integers to convert index types">,
-    Option<"mapMemorySpace", "map-memory-space",
-           "bool", /*default=*/"true",
-           "Map memory space to SPIR-V storage">
-  ];
-}
-
 def SetSPIRVCapabilities : Pass<"set-spirv-capabilities", "ModuleOp"> {
   let summary = "Set SPIR-V capabilities.";
   let options = [

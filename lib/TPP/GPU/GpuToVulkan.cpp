@@ -76,7 +76,7 @@ private:
     // Create SPIRV kernels.
     pm.addPass(tpp::createSetSPIRVCapabilities());
     pm.addPass(tpp::createSetSPIRVAbiAttribute());
-    pm.addPass(tpp::createGPUToSPIRV());
+    pm.addPass(createConvertGPUToSPIRVPass(/*mapMemorySpace=*/true));
     pm.addNestedPass<spirv::ModuleOp>(
         spirv::createSPIRVLowerABIAttributesPass());
     pm.addNestedPass<spirv::ModuleOp>(spirv::createSPIRVUpdateVCEPass());
