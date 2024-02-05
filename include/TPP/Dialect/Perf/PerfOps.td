@@ -98,7 +98,6 @@ def Perf_StopTimerOp : Perf_Op<"stop_timer", []> {
 
 def Perf_BenchOp : Perf_Op<"bench",
     [AutomaticAllocationScope, SingleBlockImplicitTerminator<"perf::YieldOp">,
-     MemoryEffects<[MemWrite, MemRead, MemAlloc<AutomaticAllocationScopeResource>]>,
      RecursiveMemoryEffects,
      DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>,
      RangedTypesMatchWith<"iter_args types match types of yield",
