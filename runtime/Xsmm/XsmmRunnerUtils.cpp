@@ -127,7 +127,7 @@ extern "C" int64_t xsmm_gemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   l_shape.comp_type =
       dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
 
-  auto sgemm = libxsmm_dispatch_gemm_v2(l_shape, l_flags, l_prefetch_flags);
+  auto sgemm = libxsmm_dispatch_gemm(l_shape, l_flags, l_prefetch_flags);
   if (!sgemm) {
     fprintf(stderr, "failed to generate matmul func\n");
     fprintf(stderr, "dtype: %u\n", dtype);
@@ -165,7 +165,7 @@ xsmm_unary_dispatch(const libxsmm_meltw_unary_type op_type,
   unary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
   libxsmm_meltwfunction_unary kernel =
-      libxsmm_dispatch_meltw_unary_v2(op_type, unary_shape, unary_flags);
+      libxsmm_dispatch_meltw_unary(op_type, unary_shape, unary_flags);
   if (!kernel) {
     fprintf(stderr, "failed to generate unary func\n");
     fprintf(stderr, "op_type: %u\n", op_type);
@@ -197,7 +197,7 @@ xsmm_binary_dispatch(const libxsmm_meltw_binary_type op_type,
   binary_shape.ldo = static_cast<libxsmm_blasint>(ldo);
 
   libxsmm_meltwfunction_binary kernel =
-      libxsmm_dispatch_meltw_binary_v2(op_type, binary_shape, flags);
+      libxsmm_dispatch_meltw_binary(op_type, binary_shape, flags);
   if (!kernel) {
     fprintf(stderr, "failed to generate binary func\n");
     fprintf(stderr, "op_type: %u\n", op_type);
@@ -311,7 +311,7 @@ extern "C" int64_t xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   l_brconfig.br_stride_b_hint = stride_a * typeSize;
   l_brconfig.br_unroll_hint = 0;
 
-  auto sgemm = libxsmm_dispatch_brgemm_v2(l_shape, l_flags, l_prefetch_flags,
+  auto sgemm = libxsmm_dispatch_brgemm(l_shape, l_flags, l_prefetch_flags,
                                           l_brconfig);
   if (!sgemm) {
     fprintf(stderr, "failed to generate brgemm func\n");
@@ -407,7 +407,7 @@ xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
   l_postops.d_binary_type = binary_op_type;
   l_postops.ldd = ldc;
 
-  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+  auto sgemm = libxsmm_dispatch_brgemm_ext(
       l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
   if (!sgemm) {
     fprintf(stderr, "failed to generate fused brgemm func\n");
