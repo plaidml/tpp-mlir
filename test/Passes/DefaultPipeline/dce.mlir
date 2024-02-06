@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-pipeline -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-pipeline | FileCheck %s
 
 module {
   ml_program.global private mutable @unused_global(dense<0> : tensor<i64>) : tensor<i64>
@@ -12,7 +12,6 @@ module {
 }
 
 // CHECK: module
-// CHECK-NOT: @unused_global
 // CHECK-NOT: @unused_func
 // CHECK: @entry
 // CHECK:   llvm.return

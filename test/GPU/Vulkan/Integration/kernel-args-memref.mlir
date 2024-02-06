@@ -8,6 +8,10 @@
 // RUN:  -entry-point-result=void -e entry -print-mlir=mid 2>&1 | \
 // RUN: FileCheck %s --check-prefix=BENCH
 
+// XFAIL:*
+// gpu.launch_func has missing 'MemoryEffectOpInterface' and breaks deallocation pass
+// after LLVM fbb62d449c47bb0b49c0727c926373b41a8183c5
+
 module attributes {
   gpu.container_module,
   spirv.target_env = #spirv.target_env<
