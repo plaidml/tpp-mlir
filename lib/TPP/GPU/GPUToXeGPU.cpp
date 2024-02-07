@@ -355,6 +355,10 @@ struct GPUToXeGPU : public tpp::impl::GPUToXeGPUBase<GPUToXeGPU> {
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
+
+    // TODO: Move patterns to OpConversionPattern and add type converter
+    //       from WMMA types.
+    //       For an example, see WmmaOpsToSPIRV.
     populateGPUToXeGPUPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
