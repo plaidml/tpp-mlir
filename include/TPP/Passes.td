@@ -547,4 +547,23 @@ def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "func::FuncOp"> {
                            "vector::VectorDialect"];
 }
 
+def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
+  let summary = "Convert linalg dialect to XeGPU dialect.";
+  let description = [{
+    Lower linalg ops to XeGPU dialect.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "imex::xegpu::XeGPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect",
+                           "vector::VectorDialect"];
+  let options = [
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
