@@ -700,15 +700,15 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   return success();
 }
 
-// Convert linalg.matmul or linalg.batch_reduce_matmul to GPU-compatible kernel.
+// Convert a GEMM-like operation to an XeGPU kernel.
 template <typename LinalgOpTy>
-struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
+struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
   using OpRewritePattern<LinalgOpTy>::OpRewritePattern;
   // Constrain conversion to the supported GEMM-like ops.
   static_assert(llvm::is_one_of<LinalgOpTy, linalg::MatmulOp,
                                 linalg::BatchReduceMatmulOp>::value);
 
-  ConvertGemmLikeToGpu(MLIRContext *ctx, LinalgToXeGPUOptions options)
+  ConvertGemmLikeToXeGPU(MLIRContext *ctx, LinalgToXeGPUOptions options)
       : OpRewritePattern<LinalgOpTy>(ctx), options(options) {}
 
   LogicalResult matchAndRewrite(LinalgOpTy gemmLikeOp,
@@ -741,10 +741,10 @@ private:
   LinalgToXeGPUOptions options;
 };
 
-void populateLinalgToGpuPatterns(RewritePatternSet &patterns,
-                                 LinalgToXeGPUOptions options) {
-  patterns.add<ConvertGemmLikeToGpu<linalg::MatmulOp>,
-               ConvertGemmLikeToGpu<linalg::BatchReduceMatmulOp>>(
+void populateLinalgToXeGPUPatterns(RewritePatternSet &patterns,
+                                   LinalgToXeGPUOptions options) {
+  patterns.add<ConvertGemmLikeToXeGPU<linalg::MatmulOp>,
+               ConvertGemmLikeToXeGPU<linalg::BatchReduceMatmulOp>>(
       patterns.getContext(), options);
 }
 
@@ -753,7 +753,7 @@ struct LinalgToXeGPU : public tpp::impl::LinalgToXeGPUBase<LinalgToXeGPU> {
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateLinalgToGpuPatterns(patterns, LinalgToXeGPUOptions{kTile});
+    populateLinalgToXeGPUPatterns(patterns, LinalgToXeGPUOptions{kTile});
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
