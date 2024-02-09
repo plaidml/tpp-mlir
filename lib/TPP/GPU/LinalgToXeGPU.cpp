@@ -27,6 +27,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include <optional>
 
 using namespace mlir;
@@ -123,6 +125,81 @@ getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
   }
 
   return dpasTile;
+}
+
+static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
+                                           ArrayRef<Value> operands,
+                                           VectorType resType,
+                                           PatternRewriter &rewriter) {
+  Location loc = genericOp.getLoc();
+
+  // Expect operands to be already loaded vectors.
+  for (auto operand : operands) {
+    if (!isa<VectorType>(operand.getType()))
+      return std::nullopt;
+  }
+
+  if (structured_match::utils::isTwoDReluOp(genericOp, /*operands=*/nullptr)) {
+    assert(operands.size() == 1 &&
+           "Invalid number of operands for generic 2D ReLU");
+
+    auto eltType = resType.getElementType();
+    Value zeroConst;
+
+    if (isa<FloatType>(eltType)) {
+      auto floatType = cast<FloatType>(eltType);
+      zeroConst = rewriter.create<arith::ConstantFloatOp>(
+          loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
+    } else if (isa<IntegerType>(eltType)) {
+      zeroConst = rewriter.create<arith::ConstantIntOp>(loc, 0, eltType);
+    } else {
+      // Unhandled type. Bail out.
+      return std::nullopt;
+    }
+
+    auto zeroVec =
+        rewriter.create<vector::BroadcastOp>(loc, resType, zeroConst);
+
+    return rewriter
+        .replaceOpWithNewOp<arith::MaximumFOp>(genericOp, resType, operands[0],
+                                               zeroVec)
+        .getResult();
+  }
+
+  if (structured_match::utils::isTwoDAddOp(genericOp, /*operands=*/nullptr)) {
+    assert(operands.size() == 2 &&
+           "Invalid number of operands for generic 2D add");
+    return rewriter
+        .replaceOpWithNewOp<arith::AddFOp>(genericOp, resType, operands[0],
+                                           operands[1])
+        .getResult();
+  }
+
+  return std::nullopt;
+}
+
+static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
+                                           ArrayRef<Value> operands,
+                                           VectorType resType,
+                                           PatternRewriter &rewriter) {
+  // Expect operands to be already loaded vectors.
+  for (auto operand : operands) {
+    if (!isa<VectorType>(operand.getType()))
+      return std::nullopt;
+  }
+
+  return llvm::TypeSwitch<Operation *, std::optional<Value>>(linalgOp)
+      .Case([&](linalg::AddOp addOp) {
+        assert(operands.size() == 2 && "Invalid number of operands for add");
+        return rewriter
+            .replaceOpWithNewOp<arith::AddFOp>(addOp, resType, operands[0],
+                                               operands[1])
+            .getResult();
+      })
+      .Case([&](linalg::GenericOp genericOp) {
+        return lowerGenericOp(genericOp, operands, resType, rewriter);
+      })
+      .Default([&](Operation *op) { return std::nullopt; });
 }
 
 // Fuse an elementwise consumer operation.
@@ -666,8 +743,9 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
     storeOps.push_back(storeOp);
   }
 
-  // (void)fuseEltwiseConsumers<SmallVector<gpu::SubgroupMmaStoreMatrixOp>>(
-  //     linalgOp, storeOps, rewriter);
+  // (void)fuseEltwiseConsumers<SmallVector<xegpu::StoreNDO>>(linalgOp,
+  // storeOps,
+  //                                                          rewriter);
 
   rewriter.eraseOp(linalgOp);
 
