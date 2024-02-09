@@ -44,38 +44,6 @@ namespace tpp {
 
 namespace {
 
-// Creates an outermost parallel loop wrapper around an operation to represent
-// number of GPU blocks.
-// If there is already a parallel loop present, no operation is created and
-// a nullopt is returned instead.
-static std::optional<scf::ParallelOp>
-createGpuBlocksWrapper(Operation *op, ArrayRef<int64_t> blockDims,
-                       PatternRewriter &rewriter) {
-  assert(blockDims.size() <= 3 && "Too many GPU blocks dimensions");
-
-  auto loc = op->getLoc();
-
-  auto *parentOp = op->getParentOp();
-  if (isa<scf::ParallelOp>(parentOp))
-    return std::nullopt;
-
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-
-  SmallVector<Value> gpuBlocks;
-  SmallVector<Value> lbs;
-  SmallVector<Value> steps;
-  for (auto blockDim : blockDims) {
-    auto blockSize = rewriter.create<arith::ConstantIndexOp>(loc, blockDim);
-    gpuBlocks.push_back(blockSize);
-    // Add matching number of lbs and steps.
-    lbs.push_back(zero);
-    steps.push_back(one);
-  }
-
-  return rewriter.create<scf::ParallelOp>(loc, lbs, gpuBlocks, steps);
-}
-
 // Return DPAS tile sizes if the gemm-like operation fits DPAS hardware.
 static std::optional<SmallVector<int64_t>>
 getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
@@ -127,6 +95,8 @@ getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
   return dpasTile;
 }
 
+// Matche and, if possible, lower a generic operation to an XeGPU compatible op.
+// Returns the result of the lowered op or nullopt, otherwise.
 static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
                                            ArrayRef<Value> operands,
                                            VectorType resType,
@@ -176,6 +146,8 @@ static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
   return std::nullopt;
 }
 
+// Lower an elementwise operation to an XeGPU compatible op.
+// Returns the result of the lowered op or nullopt, otherwise.
 static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
                                            ArrayRef<Value> operands,
                                            VectorType resType,
@@ -202,7 +174,7 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
 }
 
 // Fuse an elementwise consumer operation.
-// Returns updated store op or nullopt if the fusion fails.
+// Returns updated store ops or nullopt if the fusion fails.
 static std::optional<SmallVector<xegpu::StoreNDOp>>
 eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
               SmallVector<xegpu::StoreNDOp> rootStoreOps,
@@ -213,7 +185,6 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
   auto ctx = rootOp.getContext();
 
   auto rootOutput = rootOp.getDpsInits()[0];
-  auto outputType = rootOutput.getType().cast<ShapedType>();
 
   // Gather additional operands of the fused consumer.
   // This excludes the root's output which values are already loaded into
@@ -234,6 +205,8 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
   auto readCacheHint =
       xegpu::CacheReadHintAttr::get(ctx, xegpu::CacheReadHint::CACHED);
 
+  // For each store op, take a corresponding slice from the consumer operands
+  // and load them into registers.
   for (auto storeOp : rootStoreOps) {
     auto storedVal = storeOp.getValue();
     auto storeDesc = storeOp.getTensorDesc();
@@ -266,6 +239,7 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
       operands.push_back(loadedVec);
     }
 
+    // Lower to a vectorized eltwise op.
     auto newRes = lowerEltwiseOp(
         consumerOp, operands, cast<VectorType>(storedVal.getType()), rewriter);
     if (!newRes)
@@ -379,17 +353,6 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   Location loc = linalgOp.getLoc();
   auto ctx = linalgOp.getContext();
 
-  // If there is no parallel loop, create a unit blocks wrapper around the
-  // current op.
-  // This ensures that WMMA operations are created at the thread level (inner
-  // nested parallel loops).
-  //
-  // TODO: Move out to a separate pass before linalg lowering.
-  //       At this point GPU operations should already be outlined.
-  // auto blocksLoop = createGpuBlocksWrapper(linalgOp, {1, 1}, rewriter);
-  // if (blocksLoop)
-  //   rewriter.setInsertionPoint(blocksLoop->getBody()->getTerminator());
-
   auto matA = linalgOp.getDpsInputs()[0];
   auto matB = linalgOp.getDpsInputs()[1];
   auto matC = linalgOp.getDpsInits()[0];
@@ -439,7 +402,6 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   bool isBrgemm = isa<linalg::BatchReduceMatmulOp>(linalgOp);
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
 
   int dimM = typeC.getShape()[0];
   int dimN = typeC.getShape()[1];
