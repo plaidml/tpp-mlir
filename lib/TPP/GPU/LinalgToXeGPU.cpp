@@ -161,8 +161,7 @@ static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
         rewriter.create<vector::BroadcastOp>(loc, resType, zeroConst);
 
     return rewriter
-        .replaceOpWithNewOp<arith::MaximumFOp>(genericOp, resType, operands[0],
-                                               zeroVec)
+        .create<arith::MaximumFOp>(loc, resType, operands[0], zeroVec)
         .getResult();
   }
 
@@ -170,8 +169,7 @@ static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
     assert(operands.size() == 2 &&
            "Invalid number of operands for generic 2D add");
     return rewriter
-        .replaceOpWithNewOp<arith::AddFOp>(genericOp, resType, operands[0],
-                                           operands[1])
+        .create<arith::AddFOp>(loc, resType, operands[0], operands[1])
         .getResult();
   }
 
@@ -182,6 +180,8 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
                                            ArrayRef<Value> operands,
                                            VectorType resType,
                                            PatternRewriter &rewriter) {
+  Location loc = linalgOp.getLoc();
+
   // Expect operands to be already loaded vectors.
   for (auto operand : operands) {
     if (!isa<VectorType>(operand.getType()))
@@ -192,8 +192,7 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
       .Case([&](linalg::AddOp addOp) {
         assert(operands.size() == 2 && "Invalid number of operands for add");
         return rewriter
-            .replaceOpWithNewOp<arith::AddFOp>(addOp, resType, operands[0],
-                                               operands[1])
+            .create<arith::AddFOp>(loc, resType, operands[0], operands[1])
             .getResult();
       })
       .Case([&](linalg::GenericOp genericOp) {
@@ -204,85 +203,75 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
 
 // Fuse an elementwise consumer operation.
 // Returns updated store op or nullopt if the fusion fails.
-static std::optional<SmallVector<gpu::SubgroupMmaStoreMatrixOp>>
-eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
-              SmallVector<gpu::SubgroupMmaStoreMatrixOp> rootStoreOps,
+static std::optional<SmallVector<xegpu::StoreNDOp>>
+eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
+              SmallVector<xegpu::StoreNDOp> rootStoreOps,
               PatternRewriter &rewriter) {
   assert(rootStoreOps.size() > 0 && "Requires at least one store op");
 
   Location loc = rootOp.getLoc();
+  auto ctx = rootOp.getContext();
 
   auto rootOutput = rootOp.getDpsInits()[0];
   auto outputType = rootOutput.getType().cast<ShapedType>();
 
-  // Must be a floating point type.
-  // TODO: Add integer support.
-  auto floatType = dyn_cast<FloatType>(outputType.getElementType());
-  if (!floatType)
-    return std::nullopt;
+  // Gather additional operands of the fused consumer.
+  // This excludes the root's output which values are already loaded into
+  // registers and accessible through the store ops.
+  SmallVector<Value> extraOperands;
+  for (auto operand : consumerOp.getDpsInputOperands()) {
+    if (operand->get() != rootOutput)
+      extraOperands.push_back(operand->get());
+  }
 
-  // Insert fused eltwise ops before the store and later replace the store
-  // with a new result.
+  // Insert fused eltwise ops before the stores and later replace the stores
+  // with a new results.
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(rootStoreOps[0]);
 
-  // It is assumed that WMMA tile sizes do not vary between different
-  // operations i.e., the original workload has been split into
-  // a series of operations using the same WMMA configuration.
-  gpu::MMAMatrixType mmaOutputType = rootStoreOps[0].getSrc().getType();
-  auto leadingDim = rootStoreOps[0].getLeadDimension();
-
   // Collect new results after fusion.
   SmallVector<Value> fusedRes;
+  auto readCacheHint =
+      xegpu::CacheReadHintAttr::get(ctx, xegpu::CacheReadHint::CACHED);
 
-  SmallVector<Value> operands;
-  if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
-    // Get the value to be added - load the tile first.
-    // Must be a buffer of the same type - scalar broadcast is not supported.
-    // TODO: Add support for eltwise with broadcast.
-    auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
-    if (addValue.getType() != rootOutput.getType())
+  for (auto storeOp : rootStoreOps) {
+    auto storedVal = storeOp.getValue();
+    auto storeDesc = storeOp.getTensorDesc();
+    auto descOp = cast<xegpu::CreateNdDescOp>(storeDesc.getDefiningOp());
+
+    // Create descriptors for the extra operands.
+    SmallVector<Value> tensorDescs;
+    for (auto operand : extraOperands) {
+      auto tensorDesc = rewriter
+                            .create<xegpu::CreateNdDescOp>(
+                                loc, storeDesc.getType(), operand,
+                                descOp.getOffsets(), descOp.getShape(),
+                                descOp.getStrides(), descOp.getStaticOffsets(),
+                                descOp.getBoundaryCheck(), descOp.getMode())
+                            .getResult();
+      tensorDescs.push_back(tensorDesc);
+    }
+
+    // Operands for the consumer op.
+    // This always includes the previous result held by the store op.
+    // Load values of the extra operands into registers.
+    SmallVector<Value> operands{storedVal};
+    for (auto tensorDesc : tensorDescs) {
+      auto loadedVec = rewriter.create<xegpu::LoadNDOp>(
+          loc, storedVal.getType(), tensorDesc, /*vnni_axis=*/nullptr,
+          /*transpose=*/nullptr,
+          /*l1_hint=*/readCacheHint,
+          /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint,
+          storeOp.getMode());
+      operands.push_back(loadedVec);
+    }
+
+    auto newRes = lowerEltwiseOp(
+        consumerOp, operands, cast<VectorType>(storedVal.getType()), rewriter);
+    if (!newRes)
       return std::nullopt;
 
-    for (gpu::SubgroupMmaStoreMatrixOp rootStoreOp : rootStoreOps) {
-      auto storeIndices = rootStoreOp.getIndices();
-
-      // Fuse the add into the matmul body.
-      auto loadOp =
-          rewriter
-              .create<gpu::SubgroupMmaLoadMatrixOp>(
-                  loc, mmaOutputType, addValue, storeIndices, leadingDim,
-                  /*transpose=*/UnitAttr())
-              .getRes();
-      auto eltwiseAttr = gpu::MMAElementwiseOp::ADDF;
-      auto addRes =
-          rewriter
-              .create<gpu::SubgroupMmaElementwiseOp>(
-                  loc, mmaOutputType, ValueRange{rootStoreOp.getSrc(), loadOp},
-                  eltwiseAttr)
-              .getRes();
-      fusedRes.push_back(addRes);
-    }
-  } else if (structured_match::utils::isTwoDReluOp(consumer, &operands)) {
-    Value zeroFloat = rewriter.create<arith::ConstantFloatOp>(
-        loc, APFloat::getZero(floatType.getFloatSemantics()), floatType);
-
-    Value zeroTile = rewriter.create<gpu::SubgroupMmaConstantMatrixOp>(
-        loc, mmaOutputType, zeroFloat);
-    for (auto rootStoreOp : rootStoreOps) {
-      // Fuse the relu into the matmul body.
-      auto eltwiseAttr = gpu::MMAElementwiseOp::MAXF;
-      auto maxRes =
-          rewriter
-              .create<gpu::SubgroupMmaElementwiseOp>(
-                  loc, mmaOutputType,
-                  ValueRange{rootStoreOp.getSrc(), zeroTile}, eltwiseAttr)
-              .getRes();
-      fusedRes.push_back(maxRes);
-    }
-  } else {
-    // Not a fusable operation. Bail out.
-    return std::nullopt;
+    fusedRes.push_back(*newRes);
   }
 
   // Fusion must have failed, if number of new results is different.
@@ -291,14 +280,18 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
     return std::nullopt;
 
   // Store the new result.
-  SmallVector<gpu::SubgroupMmaStoreMatrixOp> newStores;
-  for (size_t i = 0; i < rootStoreOps.size(); i++) {
-    auto storeIndices = rootStoreOps[i].getIndices();
+  auto writeCacheHint =
+      xegpu::CacheWriteHintAttr::get(ctx, xegpu::CacheWriteHint::WRITE_BACK);
+  SmallVector<xegpu::StoreNDOp> newStores;
 
-    auto newStore = rewriter.create<gpu::SubgroupMmaStoreMatrixOp>(
-        loc, fusedRes[i], rootStoreOps[i].getDstMemref(), storeIndices,
-        leadingDim,
-        /*transpose=*/UnitAttr());
+  for (size_t i = 0; i < rootStoreOps.size(); i++) {
+    auto storeDesc = rootStoreOps[i].getTensorDesc();
+
+    auto newStore = rewriter.create<xegpu::StoreNDOp>(
+        loc, storeDesc, fusedRes[i],
+        /*l1_hint=*/writeCacheHint,
+        /*l2_hint=*/writeCacheHint,
+        /*l3_hint=*/writeCacheHint, rootStoreOps[i].getMode());
     newStores.push_back(newStore);
   }
 
@@ -306,7 +299,7 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   for (size_t i = 0; i < rootStoreOps.size(); i++)
     rewriter.replaceOp(rootStoreOps[i], newStores[i]);
 
-  rewriter.eraseOp(consumer);
+  rewriter.eraseOp(consumerOp);
 
   return newStores;
 }
@@ -354,19 +347,14 @@ getFusableConsumers(linalg::LinalgOp rootOp) {
 //
 // Fusion bails on the first mismatch.
 // Returns updated store ops.
-template <typename StoreTy>
-static StoreTy fuseEltwiseConsumers(linalg::LinalgOp rootOp,
-                                    StoreTy rootStoreOps,
-                                    PatternRewriter &rewriter) {
-  // Constrain conversion to the supported fusion types.
-  static_assert(
-      llvm::is_one_of<StoreTy, memref::StoreOp,
-                      SmallVector<gpu::SubgroupMmaStoreMatrixOp>>::value);
-
+static SmallVector<xegpu::StoreNDOp>
+fuseEltwiseConsumers(linalg::LinalgOp rootOp,
+                     SmallVector<xegpu::StoreNDOp> rootStoreOps,
+                     PatternRewriter &rewriter) {
   auto consumers = getFusableConsumers(rootOp);
 
   for (auto op : consumers) {
-    std::optional<StoreTy> updatedStoreOps = std::nullopt;
+    std::optional<SmallVector<xegpu::StoreNDOp>> updatedStoreOps = std::nullopt;
 
     updatedStoreOps = eltwiseFusion(rootOp, op, rootStoreOps, rewriter);
 
@@ -743,9 +731,7 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
     storeOps.push_back(storeOp);
   }
 
-  // (void)fuseEltwiseConsumers<SmallVector<xegpu::StoreNDO>>(linalgOp,
-  // storeOps,
-  //                                                          rewriter);
+  (void)fuseEltwiseConsumers(linalgOp, storeOps, rewriter);
 
   rewriter.eraseOp(linalgOp);
 
