@@ -411,6 +411,20 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   }
   rewriter.create<xegpu::CompileHintOp>(loc);
 
+  // DPAS only works with F32 accumulators.
+  auto dpasResType =
+      VectorType::get(dpasTypeC.getShape(), FloatType::getF32(ctx));
+
+  // Extend the accumulation values if needed.
+  auto isOutF16 = typeC.getElementType().isF16();
+  if (isOutF16) {
+    for (size_t i = 0; i < loadVecC.size(); i++) {
+      auto extOp =
+          rewriter.create<arith::ExtFOp>(loc, dpasResType, loadVecC[i]);
+      loadVecC[i] = extOp.getOut();
+    }
+  }
+
   // Create a loop and step into it.
   auto startLoop = [&](int lb, int ub, int step,
                        ValueRange iterArgs) -> scf::ForOp {
@@ -580,9 +594,7 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   // loop to minimize read after write conflicts between partial
   // computations of the same C sub-tile.
   SmallVector<Value> dpasResults = loadVecC;
-  // DPAS only works with F32 accumulators.
-  auto dpasResType =
-      VectorType::get(dpasTypeC.getShape(), FloatType::getF32(ctx));
+
   for (int k = 0; k < numTilesK; k++) {
     for (int m = 0; m < numTilesM; m++) {
       for (int n = 0; n < numTilesN; n++) {
@@ -630,6 +642,17 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   if (isBrgemm) {
     terminateLoop(batchLoop, results);
     results = batchLoop.getResults();
+  }
+
+  // Truncate the result values if needed.
+  if (isOutF16) {
+    auto truncType =
+        VectorType::get(dpasTypeC.getShape(), FloatType::getF16(ctx));
+    for (size_t i = 0; i < results.size(); i++) {
+      auto truncOp =
+          rewriter.create<arith::TruncFOp>(loc, truncType, results[i]);
+      results[i] = truncOp.getOut();
+    }
   }
 
   // Write back the final C sub-tiles results to the output buffer.
