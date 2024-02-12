@@ -13,10 +13,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: LLVM Base
         run: |-
-              command: "scripts/buildkite/check_llvm.sh || \
-              "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              scripts/buildkite/check_llvm.sh || \
+              ${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang \
-              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'"
+              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
   TPP-MLIR-LLVM-CUDA:
     runs-on: pcl-tiergarten
@@ -24,10 +24,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: LLVM CUDA
         run: |-
-              command: "scripts/buildkite/check_llvm.sh || \
-              "${{ secrets.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
+              scripts/buildkite/check_llvm.sh || \
+              ${{ secrets.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
-              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'"
+              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
   TPP-MLIR-LLVM-Vulkan:
     runs-on: pcl-tiergarten
@@ -35,8 +35,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: LLVM Vulkan
         run: |-
-              command: "scripts/buildkite/check_llvm.sh || \
-              "${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              scripts/buildkite/check_llvm.sh || \
+              ${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
-              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'"
+              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
