@@ -3,20 +3,15 @@ name: TPP-MLIR Base Tests
 on:
   workflow_dispatch:
   push:
-    branches: [ "ghactions" ]
   pull_request:
-    branches: [ "ghactions" ]
 
 env:
   NPROCS_LIMIT_LINK: 8
 
 jobs:
   Check_LLVM:
-    runs-on: pcl-tiergarten
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check LLVM
-        run: "BUILD=1 scripts/buildkite/check_llvm.sh"
+    uses: ./.github/workflows/tpp-llvm.yml
+    secrets: inherit
 
   TPP-MLIR-gcc-rel:
     runs-on: pcl-tiergarten
