@@ -484,20 +484,6 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   auto typeB = matB.getType().cast<ShapedType>();
   auto typeC = matC.getType().cast<ShapedType>();
 
-  auto stridesA = utils::getStaticStrides(matA);
-  auto stridesB = utils::getStaticStrides(matB);
-  auto stridesC = utils::getStaticStrides(matC);
-
-  if (failed(stridesA) || failed(stridesB) || failed(stridesC)) {
-    return rewriter.notifyMatchFailure(
-        linalgOp, "Expect static strides for MMA lowering");
-  }
-  if (stridesA->back() != 1 || stridesB->back() != 1 || stridesC->back() != 1) {
-    return rewriter.notifyMatchFailure(
-        linalgOp,
-        "Expect unit stride in the innermost dimension for MMA operations");
-  }
-
   int64_t dpasTileM = dpasTile[0];
   int64_t dpasTileN = dpasTile[1];
   int64_t dpasTileK = dpasTile[2];
@@ -823,6 +809,35 @@ static LogicalResult gemmToDPAS(linalg::LinalgOp linalgOp,
   return success();
 }
 
+LogicalResult isValidMemrefOperand(linalg::LinalgOp linalgOp, Value operand,
+                                   PatternRewriter &rewriter,
+                                   unsigned maxDims = 2) {
+  auto type = dyn_cast<MemRefType>(operand.getType());
+  if (!type) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expect memref operand for XeGPU lowering");
+  }
+
+  if (type.getShape().size() > maxDims) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Too high dimensionality for XeGPU operations");
+  }
+
+  auto strides = utils::getStaticStrides(operand);
+
+  if (failed(strides)) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expect static strides for XeGPU lowering");
+  }
+  if (strides->back() != 1) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "Expect unit stride in the innermost "
+                                       "dimension for XeGPU operations");
+  }
+
+  return success();
+}
+
 // Convert a GEMM-like operation to an XeGPU kernel.
 template <typename LinalgOpTy>
 struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
@@ -838,12 +853,24 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
                                 PatternRewriter &rewriter) const override {
     if (!gemmLikeOp.hasPureBufferSemantics()) {
       return rewriter.notifyMatchFailure(
-          gemmLikeOp, "Linalg brgemm to GPU expects memref type");
+          gemmLikeOp, "Linalg GEMM-like to GPU expects memref type");
     }
     if (gemmLikeOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           gemmLikeOp, "Expect static shape when mapping to GPU");
     }
+
+    for (auto input : gemmLikeOp.getDpsInputs()) {
+      // 3D inputs are also acceptable in case of brgemm.
+      auto isInputValid =
+          isValidMemrefOperand(gemmLikeOp, input, rewriter, /*maxDims=*/3);
+      if (failed(isInputValid))
+        return isInputValid;
+    }
+    auto isOutputValid =
+        isValidMemrefOperand(gemmLikeOp, gemmLikeOp.getDpsInits()[0], rewriter);
+    if (failed(isOutputValid))
+      return isOutputValid;
 
     // Ensure that reduction dimension tiling also works for smaller workloads.
     auto aType =
@@ -858,6 +885,148 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
     }
 
     return gemmToDPAS(gemmLikeOp, *dpasConfig, kTile, rewriter);
+  }
+
+private:
+  LinalgToXeGPUOptions options;
+};
+
+LogicalResult lowerToEltwiseXeGPU(linalg::LinalgOp linalgOp,
+                                  ArrayRef<int64_t> tileSizes,
+                                  PatternRewriter &rewriter) {
+  assert(tileSizes.size() == 2 && "Require 2D tile size for eltwise lowering");
+
+  Location loc = linalgOp.getLoc();
+  auto ctx = linalgOp.getContext();
+
+  auto output = linalgOp.getDpsInits()[0];
+  auto outputType = output.getType().cast<ShapedType>();
+  auto outputShape = outputType.getShape();
+
+  bool isOutput2D = outputShape.size() == 2;
+
+  auto dimM = outputShape[0];
+  auto dimN = isOutput2D ? outputShape[1] : 0;
+
+  SmallVector<int64_t> eltwiseTileShape{tileSizes[0]};
+  if (isOutput2D)
+    eltwiseTileShape.push_back(tileSizes[1]);
+
+  auto tensorDesc = xegpu::TensorDescType::get(
+      eltwiseTileShape, output.getType().cast<ShapedType>().getElementType());
+  auto xegpuMode = xegpu::Mode::VC;
+
+  // Create tiled tensor descriptors.
+  auto createDescs = [&](Value source) -> SmallVector<Value> {
+    SmallVector<Value> tiles;
+    for (int m = 0; m < dimM; m += tileSizes[0]) {
+      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
+      int n = 0;
+      do {
+        mlir::SmallVector<mlir::OpFoldResult> loadOffsets{rowIdx};
+
+        if (dimN > 0) {
+          Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
+          loadOffsets.push_back(colIdx);
+        }
+
+        Value tile = rewriter
+                         .create<xegpu::CreateNdDescOp>(
+                             loc, tensorDesc, source, loadOffsets,
+                             /*boundary_check=*/true, xegpuMode)
+                         .getResult();
+        tiles.push_back(tile);
+
+        n += tileSizes[1];
+      } while (n < dimN);
+    }
+
+    return tiles;
+  };
+
+  SmallVector<Value> outputTiles = createDescs(output);
+
+  SmallVector<SmallVector<Value>> loadedInputs;
+  for (auto input : linalgOp.getDpsInputs()) {
+    SmallVector<Value> inputTiles = createDescs(input);
+    SmallVector<Value> loadedVals;
+    for (auto tile : inputTiles) {
+      auto loadedVec = rewriter.create<xegpu::LoadNDOp>(
+          loc, tensorDesc, tile, /*vnni_axis=*/nullptr,
+          /*transpose=*/nullptr,
+          /*l1_hint=*/nullptr,
+          /*l2_hint=*/nullptr, /*l3_hint=*/nullptr, xegpuMode);
+      loadedVals.push_back(loadedVec);
+    }
+    loadedInputs.push_back(loadedVals);
+  }
+
+  auto resType =
+      VectorType::get(tensorDesc.getShape(), tensorDesc.getElementType());
+
+  SmallVector<Value> results;
+  for (size_t i = 0; i < outputTiles.size(); i++) {
+    SmallVector<Value> operands;
+    for (auto inputs : loadedInputs) {
+      operands.push_back(inputs[i]);
+    }
+    auto res = lowerEltwiseOp(linalgOp, operands, resType, rewriter);
+    if (!res)
+      return failure();
+
+    results.push_back(*res);
+  }
+
+  auto writeCacheHint =
+      xegpu::CacheWriteHintAttr::get(ctx, xegpu::CacheWriteHint::WRITE_BACK);
+
+  for (size_t i = 0; i < outputTiles.size(); i++) {
+    rewriter.create<xegpu::StoreNDOp>(loc, outputTiles[i], results[i],
+                                      /*l1_hint=*/writeCacheHint,
+                                      /*l2_hint=*/writeCacheHint,
+                                      /*l3_hint=*/writeCacheHint, xegpuMode);
+  }
+
+  return success();
+}
+
+// Convert a named elementwise operation to an XeGPU kernel.
+template <typename LinalgOpTy>
+struct ConvertNamedEltwiseToXeGPU : public OpRewritePattern<LinalgOpTy> {
+  using OpRewritePattern<LinalgOpTy>::OpRewritePattern;
+  // Constrain conversion to the supported GEMM-like ops.
+  static_assert(llvm::is_one_of<LinalgOpTy, linalg::MatmulOp,
+                                linalg::BatchReduceMatmulOp>::value);
+
+  ConvertNamedEltwiseToXeGPU(MLIRContext *ctx, LinalgToXeGPUOptions options)
+      : OpRewritePattern<LinalgOpTy>(ctx), options(options) {}
+
+  LogicalResult matchAndRewrite(LinalgOpTy eltwiseOp,
+                                PatternRewriter &rewriter) const override {
+    if (!eltwiseOp.hasPureBufferSemantics()) {
+      return rewriter.notifyMatchFailure(
+          eltwiseOp, "Linalg eltwise to GPU expects memref type");
+    }
+    if (eltwiseOp.hasDynamicShape()) {
+      return rewriter.notifyMatchFailure(
+          eltwiseOp, "Expect static shape when mapping to GPU");
+    }
+
+    for (auto input : eltwiseOp.getDpsInputs()) {
+      auto isInputValid = isValidMemrefOperand(eltwiseOp, input, rewriter);
+      if (failed(isInputValid))
+        return isInputValid;
+    }
+    auto isOutputValid =
+        isValidMemrefOperand(eltwiseOp, eltwiseOp.getDpsInits()[0], rewriter);
+    if (failed(isOutputValid))
+      return isOutputValid;
+
+    // TODO: Tile sizes for vectorized eltwise operations should be chosen
+    //       dynamically based on the workload and target hardware.
+    SmallVector<int64_t> tileSizes{8, 16};
+
+    return lowerToEltwiseXeGPU(eltwiseOp, tileSizes, rewriter);
   }
 
 private:
