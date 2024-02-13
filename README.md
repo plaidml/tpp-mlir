@@ -11,10 +11,9 @@ If you have a checkout with the previous name, please follow [these instructions
 
 ## Build Status
 
-| Build | Status |
-| ----- | ------ |
-| Tests | [![TPP-mlir](https://badge.buildkite.com/7c04eb392db7ba16b30684d80e0e4320254f7cf61558c6336f.svg?branch=main)](https://buildkite.com/intel/tpp-mlir) |
-| Benchmarks | [![TPP-benchmark](https://badge.buildkite.com/087a1980507200f059ce3661f6ddb33c227db858d115691bf9.svg?branch=main)](https://buildkite.com/intel/tpp-benchmark) |
+[![TPP-MLIR Base Tests](https://github.com/plaidml/tpp-mlir/actions/workflows/tpp-mlir.yml/badge.svg)](https://github.com/plaidml/tpp-mlir/actions/workflows/tpp-mlir.yml)
+
+[![TPP-MLIR Benchmarks](https://github.com/plaidml/tpp-mlir/actions/workflows/tpp-benchmark.yml/badge.svg)](https://github.com/plaidml/tpp-mlir/actions/workflows/tpp-benchmark.yml)
 
 ## How to setup the environment
 
