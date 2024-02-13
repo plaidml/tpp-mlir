@@ -5,20 +5,18 @@ on:
     inputs:
       RUN_SPR_BENCH:
         description: "Run on Sapphire Rapids"
-        default: 1
+        default: "1"
       RUN_ZEN_BENCH:
         description: "Run on Zen4"
-        default: 0
+        default: "0"
       RUN_ADL_BENCH:
         description: "Run on Raptor Lake"
-        default: 0
+        default: "0"
       RUN_CLX_BENCH:
         description: "Run on Coffee Lake"
-        default: 0
+        default: "0"
   push:
-    branches: [ "ghactions" ]
   pull_request:
-    branches: [ "ghactions" ]
 
 env:
   NPROCS_LIMIT_LINK: 8
@@ -26,11 +24,8 @@ env:
 
 jobs:
   Check_LLVM:
-    runs-on: pcl-tiergarten
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check LLVM
-        run: "BUILD=1 scripts/buildkite/check_llvm.sh"
+    uses: ./.github/workflows/tpp-llvm.yml
+    secrets: inherit
 
   TPP-MLIR-SPR-BASE:
     runs-on: pcl-tiergarten

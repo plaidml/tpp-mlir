@@ -25,28 +25,28 @@ git_commit() {
 
 # Check if a program is in the PATH
 check_program() {
-  PROG=$1
-  if ! which $PROG > /dev/null; then
-    echo "ERROR: '$PROG' not found!"
+  local PROG=${1}
+  if ! which ${PROG} > /dev/null; then
+    echo "ERROR: '${PROG}' not found!"
     exit 1
   fi
 }
 
 # Echoes and runs a program
 echo_run() {
-  PROGRAM=$*
+  local PROGRAM=$*
   echo "${PROGRAM}"
   ${PROGRAM}
 }
 
 # Get the LLVM version for this build
 llvm_version() {
-  LLVM_VERSION_FILE=$(git_root)/build_tools/llvm_version.txt
+  local LLVM_VERSION_FILE=$(git_root)/build_tools/llvm_version.txt
   if [ ! -f "${LLVM_VERSION_FILE}" ]; then
     echo "ERROR: cannot find ${LLVM_VERSION_FILE} for ${PWD}!"
     exit 1
   fi
-  LLVM_VERSION=$(cat "${LLVM_VERSION_FILE}")
+  local LLVM_VERSION=$(cat "${LLVM_VERSION_FILE}")
   if [ ! "${LLVM_VERSION}" ]; then
     echo "ERROR: cannot find LLVM version in ${LLVM_VERSION_FILE}!"
     exit 1
@@ -68,4 +68,20 @@ add_device_extensions() {
   fi
 
   echo ${BASE}
+}
+
+# Wait for a file to appear on an existing directory
+wait_for_file() {
+  local DIR="${1}"
+  local FILE="${1}/${2}"
+
+  if [ ! -d ${DIR} ]; then
+    echo "ERROR: Directory ${DIR} not found"
+  fi
+  echo "Waiting for ${FILE}..."
+  while [ ! -f ${FILE} ]; do
+    sleep 30
+    echo "."
+  done
+  echo "Found"
 }

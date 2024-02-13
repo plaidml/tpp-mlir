@@ -18,6 +18,19 @@ LLVM_VERSION=$(llvm_version)
 
 echo "LLVM version: ${LLVM_VERSION}"
 
+LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
+LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
+
+# If there's another process building it, wait.
+# Otherwise, make the dir quickly so others don't attempt at the same time
+if [ -d ${LLVM_INSTALL_DIR} ]; then
+  echo "LLVM being built by another process, results will be in ${LLVM_INSTALL_DIR}"
+  wait_for_file "${LLVM_INSTALL_DIR}" "bin/mlir-opt"
+  exit 0
+else
+  mkdir -p ${LLVM_INSTALL_DIR}
+fi
+
 # Destination for tar balls
 if [ ! "${LLVM_TAR_DIR}" ]; then
   LLVM_TAR_DIR="/tmp/tpp-llvm-tar"
@@ -47,8 +60,6 @@ fi
 rm ${LLVM_TAR_FILE}
 
 LLVM_PROJECT_DIR=${LLVM_TAR_DIR}/llvm-project-${LLVM_VERSION}
-LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
-LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
 
 # Environment setup
 echo "--- ENVIRONMENT"

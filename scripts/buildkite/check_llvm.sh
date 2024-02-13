@@ -19,11 +19,11 @@ LLVM_VERSION=$(llvm_version)
 LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
 LLVM_INSTALL_DIR=$(add_device_extensions ${LLVM_INSTALL_DIR} ${GPU})
 
-if [ -d "${LLVM_INSTALL_DIR}" ]; then
+if [ -f "${LLVM_INSTALL_DIR}/bin/mlir-opt" ]; then
   echo "Found $LLVM_VERSION"
   exit 0
 else
-  echo "Not Found ${LLVM_INSTALL_DIR}"
+  echo "Not Found 'mlir-opt' in ${LLVM_INSTALL_DIR}"
 fi
 
 # LLVM not found.
