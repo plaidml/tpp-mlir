@@ -18,6 +18,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -160,17 +161,139 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
       return std::nullopt;
   }
 
+  auto eltType = resType.getElementType();
+
   return llvm::TypeSwitch<Operation *, std::optional<Value>>(linalgOp)
-      .Case([&](linalg::AddOp addOp) {
+      .Case([&](linalg::AbsOp absOp) -> std::optional<Value> {
+        assert(operands.size() == 1 && "Invalid number of operands for abs");
+        if (isa<FloatType>(eltType)) {
+          return rewriter.create<math::AbsFOp>(loc, resType, operands[0])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          return rewriter.create<math::AbsIOp>(loc, resType, operands[0])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::AddOp addOp) -> std::optional<Value> {
         assert(operands.size() == 2 && "Invalid number of operands for add");
-        return rewriter
-            .create<arith::AddFOp>(loc, resType, operands[0], operands[1])
+        if (isa<FloatType>(eltType)) {
+          return rewriter
+              .create<arith::AddFOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          return rewriter
+              .create<arith::AddIOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::CeilOp ceilOp) -> std::optional<Value> {
+        assert(operands.size() == 1 && "Invalid number of operands for ceil");
+        return rewriter.create<math::CeilOp>(loc, resType, operands[0])
             .getResult();
       })
-      .Case([&](linalg::GenericOp genericOp) {
+      .Case([&](linalg::DivOp divOp) -> std::optional<Value> {
+        assert(operands.size() == 2 && "Invalid number of operands for div");
+        if (isa<FloatType>(eltType)) {
+          return rewriter
+              .create<arith::DivFOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          return rewriter
+              .create<arith::DivSIOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::DivUnsignedOp divUnsignedOp) -> std::optional<Value> {
+        assert(operands.size() == 2 &&
+               "Invalid number of operands for unsigned div");
+        if (isa<IntegerType>(eltType)) {
+          return rewriter
+              .create<arith::DivUIOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::ExpOp expOp) -> std::optional<Value> {
+        assert(operands.size() == 1 && "Invalid number of operands for exp");
+        return rewriter.create<math::ExpOp>(loc, resType, operands[0])
+            .getResult();
+      })
+      .Case([&](linalg::FloorOp floorOp) -> std::optional<Value> {
+        assert(operands.size() == 1 && "Invalid number of operands for floor");
+        return rewriter.create<math::FloorOp>(loc, resType, operands[0])
+            .getResult();
+      })
+      .Case([&](linalg::MaxOp maxOp) -> std::optional<Value> {
+        assert(operands.size() == 2 && "Invalid number of operands for max");
+        if (isa<FloatType>(eltType)) {
+          return rewriter
+              .create<arith::MaximumFOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          if (eltType.isUnsignedInteger()) {
+            return rewriter
+                .create<arith::MaxUIOp>(loc, resType, operands[0], operands[1])
+                .getResult();
+          } else {
+            return rewriter
+                .create<arith::MaxSIOp>(loc, resType, operands[0], operands[1])
+                .getResult();
+          }
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::MulOp mulOp) -> std::optional<Value> {
+        assert(operands.size() == 2 && "Invalid number of operands for mul");
+        if (isa<FloatType>(eltType)) {
+          return rewriter
+              .create<arith::MulFOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          return rewriter
+              .create<arith::MulIOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::NegfOp negfOp) -> std::optional<Value> {
+        assert(operands.size() == 1 && "Invalid number of operands for negf");
+        return rewriter.create<arith::NegFOp>(loc, resType, operands[0])
+            .getResult();
+      })
+      .Case([&](linalg::SubOp subOp) -> std::optional<Value> {
+        assert(operands.size() == 2 && "Invalid number of operands for sub");
+        if (isa<FloatType>(eltType)) {
+          return rewriter
+              .create<arith::SubFOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        if (isa<IntegerType>(eltType)) {
+          return rewriter
+              .create<arith::SubIOp>(loc, resType, operands[0], operands[1])
+              .getResult();
+        }
+        // Unhandled type. Bail out.
+        return std::nullopt;
+      })
+      .Case([&](linalg::GenericOp genericOp) -> std::optional<Value> {
         return lowerGenericOp(genericOp, operands, resType, rewriter);
       })
-      .Default([&](Operation *op) { return std::nullopt; });
+      .Default(
+          [&](Operation *op) -> std::optional<Value> { return std::nullopt; });
 }
 
 // Fuse an elementwise consumer operation.
@@ -327,10 +450,10 @@ fuseEltwiseConsumers(linalg::LinalgOp rootOp,
                      PatternRewriter &rewriter) {
   auto consumers = getFusableConsumers(rootOp);
 
-  for (auto op : consumers) {
+  for (auto consumer : consumers) {
     std::optional<SmallVector<xegpu::StoreNDOp>> updatedStoreOps = std::nullopt;
 
-    updatedStoreOps = eltwiseFusion(rootOp, op, rootStoreOps, rewriter);
+    updatedStoreOps = eltwiseFusion(rootOp, consumer, rootStoreOps, rewriter);
 
     // Failed to fuse operation. Bail out.
     if (!updatedStoreOps)

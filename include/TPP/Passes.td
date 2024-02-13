@@ -558,6 +558,7 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
                            "scf::SCFDialect",
                            "memref::MemRefDialect",
                            "arith::ArithDialect",
+                           "math::MathDialect",
                            "vector::VectorDialect"];
   let options = [
     Option<"kTile", "k-tile", "int64_t",
