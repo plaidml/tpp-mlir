@@ -903,13 +903,16 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
   SmallVector<Value> outputTiles = createDescs(output);
 
   // Create descriptors and load values for all inputs.
+  auto vecType =
+      VectorType::get(tensorDesc.getShape(), tensorDesc.getElementType());
+
   SmallVector<SmallVector<Value>> loadedInputs;
   for (auto input : linalgOp.getDpsInputs()) {
     SmallVector<Value> inputTiles = createDescs(input);
     SmallVector<Value> loadedVals;
     for (auto tile : inputTiles) {
       auto loadedVec = rewriter.create<xegpu::LoadNDOp>(
-          loc, tensorDesc, tile, /*vnni_axis=*/nullptr,
+          loc, vecType, tile, /*vnni_axis=*/nullptr,
           /*transpose=*/nullptr,
           /*l1_hint=*/nullptr,
           /*l2_hint=*/nullptr, /*l3_hint=*/nullptr, xegpuMode);
@@ -918,9 +921,6 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
     loadedInputs.push_back(loadedVals);
   }
 
-  auto resType =
-      VectorType::get(tensorDesc.getShape(), tensorDesc.getElementType());
-
   // Perform vectorized computations for each output tile.
   SmallVector<Value> results;
   for (size_t i = 0; i < outputTiles.size(); i++) {
@@ -928,7 +928,7 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
     for (auto inputs : loadedInputs) {
       operands.push_back(inputs[i]);
     }
-    auto res = lowerEltwiseOp(linalgOp, operands, resType, rewriter);
+    auto res = lowerEltwiseOp(linalgOp, operands, vecType, rewriter);
     if (!res)
       return failure();
 
@@ -944,6 +944,8 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
                                       /*l2_hint=*/writeCacheHint,
                                       /*l3_hint=*/writeCacheHint, xegpuMode);
   }
+
+  rewriter.eraseOp(linalgOp);
 
   return success();
 }
@@ -1005,9 +1007,6 @@ private:
 template <typename LinalgOpTy>
 struct ConvertNamedEltwiseToXeGPU : public OpRewritePattern<LinalgOpTy> {
   using OpRewritePattern<LinalgOpTy>::OpRewritePattern;
-  // Constrain conversion to the supported GEMM-like ops.
-  static_assert(llvm::is_one_of<LinalgOpTy, linalg::MatmulOp,
-                                linalg::BatchReduceMatmulOp>::value);
 
   ConvertNamedEltwiseToXeGPU(MLIRContext *ctx, LinalgToXeGPUOptions options)
       : OpRewritePattern<LinalgOpTy>(ctx), options(options) {}
@@ -1044,19 +1043,43 @@ private:
   LinalgToXeGPUOptions options;
 };
 
-void populateLinalgToXeGPUPatterns(RewritePatternSet &patterns,
-                                   LinalgToXeGPUOptions options) {
+void populateLinalgGemmToXeGPUPatterns(RewritePatternSet &patterns,
+                                       LinalgToXeGPUOptions options) {
   patterns.add<ConvertGemmLikeToXeGPU<linalg::MatmulOp>,
                ConvertGemmLikeToXeGPU<linalg::BatchReduceMatmulOp>>(
       patterns.getContext(), options);
+}
+
+void populateLinalgEltwiseToXeGPUPatterns(RewritePatternSet &patterns,
+                                          LinalgToXeGPUOptions options) {
+  patterns.add<ConvertNamedEltwiseToXeGPU<linalg::AbsOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::AddOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::CeilOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::DivOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::DivUnsignedOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::ExpOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::FloorOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::MaxOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::MulOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::NegfOp>,
+               ConvertNamedEltwiseToXeGPU<linalg::SubOp>>(patterns.getContext(),
+                                                          options);
 }
 
 struct LinalgToXeGPU : public tpp::impl::LinalgToXeGPUBase<LinalgToXeGPU> {
   using LinalgToXeGPUBase::LinalgToXeGPUBase;
 
   void runOnOperation() override {
+    LinalgToXeGPUOptions options{kTile};
+
+    // Run GEMM pattern first to allow fusion with its consumers.
+    RewritePatternSet gemmPatterns(&getContext());
+    populateLinalgGemmToXeGPUPatterns(gemmPatterns, options);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(gemmPatterns));
+
+    // Convert other remaining ops.
     RewritePatternSet patterns(&getContext());
-    populateLinalgToXeGPUPatterns(patterns, LinalgToXeGPUOptions{kTile});
+    populateLinalgEltwiseToXeGPUPatterns(patterns, options);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
