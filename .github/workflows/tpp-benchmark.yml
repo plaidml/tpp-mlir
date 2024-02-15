@@ -37,7 +37,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
-          ${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-SPR-OMP:
     runs-on: pcl-tiergarten
@@ -48,7 +48,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
-          ${{ secrets.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-BASE:
     runs-on: pcl-tiergarten
@@ -60,7 +60,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
-          ${{ secrets.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-OMP:
     runs-on: pcl-tiergarten
@@ -72,7 +72,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
-          ${{ secrets.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-CLX-BASE:
     runs-on: pcl-tiergarten
@@ -84,7 +84,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
-          ${{ secrets.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-CLX-OMP:
     runs-on: pcl-tiergarten
@@ -96,7 +96,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
-          ${{ secrets.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ADL-BASE:
     runs-on: pcl-tiergarten
@@ -108,7 +108,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
-          ${{ secrets.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ADL-OMP:
     runs-on: pcl-tiergarten
@@ -120,4 +120,4 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
-          ${{ secrets.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ vars.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD

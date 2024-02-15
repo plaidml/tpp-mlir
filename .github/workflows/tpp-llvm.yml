@@ -3,9 +3,6 @@ name: TPP-MLIR LLVM Build
 on:
   workflow_dispatch:
   workflow_call:
-    secrets:
-      SRUN:
-        required: true
 
 env:
   NPROCS_LIMIT_LINK: 8
@@ -18,7 +15,7 @@ jobs:
       - name: LLVM Base
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              ${{ vars.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
@@ -29,7 +26,7 @@ jobs:
       - name: LLVM CUDA
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ secrets.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
+              ${{ vars.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
@@ -40,7 +37,7 @@ jobs:
       - name: LLVM Vulkan
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ secrets.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              ${{ vars.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
