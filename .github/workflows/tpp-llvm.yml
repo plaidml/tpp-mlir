@@ -6,6 +6,7 @@ on:
 
 env:
   NPROCS_LIMIT_LINK: 8
+  SRUN: ${HOME}/srun.sh
 
 jobs:
   TPP-MLIR-LLVM-Base:
@@ -15,7 +16,7 @@ jobs:
       - name: LLVM Base
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ vars.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              ${{ env.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
@@ -26,7 +27,7 @@ jobs:
       - name: LLVM CUDA
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ vars.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
+              ${{ env.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
@@ -37,7 +38,7 @@ jobs:
       - name: LLVM Vulkan
         run: |-
               scripts/buildkite/check_llvm.sh || \
-              ${{ vars.SRUN }} --partition=spr-all --time=0:30:00 -- \
+              ${{ env.SRUN }} --partition=spr-all --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
 
