@@ -315,7 +315,7 @@ static bool validateFullTilesOnDim(TilingInterface tileOp,
   if (*tileFactor == 1 && *rangeOnDim == 1)
     return true;
 
-  return (*rangeOnDim % *tileFactor == 0 && *rangeOnDim / *tileFactor != 1);
+  return (*rangeOnDim % *tileFactor == 0);
 }
 
 bool validateFullTilesOnDims(TilingInterface tileOp,
