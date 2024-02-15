@@ -46,6 +46,12 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
+// Control grid parallelism sizes.
+llvm::cl::opt<std::string>
+    parallelTaskGrid("parallel-task-grid",
+                     llvm::cl::desc("Grid-sizes for parallel tasks"),
+                     llvm::cl::init("2,8"));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -72,6 +78,18 @@ PrintStage parsePrintStage(StringRef stage) {
       .CaseLower("late", PrintStage::Late)
       .CaseLower("llvm", PrintStage::LLVM)
       .Default(PrintStage::None);
+}
+
+std::vector<int64_t> parseParallelTaskGrid(std::string parallelTaskGrid) {
+  std::vector<int64_t> parallelTaskGridParams;
+  std::stringstream ss(parallelTaskGrid);
+
+  while (ss.good()) {
+    std::string substr;
+    getline(ss, substr, ',');
+    parallelTaskGridParams.push_back(std::atol(substr.c_str()));
+  }
+  return parallelTaskGridParams;
 }
 
 // The default lowering pipeline.
@@ -127,14 +145,18 @@ private:
     if (print == PrintStage::Mid)
       pm.addPass(createPrintIRPass());
 
+    auto parallelTaskGridSizes = parseParallelTaskGrid(parallelTaskGrid);
+
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());
     pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
     pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-    if (defParallel){
-      pm.addPass(createSCFParallelLoopTiling());
+    if (defParallel) {
+      mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
+      tilingOptions.tileSizes = parallelTaskGridSizes;
+      pm.addPass(createSCFParallelLoopTiling(tilingOptions));
       pm.addPass(createConvertSCFToOpenMPPass());
     }
     pm.addPass(createConvertVectorToSCFPass());
