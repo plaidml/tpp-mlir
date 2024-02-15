@@ -349,6 +349,12 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
            "bool", /*default=*/"false",
            "Use WMMA operations">,
     ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
+    Option<"isIntel", "intel",
+           "bool", /*default=*/"false",
+           "Convert for Intel GPU">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
   ];
 }
 
@@ -536,7 +542,7 @@ def GPUToXeGPU : Pass<"gpu-to-xegpu", "ModuleOp"> {
                            "vector::VectorDialect"];
 }
 
-def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "func::FuncOp"> {
+def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "ModuleOp"> {
   let summary = "Fold memref alias ops into consumer XeGPU load/store ops.";
   let description = [{
     The pass folds loading/storing from/to memref aliasing ops to loading/storing
