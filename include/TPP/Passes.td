@@ -470,4 +470,17 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
+def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
+  let summary = "Tile parallel loops";
+  let options = [
+    ListOption<"tileSizes", "parallel-loop-tile-sizes", "int64_t",
+               "Factors to tile parallel loops by">,
+    Option<"noMinMaxBounds", "no-min-max-bounds", "bool",
+           /*default=*/"false",
+           "Perform tiling with fixed upper bound with inbound check "
+           "inside the internal loops">
+  ];
+  let dependentDialects = ["affine::AffineDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

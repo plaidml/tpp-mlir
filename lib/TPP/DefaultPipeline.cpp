@@ -133,8 +133,10 @@ private:
     pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-    if (defParallel)
+    if (defParallel){
+      pm.addPass(createSCFParallelLoopTiling());
       pm.addPass(createConvertSCFToOpenMPPass());
+    }
     pm.addPass(createConvertVectorToSCFPass());
     pm.addPass(arith::createArithExpandOpsPass());
     pm.addPass(createLowerAffinePass());
