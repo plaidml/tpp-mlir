@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Dialect/Transform/SCF/Dialect/Passes.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 namespace mlir {
 namespace tpp {
+#define GEN_PASS_DECL_SCFPARALLELLOOPTILING
 #define GEN_PASS_DEF_SCFPARALLELLOOPTILING
 #include "TPP/Passes.h.inc"
 } // namespace tpp

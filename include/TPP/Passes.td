@@ -480,7 +480,7 @@ def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
            "Perform tiling with fixed upper bound with inbound check "
            "inside the internal loops">
   ];
-  let dependentDialects = ["affine::AffineDialect"];
+  let dependentDialects = ["affine::AffineDialect", "scf::SCFDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
