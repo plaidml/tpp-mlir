@@ -28,50 +28,6 @@ using namespace mlir;
 
 namespace {
 
-static FailureOr<DenseI64ArrayAttr>
-getSizesAndLeadingDimForBrgemmOp(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
-
-  auto memrefA = opTy.getOperand(1).getType();
-  auto memrefB = opTy.getOperand(2).getType();
-  auto memrefC = opTy.getOperand(3).getType();
-
-  int64_t m, n, k;
-  m = memrefC.cast<ShapedType>().getShape()[0];
-  n = memrefC.cast<ShapedType>().getShape()[1];
-  k = memrefA.cast<ShapedType>().getShape()[2];
-
-  auto ldaDim = xsmm::utils::getLeadingDim(memrefA, /*pos=*/1);
-  if (failed(ldaDim))
-    return failure();
-
-  int64_t lda = *ldaDim;
-
-  auto ldbDim = xsmm::utils::getLeadingDim(memrefB, /*pos=*/1);
-  if (failed(ldbDim))
-    return failure();
-
-  int64_t ldb =
-      (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
-                                   memrefB.cast<MemRefType>()))
-          ? *ldbDim / *vnni::utils::getVnniBlockingFactor(memrefB)
-          : *ldbDim;
-
-  auto ldcDim = xsmm::utils::getLeadingDim(memrefC);
-  if (failed(ldcDim))
-    return failure();
-
-  int64_t ldc = *ldcDim;
-
-  // If we are dealing with a BRGEMM we need to pass two extra dimensions:
-  // - strideA and strideB that represent the stride between different GEMM
-  // in BRGEMM.
-  int64_t strideA = lda * m;
-  int64_t strideB = ldb * k;
-  return DenseI64ArrayAttr::get(
-      rewriter.getContext(),
-      ArrayRef<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB});
-}
-
 static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
   auto memrefB = opTy.getOperand(2).getType().cast<MemRefType>();
   SmallVector<Attribute, 2> attributes;
@@ -146,14 +102,17 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
 
     Location loc = brgemmOp.getLoc();
-    auto dims = getSizesAndLeadingDimForBrgemmOp(rewriter, brgemmOp);
+    auto dims = DenseI64ArrayAttr::get(
+        rewriter.getContext(), dyn_cast<mlir::xsmm::BrgemmDispatchOp>(
+                                   brgemmOp.getOperand(0).getDefiningOp())
+                                   .getInputs());
     auto memrefB = brgemmOp.getOperand(2);
     int64_t batchSize = memrefB.getType().cast<ShapedType>().getShape()[0];
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(fusedMatch.binaryOp);
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
-        loc, integer64, *dims,
+        loc, integer64, dims,
         xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
         xsmm::UnaryKindAttr::get(rewriter.getContext(), fusedMatch.unaryKind),
         getBrgemmFlags(rewriter, brgemmOp),
