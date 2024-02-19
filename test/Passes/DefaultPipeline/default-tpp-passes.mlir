@@ -219,10 +219,12 @@ func.func @softmax(%arg0: tensor<2x2x2x2xf32>, %arg1: tensor<2x2x2x2xf32>) -> te
 // CHECK-LABEL: batch_matmul_rewrite
 func.func @batch_matmul_rewrite(%arg0: tensor<512x32x64xf32>, %arg1: tensor<512x64x32xf32>) -> tensor<512x32x32xf32> {
   %0 = tensor.empty() : tensor<512x32x32xf32>
-  // CHECK-NOT: linalg.batch_matmul
-  // CHECK: call @xsmm_{{.*}}_dispatch
-  // CHECK: scf.parallel
-  // CHECK: xsmm_{{.*}}_invoke
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C512:.+]] = arith.constant 512 : index
+  // CHECK: call @xsmm_brgemm_dispatch
+  // CHECK: scf.parallel{{.*}}(%[[C0]]) to (%[[C512]]) step (%[[C1]])
+  // CHECK: call @xsmm_brgemm_invoke
   %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<512x32x64xf32>, tensor<512x64x32xf32>)
                            outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
   return %1 : tensor<512x32x32xf32>
