@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="use-for-all=false" -cse -canonicalize -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -tile-consumer-and-fuse-producers="use-for-all=false" -cse -split-input-file | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
@@ -244,9 +244,9 @@ func.func @matmul_fuse_with_fill(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<64x64xf32>
 // CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
 // CHECK-NEXT: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
-// CHECK-DAG: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [32, 64] [1, 1] : tensor<64x64xf32> to tensor<32x64xf32>
-// CHECK-DAG: %[[SLICE0:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG4]]] [64, 32] [1, 1] : tensor<64x64xf32> to tensor<64x32xf32>
-// CHECK-DAG: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], %[[ARG4]]] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [32, 64] [1, 1] : tensor<64x64xf32> to tensor<32x64xf32>
+// CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG4]]] [64, 32] [1, 1] : tensor<64x64xf32> to tensor<64x32xf32>
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], %[[ARG4]]] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[SLICE1]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %[[MUL:.+]] = linalg.matmul ins(%[[SLICE]], %[[SLICE0]] : tensor<32x64xf32>, tensor<64x32xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
@@ -343,12 +343,14 @@ func.func @blocked_batch_matmul(%pack: tensor<512x1x2x32x32xf32>,
 // CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<512x1x1x32x32xf32>
 // CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C512]] step %[[C1]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG2]], 0, 0, 0, 0] [1, 1, 1, 32, 32] [1, 1, 1, 1, 1]
+// CHECK-NEXT: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C1]] step %[[C1]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
+// CHECK-NEXT: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C1]] step %[[C1]] iter_args(%[[ARG7:.+]] = %[[ARG5]])
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG7]][%[[ARG2]], %[[ARG4]], %[[ARG6]], 0, 0] [1, 1, 1, 32, 32] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<512x1x1x32x32xf32> to tensor<32x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[SLICE]] : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0, 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1]
+// CHECK: %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], %[[ARG4]], 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<512x1x2x32x32xf32> to tensor<2x32x32xf32>
-// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG2]], 0, 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1]
+// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG2]], %[[ARG6]], 0, 0, 0] [1, 1, 2, 32, 32] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<512x1x2x32x32xf32> to tensor<2x32x32xf32>
 // CHECK: %{{.+}} = linalg.batch_reduce_matmul ins(%[[SLICE0]], %[[SLICE1]] : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
 // CHECK-SAME:  outs(%[[FILL]] : tensor<32x32xf32>) -> tensor<32x32xf32>
@@ -376,7 +378,7 @@ func.func @projection_mha(%arg2: tensor<64x32x8x64xf32>, %cst_3: tensor<8x64x8x6
   return %2 : tensor<64x32x8x64xf32>
 }
 
-// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
 
@@ -485,7 +487,6 @@ func.func @batch_mha(%arg0: tensor<64x8x32x32xf32>, %arg1: tensor<64x32x8x64xf32
 // CHECK-LABEL: batch_mha
 // CHECK-SAME: %[[ARG0:.+]]: tensor<64x8x32x32xf32>, %[[ARG1:.+]]: tensor<64x32x8x64xf32>
 // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -495,15 +496,12 @@ func.func @batch_mha(%arg0: tensor<64x8x32x32xf32>, %arg1: tensor<64x32x8x64xf32
 // CHECK: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C8]] step %[[C1]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], 0, %[[ARG4]], 0] [1, 32, 1, 64] [1, 1, 1, 1]
 // CHECK-SAME:  : tensor<64x32x8x64xf32> to tensor<32x64xf32>
-// CHECK: %{{.+}} = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG7:.+]] = %[[SLICE]])
-// CHECK: %[[SLICE1:.+]] = tensor.extract_slice %[[ARG7]][0, %[[ARG6]]] [32, 32] [1, 1]
-// CHECK-SAME:  : tensor<32x64xf32> to tensor<32x32xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32)
+// CHECK-SAME:  outs(%[[SLICE]] : tensor<32x64xf32>) -> tensor<32x64xf32>
 // CHECK: %[[SLICE_0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], %[[ARG4]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1]
 // CHECK-SAME:  : tensor<64x8x32x32xf32> to tensor<32x32xf32>
-// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG2]], 0, %[[ARG4]], %[[ARG6]]] [1, 32, 1, 32] [1, 1, 1, 1]
-// CHECK-SAME:  : tensor<64x32x8x64xf32> to tensor<32x32xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32)
-// CHECK-SAME:  outs(%[[SLICE1]] : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG2]], 0, %[[ARG4]], 0] [1, 32, 1, 64] [1, 1, 1, 1]
+// CHECK-SAME:  : tensor<64x32x8x64xf32> to tensor<32x64xf32>
 // CHECK: %{{.+}} = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: iterator_types = ["parallel", "reduction", "parallel"]
@@ -653,9 +651,12 @@ func.func @contraction(%arg0: tensor<1024x1024xf32>, %arg1: tensor<1024x64xf32>)
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1024x64xf32>
 // CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
 // CHECK: %{{.+}} = scf.for %[[ARG4:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG5:.+]] = %[[ARG3]])
-// CHECK-DAG: %[[SLICE_ARG0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [32, 1024] [1, 1] : tensor<1024x1024xf32> to tensor<32x1024xf32>
-// CHECK-DAG: %[[SLICE_ARG1:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG4]]] [1024, 32] [1, 1] : tensor<1024x64xf32> to tensor<1024x32xf32>
-// CHECK-DAG: %[[SLICE_INIT:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], %[[ARG4]]] [32, 32] [1, 1] : tensor<1024x64xf32> to tensor<32x32xf32>
+// CHECK: %[[SLICE_ARG0:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [32, 1024] [1, 1]
+// CHECK-SAME:  : tensor<1024x1024xf32> to tensor<32x1024xf32>
+// CHECK: %[[SLICE_ARG1:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG4]]] [1024, 32] [1, 1]
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<1024x32xf32>
+// CHECK: %[[SLICE_INIT:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG2]], %[[ARG4]]] [32, 32] [1, 1]
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<32x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[SLICE_INIT]] : tensor<32x32xf32>) -> tensor<32x32xf32>
 // CHECK: %{{.+}} = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
@@ -695,8 +696,10 @@ func.func @contraction(%arg0: tensor<16x1024xf32>, %arg1: tensor<1024x64xf32>) -
 // CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x64xf32>
 // CHECK: %{{.+}} = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C64]] step %[[C32]] iter_args(%[[ARG3:.+]] = %[[EMPTY]])
-// CHECK-DAG: %[[SLICE:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG2]]] [1024, 32] [1, 1] : tensor<1024x64xf32> to tensor<1024x32xf32>
-// CHECK-DAG: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG3]][0, %[[ARG2]]] [16, 32] [1, 1] : tensor<16x64xf32> to tensor<16x32xf32>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG1]][0, %[[ARG2]]] [1024, 32] [1, 1]
+// CHECK-SAME:  : tensor<1024x64xf32> to tensor<1024x32xf32>
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG3]][0, %[[ARG2]]] [16, 32] [1, 1]
+// CHECK-SAME:  : tensor<16x64xf32> to tensor<16x32xf32>
 // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[SLICE_1]] : tensor<16x32xf32>) -> tensor<16x32xf32>
 // CHECK: %{{.+}} = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
