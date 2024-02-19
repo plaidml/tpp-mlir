@@ -54,9 +54,15 @@ using namespace mlir::scf;
 /// %i0 + j0 and %i1 + %j1.
 ///
 /// The old loop is replaced with the new one.
-FailureOr<ParallelOp> tileParallelLoop(ParallelOp op,
+void tileParallelLoop(ParallelOp op,
                                        ArrayRef<int64_t> tileSizes,
                                        bool noMinMaxBounds) {
+  bool useParallelOp = false;
+  /* TODO, need to implement this case */
+  if (!useParallelOp && noMinMaxBounds) {
+    return;
+  }
+
   OpBuilder b(op);
   auto zero = b.create<arith::ConstantIndexOp>(op.getLoc(), 0);
   SmallVector<Value, 2> tileSizeConstants;
@@ -136,7 +142,6 @@ FailureOr<ParallelOp> tileParallelLoop(ParallelOp op,
 
   SmallVector<scf::ForOp> innerLoops;
   ParallelOp innerLoop;
-  bool useParallelOp = false;
   if (useParallelOp) {
     innerLoop = b.create<ParallelOp>(
         op.getLoc(), SmallVector<Value, 2>(newBounds.size(), zero), newBounds,
@@ -186,8 +191,9 @@ FailureOr<ParallelOp> tileParallelLoop(ParallelOp op,
           .replaceAllUsesExcept(newIndex, newIndex);
     }
     thenBlock.eraseArguments(0, thenBlock.getNumArguments());
+#if 0
   } else if (!useParallelOp && noMinMaxBounds && needInboundCheck) {
-    return failure();
+#endif
   } else {
 
     if (useParallelOp) {
@@ -233,8 +239,6 @@ FailureOr<ParallelOp> tileParallelLoop(ParallelOp op,
   }
 
   op.erase();
-
-  return outerLoop;
 }
 
 namespace {
