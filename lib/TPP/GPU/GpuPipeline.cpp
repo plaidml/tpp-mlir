@@ -215,6 +215,7 @@ private:
       break;
     }
     case GpuType::Intel:
+      pm.addPass(createXegpuFoldMemRef());
       break;
     }
 
