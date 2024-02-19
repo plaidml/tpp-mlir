@@ -85,7 +85,8 @@ static bool isConvolutionLike(Operation *op) {
 // Return true if `op` can be tiled using `tileSizes`. Require to statically
 // know the range and the tile factor. The tile must be full.
 static bool canBeTiledWithCurrentSpec(Operation *op,
-                                      ArrayRef<OpFoldResult> tileSizes) {
+                                      ArrayRef<OpFoldResult> tileSizes,
+                                      int64_t minTileFactor) {
   assert(isa<TilingInterface>(op) &&
          "expect an op implementing the tiling interface");
   assert(!tileSizes.empty() && "expect tile sizes to be non-empty");
@@ -105,8 +106,8 @@ static bool canBeTiledWithCurrentSpec(Operation *op,
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Running tile validations ----\n");
-  if (!linalgx::utils::validateFullTilesOnDims(cast<TilingInterface>(op),
-                                               tileSizes)) {
+  if (!linalgx::utils::validateFullTilesOnDims(
+          cast<TilingInterface>(op), tileSizes, /*dim=*/{}, minTileFactor)) {
     LLVM_DEBUG(llvm::dbgs() << "FAILED\n");
     return false;
   }
@@ -382,7 +383,8 @@ static llvm::SmallDenseSet<Operation *> collectFusableProducers(
 static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
     RewriterBase &rewriter, TilingInterface consumer,
     llvm::DenseMap<Operation *, SmallVector<OpFoldResult>> &tileSizes,
-    llvm::SmallDenseSet<Operation *> &alreadyFusedOps, int64_t maxDepth) {
+    llvm::SmallDenseSet<Operation *> &alreadyFusedOps, int64_t maxDepth,
+    int64_t minTileFactor) {
   // Step 0. Early exit if tileSizes are empty.
   if (tileSizes.empty() || !tileSizes.count(consumer)) {
     LLVM_DEBUG(llvm::dbgs() << "EMPTY TILE SIZES\n");
@@ -397,7 +399,8 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
   }
 
   // Step 2. Check if the tile configuration fits the consumer.
-  if (!canBeTiledWithCurrentSpec(consumer, tileSizes.at(consumer))) {
+  if (!canBeTiledWithCurrentSpec(consumer, tileSizes.at(consumer),
+                                 minTileFactor)) {
     LLVM_DEBUG(llvm::dbgs() << "CONSUMER: " << consumer
                             << "\nCANNOT BE TILED WITH CURRENT CONFIG\n");
     return failure();
@@ -616,7 +619,8 @@ static Operation *getLastFusableEltWiseConsumer(
 
 // Run `fuseWithEltwise` on contraction-like operations.
 static void doFusion(RewriterBase &rewriter, func::FuncOp func,
-                     ArrayRef<int64_t> tileSizes, int64_t maxDepth) {
+                     ArrayRef<int64_t> tileSizes, int64_t maxDepth,
+                     int64_t minTileFactor) {
   // Set to keep track of fused ops.
   llvm::SmallDenseSet<Operation *> fusedOps;
 
@@ -673,7 +677,7 @@ static void doFusion(RewriterBase &rewriter, func::FuncOp func,
       LLVM_DEBUG(llvm::dbgs() << "\n\n");
       FailureOr<scf::SCFTileAndFuseResult> fuseAndTileResult =
           fuseWithEltwise(rewriter, cast<TilingInterface>(linalgOp),
-                          defaultTiles, fusedOps, maxDepth);
+                          defaultTiles, fusedOps, maxDepth, minTileFactor);
       LLVM_DEBUG(llvm::dbgs() << "\n\n");
       if (succeeded(fuseAndTileResult)) {
         rewriter.replaceOp(
@@ -703,7 +707,8 @@ struct TileConsumerAndFuseProducers
     do {
       func::FuncOp func = getOperation();
       IRRewriter rewriter(&getContext());
-      doFusion(rewriter, func, this->tileSizes, this->maxDepth);
+      doFusion(rewriter, func, this->tileSizes, this->maxDepth,
+               this->minTileFactor);
 
       {
         RewritePatternSet patterns(&ctx);

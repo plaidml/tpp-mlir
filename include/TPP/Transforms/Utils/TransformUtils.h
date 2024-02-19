@@ -78,9 +78,13 @@ isContraction(linalg::LinalgOp linalgOp);
 // Specific dims can be passed using 'dims'. If dims is empty the validation
 // will start from the outermost dimension, moving to innermost ones up to the
 // number of tiles.
+// Tiling application can restricted based on the workload dimension size.
+// The tiling is applied only to when all dimensions fulfill the predicate:
+// '(dimSize[i] / tiles[i]) >= minTileFactor'.
 bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
-                             ArrayRef<size_t> dims = {});
+                             ArrayRef<size_t> dims = {},
+                             int64_t minTileFactor = 2);
 
 // Rewrite scf.for to scf.forall. Assumes the loop to be parallel and
 // marked with `kLoopId`.

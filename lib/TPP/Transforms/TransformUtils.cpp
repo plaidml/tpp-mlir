@@ -291,7 +291,8 @@ static std::optional<int64_t> getConstantRange(const Range &range) {
 }
 
 static bool validateFullTilesOnDim(TilingInterface tileOp,
-                                   const OpFoldResult &tile, size_t dim) {
+                                   const OpFoldResult &tile, size_t dim,
+                                   int64_t minTileFactor) {
   OpBuilder builder(tileOp);
   OpBuilder::InsertionGuard guard(builder);
   SmallVector<Range> iterationDomain =
@@ -299,28 +300,29 @@ static bool validateFullTilesOnDim(TilingInterface tileOp,
   if (dim >= iterationDomain.size())
     return false;
 
-  auto tileFactor = getConstantIntValue(tile);
+  auto tileSize = getConstantIntValue(tile);
   auto rangeOnDim = getConstantRange(iterationDomain[dim]);
 
   // If the tile factor or the range are non-constant, the tile size is
   // considered to be valid.
-  if (!tileFactor || !rangeOnDim)
+  if (!tileSize || !rangeOnDim)
     return true;
 
   // Corner case: Tiling with '0' along 'dim' is valid - no tiling.
-  if (*tileFactor == 0)
+  if (*tileSize == 0)
     return true;
 
   // Corner case: Tiling '1' with '1' is valid.
-  if (*tileFactor == 1 && *rangeOnDim == 1)
+  if (*tileSize == 1 && *rangeOnDim == 1)
     return true;
 
-  return (*rangeOnDim % *tileFactor == 0);
+  return (*rangeOnDim % *tileSize == 0) &&
+         (*rangeOnDim / *tileSize >= minTileFactor);
 }
 
 bool validateFullTilesOnDims(TilingInterface tileOp,
                              ArrayRef<OpFoldResult> tiles,
-                             ArrayRef<size_t> dims) {
+                             ArrayRef<size_t> dims, int64_t minTileFactor) {
   if (!dims.empty() && dims.size() != tiles.size())
     return false;
 
@@ -333,7 +335,8 @@ bool validateFullTilesOnDims(TilingInterface tileOp,
   assert(dimsToCheck.size() == tiles.size());
 
   for (auto dim : llvm::enumerate(dimsToCheck)) {
-    if (!validateFullTilesOnDim(tileOp, tiles[dim.index()], dim.value()))
+    if (!validateFullTilesOnDim(tileOp, tiles[dim.index()], dim.value(),
+                                minTileFactor))
       return false;
   }
   return true;
