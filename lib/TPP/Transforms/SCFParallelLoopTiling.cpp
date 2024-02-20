@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Pass/Pass.h"
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DECL_SCFPARALLELLOOPTILING
@@ -54,9 +54,8 @@ using namespace mlir::scf;
 /// %i0 + j0 and %i1 + %j1.
 ///
 /// The old loop is replaced with the new one.
-void tileParallelLoop(ParallelOp op,
-                                       ArrayRef<int64_t> tileSizes,
-                                       bool noMinMaxBounds) {
+void tileParallelLoop(ParallelOp op, ArrayRef<int64_t> tileSizes,
+                      bool noMinMaxBounds) {
   bool useParallelOp = false;
   /* TODO, need to implement this case */
   if (!useParallelOp && noMinMaxBounds) {
@@ -80,7 +79,7 @@ void tileParallelLoop(ParallelOp op,
   // Create the outer loop with adjusted steps.
   SmallVector<Value, 2> newSteps;
   newSteps.reserve(op.getStep().size());
-  for (auto step : llvm::zip(op.getStep(), tileSizeConstants)) {
+  for (auto step : llvm::zip_equal(op.getStep(), tileSizeConstants)) {
     newSteps.push_back(b.create<arith::MulIOp>(op.getLoc(), std::get<0>(step),
                                                std::get<1>(step)));
   }
@@ -191,9 +190,6 @@ void tileParallelLoop(ParallelOp op,
           .replaceAllUsesExcept(newIndex, newIndex);
     }
     thenBlock.eraseArguments(0, thenBlock.getNumArguments());
-#if 0
-  } else if (!useParallelOp && noMinMaxBounds && needInboundCheck) {
-#endif
   } else {
 
     if (useParallelOp) {
@@ -211,6 +207,7 @@ void tileParallelLoop(ParallelOp op,
     else {
       b.setInsertionPointToStart(innerLoops[innerLoops.size() - 1].getBody());
       IRMapping mapper;
+      // Copy instruction by instruction and replace uses
       for (auto opItr = op.getRegion().op_begin();
            opItr != op.getRegion().op_end(); opItr++) {
         if (!dyn_cast<scf::ReduceOp>(*opItr)) {
@@ -225,12 +222,14 @@ void tileParallelLoop(ParallelOp op,
         Value innerIndex = innerLoops[index].getInductionVar();
         auto newIndex = b.create<arith::AddIOp>(
             op.getLoc(), innerIndex, outerLoop.getInductionVars()[index]);
+        // Cache the newly created index variables
         indices.push_back(newIndex);
       }
 
       auto inductionVars =
           dyn_cast<ParallelOp>(op.getRegion().getParentOp()).getInductionVars();
 
+      // Replace induction variables with newly created index variables
       for (size_t i = 0; i < inductionVars.size(); i++) {
         auto inductionVar = inductionVars[i];
         inductionVar.replaceAllUsesWith(indices[i]);
@@ -245,7 +244,8 @@ namespace {
 struct SCFParallelLoopTiling
     : public tpp::impl::SCFParallelLoopTilingBase<SCFParallelLoopTiling> {
   SCFParallelLoopTiling(){};
-  SCFParallelLoopTiling(ArrayRef<int64_t> tileSizes, bool noMinMaxBounds = false) {
+  SCFParallelLoopTiling(ArrayRef<int64_t> tileSizes,
+                        bool noMinMaxBounds = false) {
     this->tileSizes = tileSizes;
     this->noMinMaxBounds = noMinMaxBounds;
   };
@@ -273,4 +273,3 @@ struct SCFParallelLoopTiling
   }
 };
 } // namespace
-
