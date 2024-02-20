@@ -46,6 +46,13 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
+// Control grid parallelism sizes.
+llvm::cl::list<int64_t>
+    parallelTaskGrid("parallel-task-grid",
+                     llvm::cl::desc("Grid-sizes for parallel tasks"),
+                     llvm::cl::list_init<int64_t>(SmallVector<int64_t>{2, 8}),
+                     llvm::cl::CommaSeparated);
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -133,8 +140,12 @@ private:
     pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-    if (defParallel)
+    if (defParallel) {
+      mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
+      tilingOptions.tileSizes = parallelTaskGrid;
+      pm.addPass(createSCFParallelLoopTiling(tilingOptions));
       pm.addPass(createConvertSCFToOpenMPPass());
+    }
     pm.addPass(createConvertVectorToSCFPass());
     pm.addPass(arith::createArithExpandOpsPass());
     pm.addPass(createLowerAffinePass());

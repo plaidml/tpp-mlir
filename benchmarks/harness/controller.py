@@ -155,7 +155,7 @@ class BenchmarkController(object):
         if self.args.gpu is not None:
             runCmd.extend(["--gpu", self.args.gpu])
         if self.args.run_args:
-            runCmd.extend(shlex.split(self.args.run_args))
+            runCmd.extend(shlex.split(self.args.run_args.replace("'", "")))
         runResult = executor.run(runCmd, irContents)
         if 0 != runResult.returncode:
             self.logger.error(f"Error executing tpp-run: {runResult.stderr}")
