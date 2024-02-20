@@ -171,6 +171,19 @@ struct ConvertFusedBrgemmXsmmOp : public OpRewritePattern<FusedBrgemmOp> {
   }
 };
 
+struct ConvertTileConfigXsmmOp : public OpRewritePattern<TileConfigOp> {
+  using OpRewritePattern<TileConfigOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TileConfigOp tileConfigOp,
+                                PatternRewriter &rewriter) const override {
+    std::string funcName = "xsmm_tile_config_invoke";
+    buildInvokeCall(rewriter, tileConfigOp.getLoc(), funcName, tileConfigOp,
+                    xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::BF16));
+    rewriter.eraseOp(tileConfigOp);
+    return success();
+  }
+};
+
 static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
@@ -226,6 +239,13 @@ void addKindOperand(RewriterBase &rewriter, FusedBrgemmDispatchOp dispatchOp,
                     SmallVectorImpl<Type> &dispatchOperandTypes) {
   /* do nothing */
 }
+
+void addKindOperand(RewriterBase &rewriter, TileConfigDispatchOp dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  /* do nothing */
+}
+
 
 static int64_t getOredFlags(ArrayAttr flags) {
   int64_t oredFlag = 0;
@@ -370,6 +390,16 @@ struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
   }
 };
 
+struct ConvertTileConfigDispatchOp : public OpRewritePattern<TileConfigDispatchOp> {
+  using OpRewritePattern<TileConfigDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TileConfigDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return buildDispatchOp<TileConfigDispatchOp>(rewriter, dispatchOp,
+                                            "xsmm_tile_config_dispatch");
+  }
+};
+
 struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
   using OpRewritePattern<FusedBrgemmDispatchOp>::OpRewritePattern;
 
@@ -395,11 +425,11 @@ struct ConvertXsmmToFunc
     RewritePatternSet patterns(&getContext());
     patterns
         .add<ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
-             ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
+             ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp, ConvertTileConfigXsmmOp>(
             patterns.getContext());
     patterns.add<ConvertBinaryDispatchOp,
                  ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
-                 ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
+                 ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp, ConvertTileConfigDispatchOp>(
         patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

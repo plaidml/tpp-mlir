@@ -263,6 +263,15 @@ def Xsmm_GemmDispatchOp : Xsmm_GemmLikeOp<"gemm.dispatch"> {
 def Xsmm_BrgemmDispatchOp : Xsmm_GemmLikeOp<"brgemm.dispatch"> {
   let summary = "dispatch for brgemm operation.";
   let hasVerifier = 1;
+  
+}
+
+//===----------------------------------------------------------------------===//
+// TileConfigDispatchOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_TileConfigDispatchOp : Xsmm_GemmLikeOp<"tileConfig.dispatch"> {
+  let summary = "dispatch for tileConfig operation.";
 }
 
 //===----------------------------------------------------------------------===//
@@ -296,6 +305,16 @@ def Xsmm_FusedBrgemmDispatchOp : Xsmm_Op<"fused_brgemm.dispatch", [Pure]> {
   let hasCustomAssemblyFormat = 1;
 
   let hasVerifier = 1;
+}
+
+
+//===----------------------------------------------------------------------===//
+// TileConfigOp
+//===----------------------------------------------------------------------===//
+
+def Xsmm_TileConfigOp : Xsmm_Op<"tileConfig",  [MemoryEffects<[MemWrite, MemRead]>]> {
+  let summary = "invoke for tileConfig operation.";
+  let arguments = (ins I64:$dispatch, Variadic<AnyMemRef>:$inputs);
 }
 
 #endif // TPP_XSMM_OPS

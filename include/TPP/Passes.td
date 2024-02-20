@@ -470,6 +470,7 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
+
 def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
   let summary = "Tile parallel loops";
   let options = [
@@ -492,6 +493,16 @@ def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
   }];
   let dependentDialects = ["gpu::GPUDialect",
                            "arith::ArithDialect"];
+}
+
+def TileConfigInsertionPass : Pass<"tile-config-insertion-pass",
+                                     "func::FuncOp"> {
+  let summary = "Insert tile configuration xsmm calls";
+  let description = [{
+    Insert tile configuration xsmm calls and perform LICM on them.
+  }];
+
+  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

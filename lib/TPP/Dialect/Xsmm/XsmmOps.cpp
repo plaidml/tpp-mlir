@@ -235,6 +235,21 @@ void BinaryDispatchOp::print(OpAsmPrinter &printer) {
   printerDataTypeImpl<BinaryDispatchOp>(printer, *this);
 }
 
+void TileConfigDispatchOp::print(OpAsmPrinter &printer) {
+  printerInputImpl<TileConfigDispatchOp>(printer, *this);
+  auto getOpFlags = [this]() -> ArrayAttr { return this->getFlags(); };
+  printerFlagsImpl<GemmFlagsAttr>(printer, getOpFlags, FLAGS_NAME);
+  printerDataTypeImpl<TileConfigDispatchOp>(printer, *this);
+}
+
+ParseResult TileConfigDispatchOp::parse(OpAsmParser &parser,
+                                        OperationState &result) {
+  if (failed(parseInputImpl(parser, result)) ||
+      failed(parserFlagsImpl<GemmFlags>(parser, result, FLAGS_NAME)))
+    return failure();
+  return parseDataTypeImpl(parser, result);
+}
+
 template <typename FLAGS>
 static LogicalResult
 verifyUniquenessAndConsistency(ArrayAttr flags, Operation *op,

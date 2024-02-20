@@ -144,6 +144,7 @@ private:
       mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
       tilingOptions.tileSizes = parallelTaskGrid;
       pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+      pm.addNestedPass<func::FuncOp>(createTileConfigInsertionPass());
       pm.addPass(createConvertSCFToOpenMPPass());
     }
     pm.addPass(createConvertVectorToSCFPass());

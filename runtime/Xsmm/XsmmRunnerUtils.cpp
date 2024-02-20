@@ -14,6 +14,7 @@
 
 #include "XsmmRunnerUtils.h"
 #include "libxsmm.h" // NOLINT [build/include_subdir]
+#include "libxsmm_utils.h"
 
 // Helper function prototypes.
 static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
@@ -209,6 +210,43 @@ xsmm_binary_dispatch(const libxsmm_meltw_binary_type op_type,
   return reinterpret_cast<int64_t>(kernel);
 }
 
+extern "C" int64_t xsmm_tile_config_dispatch(const libxsmm_datatype dtype,
+                                             int64_t m, int64_t n, int64_t k,
+                                             int64_t lda, int64_t ldb,
+                                             int64_t ldc, int64_t stride_a,
+                                             int64_t stride_b,
+                                             const libxsmm_gemm_flags flags) {
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_cfg_flags = flags;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb;
+  l_shape.ldb = lda;
+  l_shape.ldc = ldc;
+  l_shape.a_in_type = dtype;
+  l_shape.b_in_type = dtype;
+  l_shape.out_type = dtype;
+  l_shape.comp_type =
+      dtype == LIBXSMM_DATATYPE_BF16 ? LIBXSMM_DATATYPE_F32 : dtype;
+
+  auto sgemm = libxsmm_dispatch_tilecfg_gemm(l_shape, l_cfg_flags);
+  if (!sgemm) {
+    fprintf(stderr, "failed to generate tileconfig func\n");
+    fprintf(stderr, "dtype: %u\n", dtype);
+    fprintf(stderr, "flags: %u\n", flags);
+    printXsmmStruct(l_shape);
+    exit(-1);
+  }
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
 extern "C" void xsmm_unary_invoke(const libxsmm_datatype dType, int64_t addr,
                                   void *alignedPtrIn, int64_t offsetIn,
                                   void *alignedPtrOut, int64_t offsetOut) {
@@ -311,8 +349,8 @@ extern "C" int64_t xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   l_brconfig.br_stride_b_hint = stride_a * typeSize;
   l_brconfig.br_unroll_hint = 0;
 
-  auto sgemm = libxsmm_dispatch_brgemm(l_shape, l_flags, l_prefetch_flags,
-                                          l_brconfig);
+  auto sgemm =
+      libxsmm_dispatch_brgemm(l_shape, l_flags, l_prefetch_flags, l_brconfig);
   if (!sgemm) {
     fprintf(stderr, "failed to generate brgemm func\n");
     fprintf(stderr, "dtype: %u\n", dtype);
@@ -407,8 +445,8 @@ xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
   l_postops.d_binary_type = binary_op_type;
   l_postops.ldd = ldc;
 
-  auto sgemm = libxsmm_dispatch_brgemm_ext(
-      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+  auto sgemm = libxsmm_dispatch_brgemm_ext(l_shape, l_flags, l_prefetch_flags,
+                                           l_brconfig, l_argops, l_postops);
   if (!sgemm) {
     fprintf(stderr, "failed to generate fused brgemm func\n");
     fprintf(stderr, "data_type: %u\n", data_type);
@@ -418,6 +456,18 @@ xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
   }
 
   return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_tile_config_invoke(const libxsmm_datatype dType, int64_t addr,
+                        void *tileState, int64_t offset) {
+  libxsmm_xmmfunction cfg_tr;
+
+  libxsmm_tilecfg_state *l_tilestate =
+      reinterpret_cast<libxsmm_tilecfg_state *>(tileState);
+
+  cfg_tr.tilecfg = reinterpret_cast<libxsmm_tilecfgfunction>(addr);
+  cfg_tr.tilecfg(l_tilestate);
 }
 
 static void printXsmmStruct(const libxsmm_gemm_shape &gemmShape,
