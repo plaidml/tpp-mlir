@@ -16,7 +16,10 @@ on:
         description: "Run on Coffee Lake"
         default: "0"
   push:
+    branches:
+      - 'main'
   pull_request:
+    types: [ labeled ]
 
 env:
   NPROCS_LIMIT_LINK: 8
@@ -25,12 +28,16 @@ env:
 
 jobs:
   Check_LLVM:
+    if: ${{ github.event_name }} == "push" || \
+        (${{ github.event_name }} == "pull_request" && ${{ github.event.label.name == 'benchmark' }})
     uses: ./.github/workflows/tpp-llvm.yml
     secrets: inherit
 
   TPP-MLIR-SPR-BASE:
     runs-on: pcl-tiergarten
-    if: ${{ github.event_name }} == "push" || ${{ github.event_name }} == "pull_request" || ${{ inputs.RUN_SPR_BENCH }} == 1
+    if: ${{ github.event_name }} == "push" || \
+        ${{ inputs.RUN_SPR_BENCH }} == 1 || \
+        (${{ github.event_name }} == "pull_request" && ${{ github.event.label.name == 'benchmark' }})
     needs: Check_LLVM
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +49,9 @@ jobs:
 
   TPP-MLIR-SPR-OMP:
     runs-on: pcl-tiergarten
+    if: ${{ github.event_name }} == "push" || \
+        ${{ inputs.RUN_SPR_BENCH }} == 1 || \
+        (${{ github.event_name }} == "pull_request" && ${{ github.event.label.name == 'benchmark' }})
     needs: Check_LLVM
     steps:
       - uses: actions/checkout@v4
