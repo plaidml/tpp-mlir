@@ -59,7 +59,7 @@ echo_run ./driver.py -vv \
 echo " ========= PyTorch Benchmarks ==========="
 echo_run ./driver.py -vv \
          -n ${NUM_ITER} \
-         -c "${CONFIG_DIR}pytorch/torch_dynamo.json" \
+         -c "${CONFIG_DIR}/pytorch/torch_dynamo.json" \
          --build "${BUILD_DIR}"
 
 echo " ========= OpenMP Benchmarks ==========="
