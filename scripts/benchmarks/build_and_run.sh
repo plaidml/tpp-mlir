@@ -8,16 +8,38 @@
 SCRIPT_DIR=$(realpath $(dirname $0)/..)
 source ${SCRIPT_DIR}/ci/common.sh
 
-# Install packages needed
-if [ "$(is_linux_distro Ubuntu)" == "YES" ]; then
-  sudo apt update && \
-  sudo apt install -y \
-      build-essential clang lld \
-      cmake unzip ninja-build \
-      python3-pip libomp-dev
-else
-  echo "Not Ubuntu distro, tools may not be available"
+# Install packages needed (conda)
+CONDA_DIR="$HOME/conda"
+CONDA_INIT="${CONDA_DIR}/bin/init"
+ARCH_NAME=$(uname -m)
+if [ ! -d "${CONDA_DIR}" ]; then
+  echo "Installing Conda into ${CONDA_DIR}"
+  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${ARCH_NAME}.sh
+  bash Miniconda3-latest-Linux-${ARCH_NAME}.sh -b -p "${CONDA_DIR}"
+  # Init Conda avoiding polluting .bashrc
+  echo "Initializing Conda"
+  RC="$HOME/.bashrc"
+  mv ${RC} ${RC}.tmp
+  touch ${RC}
+  conda init
+  mv ${RC} ${CONDA_INIT}
+  mv ${RC}.tmp ${RC}
 fi
+
+echo "Running Conda hook"
+eval "$(conda shell.bash hook)"
+echo "Running Conda init"
+source ${CONDA_INIT}
+echo "Running Conda activate"
+conda activate
+echo "Running Conda install packages"
+conda install -y cmake ninja git clang clangxx llvm lld llvm-openmp llvm-tools binutils unzip
+if [ "${ARCH_NAME}" == "aarch64" ]; then
+   conda install -y gcc_linux-aarch64 gxx_linux-aarch64
+elif [ "${ARCH_NAME}" == "x86_64" ]; then
+   conda install -y gcc_linux-64 gxx_linux-64
+fi
+python -m pip install coloredlogs
 
 # Environment used by the scripts
 SOURCE_DIR=$(git_root)
@@ -71,3 +93,4 @@ for cfg in dnn-fp32 dnn-bf16 mlir-fp32 mlir-bf16; do
 done
 
 popd
+conda deactivate
