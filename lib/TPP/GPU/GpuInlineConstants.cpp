@@ -31,7 +31,9 @@ namespace tpp {
 
 namespace {
 
+// Returns true if the operation represents a constant value.
 static bool isConstantOp(Operation *op) {
+  // TODO: Add more constant representations.
   return op && isa<arith::ConstantOp>(op);
 }
 
