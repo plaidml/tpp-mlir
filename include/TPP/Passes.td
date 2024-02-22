@@ -483,4 +483,15 @@ def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
   let dependentDialects = ["affine::AffineDialect", "scf::SCFDialect"];
 }
 
+def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
+  let summary = "Inlines constants into GPU launch.";
+  let description = [{
+    Inline constants into GPU launch body to reduce number of parameters
+    and allow further constant propagation after kernel outlining.
+    The pass should be used just before GPU kernel outlining.
+  }];
+  let dependentDialects = ["gpu::GPUDialect",
+                           "arith::ArithDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

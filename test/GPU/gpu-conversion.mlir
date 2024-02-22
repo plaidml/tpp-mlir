@@ -131,10 +131,11 @@ func.func @identity_with_bcast(%arg0: memref<5x1xf32>, %arg1: memref<5x6xf32>) {
 // CHECK:     gpu.launch_func  @identity_with_bcast_kernel::@identity_with_bcast_kernel
 // CHECK: gpu.module @identity_with_bcast_kernel
 // CHECK-LABEL: gpu.func @identity_with_bcast_kernel
-// CHECK-SAME: %[[ARG0:.+]]: memref<5x1xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: memref<5x6xf32>
+// CHECK-SAME: %[[ARG0:.+]]: memref<5x1xf32>, %[[ARG2:.+]]: memref<5x6xf32>
+// CHECK-DAG:   %[[c0:.+]] = arith.constant 0 : index
 // CHECK:       %[[X:.+]] = gpu.block_id  x
 // CHECK-NEXT:  %[[Y:.+]] = gpu.block_id  y
-// CHECK:       %[[L:.+]] = memref.load %arg0[%[[X]], %[[ARG1]]] : memref<5x1xf32>
+// CHECK:       %[[L:.+]] = memref.load %arg0[%[[X]], %[[c0]]] : memref<5x1xf32>
 // CHECK:       memref.store %[[L]], %[[ARG2]][%[[X]], %[[Y]]] : memref<5x6xf32>
 // CHECK:       gpu.return
 
@@ -160,11 +161,12 @@ func.func @relu(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
 // CHECK:         gpu.launch_func  @relu_kernel::@relu_kernel
 // CHECK: gpu.module @relu_kernel
 // CHECK-LABEL: gpu.func @relu_kernel
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: f32, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG2:.+]]: memref<3x3xf32>
+// CHECK-DAG:     %[[c0:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[X:.+]] = gpu.block_id x
 // CHECK-NEXT:    %[[Y:.+]] = gpu.block_id y
 // CHECK:         %[[L:.+]] = memref.load %[[ARG0]][%[[X]], %[[Y]]] : memref<3x3xf32>
-// CHECK:         %[[M:.+]] = arith.maximumf %[[L]], %[[ARG1]] : f32
+// CHECK:         %[[M:.+]] = arith.maximumf %[[L]], %[[c0]] : f32
 // CHECK:         memref.store %[[M]], %[[ARG2]][%[[X]], %[[Y]]] : memref<3x3xf32>
 // CHECK:         gpu.return
 
@@ -181,10 +183,11 @@ func.func @zero(%arg0: memref<3x3xf32>) {
 // CHECK:         gpu.launch_func  @zero_kernel::@zero_kernel
 // CHECK: gpu.module @zero_kernel
 // CHECK-LABEL: gpu.func @zero_kernel
-// CHECK-SAME:  %[[ARG0:.+]]: f32, %[[ARG1:.+]]: memref<3x3xf32>
+// CHECK-SAME:  %[[ARG1:.+]]: memref<3x3xf32>
+// CHECK-DAG:     %[[c0:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[X:.+]] = gpu.block_id x
 // CHECK-NEXT:    %[[Y:.+]] = gpu.block_id y
-// CHECK:         memref.store %[[ARG0]], %[[ARG1]][%[[X]], %[[Y]]] : memref<3x3xf32>
+// CHECK:         memref.store %[[c0]], %[[ARG1]][%[[X]], %[[Y]]] : memref<3x3xf32>
 // CHECK:         gpu.return
 
 // -----
@@ -221,14 +224,17 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 // CHECK:         gpu.launch_func  @brgemm_kernel::@brgemm_kernel
 // CHECK: gpu.module @brgemm_kernel
 // CHECK-LABEL: gpu.func @brgemm_kernel
-// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<2x3x4xf32>, %[[ARG2:.+]]: memref<2x4x3xf32>,
-// CHECK-SAME:  %[[ARG3:.+]]: index, %[[ARG4:.+]]: index, %[[ARG5:.+]]: index, %[[ARG6:.+]]: index
+// CHECK-SAME:  %[[ARG0:.+]]: memref<3x3xf32>, %[[ARG1:.+]]: memref<2x3x4xf32>, %[[ARG2:.+]]: memref<2x4x3xf32>
+// CHECK-DAG:     %[[c0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[c1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[c2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[c4:.+]] = arith.constant 4 : index
 // CHECK:         %[[X:.+]] = gpu.block_id x
 // CHECK-NEXT:    %[[Y:.+]] = gpu.block_id y
 // CHECK:         %[[C:.+]] = memref.load %[[ARG0]][%[[X]], %[[Y]]] : memref<3x3xf32>
-// CHECK:         %[[R:.+]] = scf.for %[[ARG7:.+]] = %[[ARG3]] to %[[ARG6]] step %[[ARG5]]
+// CHECK:         %[[R:.+]] = scf.for %[[ARG7:.+]] = %[[c0]] to %[[c2]] step %[[c1]]
 // CHECK-SAME:                iter_args(%[[ARG8:.+]] = %[[C]])
-// CHECK:           %{{.+}} = scf.for %[[ARG9:.+]] = %[[ARG3]] to %[[ARG4]] step %[[ARG5]]
+// CHECK:           %{{.+}} = scf.for %[[ARG9:.+]] = %[[c0]] to %[[c4]] step %[[c1]]
 // CHECK-SAME:                iter_args(%[[ARG10:.+]] = %[[ARG8]])
 // CHECK:             %[[A:.+]] = memref.load %[[ARG1]][%[[ARG7]], %[[X]], %[[ARG9]]] : memref<2x3x4xf32>
 // CHECK:             %[[B:.+]] = memref.load %[[ARG2]][%[[ARG7]], %[[ARG9]], %[[Y]]] : memref<2x4x3xf32>
@@ -252,12 +258,14 @@ func.func @gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memref<8
 // CHECK:         gpu.launch_func  @gemm_kernel::@gemm_kernel
 // CHECK: gpu.module @gemm_kernel
 // CHECK-LABEL: gpu.func @gemm_kernel
-// CHECK-SAME:  %[[ARG0:.+]]: memref<8x10xf32>, %[[ARG1:.+]]: memref<8x9xf32>,
-// CHECK-SAME:  %[[ARG2:.+]]: memref<9x10xf32>, %[[ARG3:.+]]: index, %[[ARG4:.+]]: index, %[[ARG5:.+]]: index)
+// CHECK-SAME:  %[[ARG0:.+]]: memref<8x10xf32>, %[[ARG1:.+]]: memref<8x9xf32>, %[[ARG2:.+]]: memref<9x10xf32>
+// CHECK-DAG:     %[[c0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[c1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[c9:.+]] = arith.constant 9 : index
 // CHECK:         %[[X:.+]] = gpu.block_id x
 // CHECK-NEXT:    %[[Y:.+]] = gpu.block_id y
 // CHECK:         %[[C:.+]] = memref.load %[[ARG0]][%[[X]], %[[Y]]] : memref<8x10xf32>
-// CHECK:         %[[R:.+]] = scf.for %[[ARG6:.+]] = %[[ARG3]] to %[[ARG4]] step %[[ARG5]]
+// CHECK:         %[[R:.+]] = scf.for %[[ARG6:.+]] = %[[c0]] to %[[c9]] step %[[c1]]
 // CHECK-SAME:              iter_args(%[[ARG7:.+]] = %[[C]])
 // CHECK:           %[[A:.+]] = memref.load %[[ARG1]][%[[X]], %[[ARG6]]] : memref<8x9xf32>
 // CHECK:           %[[B:.+]] = memref.load %[[ARG2]][%[[ARG6]], %[[Y]]] : memref<9x10xf32>
