@@ -8,6 +8,8 @@
 
 #include "TPP/Passes.h"
 
+#include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
+
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -41,13 +43,6 @@ namespace {
 struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
                        UtilityPassBase<ModuleOp> {
   using GpuConversionBase::GpuConversionBase;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<scf::SCFDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<gpu::GPUDialect>();
-  }
 
   void runOnOperation() override {
     auto module = getOperation();

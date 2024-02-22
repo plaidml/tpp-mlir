@@ -344,6 +344,11 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let description = [{
     Convert all eligble operations into generic GPU operations.
   }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "imex::xegpu::XeGPUDialect"];
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
