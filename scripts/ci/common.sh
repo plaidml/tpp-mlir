@@ -69,3 +69,32 @@ add_device_extensions() {
 
   echo ${BASE}
 }
+
+# Wait for a file to appear on an existing directory
+wait_for_file() {
+  local DIR="${1}"
+  local FILE="${1}/${2}"
+
+  if [ ! -d ${DIR} ]; then
+    echo "ERROR: Directory ${DIR} not found"
+  fi
+  echo "Waiting for ${FILE}..."
+  while [ ! -f ${FILE} ]; do
+    sleep 30
+    echo "."
+  done
+  echo "Found"
+}
+
+# Check if Linux is of a particular distro
+is_linux_distro() {
+  local NAME="${1}"
+
+  for file in /etc/os-release /etc/lsb-release /etc/redhat-release; do
+    if [ -f "${file}" ] && grep -qi "${NAME}" ${file}; then
+      echo "YES"
+      return
+    fi
+  done
+  echo "NO"
+}
