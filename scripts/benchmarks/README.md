@@ -13,8 +13,8 @@ For our paper, to achieve reproducible numbers, we have used the following AWS i
 | c6i.8xlarge | Intel | Ice Lake | Xeon 3 | 16 | 32 | 64GB | 300GB |
 | c6a.8xlarge | AMD   | Milan | Zen 3 | 16 | 32 | 64GB | 300GB |
 | c7i.8xlarge | Intel | Sapphire Rapids | Xeon 4 | 16 | 32 | 64GB | 300GB |
-| c7a.8xlarge | AMD   | Genoa with | Zen 4 | 16 | 16 | 32GB | 300GB |
-| c7g.8xlarge | Arm   | Graviton 3 | Neoverse V1 | 16 | 16 | 32GB | 300GB |
+| c7a.4xlarge | AMD   | Genoa with | Zen 4 | 16 | 16 | 32GB | 300GB |
+| c7g.4xlarge | Arm   | Graviton 3 | Neoverse V1 | 16 | 16 | 32GB | 300GB |
 
 All instances above use the Amazon Linux, which is free on AWS.
 
