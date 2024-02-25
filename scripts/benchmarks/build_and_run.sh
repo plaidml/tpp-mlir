@@ -45,10 +45,9 @@ export BUILD_DIR=${SOURCE_DIR}/build-${COMPILER}
 ${SCRIPT_DIR}/buildkite/build_tpp.sh
 
 # Run benchmarks
-export BUILDKITE_BENCHMARK_NUM_ITER=1000
 export BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
 export CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
-export NUM_ITER=1000
+export NUM_ITER=${NUM_ITER:=1000}
 
 pushd ${BENCH_DIR}
 
