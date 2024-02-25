@@ -11,10 +11,12 @@ source ${SCRIPT_DIR}/ci/common.sh
 # Install packages needed
 if [ "$(is_linux_distro Ubuntu)" == "YES" ]; then
   sudo apt update && \
-  sudo apt install -y \
-      build-essential clang lld \
-      cmake unzip ninja-build \
-      python3-pip libomp-dev
+  sudo apt install -y build-essential \
+                      cmake clang lld ninja-build \
+                      unzip python3-pip libomp-dev git
+elif [ "$(is_linux_distro Amazon)" == "YES" ]; then
+  sudo dnf install -y cmake clang lld ninja-build \
+                      unzip python3-pip libomp-devel git
 else
   echo "Not Ubuntu distro, tools may not be available"
 fi
