@@ -85,3 +85,16 @@ wait_for_file() {
   done
   echo "Found"
 }
+
+# Check if Linux is of a particular distro
+is_linux_distro() {
+  local NAME="${1}"
+
+  for file in /etc/os-release /etc/lsb-release /etc/redhat-release; do
+    if [ -f "${file}" ] && grep -qi "${NAME}" ${file}; then
+      echo "YES"
+      return
+    fi
+  done
+  echo "NO"
+}
