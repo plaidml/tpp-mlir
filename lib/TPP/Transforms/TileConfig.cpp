@@ -1,3 +1,4 @@
+//===- TileConfig.cpp -----------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -5,19 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements loop tiling on parallel loops.
+// This file inserts tile configuration calls.
 //
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
-#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include <list>
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_TILECONFIGINSERTIONPASS
@@ -109,11 +108,11 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
 
     auto alloca = rewriter.create<memref::AllocaOp>(
         op.getLoc(), MemRefType::get({64}, rewriter.getI8Type()));
-    
+
     ValueRange tileConfigInputs{alloca};
-    rewriter.create<mlir::xsmm::TileConfigOp>(
-        op.getLoc(), tileConfigSetup, tileConfigInputs);
-    
+    rewriter.create<mlir::xsmm::TileConfigOp>(op.getLoc(), tileConfigSetup,
+                                              tileConfigInputs);
+
     SmallVector<Value> invokeOperands;
     invokeOperands.push_back(dispatch);
     auto opItr = op->getOperands().begin();
@@ -125,10 +124,10 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
         invokeOperands);
 
     ValueRange tileResetInputs{alloca};
-    rewriter.create<mlir::xsmm::TileConfigOp>(
-        op.getLoc(), tileConfigReset, tileResetInputs);
+    rewriter.create<mlir::xsmm::TileConfigOp>(op.getLoc(), tileConfigReset,
+                                              tileResetInputs);
 
-    //rewriter.create<memref::DeallocOp>(op.getLoc(), alloca);
+    // rewriter.create<memref::DeallocOp>(op.getLoc(), alloca);
     rewriter.eraseOp(op);
     rewriter.eraseOp(op.getOperand(0).getDefiningOp());
     return success();

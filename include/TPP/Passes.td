@@ -499,7 +499,17 @@ def TileConfigInsertionPass : Pass<"tile-config-insertion-pass",
                                      "func::FuncOp"> {
   let summary = "Insert tile configuration xsmm calls";
   let description = [{
-    Insert tile configuration xsmm calls and perform LICM on them.
+    Insert tile configuration xsmm calls.
+  }];
+
+  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
+}
+
+def TileConfigHoistingPass : Pass<"tile-config-hoisting-pass",
+                                     "func::FuncOp"> {
+  let summary = "Hoist tile configuration invoke xsmm calls";
+  let description = [{
+    Run LICM on Tile configuration invoke calls.
   }];
 
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
