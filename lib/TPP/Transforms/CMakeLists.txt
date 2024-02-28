@@ -17,8 +17,8 @@ add_mlir_library(TPPTransforms
   TransformUtils.cpp
   CombineXsmmPass.cpp
   SCFParallelLoopTiling.cpp
-  TileConfig.cpp
-  TileConfigHoisting.cpp
+  IntelAMXTileConfig.cpp
+  IntelAMXTileConfigHoisting.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

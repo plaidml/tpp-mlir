@@ -1,4 +1,4 @@
-//===- TileConfigHoisting.cpp ---------------------------------------------===//
+//===- IntelAMXTileConfigHoisting.cpp -------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,16 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
-#include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 namespace mlir {
 namespace tpp {
-#define GEN_PASS_DEF_TILECONFIGHOISTINGPASS
+#define GEN_PASS_DEF_INTELAMXTILECONFIGHOISTINGPASS
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
@@ -30,31 +28,32 @@ using namespace mlir::xsmm;
 namespace mlir {
 namespace tpp {
 
-struct TileConfigHoisting : OpRewritePattern<memref::AllocaOp> {
+struct IntelAMXTileConfigHoisting : OpRewritePattern<memref::AllocaOp> {
   using OpRewritePattern<memref::AllocaOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::AllocaOp alloca,
                                 PatternRewriter &rewriter) const override {
 
-    xsmm::TileConfigOp firstTileConfig, secondTileConfig;
+    xsmm::IntelAMXTileConfigOp firstTileConfig, secondTileConfig;
     for (auto *user : alloca->getUsers()) {
-      if (!dyn_cast<xsmm::TileConfigOp>(user)) {
+      if (!dyn_cast<xsmm::IntelAMXTileConfigOp>(user)) {
         return failure();
       }
-      auto flags =
-          dyn_cast<xsmm::TileConfigDispatchOp>(
-              dyn_cast<xsmm::TileConfigOp>(user).getOperand(0).getDefiningOp())
-              .getFlags();
+      auto flags = dyn_cast<xsmm::IntelAMXTileConfigDispatchOp>(
+                       dyn_cast<xsmm::IntelAMXTileConfigOp>(user)
+                           .getOperand(0)
+                           .getDefiningOp())
+                       .getFlags();
       for (auto flagItr : flags) {
         if (flagItr == xsmm::GemmFlagsAttr::get(
                            rewriter.getContext(),
                            mlir::xsmm::GemmFlags::NO_RESET_TILECONFIG)) {
-          firstTileConfig = dyn_cast<xsmm::TileConfigOp>(user);
+          firstTileConfig = dyn_cast<xsmm::IntelAMXTileConfigOp>(user);
 
         } else if (flagItr == xsmm::GemmFlagsAttr::get(
                                   rewriter.getContext(),
                                   mlir::xsmm::GemmFlags::NO_SETUP_TILECONFIG)) {
-          secondTileConfig = dyn_cast<xsmm::TileConfigOp>(user);
+          secondTileConfig = dyn_cast<xsmm::IntelAMXTileConfigOp>(user);
         }
       }
     }
@@ -85,10 +84,11 @@ struct TileConfigHoisting : OpRewritePattern<memref::AllocaOp> {
   }
 };
 
-struct TileConfigHoistingPass
-    : public impl::TileConfigHoistingPassBase<TileConfigHoistingPass> {
+struct IntelAMXTileConfigHoistingPass
+    : public impl::IntelAMXTileConfigHoistingPassBase<
+          IntelAMXTileConfigHoistingPass> {
   void populateCombinePatterns(RewritePatternSet &patterns) {
-    patterns.add<TileConfigHoisting>(patterns.getContext());
+    patterns.add<IntelAMXTileConfigHoisting>(patterns.getContext());
   }
 
   void runOnOperation() override {

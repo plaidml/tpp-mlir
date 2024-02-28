@@ -1,4 +1,4 @@
-//===- TileConfig.cpp -----------------------------------------------------===//
+//===- IntelAMXTileConfig.cpp ---------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +19,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 namespace mlir {
 namespace tpp {
-#define GEN_PASS_DEF_TILECONFIGINSERTIONPASS
+#define GEN_PASS_DEF_INTELAMXTILECONFIGINSERTIONPASS
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
@@ -35,10 +35,9 @@ static void appendBrgemmFlags(SmallVector<Attribute> &attributes,
   auto flags =
       dyn_cast<DispatchOpTy>(opTy.getOperand(0).getDefiningOp()).getFlags();
   for (auto flagItr : flags) {
-    if (flagItr == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
-                                            xsmm::GemmFlags::NONE)) {
+    if (flagItr ==
+        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE))
       return;
-    }
     attributes.push_back(flagItr);
   }
 
@@ -48,7 +47,7 @@ static void appendBrgemmFlags(SmallVector<Attribute> &attributes,
 }
 
 template <typename InvokeOpTy, typename DispatchOpTy>
-struct TileConfig : OpRewritePattern<InvokeOpTy> {
+struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
   using OpRewritePattern<InvokeOpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(InvokeOpTy op,
@@ -58,22 +57,20 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
       return failure();
     auto flags =
         dyn_cast<DispatchOpTy>(op.getOperand(0).getDefiningOp()).getFlags();
-    for (auto flagItr : flags) {
+    for (auto flagItr : flags)
       if (flagItr == xsmm::GemmFlagsAttr::get(
                          rewriter.getContext(),
                          mlir::xsmm::GemmFlags::NO_RESET_TILECONFIG) ||
           flagItr == xsmm::GemmFlagsAttr::get(
                          rewriter.getContext(),
-                         mlir::xsmm::GemmFlags::NO_SETUP_TILECONFIG)) {
+                         mlir::xsmm::GemmFlags::NO_SETUP_TILECONFIG))
         return failure();
-      }
-    }
 
     SmallVector<Attribute> attributesSetup;
     attributesSetup.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_RESET_TILECONFIG));
     appendBrgemmFlags<InvokeOpTy, DispatchOpTy>(attributesSetup, rewriter, op);
-    auto tileConfigSetup = rewriter.create<xsmm::TileConfigDispatchOp>(
+    auto tileConfigSetup = rewriter.create<xsmm::IntelAMXTileConfigDispatchOp>(
         op.getLoc(), rewriter.getI64Type(),
         DenseI64ArrayAttr::get(
             rewriter.getContext(),
@@ -86,7 +83,7 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
     attributesReset.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_SETUP_TILECONFIG));
     appendBrgemmFlags<InvokeOpTy, DispatchOpTy>(attributesReset, rewriter, op);
-    auto tileConfigReset = rewriter.create<xsmm::TileConfigDispatchOp>(
+    auto tileConfigReset = rewriter.create<xsmm::IntelAMXTileConfigDispatchOp>(
         op.getLoc(), rewriter.getI64Type(),
         DenseI64ArrayAttr::get(
             rewriter.getContext(),
@@ -110,8 +107,8 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
         op.getLoc(), MemRefType::get({64}, rewriter.getI8Type()));
 
     ValueRange tileConfigInputs{alloca};
-    rewriter.create<mlir::xsmm::TileConfigOp>(op.getLoc(), tileConfigSetup,
-                                              tileConfigInputs);
+    rewriter.create<mlir::xsmm::IntelAMXTileConfigOp>(
+        op.getLoc(), tileConfigSetup, tileConfigInputs);
 
     SmallVector<Value> invokeOperands;
     invokeOperands.push_back(dispatch);
@@ -124,22 +121,23 @@ struct TileConfig : OpRewritePattern<InvokeOpTy> {
         invokeOperands);
 
     ValueRange tileResetInputs{alloca};
-    rewriter.create<mlir::xsmm::TileConfigOp>(op.getLoc(), tileConfigReset,
-                                              tileResetInputs);
+    rewriter.create<mlir::xsmm::IntelAMXTileConfigOp>(
+        op.getLoc(), tileConfigReset, tileResetInputs);
 
-    // rewriter.create<memref::DeallocOp>(op.getLoc(), alloca);
     rewriter.eraseOp(op);
     rewriter.eraseOp(op.getOperand(0).getDefiningOp());
     return success();
   }
 };
 
-struct TileConfigInsertionPass
-    : public impl::TileConfigInsertionPassBase<TileConfigInsertionPass> {
+struct IntelAMXTileConfigInsertionPass
+    : public impl::IntelAMXTileConfigInsertionPassBase<
+          IntelAMXTileConfigInsertionPass> {
   void populateCombinePatterns(RewritePatternSet &patterns) {
-    patterns.add<TileConfig<xsmm::BrgemmOp, xsmm::BrgemmDispatchOp>>(
+    patterns.add<IntelAMXTileConfig<xsmm::BrgemmOp, xsmm::BrgemmDispatchOp>>(
         patterns.getContext());
-    patterns.add<TileConfig<xsmm::FusedBrgemmOp, xsmm::FusedBrgemmDispatchOp>>(
+    patterns.add<
+        IntelAMXTileConfig<xsmm::FusedBrgemmOp, xsmm::FusedBrgemmDispatchOp>>(
         patterns.getContext());
   }
 

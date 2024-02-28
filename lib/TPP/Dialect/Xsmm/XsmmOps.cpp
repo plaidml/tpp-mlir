@@ -179,7 +179,7 @@ static void printerDataTypeImpl(OpAsmPrinter &printer, OpTy op) {
 
 template <typename AttrTy>
 static void printerFlagsImpl(OpAsmPrinter &printer,
-                             const std::function<ArrayAttr()>& fn,
+                             const std::function<ArrayAttr()> &fn,
                              const std::string_view &flagsName) {
   printer << " " << flagsName << " = (";
   llvm::interleaveComma(fn(), printer, [&](auto &flag) {
@@ -235,15 +235,15 @@ void BinaryDispatchOp::print(OpAsmPrinter &printer) {
   printerDataTypeImpl<BinaryDispatchOp>(printer, *this);
 }
 
-void TileConfigDispatchOp::print(OpAsmPrinter &printer) {
-  printerInputImpl<TileConfigDispatchOp>(printer, *this);
+void IntelAMXTileConfigDispatchOp::print(OpAsmPrinter &printer) {
+  printerInputImpl<IntelAMXTileConfigDispatchOp>(printer, *this);
   auto getOpFlags = [this]() -> ArrayAttr { return this->getFlags(); };
   printerFlagsImpl<GemmFlagsAttr>(printer, getOpFlags, FLAGS_NAME);
-  printerDataTypeImpl<TileConfigDispatchOp>(printer, *this);
+  printerDataTypeImpl<IntelAMXTileConfigDispatchOp>(printer, *this);
 }
 
-ParseResult TileConfigDispatchOp::parse(OpAsmParser &parser,
-                                        OperationState &result) {
+ParseResult IntelAMXTileConfigDispatchOp::parse(OpAsmParser &parser,
+                                                OperationState &result) {
   if (failed(parseInputImpl(parser, result)) ||
       failed(parserFlagsImpl<GemmFlags>(parser, result, FLAGS_NAME)))
     return failure();

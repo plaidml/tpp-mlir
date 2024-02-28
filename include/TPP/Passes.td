@@ -495,21 +495,21 @@ def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
                            "arith::ArithDialect"];
 }
 
-def TileConfigInsertionPass : Pass<"tile-config-insertion-pass",
+def IntelAMXTileConfigInsertionPass : Pass<"intel-amx-tile-config-insertion-pass",
                                      "func::FuncOp"> {
-  let summary = "Insert tile configuration xsmm calls";
+  let summary = "Insert intel amx tile configuration xsmm calls";
   let description = [{
-    Insert tile configuration xsmm calls.
+    Insert intel amx tile configuration xsmm calls.
   }];
 
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
-def TileConfigHoistingPass : Pass<"tile-config-hoisting-pass",
+def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
                                      "func::FuncOp"> {
-  let summary = "Hoist tile configuration invoke xsmm calls";
+  let summary = "Hoist intel amx tile configuration invoke xsmm calls";
   let description = [{
-    Run LICM on Tile configuration invoke calls.
+    Run LICM on intel amx tile configuration invoke calls.
   }];
 
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];

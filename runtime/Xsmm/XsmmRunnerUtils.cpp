@@ -210,12 +210,10 @@ xsmm_binary_dispatch(const libxsmm_meltw_binary_type op_type,
   return reinterpret_cast<int64_t>(kernel);
 }
 
-extern "C" int64_t xsmm_tile_config_dispatch(const libxsmm_datatype dtype,
-                                             int64_t m, int64_t n, int64_t k,
-                                             int64_t lda, int64_t ldb,
-                                             int64_t ldc, int64_t stride_a,
-                                             int64_t stride_b,
-                                             const libxsmm_gemm_flags flags) {
+extern "C" int64_t xsmm_intel_amx_tile_config_dispatch(
+    const libxsmm_datatype dtype, int64_t m, int64_t n, int64_t k, int64_t lda,
+    int64_t ldb, int64_t ldc, int64_t stride_a, int64_t stride_b,
+    const libxsmm_gemm_flags flags) {
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
@@ -459,8 +457,8 @@ xsmm_fused_brgemm_dispatch(const libxsmm_datatype data_type, int64_t m,
 }
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void
-xsmm_tile_config_invoke(const libxsmm_datatype dType, int64_t addr,
-                        void *tileState, int64_t offset) {
+xsmm_intel_amx_tile_config_invoke(const libxsmm_datatype dType, int64_t addr,
+                                  void *tileState, int64_t offset) {
   libxsmm_xmmfunction cfg_tr;
 
   libxsmm_tilecfg_state *l_tilestate =

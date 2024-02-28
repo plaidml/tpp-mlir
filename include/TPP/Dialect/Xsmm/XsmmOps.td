@@ -267,11 +267,11 @@ def Xsmm_BrgemmDispatchOp : Xsmm_GemmLikeOp<"brgemm.dispatch"> {
 }
 
 //===----------------------------------------------------------------------===//
-// TileConfigDispatchOp
+// IntelAMXTileConfigDispatchOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TileConfigDispatchOp : Xsmm_GemmLikeOp<"tileConfig.dispatch"> {
-  let summary = "dispatch for tileConfig operation.";
+def Xsmm_IntelAMXTileConfigDispatchOp : Xsmm_GemmLikeOp<"IntelAMXtileConfig.dispatch"> {
+  let summary = "dispatch for Intel amx tileConfig operation.";
 }
 
 //===----------------------------------------------------------------------===//
@@ -309,11 +309,11 @@ def Xsmm_FusedBrgemmDispatchOp : Xsmm_Op<"fused_brgemm.dispatch", [Pure]> {
 
 
 //===----------------------------------------------------------------------===//
-// TileConfigOp
+// IntelAMXTileConfigOp
 //===----------------------------------------------------------------------===//
 
-def Xsmm_TileConfigOp : Xsmm_Op<"tileConfig",  [MemoryEffects<[MemWrite, MemRead]>]> {
-  let summary = "invoke for tileConfig operation.";
+def Xsmm_IntelAMXTileConfigOp : Xsmm_Op<"IntelAMXtileConfig",  [MemoryEffects<[MemWrite, MemRead]>]> {
+  let summary = "invoke for Intel AMX tileConfig operation.";
   let arguments = (ins I64:$dispatch, Variadic<AnyMemRef>:$inputs);
 }
 
