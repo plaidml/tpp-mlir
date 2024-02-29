@@ -31,12 +31,6 @@ namespace tpp {
 
 namespace {
 
-// Returns true if the operation represents a constant value.
-static bool isConstantOp(Operation *op) {
-  // TODO: Add more constant representations.
-  return op && isa<arith::ConstantOp>(op);
-}
-
 // Inlines constants into GPU launch body.
 struct InlineConstantsIntoGPULaunch : public OpRewritePattern<gpu::LaunchOp> {
   using OpRewritePattern<gpu::LaunchOp>::OpRewritePattern;
@@ -53,7 +47,8 @@ struct InlineConstantsIntoGPULaunch : public OpRewritePattern<gpu::LaunchOp> {
     SetVector<Operation *> constantOps;
     for (auto val : aboveVals) {
       auto *op = val.getDefiningOp();
-      if (op && isConstantOp(op))
+      // TODO: Add more constant representations.
+      if (op && isa<arith::ConstantOp>(op))
         constantOps.insert(op);
     }
 
