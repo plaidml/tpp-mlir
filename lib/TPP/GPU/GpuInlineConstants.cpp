@@ -64,7 +64,7 @@ struct InlineConstantsIntoGPULaunch : public OpRewritePattern<gpu::LaunchOp> {
     for (auto *op : constantOps) {
       auto *clonedOp = rewriter.clone(*op);
 
-      // Replace uses withing the body with the inlines values.
+      // Replace uses within the body with the inlined values.
       for (auto [oldVal, newVal] :
            llvm::zip_equal(op->getResults(), clonedOp->getResults())) {
         replaceAllUsesInRegionWith(oldVal, newVal, launchOpBody);
