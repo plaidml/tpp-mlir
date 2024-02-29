@@ -79,6 +79,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createCleanup());
 
     // Create GPU kernels.
+    pm.addNestedPass<func::FuncOp>(createGpuInlineConstants());
     pm.addPass(createGpuKernelOutliningPass());
 
     // Generic cleanup.
