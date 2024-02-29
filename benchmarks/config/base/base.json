@@ -13,7 +13,7 @@
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
       "flags": [ "100", "256", "0", "F", "32", "32", "32", "1", "1", "1024", "1024", "1024", "1024" ],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
     "mlp_fp32_dnn_target": {
       "type": "XSMM-DNN",
@@ -27,14 +27,14 @@
       "benchmark": "xsmm_dnn_mlp",
       "environment": {},
       "flags": [ "100", "256", "5", "F", "32", "32", "32", "1", "1", "1024", "1024", "1024", "1024" ],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
     "gemm_fp32_mlir": {
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=const --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": {},
       "flags": [ "-n", "100" ],
-      "extensions": [ "(avx2|asimd)" ]
+      "extensions": []
     },
     "gemm_bf16_dp2_mlir": {
       "type": "IR-GEN",
@@ -55,7 +55,7 @@
       "benchmark": [ "mlir-gen", "--kernel=const --bias --relu --float-width=32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": {},
       "flags": [ "-n", "100" ],
-      "extensions": [ "(avx2|asimd)" ]
+      "extensions": []
     },
     "mlp_bf16_dp2_mlir": {
       "type": "IR-GEN",
@@ -93,14 +93,14 @@
       "benchmark": [ "mlir-gen", "--kernel=const --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100"],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
     "bf16_3x1024_args_mlir": {
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=args --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100"],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     }
   }},
   {
@@ -124,14 +124,14 @@
       "benchmark": [ "mlir-gen", "--kernel=const --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100"],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     },
     "bf16_3x1024_args_mlir": {
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=args --bias --relu --float-width=16 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
       "flags": [ "-n", "100"],
-      "extensions": [ "avx2" ]
+      "extensions": [ "(avx2|asimd)" ]
     }
   }}
 ]
