@@ -77,6 +77,10 @@ struct LocalDialectsLowering
     : public tpp::impl::LocalDialectsLoweringBase<LocalDialectsLowering>,
       UtilityPassBase<ModuleOp> {
 
+  LocalDialectsLowering() {}
+  LocalDialectsLowering(const LocalDialectsLoweringOptions &options) {
+    parallelTaskGrid = options.parallelTaskGrid;
+  }
   void runOnOperation() override {
     auto module = getOperation();
 
@@ -105,6 +109,16 @@ private:
     // Run cleanup after LICM to allow CSE to eliminate common operations now
     // that they are hoisted out of loops.
     pm.addNestedPass<func::FuncOp>(createCleanup());
+
+    mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
+    tilingOptions.tileSizes = parallelTaskGrid;
+    pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+
+    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
 
     pm.addPass(createConvertXsmmToFunc());
     pm.addPass(createConvertPerfToFunc());
@@ -310,7 +324,8 @@ private:
     pm.addPass(createConvertForAllToParallelOp());
 
     // Covert all local TPP-related dialects.
-    pm.addPass(createLocalDialectsLowering());
+    LocalDialectsLoweringOptions localDialectsLowering{parallelTaskGrid};
+    pm.addPass(createLocalDialectsLowering(localDialectsLowering));
 
     // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessing());

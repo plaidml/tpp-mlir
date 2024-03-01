@@ -204,7 +204,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let options= [
     Option<"linalgToLoops", "linalg-to-loops",
            "bool", /*default=*/"false",
-           "Skip all TPP transformations. Lower linalg directly to loops.">
+           "Skip all TPP transformations. Lower linalg directly to loops.">,
+    ListOption<"parallelTaskGrid", "parallel-task-grid",
+           "unsigned", "Grid-sizes for parallel tasks.">
+
   ];
 }
 
@@ -289,6 +292,12 @@ def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
                            "tensor::TensorDialect",
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
+  let options = [
+    ListOption<"parallelTaskGrid", "parallel-task-grid",
+           "unsigned", "Grid-sizes for parallel tasks.">
+
+  ];
+
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
@@ -470,10 +479,11 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
+
 def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
   let summary = "Tile parallel loops";
   let options = [
-    ListOption<"tileSizes", "parallel-loop-tile-sizes", "int64_t",
+    ListOption<"tileSizes", "parallel-loop-tile-sizes", "unsigned",
                "Factors to tile parallel loops by">,
     Option<"noMinMaxBounds", "no-min-max-bounds", "bool",
            /*default=*/"false",
@@ -492,6 +502,26 @@ def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
   }];
   let dependentDialects = ["gpu::GPUDialect",
                            "arith::ArithDialect"];
+}
+
+def IntelAMXTileConfigInsertionPass : Pass<"intel-amx-tile-config-insertion-pass",
+                                     "func::FuncOp"> {
+  let summary = "Insert intel amx tile configuration xsmm calls";
+  let description = [{
+    Insert intel amx tile configuration xsmm calls.
+  }];
+
+  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
+}
+
+def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
+                                     "func::FuncOp"> {
+  let summary = "Hoist intel amx tile configuration invoke xsmm calls";
+  let description = [{
+    Run LICM on intel amx tile configuration invoke calls.
+  }];
+
+  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

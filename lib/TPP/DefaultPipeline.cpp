@@ -47,10 +47,10 @@ llvm::cl::opt<bool>
                 llvm::cl::init(false));
 
 // Control grid parallelism sizes.
-llvm::cl::list<int64_t>
+llvm::cl::list<unsigned>
     parallelTaskGrid("parallel-task-grid",
                      llvm::cl::desc("Grid-sizes for parallel tasks"),
-                     llvm::cl::list_init<int64_t>(SmallVector<int64_t>{2, 8}),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
 namespace mlir {
@@ -127,7 +127,8 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops};
+      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
+                                                parallelTaskGrid};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
@@ -140,12 +141,8 @@ private:
     pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-    if (defParallel) {
-      mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
-      tilingOptions.tileSizes = parallelTaskGrid;
-      pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+    if (defParallel)
       pm.addPass(createConvertSCFToOpenMPPass());
-    }
     pm.addPass(createConvertVectorToSCFPass());
     pm.addPass(arith::createArithExpandOpsPass());
     pm.addPass(createLowerAffinePass());

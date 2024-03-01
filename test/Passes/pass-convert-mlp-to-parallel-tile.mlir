@@ -82,22 +82,22 @@ module {
 //CHECK:      omp.wsloop for  (%[[ARG10:.*]], %[[ARG11:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c16]]) {
 //CHECK:        memref.alloca_scope  {
 //CHECK:          scf.for %[[ARG12:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
+//CHECK:           %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index              
 //CHECK:           scf.for %[[ARG13:.*]] = %[[c0]] to %[[c16]] step %[[c1]] {
-//CHECK:              %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index
 //CHECK:              %[[temp2:.*]] = arith.addi %[[ARG13]], %[[ARG11]] : index
 //CHECK:  omp.parallel {
 //CHECK:      omp.wsloop for  (%[[ARG10:.*]], %[[ARG11:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c16]]) {
 //CHECK:        memref.alloca_scope  {
 //CHECK:          scf.for %[[ARG12:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
+//CHECK:           %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index
 //CHECK:           scf.for %[[ARG13:.*]] = %[[c0]] to %[[c16]] step %[[c1]] {
-//CHECK:              %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index
 //CHECK:              %[[temp2:.*]] = arith.addi %[[ARG13]], %[[ARG11]] : index
 //CHECK:  omp.parallel {
 //CHECK:      omp.wsloop for  (%[[ARG10:.*]], %[[ARG11:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c16]]) {
 //CHECK:        memref.alloca_scope  {
 //CHECK:          scf.for %[[ARG12:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
+//CHECK:           %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index
 //CHECK:           scf.for %[[ARG13:.*]] = %[[c0]] to %[[c16]] step %[[c1]] {
-//CHECK:              %[[temp1:.*]] = arith.addi %[[ARG12]], %[[ARG10]] : index
 //CHECK:              %[[temp2:.*]] = arith.addi %[[ARG13]], %[[ARG11]] : index
 
 

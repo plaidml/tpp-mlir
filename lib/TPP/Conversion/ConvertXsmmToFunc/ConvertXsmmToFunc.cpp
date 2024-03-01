@@ -171,6 +171,21 @@ struct ConvertFusedBrgemmXsmmOp : public OpRewritePattern<FusedBrgemmOp> {
   }
 };
 
+struct ConvertIntelAMXTileConfigXsmmOp
+    : public OpRewritePattern<IntelAMXTileConfigOp> {
+  using OpRewritePattern<IntelAMXTileConfigOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IntelAMXTileConfigOp tileConfigOp,
+                                PatternRewriter &rewriter) const override {
+    std::string funcName = "xsmm_intel_amx_tile_config_invoke";
+    buildInvokeCall(
+        rewriter, tileConfigOp.getLoc(), funcName, tileConfigOp,
+        xsmm::DataTypeAttr::get(rewriter.getContext(), xsmm::DataType::BF16));
+    rewriter.eraseOp(tileConfigOp);
+    return success();
+  }
+};
+
 static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
                                       ArrayRef<Value> dispatchOperands,
                                       ArrayRef<Type> dispatchOperandTypes,
@@ -195,10 +210,9 @@ static func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
   return call;
 }
 
-template <typename OpTy,
-          typename = std::enable_if_t<
-              std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
-              std::is_same<OpTy, xsmm::BinaryDispatchOp>::value>>
+template <typename OpTy, typename = std::enable_if_t<
+                             std::is_same<OpTy, xsmm::UnaryDispatchOp>::value ||
+                             std::is_same<OpTy, xsmm::BinaryDispatchOp>::value>>
 void addKindOperand(RewriterBase &rewriter, OpTy dispatchOp,
                     SmallVectorImpl<Value> &dispatchOperands,
                     SmallVectorImpl<Type> &dispatchOperandTypes) {
@@ -222,6 +236,13 @@ void addKindOperand(RewriterBase &rewriter, BrgemmDispatchOp dispatchOp,
 }
 
 void addKindOperand(RewriterBase &rewriter, FusedBrgemmDispatchOp dispatchOp,
+                    SmallVectorImpl<Value> &dispatchOperands,
+                    SmallVectorImpl<Type> &dispatchOperandTypes) {
+  /* do nothing */
+}
+
+void addKindOperand(RewriterBase &rewriter,
+                    IntelAMXTileConfigDispatchOp dispatchOp,
                     SmallVectorImpl<Value> &dispatchOperands,
                     SmallVectorImpl<Type> &dispatchOperandTypes) {
   /* do nothing */
@@ -370,6 +391,17 @@ struct ConvertUnaryDispatchOp : public OpRewritePattern<UnaryDispatchOp> {
   }
 };
 
+struct ConvertIntelAMXTileConfigDispatchOp
+    : public OpRewritePattern<IntelAMXTileConfigDispatchOp> {
+  using OpRewritePattern<IntelAMXTileConfigDispatchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IntelAMXTileConfigDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    return buildDispatchOp<IntelAMXTileConfigDispatchOp>(
+        rewriter, dispatchOp, "xsmm_intel_amx_tile_config_dispatch");
+  }
+};
+
 struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
   using OpRewritePattern<FusedBrgemmDispatchOp>::OpRewritePattern;
 
@@ -393,13 +425,12 @@ struct ConvertXsmmToFunc
     : public tpp::impl::ConvertXsmmToFuncBase<ConvertXsmmToFunc> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns
-        .add<ConvertBinaryXsmmOp, ConvertUnaryXsmmOp,
-             ConvertGemmXsmmOp, ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp>(
-            patterns.getContext());
-    patterns.add<ConvertBinaryDispatchOp,
-                 ConvertUnaryDispatchOp, ConvertGemmDispatchOp,
-                 ConvertBrgemmDispatchOp, ConvertFusedBrgemmOp>(
+    patterns.add<ConvertBinaryXsmmOp, ConvertUnaryXsmmOp, ConvertGemmXsmmOp,
+                 ConvertBrgemmXsmmOp, ConvertFusedBrgemmXsmmOp,
+                 ConvertIntelAMXTileConfigXsmmOp>(patterns.getContext());
+    patterns.add<ConvertBinaryDispatchOp, ConvertUnaryDispatchOp,
+                 ConvertGemmDispatchOp, ConvertBrgemmDispatchOp,
+                 ConvertFusedBrgemmOp, ConvertIntelAMXTileConfigDispatchOp>(
         patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
