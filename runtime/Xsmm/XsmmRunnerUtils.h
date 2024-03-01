@@ -44,6 +44,10 @@ extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_fused_brgemm_dispatch(
     const libxsmm_meltw_binary_flags binary_flags,
     const libxsmm_meltw_binary_type binary_op_type);
 
+extern "C" MLIR_RUNNERUTILS_EXPORT int64_t xsmm_intel_amx_tile_config_dispatch(
+    const libxsmm_datatype, int64_t, int64_t, int64_t, int64_t, int64_t,
+    int64_t, int64_t, int64_t, const libxsmm_gemm_flags);
+
 extern "C" MLIR_RUNNERUTILS_EXPORT void
 xsmm_gemm_invoke(const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
                  int64_t offsetA, void *alignedPtrB, int64_t offsetB,
@@ -73,5 +77,9 @@ extern "C" MLIR_RUNNERUTILS_EXPORT void xsmm_fused_brgemm_invoke(
     const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
     int64_t offsetA, void *alignedPtrB, int64_t offsetB, void *alignedPtrC,
     int64_t offsetC, void *alignedPtrD, int64_t offsetD, int64_t numBatches);
+
+extern "C" MLIR_RUNNERUTILS_EXPORT void
+xsmm_intel_amx_tile_config_invoke(const libxsmm_datatype dType, int64_t addr,
+                                  void *alignedPtrA, int64_t offset);
 
 #endif // TPP_EXECUTIONENGINE_CRUNNERUTILS_H

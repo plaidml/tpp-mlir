@@ -31,7 +31,7 @@ module {
 // CHECK:      omp.wsloop for  (%[[ARG3:.*]], %[[ARG4:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c8]]) {
 // CHECK:        memref.alloca_scope  {
 // CHECK:          scf.for %[[ARG5:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
+// CHECK:	     %[[temp1:.*]] = arith.addi %[[ARG5]], %[[ARG3]] : index
 // CHECK:            scf.for %[[ARG6:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:              %[[temp1:.*]] = arith.addi %[[ARG5]], %[[ARG3]] : index
 // CHECK:              %[[temp2:.*]] = arith.addi %[[ARG6]], %[[ARG4]] : index
 

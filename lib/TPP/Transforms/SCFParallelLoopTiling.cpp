@@ -54,7 +54,7 @@ using namespace mlir::scf;
 /// %i0 + j0 and %i1 + %j1.
 ///
 /// The old loop is replaced with the new one.
-void tileParallelLoop(ParallelOp op, ArrayRef<int64_t> tileSizes,
+void tileParallelLoop(ParallelOp op, ArrayRef<unsigned> tileSizes,
                       bool noMinMaxBounds) {
   bool useParallelOp = false;
   /* TODO, need to implement this case */
@@ -244,7 +244,7 @@ namespace {
 struct SCFParallelLoopTiling
     : public tpp::impl::SCFParallelLoopTilingBase<SCFParallelLoopTiling> {
   SCFParallelLoopTiling(){};
-  SCFParallelLoopTiling(ArrayRef<int64_t> tileSizes,
+  SCFParallelLoopTiling(ArrayRef<unsigned> tileSizes,
                         bool noMinMaxBounds = false) {
     this->tileSizes = tileSizes;
     this->noMinMaxBounds = noMinMaxBounds;
