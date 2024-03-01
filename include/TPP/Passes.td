@@ -204,7 +204,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
   let options= [
     Option<"linalgToLoops", "linalg-to-loops",
            "bool", /*default=*/"false",
-           "Skip all TPP transformations. Lower linalg directly to loops.">
+           "Skip all TPP transformations. Lower linalg directly to loops.">,
+    ListOption<"parallelTaskGrid", "parallel-task-grid",
+           "unsigned", "Grid-sizes for parallel tasks.">
+
   ];
 }
 
@@ -289,6 +292,12 @@ def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
                            "tensor::TensorDialect",
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
+  let options = [
+    ListOption<"parallelTaskGrid", "parallel-task-grid",
+           "unsigned", "Grid-sizes for parallel tasks.">
+
+  ];
+
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {
@@ -474,7 +483,7 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
 def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
   let summary = "Tile parallel loops";
   let options = [
-    ListOption<"tileSizes", "parallel-loop-tile-sizes", "int64_t",
+    ListOption<"tileSizes", "parallel-loop-tile-sizes", "unsigned",
                "Factors to tile parallel loops by">,
     Option<"noMinMaxBounds", "no-min-max-bounds", "bool",
            /*default=*/"false",
