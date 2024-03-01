@@ -125,7 +125,8 @@ struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
         op.getLoc(), tileConfigReset, tileResetInputs);
 
     rewriter.eraseOp(op);
-    rewriter.eraseOp(op.getOperand(0).getDefiningOp());
+    if (op.getOperand(0).getDefiningOp()->getUsers().empty())
+      rewriter.eraseOp(op.getOperand(0).getDefiningOp());
     return success();
   }
 };
