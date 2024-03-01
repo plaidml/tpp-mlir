@@ -60,7 +60,7 @@ struct IntelAMXTileConfigHoisting : OpRewritePattern<memref::AllocaOp> {
 
     scf::ParallelOp parallelOpParent = NULL;
     auto op = alloca.getOperation();
-    while (true) {
+    while (op) {
       if (op->getParentOfType<scf::ParallelOp>()) {
         if (&op->getParentOfType<scf::ParallelOp>().getRegion() ==
             alloca->getParentRegion()) {
