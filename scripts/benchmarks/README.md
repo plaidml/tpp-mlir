@@ -10,11 +10,11 @@ For our paper, to achieve reproducible numbers, we have used the following AWS i
 
 | Node | Vendor | Arch | Series | Cores | Threads | Memory | Disk |
 | ---- | ------ | ---- | ------ | ----- | ------- | ------ | ---- |
-| c6i.8xlarge | Intel | Ice Lake | Xeon 3 | 16 | 32 | 64GB | 300GB |
-| c6a.8xlarge | AMD   | Milan | Zen 3 | 16 | 32 | 64GB | 300GB |
-| c7i.8xlarge | Intel | Sapphire Rapids | Xeon 4 | 16 | 32 | 64GB | 300GB |
-| c7a.4xlarge | AMD   | Genoa with | Zen 4 | 16 | 16 | 32GB | 300GB |
-| c7g.4xlarge | Arm   | Graviton 3 | Neoverse V1 | 16 | 16 | 32GB | 300GB |
+| c6i.metal | Intel | Cascade Lake | Xeon 3 | 16 | 32 | 64GB | 300GB |
+| c6a.metal | AMD   | Milan | Zen 3 | 16 | 32 | 64GB | 300GB |
+| c7i.metal-24xl | Intel | Sapphire Rapids | Xeon 4 | 16 | 32 | 64GB | 300GB |
+| c7a.metal-48xl | AMD   | Genoa | Zen 4 | 16 | 16 | 32GB | 300GB |
+| hpc7g.16xlarge | Arm   | Graviton 3 | Neoverse V1 | 16 | 16 | 32GB | 300GB |
 
 All instances above use the Amazon Linux, which is free on AWS.
 
@@ -43,7 +43,7 @@ $ git clone https://github.com/plaidml/tpp-mlir.git
 $ cd tpp-mlir
 
 # Finally run the install script
-$ ./scripts/benchmarks/build_and_run.sh
+$ NUM_ITER=10000 ./scripts/benchmarks/build_and_run.sh
 ```
 
 It's recommended that you run the script on either `nohup`, `screen` or `tmux`, so that you can safely disconnect and reconnect later to gather the results.
