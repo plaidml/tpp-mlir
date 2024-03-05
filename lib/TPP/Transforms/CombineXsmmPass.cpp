@@ -28,31 +28,6 @@ using namespace mlir;
 
 namespace {
 
-static ArrayAttr getBrgemmFlags(RewriterBase &rewriter, xsmm::BrgemmOp opTy) {
-  auto memrefB = opTy.getOperand(2).getType().cast<MemRefType>();
-  SmallVector<Attribute, 2> attributes;
-  if (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::BRGEMM_INS,
-                                  memrefB)) {
-    attributes.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
-                                                  xsmm::GemmFlags::VNNI_B));
-  }
-  auto flags =
-      dyn_cast<mlir::xsmm::BrgemmDispatchOp>(opTy.getOperand(0).getDefiningOp())
-          .getFlags();
-  for (auto flagItr : flags)
-    if (flagItr == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
-                                            mlir::xsmm::GemmFlags::BETA_0)) {
-      attributes.push_back(flagItr);
-      break;
-    }
-
-  if (attributes.empty())
-    attributes.push_back(
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
-
-  return rewriter.getArrayAttr(attributes);
-}
-
 struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
 
   using OpRewritePattern<xsmm::BrgemmOp>::OpRewritePattern;
@@ -108,14 +83,20 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
                                    .getInputs());
     auto memrefB = brgemmOp.getOperand(2);
     int64_t batchSize = memrefB.getType().cast<ShapedType>().getShape()[0];
-
+    auto brgemmFlags = xsmm::utils::getBrgemmFlags<xsmm::BrgemmDispatchOp>(
+        rewriter,
+        dyn_cast<xsmm::BrgemmDispatchOp>(
+            brgemmOp.getOperand(0).getDefiningOp()),
+        true);
+    if (failed(brgemmFlags))
+      return failure();
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(fusedMatch.binaryOp);
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
         loc, integer64, dims,
         xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
         xsmm::UnaryKindAttr::get(rewriter.getContext(), fusedMatch.unaryKind),
-        getBrgemmFlags(rewriter, brgemmOp),
+        rewriter.getArrayAttr(*brgemmFlags),
         rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
             rewriter.getContext(), xsmm::UnaryFlags::NONE)),
         rewriter.getArrayAttr(

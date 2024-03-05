@@ -30,23 +30,6 @@ namespace mlir {
 namespace tpp {
 
 template <typename InvokeOpTy, typename DispatchOpTy>
-static void appendBrgemmFlags(SmallVector<Attribute> &attributes,
-                              PatternRewriter &rewriter, InvokeOpTy opTy) {
-  auto flags =
-      dyn_cast<DispatchOpTy>(opTy.getOperand(0).getDefiningOp()).getFlags();
-  for (auto flagItr : flags) {
-    if (flagItr ==
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE))
-      return;
-    attributes.push_back(flagItr);
-  }
-
-  if (attributes.empty())
-    attributes.push_back(
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
-}
-
-template <typename InvokeOpTy, typename DispatchOpTy>
 struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
   using OpRewritePattern<InvokeOpTy>::OpRewritePattern;
 
@@ -66,10 +49,16 @@ struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
                          mlir::xsmm::GemmFlags::NO_SETUP_TILECONFIG))
         return failure();
 
-    SmallVector<Attribute> attributesSetup;
+    auto brgemmFlags = mlir::xsmm::utils::getBrgemmFlags<DispatchOpTy>(
+        rewriter, dyn_cast<DispatchOpTy>(op.getOperand(0).getDefiningOp()),
+        false);
+    if (failed(brgemmFlags)) {
+      return failure();
+    }
+
+    auto attributesSetup = *brgemmFlags;
     attributesSetup.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_RESET_TILECONFIG));
-    appendBrgemmFlags<InvokeOpTy, DispatchOpTy>(attributesSetup, rewriter, op);
     auto tileConfigSetup = rewriter.create<xsmm::IntelAMXTileConfigDispatchOp>(
         op.getLoc(), rewriter.getI64Type(),
         DenseI64ArrayAttr::get(
@@ -79,10 +68,9 @@ struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
         rewriter.getArrayAttr(attributesSetup),
         xsmm::utils::getDataType(rewriter, op.getOperand(1).getType()));
 
-    SmallVector<Attribute> attributesReset;
+    SmallVector<Attribute> attributesReset = *brgemmFlags;
     attributesReset.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_SETUP_TILECONFIG));
-    appendBrgemmFlags<InvokeOpTy, DispatchOpTy>(attributesReset, rewriter, op);
     auto tileConfigReset = rewriter.create<xsmm::IntelAMXTileConfigDispatchOp>(
         op.getLoc(), rewriter.getI64Type(),
         DenseI64ArrayAttr::get(
@@ -92,12 +80,11 @@ struct IntelAMXTileConfig : OpRewritePattern<InvokeOpTy> {
         rewriter.getArrayAttr(attributesReset),
         xsmm::utils::getDataType(rewriter, op.getOperand(1).getType()));
 
-    SmallVector<Attribute> attributesBrgemm;
+    SmallVector<Attribute> attributesBrgemm = *brgemmFlags;
     attributesBrgemm.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_RESET_TILECONFIG));
     attributesBrgemm.push_back(xsmm::GemmFlagsAttr::get(
         rewriter.getContext(), xsmm::GemmFlags::NO_SETUP_TILECONFIG));
-    appendBrgemmFlags<InvokeOpTy, DispatchOpTy>(attributesBrgemm, rewriter, op);
 
     auto dispatch = dyn_cast<DispatchOpTy>(
         rewriter.clone(*op.getOperand(0).getDefiningOp()));

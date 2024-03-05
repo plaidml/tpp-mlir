@@ -80,9 +80,9 @@ module {
 // CHECK:      scf.for %[[ARG4:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:        %[[temp1:.*]] = arith.addi %[[ARG3]], %[[ARG1]] : index
 // CHECK:        %[[temp2:.*]] = arith.addi %[[ARG4]], %[[ARG2]] : index
-// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
+// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig) data_type = bf16
+// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_setup_tileconfig) data_type = bf16
+// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig, no_setup_tileconfig) data_type = bf16
 // CHECK:        %[[alloca:.*]] = memref.alloca() : memref<64xi8>
 // CHECK:        "xsmm.IntelAMXtileConfig"(%[[temp3]], %[[alloca]]) : (i64, memref<64xi8>) -> ()
 // CHECK:        xsmm.brgemm(data_type = bf16, %[[temp5]], %{{.*}}, %{{.*}}, %{{.*}}, %[[c32_i64]]) 
@@ -92,9 +92,9 @@ module {
 // CHECK:      scf.for %[[ARG4:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:        %[[temp1:.*]] = arith.addi %[[ARG3]], %[[ARG1]] : index
 // CHECK:        %[[temp2:.*]] = arith.addi %[[ARG4]], %[[ARG2]] : index
-// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
+// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig) data_type = bf16
+// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_setup_tileconfig) data_type = bf16
+// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig, no_setup_tileconfig) data_type = bf16
 // CHECK:        %[[alloca:.*]] = memref.alloca() : memref<64xi8>
 // CHECK:        "xsmm.IntelAMXtileConfig"(%[[temp3]], %[[alloca]]) : (i64, memref<64xi8>) -> ()
 // CHECK:        xsmm.brgemm(data_type = bf16, %[[temp5]], %{{.*}}, %{{.*}}, %{{.*}}, %[[c32_i64]])
@@ -104,9 +104,9 @@ module {
 // CHECK:      scf.for %[[ARG4:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // CHECK:        %[[temp1:.*]] = arith.addi %[[ARG3]], %[[ARG1]] : index
 // CHECK:        %[[temp2:.*]] = arith.addi %[[ARG4]], %[[ARG2]] : index
-// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
-// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (no_reset_tileconfig, no_setup_tileconfig, vnni_b, beta_0) data_type = bf16
+// CHECK:        %[[temp3:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig) data_type = bf16
+// CHECK:        %[[temp4:.*]] = xsmm.IntelAMXtileConfig.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_setup_tileconfig) data_type = bf16
+// CHECK:        %[[temp5:.*]] = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (vnni_b, beta_0, no_reset_tileconfig, no_setup_tileconfig) data_type = bf16
 // CHECK:        %[[alloca:.*]] = memref.alloca() : memref<64xi8>
 // CHECK:        "xsmm.IntelAMXtileConfig"(%[[temp3]], %[[alloca]]) : (i64, memref<64xi8>) -> ()
 // CHECK:        xsmm.brgemm(data_type = bf16, %[[temp5]], %{{.*}}, %{{.*}}, %{{.*}}, %[[c32_i64]])
