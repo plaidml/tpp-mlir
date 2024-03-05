@@ -397,7 +397,9 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     //  - image  (N K P0 k C c) -> (N C P0 c)
     //  - output (N K P0 k C c) -> (N K P0 k)
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, linalgOp.getContext());
+    };
     AffineExpr tileN, tileK, P0, k, tileC, c;
     bindDims(linalgOp.getContext(), tileN, tileK, P0, k, tileC, c);
     SmallVector<AffineMap> newIndexingMaps = infer(

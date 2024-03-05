@@ -82,7 +82,9 @@ static LogicalResult checkAccessPatterns(linalg::LinalgOp linalgOp) {
   }
   SmallVector<AffineMap> compressedDimMaps = compressUnusedDims(maps);
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  auto infer = [&](MapList m) {
+    return AffineMap::inferFromExprList(m, linalgOp.getContext());
+  };
   AffineExpr r1, p3, p4, r2;
   SmallVector<AffineMap> expectedMaps;
 

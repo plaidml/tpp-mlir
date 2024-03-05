@@ -45,7 +45,9 @@ struct MatmulOpDeGeneralizationPattern
   bool isMatmulOp(linalg::GenericOp linalgOp) const {
     using namespace mlir::structured_match;
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, linalgOp.getContext());
+    };
     AffineExpr i, j, k;
     bindDims(linalgOp->getContext(), i, j, k);
     auto mapList = infer({{i, k}, {k, j}, {i, j}});
@@ -85,7 +87,9 @@ struct BatchReduceOpDeGeneralizationPattern
   bool isBrgemmOp(linalg::GenericOp linalgOp) const {
     using namespace mlir::structured_match;
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, linalgOp.getContext());
+    };
     AffineExpr r, i, j, k;
     bindDims(linalgOp->getContext(), r, i, j, k);
     auto mapList = infer({{r, i, k}, {r, k, j}, {i, j}});
