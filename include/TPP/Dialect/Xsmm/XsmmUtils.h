@@ -11,6 +11,7 @@
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 class Type;
@@ -85,6 +86,11 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
 ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
+
+template <typename DispatchOpTy>
+FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
+                                                 DispatchOpTy dispatchOpTy,
+                                                 bool returnNone);
 
 } // namespace utils
 } // namespace xsmm

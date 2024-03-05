@@ -411,6 +411,40 @@ FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
   return strides[pos];
 }
 
+template <typename DispatchOpTy>
+FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
+                                                 DispatchOpTy dispatchOpTy,
+                                                 bool returnNone) {
+  SmallVector<Attribute> attributes;
+  auto flags = dispatchOpTy.getFlags();
+  for (auto flagItr : flags) {
+    if (flagItr == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                            xsmm::GemmFlags::NONE)) {
+      if (returnNone) {
+        attributes.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                      xsmm::GemmFlags::NONE));
+        return attributes;
+      } else {
+        return failure();
+      }
+    }
+    attributes.push_back(flagItr);
+  }
+
+  if (attributes.empty())
+    attributes.push_back(
+        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
+  return attributes;
+}
+
+template FailureOr<SmallVector<Attribute>>
+getBrgemmFlags<xsmm::BrgemmDispatchOp>(PatternRewriter &rewriter,
+                                       xsmm::BrgemmDispatchOp dispatchOpTy,
+                                       bool returnNone);
+template FailureOr<SmallVector<Attribute>>
+getBrgemmFlags<xsmm::FusedBrgemmDispatchOp>(
+    PatternRewriter &rewriter, xsmm::FusedBrgemmDispatchOp dispatchOpTy,
+    bool returnNone);
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir
