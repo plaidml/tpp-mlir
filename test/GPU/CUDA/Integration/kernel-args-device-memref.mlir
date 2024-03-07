@@ -33,33 +33,26 @@ module {
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry
 // CHECK:         %[[ARG0:.+]] = memref.get_global @__wrapper_0
-// CHECK:         %[[gpu0:.+]], %[[t00:.+]] = gpu.alloc async ()
-// CHECK:         %[[t01:.+]] = gpu.memcpy async [%[[t00]]] %[[gpu0]], %[[ARG0]]
-// CHECK:         gpu.wait [%[[t01]]]
+// CHECK:         %[[gpu0:.+]] = gpu.alloc ()
+// CHECK:         gpu.memcpy %[[gpu0]], %[[ARG0]]
 // CHECK:         %[[ARG1:.+]] = memref.get_global @__wrapper_1
-// CHECK:         %[[gpu1:.+]], %[[t10:.+]] = gpu.alloc async ()
-// CHECK:         %[[t11:.+]] = gpu.memcpy async [%[[t10]]] %[[gpu1]], %[[ARG1]]
-// CHECK:         gpu.wait [%[[t11]]]
+// CHECK:         %[[gpu1:.+]] = gpu.alloc ()
+// CHECK:         gpu.memcpy %[[gpu1]], %[[ARG1]]
 // CHECK:         %[[ARG2:.+]] = memref.get_global @__wrapper_2
-// CHECK:         %[[gpu2:.+]], %[[t20:.+]] = gpu.alloc async ()
-// CHECK:         %[[t21:.+]] = gpu.memcpy async [%[[t20]]] %[[gpu2]], %[[ARG2]]
-// CHECK:         gpu.wait [%[[t21]]]
+// CHECK:         %[[gpu2:.+]] = gpu.alloc ()
+// CHECK:         gpu.memcpy %[[gpu2]], %[[ARG2]]
 // CHECK:         call @_entry(%[[gpu0]], %[[gpu1]], %[[gpu2]])
-// CHECK:         %[[td0:.+]] = gpu.dealloc async %[[gpu0]]
-// CHECK:         gpu.wait [%[[td0]]]
-// CHECK:         %[[td1:.+]] = gpu.dealloc async %[[gpu1]]
-// CHECK:         gpu.wait [%[[td1]]]
-// CHECK:         %[[td2:.+]] = gpu.dealloc async %[[gpu2]]
-// CHECK:         gpu.wait [%[[td2]]]
+// CHECK:         gpu.dealloc %[[gpu0]]
+// CHECK:         gpu.dealloc %[[gpu1]]
+// CHECK:         gpu.dealloc %[[gpu2]]
 
 // PRINT-LABEL: func.func @entry
-// PRINT:         %[[gpu0:.+]],{{.*}}= gpu.alloc async ()
-// PRINT:         %[[gpu1:.+]],{{.*}}= gpu.alloc async ()
-// PRINT:         %[[gpu2:.+]],{{.*}}= gpu.alloc async ()
+// PRINT:         %[[gpu0:.+]] = gpu.alloc ()
+// PRINT:         %[[gpu1:.+]] = gpu.alloc ()
+// PRINT:         %[[gpu2:.+]] = gpu.alloc ()
 // PRINT:         call @_entry(%[[gpu0]], %[[gpu1]], %[[gpu2]])
 // PRINT:         %[[out:.+]] = memref.alloc()
-// PRINT:         %[[t0:.+]] = gpu.memcpy async %[[out]], %[[gpu2]]
-// PRINT:         gpu.wait [%[[t0]]]
+// PRINT:         gpu.memcpy %[[out]], %[[gpu2]]
 // PRINT:         vector.transfer_read %[[out]]
 // PRINT:         memref.dealloc %[[out]]
 // PRINT-COUNT-8: ( 9, 9, 9, 9, 9, 9, 9, 9 )
