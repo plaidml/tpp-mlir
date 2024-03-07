@@ -216,6 +216,13 @@ private:
     }
     case GpuType::Intel:
       pm.addPass(createXegpuFoldMemRef());
+
+      std::string clientApi = "intel";
+      SetSPIRVCapabilitiesOptions capabilitiesOptions{clientApi};
+      pm.addPass(tpp::createSetSPIRVCapabilities(capabilitiesOptions));
+      SetSPIRVAbiAttributeOptions abiAttrOptions{clientApi};
+      pm.addPass(tpp::createSetSPIRVAbiAttribute(abiAttrOptions));
+
       break;
     }
 

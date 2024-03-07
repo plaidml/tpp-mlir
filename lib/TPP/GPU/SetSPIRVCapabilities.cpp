@@ -59,6 +59,8 @@ struct SetSPIRVCapabilities
         spirv::Capability::AtomicFloat32AddEXT,
         spirv::Capability::ExpectAssumeKHR,
         spirv::Capability::StorageBuffer16BitAccess,
+        spirv::Capability::VectorComputeINTEL,
+        spirv::Capability::VectorAnyINTEL,
         // clang-format on
     };
     spirv::Capability caps_vulkan[] = {
@@ -73,12 +75,13 @@ struct SetSPIRVCapabilities
         spirv::Extension::SPV_EXT_shader_atomic_float_add,
         spirv::Extension::SPV_KHR_expect_assume,
         spirv::Extension::SPV_KHR_16bit_storage,
-        spirv::Extension::SPV_NV_cooperative_matrix};
+        spirv::Extension::SPV_NV_cooperative_matrix,
+        spirv::Extension::SPV_INTEL_vector_compute};
     spirv::Extension exts_vulkan[] = {
         spirv::Extension::SPV_KHR_storage_buffer_storage_class,
         spirv::Extension::SPV_KHR_16bit_storage,
         spirv::Extension::SPV_NV_cooperative_matrix};
-    if (clientAPI == "opencl") {
+    if (clientAPI == "opencl" || clientAPI == "intel") {
       auto triple = spirv::VerCapExtAttr::get(
           spirv::Version::V_1_4, caps_opencl, exts_opencl, context);
       auto attr = spirv::TargetEnvAttr::get(
