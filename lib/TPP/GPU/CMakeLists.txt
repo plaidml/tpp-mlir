@@ -10,7 +10,6 @@ add_mlir_library(TPPGPU
   LinalgToGpu.cpp
   GpuDataTransfer.cpp
   GpuInlineConstants.cpp
-  LinalgToXegpu.cpp
   GPUToXeGPU.cpp
   LinalgToXeGPU.cpp
 
