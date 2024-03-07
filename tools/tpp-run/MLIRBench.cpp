@@ -9,7 +9,6 @@
 #include "MLIRBench.h"
 
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -75,7 +74,6 @@ MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
   ctx->getOrLoadDialect<bufferization::BufferizationDialect>();
   ctx->getOrLoadDialect<perf::PerfDialect>();
   ctx->getOrLoadDialect<gpu::GPUDialect>();
-  ctx->getOrLoadDialect<async::AsyncDialect>();
 }
 
 LogicalResult MLIRBench::findKernel(StringRef name) {
@@ -207,23 +205,18 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   }
 
   // Allocate an arg buffer on device and copy data from host
-  auto tokenType = builder.getType<gpu::AsyncTokenType>();
-  auto gpuAlloc = builder.create<gpu::AllocOp>(
-      unkLoc, memRefTy, tokenType, ValueRange(), ValueRange(), ValueRange());
+  auto gpuAlloc = builder.create<gpu::AllocOp>(unkLoc, memRefTy, ValueRange{},
+                                               ValueRange{}, ValueRange{});
   auto gpuBuf = gpuAlloc.getResult(0);
   auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
-      unkLoc, TypeRange{tokenType}, gpuAlloc.getAsyncToken(), gpuBuf, buf);
-  auto gpuSync =
-      builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
+      unkLoc, /*asyncToken=*/std::nullopt, ValueRange{}, gpuBuf, buf);
 
   // Dealloc the arg buffer at the end of program
   builder.setInsertionPointToEnd(&getMainBlock());
-  auto gpuDealloc =
-      builder.create<gpu::DeallocOp>(unkLoc, TypeRange{tokenType}, gpuBuf);
-  builder.create<gpu::WaitOp>(unkLoc, Type(), gpuDealloc.getAsyncToken());
+  builder.create<gpu::DeallocOp>(unkLoc, /*asyncToken=*/std::nullopt, gpuBuf);
 
   // Continue inserting ops after the created kernel arg
-  builder.setInsertionPointAfter(gpuSync);
+  builder.setInsertionPointAfter(gpuMemcpy);
 
   return gpuBuf;
 }
@@ -414,11 +407,8 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     }
 
     auto outBuf = builder.create<memref::AllocOp>(unkLoc, memrefType);
-    auto tokenType = builder.getType<gpu::AsyncTokenType>();
     auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
-        unkLoc, TypeRange{tokenType}, ValueRange(), outBuf, result);
-    auto gpuSync =
-        builder.create<gpu::WaitOp>(unkLoc, Type(), gpuMemcpy.getAsyncToken());
+        unkLoc, /*asyncToken=*/std::nullopt, ValueRange{}, outBuf, result);
 
     // Dealloc the output buffer at the end of program.
     // For now, automatic deallocation is disabled for GPUs.
@@ -426,7 +416,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     builder.create<memref::DeallocOp>(unkLoc, outBuf);
 
     // Restore insertion point
-    builder.setInsertionPointAfter(gpuSync);
+    builder.setInsertionPointAfter(gpuMemcpy);
 
     result = outBuf;
   }
