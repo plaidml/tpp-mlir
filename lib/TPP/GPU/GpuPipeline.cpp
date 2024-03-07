@@ -190,7 +190,7 @@ private:
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
-    bool dealloc = gpuType != GpuType::Cuda;
+    bool dealloc = gpuType == GpuType::Vulkan;
     pm.addPass(createBufferize(BufferizeOptions{dealloc}));
     pm.addPass(createConvertForAllToParallelOp());
     pm.addNestedPass<func::FuncOp>(createCleanup());

@@ -50,7 +50,8 @@ using namespace mlir;
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
+                  llvm::cl::value_desc("cuda,vulkan,intel"),
+                  llvm::cl::init(""));
 
 // Kernel buffers - arguments and return values - are expected to be allocated
 // on GPU.
@@ -396,7 +397,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
 
   // Kernels must return a single result
   Value result = kernelCall->getResult(0);
-  if (defGpuBackend == "cuda" && defGpuArgs) {
+  if (((defGpuBackend == "cuda") || (defGpuBackend == "intel")) && defGpuArgs) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());
