@@ -10,6 +10,7 @@
 
 #include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
 #include "TPP/IR/MatcherUtils.h"
+#include "TPP/IR/StructuredOpMatcher.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 
 #include "mlir/Conversion/Passes.h"
@@ -49,7 +50,8 @@ namespace {
 static std::optional<SmallVector<int64_t>>
 getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
   if (!(isa<linalg::MatmulOp>(linalgOp) ||
-        isa<linalg::BatchReduceMatmulOp>(linalgOp))) {
+        isa<linalg::BatchReduceMatmulOp>(linalgOp) ||
+        isa<linalg::GenericOp>(linalgOp))) {
     return std::nullopt;
   }
 
@@ -500,7 +502,8 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
                                       ArrayRef<int64_t> dpasTile, int kTile,
                                       PatternRewriter &rewriter) {
   assert((isa<linalg::MatmulOp>(linalgOp) ||
-          isa<linalg::BatchReduceMatmulOp>(linalgOp)) &&
+          isa<linalg::BatchReduceMatmulOp>(linalgOp) ||
+          isa<linalg::GenericOp>(linalgOp)) &&
          "Requires a GEMM-like op for DPAS lowering");
 
   Location loc = linalgOp.getLoc();
@@ -955,8 +958,9 @@ template <typename LinalgOpTy>
 struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
   using OpRewritePattern<LinalgOpTy>::OpRewritePattern;
   // Constrain conversion to the supported GEMM-like ops.
-  static_assert(llvm::is_one_of<LinalgOpTy, linalg::MatmulOp,
-                                linalg::BatchReduceMatmulOp>::value);
+  static_assert(
+      llvm::is_one_of<LinalgOpTy, linalg::MatmulOp, linalg::BatchReduceMatmulOp,
+                      linalg::GenericOp>::value);
 
   ConvertGemmLikeToXeGPU(MLIRContext *ctx, LinalgToXeGPUOptions options)
       : OpRewritePattern<LinalgOpTy>(ctx), options(options) {}
@@ -970,6 +974,22 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
     if (gemmLikeOp.hasDynamicShape()) {
       return rewriter.notifyMatchFailure(
           gemmLikeOp, "Expect static shape when mapping to GPU");
+    }
+
+    using namespace structured_match;
+    auto matmulMatcher =
+        StructuredOpMatcher::make<linalg::GenericOp>()
+            .operation(NumDpsInits(EqualsTo(1)))
+            .operation(NumDpsInputs(EqualsTo(2)))
+            .operation(NumRegions(EqualsTo(1)))
+            .operation(NumOfLoops(EqualsTo(3)))
+            .input(MatchAll(), HasStaticShape())
+            .output(MatchAll(), HasStaticShape())
+            .region(MatchOne(0), WithOpChain<arith::MulFOp, arith::AddFOp>());
+    if (isa<linalg::GenericOp>(gemmLikeOp) &&
+        !matmulMatcher.match(gemmLikeOp)) {
+      return rewriter.notifyMatchFailure(
+          gemmLikeOp, "Generic does not represent a GEMM-like operation");
     }
 
     for (auto input : gemmLikeOp.getDpsInputs()) {
@@ -1046,8 +1066,9 @@ private:
 void populateLinalgGemmToXeGPUPatterns(RewritePatternSet &patterns,
                                        LinalgToXeGPUOptions options) {
   patterns.add<ConvertGemmLikeToXeGPU<linalg::MatmulOp>,
-               ConvertGemmLikeToXeGPU<linalg::BatchReduceMatmulOp>>(
-      patterns.getContext(), options);
+               ConvertGemmLikeToXeGPU<linalg::BatchReduceMatmulOp>,
+               ConvertGemmLikeToXeGPU<linalg::GenericOp>>(patterns.getContext(),
+                                                          options);
 }
 
 void populateLinalgEltwiseToXeGPUPatterns(RewritePatternSet &patterns,
