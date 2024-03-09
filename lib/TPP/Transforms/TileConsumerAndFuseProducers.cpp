@@ -450,7 +450,11 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
 // Trivial tile selection. If the dimension is statically known, it perfectly
 // divides the tile, and we have enough iterations return a default of 32.
 static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
-  const int64_t tile = 32;
+  mlir::DeviceDesc::DeviceID cpuID = 0;
+  size_t tileSize = linalgOp.getContext()->getSystemDesc()
+                      .getDeviceDesc(cpuID).getMatMulTileSizeInBytes();
+  LLVM_DEBUG(llvm::dbgs() << "[CostModel] CPU TileSize:" << tileSize << "\n");
+  const int64_t tile = tileSize;
   SmallVector<int64_t, 4> loopsRange = linalgOp.getStaticLoopRanges();
   if (loopsRange[dim] == ShapedType::kDynamic)
     return tile;
@@ -465,11 +469,6 @@ static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
 // that are not involved in a GEMM computation.
 static SmallVector<int64_t>
 getDefaultTileSizesForMatmulLikeOp(linalg::LinalgOp linalgOp) {
-  mlir::DeviceDesc::DeviceID cpuID = 0;
-  LLVM_DEBUG(llvm::dbgs() << "CPU L1CacheSize:" <<
-             linalgOp.getContext()->getSystemDesc()
-              .getCPUL1CacheSizeInBytes(cpuID) << "\n");
-
   SmallVector<int64_t> tiles(linalgOp.getNumLoops(), 0);
   if (isa<linalg::MatmulOp>(linalgOp)) {
     tiles[0] = getTileForDim(linalgOp, 0); // i loop

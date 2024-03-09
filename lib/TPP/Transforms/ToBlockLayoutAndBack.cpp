@@ -22,7 +22,9 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/MathExtras.h"
+#include "mlir/Support/SystemDesc.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 
@@ -42,6 +44,8 @@ namespace tpp {
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
+
+#define DEBUG_TYPE "to-block-layout-and-back"
 
 //===----------------------------------------------------------------------===//
 // Utils
@@ -584,14 +588,21 @@ struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
 
 static SmallVector<int64_t>
 getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
+  mlir::DeviceDesc::DeviceID cpuID = 0;
+  long blockingFactor = linalgOp->getContext()
+                          ->getSystemDesc()
+                          .getDeviceDesc(cpuID)
+                          .getConvAndMatMulBlockingFactor();
+  LLVM_DEBUG(llvm::dbgs() << "[CostModel] CPU BlockingFactor:"
+                          << blockingFactor << "\n");
   assert(linalgOp && "expect a valid linalgOp");
   if (isa<linalg::Conv2DNchwFchwOp>(linalgOp) ||
       isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
-    return {32, 32};
+    return {blockingFactor, blockingFactor};
   }
   assert(isa<linalg::MatmulOp>(linalgOp) ||
          isa<linalg::BatchMatmulOp>(linalgOp));
-  return {32, 32, 32};
+  return {blockingFactor, blockingFactor, blockingFactor};
 }
 
 //===----------------------------------------------------------------------===//
