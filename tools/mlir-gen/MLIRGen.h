@@ -189,7 +189,7 @@ public:
   /// Creates a specific module. Different configurations need different modules
   /// so should create new objects to not have to share / cleanup existing MLIR
   /// modules.
-  MLIRGenerator(StringRef, unsigned, StringRef, StringRef, unsigned, int, bool,
+  MLIRGenerator(StringRef, unsigned, StringRef, StringRef, StringRef, int, bool,
                 bool, bool, int);
 
   ~MLIRGenerator() { module->destroy(); }

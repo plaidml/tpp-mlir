@@ -58,17 +58,8 @@ Value getConstInt(OpBuilder &builder, int value, int width) {
   }
 }
 
-Value getConstFloat(OpBuilder &builder, float value, int width) {
-  switch (width) {
-  case 16:
-    return getConstant(builder, builder.getBF16Type(), value);
-  case 32:
-    return getConstant(builder, builder.getF32Type(), value);
-  case 64:
-    return getConstant(builder, builder.getF64Type(), value);
-  default:
-    assert(false && "Invalid constant float size");
-  }
+Value getConstFloat(OpBuilder &builder, float value, FloatType type) {
+  return getConstant(builder, type, value);
 }
 
 Value getConstIndex(OpBuilder &builder, int value) {

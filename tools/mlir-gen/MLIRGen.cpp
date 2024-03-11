@@ -19,6 +19,8 @@
 #include "MLIRGen.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include <optional>
+
 using namespace mlir;
 
 namespace {
@@ -41,7 +43,7 @@ void parseStringList(StringRef str, SmallVector<int64_t> &list) {
 
 MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
                              StringRef layersStr, StringRef tilesStr,
-                             unsigned typeWidth, int seed, bool enableBias,
+                             StringRef targetType, int seed, bool enableBias,
                              bool enableRelu, bool enableSoftmax,
                              int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), batch(batch), seed(seed),
@@ -76,17 +78,13 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
          "Must have 3 tile sizes (or none)");
 
   // Pick data type
-  switch (typeWidth) {
-  case 32:
-    dataType = builder.getF32Type();
-    break;
-  case 16:
-    dataType = builder.getBF16Type();
-    break;
-  default:
-    assert(false && "Unsupported type width");
-    return;
-  }
+  auto elementType = llvm::StringSwitch<std::optional<Type>>(targetType)
+                         .CaseLower("f32", builder.getF32Type())
+                         .CaseLower("f16", builder.getF16Type())
+                         .CaseLower("bf16", builder.getBF16Type())
+                         .Default(std::nullopt);
+  assert(elementType && "Unsupported data type");
+  dataType = *elementType;
 
   // Disable VNNI packing if it is not BF16 data type
   if (!dataType.isBF16())
@@ -340,7 +338,7 @@ Value MLIRGenerator::lowerRelu(Value input, Value output) {
   if (!enableRelu)
     return input;
 
-  auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
+  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
   auto outTy = input.getType().cast<ShapedType>();
   auto map = getMap(input, MAP_PARALLEL);
   auto relu =
@@ -392,7 +390,7 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
   auto redTy = getShape(dims, PACK_OUTPUT);
   Value redTensor =
       builder.create<tensor::EmptyOp>(loc, dims, outTy.getElementType());
-  auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
+  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
   auto fill = builder.create<linalg::FillOp>(loc, zero, redTensor);
   auto redux = builder.create<linalg::GenericOp>(
       loc, redTy, ValueRange{exp.getResult(0)}, ValueRange{fill.getResult(0)},
@@ -631,7 +629,7 @@ int MLIRGenerator::getRand() {
 }
 
 Value MLIRGenerator::getZeroInitTensor(TensorType type) {
-  auto zero = getConstFloat(builder, 0.0, dataType.getIntOrFloatBitWidth());
+  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
   Value tensor =
       builder.create<tensor::EmptyOp>(loc, type, ValueRange{}).getResult();
   tensor = builder.create<linalg::FillOp>(loc, zero, tensor).getResult(0);
