@@ -28,12 +28,14 @@ func.func @linalg_matmul(%arg0: tensor<128x1024xf16>,
 // CHECK:         xegpu.compile_hint
 // CHECK:         %[[ext_vecC:.+]] = arith.extf %[[vecC]] : vector<8x16xf16> to vector<8x16xf32>
 // CHECK-COUNT-7: arith.extf
-// CHECK:         %[[tileA:.+]] = xegpu.create_nd_tdesc %[[A]]
+// CHECK:         %[[tileA:.+]] = xegpu.create_nd_tdesc %[[A]]{{.*}}-> !xegpu.tensor_desc<8x16xf16>
 // CHECK-COUNT-7: xegpu.create_nd_tdesc %[[A]]
-// CHECK:         %[[tileB:.+]] = xegpu.create_nd_tdesc %[[B]]
+// CHECK:         %[[tileB:.+]] = xegpu.create_nd_tdesc %[[B]]{{.*}}-> !xegpu.tensor_desc<16x16xf16>
 // CHECK-COUNT-3: xegpu.create_nd_tdesc %[[B]]
-// CHECK:         %[[out:.+]]:20 = scf.for
-// CHECK-SAME:    {{.*}}iter_args(%[[acc:.+]] = %[[ext_vecC]],{{.*}}%[[tA:.+]] = %[[tileA]],{{.*}}%[[tB:.+]] = %[[tileB]]
+// CHECK:         %[[prefetchA:.+]] = xegpu.create_nd_tdesc %[[A]]{{.*}}-> !xegpu.tensor_desc<32x32xf16>
+// CHECK:         %[[prefetchB:.+]] = xegpu.create_nd_tdesc %[[B]]{{.*}}-> !xegpu.tensor_desc<32x32xf16>
+// CHECK:         %[[out:.+]]:22 = scf.for
+// CHECK-SAME:    {{.*}}iter_args(%[[acc:.+]] = %[[ext_vecC]],{{.*}}%[[tA:.+]] = %[[tileA]],{{.*}}%[[tB:.+]] = %[[tileB]],{{.*}}%[[pA:.+]] = %[[prefetchA]],{{.*}}%[[pB:.+]] = %[[prefetchB]]
 // CHECK:           %[[vecA:.+]] = xegpu.load_nd %[[tA]] {mode = vc, vnni_axis = 1, l1_hint = cached, l2_hint = cached, l3_hint = cached}
 // CHECK-COUNT-7:   xegpu.load_nd{{.*}}{mode = vc, vnni_axis = 1, l1_hint = cached, l2_hint = cached, l3_hint = cached}
 // CHECK:           %[[vecB:.+]] = xegpu.load_nd %[[tB]] {mode = vc, vnni_axis = 0, l1_hint = cached, l2_hint = cached, l3_hint = cached}
@@ -42,10 +44,10 @@ func.func @linalg_matmul(%arg0: tensor<128x1024xf16>,
 // CHECK-COUNT-7:   xegpu.update_nd_offset
 // CHECK:           %[[next_tB:.+]] = xegpu.update_nd_offset %[[tB]]
 // CHECK-COUNT-3:   xegpu.update_nd_offset
-// CHECK:           xegpu.prefetch_nd %[[next_tA]] {mode = vc, l1_hint = cached, l2_hint = cached, l3_hint = cached}
-// CHECK-COUNT-7:   xegpu.prefetch_nd
-// CHECK:           xegpu.prefetch_nd %[[next_tB]] {mode = vc, l1_hint = cached, l2_hint = cached, l3_hint = cached}
-// CHECK-COUNT-3:   xegpu.prefetch_nd
+// CHECK:           xegpu.prefetch_nd %[[pA]] {mode = vc, l1_hint = cached, l2_hint = cached, l3_hint = cached}
+// CHECK:           xegpu.prefetch_nd %[[pB]] {mode = vc, l1_hint = cached, l2_hint = cached, l3_hint = cached}
+// CHECK:           %[[next_pA:.+]] = xegpu.update_nd_offset %[[pA]]
+// CHECK:           %[[next_pB:.+]] = xegpu.update_nd_offset %[[pB]]
 // CHECK:           xegpu.compile_hint
 // CHECK:           %[[part_res:.+]] = xegpu.dpas %[[vecA]], %[[vecB]], %[[acc]]
 // CHECK-COUNT-7:   xegpu.dpas
@@ -53,7 +55,7 @@ func.func @linalg_matmul(%arg0: tensor<128x1024xf16>,
 // CHECK-COUNT-7:   xegpu.dpas
 // CHECK:           xegpu.compile_hint
 // CHECK:           gpu.barrier
-// CHECK:           scf.yield %[[res]],{{.*}}%[[next_tA]],{{.*}}%[[next_tB]]
+// CHECK:           scf.yield %[[res]],{{.*}}%[[next_tA]],{{.*}}%[[next_tB]],{{.*}}%[[next_pA]],{{.*}}%[[next_pB]]
 // CHECK:         }
 // CHECK:         %[[trunc_out:.+]] = arith.truncf %[[out]]#0 : vector<8x16xf32> to vector<8x16xf16>
 // CHECK-COUNT-7: arith.truncf
@@ -101,8 +103,8 @@ func.func @linalg_fc(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>, %ar
 // CHECK-COUNT-4:   xegpu.load_nd{{.*}}{mode = vc, vnni_axis = 0, l1_hint = cached, l2_hint = cached, l3_hint = cached}
 // CHECK-COUNT-8:   xegpu.update_nd_offset
 // CHECK-COUNT-4:   xegpu.update_nd_offset
-// CHECK-COUNT-8:   xegpu.prefetch_nd
-// CHECK-COUNT-4:   xegpu.prefetch_nd
+// CHECK-COUNT-2:   xegpu.prefetch_nd
+// CHECK-COUNT-2:   xegpu.update_nd_offset
 // CHECK:           xegpu.compile_hint
 // CHECK-COUNT-8:   xegpu.dpas
 // CHECK-COUNT-8:   xegpu.dpas

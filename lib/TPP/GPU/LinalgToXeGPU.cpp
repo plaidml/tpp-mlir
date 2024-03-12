@@ -664,12 +664,52 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     }
   }
 
+  // Create prefetch tiles.
+  //
+  // Fewer prefetch requests decrese memory controller pressure and allow
+  // more efficient data loading.
+  //
+  // TODO: Add support for multistage prefetching.
+  auto prefetchTypeA =
+      xegpu::TensorDescType::get({dimM, kTile}, typeA.getElementType());
+  auto prefetchTypeB =
+      xegpu::TensorDescType::get({kTile, dimN}, typeB.getElementType());
+  Value nextTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
+  Value prefetchA;
+  {
+    mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
+    if (isBrgemm)
+      prefetchOffsets.push_back(batchIv);
+    prefetchOffsets.append({zero, nextTileOffset});
+
+    prefetchA = rewriter
+                    .create<xegpu::CreateNdDescOp>(
+                        loc, prefetchTypeA, matA, prefetchOffsets,
+                        /*boundary_check=*/true, xegpuMode)
+                    .getResult();
+  }
+  Value prefetchB;
+  {
+    mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
+    if (isBrgemm)
+      prefetchOffsets.push_back(batchIv);
+    prefetchOffsets.append({nextTileOffset, zero});
+
+    prefetchB = rewriter
+                    .create<xegpu::CreateNdDescOp>(
+                        loc, prefetchTypeB, matB, prefetchOffsets,
+                        /*boundary_check=*/true, xegpuMode)
+                    .getResult();
+  }
+
   // Construct and move into GEMM reduction dimension tiling loop.
   // Propagate output values as iter args.
   SmallVector<Value> iterArgs;
   iterArgs.append(loadVecC);
   iterArgs.append(tilesA);
   iterArgs.append(tilesB);
+  iterArgs.push_back(prefetchA);
+  iterArgs.push_back(prefetchB);
   scf::ForOp kDimLoop = startLoop(0, dimK, kTile, iterArgs);
   auto iterValues = getLoopIterValues(kDimLoop);
 
@@ -678,8 +718,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   tilesA =
       SmallVector<Value>{iterValues.begin() + loadVecC.size(),
                          iterValues.begin() + loadVecC.size() + tilesA.size()};
-  tilesB =
-      SmallVector<Value>{iterValues.end() - tilesB.size(), iterValues.end()};
+  tilesB = SmallVector<Value>{iterValues.begin() + loadVecC.size() + tilesA.size(),
+                              iterValues.begin() + loadVecC.size() + tilesA.size() + tilesB.size()};
+  prefetchA = *(iterValues.end() - 2);
+  prefetchB = *(iterValues.end() - 1);
 
   // TODO: Make the VNNI factor a flexible parameter.
   const int vnniFactor = 2;
@@ -740,16 +782,28 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   }
 
   // Prefetch the next set of input tiles.
-  for (auto tileA : tilesA) {
-    rewriter.create<xegpu::PrefetchNDOp>(loc, tileA, /*l1_hint=*/readCacheHint,
-                                         /*l2_hint=*/readCacheHint,
-                                         /*l3_hint=*/readCacheHint, xegpuMode);
-  }
-  for (auto tileB : tilesB) {
-    rewriter.create<xegpu::PrefetchNDOp>(loc, tileB, /*l1_hint=*/readCacheHint,
-                                         /*l2_hint=*/readCacheHint,
-                                         /*l3_hint=*/readCacheHint, xegpuMode);
-  }
+  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
+                                       /*l1_hint=*/readCacheHint,
+                                       /*l2_hint=*/readCacheHint,
+                                       /*l3_hint=*/readCacheHint, xegpuMode);
+  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
+                                       /*l1_hint=*/readCacheHint,
+                                       /*l2_hint=*/readCacheHint,
+                                       /*l3_hint=*/readCacheHint, xegpuMode);
+
+  // Update offsets of the prefetch tiles.
+  // Shift along the reduction dimension.
+  prefetchA = rewriter
+                  .create<xegpu::UpdateNDOffsetOp>(
+                      loc, prefetchTypeA, prefetchA,
+                      ValueRange{zero, kTileOffset}, xegpuMode)
+                  .getResult();
+  prefetchB = rewriter
+                  .create<xegpu::UpdateNDOffsetOp>(
+                      loc, prefetchTypeB, prefetchB,
+                      ValueRange{kTileOffset, zero}, xegpuMode)
+                  .getResult();
+
   // Ensure that prefetches are scheduled before computation starts.
   rewriter.create<xegpu::CompileHintOp>(loc);
 
@@ -799,6 +853,8 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   yieldVals.append(dpasResults);
   yieldVals.append(tilesA);
   yieldVals.append(tilesB);
+  yieldVals.push_back(prefetchA);
+  yieldVals.push_back(prefetchB);
 
   // Terminate and exit reduction dim loop.
   terminateLoop(kDimLoop, yieldVals);
