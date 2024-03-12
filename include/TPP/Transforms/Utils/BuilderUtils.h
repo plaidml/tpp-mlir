@@ -21,6 +21,7 @@ class TypeRange;
 class OpBuilder;
 class Operation;
 class Value;
+class FloatType;
 namespace func {
 class FuncOp;
 } // namespace func
@@ -40,7 +41,7 @@ Value createDenseMemref(OpBuilder &, ModuleOp, TensorInitType, MemRefType, int);
 // Return a ConstantOp of a certain type with a certain initializer
 Value getConstIndex(OpBuilder &, int);
 Value getConstInt(OpBuilder &, int, int);
-Value getConstFloat(OpBuilder &, float, int);
+Value getConstFloat(OpBuilder &, float, FloatType);
 
 // Return a typed attribute of specified type and value.
 // For integer types, the value is rounded toward zero.

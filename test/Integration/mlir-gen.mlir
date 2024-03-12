@@ -11,10 +11,10 @@
 // RUN: mlir-gen --kernel=const --bias --relu --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=CONSTANT
 
 // Kernel - matmul
-// RUN: mlir-gen --kernel=args --seed=123 --float-width=32 --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=GEN-MATMUL
+// RUN: mlir-gen --kernel=args --seed=123 --float-type=f32 --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=GEN-MATMUL
 
 // Kernel - fc
-// RUN: mlir-gen --kernel=args --bias --relu --seed=123 --float-width=32 --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=GEN-FC
+// RUN: mlir-gen --kernel=args --bias --relu --seed=123 --float-type=f32 --batch=10 --layers=10,10 | tpp-run -e entry -entry-point-result=void -print | FileCheck %s --check-prefix=GEN-FC
 
 // Packed versions
 // RUN: mlir-gen --kernel=const --bias --relu --seed=123 --batch=10 --layers=10,10 --tiles=2,2,2 | tpp-run -e entry -entry-point-result=void -n 10 | FileCheck %s --check-prefix=PERF
