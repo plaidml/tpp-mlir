@@ -100,8 +100,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # BF16
-FLOAT_SIZE=32
-if [ BF16 ]; then FLOAT_SIZE="16"; fi
+FLOAT_TYPE="f32"
+if [ BF16 ]; then FLOAT_TYPE="bf16"; fi
 
 # Find binaries
 ROOT=$(git rev-parse --show-toplevel)
@@ -126,7 +126,7 @@ debug "Random seed: $SEED"
 # Defaults
 
 # Command line to extract and run
-MLIR_GEN_ARGS="--float-width=$FLOAT_SIZE --seed=$SEED --batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
+MLIR_GEN_ARGS="--float-type=$FLOAT_TYPE --seed=$SEED --batch=$MB --layers=$LAYER_SIZES --tiles=$TILE_SIZES"
 ORIG_MLIR="mlir-gen-original.mlir"
 debug "\nCreating the original MLIR model:"
 run "$MLIR_GEN $MLIR_GEN_ARGS" $ORIG_MLIR
@@ -134,7 +134,7 @@ run "$MLIR_GEN $MLIR_GEN_ARGS" $ORIG_MLIR
 # FIXME: --pack-matmul isn't quite working with the rest of the pipeline
 # Once it works, we can pass the TILE variables to it
 TPP_OPT_ARGS="--default-tpp-passes"
-if [ "$FLOAT_SIZE" == "16" ]; then
+if [ "$FLOAT_TYPE" == "bf16" ]; then
   TPP_OPT_ARGS="--pack-vnni $TPP_OPT_ARGS"
 fi
 OPT_MLIR="mlir-gen-optimized.mlir"

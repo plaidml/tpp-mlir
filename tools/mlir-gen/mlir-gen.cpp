@@ -47,11 +47,10 @@ llvm::cl::opt<std::string>
           llvm::cl::desc("Comma-separated values of size of each tile (N,K,C)"),
           llvm::cl::value_desc("32,32,32"), llvm::cl::init(""));
 
-// Float width
-llvm::cl::opt<unsigned> floatWidth("float-width",
-                                   llvm::cl::desc("Bitsize of float type"),
-                                   llvm::cl::value_desc("32|16"),
-                                   llvm::cl::init(32));
+// Float type
+llvm::cl::opt<std::string>
+    floatType("float-type", llvm::cl::desc("Float type and its bitsize"),
+              llvm::cl::value_desc("f32|f16|bf16"), llvm::cl::init("f32"));
 
 // Random seed
 llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"),
@@ -93,7 +92,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR Generator");
 
-  MLIRGenerator gen(kernel, batch, layers, tiles, floatWidth, seed, enableBias,
+  MLIRGenerator gen(kernel, batch, layers, tiles, floatType, seed, enableBias,
                     enableRelu, enableSoftmax, vnni);
   return gen.generate(filename);
 }
