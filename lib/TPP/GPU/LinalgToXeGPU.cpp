@@ -31,6 +31,7 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 
+#include <numeric>
 #include <optional>
 
 using namespace mlir;
@@ -497,6 +498,72 @@ fuseEltwiseConsumers(linalg::LinalgOp rootOp,
   return rootStoreOps;
 }
 
+// Get static GPU block sizes represented by a surrounding operation
+// like a kernel launch or parallel loop.
+// Returns known block sizes if they are all static or failure, otherwise.
+static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
+  if (!op)
+    return failure();
+
+  auto getConstVal = [&](Value val) -> std::optional<int64_t> {
+    if (auto constOp = val.getDefiningOp<arith::ConstantIndexOp>()) {
+      return constOp.value();
+    }
+    return std::nullopt;
+  };
+
+  if (auto launchOp = dyn_cast<gpu::LaunchOp>(op)) {
+    auto sizeX = getConstVal(launchOp.getBlockSizeX());
+    auto sizeY = getConstVal(launchOp.getBlockSizeY());
+    auto sizeZ = getConstVal(launchOp.getBlockSizeZ());
+    if (!sizeX || !sizeY || !sizeZ)
+      return failure();
+
+    return SmallVector<int64_t>{*sizeX, *sizeY, *sizeZ};
+  }
+
+  // TODO: Remove when the lowering only occurs within a gpu.launch op.
+  //       Manually computing this is brittle and duplicated parallel
+  //       loops to gpu conversion.
+  if (auto blockLoop = dyn_cast<scf::ParallelOp>(op)) {
+    auto gridLoop = blockLoop->getParentOfType<scf::ParallelOp>();
+
+    // Blocks or number of threads are represented by the first parallel loop
+    // nested within another parallel loop.
+    //
+    // Fail if there is no outer parallel loop or current loop is nested more
+    // than once.
+    if (!gridLoop || (gridLoop->getParentOfType<scf::ParallelOp>())) {
+      return failure();
+    }
+
+    SmallVector<int64_t> blockSizes;
+    for (auto [lb, ub, step] :
+         llvm::zip_equal(blockLoop.getLowerBound(), blockLoop.getUpperBound(),
+                         blockLoop.getStep())) {
+      auto lbVal = getConstVal(lb);
+      auto ubVal = getConstVal(ub);
+      auto stepVal = getConstVal(step);
+      if (!lbVal || !ubVal || !stepVal)
+        return failure();
+
+      int64_t blockSize = (*ubVal - *lbVal) / *stepVal;
+
+      // Assume that at least one thread/workitem is created for the given
+      // dimension. Otherwise, outlining will fail anyway.
+      blockSizes.push_back(blockSize < 0 ? 1 : blockSize);
+    }
+
+    // Too many dimensions, something went wrong. Bail out.
+    if (blockSizes.size() > 3)
+      return failure();
+
+    return blockSizes;
+  }
+
+  return failure();
+}
+
 // Create XeGPU DPAS kernel out of GEMM-like operation.
 static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
                                       ArrayRef<int64_t> dpasTile, int kTile,
@@ -670,36 +737,50 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // more efficient data loading.
   //
   // TODO: Add support for multistage prefetching.
-  auto prefetchTypeA =
-      xegpu::TensorDescType::get({dimM, kTile}, typeA.getElementType());
-  auto prefetchTypeB =
-      xegpu::TensorDescType::get({kTile, dimN}, typeB.getElementType());
-  Value nextTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
-  Value prefetchA;
-  {
-    mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
-    if (isBrgemm)
-      prefetchOffsets.push_back(batchIv);
-    prefetchOffsets.append({zero, nextTileOffset});
-
-    prefetchA = rewriter
-                    .create<xegpu::CreateNdDescOp>(
-                        loc, prefetchTypeA, matA, prefetchOffsets,
-                        /*boundary_check=*/true, xegpuMode)
-                    .getResult();
+  int64_t numThreads = 1;
+  auto blockDims =
+      getStaticBlockSizes(linalgOp->getParentOfType<scf::ParallelOp>());
+  if (succeeded(blockDims)) {
+    numThreads = std::accumulate(blockDims->begin(), blockDims->end(), 1,
+                                 std::multiplies<int64_t>());
   }
-  Value prefetchB;
-  {
-    mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
-    if (isBrgemm)
-      prefetchOffsets.push_back(batchIv);
-    prefetchOffsets.append({nextTileOffset, zero});
 
-    prefetchB = rewriter
-                    .create<xegpu::CreateNdDescOp>(
-                        loc, prefetchTypeB, matB, prefetchOffsets,
-                        /*boundary_check=*/true, xegpuMode)
-                    .getResult();
+  bool isCoopPrefetch = numThreads > 1;
+
+  Value prefetchA;
+  Value prefetchB;
+  xegpu::TensorDescType prefetchTypeA;
+  xegpu::TensorDescType prefetchTypeB;
+  if (isCoopPrefetch) {
+    prefetchTypeA =
+        xegpu::TensorDescType::get({dimM, kTile}, typeA.getElementType());
+    prefetchTypeB =
+        xegpu::TensorDescType::get({kTile, dimN}, typeB.getElementType());
+    Value nextTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
+    {
+      mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
+      if (isBrgemm)
+        prefetchOffsets.push_back(batchIv);
+      prefetchOffsets.append({zero, nextTileOffset});
+
+      prefetchA = rewriter
+                      .create<xegpu::CreateNdDescOp>(
+                          loc, prefetchTypeA, matA, prefetchOffsets,
+                          /*boundary_check=*/true, xegpuMode)
+                      .getResult();
+    }
+    {
+      mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
+      if (isBrgemm)
+        prefetchOffsets.push_back(batchIv);
+      prefetchOffsets.append({nextTileOffset, zero});
+
+      prefetchB = rewriter
+                      .create<xegpu::CreateNdDescOp>(
+                          loc, prefetchTypeB, matB, prefetchOffsets,
+                          /*boundary_check=*/true, xegpuMode)
+                      .getResult();
+    }
   }
 
   // Construct and move into GEMM reduction dimension tiling loop.
@@ -708,8 +789,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   iterArgs.append(loadVecC);
   iterArgs.append(tilesA);
   iterArgs.append(tilesB);
-  iterArgs.push_back(prefetchA);
-  iterArgs.push_back(prefetchB);
+  if (isCoopPrefetch) {
+    iterArgs.push_back(prefetchA);
+    iterArgs.push_back(prefetchB);
+  }
   scf::ForOp kDimLoop = startLoop(0, dimK, kTile, iterArgs);
   auto iterValues = getLoopIterValues(kDimLoop);
 
@@ -720,8 +803,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
                          iterValues.begin() + loadVecC.size() + tilesA.size()};
   tilesB = SmallVector<Value>{iterValues.begin() + loadVecC.size() + tilesA.size(),
                               iterValues.begin() + loadVecC.size() + tilesA.size() + tilesB.size()};
-  prefetchA = *(iterValues.end() - 2);
-  prefetchB = *(iterValues.end() - 1);
+  if (isCoopPrefetch) {
+    prefetchA = *(iterValues.end() - 2);
+    prefetchB = *(iterValues.end() - 1);
+  }
 
   // TODO: Make the VNNI factor a flexible parameter.
   const int vnniFactor = 2;
@@ -781,28 +866,30 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     tilesB[i] = updatedTile;
   }
 
-  // Prefetch the next set of input tiles.
-  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
-                                       /*l1_hint=*/readCacheHint,
-                                       /*l2_hint=*/readCacheHint,
-                                       /*l3_hint=*/readCacheHint, xegpuMode);
-  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
-                                       /*l1_hint=*/readCacheHint,
-                                       /*l2_hint=*/readCacheHint,
-                                       /*l3_hint=*/readCacheHint, xegpuMode);
+  if (isCoopPrefetch) {
+    // Prefetch the next set of input tiles.
+    rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
+                                         /*l1_hint=*/readCacheHint,
+                                         /*l2_hint=*/readCacheHint,
+                                         /*l3_hint=*/readCacheHint, xegpuMode);
+    rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
+                                         /*l1_hint=*/readCacheHint,
+                                         /*l2_hint=*/readCacheHint,
+                                         /*l3_hint=*/readCacheHint, xegpuMode);
 
-  // Update offsets of the prefetch tiles.
-  // Shift along the reduction dimension.
-  prefetchA = rewriter
-                  .create<xegpu::UpdateNDOffsetOp>(
-                      loc, prefetchTypeA, prefetchA,
-                      ValueRange{zero, kTileOffset}, xegpuMode)
-                  .getResult();
-  prefetchB = rewriter
-                  .create<xegpu::UpdateNDOffsetOp>(
-                      loc, prefetchTypeB, prefetchB,
-                      ValueRange{kTileOffset, zero}, xegpuMode)
-                  .getResult();
+    // Update offsets of the prefetch tiles.
+    // Shift along the reduction dimension.
+    prefetchA = rewriter
+                    .create<xegpu::UpdateNDOffsetOp>(
+                        loc, prefetchTypeA, prefetchA,
+                        ValueRange{zero, kTileOffset}, xegpuMode)
+                    .getResult();
+    prefetchB = rewriter
+                    .create<xegpu::UpdateNDOffsetOp>(
+                        loc, prefetchTypeB, prefetchB,
+                        ValueRange{kTileOffset, zero}, xegpuMode)
+                    .getResult();
+  }
 
   // Ensure that prefetches are scheduled before computation starts.
   rewriter.create<xegpu::CompileHintOp>(loc);
@@ -853,8 +940,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   yieldVals.append(dpasResults);
   yieldVals.append(tilesA);
   yieldVals.append(tilesB);
-  yieldVals.push_back(prefetchA);
-  yieldVals.push_back(prefetchB);
+  if (isCoopPrefetch) {
+    yieldVals.push_back(prefetchA);
+    yieldVals.push_back(prefetchB);
+  }
 
   // Terminate and exit reduction dim loop.
   terminateLoop(kDimLoop, yieldVals);
