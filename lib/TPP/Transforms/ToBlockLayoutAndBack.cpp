@@ -588,11 +588,16 @@ struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
 
 static SmallVector<int64_t>
 getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
+  long blockingFactor = 0;
   mlir::DeviceDesc::DeviceID cpuID = 0;
-  long blockingFactor = linalgOp->getContext()
-                          ->getSystemDesc()
-                          .getDeviceDesc(cpuID)
-                          .getConvAndMatMulBlockingFactor();
+  if (std::optional<int64_t> v = linalgOp->getContext()
+                                ->getSystemDesc()
+                                .getDeviceDesc(cpuID)
+                                .getConvAndMatMulBlockingFactor()) {
+    blockingFactor = static_cast<long>(*v);
+  } else {
+    blockingFactor = 32;
+  }
   LLVM_DEBUG(llvm::dbgs() << "[CostModel] CPU BlockingFactor:"
                           << blockingFactor << "\n");
   assert(linalgOp && "expect a valid linalgOp");

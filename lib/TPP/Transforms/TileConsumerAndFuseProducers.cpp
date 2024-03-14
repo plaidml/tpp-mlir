@@ -450,9 +450,14 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
 // Trivial tile selection. If the dimension is statically known, it perfectly
 // divides the tile, and we have enough iterations return a default of 32.
 static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
+  size_t tileSize = 0;
   mlir::DeviceDesc::DeviceID cpuID = 0;
-  size_t tileSize = linalgOp.getContext()->getSystemDesc()
-                      .getDeviceDesc(cpuID).getMatMulTileSizeInBytes();
+  if (std::optional<int64_t> v = linalgOp.getContext()->getSystemDesc()
+                      .getDeviceDesc(cpuID).getMatMulTileSizeInBytes()) {
+    tileSize = static_cast<size_t>(*v);
+  } else {
+    tileSize = 32;
+  }
   LLVM_DEBUG(llvm::dbgs() << "[CostModel] CPU TileSize:" << tileSize << "\n");
   const int64_t tile = tileSize;
   SmallVector<int64_t, 4> loopsRange = linalgOp.getStaticLoopRanges();
