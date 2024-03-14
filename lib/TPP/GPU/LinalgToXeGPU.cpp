@@ -574,7 +574,8 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
     blockDims.push_back(rewriter.create<gpu::BlockDimOp>(loc, dim));
   }
 
-  // Linearized ID = (z * sizeY + y) * sizeX + x;
+  // The default GPU indexing is modeled after CUDA:
+  // linear index = (z * sizeY + y) * sizeX + x
   Value threadId =
       rewriter.create<arith::MulIOp>(loc, threadIds[2], blockDims[1]);
   threadId = rewriter.create<arith::AddIOp>(loc, threadId, threadIds[1]);
@@ -586,29 +587,28 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
 
 static xegpu::CreateNdDescOp
 createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-                       Value src, int64_t numThreads, int tileRows,
-                       int tileCols, int kTile, xegpu::Mode mode,
-                       Value batchIv) {
+                       unsigned inputPos, int64_t numThreads,
+                       ArrayRef<int> blockTile, ArrayRef<int> threadTile,
+                       xegpu::Mode mode, Value batchIv) {
+  assert(inputPos <= 1 && "Can handle only GEMM inputs: mat A or mat B");
   Location loc = linalgOp.getLoc();
+
+  Value src = linalgOp.getDpsInputs()[inputPos];
+
+  const int tileRows = blockTile[0];
+  const int tileCols = blockTile[1];
 
   const int numElements = tileRows * tileCols;
   const int elementsPerThread = numElements / numThreads;
 
-  // Limit the maximum prefetching row length to avoid very wide tiles.
-  // But also ensure that the rows are large enough for the number of rows
-  // to remain within tile bounds.
-  //
-  // TODO: Expose as a tunable parameter.
-  const int maxRowLength = std::max(elementsPerThread / kTile, 32);
-
-  // Prioritize first loading contiguous elements (row lenght/number of
-  // columns) only then gather any remaining elements to be loaded from
-  // further rows.
-  // Also, ensure that the prefetch tile stays within the reduction dimension
-  // tile.
-  const int numCols =
-      std::min(std::min(elementsPerThread, tileCols), maxRowLength);
-  const int numRows = elementsPerThread / numCols;
+  // Prioritize loading the whole block tile dimension.
+  // The shared reduction dimension will be spread across the workers.
+  int numRows = threadTile[0];
+  int numCols = elementsPerThread / numRows;
+  if (inputPos == 1) {
+    numCols = threadTile[1];
+    numRows = elementsPerThread / numCols;
+  }
 
   auto srcType = src.getType().cast<ShapedType>();
 
@@ -876,15 +876,15 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     int blockRows = getBlockLevelSize(matC, 0);
     int blockCols = getBlockLevelSize(matC, 1);
 
-    auto prefetchDescA =
-        createGemmPrefetchTile(rewriter, linalgOp, matA, numThreads, blockRows,
-                               kTile, kTile, xegpuMode, batchIv);
+    auto prefetchDescA = createGemmPrefetchTile(
+        rewriter, linalgOp, /*inputPos=*/0, numThreads, {blockRows, kTile},
+        {dimM, kTile}, xegpuMode, batchIv);
     prefetchA = prefetchDescA.getResult();
     prefetchTypeA = prefetchDescA.getType();
 
-    auto prefetchDescB =
-        createGemmPrefetchTile(rewriter, linalgOp, matB, numThreads, kTile,
-                               blockCols, kTile, xegpuMode, batchIv);
+    auto prefetchDescB = createGemmPrefetchTile(
+        rewriter, linalgOp, /*inputPos=*/1, numThreads, {kTile, blockCols},
+        {kTile, dimN}, xegpuMode, batchIv);
     prefetchB = prefetchDescB.getResult();
     prefetchTypeB = prefetchDescB.getType();
 
