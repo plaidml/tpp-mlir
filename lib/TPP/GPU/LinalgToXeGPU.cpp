@@ -587,27 +587,23 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
 
 static xegpu::CreateNdDescOp
 createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-                       unsigned inputPos, int64_t numThreads,
-                       ArrayRef<int> blockTile, ArrayRef<int> threadTile,
-                       xegpu::Mode mode, Value batchIv) {
+                       unsigned inputPos, ArrayRef<int> blockTile,
+                       ArrayRef<int> threadTile, int tileStep, xegpu::Mode mode,
+                       Value batchIv) {
   assert(inputPos <= 1 && "Can handle only GEMM inputs: mat A or mat B");
   Location loc = linalgOp.getLoc();
 
   Value src = linalgOp.getDpsInputs()[inputPos];
 
-  const int tileRows = blockTile[0];
-  const int tileCols = blockTile[1];
-
-  const int numElements = tileRows * tileCols;
-  const int elementsPerThread = numElements / numThreads;
-
   // Prioritize loading the whole block tile dimension.
   // The shared reduction dimension will be spread across the workers.
+  int numCols = tileStep / (blockTile[1] / threadTile[1]);
+  assert(numCols > 0 && "Invalid tiling");
   int numRows = threadTile[0];
-  int numCols = elementsPerThread / numRows;
   if (inputPos == 1) {
     numCols = threadTile[1];
-    numRows = elementsPerThread / numCols;
+    numRows = tileStep / (blockTile[0] / threadTile[0]);
+    assert(numRows > 0 && "Invalid tiling");
   }
 
   auto srcType = src.getType().cast<ShapedType>();
@@ -618,7 +614,11 @@ createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
   Value threadId = getGpuLinearThreadId(rewriter, loc);
 
   Value numColTiles =
-      rewriter.create<arith::ConstantIndexOp>(loc, tileCols / numCols);
+      rewriter.create<arith::ConstantIndexOp>(loc, tileStep / numCols);
+  if (inputPos == 1) {
+    numColTiles =
+        rewriter.create<arith::ConstantIndexOp>(loc, threadTile[1] / numCols);
+  }
   Value tileRowOffset =
       rewriter.create<arith::DivUIOp>(loc, threadId, numColTiles);
   Value tileColOffset =
@@ -877,14 +877,14 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     int blockCols = getBlockLevelSize(matC, 1);
 
     auto prefetchDescA = createGemmPrefetchTile(
-        rewriter, linalgOp, /*inputPos=*/0, numThreads, {blockRows, kTile},
-        {dimM, kTile}, xegpuMode, batchIv);
+        rewriter, linalgOp, /*inputPos=*/0, {blockRows, blockCols},
+        {dimM, dimN}, kTile, xegpuMode, batchIv);
     prefetchA = prefetchDescA.getResult();
     prefetchTypeA = prefetchDescA.getType();
 
     auto prefetchDescB = createGemmPrefetchTile(
-        rewriter, linalgOp, /*inputPos=*/1, numThreads, {kTile, blockCols},
-        {kTile, dimN}, xegpuMode, batchIv);
+        rewriter, linalgOp, /*inputPos=*/1, {blockRows, blockCols},
+        {dimM, dimN}, kTile, xegpuMode, batchIv);
     prefetchB = prefetchDescB.getResult();
     prefetchTypeB = prefetchDescB.getType();
 
