@@ -16,6 +16,7 @@
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/TransformOps/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -564,6 +565,115 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
   return failure();
 }
 
+static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
+  SmallVector<Value, 3> threadIds;
+  SmallVector<Value, 3> blockDims;
+
+  for (auto dim : {gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z}) {
+    threadIds.push_back(rewriter.create<gpu::ThreadIdOp>(loc, dim));
+    blockDims.push_back(rewriter.create<gpu::BlockDimOp>(loc, dim));
+  }
+
+  // Linearized ID = (z * sizeY + y) * sizeX + x;
+  Value threadId =
+      rewriter.create<arith::MulIOp>(loc, threadIds[2], blockDims[1]);
+  threadId = rewriter.create<arith::AddIOp>(loc, threadId, threadIds[1]);
+  threadId = rewriter.create<arith::MulIOp>(loc, threadId, blockDims[0]);
+  threadId = rewriter.create<arith::AddIOp>(loc, threadId, threadIds[0]);
+
+  return threadId;
+}
+
+static xegpu::CreateNdDescOp
+createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+                       Value src, int64_t numThreads, int tileRows,
+                       int tileCols, int kTile, xegpu::Mode mode,
+                       Value batchIv) {
+  Location loc = linalgOp.getLoc();
+
+  const int numElements = tileRows * tileCols;
+  const int elementsPerThread = numElements / numThreads;
+
+  // Limit the maximum prefetching row length to avoid very wide tiles.
+  // But also ensure that the rows are large enough for the number of rows
+  // to remain within tile bounds.
+  //
+  // TODO: Expose as a tunable parameter.
+  const int maxRowLength = std::max(elementsPerThread / kTile, 32);
+
+  // Prioritize first loading contiguous elements (row lenght/number of
+  // columns) only then gather any remaining elements to be loaded from
+  // further rows.
+  // Also, ensure that the prefetch tile stays within the reduction dimension
+  // tile.
+  const int numCols =
+      std::min(std::min(elementsPerThread, tileCols), maxRowLength);
+  const int numRows = elementsPerThread / numCols;
+
+  auto srcType = src.getType().cast<ShapedType>();
+
+  auto prefetchType =
+      xegpu::TensorDescType::get({numRows, numCols}, srcType.getElementType());
+
+  Value threadId = getGpuLinearThreadId(rewriter, loc);
+
+  Value numColTiles =
+      rewriter.create<arith::ConstantIndexOp>(loc, tileCols / numCols);
+  Value tileRowOffset =
+      rewriter.create<arith::DivUIOp>(loc, threadId, numColTiles);
+  Value tileColOffset =
+      rewriter.create<arith::RemUIOp>(loc, threadId, numColTiles);
+
+  Value tileRowSize = rewriter.create<arith::ConstantIndexOp>(loc, numRows);
+  Value tileColSize = rewriter.create<arith::ConstantIndexOp>(loc, numCols);
+  Value eltRowOffset =
+      rewriter.create<arith::MulIOp>(loc, tileRowOffset, tileRowSize);
+  Value eltColOffset =
+      rewriter.create<arith::MulIOp>(loc, tileColOffset, tileColSize);
+
+  SmallVector<mlir::OpFoldResult> prefetchOffsets;
+  if (batchIv)
+    prefetchOffsets.push_back(batchIv);
+  prefetchOffsets.append({eltRowOffset, eltColOffset});
+
+  return rewriter.create<xegpu::CreateNdDescOp>(loc, prefetchType, src,
+                                                prefetchOffsets,
+                                                /*boundary_check=*/true, mode);
+}
+
+static SmallVector<Value>
+prefetchAndUpdateTiles(PatternRewriter &rewriter, Location loc, Value prefetchA,
+                       Value prefetchB, Value kTileOffset,
+                       xegpu::CacheReadHintAttr readCacheHint,
+                       xegpu::Mode mode) {
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+
+  // Prefetch the next set of input tiles.
+  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
+                                       /*l1_hint=*/readCacheHint,
+                                       /*l2_hint=*/readCacheHint,
+                                       /*l3_hint=*/readCacheHint, mode);
+  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
+                                       /*l1_hint=*/readCacheHint,
+                                       /*l2_hint=*/readCacheHint,
+                                       /*l3_hint=*/readCacheHint, mode);
+
+  // Update offsets of the prefetch tiles.
+  // Shift along the reduction dimension.
+  auto updatedTileA =
+      rewriter
+          .create<xegpu::UpdateNDOffsetOp>(loc, prefetchA.getType(), prefetchA,
+                                           ValueRange{zero, kTileOffset}, mode)
+          .getResult();
+  auto updateTileB =
+      rewriter
+          .create<xegpu::UpdateNDOffsetOp>(loc, prefetchB.getType(), prefetchB,
+                                           ValueRange{kTileOffset, zero}, mode)
+          .getResult();
+
+  return SmallVector<Value>{updatedTileA, updateTileB};
+}
+
 // Create XeGPU DPAS kernel out of GEMM-like operation.
 static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
                                       ArrayRef<int64_t> dpasTile, int kTile,
@@ -744,43 +854,49 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     numThreads = std::accumulate(blockDims->begin(), blockDims->end(), 1,
                                  std::multiplies<int64_t>());
   }
-
+  // Disable prefetching when there is no block/workgroup parallelism.
   bool isCoopPrefetch = numThreads > 1;
 
   Value prefetchA;
   Value prefetchB;
   xegpu::TensorDescType prefetchTypeA;
   xegpu::TensorDescType prefetchTypeB;
+  Value kTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
   if (isCoopPrefetch) {
-    prefetchTypeA =
-        xegpu::TensorDescType::get({dimM, kTile}, typeA.getElementType());
-    prefetchTypeB =
-        xegpu::TensorDescType::get({kTile, dimN}, typeB.getElementType());
-    Value nextTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
-    {
-      mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
-      if (isBrgemm)
-        prefetchOffsets.push_back(batchIv);
-      prefetchOffsets.append({zero, nextTileOffset});
+    // Return dimension size on which the whole block/workgroup operates.
+    auto getBlockLevelSize = [&](Value val, int dim) -> int {
+      if (auto subview =
+              dyn_cast_or_null<memref::SubViewOp>(val.getDefiningOp())) {
+        val = subview.getSource();
+      }
 
-      prefetchA = rewriter
-                      .create<xegpu::CreateNdDescOp>(
-                          loc, prefetchTypeA, matA, prefetchOffsets,
-                          /*boundary_check=*/true, xegpuMode)
-                      .getResult();
-    }
-    {
-      mlir::SmallVector<mlir::OpFoldResult> prefetchOffsets;
-      if (isBrgemm)
-        prefetchOffsets.push_back(batchIv);
-      prefetchOffsets.append({nextTileOffset, zero});
+      return cast<ShapedType>(val.getType()).getShape()[dim];
+    };
 
-      prefetchB = rewriter
-                      .create<xegpu::CreateNdDescOp>(
-                          loc, prefetchTypeB, matB, prefetchOffsets,
-                          /*boundary_check=*/true, xegpuMode)
-                      .getResult();
-    }
+    int blockRows = getBlockLevelSize(matC, 0);
+    int blockCols = getBlockLevelSize(matC, 1);
+
+    auto prefetchDescA =
+        createGemmPrefetchTile(rewriter, linalgOp, matA, numThreads, blockRows,
+                               kTile, kTile, xegpuMode, batchIv);
+    prefetchA = prefetchDescA.getResult();
+    prefetchTypeA = prefetchDescA.getType();
+
+    auto prefetchDescB =
+        createGemmPrefetchTile(rewriter, linalgOp, matB, numThreads, kTile,
+                               blockCols, kTile, xegpuMode, batchIv);
+    prefetchB = prefetchDescB.getResult();
+    prefetchTypeB = prefetchDescB.getType();
+
+    auto updatedTiles =
+        prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB, kTileOffset,
+                               readCacheHint, xegpuMode);
+    prefetchA = updatedTiles[0];
+    prefetchB = updatedTiles[1];
+
+    // Ensure that block/workgroup is sychronized after prefetching.
+    rewriter.create<xegpu::CompileHintOp>(loc);
+    rewriter.create<gpu::BarrierOp>(loc);
   }
 
   // Construct and move into GEMM reduction dimension tiling loop.
@@ -848,7 +964,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
   // Update offsets of the input tiles.
   // Shift along the reduction dimension.
-  Value kTileOffset = rewriter.create<arith::ConstantIndexOp>(loc, kTile);
   for (size_t i = 0; i < tilesA.size(); i++) {
     auto updatedTile = rewriter
                            .create<xegpu::UpdateNDOffsetOp>(
@@ -867,28 +982,11 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   }
 
   if (isCoopPrefetch) {
-    // Prefetch the next set of input tiles.
-    rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
-                                         /*l1_hint=*/readCacheHint,
-                                         /*l2_hint=*/readCacheHint,
-                                         /*l3_hint=*/readCacheHint, xegpuMode);
-    rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
-                                         /*l1_hint=*/readCacheHint,
-                                         /*l2_hint=*/readCacheHint,
-                                         /*l3_hint=*/readCacheHint, xegpuMode);
-
-    // Update offsets of the prefetch tiles.
-    // Shift along the reduction dimension.
-    prefetchA = rewriter
-                    .create<xegpu::UpdateNDOffsetOp>(
-                        loc, prefetchTypeA, prefetchA,
-                        ValueRange{zero, kTileOffset}, xegpuMode)
-                    .getResult();
-    prefetchB = rewriter
-                    .create<xegpu::UpdateNDOffsetOp>(
-                        loc, prefetchTypeB, prefetchB,
-                        ValueRange{kTileOffset, zero}, xegpuMode)
-                    .getResult();
+    auto updatedTiles =
+        prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB, kTileOffset,
+                               readCacheHint, xegpuMode);
+    prefetchA = updatedTiles[0];
+    prefetchB = updatedTiles[1];
   }
 
   // Ensure that prefetches are scheduled before computation starts.
