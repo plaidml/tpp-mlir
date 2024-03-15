@@ -585,11 +585,16 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
   return threadId;
 }
 
-static xegpu::CreateNdDescOp
-createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-                       unsigned inputPos, ArrayRef<int> blockTile,
-                       ArrayRef<int> threadTile, int tileStep, xegpu::Mode mode,
-                       Value batchIv) {
+// Create a GEMM input tile to be loaded by each thread/workitem in
+// cooperative fashion.
+// Optionally accepts batch IV for batched GEMM input loading.
+// Returns failure if it is unable to split block/workgroup for
+// prefetching.
+static FailureOr<xegpu::CreateNdDescOp>
+createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+                           unsigned inputPos, ArrayRef<int> blockTile,
+                           ArrayRef<int> threadTile, int tileStep,
+                           xegpu::Mode mode, Value batchIv = nullptr) {
   assert(inputPos <= 1 && "Can handle only GEMM inputs: mat A or mat B");
   Location loc = linalgOp.getLoc();
 
@@ -598,13 +603,18 @@ createGemmPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
   // Prioritize loading the whole block tile dimension.
   // The shared reduction dimension will be spread across the workers.
   int numCols = tileStep / (blockTile[1] / threadTile[1]);
-  assert(numCols > 0 && "Invalid tiling");
   int numRows = threadTile[0];
   if (inputPos == 1) {
     numCols = threadTile[1];
     numRows = tileStep / (blockTile[0] / threadTile[0]);
-    assert(numRows > 0 && "Invalid tiling");
   }
+
+  // Bail on invalid prefetching tiles config.
+  // It usually happends when there are too many threads/workitems
+  // compared to the prefetch tile size e.g., large block tile,
+  // small thread tile, small tile step (k-tile).
+  if (numRows == 0 || numCols == 0)
+    return failure();
 
   auto srcType = src.getType().cast<ShapedType>();
 
@@ -876,27 +886,32 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     int blockRows = getBlockLevelSize(matC, 0);
     int blockCols = getBlockLevelSize(matC, 1);
 
-    auto prefetchDescA = createGemmPrefetchTile(
+    auto prefetchDescA = createGemmCoopPrefetchTile(
         rewriter, linalgOp, /*inputPos=*/0, {blockRows, blockCols},
         {dimM, dimN}, kTile, xegpuMode, batchIv);
-    prefetchA = prefetchDescA.getResult();
-    prefetchTypeA = prefetchDescA.getType();
-
-    auto prefetchDescB = createGemmPrefetchTile(
+    auto prefetchDescB = createGemmCoopPrefetchTile(
         rewriter, linalgOp, /*inputPos=*/1, {blockRows, blockCols},
         {dimM, dimN}, kTile, xegpuMode, batchIv);
-    prefetchB = prefetchDescB.getResult();
-    prefetchTypeB = prefetchDescB.getType();
 
-    auto updatedTiles =
-        prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB, kTileOffset,
-                               readCacheHint, xegpuMode);
-    prefetchA = updatedTiles[0];
-    prefetchB = updatedTiles[1];
+    if (failed(prefetchDescA) || failed(prefetchDescB)) {
+      // Disable coop prefetching on failure.
+      isCoopPrefetch = false;
+    } else {
+      prefetchA = prefetchDescA->getResult();
+      prefetchTypeA = prefetchDescA->getType();
+      prefetchB = prefetchDescB->getResult();
+      prefetchTypeB = prefetchDescB->getType();
 
-    // Ensure that block/workgroup is sychronized after prefetching.
-    rewriter.create<xegpu::CompileHintOp>(loc);
-    rewriter.create<gpu::BarrierOp>(loc);
+      auto updatedTiles =
+          prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB,
+                                 kTileOffset, readCacheHint, xegpuMode);
+      prefetchA = updatedTiles[0];
+      prefetchB = updatedTiles[1];
+
+      // Ensure that block/workgroup is synchronized after prefetching.
+      rewriter.create<xegpu::CompileHintOp>(loc);
+      rewriter.create<gpu::BarrierOp>(loc);
+    }
   }
 
   // Construct and move into GEMM reduction dimension tiling loop.
@@ -981,12 +996,28 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     tilesB[i] = updatedTile;
   }
 
+  // Prefetch the next set of input tiles.
   if (isCoopPrefetch) {
+    // Prefetch all block/workgroup tiles cooperatively.
     auto updatedTiles =
         prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB, kTileOffset,
                                readCacheHint, xegpuMode);
     prefetchA = updatedTiles[0];
     prefetchB = updatedTiles[1];
+  } else {
+    // Apply naive prefetching for each thread/workitem.
+    for (auto tileA : tilesA) {
+      rewriter.create<xegpu::PrefetchNDOp>(
+          loc, tileA, /*l1_hint=*/readCacheHint,
+          /*l2_hint=*/readCacheHint,
+          /*l3_hint=*/readCacheHint, xegpuMode);
+    }
+    for (auto tileB : tilesB) {
+      rewriter.create<xegpu::PrefetchNDOp>(
+          loc, tileB, /*l1_hint=*/readCacheHint,
+          /*l2_hint=*/readCacheHint,
+          /*l3_hint=*/readCacheHint, xegpuMode);
+    }
   }
 
   // Ensure that prefetches are scheduled before computation starts.
