@@ -684,6 +684,10 @@ prefetchAndUpdateTiles(PatternRewriter &rewriter, Location loc, Value prefetchA,
   return SmallVector<Value>{updatedTileA, updateTileB};
 }
 
+// Create a GEMM input tiles to be loaded by the current thread/workitem.
+// Optionally accepts batch IV for batched GEMM input loading.
+// The load tiles are ordered in row-major fashion with respect to the
+// thread/workitem tile.
 static SmallVector<xegpu::CreateNdDescOp>
 createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
                     unsigned inputPos, ArrayRef<int> tileShape,
@@ -731,6 +735,28 @@ createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
 
   return tiles;
 }
+
+struct TilesArray {
+  TilesArray() = delete;
+  TilesArray(int numRows, int numCols) {
+    for (int i = 0; i < numRows; i++) {
+      tileMatrix.push_back(SmallVector<Value>{});
+      for (int j = 0; j < numCols; j++)
+        tileMatrix[i].push_back(Value{});
+    }
+  }
+  ~TilesArray() = default;
+
+  Value getTile(int row, int col) {
+    return tileMatrix[row][col];
+  }
+
+  void setTile(int row, int col, Value val) {
+    tileMatrix[row][col] = val;
+  }
+
+  SmallVector<SmallVector<Value, 8>, 8> tileMatrix;
+};
 
 // Create XeGPU DPAS kernel out of GEMM-like operation.
 static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
@@ -978,34 +1004,36 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // Load A sub-tiles.
   xegpu::TensorDescType tileTypeA = descsA[0].getType();
   auto vnniAxisAttrA = IntegerAttr::get(rewriter.getI32Type(), 1);
-  auto vecTypeA = getVnniVector(
+  auto vecLoadTypeA = getVnniVector(
       tileTypeA.getShape(), tileTypeA.getElementType(), vnniAxisAttrA.getInt());
 
   SmallVector<Value> loadVecA;
   for (auto tileA : tilesA) {
     auto loadOp = rewriter.create<xegpu::LoadNDOp>(
-        loc, vecTypeA, tileA, vnniAxisAttrA, transpose,
+        loc, vecLoadTypeA, tileA, vnniAxisAttrA, transpose,
         /*l1_hint=*/readCacheHint,
         /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint, xegpuMode);
     loadVecA.push_back(loadOp);
   }
   // TODO: Add split over the array_length > 1.
+  //       The split must preserve row-major ordering of the load tiles.
 
   // Load B sub-tiles.
   xegpu::TensorDescType tileTypeB = descsB[0].getType();
   auto vnniAxisAttrB = IntegerAttr::get(rewriter.getI32Type(), 0);
-  auto vecTypeB = getVnniVector(
+  auto vecLoadTypeB = getVnniVector(
       tileTypeB.getShape(), tileTypeB.getElementType(), vnniAxisAttrB.getInt());
 
   SmallVector<Value> loadVecB;
   for (auto tileB : tilesB) {
     auto loadOp = rewriter.create<xegpu::LoadNDOp>(
-        loc, vecTypeB, tileB, vnniAxisAttrB, transpose,
+        loc, vecLoadTypeB, tileB, vnniAxisAttrB, transpose,
         /*l1_hint=*/readCacheHint,
         /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint, xegpuMode);
     loadVecB.push_back(loadOp);
   }
   // TODO: Add split over the array_length > 1.
+  //       The split must preserve row-major ordering of the load tiles.
 
   // Update offsets of the input tiles.
   // Shift along the reduction dimension.
@@ -1054,47 +1082,106 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // Extract DPAS tiles from loaded sub-tiles.
-  int vecSizeA =
-      std::accumulate(vecTypeA.getShape().begin(), vecTypeA.getShape().end(), 1,
-                      std::multiplies<int64_t>());
-  auto vecFlatA = VectorType::get(vecSizeA, vecTypeA.getElementType());
+  int loadVecSizeA = std::accumulate(vecLoadTypeA.getShape().begin(),
+                                     vecLoadTypeA.getShape().end(), 1,
+                                     std::multiplies<int64_t>());
+  auto loadVecFlatA =
+      VectorType::get(loadVecSizeA, vecLoadTypeA.getElementType());
   int dpasTileSizeA = dpasTileM * dpasTileK;
   auto vecDpasTypeA = getVnniVector(
       dpasTypeA.getShape(), dpasTypeA.getElementType(), vnniAxisAttrA.getInt());
 
-  SmallVector<Value> dpasVecA;
-  for (auto vecA : loadVecA) {
-    auto castFlat = rewriter.create<vector::ShapeCastOp>(loc, vecFlatA, vecA);
-    for (int i = 0; i < vecSizeA; i += dpasTileSizeA) {
-      auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, castFlat, /*offsets=*/ArrayRef<int64_t>{i},
-          /*sizes=*/ArrayRef<int64_t>{dpasTileSizeA},
-          /*strides=*/ArrayRef<int64_t>{1});
-      auto castTile =
-          rewriter.create<vector::ShapeCastOp>(loc, vecDpasTypeA, slice);
-      dpasVecA.push_back(castTile);
+  const int loadSizeM = tileTypeA.getShape()[0];
+  const int loadSizeN = tileTypeB.getShape()[1];
+
+  const int numDpasTilesM = dimM / dpasTileM;
+  const int numDpasTilesN = dimN / dpasTileN;
+  const int numDpasTilesK = kTile / dpasTileK;
+
+  const int numLoadTilesM = dimM / loadSizeM;
+  const int numLoadTilesN = dimN / loadSizeN;
+
+  const int loadSizeColsA = tileTypeA.getShape()[1];
+  const int numLoadTilesColA = kTile / loadSizeColsA;
+  const int numDpasPerColA = loadSizeColsA / dpasTileK;
+
+  const int loadSizeRowsB = tileTypeB.getShape()[0];
+  const int numLoadTilesRowsB = kTile / loadSizeRowsB;
+  const int numDpasPerRowB = loadSizeRowsB / dpasTileK;
+
+  const int numDpasPerLoadM = loadSizeM / dpasTileM;
+  const int numDpasPerLoadN = loadSizeN / dpasTileN;
+
+  TilesArray dpasVecA(numDpasTilesM, numDpasTilesK);
+
+  // Iterate over load tile.
+  // Each load tile contains one or more DPAS tiles.
+  for (int m = 0; m < numLoadTilesM; m++) {
+    for (int k = 0; k < numLoadTilesColA; k++) {
+      // Load tiles are ordered in row-major fashion.
+      int loadIdx = m * numLoadTilesColA + k;
+      auto loadTile = loadVecA[loadIdx];
+      auto castFlat =
+          rewriter.create<vector::ShapeCastOp>(loc, loadVecFlatA, loadTile);
+
+      // Iterate over DPAS tiles.
+      for (int i = 0; i < numDpasPerLoadM; i++) {
+        for (int j = 0; j < numDpasPerColA; j++) {
+          int dpasIdx = i * numDpasPerColA + j;
+          int offset = dpasIdx * dpasTileSizeA;
+
+          auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, castFlat, /*offsets=*/ArrayRef<int64_t>{offset},
+              /*sizes=*/ArrayRef<int64_t>{dpasTileSizeA},
+              /*strides=*/ArrayRef<int64_t>{1});
+          auto castTile =
+              rewriter.create<vector::ShapeCastOp>(loc, vecDpasTypeA, slice);
+
+          // Insert the sub-tiles in their position relative to the whole
+          // thread/workitem tile.
+          int rowIdx = m * numDpasPerLoadM + i;
+          int colIdx = k * numDpasPerColA + j;
+          dpasVecA.setTile(rowIdx, colIdx, castTile);
+        }
+      }
     }
   }
 
-  int vecSizeB =
-      std::accumulate(vecTypeB.getShape().begin(), vecTypeB.getShape().end(), 1,
-                      std::multiplies<int64_t>());
-  auto vecFlatB = VectorType::get(vecSizeB, vecTypeB.getElementType());
+  int loadVecSizeB = std::accumulate(vecLoadTypeB.getShape().begin(),
+                                     vecLoadTypeB.getShape().end(), 1,
+                                     std::multiplies<int64_t>());
+  auto loadVecFlatB =
+      VectorType::get(loadVecSizeB, vecLoadTypeB.getElementType());
   int dpasTileSizeB = dpasTileK * dpasTileN;
   auto vecDpasTypeB = getVnniVector(
       dpasTypeB.getShape(), dpasTypeB.getElementType(), vnniAxisAttrB.getInt());
 
-  SmallVector<Value> dpasVecB;
-  for (auto vecB : loadVecB) {
-    auto castFlat = rewriter.create<vector::ShapeCastOp>(loc, vecFlatB, vecB);
-    for (int i = 0; i < vecSizeB; i += dpasTileSizeB) {
-      auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, castFlat, /*offsets=*/ArrayRef<int64_t>{i},
-          /*sizes=*/ArrayRef<int64_t>{dpasTileSizeB},
-          /*strides=*/ArrayRef<int64_t>{1});
-      auto castTile =
-          rewriter.create<vector::ShapeCastOp>(loc, vecDpasTypeB, slice);
-      dpasVecB.push_back(castTile);
+  TilesArray dpasVecB(numDpasTilesK, numDpasTilesN);
+
+  for (int m = 0; m < numLoadTilesRowsB; m++) {
+    for (int k = 0; k < numLoadTilesN; k++) {
+      int loadIdx = m * numLoadTilesN + k;
+      auto loadTile = loadVecB[loadIdx];
+      auto castFlat =
+          rewriter.create<vector::ShapeCastOp>(loc, loadVecFlatB, loadTile);
+
+      for (int i = 0; i < numDpasPerRowB; i++) {
+        for (int j = 0; j < numDpasPerLoadN; j++) {
+          int dpasIdx = i * numDpasPerLoadN + j;
+          int offset = dpasIdx * dpasTileSizeB;
+
+          auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, castFlat, /*offsets=*/ArrayRef<int64_t>{offset},
+              /*sizes=*/ArrayRef<int64_t>{dpasTileSizeB},
+              /*strides=*/ArrayRef<int64_t>{1});
+          auto castTile =
+              rewriter.create<vector::ShapeCastOp>(loc, vecDpasTypeB, slice);
+
+          int rowIdx = m * numDpasPerRowB + i;
+          int colIdx = k * numDpasPerLoadN + j;
+          dpasVecB.setTile(rowIdx, colIdx, castTile);
+        }
+      }
     }
   }
 
@@ -1115,15 +1202,14 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   for (int k = 0; k < numTilesK; k++) {
     for (int m = 0; m < numTilesM; m++) {
       for (int n = 0; n < numTilesN; n++) {
-        int aIdx = m * numTilesK + k;
-        int bIdx = k * numTilesN + n;
         int cIdx = m * numTilesN + n;
 
-        Value result = rewriter
-                           .create<xegpu::DpasOp>(
-                               loc, dpasResType, dpasVecA[aIdx], dpasVecB[bIdx],
-                               dpasResults[cIdx], xegpuMode)
-                           .getResult();
+        Value result =
+            rewriter
+                .create<xegpu::DpasOp>(loc, dpasResType, dpasVecA.getTile(m, k),
+                                       dpasVecB.getTile(k, n),
+                                       dpasResults[cIdx], xegpuMode)
+                .getResult();
 
         // Update sub-tile partial result.
         dpasResults[cIdx] = result;
@@ -1356,7 +1442,8 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
     if (failed(isOutputValid))
       return isOutputValid;
 
-    // Ensure that reduction dimension tiling also works for smaller workloads.
+    // Ensure that reduction dimension tiling also works for smaller
+    // workloads.
     auto aType =
         gemmLikeOp.getDpsInputs()[0].getType().template cast<ShapedType>();
     auto kDim = aType.getShape().back();
