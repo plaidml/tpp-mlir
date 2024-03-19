@@ -1035,6 +1035,9 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // TODO: Add split over the array_length > 1.
   //       The split must preserve row-major ordering of the load tiles.
 
+  // Ensure that all load are scheduled together.
+  rewriter.create<xegpu::CompileHintOp>(loc);
+
   // Update offsets of the input tiles.
   // Shift along the reduction dimension.
   for (size_t i = 0; i < tilesA.size(); i++) {
