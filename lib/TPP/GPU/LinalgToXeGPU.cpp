@@ -590,30 +590,48 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
 // Optionally accepts batch IV for batched GEMM input loading.
 // Returns failure if it is unable to split block/workgroup for
 // prefetching.
-static FailureOr<xegpu::CreateNdDescOp>
-createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-                           unsigned inputPos, ArrayRef<int> blockTile,
-                           ArrayRef<int> threadTile, int tileStep,
-                           xegpu::Mode mode, Value batchIv = nullptr) {
+static FailureOr<xegpu::CreateNdDescOp> createGemmCoopPrefetchTile(
+    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, unsigned inputPos,
+    int64_t numThreads, ArrayRef<int> blockTile, ArrayRef<int> threadTile,
+    int tileStep, xegpu::Mode mode, Value batchIv = nullptr) {
   assert(inputPos <= 1 && "Can handle only GEMM inputs: mat A or mat B");
   Location loc = linalgOp.getLoc();
 
   Value src = linalgOp.getDpsInputs()[inputPos];
 
-  // Prioritize loading the whole block tile dimension.
-  // The shared reduction dimension will be spread across the workers.
-  int numCols = tileStep / (blockTile[1] / threadTile[1]);
-  int numRows = threadTile[0];
-  if (inputPos == 1) {
-    numCols = threadTile[1];
-    numRows = tileStep / (blockTile[0] / threadTile[0]);
+  // Get a top level view into the whole matrix not only the thread slice.
+  if (auto subview = dyn_cast_or_null<memref::SubViewOp>(src.getDefiningOp())) {
+    src = subview.getSource();
   }
 
+  const int tileRows = inputPos == 0 ? blockTile[0] : tileStep;
+  const int tileCols = inputPos == 0 ? tileStep : blockTile[1];
+
+  const int numElements = tileRows * tileCols;
+  const int elementsPerThread = numElements / numThreads;
+
+  // Limit the maximum prefetching row length to avoid very wide tiles.
+  //
+  // Currently, the max row size is capped by the hardware max load width.
+  //
+  // TODO: Expose as a tunable parameter or add some heuristics.
+  const int maxRowLength = 32;
+
+  // Prioritize first loading contiguous elements (row lenght/number of
+  // columns) only then gather any remaining elements to be loaded from
+  // further rows.
+  // Also, ensure that the prefetch tile stays within the tile bounds.
+  //
+  // Ideally, prefetch tile sizes should be derived from total number of
+  // elements to be loaded, number of threads/workitems, and hardware load
+  // size limits. Large prefetch tiles might need to be split into subtiles.
+  const int numCols =
+      std::min(std::min(elementsPerThread, tileCols), maxRowLength);
+  const int numRows = elementsPerThread / numCols;
+
   // Bail on invalid prefetching tiles config.
-  // It usually happends when there are too many threads/workitems
-  // compared to the prefetch tile size e.g., large block tile,
-  // small thread tile, small tile step (k-tile).
-  if (numRows == 0 || numCols == 0)
+  if (numRows == 0 ||
+      ((numRows * numCols * numThreads) > (tileRows * tileCols)))
     return failure();
 
   auto srcType = src.getType().cast<ShapedType>();
@@ -623,11 +641,34 @@ createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
 
   Value threadId = getGpuLinearThreadId(rewriter, loc);
 
+  // TODO: Simplify block offsets.
+  //       Prefetching tile should be derived from the matmul op operands and
+  //       exposed as a subview.
+  //
+  // Add offset if there are multiple blocks in the current tile's non-reduction
+  // dimension.
+  Value blockOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  if (blockTile[inputPos] / threadTile[inputPos] > 1) {
+    Value blockSize =
+        rewriter.create<arith::ConstantIndexOp>(loc, blockTile[inputPos]);
+
+    // For matrix B, pick correct block dimension.
+    // Block min X has to be used if there is no thread tiling in the rows
+    // (dim X) but only in columns (dim Y).
+    gpu::Dimension gpuDim = gpu::Dimension::x;
+    if ((inputPos == 1) && (blockTile[0] / threadTile[0] > 1)) {
+      gpuDim = gpu::Dimension::y;
+    }
+    Value blockId = rewriter.create<gpu::BlockIdOp>(loc, gpuDim);
+
+    blockOffset = rewriter.create<arith::MulIOp>(loc, blockId, blockSize);
+  }
+
   Value numColTiles =
       rewriter.create<arith::ConstantIndexOp>(loc, tileStep / numCols);
   if (inputPos == 1) {
     numColTiles =
-        rewriter.create<arith::ConstantIndexOp>(loc, threadTile[1] / numCols);
+        rewriter.create<arith::ConstantIndexOp>(loc, blockTile[1] / numCols);
   }
   Value tileRowOffset =
       rewriter.create<arith::DivUIOp>(loc, threadId, numColTiles);
@@ -640,6 +681,14 @@ createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
       rewriter.create<arith::MulIOp>(loc, tileRowOffset, tileRowSize);
   Value eltColOffset =
       rewriter.create<arith::MulIOp>(loc, tileColOffset, tileColSize);
+
+  if (inputPos == 0) {
+    eltRowOffset =
+        rewriter.create<arith::AddIOp>(loc, eltRowOffset, blockOffset);
+  } else {
+    eltColOffset =
+        rewriter.create<arith::AddIOp>(loc, eltColOffset, blockOffset);
+  }
 
   SmallVector<mlir::OpFoldResult> prefetchOffsets;
   if (batchIv)
@@ -946,10 +995,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     int blockCols = getBlockLevelSize(matC, 1);
 
     auto prefetchDescA = createGemmCoopPrefetchTile(
-        rewriter, linalgOp, /*inputPos=*/0, {blockRows, blockCols},
+        rewriter, linalgOp, /*inputPos=*/0, numThreads, {blockRows, blockCols},
         {dimM, dimN}, kTile, xegpuMode, batchIv);
     auto prefetchDescB = createGemmCoopPrefetchTile(
-        rewriter, linalgOp, /*inputPos=*/1, {blockRows, blockCols},
+        rewriter, linalgOp, /*inputPos=*/1, numThreads, {blockRows, blockCols},
         {dimM, dimN}, kTile, xegpuMode, batchIv);
 
     if (succeeded(prefetchDescA) && succeeded(prefetchDescB)) {
