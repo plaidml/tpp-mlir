@@ -613,10 +613,11 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
 // Optionally accepts batch IV for batched GEMM input loading.
 // Returns failure if it is unable to split block/workgroup for
 // prefetching.
-static FailureOr<xegpu::CreateNdDescOp> createGemmCoopPrefetchTile(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, unsigned inputPos,
-    int64_t numThreads, ArrayRef<int> blockTile, ArrayRef<int> threadTile,
-    int tileStep, xegpu::Mode mode, Value batchIv = nullptr) {
+static FailureOr<xegpu::CreateNdDescOp>
+createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+                           unsigned inputPos, int64_t numThreads,
+                           ArrayRef<int> blockTile, ArrayRef<int> threadTile,
+                           int tileStep, xegpu::Mode mode) {
   assert(inputPos <= 1 && "Can handle only GEMM inputs: mat A or mat B");
   Location loc = linalgOp.getLoc();
 
@@ -713,10 +714,7 @@ static FailureOr<xegpu::CreateNdDescOp> createGemmCoopPrefetchTile(
         rewriter.create<arith::AddIOp>(loc, eltColOffset, blockOffset);
   }
 
-  SmallVector<mlir::OpFoldResult> prefetchOffsets;
-  if (batchIv)
-    prefetchOffsets.push_back(batchIv);
-  prefetchOffsets.append({eltRowOffset, eltColOffset});
+  SmallVector<mlir::OpFoldResult> prefetchOffsets{eltRowOffset, eltColOffset};
 
   return rewriter.create<xegpu::CreateNdDescOp>(loc, prefetchType, src,
                                                 prefetchOffsets,
@@ -752,37 +750,22 @@ static SmallVector<Value> updateTilesOffsets(PatternRewriter &rewriter,
   return updatedTiles;
 }
 
-// Create a GEMM input tiles to be loaded by the current thread/workitem.
-// Optionally accepts batch IV for batched GEMM input loading.
-// The load tiles are ordered in row-major fashion with respect to the
-// thread/workitem tile.
+// Split a source into a series of descriptor tiles.
+// The descriptors collectively load a 2D shape at the specified offsets from
+// the given source.
+// The offsets and the load shape must stay within the source boundaries.
+//
+// The descriptor sub-tiles are ordered in row-major fashion with respect to the
+// whole load tile.
 static SmallVector<Value>
-createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-                    unsigned inputPos, ArrayRef<int> tileShape,
-                    xegpu::Mode mode, bool isVnni, Value batchIv = nullptr) {
-  assert(inputPos <= 1 && "Load can handle only GEMM inputs: mat A or mat B");
-  Location loc = linalgOp.getLoc();
+createDescriptorTiles(PatternRewriter &rewriter, Location loc, Value src,
+                      ArrayRef<int64_t> loadShape,
+                      ArrayRef<int64_t> loadOffsets, ArrayRef<int64_t> descTile,
+                      xegpu::Mode mode, int arrayLength = 1) {
+  assert(arrayLength == 1 && "Array descriptors are not supported");
 
-  // TODO: Fetch actual list of supported load configs
-  //       as they also depend on data type width.
-  //       Here only 16 bit wide elements are assumed.
-  const int maxHeight = 32;
-  const int maxWidth = isVnni ? 16 : 32;
-  const int maxArrayLength = 4;
-  int loadRows = std::min(tileShape[0], maxHeight);
-  int loadCols = std::min(tileShape[1], maxWidth);
-  int arrayLength = std::min(maxWidth / loadCols, maxArrayLength);
-  // In case of partial fit, load only single tile.
-  if (maxWidth % loadCols != 0 || arrayLength != 4 || arrayLength != 2)
-    arrayLength = 1;
-
-  // TODO: Bump IMEX version to bring array_length attr support.
-  arrayLength = 1;
-
-  Value src = linalgOp.getDpsInputs()[inputPos];
   auto type = src.getType().cast<ShapedType>();
-  auto dpasType =
-      xegpu::TensorDescType::get({loadRows, loadCols}, type.getElementType());
+  auto descType = xegpu::TensorDescType::get(descTile, type.getElementType());
 
   // Create the root descriptor.
   //
@@ -790,26 +773,27 @@ createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
   // offsets compared to creating separate descriptors.
   // The original tile is split into contiguous sub-tiles so, the first tile
   // can be used as an anchor.
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  mlir::SmallVector<mlir::OpFoldResult> loadOffsets;
-  if (batchIv)
-    loadOffsets.push_back(batchIv);
-  loadOffsets.append({zero, zero});
+  Value rootOffsetRow =
+      rewriter.create<arith::ConstantIndexOp>(loc, loadOffsets[0]);
+  Value rootOffsetCol =
+      rewriter.create<arith::ConstantIndexOp>(loc, loadOffsets[1]);
+
+  mlir::SmallVector<mlir::OpFoldResult> offsets{rootOffsetRow, rootOffsetCol};
   auto rootTile =
       rewriter
-          .create<xegpu::CreateNdDescOp>(loc, dpasType, src, loadOffsets,
+          .create<xegpu::CreateNdDescOp>(loc, descType, src, offsets,
                                          /*boundary_check=*/true, mode)
           .getResult();
 
   SmallVector<Value> tiles;
-  for (int i = 0; i < tileShape[0]; i += loadRows) {
-    for (int j = 0; j < tileShape[1]; j += loadCols * arrayLength) {
+  for (int i = 0; i < loadShape[0]; i += descTile[0]) {
+    for (int j = 0; j < loadShape[1]; j += descTile[1] * arrayLength) {
       Value rowOffset = rewriter.create<arith::ConstantIndexOp>(loc, i);
       Value colOffset = rewriter.create<arith::ConstantIndexOp>(loc, j);
 
       auto tile = rewriter
                       .create<xegpu::UpdateNDOffsetOp>(
-                          loc, dpasType, rootTile,
+                          loc, descType, rootTile,
                           ValueRange{rowOffset, colOffset}, mode)
                       .getResult();
       tiles.push_back(tile);
@@ -817,6 +801,37 @@ createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
   }
 
   return tiles;
+}
+
+// Create a GEMM sub-tiles to be loaded by the current thread/workitem.
+//
+// The shape to be loaded is split into largest 2D loads supported
+// by the hardware.
+//
+// The load tiles are ordered in row-major fashion with respect to the
+// thread/workitem tile.
+static SmallVector<Value> createCoarseLoadTiles(PatternRewriter &rewriter,
+                                                Location loc, Value src,
+                                                ArrayRef<int64_t> loadShape,
+                                                xegpu::Mode mode, bool isVnni) {
+  // TODO: Fetch actual list of supported load configs
+  //       as they also depend on data type width.
+  //       Here only 16 bit wide elements are assumed.
+  const int64_t maxHeight = 32;
+  const int64_t maxWidth = isVnni ? 16 : 32;
+  const int64_t maxArrayLength = 4;
+  int64_t loadRows = std::min(loadShape[0], maxHeight);
+  int64_t loadCols = std::min(loadShape[1], maxWidth);
+  int64_t arrayLength = std::min(maxWidth / loadCols, maxArrayLength);
+  // In case of partial fit, load only single tile.
+  if (maxWidth % loadCols != 0 || arrayLength != 4 || arrayLength != 2)
+    arrayLength = 1;
+
+  // TODO: Bump IMEX version to bring array_length attr support.
+  arrayLength = 1;
+
+  return createDescriptorTiles(rewriter, loc, src, loadShape, {0, 0},
+                               {loadRows, loadCols}, mode, arrayLength);
 }
 
 static VectorType getVnniVector(ArrayRef<int64_t> shape, Type elementType,
@@ -947,6 +962,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   auto ctx = linalgOp.getContext();
 
   auto matA = linalgOp.getDpsInputs()[0];
+  auto matB = linalgOp.getDpsInputs()[1];
   auto matC = linalgOp.getDpsInits()[0];
 
   auto typeA = matA.getType().cast<ShapedType>();
@@ -976,21 +992,9 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // Create C sub-tiles.
   auto dpasTypeC = xegpu::TensorDescType::get({dpasTileM, dpasTileN},
                                               typeC.getElementType());
-  SmallVector<Value> tilesC;
-  for (int m = 0; m < dimM; m += dpasTileM) {
-    for (int n = 0; n < dimN; n += dpasTileN) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
-      Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
-
-      mlir::SmallVector<mlir::OpFoldResult> loadOffsets{rowIdx, colIdx};
-      Value tileC =
-          rewriter
-              .create<xegpu::CreateNdDescOp>(loc, dpasTypeC, matC, loadOffsets,
-                                             /*boundary_check=*/true, xegpuMode)
-              .getResult();
-      tilesC.push_back(tileC);
-    }
-  }
+  SmallVector<Value> tilesC =
+      createDescriptorTiles(rewriter, loc, matC, typeC.getShape(), {0, 0},
+                            dpasTypeC.getShape(), xegpuMode);
 
   // Load C sub-tiles.
   // Fetch the inital values of the output accumulator.
@@ -1040,17 +1044,17 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     batchLoop = startLoop(0, typeA.getShape()[0], 1, loadVecC);
     batchIv = batchLoop.getInductionVar();
     loadVecC = getLoopIterValues(batchLoop);
+    // TODO: Replace input matrices A and B with subviews on the current
+    //       batchIV as loads can only be performed on 2D memrefs.
   }
 
   // Create A sub-tiles.
-  SmallVector<Value> tilesA =
-      createGemmLoadTiles(rewriter, linalgOp, /*inputPos=*/0, {dimM, kTile},
-                          xegpuMode, /*isVnni=*/true, batchIv);
+  SmallVector<Value> tilesA = createCoarseLoadTiles(
+      rewriter, loc, matA, {dimM, kTile}, xegpuMode, /*isVnni=*/true);
 
   // Create B sub-tiles.
-  SmallVector<Value> tilesB =
-      createGemmLoadTiles(rewriter, linalgOp, /*inputPos=*/1, {kTile, dimN},
-                          xegpuMode, /*isVnni=*/true, batchIv);
+  SmallVector<Value> tilesB = createCoarseLoadTiles(
+      rewriter, loc, matB, {kTile, dimN}, xegpuMode, /*isVnni=*/true);
 
   // Create prefetch tiles.
   //
@@ -1089,10 +1093,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
     auto prefetchDescA = createGemmCoopPrefetchTile(
         rewriter, linalgOp, /*inputPos=*/0, numThreads, {blockRows, blockCols},
-        {dimM, dimN}, kTile, xegpuMode, batchIv);
+        {dimM, dimN}, kTile, xegpuMode);
     auto prefetchDescB = createGemmCoopPrefetchTile(
         rewriter, linalgOp, /*inputPos=*/1, numThreads, {blockRows, blockCols},
-        {dimM, dimN}, kTile, xegpuMode, batchIv);
+        {dimM, dimN}, kTile, xegpuMode);
 
     if (succeeded(prefetchDescA) && succeeded(prefetchDescB)) {
       prefetchA = prefetchDescA->getResult();
