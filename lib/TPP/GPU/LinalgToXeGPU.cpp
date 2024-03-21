@@ -48,6 +48,29 @@ namespace tpp {
 
 namespace {
 
+struct VnniConfig {
+  int vnniFactor;
+  int vnniAxis;
+};
+
+struct TilesArray {
+  TilesArray() = delete;
+  TilesArray(int numRows, int numCols) {
+    for (int i = 0; i < numRows; i++) {
+      tileMatrix.push_back(SmallVector<Value>{});
+      for (int j = 0; j < numCols; j++)
+        tileMatrix[i].push_back(Value{});
+    }
+  }
+  ~TilesArray() = default;
+
+  Value getTile(int row, int col) { return tileMatrix[row][col]; }
+
+  void setTile(int row, int col, Value val) { tileMatrix[row][col] = val; }
+
+  SmallVector<SmallVector<Value, 8>, 8> tileMatrix;
+};
+
 // Return DPAS tile sizes if the gemm-like operation fits DPAS hardware.
 static std::optional<SmallVector<int64_t>>
 getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
@@ -700,37 +723,33 @@ static FailureOr<xegpu::CreateNdDescOp> createGemmCoopPrefetchTile(
                                                 /*boundary_check=*/true, mode);
 }
 
-static SmallVector<Value>
-prefetchAndUpdateTiles(PatternRewriter &rewriter, Location loc, Value prefetchA,
-                       Value prefetchB, Value kTileOffset,
-                       xegpu::CacheReadHintAttr readCacheHint,
-                       xegpu::Mode mode) {
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-
+static void prefetchTiles(PatternRewriter &rewriter, Location loc,
+                          ValueRange prefetchTiles,
+                          xegpu::CacheReadHintAttr readCacheHint,
+                          xegpu::Mode mode) {
   // Prefetch the next set of input tiles.
-  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchA,
-                                       /*l1_hint=*/readCacheHint,
-                                       /*l2_hint=*/readCacheHint,
-                                       /*l3_hint=*/readCacheHint, mode);
-  rewriter.create<xegpu::PrefetchNDOp>(loc, prefetchB,
-                                       /*l1_hint=*/readCacheHint,
-                                       /*l2_hint=*/readCacheHint,
-                                       /*l3_hint=*/readCacheHint, mode);
+  for (auto tile : prefetchTiles) {
+    rewriter.create<xegpu::PrefetchNDOp>(loc, tile,
+                                         /*l1_hint=*/readCacheHint,
+                                         /*l2_hint=*/readCacheHint,
+                                         /*l3_hint=*/readCacheHint, mode);
+  }
+}
 
-  // Update offsets of the prefetch tiles.
-  // Shift along the reduction dimension.
-  auto updatedTileA =
-      rewriter
-          .create<xegpu::UpdateNDOffsetOp>(loc, prefetchA.getType(), prefetchA,
-                                           ValueRange{zero, kTileOffset}, mode)
-          .getResult();
-  auto updateTileB =
-      rewriter
-          .create<xegpu::UpdateNDOffsetOp>(loc, prefetchB.getType(), prefetchB,
-                                           ValueRange{kTileOffset, zero}, mode)
-          .getResult();
+static SmallVector<Value> updateTilesOffsets(PatternRewriter &rewriter,
+                                             Location loc, ValueRange tiles,
+                                             ValueRange offsets,
+                                             xegpu::Mode mode) {
+  SmallVector<Value> updatedTiles;
+  for (auto tile : tiles) {
+    auto updatedTile = rewriter
+                           .create<xegpu::UpdateNDOffsetOp>(loc, tile.getType(),
+                                                            tile, offsets, mode)
+                           .getResult();
+    updatedTiles.push_back(updatedTile);
+  }
 
-  return SmallVector<Value>{updatedTileA, updateTileB};
+  return updatedTiles;
 }
 
 // Create a GEMM input tiles to be loaded by the current thread/workitem.
@@ -800,27 +819,48 @@ createGemmLoadTiles(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
   return tiles;
 }
 
-struct TilesArray {
-  TilesArray() = delete;
-  TilesArray(int numRows, int numCols) {
-    for (int i = 0; i < numRows; i++) {
-      tileMatrix.push_back(SmallVector<Value>{});
-      for (int j = 0; j < numCols; j++)
-        tileMatrix[i].push_back(Value{});
-    }
-  }
-  ~TilesArray() = default;
+static VectorType getVnniVector(ArrayRef<int64_t> shape, Type elementType,
+                                VnniConfig vnniConf) {
+  SmallVector<int64_t> vecShape{shape};
+  vecShape[vnniConf.vnniAxis] /= vnniConf.vnniFactor;
+  vecShape.push_back(vnniConf.vnniFactor);
+  return VectorType::get(vecShape, elementType);
+}
 
-  Value getTile(int row, int col) {
-    return tileMatrix[row][col];
+static SmallVector<Value>
+loadGemmTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
+              xegpu::Mode mode, xegpu::CacheReadHintAttr hint,
+              std::optional<VnniConfig> vnniConf = std::nullopt,
+              DenseI64ArrayAttr transpose = nullptr) {
+  // Assume all tiles have the same shape.
+  xegpu::TensorDescType tileType =
+      loadTiles[0].getType().cast<xegpu::TensorDescType>();
+  assert(llvm::all_of(loadTiles,
+                      [&](Value tile) { return tile.getType() == tileType; }) &&
+         "All load tiles must have the same type.");
+
+  VectorType vecLoadType =
+      VectorType::get(tileType.getShape(), tileType.getElementType());
+  IntegerAttr vnniAxisAttr = nullptr;
+  if (vnniConf) {
+    vnniAxisAttr = IntegerAttr::get(rewriter.getI32Type(), vnniConf->vnniAxis);
+    vecLoadType = getVnniVector(tileType.getShape(), tileType.getElementType(),
+                                *vnniConf);
   }
 
-  void setTile(int row, int col, Value val) {
-    tileMatrix[row][col] = val;
+  SmallVector<Value> loadVec;
+  for (auto tile : loadTiles) {
+    auto loadOp = rewriter.create<xegpu::LoadNDOp>(
+        loc, vecLoadType, tile, vnniAxisAttr, transpose,
+        /*l1_hint=*/hint,
+        /*l2_hint=*/hint, /*l3_hint=*/hint, mode);
+    loadVec.push_back(loadOp);
   }
+  // TODO: Add split over the array_length > 1.
+  //       The split must preserve row-major ordering of the load tiles.
 
-  SmallVector<SmallVector<Value, 8>, 8> tileMatrix;
-};
+  return loadVec;
+}
 
 // Create XeGPU DPAS kernel out of GEMM-like operation.
 static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
@@ -891,18 +931,10 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     }
   }
 
-  // Fetch the inital value of the output element.
-  auto vecTypeC =
-      VectorType::get(dpasTypeC.getShape(), dpasTypeC.getElementType());
-
-  SmallVector<Value> loadVecC;
-  for (auto tileC : tilesC) {
-    auto loadOp = rewriter.create<xegpu::LoadNDOp>(
-        loc, vecTypeC, tileC, /*vnni_axis=*/nullptr, transpose,
-        /*l1_hint=*/readCacheHint,
-        /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint, xegpuMode);
-    loadVecC.push_back(loadOp);
-  }
+  // Load C sub-tiles.
+  // Fetch the inital values of the output accumulator.
+  SmallVector<Value> loadVecC =
+      loadGemmTiles(rewriter, loc, tilesC, xegpuMode, readCacheHint);
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // DPAS only works with F32 accumulators.
@@ -1007,11 +1039,16 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       prefetchB = prefetchDescB->getResult();
       prefetchTypeB = prefetchDescB->getType();
 
-      auto updatedTiles =
-          prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB,
-                                 kTileOffset, readCacheHint, xegpuMode);
-      prefetchA = updatedTiles[0];
-      prefetchB = updatedTiles[1];
+      prefetchTiles(rewriter, loc, ValueRange{prefetchA}, readCacheHint,
+                    xegpuMode);
+      prefetchTiles(rewriter, loc, ValueRange{prefetchB}, readCacheHint,
+                    xegpuMode);
+      prefetchA =
+          updateTilesOffsets(rewriter, loc, ValueRange{prefetchA},
+                             ValueRange{zero, kTileOffset}, xegpuMode)[0];
+      prefetchB =
+          updateTilesOffsets(rewriter, loc, ValueRange{prefetchB},
+                             ValueRange{kTileOffset, zero}, xegpuMode)[0];
 
       // Ensure that block/workgroup is synchronized after prefetching.
       rewriter.create<xegpu::CompileHintOp>(loc);
@@ -1070,108 +1107,61 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
   // TODO: Make the VNNI factor a flexible parameter.
   const int vnniFactor = 2;
-  auto getVnniVector = [&](ArrayRef<int64_t> shape, Type elementType,
-                           int vnniAxis) -> VectorType {
-    SmallVector<int64_t> vecShape{shape};
-    vecShape[vnniAxis] /= vnniFactor;
-    vecShape.push_back(vnniFactor);
-    return VectorType::get(vecShape, elementType);
-  };
+  VnniConfig vnniConfA{.vnniFactor = vnniFactor, .vnniAxis = 1};
+  VnniConfig vnniConfB{.vnniFactor = vnniFactor, .vnniAxis = 0};
 
   // Load A sub-tiles.
+  SmallVector<Value> loadVecA =
+      loadGemmTiles(rewriter, loc, tilesA, xegpuMode, readCacheHint, vnniConfA);
   xegpu::TensorDescType tileTypeA =
       tilesA[0].getType().cast<xegpu::TensorDescType>();
-  auto vnniAxisAttrA = IntegerAttr::get(rewriter.getI32Type(), 1);
-  auto vecLoadTypeA = getVnniVector(
-      tileTypeA.getShape(), tileTypeA.getElementType(), vnniAxisAttrA.getInt());
-
-  SmallVector<Value> loadVecA;
-  for (auto tileA : tilesA) {
-    auto loadOp = rewriter.create<xegpu::LoadNDOp>(
-        loc, vecLoadTypeA, tileA, vnniAxisAttrA, transpose,
-        /*l1_hint=*/readCacheHint,
-        /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint, xegpuMode);
-    loadVecA.push_back(loadOp);
-  }
-  // TODO: Add split over the array_length > 1.
-  //       The split must preserve row-major ordering of the load tiles.
 
   // Load B sub-tiles.
+  SmallVector<Value> loadVecB =
+      loadGemmTiles(rewriter, loc, tilesB, xegpuMode, readCacheHint, vnniConfB);
   xegpu::TensorDescType tileTypeB =
       tilesB[0].getType().cast<xegpu::TensorDescType>();
-  auto vnniAxisAttrB = IntegerAttr::get(rewriter.getI32Type(), 0);
-  auto vecLoadTypeB = getVnniVector(
-      tileTypeB.getShape(), tileTypeB.getElementType(), vnniAxisAttrB.getInt());
-
-  SmallVector<Value> loadVecB;
-  for (auto tileB : tilesB) {
-    auto loadOp = rewriter.create<xegpu::LoadNDOp>(
-        loc, vecLoadTypeB, tileB, vnniAxisAttrB, transpose,
-        /*l1_hint=*/readCacheHint,
-        /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint, xegpuMode);
-    loadVecB.push_back(loadOp);
-  }
-  // TODO: Add split over the array_length > 1.
-  //       The split must preserve row-major ordering of the load tiles.
 
   // Ensure that all load are scheduled together.
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // Update offsets of the input tiles.
   // Shift along the reduction dimension.
-  for (size_t i = 0; i < tilesA.size(); i++) {
-    auto updatedTile = rewriter
-                           .create<xegpu::UpdateNDOffsetOp>(
-                               loc, tileTypeA, tilesA[i],
-                               ValueRange{zero, kTileOffset}, xegpuMode)
-                           .getResult();
-    tilesA[i] = updatedTile;
-  }
-  for (size_t i = 0; i < tilesB.size(); i++) {
-    auto updatedTile = rewriter
-                           .create<xegpu::UpdateNDOffsetOp>(
-                               loc, tileTypeB, tilesB[i],
-                               ValueRange{kTileOffset, zero}, xegpuMode)
-                           .getResult();
-    tilesB[i] = updatedTile;
-  }
+  tilesA = updateTilesOffsets(rewriter, loc, tilesA,
+                              ValueRange{zero, kTileOffset}, xegpuMode);
+  tilesB = updateTilesOffsets(rewriter, loc, tilesB,
+                              ValueRange{kTileOffset, zero}, xegpuMode);
 
   // Prefetch the next set of input tiles.
   if (isCoopPrefetch) {
     // Prefetch all block/workgroup tiles cooperatively.
-    auto updatedTiles =
-        prefetchAndUpdateTiles(rewriter, loc, prefetchA, prefetchB, kTileOffset,
-                               readCacheHint, xegpuMode);
-    prefetchA = updatedTiles[0];
-    prefetchB = updatedTiles[1];
+    prefetchTiles(rewriter, loc, ValueRange{prefetchA}, readCacheHint,
+                  xegpuMode);
+    prefetchTiles(rewriter, loc, ValueRange{prefetchB}, readCacheHint,
+                  xegpuMode);
+    prefetchA = updateTilesOffsets(rewriter, loc, ValueRange{prefetchA},
+                                   ValueRange{zero, kTileOffset}, xegpuMode)[0];
+    prefetchB = updateTilesOffsets(rewriter, loc, ValueRange{prefetchB},
+                                   ValueRange{kTileOffset, zero}, xegpuMode)[0];
   } else {
     // Apply naive prefetching for each thread/workitem.
-    for (auto tileA : tilesA) {
-      rewriter.create<xegpu::PrefetchNDOp>(
-          loc, tileA, /*l1_hint=*/readCacheHint,
-          /*l2_hint=*/readCacheHint,
-          /*l3_hint=*/readCacheHint, xegpuMode);
-    }
-    for (auto tileB : tilesB) {
-      rewriter.create<xegpu::PrefetchNDOp>(
-          loc, tileB, /*l1_hint=*/readCacheHint,
-          /*l2_hint=*/readCacheHint,
-          /*l3_hint=*/readCacheHint, xegpuMode);
-    }
+    prefetchTiles(rewriter, loc, tilesA, readCacheHint, xegpuMode);
+    prefetchTiles(rewriter, loc, tilesB, readCacheHint, xegpuMode);
   }
 
   // Ensure that prefetches are scheduled before computation starts.
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // Extract DPAS tiles from loaded sub-tiles.
+  auto vecLoadTypeA = loadVecA[0].getType().cast<VectorType>();
   int loadVecSizeA = std::accumulate(vecLoadTypeA.getShape().begin(),
                                      vecLoadTypeA.getShape().end(), 1,
                                      std::multiplies<int64_t>());
   auto loadVecFlatA =
       VectorType::get(loadVecSizeA, vecLoadTypeA.getElementType());
   int dpasTileSizeA = dpasTileM * dpasTileK;
-  auto vecDpasTypeA = getVnniVector(
-      dpasTypeA.getShape(), dpasTypeA.getElementType(), vnniAxisAttrA.getInt());
+  auto vecDpasTypeA = getVnniVector(dpasTypeA.getShape(),
+                                    dpasTypeA.getElementType(), vnniConfA);
 
   const int loadSizeM = tileTypeA.getShape()[0];
   const int loadSizeN = tileTypeB.getShape()[1];
@@ -1229,14 +1219,15 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     }
   }
 
+  auto vecLoadTypeB = loadVecB[0].getType().cast<VectorType>();
   int loadVecSizeB = std::accumulate(vecLoadTypeB.getShape().begin(),
                                      vecLoadTypeB.getShape().end(), 1,
                                      std::multiplies<int64_t>());
   auto loadVecFlatB =
       VectorType::get(loadVecSizeB, vecLoadTypeB.getElementType());
   int dpasTileSizeB = dpasTileK * dpasTileN;
-  auto vecDpasTypeB = getVnniVector(
-      dpasTypeB.getShape(), dpasTypeB.getElementType(), vnniAxisAttrB.getInt());
+  auto vecDpasTypeB = getVnniVector(dpasTypeB.getShape(),
+                                    dpasTypeB.getElementType(), vnniConfB);
 
   TilesArray dpasVecB(numDpasTilesK, numDpasTilesN);
 
