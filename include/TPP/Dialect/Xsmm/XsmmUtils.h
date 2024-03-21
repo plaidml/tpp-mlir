@@ -53,6 +53,7 @@ struct FusedMatch {
   // This is the (optional) unary op that follows the GEMM/Binary
   UnaryOp unaryOp;
   UnaryKind unaryKind;
+  UnaryOp zeroOp;
 };
 
 namespace utils {
