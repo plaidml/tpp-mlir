@@ -1015,7 +1015,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
       // Ensure that block/workgroup is synchronized after prefetching.
       rewriter.create<xegpu::CompileHintOp>(loc);
-      rewriter.create<gpu::BarrierOp>(loc);
     } else {
       // Disable coop prefetching on failure.
       isCoopPrefetch = false;
@@ -1046,6 +1045,28 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     prefetchA = *(iterValues.end() - 2);
     prefetchB = *(iterValues.end() - 1);
   }
+
+  // Periodically synchronize the block/workgroup to minimize impact on cache
+  // due to replacement of subtiles before all threads/workitems consumed inputs
+  // for reduction dimension step.
+  //
+  // TODO: Synchronization frequency should derived from tile and cache size.
+  int syncFreq = 4;
+  int maxSyncStep = 1024;
+  int syncStep = std::min(std::max(dimK / syncFreq, maxSyncStep), maxSyncStep);
+  auto syncStepConst = rewriter.create<arith::ConstantIndexOp>(loc, syncStep);
+  auto loopStepMod = rewriter.create<arith::RemUIOp>(
+      loc, kDimLoop.getInductionVar(), syncStepConst);
+  auto syncBlockCond = rewriter.create<arith::CmpIOp>(
+      loc, arith::CmpIPredicate::eq, loopStepMod, zero);
+  rewriter.create<scf::IfOp>(
+      loc, syncBlockCond,
+      /*thenBuilder=*/
+      [](OpBuilder &b, Location loc) {
+        b.create<gpu::BarrierOp>(loc);
+        b.create<scf::YieldOp>(loc);
+      },
+      /*elseBuilder=*/nullptr);
 
   // TODO: Make the VNNI factor a flexible parameter.
   const int vnniFactor = 2;
@@ -1281,7 +1302,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // Ensure that DPAS computation is finished before the input tiles are
   // replaced with new values.
   rewriter.create<xegpu::CompileHintOp>(loc);
-  rewriter.create<gpu::BarrierOp>(loc);
 
   // Create loop terminator and exit the loop.
   auto terminateLoop = [&](scf::ForOp loopOp, SmallVector<Value> resultValues) {
