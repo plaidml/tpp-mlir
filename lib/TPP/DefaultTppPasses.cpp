@@ -217,7 +217,10 @@ private:
     pm.addPass(createConstantFoldPack());
     pm.addPass(createSimplifyAndCanonicalizePack());
 
+    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
     pm.addPass(createCleanup());
+    pm.addNestedPass<func::FuncOp>(
+        createLinalgConvertCompareSelectToMaximumfPass());
     pm.addPass(createTileConsumerAndFuseProducers());
     pm.addPass(createSimplifyAndCanonicalizePack());
     pm.addPass(createCleanup());
