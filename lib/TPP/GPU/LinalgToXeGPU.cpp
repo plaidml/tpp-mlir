@@ -1541,10 +1541,10 @@ private:
   LinalgToXeGPUOptions options;
 };
 
+// TODO: Finalize BRGEMM support and register the pattern.
 void populateLinalgGemmToXeGPUPatterns(RewritePatternSet &patterns,
                                        LinalgToXeGPUOptions options) {
   patterns.add<ConvertGemmLikeToXeGPU<linalg::MatmulOp>,
-               ConvertGemmLikeToXeGPU<linalg::BatchReduceMatmulOp>,
                ConvertGemmLikeToXeGPU<linalg::GenericOp>>(patterns.getContext(),
                                                           options);
 }
