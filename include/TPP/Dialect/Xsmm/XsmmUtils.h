@@ -42,9 +42,10 @@ struct BinaryInfo {
 
 /// Represents a chain of XSMM ops that can be fused. All broadcast ops
 /// should have already been converted to flags. All stray allocations
-/// should have already been converted to in-place reuse. Init zero
-/// should have already been converted to Beta=0.
+/// should have already been converted to in-place reuse.
 struct FusedMatch {
+  // This is the (optional) zero op that precedes the GEMM op
+  UnaryOp zeroOp;
   // This is the BRGEMM op
   BrgemmOp brgemmOp;
   // This is the (optional) binary op that follows the GEMM
@@ -53,7 +54,6 @@ struct FusedMatch {
   // This is the (optional) unary op that follows the GEMM/Binary
   UnaryOp unaryOp;
   UnaryKind unaryKind;
-  UnaryOp zeroOp;
 };
 
 namespace utils {
