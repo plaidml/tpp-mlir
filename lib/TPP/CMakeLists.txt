@@ -21,6 +21,10 @@ add_mlir_library(TPPPipeline
     MLIRIR
     MLIRMeshDialect
     MLIRSupport
+    MLIRToLLVMIRTranslationRegistration
+    MLIRMPIDialect
+    MLIRMLProgramDialect
+    MLIRMLProgramTransforms
     MLIRArithValueBoundsOpInterfaceImpl
     MLIRAsyncTransforms
     MLIRControlFlowTransforms
