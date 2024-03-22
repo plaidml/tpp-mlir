@@ -20,6 +20,7 @@ add_mlir_library(TPPTransforms
   IntelAMXTileConfig.cpp
   IntelAMXTileConfigHoisting.cpp
   LinalgConvertCompareSelectToMaximumfPass.cpp
+  ConvertAddInplacePass.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

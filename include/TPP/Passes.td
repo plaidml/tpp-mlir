@@ -533,4 +533,13 @@ def LinalgConvertCompareSelectToMaximumfPass: Pass<"linalg-convert-compare-selec
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
+					"func::FuncOp">{
+  let summary = "Convert linalg add to in-place operation";
+  let description = [{
+    Convert linalg add to in-place update operation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

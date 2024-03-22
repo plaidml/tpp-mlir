@@ -221,6 +221,7 @@ private:
     pm.addPass(createCleanup());
     pm.addNestedPass<func::FuncOp>(
         createLinalgConvertCompareSelectToMaximumfPass());
+
     pm.addPass(createTileConsumerAndFuseProducers());
     pm.addPass(createSimplifyAndCanonicalizePack());
     pm.addPass(createCleanup());
@@ -299,6 +300,7 @@ private:
       pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
       pm.addNestedPass<func::FuncOp>(createCleanup());
     } else {
+      pm.addNestedPass<func::FuncOp>(createConvertAddInplacePass());
       // Convert linalg.batch_matmul to linalg.matmul.
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
