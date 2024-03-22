@@ -65,7 +65,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
     if (isIntel) {
       pm.addNestedPass<func::FuncOp>(
-          createLinalgToXeGPU(LinalgToXeGPUOptions{kTile}));
+          createLinalgToXeGPU(LinalgToXeGPUOptions{kTile, stages}));
     } else {
       pm.addNestedPass<func::FuncOp>(
           createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile, kTile}));

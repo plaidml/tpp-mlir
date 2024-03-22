@@ -952,6 +952,7 @@ extractVecDpasTiles(PatternRewriter &rewriter, Location loc,
 // Create XeGPU DPAS kernel out of GEMM-like operation.
 static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
                                       ArrayRef<int64_t> dpasTile, int kTile,
+                                      int prefetchStages,
                                       PatternRewriter &rewriter) {
   assert((isa<linalg::MatmulOp>(linalgOp) ||
           isa<linalg::BatchReduceMatmulOp>(linalgOp) ||
@@ -1056,12 +1057,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   SmallVector<Value> tilesB = createCoarseLoadTiles(
       rewriter, loc, matB, {kTile, dimN}, xegpuMode, /*isVnni=*/true);
 
-  // Create prefetch tiles.
-  //
-  // Fewer prefetch requests decrese memory controller pressure and allow
-  // more efficient data loading.
-  //
-  // TODO: Add support for multistage prefetching.
+  // Create input prefetch tiles.
   int64_t numThreads = 1;
   auto blockDims =
       getStaticBlockSizes(linalgOp->getParentOfType<scf::ParallelOp>());
@@ -1104,16 +1100,19 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       prefetchB = prefetchDescB->getResult();
       prefetchTypeB = prefetchDescB->getType();
 
-      prefetchTiles(rewriter, loc, ValueRange{prefetchA}, readCacheHint,
-                    xegpuMode);
-      prefetchTiles(rewriter, loc, ValueRange{prefetchB}, readCacheHint,
-                    xegpuMode);
-      prefetchA =
-          updateTilesOffsets(rewriter, loc, ValueRange{prefetchA},
-                             ValueRange{zero, kTileOffset}, xegpuMode)[0];
-      prefetchB =
-          updateTilesOffsets(rewriter, loc, ValueRange{prefetchB},
-                             ValueRange{kTileOffset, zero}, xegpuMode)[0];
+      // Start data prefetching by multistage data load.
+      for (int i = 0; i < prefetchStages; i++) {
+        prefetchTiles(rewriter, loc, ValueRange{prefetchA}, readCacheHint,
+                      xegpuMode);
+        prefetchTiles(rewriter, loc, ValueRange{prefetchB}, readCacheHint,
+                      xegpuMode);
+        prefetchA =
+            updateTilesOffsets(rewriter, loc, ValueRange{prefetchA},
+                               ValueRange{zero, kTileOffset}, xegpuMode)[0];
+        prefetchB =
+            updateTilesOffsets(rewriter, loc, ValueRange{prefetchB},
+                               ValueRange{kTileOffset, zero}, xegpuMode)[0];
+      }
 
       // Ensure that block/workgroup is synchronized after prefetching.
       rewriter.create<xegpu::CompileHintOp>(loc);
@@ -1494,7 +1493,8 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
           gemmLikeOp, "GEMM-like compute does not fit in DPAS tiles");
     }
 
-    return createDPASKernel(gemmLikeOp, *dpasConfig, kTile, rewriter);
+    return createDPASKernel(gemmLikeOp, *dpasConfig, kTile, options.stages,
+                            rewriter);
   }
 
 private:
@@ -1569,7 +1569,7 @@ struct LinalgToXeGPU : public tpp::impl::LinalgToXeGPUBase<LinalgToXeGPU> {
   using LinalgToXeGPUBase::LinalgToXeGPUBase;
 
   void runOnOperation() override {
-    LinalgToXeGPUOptions options{kTile};
+    LinalgToXeGPUOptions options{kTile, stages};
 
     // Run GEMM pattern first to allow fusion with its consumers.
     RewritePatternSet gemmPatterns(&getContext());

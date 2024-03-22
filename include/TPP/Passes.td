@@ -360,6 +360,9 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
     Option<"kTile", "k-tile", "int64_t",
            /*default=*/"32",
            "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
   ];
 }
 
@@ -575,6 +578,9 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
     Option<"kTile", "k-tile", "int64_t",
            /*default=*/"32",
            "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
   ];
 }
 

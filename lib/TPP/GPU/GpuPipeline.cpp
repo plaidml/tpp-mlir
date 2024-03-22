@@ -65,6 +65,10 @@ llvm::cl::list<int64_t>
 llvm::cl::opt<int64_t> kTile("k-tile", llvm::cl::desc("GEMM K dim tiling size"),
                              llvm::cl::init(32));
 
+llvm::cl::opt<int64_t> stages("stages",
+                              llvm::cl::desc("GEMM coop prefetch stages"),
+                              llvm::cl::init(1));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -197,7 +201,7 @@ private:
 
     // Convert to generic GPU ops.
     pm.addPass(createGpuConversion(GpuConversionOptions{
-        gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel, kTile}));
+        gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel, kTile, stages}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
