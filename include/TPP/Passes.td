@@ -524,4 +524,22 @@ def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
   let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
 }
 
+def LinalgConvertCompareSelectToMaximumfPass: Pass<"linalg-convert-compare-select-to-maximumf-pass",
+					"func::FuncOp">{
+  let summary = "Convert linalg compare-select generic operation to maximumf operation";
+  let description = [{
+    Convert linalg generic compare-select operation to maximumf operation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
+def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
+					"func::FuncOp">{
+  let summary = "Convert linalg add to in-place operation";
+  let description = [{
+    Convert linalg add to in-place update operation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
