@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 namespace mlir {
@@ -37,13 +38,18 @@ struct LinalgConvertCompareSelectToMaximumf
     if (op.getBody()->getOperations().size() != 3)
       return failure();
     auto cmpf = dyn_cast<arith::CmpFOp>(&op.getBody()->getOperations().front());
-    if (!cmpf)
+    if (!cmpf || cmpf.getPredicate() != arith::CmpFPredicate::UGT)
+      return failure();
+
+    if (!matchPattern(cmpf.getOperand(1), m_AnyZeroFloat()))
       return failure();
     auto select = dyn_cast<arith::SelectOp>(
         std::next(op.getBody()->getOperations().begin(), 1));
     if (!select)
       return failure();
-
+    if (select.getOperand(0) != cmpf.getResult() ||
+        select.getOperand(1) != cmpf.getOperand(0))
+      return failure();
     rewriter.setInsertionPointAfter(&op.getBody()->front());
     auto maxf = rewriter.create<arith::MaximumFOp>(
         op.getLoc(),

@@ -40,6 +40,8 @@ struct ConvertAddInplace : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     if (op.getNumOperands() == 2)
       return failure();
+    // TODO: This needs to be changed in the future to a detailed analysis that
+    // checks if the second input is not used subsequently
     if (op.getInputs()[0] == op.getInputs()[1])
       return failure();
     SmallVector<AffineMap> indexingMaps;
@@ -49,6 +51,7 @@ struct ConvertAddInplace : public OpRewritePattern<linalg::GenericOp> {
     }
 
     Value inputs, outputs;
+    // Check which input is marked as non-broadcastable
     if (op.getIndexingMapsArray()[1] ==
         rewriter.getMultiDimIdentityMap(
             op.getIndexingMapsArray()[1].getNumDims())) {
