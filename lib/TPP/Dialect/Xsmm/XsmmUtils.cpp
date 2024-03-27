@@ -317,7 +317,8 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
         user->getOperands()[user->getOperands().size() - 1] != op->getResult(0))
       return failure();
   }
-  // We don't know how to fuse more than three tail ops after zero op
+  // We don't know how to fuse more than two tail ops after and a zero op before
+  // BRGEMM
   if (chain.size() > 4)
     return failure();
   if (!(isa<xsmm::BrgemmOp>(chain[0]) ||
@@ -330,7 +331,8 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   // for
   assert(isa<xsmm::BrgemmOp>(chain[0]) ||
          (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
-          dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO) &&
+          dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
+          isa<xsmm::BrgemmOp>(chain[1])) &&
              "First op must be brgemm or zero");
 
   // Now, we're sure we have a chain, but not yet if it has the right types
