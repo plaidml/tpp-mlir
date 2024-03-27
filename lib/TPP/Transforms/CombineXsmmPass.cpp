@@ -90,13 +90,22 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
         true);
     if (failed(brgemmFlags))
       return failure();
+    auto attributes = *brgemmFlags;
+    if (fusedMatch.zeroOp) {
+      if (attributes[0] == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                    xsmm::GemmFlags::NONE)) {
+        attributes.clear();
+      }
+      attributes.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                                    xsmm::GemmFlags::BETA_0));
+    }
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(fusedMatch.binaryOp);
     Value dispatched = rewriter.create<xsmm::FusedBrgemmDispatchOp>(
         loc, integer64, dims,
         xsmm::BinaryKindAttr::get(rewriter.getContext(), fusedMatch.binaryKind),
         xsmm::UnaryKindAttr::get(rewriter.getContext(), fusedMatch.unaryKind),
-        rewriter.getArrayAttr(*brgemmFlags),
+        rewriter.getArrayAttr(attributes),
         rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
             rewriter.getContext(), xsmm::UnaryFlags::NONE)),
         rewriter.getArrayAttr(
@@ -119,11 +128,18 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
     rewriter.create<xsmm::FusedBrgemmOp>(loc, dtype, invokeOperands);
     rewriter.eraseOp(brgemmOp);
     rewriter.eraseOp(brgemmOp.getOperand(0).getDefiningOp());
-    rewriter.eraseOp(fusedMatch.binaryOp);
-    rewriter.eraseOp(fusedMatch.binaryOp->getOperand(0).getDefiningOp());
-    rewriter.eraseOp(fusedMatch.unaryOp);
-    rewriter.eraseOp(fusedMatch.unaryOp->getOperand(0).getDefiningOp());
-
+    if (fusedMatch.binaryOp) {
+      rewriter.eraseOp(fusedMatch.binaryOp);
+      rewriter.eraseOp(fusedMatch.binaryOp->getOperand(0).getDefiningOp());
+    }
+    if (fusedMatch.unaryOp) {
+      rewriter.eraseOp(fusedMatch.unaryOp);
+      rewriter.eraseOp(fusedMatch.unaryOp->getOperand(0).getDefiningOp());
+    }
+    if (fusedMatch.zeroOp) {
+      rewriter.eraseOp(fusedMatch.zeroOp);
+      rewriter.eraseOp(fusedMatch.zeroOp->getOperand(0).getDefiningOp());
+    }
     return success();
   }
 };

@@ -289,13 +289,11 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   // The loop is in reverse order, so we deduplicate the list making sure we
   // only have one type of each
-  SmallVector<Operation *, 3> chain;
+  SmallVector<Operation *, 4> chain;
   Operation *prev = nullptr;
   for (auto *user : op->getUsers()) {
     // Deduplicate, only take each operation once
-    if ((dyn_cast<xsmm::UnaryOp>(user) &&
-         dyn_cast<xsmm::UnaryOp>(user).getCallee() == UnaryKind::ZERO) ||
-        dyn_cast<func::ReturnOp>(user) || user == prev)
+    if (dyn_cast<func::ReturnOp>(user) || user == prev)
       continue;
     chain.push_back(user);
     prev = user;
@@ -313,28 +311,44 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
     int numUses = std::count(user->getOperands().begin(),
                              user->getOperands().end(), op->getResult(0));
     // At least one input and the last operand (output) is the same buffer
-    if (numUses < 2 ||
+    if (((dyn_cast<xsmm::UnaryOp>(user) &&
+          dyn_cast<xsmm::UnaryOp>(user).getCallee() != UnaryKind::ZERO) &&
+         numUses < 2) ||
         user->getOperands()[user->getOperands().size() - 1] != op->getResult(0))
       return failure();
   }
-  // We don't know how to fuse more than two tail ops after the BRGEMM
-  if (chain.size() > 3)
+  // We don't know how to fuse more than two tail ops after and a zero op before
+  // BRGEMM
+  if (chain.size() > 4)
     return failure();
-  if (!isa<xsmm::BrgemmOp>(chain[0]))
-    // List is in reverse order, put the brgemm at the top
+  if (!(isa<xsmm::BrgemmOp>(chain[0]) ||
+        (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
+         dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO)))
+    // List is in reverse order, put the brgemm or zero at the top
     std::reverse(chain.begin(), chain.end());
 
-  // If we haven't found a BRGEMM, this are not the droids we're looking for
-  assert(isa<xsmm::BrgemmOp>(chain[0]) && "First op must be brgemm");
+  // If we haven't found a BRGEMM or zero, this are not the droids we're looking
+  // for
+  assert(isa<xsmm::BrgemmOp>(chain[0]) ||
+         (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
+          dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
+          isa<xsmm::BrgemmOp>(chain[1])) &&
+             "First op must be brgemm or zero");
 
   // Now, we're sure we have a chain, but not yet if it has the right types
-  // and in the right order: BRGEMM -> BINARY -> UNARY
+  // and in the right order: (ZER0) -> BRGEMM -> BINARY -> UNARY
   // Allowed patterns are:
-  //  - GEMM + BINARY
-  //  - GEMM + UNARY
-  //  - GEMM + BINARY + UNARY
+  //  - (ZERO) + GEMM + BINARY
+  //  - (ZERO)+ GEMM + UNARY
+  //  - (ZERO) + GEMM + BINARY + UNARY
   xsmm::FusedMatch fusedMatch;
   for (auto *user : chain) {
+    if (auto unaryOp = dyn_cast<xsmm::UnaryOp>(user)) {
+      if (dyn_cast<xsmm::UnaryOp>(user).getCallee() == UnaryKind::ZERO) {
+        fusedMatch.zeroOp = unaryOp;
+        continue;
+      }
+    }
     if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
       // We only accept one of each
       if (fusedMatch.brgemmOp)

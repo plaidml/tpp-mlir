@@ -261,4 +261,48 @@ func.func @none_on_binary_add_bf16(%arg0: memref<256x128xbf16>) -> memref<256x51
 // CHECK-NOT: %[[DISPATCH:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (vnni_b, beta_0)  binary_flags = (none)  unary_flags = (none) data_type = bf16
 // CHECK-NOT: xsmm.fused_brgemm(data_type = bf16, %[[DISPATCH]] , %{{.*}}, %{{.*}}, %{{.*}}, %[[BIAS]], %{{.*}})
 
+// -----
+ memref.global "private" constant @__constant_32x32x32xf32_1 : memref<32x32x32xf32> = dense<1.600000e+00> {alignment = 64 : i64}
+ memref.global "private" constant @__constant_32xf32_1 : memref<32xf32> = dense<1.300000e+00> {alignment = 64 : i64}
+ memref.global "private" constant @__constant_32x32x32xf32_0 : memref<32x32x32xf32> = dense<1.500000e+00> {alignment = 64 : i64}
+ memref.global "private" constant @__constant_32xf32_0 : memref<32xf32> = dense<1.200000e+00> {alignment = 64 : i64}
+ memref.global "private" constant @__constant_32x32x32xf32 : memref<32x32x32xf32> = dense<1.400000e+00> {alignment = 64 : i64}
+ memref.global "private" constant @__constant_32xf32 : memref<32xf32> = dense<1.100000e+00> {alignment = 64 : i64}
+
+func.func @forward(%arg0: memref<256x1024xf32>) -> memref<256x1024xf32> {
+  %c32_i64 = arith.constant 32 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = memref.get_global @__constant_32xf32 : memref<32xf32>
+  %1 = memref.get_global @__constant_32x32x32xf32 : memref<32x32x32xf32>
+  %2 = memref.get_global @__constant_32x32x32xf32_0 : memref<32x32x32xf32>
+  %3 = memref.get_global @__constant_32xf32_0 : memref<32xf32>
+  %4 = memref.get_global @__constant_32x32x32xf32_1 : memref<32x32x32xf32>
+  %alloc = memref.alloc() {alignment = 64 : i64} : memref<256x1024xf32>
+  %alloc_0 = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xf32>
+  %alloc_1 = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xf32>
+  scf.forall (%arg1, %arg2) in (8, 32) {
+    %subview = memref.subview %alloc_0[%arg1, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+    %5 = xsmm.unary.dispatch zero [32, 32, 1, 32] flags = (bcast_scalar) data_type = f32
+    xsmm.unary zero(data_type = f32, %5, %cst, %subview) : (i64, f32, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+    %subview_3 = memref.subview %alloc_1[%arg1, 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+    %6 = xsmm.brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024] flags = (none) data_type = f32
+    xsmm.brgemm(data_type = f32, %6, %subview_3, %4, %subview, %c32_i64) : (i64, memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<32x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, i64) -> ()
+    %7 = xsmm.binary.dispatch add [32, 32, 32, 32, 32] flags = (bcast_col_in0) data_type = f32
+    xsmm.binary add(data_type = f32, %7, %3, %subview, %subview) : (i64, memref<32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+    %8 = xsmm.unary.dispatch relu [32, 32, 32, 32] flags = (none) data_type = f32
+    xsmm.unary relu(data_type = f32, %8, %subview, %subview) : (i64, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32x32xf32, strided<[32, 1], offset: ?>>) -> ()
+  }
+  return %alloc : memref<256x1024xf32>
+}
+
+// CHECK-LABEL:func.func @forward(
+// CHECK: %[[ARG0:.*]]: memref<256x1024xf32>) -> memref<256x1024xf32> {
+// CHECK-DAG: %[[c32_i64:.*]] = arith.constant 32 : i64
+// CHECK:  scf.forall (%[[arg1:.*]], %[[arg2:.*]]) in (8, 32) {
+// CHECK:      %[[subview:.*]] = memref.subview %{{.*}}[%[[arg1]], %[[arg2]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32xf32, strided<[32, 1], offset: ?>>
+// CHECK:      %[[subview_2:.*]] = memref.subview %{{.*}}[%[[arg1]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<8x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK:      %[[temp2:.*]] = xsmm.fused_brgemm.dispatch [32, 32, 32, 32, 32, 32, 1024, 1024][add,relu]  flags = (beta_0)  binary_flags = (bcast_col_in0)  unary_flags = (none) data_type = f32
+// CHECK:      xsmm.fused_brgemm(data_type = f32, %[[temp2]], %[[subview_2]], %{{.*}}, %[[subview]], %{{.*}} %[[c32_i64]]) : (i64, memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>, memref<32x32x32xf32>, memref<32x32xf32, strided<[32, 1], offset: ?>>, memref<32xf32>, i64) -> ()
+// CHECK:    }
+// CHECK:    return %{{.*}} : memref<256x1024xf32>
 
