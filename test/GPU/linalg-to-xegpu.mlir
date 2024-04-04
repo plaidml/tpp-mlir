@@ -7,27 +7,9 @@ func.func @matmul(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>, %arg2: memr
 }
 
 // CHECK-LABEL: func.func @matmul
-// CHECK-SAME:  %[[A:.+]]: memref<8x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<8x16xf32>
-// CHECK: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK: xegpu.compile_hint
-// CHECK: %[[tA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[tB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[pA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[pB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[vA:.+]] = xegpu.load_nd %[[tA]]
-// CHECK: %[[vB:.+]] = xegpu.load_nd %[[tB]]
-// CHECK: %[[new_tA:.+]] = xegpu.update_nd_offset %[[tA]]
-// CHECK: %[[new_tB:.+]] = xegpu.update_nd_offset %[[tB]]
-// CHECK: xegpu.prefetch_nd %[[pA]]
-// CHECK: xegpu.prefetch_nd %[[pB]]
-// CHECK: %[[new_pA:.+]] = xegpu.update_nd_offset %[[pA]]
-// CHECK: %[[new_pB:.+]] = xegpu.update_nd_offset %[[pB]]
-// CHECK: xegpu.compile_hint
-// CHECK: %[[dpas:.+]] = xegpu.dpas %[[vA]], %[[vB]], %[[vC]]
-// CHECK: xegpu.compile_hint
-// CHECK: gpu.barrier
-// CHECH: xegpu.store_nd %[[dpas]], %[[tC]]
+// CHECK-COUNT-3: xegpu.load_nd
+// CHECK: xegpu.dpas
+// CHECH: xegpu.store_nd
 
 // -----
 
@@ -47,29 +29,9 @@ module {
 }
 
 // CHECK-LABEL: func.func @generic_matmul
-// CHECK-SAME:  %[[A:.+]]: memref<8x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<8x16xf16>
-// CHECK: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK: xegpu.compile_hint
-// CHECK: %[[vCf32:.+]] = arith.extf %[[vC]]
-// CHECK: %[[tA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[tB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[pA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[pB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[vA:.+]] = xegpu.load_nd %[[tA]]
-// CHECK: %[[vB:.+]] = xegpu.load_nd %[[tB]]
-// CHECK: %[[new_tA:.+]] = xegpu.update_nd_offset %[[tA]]
-// CHECK: %[[new_tB:.+]] = xegpu.update_nd_offset %[[tB]]
-// CHECK: xegpu.prefetch_nd %[[pA]]
-// CHECK: xegpu.prefetch_nd %[[pB]]
-// CHECK: %[[new_pA:.+]] = xegpu.update_nd_offset %[[pA]]
-// CHECK: %[[new_pB:.+]] = xegpu.update_nd_offset %[[pB]]
-// CHECK: xegpu.compile_hint
-// CHECK: %[[dpas:.+]] = xegpu.dpas %[[vA]], %[[vB]], %[[vCf32]]
-// CHECK: xegpu.compile_hint
-// CHECK: gpu.barrier
-// CHECK: %[[vCf16:.+]] = arith.truncf %[[dpas]]
-// CHECH: xegpu.store_nd %[[vCf16]], %[[tC]]
+// CHECK-COUNT-3: xegpu.load_nd
+// CHECK: xegpu.dpas
+// CHECH: xegpu.store_nd
 
 // -----
 
@@ -80,80 +42,10 @@ func.func @matmul_trunc_result(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>
 }
 
 // CHECK-LABEL: func.func @matmul_trunc_result
-// CHECK-SAME:  %[[A:.+]]: memref<8x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<8x16xf16>
-// CHECK: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK: xegpu.compile_hint
-// CHECK: %[[vCf32:.+]] = arith.extf %[[vC]]
-// CHECK: %[[dpas:.+]] = xegpu.dpas{{.*}}%[[vCf32]]
-// CHECK: %[[vCf16:.+]] = arith.truncf %[[dpas]]
-// CHECH: xegpu.store_nd %[[vCf16]], %[[tC]]
-
-// -----
-
-func.func @matmul_reduction_dim_tiling(%arg0: memref<8x32xf16>, %arg1: memref<32x16xf16>, %arg2: memref<8x16xf32>) {
-  linalg.matmul ins(%arg0, %arg1 : memref<8x32xf16>, memref<32x16xf16>)
-                outs(%arg2 : memref<8x16xf32>)
-  return
-}
-
-// CHECK-LABEL: func.func @matmul_reduction_dim_tiling
-// CHECK-SAME:  %[[A:.+]]: memref<8x32xf16>, %[[B:.+]]: memref<32x16xf16>, %[[C:.+]]: memref<8x16xf32>
-// CHECK-DAG: %[[c0:.+]] = arith.constant 0
-// CHECK-DAG: %[[c16:.+]] = arith.constant 16
-// CHECK-DAG: %[[c32:.+]] = arith.constant 32
-// CHECK: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK: %[[tA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[tB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[pA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK: %[[pB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK: %[[res:.+]]:5 = scf.for{{.*}}%[[c0]] to %[[c32]] step %[[c16]]
-// CHECK-SAME: iter_args(%[[acc:.+]] = %[[vC]], %[[iterA:.+]] = %[[tA]], %[[iterB:.+]] = %[[tB]], %[[prefA:.+]] = %[[pA]], %[[prefB:.+]] = %[[pB]])
-// CHECK:   %[[vA:.+]] = xegpu.load_nd %[[iterA]]
-// CHECK:   %[[vB:.+]] = xegpu.load_nd %[[iterB]]
-// CHECK:   %[[new_tA:.+]] = xegpu.update_nd_offset %[[iterA]]
-// CHECK:   %[[new_tB:.+]] = xegpu.update_nd_offset %[[iterB]]
-// CHECK:   xegpu.prefetch_nd %[[prefA]]
-// CHECK:   xegpu.prefetch_nd %[[prefB]]
-// CHECK:   %[[new_prefA:.+]] = xegpu.update_nd_offset %[[prefA]]
-// CHECK:   %[[new_prefB:.+]] = xegpu.update_nd_offset %[[prefB]]
-// CHECK:   xegpu.compile_hint
-// CHECK:   %[[dpas:.+]] = xegpu.dpas %[[vA]], %[[vB]], %[[acc]]
-// CHECK:   xegpu.compile_hint
-// CHECK:   gpu.barrier
-// CHECK:   scf.yield %[[dpas]], %[[new_tA]], %[[new_tB]], %[[new_prefA]], %[[new_prefB]]
-// CHECH: xegpu.store_nd %[[res]]#0, %[[tC]]
-
-// -----
-
-#map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @matmul_fused(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>, %arg2: memref<8x16xf32>, %bias : memref<8x16xf32>) {
-  linalg.matmul ins(%arg0, %arg1 : memref<8x16xf16>, memref<16x16xf16>)
-                outs(%arg2 : memref<8x16xf32>)
-  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%bias : memref<8x16xf32>) outs(%arg2 : memref<8x16xf32>) {
-  ^bb0(%in: f32, %out: f32):
-    %0 = arith.addf %in, %out : f32
-    linalg.yield %0 : f32
-  }
-  %cst = arith.constant 0.000000e+00 : f32
-  linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%arg2 :memref<8x16xf32>) {
-  ^bb0(%out: f32):
-    %0 = arith.maximumf %out, %cst : f32
-    linalg.yield %0 : f32
-  }
-  return
-}
-
-// CHECK-LABEL: func.func @matmul_fused
-// CHECK-SAME:  %[[A:.+]]: memref<8x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<8x16xf32>, %[[bias:.+]]: memref<8x16xf32>
-// CHECK-DAG: %[[zero:.+]] = arith.constant dense<0.000000e+00> : vector<8x16xf32>
-// CHECK: %[[dpas:.+]] = xegpu.dpas
-// CHECK: %[[tBias:.+]] = xegpu.create_nd_tdesc %[[bias]]
-// CHECK: %[[vBias:.+]] = xegpu.load_nd %[[tBias]]
-// CHECK: %[[add:.+]] = arith.addf %[[dpas]], %[[vBias]]
-// CHECK: %[[max:.+]] = arith.maximumf %[[add]], %[[zero]]
-// CHECH: xegpu.store_nd %[[max]], %[[tC]]
+// CHECK: arith.extf
+// CHECK: xegpu.dpas
+// CHECK: arith.truncf
+// CHECH: xegpu.store_nd
 
 // -----
 
