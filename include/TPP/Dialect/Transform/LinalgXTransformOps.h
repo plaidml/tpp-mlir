@@ -11,7 +11,8 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformTypes.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
@@ -20,6 +21,13 @@ namespace linalg {
 class GenericOp;
 class LinalgOp;
 } // namespace linalg
+
+namespace transform {
+class AnyOpType;
+class AnyValueType;
+class OperationType;
+class TransformHandleTypeInterface;
+} // namespace transform
 } // namespace mlir
 
 //===----------------------------------------------------------------------===//
