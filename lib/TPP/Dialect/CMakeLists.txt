@@ -1,4 +1,5 @@
 add_subdirectory(Check)
 add_subdirectory(Perf)
 add_subdirectory(Transform)
+add_subdirectory(XeGPU)
 add_subdirectory(Xsmm)
