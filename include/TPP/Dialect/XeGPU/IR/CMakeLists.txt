@@ -1,4 +1,4 @@
-add_mlir_dialect(XeGPUOps xegpu)
+add_mlir_dialect(XeGPUOps xegpux)
 add_mlir_doc(XeGPUOps XeGPUDialect Dialects/ -gen-dialect-doc)
 
 set(LLVM_TARGET_DEFINITIONS XeGPUOps.td)

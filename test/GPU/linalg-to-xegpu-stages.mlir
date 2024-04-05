@@ -28,26 +28,26 @@ module {
 
 // STAGES-1-LABEL: func.func @matmul_multistage_coop_prefetch
 // STAGES-1-SAME:  %[[A:.+]]: memref<1024x1024xf16>, %[[B:.+]]: memref<1024x1024xf16>, %[[C:.+]]: memref<1024x1024xf16>
-// STAGES-1: %[[s1_A:.+]] = xegpu.create_nd_tdesc %[[A]]
-// STAGES-1: %[[s1_B:.+]] = xegpu.create_nd_tdesc %[[B]]
-// STAGES-1: xegpu.prefetch_nd %[[s1_A]]
-// STAGES-1: xegpu.prefetch_nd %[[s1_B]]
-// STAGES-1: %[[loop_pref_A:.+]] = xegpu.update_nd_offset %[[s1_A]]
-// STAGES-1: %[[loop_pref_B:.+]] = xegpu.update_nd_offset %[[s1_B]]
-// STAGES-1-NOT: xegpu.prefetch_nd
+// STAGES-1: %[[s1_A:.+]] = xegpux.create_nd_tdesc %[[A]]
+// STAGES-1: %[[s1_B:.+]] = xegpux.create_nd_tdesc %[[B]]
+// STAGES-1: xegpux.prefetch_nd %[[s1_A]]
+// STAGES-1: xegpux.prefetch_nd %[[s1_B]]
+// STAGES-1: %[[loop_pref_A:.+]] = xegpux.update_nd_offset %[[s1_A]]
+// STAGES-1: %[[loop_pref_B:.+]] = xegpux.update_nd_offset %[[s1_B]]
+// STAGES-1-NOT: xegpux.prefetch_nd
 // STAGES-1: scf.for
 
 // STAGES-2-LABEL: func.func @matmul_multistage_coop_prefetch
 // STAGES-2-SAME:  %[[A:.+]]: memref<1024x1024xf16>, %[[B:.+]]: memref<1024x1024xf16>, %[[C:.+]]: memref<1024x1024xf16>
-// STAGES-2: %[[s1_A:.+]] = xegpu.create_nd_tdesc %[[A]]
-// STAGES-2: %[[s1_B:.+]] = xegpu.create_nd_tdesc %[[B]]
-// STAGES-2: xegpu.prefetch_nd %[[s1_A]]
-// STAGES-2: xegpu.prefetch_nd %[[s1_B]]
-// STAGES-2: %[[s2_A:.+]] = xegpu.update_nd_offset %[[s1_A]]
-// STAGES-2: %[[s2_B:.+]] = xegpu.update_nd_offset %[[s1_B]]
-// STAGES-2: xegpu.prefetch_nd %[[s2_A]]
-// STAGES-2: xegpu.prefetch_nd %[[s2_B]]
-// STAGES-2: %[[loop_pref_A:.+]] = xegpu.update_nd_offset %[[s2_A]]
-// STAGES-2: %[[loop_pref_B:.+]] = xegpu.update_nd_offset %[[s2_B]]
-// STAGES-2-NOT: xegpu.prefetch_nd
+// STAGES-2: %[[s1_A:.+]] = xegpux.create_nd_tdesc %[[A]]
+// STAGES-2: %[[s1_B:.+]] = xegpux.create_nd_tdesc %[[B]]
+// STAGES-2: xegpux.prefetch_nd %[[s1_A]]
+// STAGES-2: xegpux.prefetch_nd %[[s1_B]]
+// STAGES-2: %[[s2_A:.+]] = xegpux.update_nd_offset %[[s1_A]]
+// STAGES-2: %[[s2_B:.+]] = xegpux.update_nd_offset %[[s1_B]]
+// STAGES-2: xegpux.prefetch_nd %[[s2_A]]
+// STAGES-2: xegpux.prefetch_nd %[[s2_B]]
+// STAGES-2: %[[loop_pref_A:.+]] = xegpux.update_nd_offset %[[s2_A]]
+// STAGES-2: %[[loop_pref_B:.+]] = xegpux.update_nd_offset %[[s2_B]]
+// STAGES-2-NOT: xegpux.prefetch_nd
 // STAGES-2: scf.for

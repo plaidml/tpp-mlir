@@ -7,9 +7,9 @@ func.func @matmul(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>, %arg2: memr
 }
 
 // CHECK-LABEL: func.func @matmul
-// CHECK-COUNT-3: xegpu.load_nd
-// CHECK: xegpu.dpas
-// CHECH: xegpu.store_nd
+// CHECK-COUNT-3: xegpux.load_nd
+// CHECK: xegpux.dpas
+// CHECH: xegpux.store_nd
 
 // -----
 
@@ -29,9 +29,9 @@ module {
 }
 
 // CHECK-LABEL: func.func @generic_matmul
-// CHECK-COUNT-3: xegpu.load_nd
-// CHECK: xegpu.dpas
-// CHECH: xegpu.store_nd
+// CHECK-COUNT-3: xegpux.load_nd
+// CHECK: xegpux.dpas
+// CHECH: xegpux.store_nd
 
 // -----
 
@@ -43,9 +43,9 @@ func.func @matmul_trunc_result(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>
 
 // CHECK-LABEL: func.func @matmul_trunc_result
 // CHECK: arith.extf
-// CHECK: xegpu.dpas
+// CHECK: xegpux.dpas
 // CHECK: arith.truncf
-// CHECH: xegpu.store_nd
+// CHECH: xegpux.store_nd
 
 // -----
 
@@ -56,9 +56,9 @@ func.func @abs(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>) {
 }
 
 // CHECK-LABEL: func.func @abs
-// CHECK-COUNT-1: xegpu.load_nd
+// CHECK-COUNT-1: xegpux.load_nd
 // CHECK: math.absf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -69,9 +69,9 @@ func.func @add(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 }
 
 // CHECK-LABEL: func.func @add
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.addf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -82,9 +82,9 @@ func.func @ceil(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>) {
 }
 
 // CHECK-LABEL: func.func @ceil
-// CHECK-COUNT-1: xegpu.load_nd
+// CHECK-COUNT-1: xegpux.load_nd
 // CHECK: math.ceil
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -95,9 +95,9 @@ func.func @div(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 }
 
 // CHECK-LABEL: func.func @div
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.divf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -108,9 +108,9 @@ func.func @div_unsigned(%arg0: memref<8x16xi16>, %arg1: memref<8x16xi16>, %arg2:
 }
 
 // CHECK-LABEL: func.func @div_unsigned
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.divui
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -121,9 +121,9 @@ func.func @exp(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>) {
 }
 
 // CHECK-LABEL: func.func @exp
-// CHECK-COUNT-1: xegpu.load_nd
+// CHECK-COUNT-1: xegpux.load_nd
 // CHECK: math.exp
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -134,9 +134,9 @@ func.func @floor(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>) {
 }
 
 // CHECK-LABEL: func.func @floor
-// CHECK-COUNT-1: xegpu.load_nd
+// CHECK-COUNT-1: xegpux.load_nd
 // CHECK: math.floor
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -147,9 +147,9 @@ func.func @max(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 }
 
 // CHECK-LABEL: func.func @max
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.maximumf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -160,9 +160,9 @@ func.func @mul(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 }
 
 // CHECK-LABEL: func.func @mul
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.mulf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -173,9 +173,9 @@ func.func @negf(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>) {
 }
 
 // CHECK-LABEL: func.func @negf
-// CHECK-COUNT-1: xegpu.load_nd
+// CHECK-COUNT-1: xegpux.load_nd
 // CHECK: arith.negf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd
 
 // -----
 
@@ -186,6 +186,6 @@ func.func @sub(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 }
 
 // CHECK-LABEL: func.func @sub
-// CHECK-COUNT-2: xegpu.load_nd
+// CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.subf
-// CHECK: xegpu.store_nd
+// CHECK: xegpux.store_nd

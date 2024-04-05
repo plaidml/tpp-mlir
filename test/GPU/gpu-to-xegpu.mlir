@@ -20,20 +20,20 @@ func.func @mma_f16_f16_f16(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %
 // CHECK-LABEL: func.func @mma_f16_f16_f16
 // CHECK-SAME:  %[[A:.+]]: memref<16x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<16x16xf16>, %[[bias:.+]]: memref<16x16xf16>
 // CHECK-DAG: %[[zero:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
-// CHECK-DAG: %[[tA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK-DAG: %[[vA:.+]] = xegpu.load_nd %[[tA]]
-// CHECK-DAG: %[[tB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK-DAG: %[[vB:.+]] = xegpu.load_nd %[[tB]]
-// CHECK-DAG: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK-DAG: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK-DAG: %[[tBias:.+]] = xegpu.create_nd_tdesc %[[bias]]
-// CHECK-DAG: %[[vBias:.+]] = xegpu.load_nd %[[tBias]]
+// CHECK-DAG: %[[tA:.+]] = xegpux.create_nd_tdesc %[[A]]
+// CHECK-DAG: %[[vA:.+]] = xegpux.load_nd %[[tA]]
+// CHECK-DAG: %[[tB:.+]] = xegpux.create_nd_tdesc %[[B]]
+// CHECK-DAG: %[[vB:.+]] = xegpux.load_nd %[[tB]]
+// CHECK-DAG: %[[tC:.+]] = xegpux.create_nd_tdesc %[[C]]
+// CHECK-DAG: %[[vC:.+]] = xegpux.load_nd %[[tC]]
+// CHECK-DAG: %[[tBias:.+]] = xegpux.create_nd_tdesc %[[bias]]
+// CHECK-DAG: %[[vBias:.+]] = xegpux.load_nd %[[tBias]]
 // CHECK: %[[vCf32:.+]] = arith.extf %[[vC]]
-// CHECK: %[[dpas:.+]] = xegpu.dpas %[[vA]], %[[vB]], %[[vCf32]]
+// CHECK: %[[dpas:.+]] = xegpux.dpas %[[vA]], %[[vB]], %[[vCf32]]
 // CHECK: %[[vCf16:.+]] = arith.truncf %[[dpas]]
 // CHECK: %[[add:.+]] = arith.addf %[[vCf16]], %[[vBias]]
 // CHECK: %[[maxf:.+]] = arith.maximumf %[[add]], %[[zero]]
-// CHECH: xegpu.store_nd %12 %[[maxf]]
+// CHECH: xegpux.store_nd %12 %[[maxf]]
 
 // -----
 
@@ -57,18 +57,18 @@ func.func @mma_f16_f16_f32(%arg0: memref<16x16xf16>, %arg1: memref<16x16xf16>, %
 // CHECK-LABEL: func.func @mma_f16_f16_f32
 // CHECK-SAME:  %[[A:.+]]: memref<16x16xf16>, %[[B:.+]]: memref<16x16xf16>, %[[C:.+]]: memref<16x16xf32>, %[[bias:.+]]: memref<16x16xf32>
 // CHECK-DAG: %[[zero:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf32>
-// CHECK-DAG: %[[tA:.+]] = xegpu.create_nd_tdesc %[[A]]
-// CHECK-DAG: %[[vA:.+]] = xegpu.load_nd %[[tA]]
-// CHECK-DAG: %[[tB:.+]] = xegpu.create_nd_tdesc %[[B]]
-// CHECK-DAG: %[[vB:.+]] = xegpu.load_nd %[[tB]]
-// CHECK-DAG: %[[tC:.+]] = xegpu.create_nd_tdesc %[[C]]
-// CHECK-DAG: %[[vC:.+]] = xegpu.load_nd %[[tC]]
-// CHECK-DAG: %[[tBias:.+]] = xegpu.create_nd_tdesc %[[bias]]
-// CHECK-DAG: %[[vBias:.+]] = xegpu.load_nd %[[tBias]]
-// CHECK: %[[dpas:.+]] = xegpu.dpas %[[vA]], %[[vB]], %[[vC]]
+// CHECK-DAG: %[[tA:.+]] = xegpux.create_nd_tdesc %[[A]]
+// CHECK-DAG: %[[vA:.+]] = xegpux.load_nd %[[tA]]
+// CHECK-DAG: %[[tB:.+]] = xegpux.create_nd_tdesc %[[B]]
+// CHECK-DAG: %[[vB:.+]] = xegpux.load_nd %[[tB]]
+// CHECK-DAG: %[[tC:.+]] = xegpux.create_nd_tdesc %[[C]]
+// CHECK-DAG: %[[vC:.+]] = xegpux.load_nd %[[tC]]
+// CHECK-DAG: %[[tBias:.+]] = xegpux.create_nd_tdesc %[[bias]]
+// CHECK-DAG: %[[vBias:.+]] = xegpux.load_nd %[[tBias]]
+// CHECK: %[[dpas:.+]] = xegpux.dpas %[[vA]], %[[vB]], %[[vC]]
 // CHECK: %[[add:.+]] = arith.addf %[[dpas]], %[[vBias]]
 // CHECK: %[[maxf:.+]] = arith.maximumf %[[add]], %[[zero]]
-// CHECH: xegpu.store_nd %12 %[[maxf]]
+// CHECH: xegpux.store_nd %12 %[[maxf]]
 
 // -----
 

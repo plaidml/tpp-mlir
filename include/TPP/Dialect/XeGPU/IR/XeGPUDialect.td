@@ -19,7 +19,7 @@ include "mlir/Interfaces/ShapedOpInterfaces.td"
 // can define our operations.
 def XeGPUDialect : Dialect {
     // The namespace of our dialect
-    let name = "xegpu";
+    let name = "xegpux";
 
     // A short one-line summary of our dialect.
     let summary = "The XeGPU dialect that models Intel GPU's ISA";

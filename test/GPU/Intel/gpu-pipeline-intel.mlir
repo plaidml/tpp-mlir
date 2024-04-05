@@ -24,19 +24,19 @@ func.func @linalg_matmul(%arg0: tensor<128x1024xf16>,
 // CHECK-DAG:   %[[c0:.+]] = arith.constant 0 : index
 // CHECK-DAG:   %[[c32:.+]] = arith.constant 32 : index
 // CHECK-DAG:   %[[c1024:.+]] = arith.constant 1024 : index
-// CHECK-COUNT-8: xegpu.load_nd
+// CHECK-COUNT-8: xegpux.load_nd
 // CHECK-COUNT-8: arith.extf
-// CHECK-COUNT-2: xegpu.prefetch_nd
+// CHECK-COUNT-2: xegpux.prefetch_nd
 // CHECK:         %[[out:.+]]:14 = scf.for %[[iv:.+]] = %[[c0]] to %[[c1024]] step %[[c32]]
 // CHECK-SAME:    {
-// CHECK-COUNT-4:   xegpu.load_nd
-// CHECK-COUNT-4:   xegpu.update_nd_offset
-// CHECK-COUNT-2:   xegpu.prefetch_nd
-// CHECK-COUNT-2:   xegpu.update_nd_offset
+// CHECK-COUNT-4:   xegpux.load_nd
+// CHECK-COUNT-4:   xegpux.update_nd_offset
+// CHECK-COUNT-2:   xegpux.prefetch_nd
+// CHECK-COUNT-2:   xegpux.update_nd_offset
 // CHECK-COUNT-12:  vector.extract_strided_slice
-// CHECK-COUNT-16:  xegpu.dpas
+// CHECK-COUNT-16:  xegpux.dpas
 // CHECK:           scf.yield
 // CHECK:         }
 // CHECK-COUNT-8: arith.truncf
-// CHECK-COUNT-8: xegpu.store_nd
+// CHECK-COUNT-8: xegpux.store_nd
 // CHECK:         gpu.return
