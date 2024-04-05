@@ -20,6 +20,7 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Dialect/Transform/LinalgXTransformOps.h"
+#include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
@@ -91,6 +92,7 @@ struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
     registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
+    registry.insert<imex::xegpu::XeGPUDialect>();
     linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -134,6 +136,13 @@ private:
 
     if (print == PrintStage::Mid)
       pm.addPass(createPrintIRPass());
+
+    // Bail out early for Intel GPU.
+    // The rest of the lowering is performed by IMEX.
+    if (gpuBackend == "intel") {
+      pm.addPass(createPrintIRPass());
+      return;
+    }
 
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());

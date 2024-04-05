@@ -8,6 +8,8 @@
 
 #include "TPP/Passes.h"
 
+#include "TPP/Dialect/XeGPU/IR/XeGPUOps.h"
+
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -42,13 +44,6 @@ struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
                        UtilityPassBase<ModuleOp> {
   using GpuConversionBase::GpuConversionBase;
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<scf::SCFDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<gpu::GPUDialect>();
-  }
-
   void runOnOperation() override {
     auto module = getOperation();
 
@@ -68,8 +63,13 @@ private:
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
-    pm.addNestedPass<func::FuncOp>(
-        createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile}));
+    if (isIntel) {
+      pm.addNestedPass<func::FuncOp>(
+          createLinalgToXeGPU(LinalgToXeGPUOptions{kTile, stages}));
+    } else {
+      pm.addNestedPass<func::FuncOp>(
+          createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile, kTile}));
+    }
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
     // Map loops into GPU kernels.
