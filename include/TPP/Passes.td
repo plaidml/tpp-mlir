@@ -344,11 +344,25 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let description = [{
     Convert all eligble operations into generic GPU operations.
   }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "imex::xegpu::XeGPUDialect"];
   let options = [
     Option<"useWmma", "wmma",
            "bool", /*default=*/"false",
            "Use WMMA operations">,
     ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
+    Option<"isIntel", "intel",
+           "bool", /*default=*/"false",
+           "Convert for Intel GPU">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
   ];
 }
 
@@ -540,6 +554,52 @@ def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
     Convert linalg add to in-place update operation.
   }];
   let dependentDialects = ["linalg::LinalgDialect"];
+}
+
+def GPUToXeGPU : Pass<"gpu-to-xegpu", "ModuleOp"> {
+  let summary = "Convert GPU dialect to XeGPU dialect.";
+  let description = [{
+    Lower GPU ops to XeGPU dialect.
+  }];
+  let dependentDialects = ["gpu::GPUDialect",
+                           "imex::xegpu::XeGPUDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect",
+                           "vector::VectorDialect"];
+}
+
+def XegpuFoldMemRef : Pass<"xegpu-fold-memref", "ModuleOp"> {
+  let summary = "Fold memref alias ops into consumer XeGPU load/store ops.";
+  let description = [{
+    The pass folds loading/storing from/to memref aliasing ops to loading/storing
+    from/to the original memref.
+  }];
+  let dependentDialects = ["affine::AffineDialect",
+                           "memref::MemRefDialect",
+                           "vector::VectorDialect"];
+}
+
+def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
+  let summary = "Convert linalg dialect to XeGPU dialect.";
+  let description = [{
+    Lower linalg ops to XeGPU dialect.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "imex::xegpu::XeGPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect",
+                           "math::MathDialect",
+                           "vector::VectorDialect"];
+  let options = [
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
+  ];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

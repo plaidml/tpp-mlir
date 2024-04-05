@@ -11,6 +11,12 @@
 
 #include "mlir/Pass/Pass.h"
 
+namespace imex {
+namespace xegpu {
+class XeGPUDialect;
+} // namespace xegpu
+} // namespace imex
+
 namespace mlir {
 class ModuleOp;
 
@@ -71,6 +77,10 @@ class SPIRVDialect;
 namespace tensor {
 class TensorDialect;
 } // namespace tensor
+
+namespace affine {
+class AffineDialect;
+} // namespace affine
 
 namespace tpp {
 
