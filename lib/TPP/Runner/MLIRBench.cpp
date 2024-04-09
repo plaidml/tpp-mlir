@@ -1,4 +1,10 @@
-//===- MLIRBench.cpp - MLIR Benchmark Producer ----------------------------===//
+//===- MLIRBench.cpp - MLIR Benchmark Producer -----------------*----C++-*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // Producer for benchmark wrapper methods. Upon selecting a Kernel to run, maps
 // the arguments, random initialize them and call the Kernel as many times as
@@ -6,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "MLIRBench.h"
+#include "TPP/Runner/MLIRBench.h"
 
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -47,33 +53,15 @@
 
 using namespace mlir;
 
-// Select target GPU backend for the pipeline.
-llvm::cl::opt<std::string>
-    defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
-
-// Kernel buffers - arguments and return values - are expected to be allocated
-// on GPU.
-llvm::cl::opt<bool>
-    defGpuArgs("gpu-args",
-               llvm::cl::desc("Kernel buffers are allocated on GPU"),
-               llvm::cl::init(true));
-
 MLIRBench::MLIRBench(mlir::Operation *op, const MLIRBenchConfig &config)
     : builder(op->getContext()), unkLoc(builder.getUnknownLoc()) {
   seed = config.seed;
+  backend = config.backend;
   initType = config.initType;
+  offloadToDevice = config.offloadToDevice;
 
   module = dyn_cast<ModuleOp>(op);
   assert(module && "expected a 'builtin.Module' op");
-  auto *ctx = module->getContext();
-  ctx->getOrLoadDialect<tensor::TensorDialect>();
-  ctx->getOrLoadDialect<vector::VectorDialect>();
-  ctx->getOrLoadDialect<scf::SCFDialect>();
-  ctx->getOrLoadDialect<math::MathDialect>();
-  ctx->getOrLoadDialect<bufferization::BufferizationDialect>();
-  ctx->getOrLoadDialect<perf::PerfDialect>();
-  ctx->getOrLoadDialect<gpu::GPUDialect>();
 }
 
 LogicalResult MLIRBench::findKernel(StringRef name) {
@@ -187,10 +175,10 @@ LogicalResult MLIRBench::renameKernel() {
 
 Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   // Do nothing when not using GPU
-  if (defGpuBackend.empty() || !defGpuArgs)
+  if (!offloadToDevice || !(backend == "cuda" || backend == "vulkan"))
     return buf;
 
-  if (defGpuBackend == "vulkan") {
+  if (backend == "vulkan") {
     // Copy to heap as global memory is not shared between host and device
     auto localBuf = builder.create<memref::AllocOp>(unkLoc, memRefTy);
     auto copy = builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
@@ -396,7 +384,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
 
   // Kernels must return a single result
   Value result = kernelCall->getResult(0);
-  if (defGpuBackend == "cuda" && defGpuArgs) {
+  if (backend == "cuda" && offloadToDevice) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());
@@ -424,26 +412,13 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   return printShapedType(result);
 }
 
-LogicalResult MLIRBench::finalize() {
+LogicalResult MLIRBench::terminate() {
   // If we created a main at all...
   // return void and add func to Module
   if (main) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToEnd(&getMainBlock());
     builder.create<func::ReturnOp>(unkLoc);
-  }
-
-  // A set of default passes that lower any input IR to LLVM
-  PassManager passManager(module->getContext());
-
-  tpp::DefaultPipelineOptions options{defGpuBackend};
-  passManager.addPass(tpp::createDefaultPipeline(options));
-
-  auto result = passManager.run(module);
-  if (failed(result)) {
-    llvm::errs() << "ERROR: Failed to lower IR to LLVM dialect\n";
-    module->print(llvm::errs());
-    return result;
   }
 
   return success();
@@ -461,4 +436,4 @@ LogicalResult MLIRBench::emitError(llvm::Twine desc) {
   return module.emitError(desc);
 }
 
-std::string MLIRBench::getGPUName() { return defGpuBackend; }
+std::string MLIRBench::getGPUName() { return backend; }
