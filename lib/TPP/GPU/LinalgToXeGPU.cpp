@@ -68,6 +68,13 @@ struct TilesArray {
 
   void setTile(int row, int col, Value val) { tileMatrix[row][col] = val; }
 
+  SmallVector<Value> toFlatVector() {
+    SmallVector<Value> flatVector;
+    for (auto row : tileMatrix)
+      flatVector.append(row);
+    return flatVector;
+  }
+
   SmallVector<SmallVector<Value, 8>, 8> tileMatrix;
 };
 
@@ -208,9 +215,14 @@ static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
 // Returns the result of the lowered op or nullopt, otherwise.
 static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
                                            ArrayRef<Value> operands,
-                                           VectorType resType,
                                            PatternRewriter &rewriter) {
   Location loc = linalgOp.getLoc();
+
+  assert(llvm::all_of(operands,
+                      [&](Value tile) {
+                        return tile.getType() == operands[0].getType();
+                      }) &&
+         "All eltwise operands must have the same type.");
 
   // Expect operands to be already loaded vectors.
   for (auto operand : operands) {
@@ -218,6 +230,9 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
       return std::nullopt;
   }
 
+  auto operandType = operands[0].getType().cast<ShapedType>();
+  auto resType =
+      VectorType::get(operandType.getShape(), operandType.getElementType());
   auto eltType = resType.getElementType();
 
   return llvm::TypeSwitch<Operation *, std::optional<Value>>(linalgOp)
@@ -420,8 +435,7 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
     }
 
     // Lower to a vectorized eltwise op.
-    auto newRes = lowerEltwiseOp(
-        consumerOp, operands, cast<VectorType>(storedVal.getType()), rewriter);
+    auto newRes = lowerEltwiseOp(consumerOp, operands, rewriter);
     if (!newRes)
       return std::nullopt;
 
@@ -803,25 +817,38 @@ createDescriptorTiles(PatternRewriter &rewriter, Location loc, Value src,
   return tiles;
 }
 
-// Create a GEMM sub-tiles to be loaded by the current thread/workitem.
+// Create a coarse sub-tiles to be loaded by the current thread/workitem.
 //
 // The shape to be loaded is split into largest 2D loads supported
 // by the hardware.
 //
-// The load tiles are ordered in row-major fashion with respect to the
-// thread/workitem tile.
-static SmallVector<Value> createCoarseLoadTiles(PatternRewriter &rewriter,
-                                                Location loc, Value src,
-                                                ArrayRef<int64_t> loadShape,
-                                                xegpu::Mode mode, bool isVnni) {
-  // TODO: Fetch actual list of supported load configs
-  //       as they also depend on data type width.
-  //       Here only 16 bit wide elements are assumed.
-  const int64_t maxHeight = 32;
-  const int64_t maxWidth = isVnni ? 16 : 32;
-  const int64_t maxArrayLength = 4;
-  int64_t loadRows = std::min(loadShape[0], maxHeight);
-  int64_t loadCols = std::min(loadShape[1], maxWidth);
+// The load tiles are ordered in row-major fashion with respect to the source.
+static SmallVector<Value> createCoarseDscTiles(PatternRewriter &rewriter,
+                                               Location loc, Value src,
+                                               ArrayRef<int64_t> loadShape,
+                                               xegpu::Mode mode, bool isVnni) {
+  assert(loadShape.size() <= 2 &&
+         "Require at most 2D tile size for eltwise lowering");
+
+  // Ensure that load is 2D.
+  // TODO: Add support for 1D loads.
+  SmallVector<int64_t, 2> loadShape2D{loadShape};
+  if (loadShape.size() == 1)
+    loadShape2D.push_back(1);
+
+  auto type = src.getType().cast<ShapedType>();
+  auto elemByteWidth = type.getElementType().getIntOrFloatBitWidth() / 8;
+
+  // TODO: Fetch actual list of supported load configs.
+  int64_t maxHeight = 32;
+  int64_t maxWidth = 64 / elemByteWidth;
+  // Assumes VNNI-factor 2.
+  // TODO: Make the VNNI-factor flexible.
+  if (isVnni)
+    maxWidth /= 2;
+  int64_t maxArrayLength = 4;
+  int64_t loadRows = std::min(loadShape2D[0], maxHeight);
+  int64_t loadCols = std::min(loadShape2D[1], maxWidth);
   int64_t arrayLength = std::min(maxWidth / loadCols, maxArrayLength);
   // In case of partial fit, load only single tile.
   if (maxWidth % loadCols != 0 || arrayLength != 4 || arrayLength != 2)
@@ -830,7 +857,7 @@ static SmallVector<Value> createCoarseLoadTiles(PatternRewriter &rewriter,
   // TODO: Bump IMEX version to bring array_length attr support.
   arrayLength = 1;
 
-  return createDescriptorTiles(rewriter, loc, src, loadShape, {0, 0},
+  return createDescriptorTiles(rewriter, loc, src, loadShape2D, {0, 0},
                                {loadRows, loadCols}, mode, arrayLength);
 }
 
@@ -842,11 +869,12 @@ static VectorType getVnniVector(ArrayRef<int64_t> shape, Type elementType,
   return VectorType::get(vecShape, elementType);
 }
 
+// Loads n-D tiles from memory to registers.
 static SmallVector<Value>
-loadGemmTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
-              xegpu::Mode mode, xegpu::CacheReadHintAttr hint,
-              std::optional<VnniConfig> vnniConf = std::nullopt,
-              DenseI64ArrayAttr transpose = nullptr) {
+loadNdDescTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
+                xegpu::Mode mode, xegpu::CacheReadHintAttr hint,
+                std::optional<VnniConfig> vnniConf = std::nullopt,
+                DenseI64ArrayAttr transpose = nullptr) {
   // Assume all tiles have the same shape.
   xegpu::TensorDescType tileType =
       loadTiles[0].getType().cast<xegpu::TensorDescType>();
@@ -878,10 +906,11 @@ loadGemmTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
 }
 
 static TilesArray
-extractVecDpasTiles(PatternRewriter &rewriter, Location loc,
-                    ValueRange loadVecTiles, ArrayRef<int64_t> loadTile,
-                    ArrayRef<int64_t> loadSubTile, ArrayRef<int64_t> dpasTile,
-                    std::optional<VnniConfig> vnniConf = std::nullopt) {
+extractVecSubTiles(PatternRewriter &rewriter, Location loc,
+                   ValueRange loadVecTiles, ArrayRef<int64_t> totalTileShape,
+                   ArrayRef<int64_t> loadTileShape,
+                   ArrayRef<int64_t> subTileShape,
+                   std::optional<VnniConfig> vnniConf = std::nullopt) {
   auto vecLoadType = loadVecTiles[0].getType().cast<VectorType>();
   assert(llvm::all_of(loadVecTiles,
                       [&](Value tile) {
@@ -895,58 +924,58 @@ extractVecDpasTiles(PatternRewriter &rewriter, Location loc,
                                     std::multiplies<int64_t>());
   auto loadVecFlat = VectorType::get(loadVecSize, vecLoadType.getElementType());
 
-  VectorType vecDpasType =
-      VectorType::get(dpasTile, vecLoadType.getElementType());
+  VectorType vecSubTileType =
+      VectorType::get(subTileShape, vecLoadType.getElementType());
   if (vnniConf) {
-    vecDpasType =
-        getVnniVector(dpasTile, vecLoadType.getElementType(), *vnniConf);
+    vecSubTileType =
+        getVnniVector(subTileShape, vecLoadType.getElementType(), *vnniConf);
   }
 
-  const int numLoadTilesRows = loadTile[0] / loadSubTile[0];
-  const int numLoadTilesCol = loadTile[1] / loadSubTile[1];
+  const int totalTileRows = totalTileShape[0] / loadTileShape[0];
+  const int totalTileCols = totalTileShape[1] / loadTileShape[1];
 
-  const int numDpasPerLoadRow = loadSubTile[0] / dpasTile[0];
-  const int numDpasPerLoadCol = loadSubTile[1] / dpasTile[1];
+  const int subTilesPerLoadRow = loadTileShape[0] / subTileShape[0];
+  const int subTilePerLoadCol = loadTileShape[1] / subTileShape[1];
 
-  const int numDpasTileRows = loadTile[0] / dpasTile[0];
-  const int numDpasTileCols = loadTile[1] / dpasTile[1];
-  TilesArray dpasTiles(numDpasTileRows, numDpasTileCols);
+  const int subTileRows = totalTileShape[0] / subTileShape[0];
+  const int subTileCols = totalTileShape[1] / subTileShape[1];
+  TilesArray subTiles(subTileRows, subTileCols);
 
-  // Iterate over load tile.
-  // Each load tile contains one or more DPAS tiles.
-  for (int m = 0; m < numLoadTilesRows; m++) {
-    for (int k = 0; k < numLoadTilesCol; k++) {
+  // Iterate over the total tile.
+  for (int m = 0; m < totalTileRows; m++) {
+    for (int k = 0; k < totalTileCols; k++) {
       // Load tiles are ordered in row-major fashion.
-      int loadIdx = m * numLoadTilesCol + k;
-      auto loadTile = loadVecTiles[loadIdx];
-      auto castFlat =
-          rewriter.create<vector::ShapeCastOp>(loc, loadVecFlat, loadTile);
+      int loadIdx = m * totalTileCols + k;
+      auto totalTileShape = loadVecTiles[loadIdx];
+      auto castFlat = rewriter.create<vector::ShapeCastOp>(loc, loadVecFlat,
+                                                           totalTileShape);
 
-      // Iterate over DPAS tiles.
-      for (int i = 0; i < numDpasPerLoadRow; i++) {
-        for (int j = 0; j < numDpasPerLoadCol; j++) {
-          const int dpasTileSize = dpasTile[0] * dpasTile[1];
-          int dpasIdx = i * numDpasPerLoadCol + j;
-          int offset = dpasIdx * dpasTileSize;
+      // Iterate over load tiles.
+      // Each load tile contains one or more sub-tiles.
+      for (int i = 0; i < subTilesPerLoadRow; i++) {
+        for (int j = 0; j < subTilePerLoadCol; j++) {
+          const int subTileShapeSize = subTileShape[0] * subTileShape[1];
+          int dpasIdx = i * subTilePerLoadCol + j;
+          int offset = dpasIdx * subTileShapeSize;
 
           auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
               loc, castFlat, /*offsets=*/ArrayRef<int64_t>{offset},
-              /*sizes=*/ArrayRef<int64_t>{dpasTileSize},
+              /*sizes=*/ArrayRef<int64_t>{subTileShapeSize},
               /*strides=*/ArrayRef<int64_t>{1});
           auto castTile =
-              rewriter.create<vector::ShapeCastOp>(loc, vecDpasType, slice);
+              rewriter.create<vector::ShapeCastOp>(loc, vecSubTileType, slice);
 
           // Insert the sub-tiles in their position relative to the whole
           // thread/workitem tile.
-          int rowIdx = m * numDpasPerLoadRow + i;
-          int colIdx = k * numDpasPerLoadCol + j;
-          dpasTiles.setTile(rowIdx, colIdx, castTile);
+          int rowIdx = m * subTilesPerLoadRow + i;
+          int colIdx = k * subTilePerLoadCol + j;
+          subTiles.setTile(rowIdx, colIdx, castTile);
         }
       }
     }
   }
 
-  return dpasTiles;
+  return subTiles;
 }
 
 // Create XeGPU DPAS kernel out of GEMM-like operation.
@@ -1000,7 +1029,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // Load C sub-tiles.
   // Fetch the inital values of the output accumulator.
   SmallVector<Value> loadVecC =
-      loadGemmTiles(rewriter, loc, tilesC, xegpuMode, readCacheHint);
+      loadNdDescTiles(rewriter, loc, tilesC, xegpuMode, readCacheHint);
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // DPAS only works with F32 accumulators.
@@ -1050,11 +1079,11 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   }
 
   // Create A sub-tiles.
-  SmallVector<Value> tilesA = createCoarseLoadTiles(
+  SmallVector<Value> tilesA = createCoarseDscTiles(
       rewriter, loc, matA, {dimM, kTile}, xegpuMode, /*isVnni=*/true);
 
   // Create B sub-tiles.
-  SmallVector<Value> tilesB = createCoarseLoadTiles(
+  SmallVector<Value> tilesB = createCoarseDscTiles(
       rewriter, loc, matB, {kTile, dimN}, xegpuMode, /*isVnni=*/true);
 
   // Create input prefetch tiles.
@@ -1175,14 +1204,14 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   VnniConfig vnniConfB{.vnniFactor = vnniFactor, .vnniAxis = 0};
 
   // Load A sub-tiles.
-  SmallVector<Value> loadVecA =
-      loadGemmTiles(rewriter, loc, tilesA, xegpuMode, readCacheHint, vnniConfA);
+  SmallVector<Value> loadVecA = loadNdDescTiles(
+      rewriter, loc, tilesA, xegpuMode, readCacheHint, vnniConfA);
   xegpu::TensorDescType tileTypeA =
       tilesA[0].getType().cast<xegpu::TensorDescType>();
 
   // Load B sub-tiles.
-  SmallVector<Value> loadVecB =
-      loadGemmTiles(rewriter, loc, tilesB, xegpuMode, readCacheHint, vnniConfB);
+  SmallVector<Value> loadVecB = loadNdDescTiles(
+      rewriter, loc, tilesB, xegpuMode, readCacheHint, vnniConfB);
   xegpu::TensorDescType tileTypeB =
       tilesB[0].getType().cast<xegpu::TensorDescType>();
 
@@ -1217,12 +1246,12 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   rewriter.create<xegpu::CompileHintOp>(loc);
 
   // Extract DPAS tiles from loaded sub-tiles.
-  TilesArray dpasVecA = extractVecDpasTiles(rewriter, loc, loadVecA,
-                                            {dimM, kTile}, tileTypeA.getShape(),
-                                            {dpasTileM, dpasTileK}, vnniConfA);
-  TilesArray dpasVecB = extractVecDpasTiles(rewriter, loc, loadVecB,
-                                            {kTile, dimN}, tileTypeB.getShape(),
-                                            {dpasTileK, dpasTileN}, vnniConfB);
+  TilesArray dpasVecA = extractVecSubTiles(rewriter, loc, loadVecA,
+                                           {dimM, kTile}, tileTypeA.getShape(),
+                                           {dpasTileM, dpasTileK}, vnniConfA);
+  TilesArray dpasVecB = extractVecSubTiles(rewriter, loc, loadVecB,
+                                           {kTile, dimN}, tileTypeB.getShape(),
+                                           {dpasTileK, dpasTileN}, vnniConfB);
 
   // Finalize vector reshaping before DPAS.
   rewriter.create<xegpu::CompileHintOp>(loc);
@@ -1320,99 +1349,79 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
 // Create XeGPU kernel out of elementwise operation.
 LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
-                                  ArrayRef<int64_t> tileSizes,
                                   PatternRewriter &rewriter) {
-  assert(tileSizes.size() == 2 && "Require 2D tile size for eltwise lowering");
-
   Location loc = linalgOp.getLoc();
   auto ctx = linalgOp.getContext();
 
   auto output = linalgOp.getDpsInits()[0];
-  auto outputType = output.getType().cast<ShapedType>();
-  auto outputShape = outputType.getShape();
+  auto outputShape = output.getType().cast<ShapedType>().getShape();
 
-  bool isOutput2D = outputShape.size() == 2;
-
-  auto dimM = outputShape[0];
-  auto dimN = isOutput2D ? outputShape[1] : 0;
-
-  SmallVector<int64_t> eltwiseTileShape{tileSizes[0]};
-  if (isOutput2D)
-    eltwiseTileShape.push_back(tileSizes[1]);
-
-  // Linalg named elementwise operations guarantee that all operands
-  // have the same shape and type. Thus, the same tensor descriptor
-  // type can be used for all operands.
-  auto tensorDesc = xegpu::TensorDescType::get(
-      eltwiseTileShape, output.getType().cast<ShapedType>().getElementType());
+  // Instruction mode - use subgroup intristics directly.
   auto xegpuMode = xegpu::Mode::VC;
 
-  // Create tiled tensor descriptors.
-  auto createDescs = [&](Value source) -> SmallVector<Value> {
-    SmallVector<Value> tiles;
-    // TODO: Use larger tile size in case of 1D inputs.
-    for (int m = 0; m < dimM; m += tileSizes[0]) {
-      Value rowIdx = rewriter.create<arith::ConstantIndexOp>(loc, m);
-
-      // Flexibly create 1D or 2D descriptors.
-      int n = 0;
-      do {
-        mlir::SmallVector<mlir::OpFoldResult> loadOffsets{rowIdx};
-
-        if (dimN > 0) {
-          Value colIdx = rewriter.create<arith::ConstantIndexOp>(loc, n);
-          loadOffsets.push_back(colIdx);
-        }
-
-        Value tile = rewriter
-                         .create<xegpu::CreateNdDescOp>(
-                             loc, tensorDesc, source, loadOffsets,
-                             /*boundary_check=*/true, xegpuMode)
-                         .getResult();
-        tiles.push_back(tile);
-
-        n += tileSizes[1];
-      } while (n < dimN);
-    }
-
-    return tiles;
-  };
-
-  // Output descriptors for later stores.
-  SmallVector<Value> outputTiles = createDescs(output);
-
   // Create descriptors and load values for all inputs.
-  auto vecType =
-      VectorType::get(tensorDesc.getShape(), tensorDesc.getElementType());
-
   SmallVector<SmallVector<Value>> loadedInputs;
   for (auto input : linalgOp.getDpsInputs()) {
-    SmallVector<Value> inputTiles = createDescs(input);
-    SmallVector<Value> loadedVals;
-    for (auto tile : inputTiles) {
-      auto loadedVec = rewriter.create<xegpu::LoadNDOp>(
-          loc, vecType, tile, /*vnni_axis=*/nullptr,
-          /*transpose=*/nullptr,
-          /*l1_hint=*/nullptr,
-          /*l2_hint=*/nullptr, /*l3_hint=*/nullptr, xegpuMode);
-      loadedVals.push_back(loadedVec);
-    }
+    SmallVector<Value> inputTiles = createCoarseDscTiles(
+        rewriter, loc, input, outputShape, xegpuMode, /*isVnni=*/false);
+    SmallVector<Value> loadedVals =
+        loadNdDescTiles(rewriter, loc, inputTiles, xegpuMode, /*hint=*/nullptr);
     loadedInputs.push_back(loadedVals);
   }
 
+  // Ensure that all loads are scheduled together.
+  rewriter.create<xegpu::CompileHintOp>(loc);
+
+  // Extract SIMD sized sub-tiles from loaded tiles.
+  // TODO: Fetch SIMD sizes from target descriptor.
+  int maxSizeSIMD = 256;
+  auto loadShape = loadedInputs[0][0].getType().cast<VectorType>().getShape();
+  // For sake of n-D loads and store, the vectorized operations are kept in 2D
+  // shape. The loaded tiles might be larger than what SIMD units can handle.
+  // Thus, split the registers into contiguous smaller slices. The current
+  // hardware load restrictions ensure that the loaded tile width will not
+  // exceed SIMD size.
+  //
+  // Take at least one whole row plus as many extra rows as can fit into
+  // a single SIMD instruction.
+  int64_t subTileCols = loadShape[1];
+  int64_t subTileRows = std::min(loadShape[0], maxSizeSIMD / subTileCols);
+
+  SmallVector<SmallVector<Value>> vecSubTiles;
+  for (auto inputTiles : loadedInputs) {
+    TilesArray subTiles =
+        extractVecSubTiles(rewriter, loc, inputTiles, outputShape, loadShape,
+                           {subTileRows, subTileCols});
+    vecSubTiles.push_back(subTiles.toFlatVector());
+  }
+
+  // Finalize vector reshaping before computation.
+  rewriter.create<xegpu::CompileHintOp>(loc);
+
   // Perform vectorized computations for each output tile.
   SmallVector<Value> results;
-  for (size_t i = 0; i < outputTiles.size(); i++) {
+  for (size_t i = 0; i < vecSubTiles[0].size(); i++) {
+    // Operands are sub-tiles at the same location.
     SmallVector<Value> operands;
-    for (auto inputs : loadedInputs) {
+    for (auto inputs : vecSubTiles) {
       operands.push_back(inputs[i]);
     }
-    auto res = lowerEltwiseOp(linalgOp, operands, vecType, rewriter);
+
+    // Create SIMD operations on the sub-tiles.
+    auto res = lowerEltwiseOp(linalgOp, operands, rewriter);
     if (!res)
       return failure();
 
     results.push_back(*res);
   }
+
+  // Ensure that all computations are scheduled together.
+  rewriter.create<xegpu::CompileHintOp>(loc);
+
+  // Output descriptors for later stores.
+  SmallVector<Value> outputTiles =
+      createDescriptorTiles(rewriter, loc, output, outputShape, {0, 0},
+                            {subTileRows, subTileCols}, xegpuMode);
 
   // Store results.
   auto writeCacheHint =
@@ -1530,11 +1539,7 @@ struct ConvertNamedEltwiseToXeGPU : public OpRewritePattern<LinalgOpTy> {
     if (failed(isOutputValid))
       return isOutputValid;
 
-    // TODO: Tile sizes for vectorized eltwise operations should be chosen
-    //       dynamically based on the workload and target hardware.
-    SmallVector<int64_t> tileSizes{8, 16};
-
-    return createEltwiseKernel(eltwiseOp, tileSizes, rewriter);
+    return createEltwiseKernel(eltwiseOp, rewriter);
   }
 
 private:

@@ -189,3 +189,29 @@ func.func @sub(%arg0: memref<8x16xf16>, %arg1: memref<8x16xf16>, %arg2: memref<8
 // CHECK-COUNT-2: xegpux.load_nd
 // CHECK: arith.subf
 // CHECK: xegpux.store_nd
+
+// -----
+
+func.func @add_large_f16(%arg0: memref<64x64xf16>, %arg1: memref<64x64xf16>, %arg2: memref<64x64xf16>) {
+  linalg.add ins(%arg0, %arg1 : memref<64x64xf16>, memref<64x64xf16>)
+             outs(%arg2 : memref<64x64xf16>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_large_f16
+// CHECK: xegpux.load_nd{{.*}}: !xegpux.tensor_desc<32x32xf16> -> vector<32x32xf16>
+// CHECK: arith.addf{{.*}}: vector<8x32xf16>
+// CHECK: xegpux.store_nd{{.*}}: vector<8x32xf16>
+
+// -----
+
+func.func @add_large_f32(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>, %arg2: memref<64x64xf32>) {
+  linalg.add ins(%arg0, %arg1 : memref<64x64xf32>, memref<64x64xf32>)
+             outs(%arg2 : memref<64x64xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @add_large_f32
+// CHECK: xegpux.load_nd{{.*}}: !xegpux.tensor_desc<32x16xf32> -> vector<32x16xf32>
+// CHECK: arith.addf{{.*}}: vector<16x16xf32>
+// CHECK: xegpux.store_nd{{.*}}: vector<16x16xf32>
