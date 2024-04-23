@@ -38,19 +38,13 @@ add_mlir_library(TPPTransforms
     MLIRSupport
     MLIRBufferizationToMemRef
     MLIRBufferizationPipelines
-    # TPPTppDialect
     TPPTransformsUtils
     TPPIR
     TPPXsmmDialect
     TPPCheckToLoops
     TPPLinalgToFunc
-    # TPPLinalgToTpp
-    # TPPLinalgToXSMM
-    # TPPMemRefToXSMM
     TPPPerfToFunc
     TPPPerfToLoop
-    # TPPTppToLoops
-    # TPPTppToXSMM
     TPPXsmmToFunc
     TPPLinalgXTransformOps
   )

@@ -150,6 +150,3 @@ add_custom_target(reformat DEPENDS reformat-clang reformat-python)
 add_custom_target(check-python ${CI_DIR}/lint-python.sh)
 add_custom_target(check-clang  ${CI_DIR}/lint-clang.sh)
 add_custom_target(check-format DEPENDS check-clang check-python)
-
-# Check-all is just check, for now
-add_custom_target(tpp-check-all DEPENDS tpp-check)

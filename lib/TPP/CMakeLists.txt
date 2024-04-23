@@ -19,21 +19,7 @@ add_mlir_library(TPPPipeline
 
   LINK_LIBS PUBLIC
     MLIRIR
-    MLIRMeshDialect
-    MLIRSupport
-    MLIRToLLVMIRTranslationRegistration
-    MLIRMPIDialect
-    MLIRMLProgramDialect
-    MLIRMLProgramTransforms
-    MLIRArithValueBoundsOpInterfaceImpl
-    MLIRAsyncTransforms
-    MLIRControlFlowTransforms
-    MLIRShapeOpsTransforms
-    MLIRSparseTensorTransforms
-    MLIRTensorDialect
-    MLIRTensorInferTypeOpInterfaceImpl
-    MLIRTosaDialect
-    MLIRTosaShardingInterfaceImpl
+    ${mlir_dialect_libs}
     ${conversion_libs}
     TPPGPU
   )
