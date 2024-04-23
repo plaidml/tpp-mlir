@@ -1,7 +1,7 @@
-// RUN: tpp-opt %s -set-spirv-capabilities=client-api=vulkan | \
+// RUN: tpp-opt %s -tpp-set-spirv-capabilities=client-api=vulkan | \
 // RUN: FileCheck %s --check-prefix=VULKAN
 
-// RUN: tpp-opt %s -set-spirv-capabilities=client-api=opencl | \
+// RUN: tpp-opt %s -tpp-set-spirv-capabilities=client-api=opencl | \
 // RUN: FileCheck %s --check-prefix=OPENCL
 
 module attributes {gpu.container_module} {
