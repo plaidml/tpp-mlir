@@ -410,21 +410,21 @@ struct ConvertToForAll : public OpRewritePattern<scf::ForOp> {
               Value destVal = mapping.lookup(insertSlice.getDest());
               SmallVector<OpFoldResult> offsets;
               for (OpFoldResult offset : insertSlice.getMixedOffsets()) {
-                if (auto valueOffset = offset.dyn_cast<Value>())
+                if (auto valueOffset = dyn_cast<Value>(offset))
                   offsets.push_back(mapping.lookupOrDefault(valueOffset));
                 else
                   offsets.push_back(offset);
               }
               SmallVector<OpFoldResult> sizes;
               for (OpFoldResult size : insertSlice.getMixedSizes()) {
-                if (auto valueSize = size.dyn_cast<Value>())
+                if (auto valueSize = dyn_cast<Value>(size))
                   sizes.push_back(mapping.lookupOrDefault(valueSize));
                 else
                   sizes.push_back(size);
               }
               SmallVector<OpFoldResult> strides;
               for (OpFoldResult stride : insertSlice.getMixedStrides()) {
-                if (auto valueStride = stride.dyn_cast<Value>())
+                if (auto valueStride = dyn_cast<Value>(stride))
                   strides.push_back(mapping.lookupOrDefault(valueStride));
                 else
                   strides.push_back(stride);

@@ -118,7 +118,7 @@ FailureOr<SmallVector<int64_t>> getStaticStrides(Value value) {
 
 std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value operand,
                                         Location loc) {
-  auto memrefType = operand.getType().dyn_cast<MemRefType>();
+  auto memrefType = dyn_cast<MemRefType>(operand.getType());
   assert(memrefType && "Expect a memref value");
   MemRefType baseMemrefType = MemRefType::get({}, memrefType.getElementType());
   Type basePtrType = builder.getIndexType();

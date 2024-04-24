@@ -166,7 +166,7 @@ struct HasStaticShape {
 
   bool operator()(OpOperand *operand, Operation *op) const {
     auto operandType = operand->get().getType();
-    if (auto shapedType = operandType.dyn_cast_or_null<ShapedType>()) {
+    if (auto shapedType = dyn_cast_or_null<ShapedType>(operandType)) {
       if (!shapedType.hasStaticShape())
         return false;
       if (shape) {
@@ -188,7 +188,7 @@ struct HasStaticStrides {
   bool operator()(OpOperand *operand, Operation *op) const {
     auto operandType = operand->get().getType();
     SmallVector<int64_t> strides;
-    if (auto memRefType = operandType.dyn_cast_or_null<MemRefType>()) {
+    if (auto memRefType = dyn_cast_or_null<MemRefType>(operandType)) {
       int64_t offset;
       if (failed(getStridesAndOffset(memRefType, strides, offset)))
         return false;

@@ -42,7 +42,7 @@ static SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
   results.push_back(integer64);
   for (Value operand : operands) {
     Type operandType = operand.getType();
-    if (auto memrefType = operandType.dyn_cast<MemRefType>()) {
+    if (auto memrefType = dyn_cast<MemRefType>(operandType)) {
       // TODO: non-POD will require an LLVMTypeConverter.
       Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
       results.push_back(basePtrType);
@@ -65,7 +65,7 @@ static SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
       builder.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
 
   for (Value operand : operands) {
-    auto memrefType = operand.getType().dyn_cast<MemRefType>();
+    auto memrefType = dyn_cast<MemRefType>(operand.getType());
     if (!memrefType) {
       res.push_back(operand);
       continue;

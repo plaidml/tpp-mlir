@@ -28,10 +28,11 @@ module {
 // CHECK: %[[c0_i64:.*]] = arith.constant 0 : i64
 // CHECK: %[[temp0:.*]] = call @xsmm_brgemm_dispatch(%[[c1_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c0_i64]])
 // CHECK:    omp.parallel {
-// CHECK:      omp.wsloop for  (%[[ARG3:.*]], %[[ARG4:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c8]]) {
-// CHECK:        memref.alloca_scope  {
-// CHECK:          scf.for %[[ARG5:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
-// CHECK:	     %[[temp1:.*]] = arith.addi %[[ARG5]], %[[ARG3]] : index
-// CHECK:            scf.for %[[ARG6:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
-// CHECK:              %[[temp2:.*]] = arith.addi %[[ARG6]], %[[ARG4]] : index
+// CHECK:      omp.wsloop {
+// CHECK:        omp.loop_nest (%[[ARG3:.*]], %[[ARG4:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c8]]) {
+// CHECK:          memref.alloca_scope  {
+// CHECK:            scf.for %[[ARG5:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
+// CHECK:	       %[[temp1:.*]] = arith.addi %[[ARG5]], %[[ARG3]] : index
+// CHECK:              scf.for %[[ARG6:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
+// CHECK:                %[[temp2:.*]] = arith.addi %[[ARG6]], %[[ARG4]] : index
 
