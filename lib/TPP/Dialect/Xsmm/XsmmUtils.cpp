@@ -50,7 +50,7 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   Type outputType = output.getType();
 
   assert(isa<ShapedType>(outputType));
-  auto outputShapedType = output.getType().cast<ShapedType>();
+  auto outputShapedType = outputType.cast<ShapedType>();
   if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
@@ -96,7 +96,7 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
   Type outputType = output.getType();
 
   assert(isa<ShapedType>(outputType));
-  auto outputShapedType = output.getType().cast<ShapedType>();
+  auto outputShapedType = outputType.cast<ShapedType>();
   if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
@@ -268,6 +268,7 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
         return xsmm::BinaryFlags::BCAST_COL_IN_1;
     }
     assert(false && "unrechable");
+    abort();
   };
 
   if (bOperandShape == shapeOutput)
@@ -329,10 +330,10 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
 
   // If we haven't found a BRGEMM or zero, this are not the droids we're looking
   // for
-  assert(isa<xsmm::BrgemmOp>(chain[0]) ||
+  assert((isa<xsmm::BrgemmOp>(chain[0]) ||
          (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
           dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
-          isa<xsmm::BrgemmOp>(chain[1])) &&
+          isa<xsmm::BrgemmOp>(chain[1]))) &&
              "First op must be brgemm or zero");
 
   // Now, we're sure we have a chain, but not yet if it has the right types

@@ -288,7 +288,7 @@ Value MLIRBench::createTimerLoop(unsigned iters) {
   builder.setInsertionPointToStart(bench.getBody());
 
   // Call the kernel, ignore output
-  auto *call = callKernel();
+  [[maybe_unused]] auto *call = callKernel();
   assert(call && "Failed to generate a kernel call");
 
   // Revert insertion point and return the accumulation ID

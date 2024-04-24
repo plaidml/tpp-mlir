@@ -84,7 +84,7 @@ static LogicalResult isDimExprOrMulExpr(AffineExpr expr,
 }
 
 // Walk `convExpr` in pre-order and extract a constant if any.
-static LogicalResult walkConvExpr(AffineExpr convExpr,
+[[maybe_unused]] static LogicalResult walkConvExpr(AffineExpr convExpr,
                                   AffineExpr &multiplicativeFactor) {
   if (auto dimExpr = dyn_cast<AffineDimExpr>(convExpr))
     return success();
@@ -139,7 +139,7 @@ static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));
   if (isImage) {
     AffineMap imageMap = linalgOp.getMatchingIndexingMap(operand);
-    AffineExpr wExpr = imageMap.getResult(imageMap.getNumResults() - 2);
+    [[maybe_unused]] AffineExpr wExpr = imageMap.getResult(imageMap.getNumResults() - 2);
     AffineExpr multiplicativeFactor =
         getAffineConstantExpr(1, linalgOp.getContext());
     // By definition a convolution affine expression can either be:

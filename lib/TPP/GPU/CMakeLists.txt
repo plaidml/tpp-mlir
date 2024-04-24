@@ -23,6 +23,7 @@ add_mlir_library(TPPGPU
   LINK_LIBS PUBLIC
     MLIRGPUDialect
     MLIRGPUTransforms
+    MLIRGPUToSPIRV
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRMathToSPIRV

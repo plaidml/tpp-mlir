@@ -105,6 +105,7 @@ static Type inferNewOperandType(Type oldType,
         newTensorShape, oldType.cast<RankedTensorType>().getElementType());
   }
   assert(false && "expect memref or rankedTensorType");
+  abort();
 }
 
 static FailureOr<Value> collapseOperand(Value operand,

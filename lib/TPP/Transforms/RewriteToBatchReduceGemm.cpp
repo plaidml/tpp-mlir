@@ -57,7 +57,7 @@ static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
 }
 
 // Check if the operand is an output to linalgOp.
-static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
+[[maybe_unused]] static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
   return !isInputOperand(linalgOp, operand);
 }
 

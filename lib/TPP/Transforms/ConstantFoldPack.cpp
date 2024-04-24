@@ -171,7 +171,7 @@ struct ConstantFoldPack
           }
         });
 
-    bool detectSpalt = false;
+    [[maybe_unused]] bool detectSpalt = false;
     assert(DenseElementsAttr::isValidRawBuffer(packOp.getDestType(),
                                                destRawData, detectSpalt));
     auto newDense =

@@ -8,6 +8,9 @@ add_mlir_dialect_library(TPPLinalgXTransformOps
   DEPENDS
     TPPCompilerPassIncGen
     TPPLinalgXTransformOpsIncGen
+
+  LINK_LIBS PUBLIC
+    MLIRTransformDialect
 )
 
 target_include_directories(TPPLinalgXTransformOps

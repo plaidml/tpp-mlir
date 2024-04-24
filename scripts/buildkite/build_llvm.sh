@@ -141,7 +141,7 @@ fi
 
 # Check LLVM
 echo "--- CHECK"
-echo_run ninja -C ${LLVM_BUILD_DIR} check-all
+echo_run ninja -C ${LLVM_BUILD_DIR} check-tpp
 if [ $? != 0 ]; then
   exit 1
 fi

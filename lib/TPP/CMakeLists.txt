@@ -19,6 +19,7 @@ add_mlir_library(TPPPipeline
 
   LINK_LIBS PUBLIC
     MLIRIR
+    ${mlir_dialect_libs}
     ${conversion_libs}
     TPPGPU
   )

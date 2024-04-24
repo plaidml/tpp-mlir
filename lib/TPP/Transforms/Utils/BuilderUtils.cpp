@@ -56,6 +56,7 @@ Value getConstInt(OpBuilder &builder, int value, int width) {
   default:
     assert(false && "Invalid constant integer size");
   }
+  abort();
 }
 
 Value getConstFloat(OpBuilder &builder, float value, FloatType type) {
