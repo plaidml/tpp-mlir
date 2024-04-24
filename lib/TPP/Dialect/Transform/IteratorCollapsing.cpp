@@ -73,19 +73,19 @@ convertAffineMapArrayToExprs(ArrayAttr affineMapArrayAttr) {
   SmallVector<ReassociationExprs, 2> reassociationExprs;
   for (auto attr : affineMapArrayAttr)
     reassociationExprs.push_back(
-        llvm::to_vector<4>(attr.cast<AffineMapAttr>().getValue().getResults()));
+        llvm::to_vector<4>(cast<AffineMapAttr>(attr).getValue().getResults()));
   return reassociationExprs;
 }
 
 static Type inferNewOperandType(Type oldType,
                                 ArrayRef<ReassociationIndices> reassociation) {
-  if (oldType.isa<MemRefType>())
+  if (isa<MemRefType>(oldType)) {
     return memref::CollapseShapeOp::computeCollapsedType(
-        oldType.cast<MemRefType>(), reassociation);
-  if (oldType.isa<RankedTensorType>()) {
+        cast<MemRefType>(oldType), reassociation);
+  }
+  if (isa<RankedTensorType>(oldType)) {
     SmallVector<int64_t> newTensorShape;
-    ArrayRef<int64_t> oldTypeShape =
-        oldType.cast<RankedTensorType>().getShape();
+    ArrayRef<int64_t> oldTypeShape = cast<RankedTensorType>(oldType).getShape();
     for (const ReassociationIndices &reassoc : reassociation) {
       ArrayRef<int64_t> currentReassoc = ArrayRef(reassoc);
       bool hasDynamicDim = false;
@@ -102,7 +102,7 @@ static Type inferNewOperandType(Type oldType,
         newTensorShape.push_back(currentReassocShape);
     }
     return RankedTensorType::get(
-        newTensorShape, oldType.cast<RankedTensorType>().getElementType());
+        newTensorShape, cast<RankedTensorType>(oldType).getElementType());
   }
   assert(false && "expect memref or rankedTensorType");
   abort();
@@ -118,13 +118,13 @@ static FailureOr<Value> collapseOperand(Value operand,
           rewriter, convertAffineMapArrayToExprs(reassociationMap)));
   if (operandType == newOperandType)
     return operand;
-  if (operandType.isa<MemRefType>())
+  if (isa<MemRefType>(operandType))
     return rewriter
         .create<memref::CollapseShapeOp>(
             loc, newOperandType, operand,
             convertAffineMapArrayToExprs(reassociationMap))
         .getResult();
-  if (operandType.isa<RankedTensorType>())
+  if (isa<RankedTensorType>(operandType))
     return rewriter
         .create<tensor::CollapseShapeOp>(
             loc, newOperandType, operand,
@@ -139,13 +139,13 @@ static FailureOr<Value> insertExpand(Value operand, Type newOperandType,
   Type operandType = operand.getType();
   if (operandType == newOperandType)
     return operand;
-  if (operandType.isa<MemRefType>())
+  if (isa<MemRefType>(operandType))
     return rewriter
         .create<memref::ExpandShapeOp>(
             loc, newOperandType, operand,
             convertAffineMapArrayToExprs(reassociationMap))
         .getResult();
-  if (operandType.isa<RankedTensorType>())
+  if (isa<RankedTensorType>(operandType))
     return rewriter
         .create<tensor::ExpandShapeOp>(
             loc, newOperandType, operand,

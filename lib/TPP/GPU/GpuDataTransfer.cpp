@@ -68,8 +68,8 @@ static FailureOr<Value> matchTransferBuffers(RewriterBase &rewriter,
                                              Value gpuBuffer) {
   auto loc = gpuBuffer.getLoc();
 
-  auto operandType = kernelOperand.getType().cast<MemRefType>();
-  auto gpuAllocType = gpuBuffer.getType().cast<MemRefType>();
+  auto operandType = cast<MemRefType>(kernelOperand.getType());
+  auto gpuAllocType = cast<MemRefType>(gpuBuffer.getType());
 
   // Kernel operands type already matches the device buffer.
   // The host and device buffers can be used directly.

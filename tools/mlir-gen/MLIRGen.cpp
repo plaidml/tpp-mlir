@@ -265,8 +265,8 @@ std::string MLIRGenerator::createMetadata() {
 }
 
 Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
-  auto inputShape = input.getType().cast<ShapedType>();
-  auto outShape = output.getType().cast<ShapedType>();
+  auto inputShape = cast<ShapedType>(input.getType());
+  auto outShape = cast<ShapedType>(output.getType());
 
   // Matmul as a linalg.generic
   auto map1 = getMap(input, MAP_MATMUL_INPUT);   // { 0, 2 }
@@ -308,7 +308,7 @@ Value MLIRGenerator::lowerBiasAdd(Value input, Value bias, Value output) {
   if (!enableBias)
     return input;
 
-  auto outTy = input.getType().cast<ShapedType>();
+  auto outTy = cast<ShapedType>(input.getType());
   auto mapA = getMap(input, MAP_BROADCAST);
   auto mapB = getMap(input, MAP_PARALLEL);
   auto sum =
@@ -338,8 +338,8 @@ Value MLIRGenerator::lowerRelu(Value input, Value output) {
   if (!enableRelu)
     return input;
 
-  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
-  auto outTy = input.getType().cast<ShapedType>();
+  auto zero = getConstFloat(builder, 0.0, cast<FloatType>(dataType));
+  auto outTy = cast<ShapedType>(input.getType());
   auto map = getMap(input, MAP_PARALLEL);
   auto relu =
       builder
@@ -368,11 +368,11 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
   if (!enableSoftmax)
     return input;
 
-  assert(input.getType().cast<ShapedType>().getRank() == 2 &&
+  assert(cast<ShapedType>(input.getType()).getRank() == 2 &&
          "Packed softmax not implemented yet");
   auto map1 = getMap(input, MAP_PARALLEL);
   auto map2 = getMap(input, MAP_REDUCTION);
-  auto outTy = input.getType().cast<ShapedType>();
+  auto outTy = cast<ShapedType>(input.getType());
 
   // First, we calculate the element-wise exp
   Value expTensor = builder.create<tensor::EmptyOp>(loc, outTy, ValueRange{});
@@ -390,7 +390,7 @@ Value MLIRGenerator::lowerSoftmax(Value input, Value output) {
   auto redTy = getShape(dims, PACK_OUTPUT);
   Value redTensor =
       builder.create<tensor::EmptyOp>(loc, dims, outTy.getElementType());
-  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
+  auto zero = getConstFloat(builder, 0.0, cast<FloatType>(dataType));
   auto fill = builder.create<linalg::FillOp>(loc, zero, redTensor);
   auto redux = builder.create<linalg::GenericOp>(
       loc, redTy, ValueRange{exp.getResult(0)}, ValueRange{fill.getResult(0)},
@@ -488,7 +488,7 @@ TensorType MLIRGenerator::getShape(ArrayRef<int64_t> dims, PackingType type) {
 }
 
 AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
-  auto n = tensor.getType().cast<ShapedType>().getRank();
+  auto n = cast<ShapedType>(tensor.getType()).getRank();
   // Packed tensors are either 4 or 5 dim, map needs to be 6 or 7
   bool packed = (n > 2);
   bool vnniPacked = packed && vnniFactor != 0;
@@ -629,7 +629,7 @@ int MLIRGenerator::getRand() {
 }
 
 Value MLIRGenerator::getZeroInitTensor(TensorType type) {
-  auto zero = getConstFloat(builder, 0.0, dataType.cast<FloatType>());
+  auto zero = getConstFloat(builder, 0.0, cast<FloatType>(dataType));
   Value tensor =
       builder.create<tensor::EmptyOp>(loc, type, ValueRange{}).getResult();
   tensor = builder.create<linalg::FillOp>(loc, zero, tensor).getResult(0);

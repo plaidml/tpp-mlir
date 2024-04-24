@@ -401,7 +401,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());
 
-    if (result.getType().isa<TensorType>()) {
+    if (isa<TensorType>(result.getType())) {
       result =
           builder.create<bufferization::ToMemrefOp>(unkLoc, memrefType, result);
     }

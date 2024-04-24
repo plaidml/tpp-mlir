@@ -48,12 +48,12 @@ def Xsmm_BinaryOp : Xsmm_Op<"binary", [MemoryEffects<[MemWrite, MemRead]>]> {
 
     bool hasScalarLhs() {
       Type operand = getInputs()[1].getType();
-      return !operand.isa<ShapedType>();
+      return !isa<ShapedType>(operand);
     }
 
     bool hasScalarRhs() {
       Type operand = getInputs()[2].getType();
-      return !operand.isa<ShapedType>();
+      return !isa<ShapedType>(operand);
     }
   }];
 
@@ -84,7 +84,7 @@ def Xsmm_UnaryOp : Xsmm_Op<"unary", [MemoryEffects<[MemWrite, MemRead]>]> {
 
     bool hasScalarInput() {
       Type operand = getInputs()[1].getType();
-      return !operand.isa<ShapedType>();
+      return !isa<ShapedType>(operand);
     }
   }];
 

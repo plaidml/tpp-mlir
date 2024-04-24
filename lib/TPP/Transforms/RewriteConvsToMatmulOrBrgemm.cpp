@@ -34,9 +34,9 @@ bool isMarkedWithTpp(linalg::LinalgOp linalgOp, const std::string &target) {
 
 // return true if all operands have static shape.
 static bool hasStaticShape(Value image, Value filter, Value output) {
-  ShapedType imageType = image.getType().cast<ShapedType>();
-  ShapedType filterType = filter.getType().cast<ShapedType>();
-  ShapedType outputType = output.getType().cast<ShapedType>();
+  ShapedType imageType = cast<ShapedType>(image.getType());
+  ShapedType filterType = cast<ShapedType>(filter.getType());
+  ShapedType outputType = cast<ShapedType>(output.getType());
   return !((!imageType.hasStaticShape()) || (!filterType.hasStaticShape()) ||
            (!outputType.hasStaticShape()));
 }
@@ -71,7 +71,7 @@ template <typename CONVOP> static bool hasDilation(CONVOP convOp) {
 // otherwise false. The operand is expected to have static shape.
 static bool hasFilterWithRandSEqualOne(OpOperand *filter, unsigned i,
                                        unsigned j) {
-  ShapedType filterType = filter->get().getType().cast<ShapedType>();
+  ShapedType filterType = cast<ShapedType>(filter->get().getType());
   if (!filterType.hasStaticShape())
     return false;
   ArrayRef<int64_t> filterShape = filterType.getShape();
@@ -355,7 +355,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     SmallVector<ReassociationExprs, 2> reassociationExprs;
     for (auto attr : affineMapArrayAttr)
       reassociationExprs.push_back(llvm::to_vector<4>(
-          attr.cast<AffineMapAttr>().getValue().getResults()));
+          cast<AffineMapAttr>(attr).getValue().getResults()));
     return reassociationExprs;
   }
 
@@ -363,7 +363,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
   Type getCollapsedType(OpOperand *operand, size_t startCollapse,
                         size_t endCollapse) const {
     assert(endCollapse > startCollapse && "expect >");
-    ShapedType operandType = operand->get().getType().cast<ShapedType>();
+    ShapedType operandType = cast<ShapedType>(operand->get().getType());
     size_t rank = operandType.getRank();
     ArrayRef<int64_t> oldShape = operandType.getShape();
     SmallVector<int64_t> newShape;
@@ -377,9 +377,9 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
       newShape.push_back(collapsedDim);
       idx++;
     }
-    if (operandType.isa<MemRefType>())
+    if (isa<MemRefType>(operandType))
       return MemRefType::get(newShape, operandType.getElementType());
-    if (operandType.isa<RankedTensorType>())
+    if (isa<RankedTensorType>(operandType))
       return RankedTensorType::get(newShape, operandType.getElementType());
     assert(false && "expect tensor or memref");
     abort();
@@ -417,24 +417,24 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     OpOperand *image = linalgOp.getDpsInputOperands()[0];
     Type newImageType = getCollapsedType(image, 2, 3);
     auto reassociationImage = getReassociationIndicesForCollapse(
-        image->get().getType().cast<ShapedType>().getShape(),
-        newImageType.cast<ShapedType>().getShape());
+        cast<ShapedType>(image->get().getType()).getShape(),
+        cast<ShapedType>(newImageType).getShape());
     if (!reassociationImage)
       return failure();
 
     OpOperand *filter = linalgOp.getDpsInputOperands()[1];
     Type newFilterType = getCollapsedType(filter, 1, 3);
     auto reassociationFilter = getReassociationIndicesForCollapse(
-        filter->get().getType().cast<ShapedType>().getShape(),
-        newFilterType.cast<ShapedType>().getShape());
+        cast<ShapedType>(filter->get().getType()).getShape(),
+        cast<ShapedType>(newFilterType).getShape());
     if (!reassociationFilter)
       return failure();
 
     OpOperand &output = linalgOp.getDpsInitsMutable()[0];
     Type newOutputType = getCollapsedType(&output, 2, 3);
     auto reassociationOutput = getReassociationIndicesForCollapse(
-        output.get().getType().cast<ShapedType>().getShape(),
-        newOutputType.cast<ShapedType>().getShape());
+        cast<ShapedType>(output.get().getType()).getShape(),
+        cast<ShapedType>(newOutputType).getShape());
     if (!reassociationOutput)
       return failure();
 
@@ -459,8 +459,8 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
                                 replacementOp.getRegion().begin());
     Value res = replacementOp->getResult(0);
     reassociationOutput = getReassociationIndicesForReshape(
-        res.getType().cast<ShapedType>(),
-        output.get().getType().cast<ShapedType>());
+        cast<ShapedType>(res.getType()),
+        cast<ShapedType>(output.get().getType()));
     if (!reassociationOutput)
       return failure();
     Value resExpanded = linalgx::utils::expand(

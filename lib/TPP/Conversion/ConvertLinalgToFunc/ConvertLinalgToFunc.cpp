@@ -109,7 +109,7 @@ struct ConvertMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     SmallVector<Value> operands = matmulOp.getDpsInputs();
     operands.push_back(matmulOp.getDpsInits()[0]);
     if (!llvm::all_of(operands, [](Value operand) {
-          MemRefType memref = operand.getType().cast<MemRefType>();
+          MemRefType memref = cast<MemRefType>(operand.getType());
           return memref.getLayout().isIdentity() &&
                  memref.getElementType().isF32();
         })) {

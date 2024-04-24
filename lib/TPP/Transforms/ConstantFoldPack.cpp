@@ -42,7 +42,7 @@ struct ConstantFoldPack
     if (!cstOp)
       return failure();
     auto cst = cstOp.getValue();
-    if (!cst.isa<DenseElementsAttr>())
+    if (!isa<DenseElementsAttr>(cst))
       return failure();
     auto oldDense = cast<DenseElementsAttr>(cst);
     return std::make_pair(cstOp, oldDense);

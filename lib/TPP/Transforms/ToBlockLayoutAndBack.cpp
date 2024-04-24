@@ -56,9 +56,9 @@ static Value toPackLayoutImpl(OpBuilder &builder, Location loc, Value input,
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(tiles, dynamicTiles, staticTiles);
   RankedTensorType result =
-      tensor::PackOp::inferPackedType(input.getType().cast<RankedTensorType>(),
+      tensor::PackOp::inferPackedType(cast<RankedTensorType>(input.getType()),
                                       staticTiles, innerDimsPos, outerDimsPerm);
-  auto inputType = input.getType().cast<RankedTensorType>();
+  auto inputType = cast<RankedTensorType>(input.getType());
   ArrayRef<int64_t> shape = result.getShape();
   Value output =
       builder.create<tensor::EmptyOp>(loc, shape, inputType.getElementType());
@@ -82,7 +82,7 @@ static Value handleLayout_VNNI(OpBuilder &builder, Location loc, Value input,
                                ArrayRef<OpFoldResult> tiles) {
   assert(tiles.size() == 1 && "expect 1 block for VNNI");
   SmallVector<int64_t> innerDimPos = {
-      input.getType().cast<ShapedType>().getRank() - 2};
+      cast<ShapedType>(input.getType()).getRank() - 2};
   return toPackLayoutImpl(builder, loc, input, tiles, innerDimPos,
                           /*outerDimsPerm=*/{});
 }

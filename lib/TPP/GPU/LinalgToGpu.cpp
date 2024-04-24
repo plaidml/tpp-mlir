@@ -86,9 +86,9 @@ static bool isMMACompatible(linalg::LinalgOp linalgOp,
   if (linalgOp.hasDynamicShape())
     return false;
 
-  auto aType = linalgOp.getDpsInputs()[0].getType().cast<ShapedType>();
-  auto bType = linalgOp.getDpsInputs()[1].getType().cast<ShapedType>();
-  auto cType = linalgOp.getDpsInits()[0].getType().cast<ShapedType>();
+  auto aType = cast<ShapedType>(linalgOp.getDpsInputs()[0].getType());
+  auto bType = cast<ShapedType>(linalgOp.getDpsInputs()[1].getType());
+  auto cType = cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
 
   auto elemTypeA = aType.getElementType();
   auto elemTypeB = bType.getElementType();
@@ -131,7 +131,7 @@ eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumer,
   Location loc = rootOp.getLoc();
 
   auto rootOutput = rootOp.getDpsInits()[0];
-  auto outputType = rootOutput.getType().cast<ShapedType>();
+  auto outputType = cast<ShapedType>(rootOutput.getType());
 
   // Must be a floating point type.
   // TODO: Add integer support.
@@ -239,7 +239,7 @@ static std::optional<memref::StoreOp> eltwiseFusion(linalg::LinalgOp rootOp,
                                                     PatternRewriter &rewriter) {
   Location loc = rootOp.getLoc();
   auto rootOutput = rootOp.getDpsInits()[0];
-  auto outputType = rootOutput.getType().cast<ShapedType>();
+  auto outputType = cast<ShapedType>(rootOutput.getType());
 
   // Must be a floating point type.
   // TODO: Add integer support.
@@ -259,7 +259,7 @@ static std::optional<memref::StoreOp> eltwiseFusion(linalg::LinalgOp rootOp,
   if (structured_match::utils::isTwoDAddOp(consumer, &operands)) {
     // Get the value to be added. Load the element first, if necessary.
     auto addValue = (operands[0] != rootOutput) ? operands[0] : operands[1];
-    if (addValue.getType().isa<ShapedType>()) {
+    if (isa<ShapedType>(addValue.getType())) {
       addValue = rewriter.create<memref::LoadOp>(loc, addValue, storeIndices)
                      .getResult();
     }
@@ -379,9 +379,9 @@ static LogicalResult gemmToGpuMMA(linalg::LinalgOp linalgOp,
   auto matB = linalgOp.getDpsInputs()[1];
   auto matC = linalgOp.getDpsInits()[0];
 
-  auto typeA = matA.getType().cast<ShapedType>();
-  auto typeB = matB.getType().cast<ShapedType>();
-  auto typeC = matC.getType().cast<ShapedType>();
+  auto typeA = cast<ShapedType>(matA.getType());
+  auto typeB = cast<ShapedType>(matB.getType());
+  auto typeC = cast<ShapedType>(matC.getType());
 
   auto stridesA = utils::getStaticStrides(matA);
   auto stridesB = utils::getStaticStrides(matB);
@@ -612,8 +612,8 @@ static LogicalResult gemmToGpuLoops(linalg::LinalgOp linalgOp,
   auto matB = linalgOp.getDpsInputs()[1];
   auto matC = linalgOp.getDpsInits()[0];
 
-  ArrayRef<int64_t> shapeC = matC.getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> shapeA = matA.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeC = cast<ShapedType>(matC.getType()).getShape();
+  ArrayRef<int64_t> shapeA = cast<ShapedType>(matA.getType()).getShape();
 
   // Parallel dims.
   Value i = rewriter.create<arith::ConstantIndexOp>(loc, shapeC[0]);

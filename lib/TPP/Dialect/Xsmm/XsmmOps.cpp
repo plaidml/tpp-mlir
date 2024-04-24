@@ -256,7 +256,7 @@ verifyUniquenessAndConsistency(ArrayAttr flags, Operation *op,
                                const std::string_view &flagsName) {
   SmallVector<int64_t> flagsAsInt;
   for (auto flag : flags)
-    flagsAsInt.push_back(flag.cast<IntegerAttr>().getInt());
+    flagsAsInt.push_back(cast<IntegerAttr>(flag).getInt());
 
   // check uniqueness
   std::sort(flagsAsInt.begin(), flagsAsInt.end());
@@ -286,7 +286,7 @@ static LogicalResult verifyGemmFlags(ArrayAttr flags, DataType dataType,
 
   SmallVector<int64_t> flagsAsInt;
   for (auto flag : flags) {
-    flagsAsInt.push_back(flag.cast<IntegerAttr>().getInt());
+    flagsAsInt.push_back(cast<IntegerAttr>(flag).getInt());
   }
   // VNNI flags must be specified only for bf16 type
   if (dataType != DataType::BF16 && llvm::any_of(flagsAsInt, [](int64_t flag) {

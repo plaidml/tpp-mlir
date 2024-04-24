@@ -50,7 +50,7 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   Type outputType = output.getType();
 
   assert(isa<ShapedType>(outputType));
-  auto outputShapedType = outputType.cast<ShapedType>();
+  auto outputShapedType = cast<ShapedType>(outputType);
   if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
@@ -96,7 +96,7 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
   Type outputType = output.getType();
 
   assert(isa<ShapedType>(outputType));
-  auto outputShapedType = outputType.cast<ShapedType>();
+  auto outputShapedType = cast<ShapedType>(outputType);
   if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
@@ -187,17 +187,17 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
 }
 
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
-  assert(outputType.isa<ShapedType>() && "expect shaped type on output");
-  assert(outputType.cast<ShapedType>().getRank() == 2 &&
+  assert(isa<ShapedType>(outputType) && "expect shaped type on output");
+  assert(cast<ShapedType>(outputType).getRank() == 2 &&
          "expect rank 2 on output");
 
-  if (!inputType.isa<ShapedType>() ||
-      inputType.cast<ShapedType>().getRank() == 0) {
+  if (!isa<ShapedType>(inputType) ||
+      cast<ShapedType>(inputType).getRank() == 0) {
     return xsmm::UnaryFlags::BCAST_SCALAR;
   }
 
-  ArrayRef<int64_t> shapeOutput = outputType.cast<ShapedType>().getShape();
-  ArrayRef<int64_t> shapeInput = inputType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> shapeOutput = cast<ShapedType>(outputType).getShape();
+  ArrayRef<int64_t> shapeInput = cast<ShapedType>(inputType).getShape();
   assert(shapeOutput.size() >= shapeInput.size() &&
          "output rank must be >= input rank");
   SmallVector<int64_t> bShapeInput;
@@ -225,20 +225,20 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
 
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber) {
-  assert(outputType.isa<ShapedType>() && "expect shaped type on output");
-  assert(outputType.cast<ShapedType>().getRank() == 2 &&
+  assert(isa<ShapedType>(outputType) && "expect shaped type on output");
+  assert(cast<ShapedType>(outputType).getRank() == 2 &&
          "expect rank 2 on output");
 
-  if (!operandType.isa<ShapedType>() ||
-      operandType.cast<ShapedType>().getRank() == 0) {
+  if (!isa<ShapedType>(operandType) ||
+      cast<ShapedType>(operandType).getRank() == 0) {
     if (operandNumber == OperandPos::LHS)
       return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
     return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
   }
 
   enum class BCastType { NONE = 0, SCALAR, ROW, COL };
-  auto shapeOutput = outputType.cast<MemRefType>().getShape();
-  auto shapeOperand = operandType.cast<MemRefType>().getShape();
+  auto shapeOutput = cast<MemRefType>(outputType).getShape();
+  auto shapeOperand = cast<MemRefType>(operandType).getShape();
   assert(shapeOutput.size() >= shapeOperand.size() &&
          "Output rank must be >= operand rank");
   SmallVector<int64_t> bOperandShape;
