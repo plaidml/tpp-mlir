@@ -21,7 +21,7 @@ using namespace mlir;
 static SmallVector<OpFoldResult>
 computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
   OpOperand *image = linalgOp.getDpsInputOperands()[0];
-  unsigned rank = image->get().getType().cast<ShapedType>().getRank();
+  unsigned rank = cast<ShapedType>(image->get().getType()).getRank();
   SmallVector<OpFoldResult> sizes;
   sizes.reserve(rank);
 
@@ -32,10 +32,9 @@ computeSizeGemmForImage(OpBuilder &builder, linalg::LinalgOp linalgOp) {
 
   Value output = linalgOp.getDpsInits()[0];
   OpOperand *filter = linalgOp.getDpsInputOperands()[1];
-  ArrayRef<int64_t> outputShape =
-      output.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> outputShape = cast<ShapedType>(output.getType()).getShape();
   ArrayRef<int64_t> filterShape =
-      filter->get().getType().cast<ShapedType>().getShape();
+      cast<ShapedType>(filter->get().getType()).getShape();
   int64_t mIdx = outputShape.size() - 2;
   int64_t kIdx = filterShape.size() - 2;
   sizes.push_back(
@@ -104,7 +103,7 @@ static FailureOr<Value> getSlicedConvOperandImpl(OpBuilder &builder,
                                                  ValueRange ivs,
                                                  ValueRange valuesToUse) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
-  ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+  ShapedType operandType = cast<ShapedType>(operandToUse.getType());
   size_t rank = operandType.getRank();
   bool isImage = operand->getOperandNumber() == 0;
   unsigned desiredResultRank = 2;
@@ -292,8 +291,8 @@ mlir::linalgx::rewriteConvToMatmul(RewriterBase &rewriter,
   SmallVector<Operation *, 8> loops;
   loops.reserve(ivs.size());
   for (Value iv : ivs) {
-    if (iv.isa<BlockArgument>()) {
-      loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
+    if (isa<BlockArgument>(iv)) {
+      loops.push_back(cast<BlockArgument>(iv).getOwner()->getParentOp());
       assert(loops.back() && "no owner found for induction variable!");
     } else {
       loops.push_back(nullptr);

@@ -51,10 +51,10 @@ struct ConvertAlmostEqualsOp
                                 PatternRewriter &rewriter) const override {
     Location loc = almostEqOp.getLoc();
     SmallVector<Value> ubs;
-    if (!almostEqOp.getLhs().getType().isa<MemRefType>()) {
+    if (!isa<MemRefType>(almostEqOp.getLhs().getType())) {
       return failure();
     }
-    size_t rank = almostEqOp.getLhs().getType().cast<MemRefType>().getRank();
+    size_t rank = cast<MemRefType>(almostEqOp.getLhs().getType()).getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       auto dim = linalg::createOrFoldDimOp(rewriter, loc,
                                            almostEqOp.getOperand(0), idx);
@@ -72,7 +72,7 @@ struct ConvertAlmostEqualsOp
           Value scalarRhs =
               b.create<memref::LoadOp>(loc, almostEqOp.getRhs(), localIvs);
           Value compare;
-          if (scalarLhs.getType().isa<mlir::FloatType>()) {
+          if (isa<mlir::FloatType>(scalarLhs.getType())) {
             Value diff = b.create<arith::SubFOp>(loc, scalarLhs, scalarRhs);
             Value abs = b.create<math::AbsFOp>(loc, diff);
             compare = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLE,
@@ -131,10 +131,10 @@ struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
     auto operandType = operand.getType();
     auto elementType = operandType.getElementType();
     SmallVector<Value> ubs;
-    if (!operandType.isa<MemRefType>() || !elementType.isa<mlir::FloatType>()) {
+    if (!isa<MemRefType>(operandType) || !isa<mlir::FloatType>(elementType)) {
       return failure();
     }
-    size_t rank = operandType.cast<MemRefType>().getRank();
+    size_t rank = cast<MemRefType>(operandType).getRank();
     for (size_t idx = 0; idx < rank; idx++) {
       auto dim = linalg::createOrFoldDimOp(rewriter, loc, operand, idx);
       ubs.push_back(dim);
@@ -157,7 +157,7 @@ struct ConvertExpectSaneOp : public OpRewritePattern<ExpectSaneOp> {
               b.getFloatAttr(
                   elementType,
                   APFloat::getInf(
-                      elementType.cast<FloatType>().getFloatSemantics())));
+                      cast<FloatType>(elementType).getFloatSemantics())));
           Value notNan = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ORD,
                                                  scalarOperandAbsf, zeroVal);
           Value notInf = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::ONE,

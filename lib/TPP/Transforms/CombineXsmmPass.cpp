@@ -82,7 +82,7 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
                                    brgemmOp.getOperand(0).getDefiningOp())
                                    .getInputs());
     auto memrefB = brgemmOp.getOperand(2);
-    int64_t batchSize = memrefB.getType().cast<ShapedType>().getShape()[0];
+    int64_t batchSize = cast<ShapedType>(memrefB.getType()).getShape()[0];
     auto brgemmFlags = xsmm::utils::getBrgemmFlags<xsmm::BrgemmDispatchOp>(
         rewriter,
         dyn_cast<xsmm::BrgemmDispatchOp>(

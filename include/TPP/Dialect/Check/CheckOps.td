@@ -49,7 +49,7 @@ def CHECK_ExpectAlmostEqOp :
     Op<CHECK_Dialect, "expect_almost_eq",
     [TypesMatchWith<"Operand types match",
                     "lhs", "rhs",
-                    "$_self.cast<ShapedType>()">,
+                    "cast<ShapedType>($_self)">,
      MemoryEffects<[MemWrite, MemRead]>]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{

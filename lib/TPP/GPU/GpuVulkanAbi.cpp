@@ -57,15 +57,15 @@ static Type FlattenMemrefType(MemRefType memrefType) {
 static Type getVulkanTypeWrapper(Type type,
                                  const SPIRVTypeConverter &typeConverter,
                                  RewriterBase &rewriter) {
-  assert(!type.isa<TensorType>() && "Tensors are not supported by Vulkan");
+  assert(!isa<TensorType>(type) && "Tensors are not supported by Vulkan");
 
   // Buffers are already Vulkan compatible.
   if (auto memrefType = type.dyn_cast<MemRefType>())
     return FlattenMemrefType(memrefType);
 
   // Index has to be converted to a fixed-size integer.
-  if (type.isa<IndexType>()) {
-    auto spirvIndex = typeConverter.getIndexType().cast<spirv::SPIRVType>();
+  if (isa<IndexType>(type)) {
+    auto spirvIndex = cast<spirv::SPIRVType>(typeConverter.getIndexType());
     type = rewriter.getIntegerType(*(spirvIndex.getSizeInBytes()) * 8);
   }
 
@@ -142,17 +142,17 @@ static Value getVulkanOperandWrapper(Value operand,
   auto loc = operand.getLoc();
   auto type = operand.getType();
 
-  assert(!type.isa<TensorType>() && "Tensors are not supported by Vulkan");
+  assert(!isa<TensorType>(type) && "Tensors are not supported by Vulkan");
 
   // Buffers are Vulkan compatible but need to be min 1D and max 3D shaped.
-  if (type.isa<MemRefType>())
+  if (isa<MemRefType>(type))
     return FlattenMemrefOperand(operand, rewriter);
 
   auto wrapperType =
-      getVulkanTypeWrapper(type, typeConverter, rewriter).cast<MemRefType>();
+      cast<MemRefType>(getVulkanTypeWrapper(type, typeConverter, rewriter));
 
   // Cast index to a fixed-size integer.
-  if (type.isa<IndexType>()) {
+  if (isa<IndexType>(type)) {
     auto castType = wrapperType.getElementType();
     operand =
         rewriter.create<arith::IndexCastOp>(loc, castType, operand).getOut();

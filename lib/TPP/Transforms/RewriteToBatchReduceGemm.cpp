@@ -154,8 +154,8 @@ static Operation *getOuterMostLoop(ArrayRef<Value> ivs) {
   SmallVector<Operation *, 8> loops;
   loops.reserve(ivs.size());
   for (Value iv : ivs) {
-    if (iv.isa<BlockArgument>()) {
-      loops.push_back(iv.cast<BlockArgument>().getOwner()->getParentOp());
+    if (isa<BlockArgument>(iv)) {
+      loops.push_back(cast<BlockArgument>(iv).getOwner()->getParentOp());
       assert(loops.back() && "no owner found for induction variable!");
     } else {
       loops.push_back(nullptr);

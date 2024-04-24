@@ -400,7 +400,7 @@ bool isTwoDZeroOp(linalg::LinalgOp linalgOp, SmallVectorImpl<Value> *operands) {
 
   // Only take the output as tpp.zero is an in-place operation.
   Value output = linalgOp.getDpsInits()[0];
-  if (!output.getType().isa<ShapedType>())
+  if (!isa<ShapedType>(output.getType()))
     return false;
 
   if (operands)
@@ -424,7 +424,7 @@ bool isTwoDBiasReluOp(linalg::LinalgOp linalgOp,
 
   // Only take the output as tpp.add + tpp.relu should be in-place operations.
   Value output = linalgOp.getDpsInits()[0];
-  if (!output.getType().isa<ShapedType>())
+  if (!isa<ShapedType>(output.getType()))
     return false;
 
   if (operands)

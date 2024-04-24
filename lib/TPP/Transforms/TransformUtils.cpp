@@ -30,10 +30,11 @@ Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
   OpBuilder::InsertionGuard guard(builder);
   if (newType == val.getType())
     return val;
-  if (newType.isa<RankedTensorType>()) {
+  if (isa<RankedTensorType>(newType)) {
     return builder.create<tensor::ExpandShapeOp>(loc, newType, val,
                                                  reassociationMap);
-  } if (newType.isa<MemRefType>()) {
+  }
+  if (isa<MemRefType>(newType)) {
     return builder.create<memref::ExpandShapeOp>(loc, newType, val,
                                                  reassociationMap);
   }
@@ -46,10 +47,11 @@ Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
                ArrayAttr reassociationMap) {
   if (newType == val.getType())
     return val;
-  if (newType.isa<RankedTensorType>()) {
+  if (isa<RankedTensorType>(newType)) {
     return builder.create<tensor::CollapseShapeOp>(loc, newType, val,
                                                    reassociationMap);
-  } if (newType.isa<MemRefType>()) {
+  }
+  if (isa<MemRefType>(newType)) {
     return builder.create<memref::CollapseShapeOp>(loc, newType, val,
                                                    reassociationMap);
   }
@@ -128,7 +130,7 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
                       ArrayRef<OpFoldResult> sizes,
                       ArrayRef<OpFoldResult> strides,
                       unsigned desiredResultRank) {
-  ShapedType operandType = operand.getType().cast<ShapedType>();
+  ShapedType operandType = cast<ShapedType>(operand.getType());
   [[maybe_unused]] size_t rank = operandType.getRank();
 
   assert(rank == offsets.size() && "expect rank == offsets");
@@ -139,19 +141,19 @@ Value getSliceOperand(OpBuilder &builder, linalg::LinalgOp linalgOp,
   Type reducedType =
       (linalgOp.hasPureTensorSemantics())
           ? tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                desiredResultRank, operandType.cast<RankedTensorType>(),
-                offsets, sizes, strides)
+                desiredResultRank, cast<RankedTensorType>(operandType), offsets,
+                sizes, strides)
           : memref::SubViewOp::inferRankReducedResultType(
                 getExpectedResultMemRefShape(sizes, desiredResultRank),
-                operandType.cast<MemRefType>(), offsets, sizes, strides);
+                cast<MemRefType>(operandType), offsets, sizes, strides);
 
   Operation *extractOperation =
       (linalgOp.hasPureTensorSemantics())
           ? builder.create<tensor::ExtractSliceOp>(
-                loc, reducedType.cast<RankedTensorType>(), operand, offsets,
+                loc, cast<RankedTensorType>(reducedType), operand, offsets,
                 sizes, strides)
           : builder.create<memref::SubViewOp>(loc,
-                                              reducedType.cast<MemRefType>(),
+                                              cast<MemRefType>(reducedType),
                                               operand, offsets, sizes, strides);
 
   assert(extractOperation->getNumResults() == 1 && "expect single result");
@@ -163,7 +165,7 @@ static Value getSliceOperandImpl(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                  ValueRange valuesToUse,
                                  unsigned desiredResultRank) {
   Value operandToUse = valuesToUse[operand->getOperandNumber()];
-  ShapedType operandType = operandToUse.getType().cast<ShapedType>();
+  ShapedType operandType = cast<ShapedType>(operandToUse.getType());
   size_t rank = operandType.getRank();
   // Happy path, use the current operand.
   if (rank == desiredResultRank)

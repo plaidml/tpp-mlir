@@ -244,14 +244,14 @@ static FailureOr<xsmm::UnaryFlags> getBroadCastUnaryFlagFromMap(AffineMap map) {
 static Value makeOperandShapeRowBroadCastable(RewriterBase &rewriter,
                                               Location loc, Value output,
                                               Value operand) {
-  assert(output.getType().isa<ShapedType>());
-  assert(operand.getType().isa<ShapedType>());
+  assert(isa<ShapedType>(output.getType()));
+  assert(isa<ShapedType>(operand.getType()));
 
-  ShapedType shapedOutput = output.getType().cast<ShapedType>();
+  ShapedType shapedOutput = cast<ShapedType>(output.getType());
   if (shapedOutput.getRank() != 2)
     return operand;
 
-  ShapedType shapedOperand = operand.getType().cast<ShapedType>();
+  ShapedType shapedOperand = cast<ShapedType>(operand.getType());
   if (shapedOperand.getRank() != 1)
     return operand;
 
@@ -642,7 +642,7 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
   rewriter.setInsertionPoint(linalgOp);
 
   Location loc = linalgOp.getLoc();
-  auto operandType = operand->get().getType().cast<ShapedType>();
+  auto operandType = cast<ShapedType>(operand->get().getType());
   auto rank = operandType.getRank();
   SmallVector<int64_t> shape = llvm::to_vector(operandType.getShape());
   auto permutation = llvm::to_vector(llvm::seq<int64_t>(0, rank));
@@ -697,7 +697,7 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
 }
 
 static bool isInnerMostDim(OpOperand *operand, unsigned minorDim) {
-  auto shapedType = operand->get().getType().cast<ShapedType>();
+  auto shapedType = cast<ShapedType>(operand->get().getType());
   unsigned rank = shapedType.getRank();
   return minorDim == rank - 1;
 }
@@ -1017,8 +1017,8 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
 
     Value out = transposeOp.getInit();
     Value source = transposeOp.getInput();
-    MemRefType outType = out.getType().cast<MemRefType>();
-    MemRefType sourceType = source.getType().cast<MemRefType>();
+    MemRefType outType = cast<MemRefType>(out.getType());
+    MemRefType sourceType = cast<MemRefType>(source.getType());
     if (!outType.hasStaticShape() || !sourceType.hasStaticShape() ||
         !vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::TRANSPOSE,
                                      outType)) {
@@ -1078,15 +1078,15 @@ struct ConvertGenericToVnniMatmulLikeOp
     Value bufferB = genericOp.getDpsInputs()[1];
     Value bufferC = genericOp.getDpsInits()[0];
 
-    int64_t m = bufferC.getType().cast<ShapedType>().getShape()[0];
-    int64_t n = bufferC.getType().cast<ShapedType>().getShape()[1];
+    int64_t m = cast<ShapedType>(bufferC.getType()).getShape()[0];
+    int64_t n = cast<ShapedType>(bufferC.getType()).getShape()[1];
     int64_t kPos = 1;
     if (hasBatch)
       kPos++;
-    int64_t k = bufferA.getType().cast<ShapedType>().getShape()[kPos];
+    int64_t k = cast<ShapedType>(bufferA.getType()).getShape()[kPos];
     int64_t batch = 0;
     if (hasBatch)
-      batch = bufferA.getType().cast<ShapedType>().getShape()[0];
+      batch = cast<ShapedType>(bufferA.getType()).getShape()[0];
 
     auto stridesOnLhs = utils::getStaticStrides(bufferA);
     auto stridesOnRhs = utils::getStaticStrides(bufferB);

@@ -88,8 +88,8 @@ transform::CollapseOp::getReassociationIndices() {
   SmallVector<ReassociationIndices, 4> reassociationIndices;
   for (auto attr : getReassociation())
     reassociationIndices.push_back(llvm::to_vector<2>(
-        llvm::map_range(attr.cast<ArrayAttr>(), [&](Attribute indexAttr) {
-          return indexAttr.cast<IntegerAttr>().getInt();
+        llvm::map_range(cast<ArrayAttr>(attr), [&](Attribute indexAttr) {
+          return cast<IntegerAttr>(indexAttr).getInt();
         })));
   return reassociationIndices;
 }
@@ -172,7 +172,7 @@ transform::GetBlockedConvolutions::apply(transform::TransformRewriter &rewriter,
     if (linalgx::utils::isBlockedConvolution(op))
       res.push_back(op);
   }
-  results.set(getResult().cast<OpResult>(), res);
+  results.set(cast<OpResult>(getResult()), res);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -192,7 +192,7 @@ transform::GetBlockedMatmuls::apply(transform::TransformRewriter &rewriter,
       res.push_back(op);
     }
   }
-  results.set(getResult().cast<OpResult>(), res);
+  results.set(cast<OpResult>(getResult()), res);
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -73,7 +73,7 @@ static LogicalResult verifyGemmDispatchAndInvokeLikeOp(InvokeTy gemmOp) {
   // VNNI flags must be consistent with the memref shapes.
   ArrayAttr flags = dispatchOp->getFlags();
   for (auto flag : flags) {
-    int64_t gemmFlag = flag.cast<IntegerAttr>().getInt();
+    int64_t gemmFlag = cast<IntegerAttr>(flag).getInt();
     if (gemmFlag == static_cast<int64_t>(xsmm::GemmFlags::VNNI_A) &&
         !vnni::utils::isInVnniLayout(expectedVnniRankIns, operandA)) {
       return gemmOp.emitOpError(
@@ -101,7 +101,7 @@ static LogicalResult verifyFlags(xsmm::UnaryOp invokeUnaryOp,
   assert(succeeded(expectedFlag));
   auto flags = dispatchUnaryOp.getFlags();
   for (auto flag : flags) {
-    switch (flag.cast<xsmm::UnaryFlagsAttr>().getValue()) {
+    switch (cast<xsmm::UnaryFlagsAttr>(flag).getValue()) {
     case xsmm::UnaryFlags::NONE:
       if (*expectedFlag != xsmm::UnaryFlags::NONE) {
         return invokeUnaryOp.emitOpError("invalid 'none' flag for input");
@@ -140,7 +140,7 @@ static LogicalResult verifyFlags(xsmm::BinaryOp invokeBinaryOp,
 
   auto flags = dispatchBinaryOp.getFlags();
   for (auto flag : flags) {
-    switch (flag.cast<xsmm::BinaryFlagsAttr>().getValue()) {
+    switch (cast<xsmm::BinaryFlagsAttr>(flag).getValue()) {
     case xsmm::BinaryFlags::NONE:
       if ((*expectedFlagsLhs != xsmm::BinaryFlags::NONE) ||
           (*expectedFlagsRhs != xsmm::BinaryFlags::NONE)) {

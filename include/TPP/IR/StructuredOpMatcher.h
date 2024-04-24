@@ -214,7 +214,7 @@ struct HasRank {
     auto operandType = operand->get().getType();
     if (!isa<ShapedType>(operandType))
       return llvm::is_contained(ranks, HasRank::SCALAR);
-    int64_t rank = operandType.cast<ShapedType>().getRank();
+    int64_t rank = cast<ShapedType>(operandType).getRank();
     return llvm::any_of(
         ranks, [=](int64_t expectedRank) { return expectedRank == rank; });
   }
