@@ -60,7 +60,7 @@ static Type getVulkanTypeWrapper(Type type,
   assert(!isa<TensorType>(type) && "Tensors are not supported by Vulkan");
 
   // Buffers are already Vulkan compatible.
-  if (auto memrefType = type.dyn_cast<MemRefType>())
+  if (auto memrefType = dyn_cast<MemRefType>(type))
     return FlattenMemrefType(memrefType);
 
   // Index has to be converted to a fixed-size integer.
@@ -120,7 +120,7 @@ static Value FlattenMemrefOperand(Value operand, RewriterBase &rewriter) {
   auto loc = operand.getLoc();
 
   // Ignore non-memref types and 1D buffers.
-  auto memrefType = operand.getType().dyn_cast<MemRefType>();
+  auto memrefType = dyn_cast<MemRefType>(operand.getType());
   if (!memrefType || memrefType.getRank() <= 1)
     return operand;
 

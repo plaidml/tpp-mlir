@@ -165,7 +165,7 @@ LogicalResult MLIRBench::replaceSplatWithRandom() {
     auto constant = dyn_cast<arith::ConstantOp>(op);
     if (!constant)
       continue;
-    auto cstType = constant.getType().dyn_cast<ShapedType>();
+    auto cstType = dyn_cast<ShapedType>(constant.getType());
     if (!cstType)
       continue;
     auto newAttr = replaceSplat(cstType, constant.getValueAttr());
@@ -318,7 +318,7 @@ void MLIRBench::printMean(Value mean) {
 
 void MLIRBench::printVector(Value vector) {
   auto op = vector;
-  auto vectorValue = vector.getType().dyn_cast<VectorType>();
+  auto vectorValue = dyn_cast<VectorType>(vector.getType());
   if (vectorValue.getElementType().isBF16()) {
     VectorType vecType =
         VectorType::get(vectorValue.getShape(), builder.getF32Type());
