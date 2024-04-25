@@ -45,6 +45,7 @@ if [ ! -f "${LLVM_TAR_FILE}" ]; then
   echo_run wget -nv -P ${LLVM_TAR_DIR} https://github.com/llvm/llvm-project/archive/${LLVM_TAR_NAME}
   if [ $? != 0 ]; then
     echo "Failed to fetch repo"
+    rm -r ${LLVM_INSTALL_DIR}
     exit 1
   fi
 fi
@@ -53,6 +54,7 @@ fi
 echo_run unzip -uqn ${LLVM_TAR_FILE} -d ${LLVM_TAR_DIR}
 if [ $? != 0 ]; then
   echo "Failed to unpack repo"
+  rm -r ${LLVM_INSTALL_DIR}
   exit 1
 fi
 
@@ -78,6 +80,7 @@ elif [ "${COMPILER}" == "gcc" ]; then
   CXX=g++
 else
   echo "Compiler "${COMPILER}" not recognized"
+  rm -r ${LLVM_INSTALL_DIR}
   exit 1
 fi
 
@@ -136,6 +139,7 @@ echo_run cmake -Wno-dev -G Ninja \
 echo "--- BUILD"
 echo_run ninja -C ${LLVM_BUILD_DIR} all
 if [ $? != 0 ]; then
+  rm -r ${LLVM_INSTALL_DIR}
   exit 1
 fi
 
@@ -143,6 +147,7 @@ fi
 echo "--- CHECK"
 echo_run ninja -C ${LLVM_BUILD_DIR} check-all
 if [ $? != 0 ]; then
+  rm -r ${LLVM_INSTALL_DIR}
   exit 1
 fi
 
