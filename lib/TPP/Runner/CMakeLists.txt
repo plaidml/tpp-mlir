@@ -1,6 +1,6 @@
 add_mlir_library(TPPRunner
   MLIRBench.cpp
-  MLIRBenchPass.cpp
+  TppRunnerWrapper.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

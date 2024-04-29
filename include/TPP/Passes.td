@@ -542,7 +542,7 @@ def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
-def MLIRBenchPass : Pass<"mlir-bench", "ModuleOp">{
+def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
   let summary = "Create main function runner wrapper";
   let description = [{
     Creates a runner wrapper - maps the arguments and random initialize them.

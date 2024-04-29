@@ -152,19 +152,19 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module.getContext());
 
-  tpp::MLIRBenchPassOptions benchOpts;
-  benchOpts.kernelName = options.mainFuncName;
-  benchOpts.kernelType = options.mainFuncType;
-  benchOpts.backend = defGpuBackend;
-  benchOpts.offloadToDevice = defGpuArgs;
-  benchOpts.numBenchLoops = benchNumLoops;
+  tpp::TppRunnerWrapperOptions wrapperOpts;
+  wrapperOpts.kernelName = options.mainFuncName;
+  wrapperOpts.kernelType = options.mainFuncType;
+  wrapperOpts.backend = defGpuBackend;
+  wrapperOpts.offloadToDevice = defGpuArgs;
+  wrapperOpts.numBenchLoops = benchNumLoops;
   // Warmup on GPUs are currently breaking buffer allocation on GPUs
-  benchOpts.benchWarmup = defGpuBackend.empty();
-  benchOpts.printResult = printKernelResult;
-  benchOpts.randomSplat = splatRandom;
-  benchOpts.seed = seed;
-  benchOpts.initType = initType;
-  passManager.addPass(tpp::createMLIRBenchPass(benchOpts));
+  wrapperOpts.benchWarmup = defGpuBackend.empty();
+  wrapperOpts.printResult = printKernelResult;
+  wrapperOpts.randomSplat = splatRandom;
+  wrapperOpts.seed = seed;
+  wrapperOpts.initType = initType;
+  passManager.addPass(tpp::createTppRunnerWrapper(wrapperOpts));
 
   tpp::DefaultPipelineOptions defPipelineOpts{defGpuBackend};
   passManager.addPass(tpp::createDefaultPipeline(defPipelineOpts));

@@ -1,4 +1,4 @@
-//===- MLIRBenchPass.cpp -----------------------------------------*- C++-*-===//
+//===- TppRunnerWrapper.cpp ------------------------------------*----C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -32,7 +32,7 @@ using namespace mlir::tpp;
 
 namespace mlir {
 namespace tpp {
-#define GEN_PASS_DEF_MLIRBENCHPASS
+#define GEN_PASS_DEF_TPPRUNNERWRAPPER
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
@@ -40,8 +40,9 @@ namespace tpp {
 namespace {
 
 // Create runner wrapper around the main kernel function.
-struct MLIRBenchPass : public tpp::impl::MLIRBenchPassBase<MLIRBenchPass> {
-  using MLIRBenchPassBase::MLIRBenchPassBase;
+struct TppRunnerWrapper
+    : public tpp::impl::TppRunnerWrapperBase<TppRunnerWrapper> {
+  using TppRunnerWrapperBase::TppRunnerWrapperBase;
 
   void runOnOperation() override {
     mlir::ModuleOp module = getOperation();
