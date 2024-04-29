@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "MLIRBench.h"
+#include "TPP/Runner/MLIRBench.h"
 
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Casting.h"
@@ -129,91 +129,54 @@ llvm::cl::opt<bool> printLLVM("print-llvm",
                               llvm::cl::desc("print LLVM IR before lowering"),
                               llvm::cl::init(false));
 
+// Select target GPU backend for the pipeline.
+llvm::cl::opt<std::string>
+    defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
+                  llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
+
+// Kernel buffers - arguments and return values - are expected to be allocated
+// on GPU.
+llvm::cl::opt<bool>
+    defGpuArgs("gpu-args",
+               llvm::cl::desc("Kernel buffers are allocated on GPU"),
+               llvm::cl::init(true));
+
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,
                                        JitRunnerOptions &options) {
-  auto tensorInitType = parseTensorInitType(initType);
+  auto module = dyn_cast<ModuleOp>(op);
+  if (!module)
+    return op->emitOpError("Expected a 'builtin.module' op");
 
-  // Randon options need seed
-  if (!seed && (splatRandom || tensorInitType == TensorInitType::Random ||
-                tensorInitType == TensorInitType::Normal)) {
-    seed = std::time(0);
+  // A set of default passes that lower any input IR to LLVM
+  PassManager passManager(module.getContext());
+
+  tpp::TppRunnerWrapperOptions wrapperOpts;
+  wrapperOpts.kernelName = options.mainFuncName;
+  wrapperOpts.kernelType = options.mainFuncType;
+  wrapperOpts.backend = defGpuBackend;
+  wrapperOpts.offloadToDevice = defGpuArgs;
+  wrapperOpts.numBenchLoops = benchNumLoops;
+  // Warmup on GPUs are currently breaking buffer allocation on GPUs
+  wrapperOpts.benchWarmup = defGpuBackend.empty();
+  wrapperOpts.printResult = printKernelResult;
+  wrapperOpts.randomSplat = splatRandom;
+  wrapperOpts.seed = seed;
+  wrapperOpts.initType = initType;
+  passManager.addPass(tpp::createTppRunnerWrapper(wrapperOpts));
+
+  tpp::DefaultPipelineOptions defPipelineOpts{defGpuBackend};
+  passManager.addPass(tpp::createDefaultPipeline(defPipelineOpts));
+
+  auto result = passManager.run(module);
+  if (failed(result)) {
+    llvm::errs() << "ERROR: Failed to lower IR to LLVM dialect\n";
+    module->print(llvm::errs());
+    return result;
   }
 
-  // Benchmark object
-  MLIRBenchConfig config(seed, tensorInitType);
-  MLIRBench bench(op, config);
-
-  // Can only either print or run benchmarks, make this clear before we try to
-  // run
-  if (printKernelResult && benchNumLoops > 1)
-    return bench.emitError(
-        "Cannot print while running benchmarks, pick one or the other");
-
-  // Basic checks
-  if (options.mainFuncType != "void")
-    return bench.emitError(
-        "Main function has to be 'void', even if the kernel return's a value, "
-        "because that's the type of the wrapper we create here");
-
-  if (failed(bench.findKernel(options.mainFuncName)))
-    return bench.emitError("Cannot find kernel '" + options.mainFuncName + "'");
-
-  if (failed(bench.checkKernelSignature()))
-    return bench.finalize();
-
-  if (splatRandom && failed(bench.replaceSplatWithRandom()))
-    return bench.emitError("Error converting splat tensors with random values");
-
-  // Move the kernel to a local name, so we can create `main` with the same
-  // name as the pre-defined entry point (since we can't change it)
-  if (failed(bench.renameKernel()))
-    return bench.emitError("Cannot rename kernel function");
-
-  // Creates the main wrapper
-  if (failed(bench.createMainWrapper()))
-    return bench.emitError("Cannot create main wrapper");
-
-  // Creates the inputs for the kernel
-  if (failed(bench.createKernelArgs()))
-    return bench.emitError("Cannot create kernel inputs");
-
-  // Either run once or run benchmarks
-  if (benchNumLoops == 1) {
-    // Call kernel once to compile xsmm and print results
-    auto *call = bench.callKernel();
-    if (!call)
-      return bench.emitError("Cannot generate a call to the kernel");
-
-    if (printKernelResult) {
-      if (!call->getResults().size())
-        return bench.emitError("Cannot print functions with void return");
-
-      if (failed(bench.printResult(call)))
-        return bench.emitError("Cannot print result memref");
-    }
-
-  } else {
-    // Warmup on GPUs are currently breaking buffer allocation on GPUs
-    if (bench.getGPUName().empty()) {
-      // Warmup to 1% of the total runs, but no less than 1 and no more than 50
-      int warmupIter = benchNumLoops / 100;
-      warmupIter = std::max(warmupIter, 1);
-      warmupIter = std::min(warmupIter, 50);
-
-      // This is the warmup loop, if N > 1, ignore the result
-      bench.createTimerLoop(warmupIter);
-    }
-
-    // This is the benchmark loop
-    auto delta = bench.createTimerLoop(benchNumLoops);
-    auto stats = bench.getTimerStats(delta);
-    bench.printMean(stats);
-  }
-
-  // Finally lower to LLVM Dialect
-  return bench.finalize();
+  return success();
 }
 
 std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,

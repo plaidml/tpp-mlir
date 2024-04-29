@@ -1,13 +1,19 @@
-#ifndef TPP_RUN_MLIRBENCH_H
-#define TPP_RUN_MLIRBENCH_H
-
-//===- MLIRBench.h - MLIR Benchmark Producer ------------------------------===//
+//===- MLIRBench.h - MLIR Benchmark Producer ---------------------*- C++-*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // Producer for benchmark wrapper methods. Upon selecting a kernel to run, maps
 // the arguments, random initialize them and call the kernel as many times as
 // requested, taking measurements and printing the result in the end.
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef TPP_RUNNER_MLIRBENCH_H
+#define TPP_RUNNER_MLIRBENCH_H
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,6 +31,7 @@ class ModuleOp;
 class MemRefType;
 class Operation;
 class Value;
+
 namespace func {
 class FuncOp;
 } // namespace func
@@ -33,11 +40,15 @@ class FuncOp;
 // pipeline.
 struct MLIRBenchConfig {
   MLIRBenchConfig() = default;
-  MLIRBenchConfig(int seed, TensorInitType initType)
-      : seed(seed), initType(initType) {}
+  MLIRBenchConfig(int seed, TensorInitType initType, std::string backend,
+                  bool offloadToDevice)
+      : seed(seed), initType(initType), backend(backend),
+        offloadToDevice(offloadToDevice) {}
 
   int seed = 0;
   TensorInitType initType = TensorInitType::Auto;
+  std::string backend = "cpu";
+  bool offloadToDevice = true;
 };
 
 /// MLIRBench - Creates wrapper for calling kernel methods.
@@ -47,15 +58,6 @@ struct MLIRBenchConfig {
 /// inteface is a bit weird, but it will get better once we clear the
 /// API design, with time.
 class MLIRBench {
-  /// Min number of warmup loops
-  static unsigned constexpr minIters = 1;
-
-  /// Max number of warmup loops
-  static unsigned constexpr maxIters = 100;
-
-  /// Target ratio of warmup loops: ( total iterations / warmupRatio )
-  static unsigned constexpr warmupRatio = 10;
-
   /// MLIR OpBulder
   OpBuilder builder;
 
@@ -85,6 +87,12 @@ class MLIRBench {
 
   /// Tensor init type
   TensorInitType initType;
+
+  /// Target device backend
+  std::string backend;
+
+  /// Allocate arguments on target device
+  bool offloadToDevice;
 
   /// Gets module's main block
   Block &getModuleBlock();
@@ -143,8 +151,8 @@ public:
   /// Prints the result of a kernel call
   LogicalResult printResult(Operation *kernelCall);
 
-  /// Terminates the function, issuing a return, lower to LLVM
-  LogicalResult finalize();
+  /// Terminates the function, issuing a return.
+  LogicalResult terminate();
 
   /// Reports error on the current module's location
   LogicalResult emitError(llvm::Twine);
@@ -155,4 +163,4 @@ public:
 
 } // namespace mlir
 
-#endif
+#endif // TPP_RUNNER_MLIRBENCH_H

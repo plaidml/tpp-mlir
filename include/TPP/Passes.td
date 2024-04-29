@@ -542,4 +542,54 @@ def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
+  let summary = "Create main function runner wrapper";
+  let description = [{
+    Creates a runner wrapper - maps the arguments and random initialize them.
+    Optionally, inserts benchmark wrapper calling the main kernel repeatedly
+    and taking measurements, or printing the result in the end.
+  }];
+  let dependentDialects = ["func::FuncDialect",
+                           "tensor::TensorDialect",
+                           "memref::MemRefDialect",
+                           "gpu::GPUDialect",
+                           "arith::ArithDialect",
+                           "scf::SCFDialect",
+                           "vector::VectorDialect",
+                           "bufferization::BufferizationDialect",
+                           "perf::PerfDialect"];
+  let options = [
+    Option<"kernelName", "kernel-name", "std::string",
+            /*default=*/"\"entry\"",
+           "The kernel function to be called.">,
+    Option<"kernelType", "kernel-type", "std::string",
+            /*default=*/"\"void\"",
+           "The type of the kernel function.">,
+    Option<"backend", "backend", "std::string",
+            /*default=*/"\"cpu\"",
+           "Kernel target device backend (cpu, cuda, vulkan).">,
+    Option<"offloadToDevice", "offload-on-device", "bool",
+            /*default=*/"true",
+           "Offload kernel arguments to the target device.">,
+    Option<"numBenchLoops", "bench-loops", "int64_t",
+            /*default=*/"1",
+           "Number of benchmarking loops.">,
+    Option<"benchWarmup", "bench-warmup", "bool",
+            /*default=*/"true",
+           "Add benchmark warmup loops.">,
+    Option<"printResult", "print", "bool",
+            /*default=*/"false",
+           "Print kernel results.">,
+    Option<"randomSplat", "random-splat", "bool",
+            /*default=*/"false",
+           "Replace splat dense tensors with random values.">,
+    Option<"seed", "seed", "int64_t",
+            /*default=*/"0",
+           "Initialization random seed.">,
+    Option<"initType", "init-type", "std::string",
+            /*default=*/"",
+           "Initializer type (const, simple, cont, rand, normal).">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

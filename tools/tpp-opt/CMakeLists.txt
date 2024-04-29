@@ -15,6 +15,7 @@ set(LIBS
         MLIRToLLVMIRTranslationRegistration
         MLIROptLib
         TPPPipeline
+        TPPRunner
         TPPTransforms
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}

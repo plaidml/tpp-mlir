@@ -30,6 +30,7 @@ set(LIBS
         MLIROptLib
         TPPPipeline
         TPPTransforms
+        TPPRunner
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
         )
@@ -42,7 +43,6 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_llvm_executable(tpp-run
-  MLIRBench.cpp
   tpp-run.cpp)
 
 llvm_update_compile_flags(tpp-run)
