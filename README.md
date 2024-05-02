@@ -159,3 +159,4 @@ TPP: [Tensor Processing Primitives: A Programming Abstraction for Efficiency and
 
 PARLOOPER: [Harnessing Deep Learning and HPC Kernels via High-Level Loop and Tensor Abstractions on CPU Architectures (2023)](https://arxiv.org/abs/2304.12576)
 
+TPP-MLIR: [Towards a high-performance AI compiler with upstream MLIR (2024)](https://arxiv.org/abs/2404.15204)
