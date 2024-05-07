@@ -18,7 +18,6 @@ add_mlir_library(TPPGPU
     MLIRPerfOpsIncGen
     MLIRXsmmOpsIncGen
     TPPCompilerPassIncGen
-    TPPLinalgXTransformOpsIncGen
 
   LINK_LIBS PUBLIC
     MLIRGPUDialect

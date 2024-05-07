@@ -20,7 +20,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/PassUtils.h"
 
 #include <optional>

@@ -31,7 +31,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Transform/LinalgXTransformOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
@@ -115,7 +114,6 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
     registry.insert<nvgpu::NVGPUDialect>();
     registry.insert<bufferization::BufferizationDialect>();
     registry.insert<spirv::SPIRVDialect>();
-    linalgx::registerTransformDialectExtension(registry);
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
 
