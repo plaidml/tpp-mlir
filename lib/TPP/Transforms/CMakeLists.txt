@@ -30,7 +30,6 @@ add_mlir_library(TPPTransforms
     MLIRXsmmOpsIncGen
     MLIRXsmmAttrDefIncGen
     TPPCompilerPassIncGen
-    TPPLinalgXTransformOpsIncGen
 
   LINK_LIBS PUBLIC
     ${mlir_dialect_libs}
@@ -46,5 +45,4 @@ add_mlir_library(TPPTransforms
     TPPPerfToFunc
     TPPPerfToLoop
     TPPXsmmToFunc
-    TPPLinalgXTransformOps
   )
