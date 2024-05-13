@@ -439,16 +439,13 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     Value collapsedImage = linalgx::utils::collapse(
-        rewriter, loc, image->get(), newImageType,
-        getReassociationIndicesAttribute(rewriter, *reassociationImage));
+        rewriter, loc, image->get(), newImageType, *reassociationImage);
 
     Value collapsedFilter = linalgx::utils::collapse(
-        rewriter, loc, filter->get(), newFilterType,
-        getReassociationIndicesAttribute(rewriter, *reassociationFilter));
+        rewriter, loc, filter->get(), newFilterType, *reassociationFilter);
 
     Value collapsedOutput = linalgx::utils::collapse(
-        rewriter, loc, output.get(), newOutputType,
-        getReassociationIndicesAttribute(rewriter, *reassociationOutput));
+        rewriter, loc, output.get(), newOutputType, *reassociationOutput);
 
     linalg::GenericOp replacementOp = rewriter.create<linalg::GenericOp>(
         loc, newOutputType, ValueRange{collapsedImage, collapsedFilter},
@@ -464,8 +461,7 @@ struct CollapseFilterAndImage : OpRewritePattern<linalg::GenericOp> {
     if (!reassociationOutput)
       return failure();
     Value resExpanded = linalgx::utils::expand(
-        rewriter, loc, res, output.get().getType(),
-        getReassociationIndicesAttribute(rewriter, *reassociationOutput));
+        rewriter, loc, res, output.get().getType(), *reassociationOutput);
     rewriter.replaceOp(linalgOp, resExpanded);
     return success();
   }

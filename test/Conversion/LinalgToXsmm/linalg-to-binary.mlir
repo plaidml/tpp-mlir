@@ -692,7 +692,7 @@ func.func @mul_bcast_row_in0(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
 
 // CHECK-LABEL: mul_bcast_row_in0
 // CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
-// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
+// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [10, 1] : memref<10xf32> into memref<10x1xf32>
 // CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 1, 10, 10] flags = (bcast_row_in0) data_type = f32
 // CHECK: xsmm.binary mul(data_type = f32, %[[DIS]], %[[EXP]], %[[ARG1]], %[[ARG1]])
 
@@ -716,6 +716,6 @@ func.func @mul_bcast_row_in1(%arg0: memref<10xf32>, %arg1: memref<10x10xf32>) {
 
 // CHECK-LABEL: mul_bcast_row_in1
 // CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
-// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
+// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [10, 1] : memref<10xf32> into memref<10x1xf32>
 // CHECK: %[[DIS:.+]] = xsmm.binary.dispatch mul [10, 10, 10, 1, 10] flags = (bcast_row_in1) data_type = f32
 // CHECK: xsmm.binary mul(data_type = f32, %[[DIS]], %[[ARG1]], %[[EXP]], %[[ARG1]])

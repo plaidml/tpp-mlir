@@ -167,7 +167,7 @@ ParseResult BenchOp::parse(OpAsmParser &parser, OperationState &result) {
   if (types.size() != 1)
     return parser.emitError(locs[0], "expect one types for argument");
   if (parser.resolveOperand(operands[0], types[0], result.operands) ||
-      !types[0].isa<IntegerType>())
+      !isa<IntegerType>(types[0]))
     return parser.emitError(locs[0], "expect integer number of iterations");
   operands.clear();
   types.clear();

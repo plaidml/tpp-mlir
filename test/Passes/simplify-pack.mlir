@@ -131,7 +131,7 @@ func.func @rank_reduce_pack(%arg0: tensor<32x32xbf16>, %arg1: tensor<1x16x32x2xb
   // CHECK-SAME:  : tensor<32x32xbf16> -> tensor<16x32x2xbf16>
   // CHECK: %[[EXP:.+]] = tensor.expand_shape %[[PACK]] {{\[}}[0, 1], [2], [3]]
   // CHECK-SAME:  : tensor<16x32x2xbf16> into tensor<1x16x32x2xbf16>
-  %expanded = tensor.expand_shape %arg0 [[0, 1], [2]] : tensor<32x32xbf16> into tensor<1x32x32xbf16>
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape [1, 32, 32] : tensor<32x32xbf16> into tensor<1x32x32xbf16>
   %pack = tensor.pack %expanded inner_dims_pos = [1] inner_tiles = [2] into %arg1
     : tensor<1x32x32xbf16> -> tensor<1x16x32x2xbf16>
   return %pack : tensor<1x16x32x2xbf16>

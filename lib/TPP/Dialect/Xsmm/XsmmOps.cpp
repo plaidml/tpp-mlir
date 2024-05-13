@@ -183,7 +183,7 @@ static void printerFlagsImpl(OpAsmPrinter &printer,
                              const std::string_view &flagsName) {
   printer << " " << flagsName << " = (";
   llvm::interleaveComma(fn(), printer, [&](auto &flag) {
-    printer << stringifyEnum(flag.template cast<AttrTy>().getValue());
+    printer << stringifyEnum(cast<AttrTy>(flag).getValue());
   });
   printer << ") ";
 }
@@ -385,7 +385,7 @@ LogicalResult FusedBrgemmDispatchOp::verify() {
   if (unaryKind == xsmm::UnaryKind::NONE) {
     auto unaryFlags = getUnaryFlags();
     if (unaryFlags.size() != 1 ||
-        unaryFlags[0].cast<xsmm::UnaryFlagsAttr>().getValue() !=
+        cast<xsmm::UnaryFlagsAttr>(unaryFlags[0]).getValue() !=
             xsmm::UnaryFlags::NONE) {
       return emitOpError() << "invalid unary flags for kind none";
     }
@@ -394,7 +394,7 @@ LogicalResult FusedBrgemmDispatchOp::verify() {
   if (binaryKind == xsmm::BinaryKind::NONE) {
     auto binaryFlags = getBinaryFlags();
     if (binaryFlags.size() != 1 ||
-        binaryFlags[0].cast<xsmm::BinaryFlagsAttr>().getValue() !=
+        cast<xsmm::BinaryFlagsAttr>(binaryFlags[0]).getValue() !=
             xsmm::BinaryFlags::NONE) {
       return emitOpError() << "invalid binary flags for kind none";
     }

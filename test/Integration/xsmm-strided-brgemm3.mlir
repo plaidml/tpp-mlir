@@ -14,11 +14,11 @@
 
 // IR-LABEL: matmul_static
 func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t) {
-  %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] :
+  %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] output_shape[2, 2, 2, 4] :
     !A_tensor_t into tensor<2x2x2x4xf32>
-  %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] :
+  %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] output_shape[2, 8, 2, 4] :
     !B_tensor_t into tensor<2x8x2x4xf32>
-  %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] :
+  %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] output_shape[2, 2, 8, 2] :
     !C_tensor_t into tensor<2x2x8x2xf32>
 
   %cst_fill = arith.constant 0.0 : f32

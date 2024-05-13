@@ -15,13 +15,13 @@
 #map3 = affine_map<(i, ii, j, jj) -> (i, ii, j, jj)>
 
 func.func @matmul_static(%A : !A_tensor_t, %B : !B_tensor_t, %C : !C_tensor_t, %D : !D_tensor_t) {
-  %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] :
+  %A_exp = tensor.expand_shape %A [[0, 1], [2, 3]] output_shape[2, 2, 2, 4] :
     !A_tensor_t into tensor<2x2x2x4xf32>
-  %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] :
+  %B_exp = tensor.expand_shape %B [[0, 1], [2, 3]] output_shape[2, 4, 8, 2] :
     !B_tensor_t into tensor<2x4x8x2xf32>
-  %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] :
+  %C_exp = tensor.expand_shape %C [[0, 1], [2, 3]] output_shape[2, 2, 8, 2] :
     !C_tensor_t into tensor<2x2x8x2xf32>
-  %D_exp = tensor.expand_shape %D [[0, 1], [2, 3]] :
+  %D_exp = tensor.expand_shape %D [[0, 1], [2, 3]] output_shape[2, 2, 8, 2] :
     !D_tensor_t into tensor<2x2x8x2xf32>
 
   // IR-DAG: %[[C1:.+]] = arith.constant 1 : i64

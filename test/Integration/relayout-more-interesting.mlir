@@ -72,7 +72,7 @@ func.func @entry() {
   %2 = bufferization.alloc_tensor() : tensor<6x16xf32>
   %3 = linalg.copy ins(%d: tensor<6x16xf32>) outs(%2: tensor<6x16xf32>) -> tensor<6x16xf32>
   %4 = tensor.collapse_shape %3 [[0, 1]] : tensor<6x16xf32> into tensor<96xf32>
-  %5 = tensor.expand_shape %4 [[0, 1, 2, 3]] : tensor<96xf32> into tensor<3x8x2x2xf32>
+  %5 = tensor.expand_shape %4 [[0, 1, 2, 3]] output_shape [3, 8, 2, 2] : tensor<96xf32> into tensor<3x8x2x2xf32>
   %v1 = vector.transfer_read %5[%c0, %c0, %c0, %c0], %d1 : tensor<3x8x2x2xf32>, vector<3x8x2x2xf32>
   //
   // CHECK:     ( ( ( ( 1.1, 2.1 ), ( 3.1, 4.1 ) ),
