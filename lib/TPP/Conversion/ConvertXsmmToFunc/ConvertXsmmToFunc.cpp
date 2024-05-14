@@ -251,7 +251,7 @@ void addKindOperand(RewriterBase &rewriter,
 static int64_t getOredFlags(ArrayAttr flags) {
   int64_t oredFlag = 0;
   for (auto flag : flags) {
-    int64_t intAttr = flag.template dyn_cast<IntegerAttr>().getInt();
+    int64_t intAttr = dyn_cast<IntegerAttr>(flag).getInt();
     // LIBXSMM is col-major, swap A and B flags.
     if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
       if (gemmFlag.getValue() == GemmFlags::VNNI_A)
@@ -412,7 +412,7 @@ struct ConvertFusedBrgemmOp : public OpRewritePattern<FusedBrgemmDispatchOp> {
     auto isFusedAdd = dispatchOp.getBinaryKind() == xsmm::BinaryKind::ADD;
     auto binaryFlags = dispatchOp.getBinaryFlags();
     if (isFusedAdd && (binaryFlags.size() != 1 ||
-                       binaryFlags[0].cast<BinaryFlagsAttr>().getValue() !=
+                       cast<BinaryFlagsAttr>(binaryFlags[0]).getValue() !=
                            BinaryFlags::BCAST_COL_IN_0)) {
       return failure();
     }

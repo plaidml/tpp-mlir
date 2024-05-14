@@ -262,9 +262,8 @@ static Value makeOperandShapeRowBroadCastable(RewriterBase &rewriter,
   auto reassoc =
       getReassociationIndicesForReshape(shapedOperand, newShapedOperand);
   assert(reassoc.has_value());
-  return linalgx::utils::expand(
-      rewriter, loc, operand, newShapedOperand,
-      getReassociationIndicesAttribute(rewriter, *reassoc));
+  return linalgx::utils::expand(rewriter, loc, operand, newShapedOperand,
+                                *reassoc);
 }
 
 // Convert linalg.generic to xsmm unary relu or identity op.

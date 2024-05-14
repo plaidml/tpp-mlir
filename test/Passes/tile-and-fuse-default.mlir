@@ -192,7 +192,7 @@ func.func @blocked_matmul_with_vnni_blocking(
       %4 = arith.addf %out, %3 : bf16
       linalg.yield %4 : bf16
   } -> tensor<8x48x32x32xbf16>
-  %expanded = tensor.expand_shape %arg2 [[0, 1]] : tensor<1536xbf16> into tensor<48x32xbf16>
+  %expanded = tensor.expand_shape %arg2 [[0, 1]] output_shape [48, 32] : tensor<1536xbf16> into tensor<48x32xbf16>
   %1 = linalg.generic {
     indexing_maps = [#map3, #map4, #map3],
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]}

@@ -9,6 +9,7 @@
 #ifndef TPP_TRANSFORMS_UTILS_TRANSFORMUTILS_H
 #define TPP_TRANSFORMS_UTILS_TRANSFORMUTILS_H
 
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
@@ -94,11 +95,11 @@ void populateScfForToForAllRewritePattern(RewritePatternSet &patterns);
 
 // Given a value `val` expand its shape based on `reassociationMap`.
 Value expand(OpBuilder &builder, Location loc, Value val, Type newType,
-             ArrayAttr reassociationMap);
+             ArrayRef<ReassociationIndices> reassociationMap);
 
 // Given a value `val` collapse its shape based on  `reassociationMap`.
 Value collapse(OpBuilder &builder, Location loc, Value val, Type newType,
-               ArrayAttr reassociationMap);
+               ArrayRef<ReassociationIndices> reassociationMap);
 
 } // namespace utils
 } // namespace linalgx

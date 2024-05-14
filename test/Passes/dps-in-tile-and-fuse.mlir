@@ -22,7 +22,7 @@ func.func @dps_test(%arg0: tensor<8x48x32x32xbf16>,
       %add = arith.addf %out, %mul : bf16
       linalg.yield %add : bf16
   } -> tensor<8x48x32x32xbf16>
-  %expanded = tensor.expand_shape %arg2 [[0, 1]] : tensor<1536xbf16> into tensor<48x32xbf16>
+  %expanded = tensor.expand_shape %arg2 [[0, 1]] output_shape [48, 32] : tensor<1536xbf16> into tensor<48x32xbf16>
   %2 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%0, %expanded : tensor<8x48x32x32xbf16>, tensor<48x32xbf16>) outs(%arg3 : tensor<8x48x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %add = arith.addf %in, %in_0 : bf16

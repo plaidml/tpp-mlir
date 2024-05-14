@@ -14,7 +14,7 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
       %5 = arith.addf %out, %4 : bf16
       linalg.yield %5 : bf16
   } -> tensor<32x128x4x4xbf16>
-  %expanded = tensor.expand_shape %arg2 [[0, 1]] : tensor<512xbf16> into tensor<128x4xbf16>
+  %expanded = tensor.expand_shape %arg2 [[0, 1]] output_shape [128, 4] : tensor<512xbf16> into tensor<128x4xbf16>
   %1 = tensor.empty() : tensor<32x128x4x4xbf16>
   %2 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%0, %expanded : tensor<32x128x4x4xbf16>, tensor<128x4xbf16>) outs(%1 : tensor<32x128x4x4xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):

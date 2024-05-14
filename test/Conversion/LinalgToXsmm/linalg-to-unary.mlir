@@ -297,7 +297,7 @@ func.func @identity_3(%arg0: memref<128x1xf32>, %arg1: memref<128x512xf32>) {
 
 func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>,
                         %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
-  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]]
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape[16, 2, 32]
     : memref<32x32xbf16, strided<[512, 1], offset: ?>>
     into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
   linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>)
@@ -315,7 +315,7 @@ func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>
 
 func.func @not_vnni_packing(%arg0 : memref<32x32xf32, strided<[512, 1], offset: ?>>,
                             %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
-  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]]
+  %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape[16, 2, 32]
     : memref<32x32xf32, strided<[512, 1], offset: ?>>
     into memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>
   linalg.transpose ins(%expand_shape : memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>)
@@ -359,7 +359,7 @@ func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2
       : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
     %subview_1 = memref.subview %arg2[%arg3, %arg4, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1]
       : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-    %expand_shape = memref.expand_shape %subview [[0, 1], [2]]
+    %expand_shape = memref.expand_shape %subview [[0, 1], [2]] output_shape[16, 2, 32]
       : memref<32x32xbf16, strided<[128, 1], offset: ?>> into memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>
     linalg.transpose ins(%expand_shape : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>)
                      outs(%subview_1 : memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>)
@@ -417,7 +417,7 @@ func.func @identity_5(%arg0 : memref<10xf32>, %arg1 : memref<10x10xf32>) {
 
 // CHECK-LABEL: identity_5
 // CHECK-SAME: %[[ARG0:.+]]: memref<10xf32>, %[[ARG1:.+]]: memref<10x10xf32>
-// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] : memref<10xf32> into memref<10x1xf32>
+// CHECK: %[[EXP:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [10, 1] : memref<10xf32> into memref<10x1xf32>
 // CHECK: %[[DIS:.+]] = xsmm.unary.dispatch identity [10, 10, 1, 10] flags = (bcast_row) data_type = f32
 // CHECK: xsmm.unary identity(data_type = f32, %[[DIS]], %[[EXP]], %[[ARG1]])
 

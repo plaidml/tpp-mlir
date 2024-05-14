@@ -48,11 +48,10 @@ struct RankReducedExtractSliceOp
         reassociation->size() == static_cast<size_t>(resultType.getRank())) {
       return failure();
     }
-    auto rankReducedType =
+    auto rankReducedType = cast<RankedTensorType>(
         tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
             reassociation->size(), sliceOp.getSourceType(), offsets, sizes,
-            strides)
-            .cast<RankedTensorType>();
+            strides));
 
     Location loc = sliceOp.getLoc();
     Value newSlice = rewriter.create<tensor::ExtractSliceOp>(

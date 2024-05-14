@@ -804,9 +804,9 @@ struct PackAsReshape : public OpRewritePattern<tensor::PackOp> {
         getReassociationIndicesForReshape(sourceType, packOp.getDestType());
     if (!reassoc)
       return failure();
-    Value expanded = linalgx::utils::expand(
-        rewriter, packOp.getLoc(), packOp.getSource(), packOp.getDestType(),
-        getReassociationIndicesAttribute(rewriter, *reassoc));
+    Value expanded =
+        linalgx::utils::expand(rewriter, packOp.getLoc(), packOp.getSource(),
+                               packOp.getDestType(), *reassoc);
     rewriter.replaceOp(packOp, expanded);
     return success();
   }
@@ -835,8 +835,7 @@ struct UnPackAsReshape : public OpRewritePattern<tensor::UnPackOp> {
     if (!reassoc)
       return failure();
     Value collapse = linalgx::utils::collapse(
-        rewriter, unPackOp.getLoc(), unPackOp.getSource(), destType,
-        getReassociationIndicesAttribute(rewriter, *reassoc));
+        rewriter, unPackOp.getLoc(), unPackOp.getSource(), destType, *reassoc);
     rewriter.replaceOp(unPackOp, collapse);
     return success();
   }
@@ -885,9 +884,9 @@ struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
         packOp.getMixedTiles(), packOp.getPaddingValue(),
         packOp.getOuterDimsPerm());
 
-    Value expanded = linalgx::utils::expand(
-        rewriter, packOp.getLoc(), packedVal, packOp.getDestType(),
-        getReassociationIndicesAttribute(rewriter, *reassocExpand));
+    Value expanded =
+        linalgx::utils::expand(rewriter, packOp.getLoc(), packedVal,
+                               packOp.getDestType(), *reassocExpand);
     rewriter.replaceOp(packOp, expanded);
 
     return success();

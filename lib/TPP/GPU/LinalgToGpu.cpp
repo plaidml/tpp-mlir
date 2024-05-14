@@ -726,8 +726,7 @@ struct ConvertGemmLikeToGpu : public OpRewritePattern<LinalgOpTy> {
     }
 
     // Ensure that reduction dimension tiling also works for smaller workloads.
-    auto aType =
-        gemmLikeOp.getDpsInputs()[0].getType().template cast<ShapedType>();
+    auto aType = cast<ShapedType>(gemmLikeOp.getDpsInputs()[0].getType());
     auto kDim = aType.getShape().back();
     auto kTile = kDim < options.kTile ? kDim : options.kTile;
 
