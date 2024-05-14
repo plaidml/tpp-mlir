@@ -304,101 +304,6 @@ mlir::linalgx::packConv2DNchwFchwOp(RewriterBase &rewriter,
   return packConvolutions(rewriter, convOp, tiles);
 }
 
-template <typename OpTy>
-static FailureOr<linalg::LinalgOp>
-packMatmulOpImpl(RewriterBase &rewriter, OpTy matmulOp,
-                 ArrayRef<OpFoldResult> tiles) {
-  static_assert(
-      llvm::is_one_of<OpTy, linalg::MatmulOp, linalg::BatchMatmulOp>::value,
-      "applies to only matmul or batch matmul operations");
-
-  OpBuilder::InsertionGuard guard(rewriter);
-  // The op is replaced, we need to set the insertion
-  // point after it.
-  rewriter.setInsertionPointAfter(matmulOp);
-
-  if (matmulOp.hasDynamicShape())
-    return rewriter.notifyMatchFailure(matmulOp, "require static shape");
-
-  if (matmulOp.hasPureBufferSemantics())
-    return rewriter.notifyMatchFailure(matmulOp, "require tensor semantics");
-
-  OpFoldResult tileOnI = tiles[0];
-  OpFoldResult tileOnJ = tiles[1];
-  OpFoldResult tileOnK = tiles[2];
-  bool isBatchMatmulOp = std::is_same_v<OpTy, linalg::BatchMatmulOp>;
-  size_t inc = isBatchMatmulOp ? 1 : 0;
-  size_t posI = 0 + inc;
-  size_t posJ = 1 + inc;
-  size_t posK = 2 + inc;
-  if (!linalgx::utils::validateFullTilesOnDims(
-          cast<TilingInterface>(matmulOp.getOperation()),
-          {tileOnI, tileOnJ, tileOnK}, {posI, posJ, posK})) {
-    return rewriter.notifyMatchFailure(matmulOp, "expect full tiles only");
-  }
-
-  // [..][IB][JB][ib][jb] += [..][IB][KB][ib][kb] * [..][KB][JB][jb][kb]
-  auto packedCanonicalMatmul = linalg::packMatmulGreedily(
-      rewriter, matmulOp, tiles, /*mnkPaddedSizesNextMultipleOf=*/{},
-      /*mnkPackedSizes=*/{0, 1, 2});
-  if (failed(packedCanonicalMatmul))
-    return failure();
-
-  assert(packedCanonicalMatmul->packOps.size() == 3);
-  assert(packedCanonicalMatmul->unPackOps.size() == 1);
-
-  SmallVector<int64_t> innerPerm = {1, 0};
-  SmallVector<int64_t> outerPerm = {1, 0};
-  if (isBatchMatmulOp)
-    outerPerm = {0, 2, 1};
-  auto packedMatmul =
-      linalg::packTranspose(rewriter, packedCanonicalMatmul->packOps[1],
-                            packedCanonicalMatmul->packedLinalgOp,
-                            /*maybeUnPackOp=*/nullptr, outerPerm, innerPerm);
-  if (failed(packedMatmul))
-    return failure();
-  return packedMatmul->transposedLinalgOp;
-}
-
-//===----------------------------------------------------------------------===//
-// MatmulOp
-//===----------------------------------------------------------------------===//
-//  i      j        i     k      k      j
-// [128 x 256] += [128 x 256] * [256 x 256]
-//
-// tile factor on i = 32
-// tile factor on j = 16
-// tile factor on k = 8
-//
-// [IB][JB][ib][jb] += [IB][KB][ib][kb] * [JB][KB][kb][jb]
-// [4 ][16][32][16] += [4 ][32][32][8 ] * [16][32][8 ][16]
-// KB is the batch reduce dimension.
-FailureOr<linalg::LinalgOp>
-mlir::linalgx::packMatmulOp(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-                            ArrayRef<OpFoldResult> tiles) {
-  if (tiles.size() != 3)
-    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
-
-  return packMatmulOpImpl<linalg::MatmulOp>(rewriter, matmulOp, tiles);
-}
-
-//===----------------------------------------------------------------------===//
-// BatchMatmulOp
-//===----------------------------------------------------------------------===//
-// Original layout:
-//  [B][I][J] += [B][I][K] * [B][K][J]
-// New layout:
-//  [B][IB][JB][ib][jb] += [B][IB][KB][ib][kb] * [B][JB][KB][kb][jb]
-FailureOr<linalg::LinalgOp>
-mlir::linalgx::packMatmulOp(RewriterBase &rewriter,
-                            linalg::BatchMatmulOp matmulOp,
-                            ArrayRef<OpFoldResult> tiles) {
-  if (tiles.size() != 3)
-    return rewriter.notifyMatchFailure(matmulOp, "require 3 tile factors");
-
-  return packMatmulOpImpl<linalg::BatchMatmulOp>(rewriter, matmulOp, tiles);
-}
-
 //===----------------------------------------------------------------------===//
 // MatmulOp (VNNI packing)
 //===----------------------------------------------------------------------===//
@@ -555,29 +460,6 @@ getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
 // Passes
 //===----------------------------------------------------------------------===//
 
-// Pack MatmulOp and BatchMatmulOp.
-template <typename OpTy> struct PackMatmulImpl : public OpRewritePattern<OpTy> {
-  PackMatmulImpl(MLIRContext *context, ArrayRef<int64_t> blockingFactors,
-                 PatternBenefit benefit = 1)
-      : OpRewritePattern<OpTy>(context, benefit),
-        blockingFactors(blockingFactors) {}
-
-  LogicalResult matchAndRewrite(OpTy matmulOp,
-                                PatternRewriter &rewriter) const override {
-    if (blockingFactors.empty())
-      blockingFactors = getDefaultBlockingFactors(matmulOp);
-    FailureOr<linalg::GenericOp> packedMatmul = mlir::linalgx::packMatmulOp(
-        rewriter, matmulOp,
-        getAsOpFoldResult(rewriter.getI64ArrayAttr(blockingFactors)));
-    if (failed(packedMatmul))
-      return failure();
-    return success();
-  }
-
-private:
-  mutable SmallVector<int64_t> blockingFactors;
-};
-
 // Entry point for packing a matmul operation.
 // Pack MatmulOp as following:
 // [NB][KB][nb][kb] += [NB][CB][nb][cb] * [KB][CB][cb][kb]
@@ -591,9 +473,57 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<PackMatmulImpl<linalg::MatmulOp>,
-                 PackMatmulImpl<linalg::BatchMatmulOp>>(ctx, blockingFactors);
+
+    auto packControlFn = [&](linalg::LinalgOp linalgOp)
+        -> std::optional<linalg::BlockPackMatmulOptions> {
+      linalg::BlockPackMatmulOptions options;
+
+      // Pack only these two named matmul variants.
+      if (!(isa<linalg::MatmulOp>(linalgOp) ||
+            isa<linalg::BatchMatmulOp>(linalgOp))) {
+        return std::nullopt;
+      }
+
+      // Enforce user defined blocking factors or use defaults.
+      if (!blockingFactors.empty()) {
+        SmallVector<int64_t, 3> blockFactors{*blockingFactors};
+        options.blockFactors = blockFactors;
+      } else {
+        options.blockFactors = getDefaultBlockingFactors(linalgOp);
+      }
+
+      // Allow padding to avoid double checks.
+      options.allowPadding = true;
+
+      // Apply more restrictive packing validation.
+      OpBuilder builder(linalgOp);
+      SmallVector<OpFoldResult> tiles =
+          getAsOpFoldResult(builder.getI64ArrayAttr(options.blockFactors));
+      OpFoldResult tileOnI = tiles[0];
+      OpFoldResult tileOnJ = tiles[1];
+      OpFoldResult tileOnK = tiles[2];
+      bool isBatchMatmulOp = isa<linalg::BatchMatmulOp>(linalgOp);
+      size_t inc = isBatchMatmulOp ? 1 : 0;
+      size_t posI = 0 + inc;
+      size_t posJ = 1 + inc;
+      size_t posK = 2 + inc;
+      if (!linalgx::utils::validateFullTilesOnDims(
+              cast<TilingInterface>(linalgOp.getOperation()),
+              {tileOnI, tileOnJ, tileOnK}, {posI, posJ, posK})) {
+        return std::nullopt;
+      }
+
+      // Apply XSMM packing with block transpose only.
+      options.lhsTransposeOuterBlocks = false;
+      options.lhsTransposeInnerBlocks = false;
+      options.rhsTransposeOuterBlocks = true;
+      options.rhsTransposeInnerBlocks = false;
+
+      return options;
+    };
+    linalg::populateBlockPackMatmulPatterns(patterns, packControlFn);
     linalg::populateLinalgDeGeneralizationPatterns(patterns);
+
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
