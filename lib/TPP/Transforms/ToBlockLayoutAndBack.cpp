@@ -539,49 +539,6 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
 
 namespace {
 
-//===----------------------------------------------------------------------===//
-// BubbleUpThroughFillOp
-//===----------------------------------------------------------------------===//
-
-// Attempt to avoid packing a fill op. Instead create a 'packed' fill.
-// %0 = tensor.empty
-// %packed = tensor.empty
-// %1 = linalg.fill ins(%cst) outs(%0)
-// %2 = tensor.pack %1 into %packed
-// %3 = some_packed_op %2
-//
-// --->
-//
-// %0 = tensor.empty
-// %1 = linalg.fill ins(%cst) outs (%packed)
-// %2 = some_packed_op %1
-// %3 = tensor.unpack %2 into %0
-//
-struct BubbleUpThroughFillOp : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const override {
-    Value source = packOp.getSource();
-    auto fillOp = source.getDefiningOp<linalg::FillOp>();
-    if (!fillOp)
-      return failure();
-
-    Value fillRes = fillOp.getResult(0);
-    if (!fillRes.hasOneUse())
-      return failure();
-
-    // Replace result with output.
-    rewriter.replaceAllUsesWith(fillRes, fillOp.getOutputs()[0]);
-    auto empty = tensor::PackOp::createDestinationTensor(
-        rewriter, packOp.getLoc(), source, packOp.getMixedTiles(),
-        packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
-    rewriter.replaceOpWithNewOp<linalg::FillOp>(packOp, fillOp.getInputs(),
-                                                empty);
-    return success();
-  }
-};
-
 static SmallVector<int64_t>
 getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
   assert(linalgOp && "expect a valid linalgOp");
@@ -758,7 +715,8 @@ struct PropagatePackUnPack
   void runOnOperation() override {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
-    tpp::populateSinkPackPatterns(patterns);
+    linalg::populateDataLayoutPropagationPatterns(
+        patterns, [](Operation *op) { return true; });
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -1157,10 +1115,4 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
                FoldCollapseShapeInExtractSliceOp, FoldUnPackIntoInsertSlice,
                ForAllIterArgsFolder>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
-}
-
-void mlir::tpp::populateSinkPackPatterns(RewritePatternSet &patterns) {
-  linalg::populateDataLayoutPropagationPatterns(
-      patterns, [](Operation *op) { return true; });
-  patterns.add<BubbleUpThroughFillOp>(patterns.getContext());
 }
