@@ -45,7 +45,7 @@ struct SetSPIRVAbiAttribute
 
     bool isIntel = (clientAPI == "intel");
 
-    if (clientAPI == "opencl" || isIntel) {
+    if ((clientAPI == "opencl") || isIntel) {
       auto abi = spirv::getEntryPointABIAttr(context);
       for (const auto &gpuFunc : gpuModule.getOps<gpu::GPUFuncOp>()) {
         if (!gpu::GPUDialect::isKernel(gpuFunc) || gpuFunc->getAttr(attrName))
