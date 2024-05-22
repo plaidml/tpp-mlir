@@ -70,7 +70,7 @@ LogicalResult MLIRBench::findKernel(StringRef name) {
     // If the user passed the entry point, use it
     for (auto &op : moduleOps) {
       func::FuncOp func = dyn_cast_or_null<func::FuncOp>(op);
-      if (func && func.getName().equals(name)) {
+      if (func && (func.getName() == name)) {
         kernel = func;
         break;
       }
