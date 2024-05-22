@@ -43,7 +43,7 @@ struct SetSPIRVAbiAttribute
     auto *context = &getContext();
     auto attrName = StringAttr::get(context, spirv::getEntryPointABIAttrName());
 
-    bool isIntel = clientAPI == "intel";
+    bool isIntel = (clientAPI == "intel");
 
     if (clientAPI == "opencl" || isIntel) {
       auto abi = spirv::getEntryPointABIAttr(context);
