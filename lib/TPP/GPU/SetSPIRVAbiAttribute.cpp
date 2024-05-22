@@ -42,13 +42,21 @@ struct SetSPIRVAbiAttribute
     auto gpuModule = getOperation();
     auto *context = &getContext();
     auto attrName = StringAttr::get(context, spirv::getEntryPointABIAttrName());
-    if (clientAPI == "opencl") {
+
+    bool isIntel = clientAPI == "intel";
+
+    if (clientAPI == "opencl" || isIntel) {
       auto abi = spirv::getEntryPointABIAttr(context);
       for (const auto &gpuFunc : gpuModule.getOps<gpu::GPUFuncOp>()) {
         if (!gpu::GPUDialect::isKernel(gpuFunc) || gpuFunc->getAttr(attrName))
           continue;
 
         gpuFunc->setAttr(attrName, abi);
+
+        if (isIntel) {
+          gpuFunc->setAttr("VectorComputeFunctionINTEL",
+                           UnitAttr::get(context));
+        }
       }
     } else if (clientAPI == "vulkan") {
       const SmallVector<gpu::Dimension> dims = {
