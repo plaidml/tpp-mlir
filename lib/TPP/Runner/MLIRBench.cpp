@@ -193,18 +193,27 @@ Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   }
 
   // Allocate an arg buffer on device and copy data from host
-  auto gpuAlloc = builder.create<gpu::AllocOp>(unkLoc, memRefTy, ValueRange{},
-                                               ValueRange{}, ValueRange{});
+  // Use shared memory on Intel GPU and dedicated GPU allocation, otherwise
+  bool isHostShared = backend == "intel";
+  auto gpuAlloc =
+      builder.create<gpu::AllocOp>(unkLoc, memRefTy, ValueRange{}, ValueRange{},
+                                   ValueRange{}, /*hostShared=*/isHostShared);
   auto gpuBuf = gpuAlloc.getResult(0);
-  auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
-      unkLoc, /*asyncToken=*/std::nullopt, ValueRange{}, gpuBuf, buf);
+
+  Operation *memcpy;
+  if (backend == "intel") {
+    memcpy = builder.create<memref::CopyOp>(unkLoc, buf, gpuBuf);
+  } else {
+    memcpy = builder.create<gpu::MemcpyOp>(unkLoc, /*asyncToken=*/std::nullopt,
+                                           ValueRange{}, gpuBuf, buf);
+  }
 
   // Dealloc the arg buffer at the end of program
   builder.setInsertionPointToEnd(&getMainBlock());
   builder.create<gpu::DeallocOp>(unkLoc, /*asyncToken=*/std::nullopt, gpuBuf);
 
   // Continue inserting ops after the created kernel arg
-  builder.setInsertionPointAfter(gpuMemcpy);
+  builder.setInsertionPointAfter(memcpy);
 
   return gpuBuf;
 }
@@ -384,7 +393,9 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
 
   // Kernels must return a single result
   Value result = kernelCall->getResult(0);
-  if (backend == "cuda" && offloadToDevice) {
+
+  bool isIntel = backend == "intel";
+  if ((backend == "cuda" || isIntel) && offloadToDevice) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());
@@ -395,8 +406,14 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     }
 
     auto outBuf = builder.create<memref::AllocOp>(unkLoc, memrefType);
-    auto gpuMemcpy = builder.create<gpu::MemcpyOp>(
-        unkLoc, /*asyncToken=*/std::nullopt, ValueRange{}, outBuf, result);
+
+    Operation *memcpy;
+    if (isIntel) {
+      memcpy = builder.create<memref::CopyOp>(unkLoc, result, outBuf);
+    } else {
+      memcpy = builder.create<gpu::MemcpyOp>(
+          unkLoc, /*asyncToken=*/std::nullopt, ValueRange{}, outBuf, result);
+    }
 
     // Dealloc the output buffer at the end of program.
     // For now, automatic deallocation is disabled for GPUs.
@@ -404,7 +421,7 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
     builder.create<memref::DeallocOp>(unkLoc, outBuf);
 
     // Restore insertion point
-    builder.setInsertionPointAfter(gpuMemcpy);
+    builder.setInsertionPointAfter(memcpy);
 
     result = outBuf;
   }

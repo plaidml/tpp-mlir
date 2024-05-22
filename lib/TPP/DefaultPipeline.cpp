@@ -132,6 +132,13 @@ private:
     if (print == PrintStage::Mid)
       pm.addPass(createPrintIRPass());
 
+    // Bail out early for Intel GPU.
+    // The rest of the lowering is performed by IMEX.
+    if (gpuBackend == "intel") {
+      pm.addPass(createPrintIRPass());
+      return;
+    }
+
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());
     pm.addPass(createConvertTensorToLinalgPass());

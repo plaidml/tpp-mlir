@@ -88,6 +88,10 @@ namespace xsmm {
 class XsmmDialect;
 } // namespace xsmm
 
+namespace xegpu {
+class XeGPUDialect;
+} // namespace xegpu
+
 } // namespace mlir
 
 namespace mlir {

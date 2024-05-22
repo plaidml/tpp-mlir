@@ -270,6 +270,64 @@ def ConvertForAllToParallelOp : Pass<"convert-forall-to-parallel",
   }];
 }
 
+<<<<<<< HEAD
+=======
+def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
+  let summary = "Lower all eligible operations into GPU compatible IR";
+  let options = [
+    Option<"gpuBackend", "gpu", "std::string",
+            /*default=*/"\"cuda\"",
+           "Target GPU backend for lowering (cuda).">,
+  ];
+}
+
+def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
+  let summary = "Convert operations to GPU";
+  let description = [{
+    Convert all eligble operations into generic GPU operations.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "xegpu::XeGPUDialect"];
+  let options = [
+    Option<"useWmma", "wmma",
+           "bool", /*default=*/"false",
+           "Use WMMA operations">,
+    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
+    Option<"isIntel", "intel",
+           "bool", /*default=*/"false",
+           "Convert for Intel GPU">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
+  ];
+}
+
+def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
+  let summary = "Lower generic GPU operations to CUDA backend";
+  let options = [
+    Option<"gpuTriple", "triple", "std::string",
+            /*default=*/"\"nvptx64-nvidia-cuda\"",
+           "GPU target triple.">,
+    Option<"gpuChip", "chip", "std::string",
+            /*default=*/"\"sm_70\"",
+           "GPU target architecture.">,
+    Option<"gpuFeatures", "features", "std::string",
+            /*default=*/"\"+ptx60\"",
+           "GPU target features.">,
+  ];
+}
+
+def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
+  let summary = "Lower generic GPU operations to Vulkan backend";
+}
+
+>>>>>>> XeGPU support
 def LinalgDeGeneralize : Pass<"linalg-degeneralize-generic-ops", "func::FuncOp"> {
   let summary = "Convert generic ops into named ops";
   let dependentDialects = ["linalg::LinalgDialect"];
@@ -476,6 +534,29 @@ def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
     Option<"initType", "init-type", "std::string",
             /*default=*/"",
            "Initializer type (const, simple, cont, rand, normal).">,
+  ];
+}
+
+def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
+  let summary = "Convert linalg dialect to XeGPU dialect.";
+  let description = [{
+    Lower linalg ops to XeGPU dialect.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
+                           "xegpu::XeGPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect",
+                           "math::MathDialect",
+                           "vector::VectorDialect"];
+  let options = [
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
   ];
 }
 

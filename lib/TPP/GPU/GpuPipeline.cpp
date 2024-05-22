@@ -50,6 +50,23 @@ llvm::cl::list<int64_t> wmmaTileSizes(
     llvm::cl::list_init<int64_t>(SmallVector<int64_t>{16, 16, 16}),
     llvm::cl::CommaSeparated);
 
+llvm::cl::list<int64_t>
+    gpuBlockTile("gpu-block-tile", llvm::cl::desc("GPU block tile size"),
+                 llvm::cl::list_init<int64_t>(SmallVector<int64_t>{128, 128}),
+                 llvm::cl::CommaSeparated);
+
+llvm::cl::list<int64_t>
+    gpuThreadTile("gpu-thread-tile", llvm::cl::desc("GPU thread tile size"),
+                  llvm::cl::list_init<int64_t>(SmallVector<int64_t>{32, 32}),
+                  llvm::cl::CommaSeparated);
+
+llvm::cl::opt<int64_t> kTile("k-tile", llvm::cl::desc("GEMM K dim tiling size"),
+                             llvm::cl::init(32));
+
+llvm::cl::opt<int64_t> stages("stages",
+                              llvm::cl::desc("GEMM coop prefetch stages"),
+                              llvm::cl::init(1));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -62,12 +79,14 @@ namespace {
 enum class GpuType {
   Cuda,
   Vulkan,
+  Intel,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
   auto type = llvm::StringSwitch<std::optional<GpuType>>(gpuStr)
                   .CaseLower("cuda", GpuType::Cuda)
                   .CaseLower("vulkan", GpuType::Vulkan)
+                  .CaseLower("intel", GpuType::Intel)
                   .Default(std::nullopt);
   assert(type && "Unsupported GPU backend");
 
@@ -90,7 +109,8 @@ GpuOptions getGpuOptions(GpuType gpuType) {
     options.features = "+ptx60";
     break;
   }
-  case GpuType::Vulkan: {
+  case GpuType::Vulkan:
+  case GpuType::Intel: {
     // No options needed at the moment.
     break;
   }
@@ -145,22 +165,39 @@ private:
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanup());
-    TileConsumerAndFuseProducersOptions tilingOptions;
-    tilingOptions.minTileFactor = 1;
-    pm.addPass(createTileConsumerAndFuseProducers(tilingOptions));
+    if (gpuType == GpuType::Intel) {
+      // First split computation into grid with blocks of specified size.
+      TileConsumerAndFuseProducersOptions blockTileOptions;
+      blockTileOptions.tileSizes = gpuBlockTile;
+      blockTileOptions.minTileFactor = 1;
+      pm.addPass(createTileConsumerAndFuseProducers(blockTileOptions));
+
+      // Then try to further split computation into subtiles.
+      // This allows to split larger computations across multiple
+      // threads/workitems. For smaller workloads, it provides another
+      // chance for outlining.
+      TileConsumerAndFuseProducersOptions threadTileOptions;
+      threadTileOptions.tileSizes = gpuThreadTile;
+      threadTileOptions.minTileFactor = 1;
+      pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
+    } else {
+      TileConsumerAndFuseProducersOptions tilingOptions;
+      tilingOptions.minTileFactor = 1;
+      pm.addPass(createTileConsumerAndFuseProducers(tilingOptions));
+    }
     pm.addPass(createCleanup());
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
-    bool dealloc = gpuType != GpuType::Cuda;
+    bool dealloc = gpuType == GpuType::Vulkan;
     pm.addPass(createBufferize(BufferizeOptions{dealloc}));
     pm.addPass(createConvertForAllToParallelOp());
     pm.addPass(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(
-        createGpuConversion(GpuConversionOptions{gpuWmma, wmmaTileSizes}));
+    pm.addPass(createGpuConversion(GpuConversionOptions{
+        gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel, kTile, stages}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
@@ -177,6 +214,16 @@ private:
       pm.addPass(createGpuToVulkan());
       break;
     }
+    case GpuType::Intel:
+      pm.addPass(xegpu::createXeGPUFoldAliasOps());
+
+      std::string clientApi = "intel";
+      SetSPIRVCapabilitiesOptions capabilitiesOptions{clientApi};
+      pm.addPass(tpp::createSetSPIRVCapabilities(capabilitiesOptions));
+      SetSPIRVAbiAttributeOptions abiAttrOptions{clientApi};
+      pm.addPass(tpp::createSetSPIRVAbiAttribute(abiAttrOptions));
+
+      break;
     }
 
     // Covert all local dialects like perf.

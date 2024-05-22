@@ -124,9 +124,25 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
     ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
   ];
   let dependentDialects = ["linalg::LinalgDialect",
+                           "gpu::GPUDialect",
                            "scf::SCFDialect",
                            "memref::MemRefDialect",
-                           "gpu::GPUDialect"];
+                           "xegpu::XeGPUDialect"];
+  let options = [
+    Option<"useWmma", "wmma",
+           "bool", /*default=*/"false",
+           "Use WMMA operations">,
+    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
+    Option<"isIntel", "intel",
+           "bool", /*default=*/"false",
+           "Convert for Intel GPU">,
+    Option<"kTile", "k-tile", "int64_t",
+           /*default=*/"32",
+           "GEMM tile size for reduction dimension.">,
+    Option<"stages", "stages", "int64_t",
+           /*default=*/"1",
+           "Number of cooperative prefetch stages.">,
+  ];
 }
 
 def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
