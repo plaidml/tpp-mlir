@@ -81,7 +81,7 @@ struct SetSPIRVCapabilities
         spirv::Extension::SPV_KHR_storage_buffer_storage_class,
         spirv::Extension::SPV_KHR_16bit_storage,
         spirv::Extension::SPV_NV_cooperative_matrix};
-    if (clientAPI == "opencl" || clientAPI == "intel") {
+    if ((clientAPI == "opencl") || (clientAPI == "intel")) {
       auto triple = spirv::VerCapExtAttr::get(
           spirv::Version::V_1_4, caps_opencl, exts_opencl, context);
       auto attr = spirv::TargetEnvAttr::get(
