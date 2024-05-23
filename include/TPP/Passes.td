@@ -280,7 +280,7 @@ def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
 }
 
-def LowLevelParallelization : Pass<"low-level-paralle", "ModuleOp"> {
+def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
   let summary = "Low level parallelization (multi-threading, AMX config).";
   let dependentDialects = ["affine::AffineDialect",
                            "arith::ArithDialect",
