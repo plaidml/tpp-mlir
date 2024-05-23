@@ -860,8 +860,8 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       VectorType::get(dpasTypeC.getShape(), FloatType::getF32(ctx));
 
   // Extend the accumulation values if needed.
-  auto isOutF16 = typeC.getElementType().isF16();
-  if (isOutF16) {
+  auto convOutPrecision = !typeC.getElementType().isF32();
+  if (convOutPrecision) {
     for (size_t i = 0; i < loadVecC.size(); i++) {
       auto extOp =
           rewriter.create<arith::ExtFOp>(loc, dpasResType, loadVecC[i]);
@@ -1013,8 +1013,13 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       },
       /*elseBuilder=*/nullptr);
 
-  // TODO: Make the VNNI factor a flexible parameter.
-  const int vnniFactor = 2;
+  // TODO: Add more possible types.
+  int vnniFactor = TypeSwitch<Type, int>(typeA.getElementType())
+                       .Case([](Float16Type type) { return 2; })
+                       .Default([](Type type) { return -1; });
+  if (vnniFactor == -1)
+    return failure();
+
   VnniConfig vnniConfA{.vnniFactor = vnniFactor, .vnniAxis = 1};
   VnniConfig vnniConfB{.vnniFactor = vnniFactor, .vnniAxis = 0};
 
@@ -1114,9 +1119,9 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   }
 
   // Truncate the result values if needed.
-  if (isOutF16) {
+  if (convOutPrecision) {
     auto truncType =
-        VectorType::get(dpasTypeC.getShape(), FloatType::getF16(ctx));
+        VectorType::get(dpasTypeC.getShape(), typeC.getElementType());
     for (size_t i = 0; i < results.size(); i++) {
       auto truncOp =
           rewriter.create<arith::TruncFOp>(loc, truncType, results[i]);
