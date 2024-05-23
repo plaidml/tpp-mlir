@@ -135,8 +135,6 @@ private:
 
     // Partial Lowering
     pm.addPass(memref::createExpandStridedMetadataPass());
-    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
-    pm.addPass(tpp::createConvertPerfToFunc());
     pm.addPass(createConvertTensorToLinalgPass());
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
     if (defParallel)
