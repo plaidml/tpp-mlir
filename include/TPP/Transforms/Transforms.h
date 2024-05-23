@@ -51,14 +51,6 @@ FailureOr<linalg::GenericOp>
 packConv2DNhwcHwcfOp(RewriterBase &rewriter, linalg::Conv2DNhwcHwcfOp linalgOp,
                      ArrayRef<OpFoldResult> tiles);
 
-// Attempt to block a MatmulOp or a BatchMatmulOp.
-FailureOr<linalg::LinalgOp> packMatmulOp(RewriterBase &rewriter,
-                                         linalg::MatmulOp linalgOp,
-                                         ArrayRef<OpFoldResult> tiles);
-FailureOr<linalg::LinalgOp> packMatmulOp(RewriterBase &rewriter,
-                                         linalg::BatchMatmulOp linalgOp,
-                                         ArrayRef<OpFoldResult> tiles);
-
 // Attempt to block a MatmulOp to VNNI format.
 FailureOr<linalg::GenericOp> packVNNIMatmulOp(RewriterBase &rewriter,
                                               linalg::GenericOp linalgOp);
