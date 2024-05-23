@@ -368,175 +368,6 @@ static std::optional<Value> lowerEltwiseOp(linalg::LinalgOp linalgOp,
           [&](Operation *op) -> std::optional<Value> { return std::nullopt; });
 }
 
-// Fuse an elementwise consumer operation.
-// Returns updated store ops or nullopt if the fusion fails.
-static std::optional<SmallVector<xegpu::StoreNdOp>>
-eltwiseFusion(linalg::LinalgOp rootOp, linalg::LinalgOp consumerOp,
-              SmallVector<xegpu::StoreNdOp> rootStoreOps,
-              PatternRewriter &rewriter) {
-  assert(rootStoreOps.size() > 0 && "Requires at least one store op");
-
-  Location loc = rootOp.getLoc();
-  auto ctx = rootOp.getContext();
-
-  auto rootOutput = rootOp.getDpsInits()[0];
-
-  // Gather additional operands of the fused consumer.
-  // This excludes the root's output which values are already loaded into
-  // registers and accessible through the store ops.
-  SmallVector<Value> extraOperands;
-  for (auto operand : consumerOp.getDpsInputOperands()) {
-    if (operand->get() != rootOutput)
-      extraOperands.push_back(operand->get());
-  }
-
-  // Insert fused eltwise ops before the stores and later replace the stores
-  // with a new results.
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(rootStoreOps[0]);
-
-  // Collect new results after fusion.
-  SmallVector<Value> fusedRes;
-  auto readCacheHint =
-      xegpu::CachePolicyAttr::get(ctx, xegpu::CachePolicy::CACHED);
-
-  // For each store op, take a corresponding slice from the consumer operands
-  // and load them into registers.
-  for (auto storeOp : rootStoreOps) {
-    auto storedVal = storeOp.getValue();
-    auto storeDesc = storeOp.getTensorDesc();
-    auto descOp = cast<xegpu::CreateNdDescOp>(storeDesc.getDefiningOp());
-
-    // Create descriptors for the extra operands.
-    SmallVector<Value> tensorDescs;
-    for (auto operand : extraOperands) {
-      auto tensorDesc =
-          rewriter
-              .create<xegpu::CreateNdDescOp>(
-                  loc, storeDesc.getType(),
-                  dyn_cast<TypedValue<MemRefType>>(operand),
-                  descOp.getOffsets(), descOp.getShape(), descOp.getStrides(),
-                  descOp.getConstOffsetsAttr(), descOp.getConstShapeAttr(),
-                  descOp.getConstStridesAttr())
-              .getResult();
-      tensorDescs.push_back(tensorDesc);
-    }
-
-    // Operands for the consumer op.
-    // This always includes the previous result held by the store op.
-    // Load values of the extra operands into registers.
-    SmallVector<Value> operands{storedVal};
-    for (auto tensorDesc : tensorDescs) {
-      auto loadedVec = rewriter.create<xegpu::LoadNdOp>(
-          loc, storedVal.getType(), tensorDesc, /*vnni_axis=*/nullptr,
-          /*transpose=*/nullptr,
-          /*l1_hint=*/readCacheHint,
-          /*l2_hint=*/readCacheHint, /*l3_hint=*/readCacheHint);
-      operands.push_back(loadedVec);
-    }
-
-    // Lower to a vectorized eltwise op.
-    auto newRes = lowerEltwiseOp(consumerOp, operands, rewriter);
-    if (!newRes)
-      return std::nullopt;
-
-    fusedRes.push_back(*newRes);
-  }
-
-  // Fusion must have failed, if number of new results is different.
-  // Bail out.
-  if (fusedRes.size() != rootStoreOps.size())
-    return std::nullopt;
-
-  // Store the new result.
-  auto writeCacheHint =
-      xegpu::CachePolicyAttr::get(ctx, xegpu::CachePolicy::WRITE_BACK);
-  SmallVector<xegpu::StoreNdOp> newStores;
-
-  for (size_t i = 0; i < rootStoreOps.size(); i++) {
-    auto storeDesc = rootStoreOps[i].getTensorDesc();
-
-    auto newStore =
-        rewriter.create<xegpu::StoreNdOp>(loc, fusedRes[i], storeDesc,
-                                          /*l1_hint=*/writeCacheHint,
-                                          /*l2_hint=*/writeCacheHint,
-                                          /*l3_hint=*/writeCacheHint);
-    newStores.push_back(newStore);
-  }
-
-  // Replace store ops and cleanup standalone consumer.
-  for (size_t i = 0; i < rootStoreOps.size(); i++)
-    rewriter.replaceOp(rootStoreOps[i], newStores[i]);
-
-  rewriter.eraseOp(consumerOp);
-
-  return newStores;
-}
-
-// Find operations fusable with the given root op.
-//
-// A simple fusion strategy that looks at the other operations after the root
-// linalg op and tries to fuse them.
-static SmallVector<linalg::LinalgOp>
-getFusableConsumers(linalg::LinalgOp rootOp) {
-  auto *parentOp = rootOp->getParentOp();
-  auto rootOutput = rootOp.getDpsInits()[0];
-
-  // Traverse other ops within the same region and collect consumers.
-  SmallVector<linalg::LinalgOp> consumers;
-  Operation *nextOp = rootOp;
-  while ((nextOp = nextOp->getNextNode())) {
-    // Potential consumers must be within the same region.
-    if (nextOp->getParentOp() != parentOp)
-      break;
-
-    // Only other linalg ops are expected as consumers.
-    // TODO: might need to be relaxed to skip over ops without side effects
-    auto consumer = dyn_cast<linalg::LinalgOp>(nextOp);
-    if (!consumer || !linalg::isElementwise(consumer))
-      break;
-    // Require the same iteration space.
-    if (consumer.getNumParallelLoops() != rootOp.getNumParallelLoops())
-      break;
-
-    auto outBuf = consumer.getDpsInitOperand(0)->get();
-    // Check that the op reuses the same output buffer as the root op.
-    // Otherwise, it is assumed that the op cannot be fused.
-    // TODO: Consider adding support for eltwise with broadcast.
-    if (outBuf != rootOutput)
-      break;
-
-    consumers.push_back(consumer);
-  }
-
-  return consumers;
-}
-
-// Fuse elementwise consumers within a GPU kernel.
-//
-// Fusion bails on the first mismatch.
-// Returns updated store ops.
-static SmallVector<xegpu::StoreNdOp>
-fuseEltwiseConsumers(linalg::LinalgOp rootOp,
-                     SmallVector<xegpu::StoreNdOp> rootStoreOps,
-                     PatternRewriter &rewriter) {
-  auto consumers = getFusableConsumers(rootOp);
-
-  for (auto consumer : consumers) {
-    std::optional<SmallVector<xegpu::StoreNdOp>> updatedStoreOps = std::nullopt;
-
-    updatedStoreOps = eltwiseFusion(rootOp, consumer, rootStoreOps, rewriter);
-
-    // Failed to fuse operation. Bail out.
-    if (!updatedStoreOps)
-      break;
-
-    rootStoreOps = *updatedStoreOps;
-  }
-
-  return rootStoreOps;
-}
-
 // Get static GPU block sizes represented by a surrounding operation
 // like a kernel launch or parallel loop.
 // Returns known block sizes if they are all static or failure, otherwise.
@@ -1023,7 +854,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // Fetch the inital values of the output accumulator.
   SmallVector<Value> loadVecC =
       loadNdDescTiles(rewriter, loc, tilesC, readCacheHint);
-  // TODO: Compile hint?
 
   // DPAS only works with F32 accumulators.
   auto dpasResType =
@@ -1130,9 +960,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
         prefetchB = updateTilesOffsets(rewriter, loc, ValueRange{prefetchB},
                                        {kTile, 0})[0];
       }
-
-      // Ensure that block/workgroup is synchronized after prefetching.
-      // TODO: Compile hint?
     } else {
       // Disable coop prefetching on failure.
       isCoopPrefetch = false;
@@ -1201,9 +1028,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       loadNdDescTiles(rewriter, loc, tilesB, readCacheHint, vnniConfB);
   auto tileTypeB = cast<xegpu::TensorDescType>(tilesB[0].getType());
 
-  // Ensure that all load are scheduled together.
-  // TODO: Compile hint?
-
   // Update offsets of the input tiles.
   // Shift along the reduction dimension.
   tilesA = updateTilesOffsets(rewriter, loc, tilesA, {0, kTile});
@@ -1224,9 +1048,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     prefetchTiles(rewriter, loc, tilesB, readCacheHint);
   }
 
-  // Ensure that prefetches are scheduled before computation starts.
-  // TODO: Compile hint?
-
   // Extract DPAS tiles from loaded sub-tiles.
   TilesArray dpasVecA = extractVecSubTiles(rewriter, loc, loadVecA,
                                            {dimM, kTile}, tileTypeA.getShape(),
@@ -1234,9 +1055,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   TilesArray dpasVecB = extractVecSubTiles(rewriter, loc, loadVecB,
                                            {kTile, dimN}, tileTypeB.getShape(),
                                            {dpasTileK, dpasTileN}, vnniConfB);
-
-  // Finalize vector reshaping before DPAS.
-  // TODO: Compile hint?
 
   const int numTilesM = dimM / dpasTileM;
   const int numTilesN = dimN / dpasTileN;
@@ -1265,10 +1083,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
       }
     }
   }
-
-  // Ensure that DPAS computation is finished before the input tiles are
-  // replaced with new values.
-  // TODO: Compile hint?
 
   // Create loop terminator and exit the loop.
   auto terminateLoop = [&](scf::ForOp loopOp, SmallVector<Value> resultValues) {
@@ -1321,8 +1135,6 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     storeOps.push_back(storeOp);
   }
 
-  (void)fuseEltwiseConsumers(linalgOp, storeOps, rewriter);
-
   rewriter.eraseOp(linalgOp);
 
   return success();
@@ -1347,9 +1159,6 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
     loadedInputs.push_back(loadedVals);
   }
 
-  // Ensure that all loads are scheduled together.
-  // TODO: Compile hint?
-
   // Extract SIMD sized sub-tiles from loaded tiles.
   // TODO: Fetch SIMD sizes from target descriptor.
   int maxSizeSIMD = 256;
@@ -1373,9 +1182,6 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
     vecSubTiles.push_back(subTiles.toFlatVector());
   }
 
-  // Finalize vector reshaping before computation.
-  // TODO: Compile hint?
-
   // Perform vectorized computations for each output tile.
   SmallVector<Value> results;
   for (size_t i = 0; i < vecSubTiles[0].size(); i++) {
@@ -1392,9 +1198,6 @@ LogicalResult createEltwiseKernel(linalg::LinalgOp linalgOp,
 
     results.push_back(*res);
   }
-
-  // Ensure that all computations are scheduled together.
-  // TODO: Compile hint?
 
   // Output descriptors for later stores.
   SmallVector<Value> outputTiles = createDescriptorTiles(
