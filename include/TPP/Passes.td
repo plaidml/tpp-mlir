@@ -280,6 +280,22 @@ def Cleanup : Pass<"cleanup", "func::FuncOp"> {
   let summary = "General IR cleanup e.g., canonicalization, CSE etc.";
 }
 
+def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
+  let summary = "Low level parallelization (multi-threading, AMX config).";
+  let dependentDialects = ["affine::AffineDialect",
+                           "arith::ArithDialect",
+                           "func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "xsmm::XsmmDialect",
+                           "LLVM::LLVMDialect"];
+  let options = [
+    ListOption<"parallelTaskGrid", "parallel-task-grid",
+           "unsigned", "Grid-sizes for parallel tasks.">
+
+  ];
+}
+
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
   let summary = "Lower all local dialects (XSMM, check etc.).";
   let dependentDialects = ["affine::AffineDialect",
@@ -292,12 +308,6 @@ def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
                            "tensor::TensorDialect",
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
-  let options = [
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
-
-  ];
-
 }
 
 def Postprocessing : Pass<"postprocess", "func::FuncOp"> {

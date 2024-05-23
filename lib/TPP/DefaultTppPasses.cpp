@@ -35,6 +35,8 @@ namespace tpp {
 #include "TPP/Passes.h.inc"
 #define GEN_PASS_DEF_LOCALDIALECTSLOWERING
 #include "TPP/Passes.h.inc"
+#define GEN_PASS_DEF_LOWLEVELPARALLELIZATION
+#include "TPP/Passes.h.inc"
 #define GEN_PASS_DEF_POSTPROCESSING
 #include "TPP/Passes.h.inc"
 #define GEN_PASS_DEF_TPPMAPPING
@@ -70,14 +72,13 @@ private:
   }
 };
 
-// Lower all local dialects (XSMM, check etc.) to standard dialects
-// and function calls.
-struct LocalDialectsLowering
-    : public tpp::impl::LocalDialectsLoweringBase<LocalDialectsLowering>,
+// Low level parallelization, 2D blocking, AMX config
+struct LowLevelParallelization
+    : public tpp::impl::LowLevelParallelizationBase<LowLevelParallelization>,
       UtilityPassBase<ModuleOp> {
 
-  LocalDialectsLowering() {}
-  LocalDialectsLowering(const LocalDialectsLoweringOptions &options) {
+  LowLevelParallelization() {}
+  LowLevelParallelization(const LowLevelParallelizationOptions &options) {
     parallelTaskGrid = options.parallelTaskGrid;
   }
   void runOnOperation() override {
@@ -95,9 +96,6 @@ struct LocalDialectsLowering
 private:
   void constructPipeline() override {
     pm.clear();
-
-    pm.addNestedPass<func::FuncOp>(createConvertCheckToLoops());
-    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
 
     // Note that LICM should be performed before any function calls are
     // generated
@@ -118,7 +116,34 @@ private:
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+  }
+};
 
+// Lower all local dialects (XSMM, check etc.) to standard dialects
+// and function calls.
+struct LocalDialectsLowering
+    : public tpp::impl::LocalDialectsLoweringBase<LocalDialectsLowering>,
+      UtilityPassBase<ModuleOp> {
+
+  LocalDialectsLowering() {}
+  void runOnOperation() override {
+    auto module = getOperation();
+
+    // Initialize the pipeline if needed.
+    // Otherwise, just run the cached one.
+    if (pm.empty())
+      constructPipeline();
+
+    if (failed(runPipeline(pm, module)))
+      return signalPassFailure();
+  }
+
+private:
+  void constructPipeline() override {
+    pm.clear();
+
+    pm.addNestedPass<func::FuncOp>(createConvertCheckToLoops());
+    pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
     pm.addPass(createConvertXsmmToFunc());
     pm.addPass(createConvertPerfToFunc());
   }
@@ -326,9 +351,12 @@ private:
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
 
+    // Low leve parallelization passes.
+    LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
+    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+
     // Covert all local TPP-related dialects.
-    LocalDialectsLoweringOptions localDialectsLowering{parallelTaskGrid};
-    pm.addPass(createLocalDialectsLowering(localDialectsLowering));
+    pm.addPass(createLocalDialectsLowering());
 
     // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessing());
