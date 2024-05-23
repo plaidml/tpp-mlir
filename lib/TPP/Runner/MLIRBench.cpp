@@ -394,8 +394,8 @@ LogicalResult MLIRBench::printResult(Operation *kernelCall) {
   // Kernels must return a single result
   Value result = kernelCall->getResult(0);
 
-  bool isIntel = backend == "intel";
-  if ((backend == "cuda" || isIntel) && offloadToDevice) {
+  bool isIntel = (backend == "intel");
+  if (((backend == "cuda") || isIntel) && offloadToDevice) {
     auto resType = cast<ShapedType>(result.getType());
     auto memrefType =
         MemRefType::get(resType.getShape(), resType.getElementType());

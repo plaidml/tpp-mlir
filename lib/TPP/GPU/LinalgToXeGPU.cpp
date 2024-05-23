@@ -48,11 +48,13 @@ namespace tpp {
 
 namespace {
 
+// Represents VNNI configuration for an operand.
 struct VnniConfig {
   int vnniFactor;
   int vnniAxis;
 };
 
+// Helper struct to keep track of tiles' position with respect to whole matrix.
 struct TilesArray {
   TilesArray() = delete;
   TilesArray(int numRows, int numCols) {
@@ -434,6 +436,7 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
   return failure();
 }
 
+// Get linearized GPU thread ID.
 static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
   SmallVector<Value, 3> threadIds;
   SmallVector<Value, 3> blockDims;
@@ -567,6 +570,7 @@ createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
       prefetchOffsets);
 }
 
+// Insert prefetches for the given tensor descriptors.
 static void prefetchTiles(PatternRewriter &rewriter, Location loc,
                           ValueRange prefetchTiles,
                           xegpu::CachePolicyAttr readCacheHint) {
@@ -579,6 +583,7 @@ static void prefetchTiles(PatternRewriter &rewriter, Location loc,
   }
 }
 
+// Update all tensor descriptors offsets with the fixed offsets.
 static SmallVector<Value> updateTilesOffsets(PatternRewriter &rewriter,
                                              Location loc, ValueRange tiles,
                                              ArrayRef<int64_t> offsets) {
@@ -690,8 +695,10 @@ static SmallVector<Value> createCoarseDscTiles(PatternRewriter &rewriter,
                                {loadRows, loadCols}, arrayLength);
 }
 
+// Return vector type with specified VNNI shape.
 static VectorType getVnniVector(ArrayRef<int64_t> shape, Type elementType,
                                 VnniConfig vnniConf) {
+  assert(shape.size() == 2 && "Expected plain 2D shape");
   SmallVector<int64_t> vecShape{shape};
   vecShape[vnniConf.vnniAxis] /= vnniConf.vnniFactor;
   vecShape.push_back(vnniConf.vnniFactor);
@@ -733,6 +740,15 @@ loadNdDescTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
   return loadVec;
 }
 
+// Splits loaded tiles of a larger 2D tile into individual subtiles and places
+// them in their corresponding positions with respect to the original large
+// tile.
+//
+// The loaded tiles must be perfectly divisible by the specified subtiles.
+// Assumes row-major ordering for both the loaded tiles and the original tile.
+//
+// If the loaded tiles use VNNI layout, corresponding VNNI configuration must be
+// provided.
 static TilesArray
 extractVecSubTiles(PatternRewriter &rewriter, Location loc,
                    ValueRange loadVecTiles, ArrayRef<int64_t> totalTileShape,
@@ -745,8 +761,11 @@ extractVecSubTiles(PatternRewriter &rewriter, Location loc,
                         return cast<VectorType>(tile.getType()) == vecLoadType;
                       }) &&
          "All loaded vectors must have the same type.");
+  assert(vecLoadType.getShape().size() == 2 ||
+         vnniConf && "Requires VNNI config for non 2D loaded tiles");
 
-  // Accumulate all dimensions as the vector might have extra VNNI dimensions.
+  // Accumulate all dimensions as the vector might have extra VNNI
+  // dimensions.
   int loadVecSize = std::accumulate(vecLoadType.getShape().begin(),
                                     vecLoadType.getShape().end(), 1,
                                     std::multiplies<int64_t>());
