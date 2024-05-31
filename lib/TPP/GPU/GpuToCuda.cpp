@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Passes.h"
+#include "TPP/Bundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -17,11 +17,12 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinOps.h"
+
 #include "mlir/IR/Dialect.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -35,7 +36,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUTOCUDA
-#include "TPP/Passes.h.inc"
+#include "TPP/Bundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -43,17 +44,8 @@ namespace {
 
 // Lower generic GPU ops to CUDA backend.
 struct GpuToCuda : public tpp::impl::GpuToCudaBase<GpuToCuda>,
-                   UtilityPassBase<ModuleOp> {
+                   PassBundle<ModuleOp> {
   using GpuToCudaBase::GpuToCudaBase;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
-    registry.insert<NVVM::NVVMDialect>();
-    registry.insert<nvgpu::NVGPUDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<affine::AffineDialect>();
-    registry.insert<arith::ArithDialect>();
-  }
 
   void runOnOperation() override {
     auto module = getOperation();
@@ -69,8 +61,6 @@ struct GpuToCuda : public tpp::impl::GpuToCudaBase<GpuToCuda>,
 
 private:
   void constructPipeline() override {
-    pm.clear();
-
 #ifdef TPP_CUDA_ENABLE
     // Preprocess and lower standard ops.
     pm.addNestedPass<gpu::GPUModuleOp>(

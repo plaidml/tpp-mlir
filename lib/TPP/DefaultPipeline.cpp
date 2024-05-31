@@ -6,8 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Passes.h"
+#include "TPP/Bundles.h"
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
@@ -55,7 +56,7 @@ llvm::cl::list<unsigned>
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
-#include "TPP/Passes.h.inc"
+#include "TPP/Bundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -82,7 +83,7 @@ PrintStage parsePrintStage(StringRef stage) {
 
 // The default lowering pipeline.
 struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
-                         UtilityPassBase<ModuleOp> {
+                         PassBundle<ModuleOp> {
   using DefaultPipelineBase::DefaultPipelineBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -112,8 +113,6 @@ struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
 
 private:
   void constructPipeline() override {
-    pm.clear();
-
     auto print = parsePrintStage(printMLIR);
 
     // Print IR of unoptimized kernel and main

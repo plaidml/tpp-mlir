@@ -1,4 +1,10 @@
-//===- tpp-run.cpp - TPP CPU Execution Driver------------------------------===//
+//===- tpp-run.cpp - TPP CPU Execution Driver--------------------*- C++ -*-===//
+//
+// This file is licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // Main entry point to a command line utility that executes an MLIR file on the
 // CPU by translating MLIR to LLVM IR before JIT-compiling and executing the
@@ -45,6 +51,7 @@
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
+#include "TPP/Bundles.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"

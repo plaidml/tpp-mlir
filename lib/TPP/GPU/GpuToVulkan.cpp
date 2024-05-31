@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Passes.h"
+#include "TPP/Bundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -19,7 +19,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -33,7 +33,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUTOVULKAN
-#include "TPP/Passes.h.inc"
+#include "TPP/Bundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -41,15 +41,8 @@ namespace {
 
 // Lower generic GPU ops to Vulkan backend.
 struct GpuToVulkan : public tpp::impl::GpuToVulkanBase<GpuToVulkan>,
-                     UtilityPassBase<ModuleOp> {
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
-    registry.insert<spirv::SPIRVDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<arith::ArithDialect>();
-    registry.insert<func::FuncDialect>();
-  }
+                     PassBundle<ModuleOp> {
+  using GpuToVulkanBase::GpuToVulkanBase;
 
   void runOnOperation() override {
     auto module = getOperation();
@@ -65,8 +58,6 @@ struct GpuToVulkan : public tpp::impl::GpuToVulkanBase<GpuToVulkan>,
 
 private:
   void constructPipeline() override {
-    pm.clear();
-
 #ifdef TPP_VULKAN_ENABLE
     // Preprocess
     // Subviews are not supported by SPIRV ops
