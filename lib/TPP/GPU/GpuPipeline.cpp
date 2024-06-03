@@ -114,6 +114,8 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
     registry.insert<nvgpu::NVGPUDialect>();
     registry.insert<bufferization::BufferizationDialect>();
     registry.insert<spirv::SPIRVDialect>();
+    registry.insert<check::CheckDialect>();
+    registry.insert<perf::PerfDialect>();
     check::registerBufferizableOpInterfaceExternalModels(registry);
     perf::registerBufferizableOpInterfaceExternalModels(registry);
 
@@ -178,6 +180,9 @@ private:
       break;
     }
     }
+
+    // Covert all local dialects like perf.
+    pm.addPass(createLocalDialectsLowering());
 
     // Clean up after the GPU pipeline.
     // Use upstream passes directly instead of the cleanup pass as the GPU
