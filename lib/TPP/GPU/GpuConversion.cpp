@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Passes.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -15,7 +15,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -30,7 +30,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUCONVERSION
-#include "TPP/Passes.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -38,15 +38,8 @@ namespace {
 
 // Map and lower operations to generic GPU ops.
 struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
-                       UtilityPassBase<ModuleOp> {
+                       PassBundle<ModuleOp> {
   using GpuConversionBase::GpuConversionBase;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<scf::SCFDialect>();
-    registry.insert<memref::MemRefDialect>();
-    registry.insert<gpu::GPUDialect>();
-  }
 
   void runOnOperation() override {
     auto module = getOperation();
@@ -62,8 +55,6 @@ struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
 
 private:
   void constructPipeline() override {
-    pm.clear();
-
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
@@ -75,7 +66,7 @@ private:
     pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
     pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
 
-    pm.addNestedPass<func::FuncOp>(createCleanup());
+    pm.addPass(createCleanup());
 
     // Create GPU kernels.
     pm.addNestedPass<func::FuncOp>(createGpuInlineConstants());

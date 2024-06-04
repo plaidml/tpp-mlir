@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Passes.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -20,7 +20,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
@@ -53,7 +53,7 @@ llvm::cl::list<int64_t> wmmaTileSizes(
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
-#include "TPP/Passes.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 
@@ -101,7 +101,7 @@ GpuOptions getGpuOptions(GpuType gpuType) {
 
 // GPU pipeline - map and lower operations to enable execution on a GPU.
 struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
-                     UtilityPassBase<ModuleOp> {
+                     PassBundle<ModuleOp> {
   using GpuPipelineBase::GpuPipelineBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -139,8 +139,6 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
 
 private:
   void constructPipeline() override {
-    pm.clear();
-
     GpuType gpuType = parseGpuOption(this->gpuBackend);
     GpuOptions gpuOptions = getGpuOptions(gpuType);
 
@@ -158,7 +156,7 @@ private:
     bool dealloc = gpuType != GpuType::Cuda;
     pm.addPass(createBufferize(BufferizeOptions{dealloc}));
     pm.addPass(createConvertForAllToParallelOp());
-    pm.addNestedPass<func::FuncOp>(createCleanup());
+    pm.addPass(createCleanup());
 
     // Convert to generic GPU ops.
     pm.addPass(
@@ -185,11 +183,7 @@ private:
     pm.addPass(createLocalDialectsLowering());
 
     // Clean up after the GPU pipeline.
-    // Use upstream passes directly instead of the cleanup pass as the GPU
-    // kernel is at the LLVM dialect level which is not compatible with the
-    // custom TPP passes.
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
+    pm.addPass(createCleanup());
   }
 };
 

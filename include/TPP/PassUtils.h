@@ -5,10 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// Utilities to help build MLIR passes.
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef TPP_PASSUTILS_H
 #define TPP_PASSUTILS_H
@@ -18,13 +14,26 @@
 namespace mlir {
 namespace tpp {
 
-// Helper base class for passes that call and manage combination of other
-// existing passes.
-template <typename OpT> class UtilityPassBase {
+// Helper base class for bundles of passes that only call and manage combination
+// of other existing passes.
+template <typename OpT = void> class PassBundle {
 public:
-  UtilityPassBase()
+  PassBundle()
       : pm(OpT::getOperationName(), mlir::OpPassManager::Nesting::Implicit){};
-  virtual ~UtilityPassBase() = default;
+  virtual ~PassBundle() = default;
+
+protected:
+  OpPassManager pm;
+
+  // Create the pass processing pipeline.
+  virtual void constructPipeline() = 0;
+};
+
+// Pass bundle specialization without anchor operation type.
+template <> class PassBundle<void> {
+public:
+  PassBundle() : pm(mlir::OpPassManager::Nesting::Implicit){};
+  virtual ~PassBundle() = default;
 
 protected:
   OpPassManager pm;
