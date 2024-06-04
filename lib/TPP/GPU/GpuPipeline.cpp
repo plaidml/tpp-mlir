@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Bundles.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -53,7 +53,7 @@ llvm::cl::list<int64_t> wmmaTileSizes(
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
-#include "TPP/Bundles.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 

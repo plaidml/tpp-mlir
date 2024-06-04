@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Bundles.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -30,7 +30,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUCONVERSION
-#include "TPP/Bundles.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 

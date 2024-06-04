@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Bundles.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,7 +33,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUTOVULKAN
-#include "TPP/Bundles.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 

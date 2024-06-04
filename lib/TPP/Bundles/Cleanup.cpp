@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TPP/Bundles.h"
+#include "TPP/PassBundles.h"
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -21,7 +21,7 @@ using namespace mlir::tpp;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_CLEANUP
-#include "TPP/Bundles.h.inc"
+#include "TPP/PassBundles.h.inc"
 } // namespace tpp
 } // namespace mlir
 

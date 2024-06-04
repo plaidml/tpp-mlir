@@ -18,7 +18,7 @@ add_mlir_library(TPPPipeline
 
   DEPENDS
     TPPCompilerPassIncGen
-    TPPCompilerBundleIncGen
+    TPPCompilerPassBundleIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR

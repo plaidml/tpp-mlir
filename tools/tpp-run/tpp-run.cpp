@@ -51,11 +51,11 @@
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
-#include "TPP/Bundles.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/GPU/Utils.h"
+#include "TPP/PassBundles.h"
 #include "TPP/Passes.h"
 
 #include <algorithm>

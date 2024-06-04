@@ -18,7 +18,7 @@ add_mlir_library(TPPGPU
     MLIRPerfOpsIncGen
     MLIRXsmmOpsIncGen
     TPPCompilerPassIncGen
-    TPPCompilerBundleIncGen
+    TPPCompilerPassBundleIncGen
 
   LINK_LIBS PUBLIC
     MLIRGPUDialect
