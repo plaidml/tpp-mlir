@@ -5,10 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// Utilities to help build MLIR passes.
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef TPP_PASSUTILS_H
 #define TPP_PASSUTILS_H
@@ -18,8 +14,8 @@
 namespace mlir {
 namespace tpp {
 
-// Helper base class for bundle passes that call and manage combination of other
-// existing passes.
+// Helper base class for bundles of passes that only call and manage combination
+// of other existing passes.
 template <typename OpT = void> class PassBundle {
 public:
   PassBundle()

@@ -1,8 +1,8 @@
-add_subdirectory(Bundles)
-add_subdirectory(Dialect)
 add_subdirectory(Conversion)
-add_subdirectory(IR)
+add_subdirectory(Dialect)
 add_subdirectory(GPU)
+add_subdirectory(IR)
+add_subdirectory(PassBundles)
 add_subdirectory(Runner)
 add_subdirectory(Transforms)
 

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TPP_DIALECT_TPP_BUNDLES
-#define TPP_DIALECT_TPP_BUNDLES
+#ifndef TPP_DIALECT_TPP_PASSBUNDLES
+#define TPP_DIALECT_TPP_PASSBUNDLES
 
 include "mlir/Pass/PassBase.td"
 
@@ -160,4 +160,4 @@ def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
                            "spirv::SPIRVDialect"];
 }
 
-#endif // TPP_DIALECT_TPP_BUNDLES
+#endif // TPP_DIALECT_TPP_PASSBUNDLES
