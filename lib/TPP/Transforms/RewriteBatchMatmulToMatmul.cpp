@@ -103,12 +103,15 @@ struct RewriteBatchMatmulToMatmul
       tiles[0] = getAsIndexOpFoldResult(rewriter.getContext(), 1);
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPoint(batchMatmulOp);
-      auto tilingResult = linalg::tileToForallOpUsingTileSizes(
-          rewriter, cast<TilingInterface>(batchMatmulOp.getOperation()), tiles,
-          /*mapping=*/std::nullopt);
+      scf::SCFTilingOptions tilingOpts;
+      tilingOpts.setTileSizes(tiles);
+      tilingOpts.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+      auto tilingResult = scf::tileUsingSCF(
+          rewriter, cast<TilingInterface>(batchMatmulOp.getOperation()),
+          tilingOpts);
       if (failed(tilingResult))
         return signalPassFailure();
-      rewriter.replaceOp(batchMatmulOp, tilingResult->tileOp->getResults());
+      rewriter.replaceOp(batchMatmulOp, tilingResult->replacements);
     });
 
     // Step2:
