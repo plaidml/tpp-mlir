@@ -216,6 +216,9 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
   let description = [{
     Reduce pack overhead by folding tensor.pack into constant tensors.
   }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect",
+                           "arith::ArithDialect"];
 }
 
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
