@@ -34,9 +34,10 @@ struct ConstantFoldPack
     auto module = getOperation();
     auto *ctx = &getContext();
 
-    // Apply pack canonicalization to fold trivial cases.
+    // Apply canonicalization to fold trivial cases.
     RewritePatternSet packFolderPatterns(&getContext());
     tensor::PackOp::getCanonicalizationPatterns(packFolderPatterns, ctx);
+    linalg::FillOp::getCanonicalizationPatterns(packFolderPatterns, ctx);
     (void)applyPatternsAndFoldGreedily(module, std::move(packFolderPatterns));
 
     // Collect operations that pack constants.
