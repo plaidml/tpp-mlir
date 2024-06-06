@@ -33,8 +33,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"linalgToLoops", "linalg-to-loops",
            "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+               "Shape to reshape the M tensor into">,
+    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+               "Shape to reshape the N tensor into">
 
   ];
 }
@@ -68,8 +70,10 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
   let options = [
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+               "Shape to reshape the M tensor into">,
+    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+               "Shape to reshape the N tensor into">
 
   ];
 }

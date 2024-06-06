@@ -429,6 +429,41 @@ def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
   let dependentDialects = ["linalg::LinalgDialect"];
 }
 
+def LoopInsertionPass: Pass<"loop-insertion-pass">{
+  let summary = "Insert loop around brgemm parallel op";
+  let description = [{
+    Insert nd parallel loop around brgemm parallel loop.
+  }];
+  let dependentDialects = ["affine::AffineDialect", "scf::SCFDialect" , "xsmm::XsmmDialect"];
+  let options = [
+    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+               "Shape to reshape the M tensor into">,
+    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+               "Shape to reshape the N tensor into">
+  ];
+}
+
+def LoopExpansionPass: Pass<"loop-expansion-pass">{
+  let summary = "Expand brgemm parallel op";
+  let description = [{
+    Expand nd parallel loop.
+  }];
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
+def LoopShufflePass: Pass<"loop-shuffle-pass">{
+  let summary = "Shuffle brgemm parallel op";
+  let description = [{
+    Shuffle nd brgemm parallel loop.
+  }];
+  let options = [
+    ListOption<"shuffleOrder", "shuffle-order", "unsigned",
+               "Order to shuffle the parallel loop by">
+  ];
+
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
 def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
   let summary = "Create main function runner wrapper";
   let description = [{

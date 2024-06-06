@@ -53,6 +53,19 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
+llvm::cl::list<unsigned>
+    tileShapeM("M-tile-shape",
+                     llvm::cl::desc("Tile shape of M tensor"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 4}),
+                     llvm::cl::CommaSeparated);
+
+llvm::cl::list<unsigned>
+    tileShapeN("N-tile-shape",
+                     llvm::cl::desc("Tile shape of N tensor"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{4, 8}),
+                     llvm::cl::CommaSeparated);
+
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -125,7 +138,7 @@ private:
     } else {
       // Apply the default preprocessing pass
       DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
-                                                parallelTaskGrid};
+                                                tileShapeM, tileShapeN};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

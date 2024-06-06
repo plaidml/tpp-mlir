@@ -101,13 +101,14 @@ private:
       pm.addPass(createCleanup());
     }
 
+    // Low level parallelization passes.
+    LowLevelParallelizationOptions LowLevelParallelization(LowLevelParallelizationOptions{tileShapeM, tileShapeN});
+    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
 
-    // Low leve parallelization passes.
-    LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
-    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
 
     // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLowering());

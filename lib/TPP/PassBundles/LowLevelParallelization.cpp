@@ -62,14 +62,19 @@ private:
     // that they are hoisted out of loops.
     pm.addPass(createCleanup());
 
-    mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
-    tilingOptions.tileSizes = parallelTaskGrid;
-    pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+    mlir::tpp::LoopInsertionPassOptions loopInsertionPassOptions;
+    loopInsertionPassOptions.tileShapeM = tileShapeM;
+    loopInsertionPassOptions.tileShapeN = tileShapeN;
+    pm.addPass(createLoopInsertionPass(loopInsertionPassOptions));
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
     pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+    pm.addPass(createCombineXsmmOpPass());
+    pm.addPass(createFoldXsmmFlags());
+    pm.addPass(createVerifyXsmmCalls());
   }
 };
