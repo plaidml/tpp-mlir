@@ -34,7 +34,15 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
     ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+           "unsigned", "Grid-sizes for parallel tasks.">,
+    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+               "Shape to reshape the M tensor into">,
+    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+               "Shape to reshape the N tensor into">,
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Shuffle order of scf for all loop surrounding brgemm op">,
+    Option<"outerParallelLoops", "num-outer-parallel", "unsigned", "0",
+               "Number of outer loops to be parallelized">
 
   ];
 }
@@ -68,8 +76,14 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
   let options = [
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+               "Shape to reshape the M tensor into">,
+    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+               "Shape to reshape the N tensor into">,
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Shuffle order of scf for all loop surrounding brgemm op">,
+    Option<"outerParallelLoops", "num-outer-parallel", "unsigned","0",
+               "Number of outer loops to be parallelized">
 
   ];
 }

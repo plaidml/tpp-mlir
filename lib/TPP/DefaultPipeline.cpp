@@ -53,6 +53,24 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
+llvm::cl::list<unsigned> tileShapeM("M-tile-shape",
+                                    llvm::cl::desc("Tile shape of M tensor"),
+                                    llvm::cl::CommaSeparated);
+
+llvm::cl::list<unsigned> tileShapeN("N-tile-shape",
+                                    llvm::cl::desc("Tile shape of N tensor"),
+                                    llvm::cl::CommaSeparated);
+
+llvm::cl::list<unsigned> shuffleOrder(
+    "loop-shuffle-order",
+    llvm::cl::desc("shuffle order of scf for all loop surrounding brgemm op"),
+    llvm::cl::CommaSeparated);
+
+llvm::cl::opt<unsigned> outerParallelLoops(
+    "num-outer-parallel",
+    llvm::cl::desc("Number of outer loops to be parallelized"),
+    llvm::cl::value_desc("int"), llvm::cl::init(0));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -124,9 +142,16 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
-                                                parallelTaskGrid};
-      pm.addPass(createDefaultTppPasses(tppDefaultOptions));
+      if (!tileShapeM.empty() && !tileShapeN.empty()) {
+        DefaultTppPassesOptions tppDefaultOptions{
+            linalgToLoops, parallelTaskGrid, tileShapeM,
+            tileShapeN,    shuffleOrder,     outerParallelLoops};
+        pm.addPass(createDefaultTppPasses(tppDefaultOptions));
+      } else {
+        DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
+                                                  parallelTaskGrid};
+        pm.addPass(createDefaultTppPasses(tppDefaultOptions));
+      }
     }
 
     if (print == PrintStage::Mid)

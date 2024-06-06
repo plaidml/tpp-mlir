@@ -126,19 +126,31 @@ struct CombineXsmmOp : public OpRewritePattern<xsmm::BrgemmOp> {
 
     // Replace and delete the old invokes and their dispatches
     rewriter.create<xsmm::FusedBrgemmOp>(loc, dtype, invokeOperands);
+    assert(brgemmOp.use_empty());
     rewriter.eraseOp(brgemmOp);
-    rewriter.eraseOp(brgemmOp.getOperand(0).getDefiningOp());
+    if (brgemmOp.getOperand(0).getDefiningOp()->use_empty()) {
+      rewriter.eraseOp(brgemmOp.getOperand(0).getDefiningOp());
+    }
     if (fusedMatch.binaryOp) {
+      assert(fusedMatch.binaryOp.use_empty());
       rewriter.eraseOp(fusedMatch.binaryOp);
-      rewriter.eraseOp(fusedMatch.binaryOp->getOperand(0).getDefiningOp());
+      if (fusedMatch.binaryOp->getOperand(0).getDefiningOp()->use_empty()) {
+        rewriter.eraseOp(fusedMatch.binaryOp->getOperand(0).getDefiningOp());
+      }
     }
     if (fusedMatch.unaryOp) {
+      assert(fusedMatch.unaryOp.use_empty());
       rewriter.eraseOp(fusedMatch.unaryOp);
-      rewriter.eraseOp(fusedMatch.unaryOp->getOperand(0).getDefiningOp());
+      if (fusedMatch.unaryOp->getOperand(0).getDefiningOp()->use_empty()) {
+        rewriter.eraseOp(fusedMatch.unaryOp->getOperand(0).getDefiningOp());
+      }
     }
     if (fusedMatch.zeroOp) {
+      assert(fusedMatch.zeroOp.use_empty());
       rewriter.eraseOp(fusedMatch.zeroOp);
-      rewriter.eraseOp(fusedMatch.zeroOp->getOperand(0).getDefiningOp());
+      if (fusedMatch.zeroOp->getOperand(0).getDefiningOp()->use_empty()) {
+        rewriter.eraseOp(fusedMatch.zeroOp->getOperand(0).getDefiningOp());
+      }
     }
     return success();
   }

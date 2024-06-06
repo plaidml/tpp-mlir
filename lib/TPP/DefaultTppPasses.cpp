@@ -14,6 +14,7 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
@@ -101,13 +102,33 @@ private:
       pm.addPass(createCleanup());
     }
 
-    // Convert forAll to parallel loops should run after bufferization
-    // as scf.parallel does not handle tensor.
-    pm.addPass(createConvertForAllToParallelOp());
+    // Low level parallelization passes.
+    if (!tileShapeM.empty() && !tileShapeN.empty()) {
+      LowLevelParallelizationOptions LowLevelParallelization(
+          LowLevelParallelizationOptions{tileShapeM, tileShapeN, shuffleOrder,
+                                         outerParallelLoops});
+      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
 
-    // Low leve parallelization passes.
-    LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
-    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+      // Convert forAll to parallel loops should run after bufferization
+      // as scf.parallel does not handle tensor.
+      pm.addPass(createConvertForAllToParallelOp());
+    } else {
+      // FIXME remove as soon as the above code is fixed
+      pm.addPass(createConvertForAllToParallelOp());
+      mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
+      tilingOptions.tileSizes = parallelTaskGrid;
+      pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+
+      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+      pm.addPass(createCombineXsmmOpPass());
+      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+      pm.addPass(createFoldXsmmFlags());
+      pm.addPass(createVerifyXsmmCalls());
+    }
 
     // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLowering());
