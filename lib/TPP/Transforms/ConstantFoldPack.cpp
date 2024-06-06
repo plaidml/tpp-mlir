@@ -27,6 +27,47 @@ namespace tpp {
 
 namespace {
 
+// Helper pattern - lower tensor.pack operations that pack constants.
+struct LowerConstantPacking : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    auto constOp = packOp.getSource().getDefiningOp<arith::ConstantOp>();
+    if (!constOp)
+      return failure();
+    // Must be a dense constant.
+    auto denseAttr = dyn_cast<DenseElementsAttr>(constOp.getValue());
+    if (!denseAttr)
+      return failure();
+
+    // Bail out if the pack is used as a writing operation i.e., the destination
+    // is not a tensor.empty.
+    if (!packOp.getDest().getDefiningOp<tensor::EmptyOp>())
+      return rewriter.notifyMatchFailure(packOp,
+                                         "expects empty tensor destination");
+    // Pack destination must have static shape.
+    if (!packOp.getDestType().hasStaticShape())
+      return rewriter.notifyMatchFailure(
+          packOp, "expects destination with static shape");
+
+    // Pack with padding is not supported currently.
+    // TODO: Add tensor.pad folder pattern when available and lower the pack.
+    if (packOp.getPaddingValue())
+      return rewriter.notifyMatchFailure(packOp,
+                                         "NYI, expects no padding value");
+
+    // If it is a splat constant, skip and let tensor.pack folder to handle this
+    // case.
+    if (denseAttr.isSplat())
+      return rewriter.notifyMatchFailure(
+          packOp, "skip pack - existing folder covers constant splats");
+
+    return linalg::lowerPack(rewriter, packOp);
+  }
+};
+
+// Rewrite constant packing operation as a compile-time packed constant.
 struct ConstantFoldPack
     : public tpp::impl::ConstantFoldPackBase<ConstantFoldPack> {
 
@@ -34,56 +75,19 @@ struct ConstantFoldPack
     auto module = getOperation();
     auto *ctx = &getContext();
 
-    // Apply canonicalization to fold trivial cases.
-    RewritePatternSet packFolderPatterns(&getContext());
-    tensor::PackOp::getCanonicalizationPatterns(packFolderPatterns, ctx);
-    linalg::FillOp::getCanonicalizationPatterns(packFolderPatterns, ctx);
-    (void)applyPatternsAndFoldGreedily(module, std::move(packFolderPatterns));
-
-    // Collect operations that pack constants.
-    SmallVector<tensor::PackOp> packsToFold;
-    module->walk([&](tensor::PackOp packOp) {
-      auto constOp = packOp.getSource().getDefiningOp<arith::ConstantOp>();
-      if (!constOp)
-        return WalkResult::skip();
-      // Must be a dense constant.
-      auto denseAttr = dyn_cast<DenseElementsAttr>(constOp.getValue());
-      if (!denseAttr)
-        return WalkResult::skip();
-
-      // Bail out if the pack is used as a writing operation i.e.,
-      // the destination is not a tensor.empty.
-      if (!packOp.getDest().getDefiningOp<tensor::EmptyOp>())
-        return WalkResult::skip();
-      // Pack destination must have static shape.
-      if (!packOp.getDestType().hasStaticShape())
-        return WalkResult::skip();
-
-      // Pack with padding is not supported currently.
-      // TODO: Add tensor.pad folder pattern when available.
-      if (packOp.getPaddingValue())
-        return WalkResult::skip();
-
-      packsToFold.push_back(packOp);
-
-      return WalkResult::advance();
-    });
-
-    // Go through intermediate lowering through Linalg operations.
-    IRRewriter rewriter(ctx);
-    for (auto pack : packsToFold) {
-      FailureOr<linalg::LowerPackResult> res =
-          linalg::lowerPack(rewriter, pack);
-      assert(succeeded(res) && "failed intermediate pack lowering");
-    }
-
-    // Apply Linalg constant folders to cleanup lowered packs.
     // TODO: Add tensor.pad folder pattern when available.
-    RewritePatternSet constantFolderPatterns(&getContext());
+    RewritePatternSet patterns(ctx);
+    // Temporarily lower constant packing operation to allow other existing
+    // patterns to fold the operation completely.
+    patterns.add<LowerConstantPacking>(ctx);
+    // Apply canonicalization to fold trivial cases and linalg constant folders
+    // to cleanup lowered packs.
+    linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
+    tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::populateConstantFoldLinalgOperations(
-        constantFolderPatterns, [](OpOperand *) -> bool { return true; });
-    (void)applyPatternsAndFoldGreedily(module,
-                                       std::move(constantFolderPatterns));
+        patterns, [](OpOperand *) -> bool { return true; });
+
+    (void)applyPatternsAndFoldGreedily(module, std::move(patterns));
   }
 };
 
