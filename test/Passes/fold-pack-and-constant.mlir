@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -constant-fold-pack -canonicalize -cse -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -constant-fold-pack -cse -split-input-file | FileCheck %s
 
 func.func @expect_to_fold_cst() ->  tensor<8x2x1x1x32x32xi64> {
   %cst = arith.constant dense<1> : tensor<1x1x64x256xi64>
