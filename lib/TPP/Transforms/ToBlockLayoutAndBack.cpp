@@ -652,21 +652,6 @@ struct PropagatePackUnPack
   }
 };
 
-// TODO: (lorenzo) Upstream in `populateSimplifyTensorPack`.
-// Do not pack an empty.
-struct SimplifyPackToEmpty : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const override {
-    auto emptyTensor = packOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensor)
-      return failure();
-    rewriter.replaceOp(packOp, packOp.getDest());
-    return success();
-  }
-};
-
 // Fold: expand_shape(tensor.pack).
 struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
@@ -967,6 +952,7 @@ struct SimplifyAndCanonicalizePack
 void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
   tensor::populateSimplifyPackAndUnpackPatterns(patterns);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
   tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
@@ -978,9 +964,8 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns
-      .add<SimplifyPackToEmpty, PackOfReshape,
-           FoldExpandShapeInParallelInsertOp, FoldCollapseShapeInExtractSliceOp,
-           FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(ctx);
+  patterns.add<PackOfReshape, FoldExpandShapeInParallelInsertOp,
+               FoldCollapseShapeInExtractSliceOp, FoldUnPackIntoInsertSlice,
+               ForAllIterArgsFolder>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
