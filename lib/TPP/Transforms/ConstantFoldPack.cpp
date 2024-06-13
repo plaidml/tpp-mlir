@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Threading.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -51,12 +52,6 @@ struct LowerConstantPacking : public OpRewritePattern<tensor::PackOp> {
       return rewriter.notifyMatchFailure(
           packOp, "expects destination with static shape");
 
-    // Pack with padding is not supported currently.
-    // TODO: Add tensor.pad folder pattern when available and lower the pack.
-    if (packOp.getPaddingValue())
-      return rewriter.notifyMatchFailure(packOp,
-                                         "NYI, expects no padding value");
-
     // If it is a splat constant, skip and let tensor.pack folder to handle this
     // case.
     if (denseAttr.isSplat())
@@ -75,7 +70,6 @@ struct ConstantFoldPack
     auto module = getOperation();
     auto *ctx = &getContext();
 
-    // TODO: Add tensor.pad folder pattern when available.
     RewritePatternSet patterns(ctx);
     // Temporarily lower constant packing operation to allow other existing
     // patterns to fold the operation completely.
@@ -84,6 +78,8 @@ struct ConstantFoldPack
     // to cleanup lowered packs.
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+    tensor::populateRewriteAsConstantPatterns(
+        patterns, [](OpOperand *) -> bool { return true; });
     linalg::populateConstantFoldLinalgOperations(
         patterns, [](OpOperand *) -> bool { return true; });
 
