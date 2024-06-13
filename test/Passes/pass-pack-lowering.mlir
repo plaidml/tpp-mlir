@@ -126,7 +126,7 @@ func.func @expect_not_to_fuse(%arg0: tensor<1024x512xbf16>, %arg1: tensor<8x32x3
 
 // -----
 
-func.func @pack_fuson_outer_only(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x16x32x32x2xbf16>) -> tensor<16x16x32x32x2xbf16> {
+func.func @pack_fusion_outer_only(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x16x32x32x2xbf16>) -> tensor<16x16x32x32x2xbf16> {
   %1 = tensor.empty() : tensor<16x32x32x32xbf16>
   %pack_0 = tensor.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %1
     : tensor<1024x512xbf16> -> tensor<16x32x32x32xbf16>
@@ -137,20 +137,19 @@ func.func @pack_fuson_outer_only(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
 
-// CHECK-LABEL: pack_fuson_outer_only
+// CHECK-LABEL: pack_fusion_outer_only
 // CHECK-SAME: %[[ARG0:.+]]: tensor<1024x512xbf16>, %[[ARG1:.+]]: tensor<16x16x32x32x2xbf16>
-// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x32x32x32xbf16>
 // CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]]) in (16) shared_outs(%[[ARG3:.+]] = %[[ARG1]])
 // CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG2]])
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[APPLY]]] [1024, 32] [1, 1] : tensor<1024x512xbf16> to tensor<1024x32xbf16>
-// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[EMPTY]][%[[ARG2]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : tensor<16x32x32x32xbf16> to tensor<1x32x32x32xbf16>
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x32x32x32xbf16>
 // CHECK: %[[EXP:.+]] = tensor.expand_shape %[[SLICE]] {{\[}}[0, 1], [2, 3]] output_shape [32, 32, 1, 32] : tensor<1024x32xbf16> into tensor<32x32x1x32xbf16>
-// CHECK: %[[TRAN:.+]] = linalg.transpose ins(%[[EXP]] : tensor<32x32x1x32xbf16>) outs(%[[SLICE_1]] : tensor<1x32x32x32xbf16>)
+// CHECK: %[[TRAN:.+]] = linalg.transpose ins(%[[EXP]] : tensor<32x32x1x32xbf16>) outs(%[[EMPTY]] : tensor<1x32x32x32xbf16>)
 // CHECK-SAME:  permutation = [2, 0, 1, 3]
-// CHECK: %[[SLICE_2:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG2]], 0, 0, 0, 0] [1, 16, 32, 32, 2] [1, 1, 1, 1, 1]
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG2]], 0, 0, 0, 0] [1, 16, 32, 32, 2] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<16x16x32x32x2xbf16> to tensor<1x16x32x32x2xbf16>
 // CHECK: %[[EXP_2:.+]] = tensor.expand_shape %[[TRAN]] {{\[}}[0], [1, 2], [3], [4]] output_shape [1, 16, 2, 32, 32] : tensor<1x32x32x32xbf16> into tensor<1x16x2x32x32xbf16>
-// CHECK: %[[TRAN_2:.+]] = linalg.transpose ins(%[[EXP_2]] : tensor<1x16x2x32x32xbf16>) outs(%[[SLICE_2]] : tensor<1x16x32x32x2xbf16>)
+// CHECK: %[[TRAN_2:.+]] = linalg.transpose ins(%[[EXP_2]] : tensor<1x16x2x32x32xbf16>) outs(%[[SLICE_1]] : tensor<1x16x32x32x2xbf16>)
 // CHECK-SAME:  permutation = [0, 1, 3, 4, 2]
 // CHECK: tensor.parallel_insert_slice %[[TRAN_2]] into %[[ARG3]][%[[ARG2]], 0, 0, 0, 0] [1, 16, 32, 32, 2] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<1x16x32x32x2xbf16> into tensor<16x16x32x32x2xbf16>
