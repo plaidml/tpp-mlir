@@ -165,9 +165,7 @@ func.func @vnni_pack(%arg0: tensor<1024x512xbf16>, %arg1: tensor<16x32x16x32x2xb
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
 // CHECK-LABEL: vnni_pack
 // CHECK-SAME: %[[ARG0:.+]]: tensor<1024x512xbf16>, %[[ARG1:.+]]: tensor<16x32x16x32x2xbf16>
-// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
-// CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (%[[C16]], %[[C32]]) shared_outs(%[[ARG4:.+]] = %[[ARG1]])
+// CHECK: %{{.+}} = scf.forall (%[[ARG2:.+]], %[[ARG3:.+]]) in (16, 32) shared_outs(%[[ARG4:.+]] = %[[ARG1]])
 // CHECK: %[[AFFINE_APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]])
 // CHECK: %[[AFFINE_APPLY_1:.+]] = affine.apply #[[MAP]](%[[ARG2]])
 // CHECK: %[[SLICE:.+]] = tensor.extract_slice %arg0[%[[AFFINE_APPLY]], %[[AFFINE_APPLY_1]]] [32, 32] [1, 1]
@@ -292,23 +290,6 @@ func.func @expect_to_remove_first_and_last_iter_arg(%arg0: tensor<2x2x32x32xbf16
 
 // -----
 
-func.func @expect_to_remove_first_iter_arg(%arg0: tensor<2x2x32x32xbf16>) -> tensor<2x2x32x32xbf16> {
-  %0:3 = scf.forall (%arg1, %arg2) in (2, 2) shared_outs(%arg3 = %arg0, %arg4 = %arg0, %arg5 = %arg0) -> (tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>) {
-    %1 = tensor.extract_slice %arg5[%arg1, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %1 into %arg5[%arg1, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
-    }
-  }
-  // Result associated with second iter arg is used here, expect to keep it.
-  return %0#1 : tensor<2x2x32x32xbf16>
-}
-
-// CHECK-LABEL: expect_to_remove_first_iter_arg
-// CHECK-SAME: %[[ARG0:.+]]: tensor<2x2x32x32xbf16>
-// CHECK: %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (2, 2) shared_outs(%{{.+}} = %[[ARG0]], %{{.+}} = %[[ARG0]])
-
-// -----
-
 func.func private @some_use(%arg0 : tensor<2x2x32x32xbf16>) -> tensor<64x64xbf16>
 
 func.func @fold_pack_expect_to_fail_multiple_uses(
@@ -358,15 +339,13 @@ func.func @expect_to_fail_fold_pack_in_insert_slice_1(
 
 // -----
 
-// CHECK-LABEL: expect_to_fail_fold_pack_in_insert_slice_2
-func.func @expect_to_fail_fold_pack_in_insert_slice_2(
+func.func @expect_to_fold_pack_in_insert_slice_2(
         %arg0: tensor<2x4x32x32xbf16>, %arg1: tensor<2x4x32x32xbf16>,
         %arg2: tensor<64x64xbf16>, %dest: tensor<64x64xbf16>, %dest_t: tensor<2x2x32x32xbf16>) -> tensor<64x64xbf16> {
   %packed_layout = tensor.empty() : tensor<2x2x32x32xbf16>
   %pack = tensor.pack %arg2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %packed_layout
     : tensor<64x64xbf16> -> tensor<2x2x32x32xbf16>
-  // Multiple results fail to apply the folding pattern.
-  %0:2 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %pack, %arg6 = %dest_t)
+  %0:2 = scf.forall (%arg3, %arg4) in (2, 2) shared_outs(%arg5 = %dest_t, %arg6 = %pack)
       -> (tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>) {
     %extracted_slice = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
     %extracted_slice_2 = tensor.extract_slice %arg1[%arg3, 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
@@ -376,8 +355,26 @@ func.func @expect_to_fail_fold_pack_in_insert_slice_2(
       tensor.parallel_insert_slice %4 into %arg6[%arg3, %arg4, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
     }
   }
-  // CHECK: tensor.unpack
-  %unpack = tensor.unpack %0#0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
+  %unpack = tensor.unpack %0#1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   return %unpack : tensor<64x64xbf16>
 }
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
+
+// CHECK-LABEL: @expect_to_fold_pack_in_insert_slice_2
+// CHECK-SAME: %[[ARG0:.+]]: tensor<2x4x32x32xbf16>, %[[ARG1:.+]]: tensor<2x4x32x32xbf16>,
+// CHECK-SAME: %[[ARG2:.+]]: tensor<64x64xbf16>, %[[ARG3:.+]]: tensor<64x64xbf16>
+// CHECK-SAME: %[[ARG4:.+]]: tensor<2x2x32x32xbf16>
+// CHECK-NOT: tensor.pack
+// CHECK: %[[RES:.+]] = scf.forall (%[[ARG5:.+]], %[[ARG6:.+]]) in (2, 2) shared_outs(%[[ARG7:.+]] = %[[ARG2]])
+// CHECK: %[[AFFINE_I:.+]] = affine.apply #[[MAP]](%[[ARG5]])
+// CHECK: %[[AFFINE_J:.+]] = affine.apply #[[MAP]](%[[ARG6]])
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG5]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+// CHECK: %[[SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG5]], 0, 0, 0] [1, 4, 32, 32] [1, 1, 1, 1] : tensor<2x4x32x32xbf16> to tensor<4x32x32xbf16>
+// CHECK: %[[SLICE_1:.+]] = tensor.extract_slice %[[ARG4]][%[[ARG5]], %[[ARG6]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
+// CHECK: %[[GEMM:.+]] = linalg.batch_reduce_matmul ins(%[[SLICE]], %[[SLICE_0]] : tensor<4x32x32xbf16>, tensor<4x32x32xbf16>)
+// CHECK-SAME:  outs(%[[SLICE_1]] : tensor<32x32xbf16>) -> tensor<32x32xbf16>
+// CHECK: tensor.parallel_insert_slice %[[GEMM]] into %[[ARG7]][%[[AFFINE_I]], %[[AFFINE_J]]] [32, 32] [1, 1] : tensor<32x32xbf16> into tensor<64x64xbf16>
+// CHECK-NOT: tensor.unpack
+// CHECK: return %[[RES]] : tensor<64x64xbf16>

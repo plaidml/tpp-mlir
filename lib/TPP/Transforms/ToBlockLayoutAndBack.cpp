@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Traits.h"
@@ -830,66 +831,6 @@ struct FoldUnPackIntoInsertSlice : public OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-// Fold dead iter args for scf.forall.
-// TODO: (lorenzo) upstream.
-struct ForAllIterArgsFolder : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
-                                PatternRewriter &rewriter) const final {
-    bool canonicalize = false;
-    SmallVector<Value> newOperands;
-    llvm::DenseSet<size_t> unusedIndices;
-
-    size_t idxUnused = 0;
-    for (auto it :
-         llvm::zip_equal(forallOp.getDpsInitsMutable(),
-                         forallOp.getRegionIterArgs(), forallOp.getResults())) {
-      Value operand = std::get<0>(it).get();
-      BlockArgument bbArg = std::get<1>(it);
-      Value result = std::get<2>(it);
-      if (!bbArg.use_empty() || !result.use_empty()) {
-        newOperands.push_back(operand);
-      } else {
-        unusedIndices.insert(idxUnused);
-        canonicalize = true;
-      }
-      idxUnused++;
-    }
-
-    if (!canonicalize)
-      return failure();
-
-    auto newForallOp = rewriter.create<scf::ForallOp>(
-        forallOp.getLoc(), forallOp.getMixedLowerBound(),
-        forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newOperands,
-        forallOp.getMapping());
-    rewriter.eraseBlock(newForallOp.getBody());
-    newForallOp.getRegion().takeBody(forallOp.getRegion());
-    Block *newBlock = newForallOp.getBody();
-
-    // Mark dead args and remove from the block.
-    BitVector nonLiveArgs(newBlock->getNumArguments(), false);
-    for (auto idx : unusedIndices) {
-      nonLiveArgs[newForallOp.getRank() + idx] = true;
-    }
-    newBlock->eraseArguments(nonLiveArgs);
-
-    SmallVector<Value> repl;
-    for (size_t idx = 0, collapsedIdx = 0, e = forallOp.getNumResults();
-         idx != e; idx++) {
-      if (unusedIndices.count(idx) == 0) {
-        repl.push_back(newForallOp.getResults()[collapsedIdx++]);
-      } else {
-        // The arg is dead replace with the first result.
-        repl.push_back(newForallOp.getResults()[0]);
-      }
-    }
-    rewriter.replaceOp(forallOp, repl);
-    return success();
-  }
-};
-
 struct SimplifyAndCanonicalizePack
     : public tpp::impl::SimplifyAndCanonicalizePackBase<
           SimplifyAndCanonicalizePack> {
@@ -916,9 +857,9 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  scf::ForallOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(
-      ctx);
+  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
