@@ -667,69 +667,6 @@ struct SimplifyPackToEmpty : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
-// If all the tiled dimension create unit tile loops pack can be rewritten as
-// a reshape.
-struct PackAsReshape : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const override {
-    if (packOp.getPaddingValue())
-      return failure();
-    RankedTensorType sourceType = packOp.getSourceType();
-    ArrayRef<int64_t> sourceShape = sourceType.getShape();
-    size_t dimsToDrop = 0;
-    for (auto [dim, tile] : packOp.getDimAndTileMapping()) {
-      auto constantTile = getConstantIntValue(tile);
-      if (constantTile && sourceShape[dim] == *constantTile)
-        dimsToDrop++;
-    }
-    // All the tiled dimension need to be dropped, we cannot drop
-    // single dimensions.
-    if (dimsToDrop != sourceShape.size())
-      return failure();
-
-    auto reassoc =
-        getReassociationIndicesForReshape(sourceType, packOp.getDestType());
-    if (!reassoc)
-      return failure();
-    Value expanded =
-        linalgx::utils::expand(rewriter, packOp.getLoc(), packOp.getSource(),
-                               packOp.getDestType(), *reassoc);
-    rewriter.replaceOp(packOp, expanded);
-    return success();
-  }
-};
-
-// If all the tiled dimension create unit tile loops unpack can be rewritten as
-// a collapse.
-struct UnPackAsReshape : public OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
-                                PatternRewriter &rewriter) const override {
-    RankedTensorType destType = unPackOp.getDestType();
-    ArrayRef<int64_t> destShape = destType.getShape();
-    size_t dimsToDrop = 0;
-    for (auto [dim, tile] : unPackOp.getDimAndTileMapping()) {
-      auto constantTile = getConstantIntValue(tile);
-      if (constantTile && destShape[dim] == *constantTile)
-        dimsToDrop++;
-    }
-    if (dimsToDrop != destShape.size())
-      return failure();
-
-    auto reassoc =
-        getReassociationIndicesForReshape(unPackOp.getSourceType(), destType);
-    if (!reassoc)
-      return failure();
-    Value collapse = linalgx::utils::collapse(
-        rewriter, unPackOp.getLoc(), unPackOp.getSource(), destType, *reassoc);
-    rewriter.replaceOp(unPackOp, collapse);
-    return success();
-  }
-};
-
 // Fold: expand_shape(tensor.pack).
 struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
@@ -1041,9 +978,9 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<SimplifyPackToEmpty, PackAsReshape, PackOfReshape,
-               FoldExpandShapeInParallelInsertOp, UnPackAsReshape,
-               FoldCollapseShapeInExtractSliceOp, FoldUnPackIntoInsertSlice,
-               ForAllIterArgsFolder>(ctx);
+  patterns
+      .add<SimplifyPackToEmpty, PackOfReshape,
+           FoldExpandShapeInParallelInsertOp, FoldCollapseShapeInExtractSliceOp,
+           FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
