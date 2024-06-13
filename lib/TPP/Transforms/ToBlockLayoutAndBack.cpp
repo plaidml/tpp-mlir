@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Traits.h"
@@ -916,9 +917,9 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  scf::ForallOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(
-      ctx);
+  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
