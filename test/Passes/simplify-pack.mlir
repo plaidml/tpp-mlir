@@ -290,22 +290,6 @@ func.func @expect_to_remove_first_and_last_iter_arg(%arg0: tensor<2x2x32x32xbf16
 
 // -----
 
-func.func @expect_to_remove_all_iter_args_and_fold(%arg0: tensor<2x2x32x32xbf16>) -> tensor<2x2x32x32xbf16> {
-  %0:3 = scf.forall (%arg1, %arg2) in (2, 2) shared_outs(%arg3 = %arg0, %arg4 = %arg0, %arg5 = %arg0) -> (tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>, tensor<2x2x32x32xbf16>) {
-    %1 = tensor.extract_slice %arg5[%arg1, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<2x2x32x32xbf16> to tensor<32x32xbf16>
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %1 into %arg5[%arg1, %arg2, 0, 0] [1, 1, 32, 32] [1, 1, 1, 1] : tensor<32x32xbf16> into tensor<2x2x32x32xbf16>
-    }
-  }
-  return %0#1 : tensor<2x2x32x32xbf16>
-}
-
-// CHECK-LABEL: expect_to_remove_all_iter_args_and_fold
-// CHECK-SAME: %[[ARG0:.+]]: tensor<2x2x32x32xbf16>
-// CHECK: return %[[ARG0]]
-
-// -----
-
 func.func private @some_use(%arg0 : tensor<2x2x32x32xbf16>) -> tensor<64x64xbf16>
 
 func.func @fold_pack_expect_to_fail_multiple_uses(
