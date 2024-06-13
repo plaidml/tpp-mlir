@@ -99,11 +99,11 @@ void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
   brgemmOp.getOperand(operandNumber).replaceAllUsesWith(subview);
 }
 
-FailureOr<ForallOp> insertParallelLoop(ForallOp op,
-                                       ArrayRef<unsigned> tileShapeM,
-                                       ArrayRef<unsigned> tileShapeN) {
+LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
+                                 ArrayRef<unsigned> tileShapeN) {
   xsmm::BrgemmOp brgemmOp = NULL;
   OpBuilder b(op);
+  PatternRewriter rewriter(b.getContext());
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++)
     if (dyn_cast<xsmm::BrgemmOp>(oper)) {
@@ -111,7 +111,7 @@ FailureOr<ForallOp> insertParallelLoop(ForallOp op,
       break;
     }
   if (brgemmOp == NULL)
-    return failure();
+    return rewriter.notifyMatchFailure(op, "require brgemm op");
 
   int boundSize = tileShapeM.size() + tileShapeN.size();
   auto mShape =
@@ -125,7 +125,8 @@ FailureOr<ForallOp> insertParallelLoop(ForallOp op,
     multipleM = multipleM * tileShapeM[i];
 
   if (mShape[0] != multipleM)
-    return failure();
+    return rewriter.notifyMatchFailure(
+        op, "require m tile shape to match tensor shape");
 
   auto nShape =
       dyn_cast<ShapedType>(
@@ -137,7 +138,8 @@ FailureOr<ForallOp> insertParallelLoop(ForallOp op,
     multipleN = multipleN * tileShapeN[i];
 
   if (nShape[0] != multipleN)
-    return failure();
+    return rewriter.notifyMatchFailure(
+        op, "require n tile shape to match tensor shape");
 
   auto kShape =
       dyn_cast<ShapedType>(
@@ -145,7 +147,8 @@ FailureOr<ForallOp> insertParallelLoop(ForallOp op,
           .getShape();
 
   if ((multipleM * multipleN) != (kShape[0] * kShape[1]))
-    return failure();
+    return rewriter.notifyMatchFailure(
+        op, "require k tile shape to match tensor shape");
 
   // Set the new bounds of for loop
   SmallVector<int64_t> lbs(boundSize, 0), steps(boundSize, 1);
@@ -220,7 +223,7 @@ FailureOr<ForallOp> insertParallelLoop(ForallOp op,
                   op, b, brgemmOp, i);
   }
 
-  return op;
+  return success();
 }
 
 bool getInnermostForLoops(Operation *rootOp,
@@ -248,28 +251,20 @@ bool getInnermostForLoops(Operation *rootOp,
 struct LoopInsertionPass
     : public tpp::impl::LoopInsertionPassBase<LoopInsertionPass> {
 
-  LoopInsertionPass(){};
-
-  LoopInsertionPass(ArrayRef<unsigned> tileShapeM,
-                    ArrayRef<unsigned> tileShapeN) {
-    this->tileShapeM = tileShapeM;
-    this->tileShapeN = tileShapeN;
-  };
+  LoopInsertionPass() {}
 
   LoopInsertionPass(const tpp::LoopInsertionPassOptions &options) {
     tileShapeM = options.tileShapeM;
     tileShapeN = options.tileShapeN;
-  };
+  }
 
   void runOnOperation() override {
     auto *parentOp = getOperation();
     SmallVector<ForallOp> innermostForAllloops;
     getInnermostForLoops(parentOp, innermostForAllloops);
-    for (ForallOp loop : innermostForAllloops) {
-      if (failed(insertParallelLoop(loop, tileShapeM, tileShapeN))) {
-        return;
-      }
-    }
+    for (ForallOp loop : innermostForAllloops)
+      if (failed(insertParallelLoop(loop, tileShapeM, tileShapeN)))
+        loop->emitWarning("Failed to tile the loop");
   }
 };
 } // namespace tpp
