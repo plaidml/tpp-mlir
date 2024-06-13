@@ -148,8 +148,13 @@ private:
             tileShapeN,    shuffleOrder,     outerParallelLoops};
         pm.addPass(createDefaultTppPasses(tppDefaultOptions));
       } else {
-        DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
-                                                  parallelTaskGrid};
+        ArrayRef<unsigned> tileShapeM;
+        ArrayRef<unsigned> tileShapeN;
+        ArrayRef<unsigned> shuffleOrder;
+        unsigned outerParallelLoops = 0;
+        DefaultTppPassesOptions tppDefaultOptions{
+            linalgToLoops, parallelTaskGrid, tileShapeM,
+            tileShapeN,    shuffleOrder,     outerParallelLoops};
         pm.addPass(createDefaultTppPasses(tppDefaultOptions));
       }
     }
