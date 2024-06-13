@@ -36,11 +36,11 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     ListOption<"parallelTaskGrid", "parallel-task-grid",
            "unsigned", "Grid-sizes for parallel tasks.">,
     ListOption<"tileShapeM", "M-tile-shape", "unsigned",
-               "Shape to reshape the M tensor into">,
+               "Shape to reshape first operand tensor of brgemm into">,
     ListOption<"tileShapeN", "N-tile-shape", "unsigned",
-               "Shape to reshape the N tensor into">,
+               "Shape to reshape the second operand tensor of brgemm into">,
     ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
-               "Shuffle order of scf for all loop surrounding brgemm op">,
+               "Permutation order (integer index list) to shuffle the scf forall loop by">,
     Option<"outerParallelLoops", "num-outer-parallel", "unsigned", "0",
                "Number of outer loops to be parallelized">
 
