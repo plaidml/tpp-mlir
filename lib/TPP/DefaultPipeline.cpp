@@ -53,17 +53,20 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
-llvm::cl::list<unsigned> tileShapeM("M-tile-shape",
-                                    llvm::cl::desc("Shape to tile the first operand tensor of brgemm op by"),
-                                    llvm::cl::CommaSeparated);
+llvm::cl::list<unsigned> tileShapeM(
+    "M-tile-shape",
+    llvm::cl::desc("Shape to tile the first operand tensor of brgemm op by"),
+    llvm::cl::CommaSeparated);
 
-llvm::cl::list<unsigned> tileShapeN("N-tile-shape",
-                                    llvm::cl::desc("Shape to tile the second operand tensor of brgemm op by"),
-                                    llvm::cl::CommaSeparated);
+llvm::cl::list<unsigned> tileShapeN(
+    "N-tile-shape",
+    llvm::cl::desc("Shape to tile the second operand tensor of brgemm op by"),
+    llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> shuffleOrder(
     "loop-shuffle-order",
-    llvm::cl::desc("Permutation shuffle order (integer index list) to shuffle the scf forall loop surrounding brgemm op"),
+    llvm::cl::desc("Permutation shuffle order (integer index list) to shuffle "
+                   "the scf forall loop surrounding brgemm op"),
     llvm::cl::CommaSeparated);
 
 llvm::cl::opt<unsigned> outerParallelLoops(
@@ -142,21 +145,17 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      if (!tileShapeM.empty() && !tileShapeN.empty()) {
-        DefaultTppPassesOptions tppDefaultOptions{
-            linalgToLoops, parallelTaskGrid, tileShapeM,
-            tileShapeN,    shuffleOrder,     outerParallelLoops};
-        pm.addPass(createDefaultTppPasses(tppDefaultOptions));
-      } else {
-        ArrayRef<unsigned> tileShapeM;
-        ArrayRef<unsigned> tileShapeN;
-        ArrayRef<unsigned> shuffleOrder;
-        unsigned outerParallelLoops = 0;
-        DefaultTppPassesOptions tppDefaultOptions{
-            linalgToLoops, parallelTaskGrid, tileShapeM,
-            tileShapeN,    shuffleOrder,     outerParallelLoops};
-        pm.addPass(createDefaultTppPasses(tppDefaultOptions));
-      }
+      DefaultTppPassesOptions tppDefaultOptions;
+      if (!tileShapeM.empty())
+        tppDefaultOptions.tileShapeM = tileShapeM;
+      if (!tileShapeN.empty())
+        tppDefaultOptions.tileShapeN = tileShapeN;
+      if (!shuffleOrder.empty())
+        tppDefaultOptions.shuffleOrder = shuffleOrder;
+      tppDefaultOptions.linalgToLoops = linalgToLoops;
+      tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+      tppDefaultOptions.outerParallelLoops = outerParallelLoops;
+      pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
     if (print == PrintStage::Mid)
