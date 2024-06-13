@@ -704,27 +704,6 @@ struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
-struct FoldExpandShapeInParallelInsertOp
-    : public OpRewritePattern<tensor::ParallelInsertSliceOp> {
-  using OpRewritePattern<tensor::ParallelInsertSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ParallelInsertSliceOp insertOp,
-                                PatternRewriter &rewriter) const override {
-    auto expandShapeOp =
-        insertOp.getSource().getDefiningOp<tensor::ExpandShapeOp>();
-    if (!expandShapeOp)
-      return failure();
-    SliceVerificationResult res = isRankReducedType(
-        expandShapeOp.getResultType(), expandShapeOp.getSrcType());
-    if (res != SliceVerificationResult::Success)
-      return failure();
-    rewriter.modifyOpInPlace(insertOp, [&]() {
-      insertOp.setOperand(/*source=*/0, expandShapeOp.getSrc());
-    });
-    return success();
-  }
-};
-
 // Rank reduce the result of an `ExtractSliceOp` that is a producer
 // of a `CollapseShapeOp` operation.
 struct FoldCollapseShapeInExtractSliceOp
@@ -964,8 +943,7 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<PackOfReshape, FoldExpandShapeInParallelInsertOp,
-               FoldCollapseShapeInExtractSliceOp, FoldUnPackIntoInsertSlice,
-               ForAllIterArgsFolder>(ctx);
+  patterns.add<PackOfReshape, FoldCollapseShapeInExtractSliceOp,
+               FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
