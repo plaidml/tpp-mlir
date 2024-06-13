@@ -54,16 +54,16 @@ llvm::cl::list<unsigned>
                      llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> tileShapeM("M-tile-shape",
-                                    llvm::cl::desc("Tile shape of M tensor"),
+                                    llvm::cl::desc("Shape to tile the first operand tensor of brgemm op by"),
                                     llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> tileShapeN("N-tile-shape",
-                                    llvm::cl::desc("Tile shape of N tensor"),
+                                    llvm::cl::desc("Shape to tile the second operand tensor of brgemm op by"),
                                     llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> shuffleOrder(
     "loop-shuffle-order",
-    llvm::cl::desc("shuffle order of scf for all loop surrounding brgemm op"),
+    llvm::cl::desc("Permutation shuffle order (integer index list) to shuffle the scf forall loop surrounding brgemm op"),
     llvm::cl::CommaSeparated);
 
 llvm::cl::opt<unsigned> outerParallelLoops(

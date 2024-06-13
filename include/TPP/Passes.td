@@ -437,9 +437,9 @@ def LoopInsertionPass: Pass<"loop-insertion-pass">{
   let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect"];
   let options = [
     ListOption<"tileShapeM", "M-tile-shape", "unsigned",
-               "Shape to reshape the M tensor into">,
+               "Shape to reshape the first input operand tensor of brgemm into">,
     ListOption<"tileShapeN", "N-tile-shape", "unsigned",
-               "Shape to reshape the N tensor into">
+               "Shape to reshape the second input operand tensor of brgemm into">
   ];
 }
 
@@ -461,8 +461,8 @@ def LoopShufflePass: Pass<"loop-shuffle-pass">{
     Shuffle nd brgemm parallel loop.
   }];
   let options = [
-    ListOption<"shuffleOrder", "shuffle-order", "unsigned",
-               "Order to shuffle the parallel loop by">
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Permutation order (integer index list) to shuffle the scf forall loop by">
   ];
 
   let dependentDialects = ["scf::SCFDialect"];
