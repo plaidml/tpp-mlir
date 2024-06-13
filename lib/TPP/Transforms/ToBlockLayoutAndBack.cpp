@@ -704,31 +704,6 @@ struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
-// Rank reduce the result of an `ExtractSliceOp` that is a producer
-// of a `CollapseShapeOp` operation.
-struct FoldCollapseShapeInExtractSliceOp
-    : public OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseShapeOp,
-                                PatternRewriter &rewriter) const override {
-    auto extractSliceOp =
-        collapseShapeOp.getSrc().getDefiningOp<tensor::ExtractSliceOp>();
-    if (!extractSliceOp)
-      return failure();
-    SliceVerificationResult res = isRankReducedType(
-        extractSliceOp.getResultType(), collapseShapeOp.getResultType());
-    if (res != SliceVerificationResult::Success)
-      return failure();
-    Value rankedReduceExtractSlice = rewriter.create<tensor::ExtractSliceOp>(
-        extractSliceOp.getLoc(), collapseShapeOp.getResultType(),
-        extractSliceOp.getSource(), extractSliceOp.getMixedOffsets(),
-        extractSliceOp.getMixedSizes(), extractSliceOp.getMixedStrides());
-    rewriter.replaceOp(collapseShapeOp, rankedReduceExtractSlice);
-    return success();
-  }
-};
-
 // Fold a tensor.unpack into an scf.parallel_insert.
 //
 // The pattern looks like:
@@ -943,7 +918,7 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<PackOfReshape, FoldCollapseShapeInExtractSliceOp,
-               FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(ctx);
+  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice, ForAllIterArgsFolder>(
+      ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
