@@ -18,6 +18,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include <list>
+#include <map>
 
 namespace mlir {
 namespace tpp {
@@ -84,17 +85,25 @@ struct LoopShuffle : OpRewritePattern<scf::ForallOp> {
     op.setStaticLowerBound(lbs);
     op.setStaticUpperBound(ubs);
     op.setStaticStep(steps);
-    SmallVector<Value> tempVector;
+
+    SmallVector<Value> tempValueMap(op.getInductionVars().size());
+    SmallVector<int64_t> tempIndexMap(op.getInductionVars().size());
     for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-      auto tempValue = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), i);
-      replaceAllUsesInRegionWith(op.getInductionVar(i), tempValue,
-                                 op.getRegion());
-      tempVector.push_back(tempValue);
+      for (size_t j = 0; j < options.shuffleOrder.size(); j++) {
+        if (i == options.shuffleOrder[j]) {
+          auto tempValue =
+              rewriter.create<arith::ConstantIndexOp>(op.getLoc(), j);
+          replaceAllUsesInRegionWith(op.getInductionVar(i), tempValue,
+                                     op.getRegion());
+          tempValueMap[i] = tempValue;
+          tempIndexMap[i] = j;
+          break;
+        }
+      }
     }
     for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-      replaceAllUsesInRegionWith(tempVector[i],
-                                 op.getInductionVar(options.shuffleOrder[i]),
-                                 op.getRegion());
+      replaceAllUsesInRegionWith(
+          tempValueMap[i], op.getInductionVar(tempIndexMap[i]), op.getRegion());
     }
     visitedForallOp.push_back(op);
     return success();
