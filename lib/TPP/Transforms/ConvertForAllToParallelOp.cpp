@@ -9,6 +9,7 @@
 #include "TPP/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,31 +24,13 @@ namespace tpp {
 
 namespace {
 
+// Wrapper for upstream transform API.
 struct ConvertForAllToParallelOpImpl : public OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
-    // Bail-out if we are not at memref.
-    if (forallOp->getNumResults() != 0)
-      return failure();
-    Location loc = forallOp.getLoc();
-    SmallVector<Value> lowerBounds = getValueOrCreateConstantIndexOp(
-        rewriter, loc, forallOp.getMixedLowerBound());
-    SmallVector<Value> upperBounds = getValueOrCreateConstantIndexOp(
-        rewriter, loc, forallOp.getMixedUpperBound());
-    SmallVector<Value> steps =
-        getValueOrCreateConstantIndexOp(rewriter, loc, forallOp.getMixedStep());
-    rewriter.replaceOpWithNewOp<scf::ParallelOp>(
-        forallOp, lowerBounds, upperBounds, steps,
-        [&](OpBuilder &nestedBuilder, Location loc, ValueRange regionArgs) {
-          IRMapping mapping;
-          mapping.map(forallOp.getInductionVars(), regionArgs);
-          Block *forallOpBlock = forallOp.getBody();
-          for (auto &nestedOp : forallOpBlock->without_terminator())
-            nestedBuilder.clone(nestedOp, mapping);
-        });
-    return success();
+    return scf::forallToParallelLoop(rewriter, forallOp);
   }
 };
 
