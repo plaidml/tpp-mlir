@@ -62,12 +62,11 @@ void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
                       dyn_cast<MemRefType>(type).getElementType()),
       operand, reassociation);
   expandShape.setStaticOutputShape(tensorShape);
-  b.setInsertionPoint(brgemmOp);
+  b.setInsertionPoint(&op.getBody()->front());
   SmallVector<OpFoldResult> strides(tensorShape.size(), b.getIndexAttr(1)),
       sizes, offsets;
   size_t tileSize =
       tensorShape.size() - dyn_cast<ShapedType>(resultType).getShape().size();
-
   SmallVector<int64_t> tileSizes;
   for (size_t i = 0; i < tensorShape.size(); i++) {
     if (i < tileSize) {
@@ -76,6 +75,7 @@ void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
         opnum = 1;
       }
       int inductionVarIndex = (opnum - 1) * tileSize + i;
+
       offsets.push_back(op.getInductionVars()[inductionVarIndex]);
       sizes.push_back(b.getIndexAttr(1));
     } else {
@@ -114,12 +114,16 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
     return rewriter.notifyMatchFailure(op, "require brgemm op");
 
   int boundSize = tileShapeM.size() + tileShapeN.size();
-  auto mShape =
-      dyn_cast<ShapedType>(
-          brgemmOp.getOperand(1).getDefiningOp()->getOperand(0).getType())
-          .getShape();
-
   // Validate the input tile sizes against the operand shapes
+  ArrayRef<int64_t> mShape;
+  auto mDefiningOp = brgemmOp.getOperand(1).getDefiningOp();
+  if (isa<memref::SubViewOp>(mDefiningOp))
+    mShape =
+        dyn_cast<ShapedType>(mDefiningOp->getOperand(0).getType()).getShape();
+  else
+    mShape =
+        dyn_cast<ShapedType>(mDefiningOp->getResult(0).getType()).getShape();
+
   long multipleM = 1;
   for (size_t i = 0; i < tileShapeM.size(); i++)
     multipleM = multipleM * tileShapeM[i];
@@ -128,10 +132,14 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
     return rewriter.notifyMatchFailure(
         op, "require m tile shape to match tensor shape");
 
-  auto nShape =
-      dyn_cast<ShapedType>(
-          brgemmOp.getOperand(2).getDefiningOp()->getOperand(0).getType())
-          .getShape();
+  ArrayRef<int64_t> nShape;
+  auto nDefiningOp = brgemmOp.getOperand(2).getDefiningOp();
+  if (isa<memref::SubViewOp>(nDefiningOp))
+    nShape =
+        dyn_cast<ShapedType>(nDefiningOp->getOperand(0).getType()).getShape();
+  else
+    nShape =
+        dyn_cast<ShapedType>(nDefiningOp->getResult(0).getType()).getShape();
 
   long multipleN = 1;
   for (size_t i = 0; i < tileShapeN.size(); i++)
@@ -141,10 +149,14 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
     return rewriter.notifyMatchFailure(
         op, "require n tile shape to match tensor shape");
 
-  auto kShape =
-      dyn_cast<ShapedType>(
-          brgemmOp.getOperand(3).getDefiningOp()->getOperand(0).getType())
-          .getShape();
+  ArrayRef<int64_t> kShape;
+  auto kDefiningOp = brgemmOp.getOperand(3).getDefiningOp();
+  if (isa<memref::SubViewOp>(kDefiningOp))
+    kShape =
+        dyn_cast<ShapedType>(kDefiningOp->getOperand(0).getType()).getShape();
+  else
+    kShape =
+        dyn_cast<ShapedType>(kDefiningOp->getResult(0).getType()).getShape();
 
   if ((multipleM * multipleN) != (kShape[0] * kShape[1]))
     return rewriter.notifyMatchFailure(
@@ -205,22 +217,25 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
       {tileShapeM}, {tileShapeN}, {tileShapeM, tileShapeN}};
 
   for (int i = 1; i <= 3; i++) {
-    auto operand = brgemmOp.getOperand(i).getDefiningOp()->getOperand(0);
-    auto operandType = operand.getType();
-    auto resultType = dyn_cast<MemRefType>(brgemmOp.getOperand(i).getType());
-    auto reassociationIndex =
-        getReassociationIndices(originalShapes[i - 1], tilingVectors[i - 1]);
+    auto definingOp = brgemmOp.getOperand(i).getDefiningOp();
+    if (isa<memref::SubViewOp>(definingOp)) {
+      Value operand = definingOp->getOperand(0);
 
-    SmallVector<int64_t> shape;
-    for (size_t j = 0; j < tilingVectors[i - 1].size(); j++) {
-      shape.append(tilingVectors[i - 1][j].begin(),
-                   tilingVectors[i - 1][j].end());
+      auto operandType = operand.getType();
+      auto resultType = dyn_cast<MemRefType>(brgemmOp.getOperand(i).getType());
+      auto reassociationIndex =
+          getReassociationIndices(originalShapes[i - 1], tilingVectors[i - 1]);
+
+      SmallVector<int64_t> shape;
+      for (size_t j = 0; j < tilingVectors[i - 1].size(); j++)
+        shape.append(tilingVectors[i - 1][j].begin(),
+                     tilingVectors[i - 1][j].end());
+      shape.append(
+          std::next(originalShapes[i - 1].begin(), tilingVectors[i - 1].size()),
+          originalShapes[i - 1].end());
+      insertSubview(shape, operandType, resultType, reassociationIndex, operand,
+                    op, b, brgemmOp, i);
     }
-    shape.append(
-        std::next(originalShapes[i - 1].begin(), tilingVectors[i - 1].size()),
-        originalShapes[i - 1].end());
-    insertSubview(shape, operandType, resultType, reassociationIndex, operand,
-                  op, b, brgemmOp, i);
   }
 
   return success();
