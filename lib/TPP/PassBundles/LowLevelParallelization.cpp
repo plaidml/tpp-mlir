@@ -66,7 +66,6 @@ private:
     loopInsertionPassOptions.tileShapeM = tileShapeM;
     loopInsertionPassOptions.tileShapeN = tileShapeN;
     pm.addPass(createLoopInsertionPass(loopInsertionPassOptions));
-    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
     mlir::tpp::LoopShufflePassOptions loopShufflePassOptions;
     loopShufflePassOptions.shuffleOrder = shuffleOrder;
