@@ -266,12 +266,7 @@ bool getInnermostForLoops(Operation *rootOp,
 struct LoopInsertionPass
     : public tpp::impl::LoopInsertionPassBase<LoopInsertionPass> {
 
-  LoopInsertionPass() {}
-
-  LoopInsertionPass(const tpp::LoopInsertionPassOptions &options) {
-    tileShapeM = options.tileShapeM;
-    tileShapeN = options.tileShapeN;
-  }
+  using LoopInsertionPassBase::LoopInsertionPassBase;
 
   void runOnOperation() override {
     auto *parentOp = getOperation();

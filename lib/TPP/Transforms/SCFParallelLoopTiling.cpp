@@ -243,17 +243,8 @@ void tileParallelLoop(ParallelOp op, ArrayRef<unsigned> tileSizes,
 namespace {
 struct SCFParallelLoopTiling
     : public tpp::impl::SCFParallelLoopTilingBase<SCFParallelLoopTiling> {
-  SCFParallelLoopTiling(){};
-  SCFParallelLoopTiling(ArrayRef<unsigned> tileSizes,
-                        bool noMinMaxBounds = false) {
-    this->tileSizes = tileSizes;
-    this->noMinMaxBounds = noMinMaxBounds;
-  };
 
-  SCFParallelLoopTiling(const tpp::SCFParallelLoopTilingOptions &options) {
-    tileSizes = options.tileSizes;
-    noMinMaxBounds = options.noMinMaxBounds;
-  };
+  using SCFParallelLoopTilingBase::SCFParallelLoopTilingBase;
 
   void runOnOperation() override {
     for (auto tileSize : tileSizes)
