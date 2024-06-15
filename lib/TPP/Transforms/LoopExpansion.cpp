@@ -121,11 +121,7 @@ private:
 struct LoopExpansionPass
     : public impl::LoopExpansionPassBase<LoopExpansionPass> {
 
-  LoopExpansionPass() {}
-
-  LoopExpansionPass(const LoopExpansionPassOptions &options) {
-    this->numOuterParallel = options.numOuterParallel;
-  }
+  using LoopExpansionPassBase::LoopExpansionPassBase;
 
   void populateCombinePatterns(RewritePatternSet &patterns,
                                LoopExpansionPassOptions options) {

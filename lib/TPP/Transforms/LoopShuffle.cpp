@@ -115,11 +115,7 @@ private:
 
 struct LoopShufflePass : public impl::LoopShufflePassBase<LoopShufflePass> {
 
-  LoopShufflePass() {}
-
-  LoopShufflePass(const LoopShufflePassOptions &options) {
-    this->shuffleOrder = options.shuffleOrder;
-  }
+  using LoopShufflePassBase::LoopShufflePassBase;
 
   void populateCombinePatterns(RewritePatternSet &patterns,
                                LoopShufflePassOptions options) {
