@@ -16,7 +16,7 @@ module attributes {gpu.container_module} {
 
   gpu.module @entry_kernel {
     gpu.func @entry_kernel(%arg0: index, %arg1: index, %arg2: memref<16x16xf16>, %arg3: memref<16x16xf16>, %arg4: memref<16x16xf16>) kernel
-    attributes {gpu.known_block_size = array<i32: 32, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    attributes {known_block_size = array<i32: 32, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       %c0 = arith.constant 0 : index
 
       %C = gpu.subgroup_mma_load_matrix %arg4[%c0, %c0]

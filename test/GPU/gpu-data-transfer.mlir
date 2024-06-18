@@ -13,7 +13,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -44,7 +44,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32>, %arg1: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>, %arg1: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -78,7 +78,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[32, 1], offset: ?>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[32, 1], offset: ?>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -111,7 +111,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<?x?xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<?x?xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -166,10 +166,10 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
-    gpu.func @entry_kernel_1(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel_1(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -209,7 +209,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[32, 1], offset: ?>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[32, 1], offset: ?>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -242,7 +242,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<?x?xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<?x?xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -295,10 +295,10 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
-    gpu.func @entry_kernel_1(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel_1(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -334,7 +334,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -366,7 +366,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[?, 1], offset: ?>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[?, 1], offset: ?>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
@@ -400,7 +400,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0:  memref<?x?xf32, strided<[?, 1]>>) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0:  memref<?x?xf32, strided<[?, 1]>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
