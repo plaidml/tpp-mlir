@@ -653,58 +653,6 @@ struct PropagatePackUnPack
   }
 };
 
-// Fold: expand_shape(tensor.pack).
-struct PackOfReshape : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const override {
-    if (!packOp.getOuterDimsPerm().empty())
-      return failure();
-
-    auto expandShapeOp =
-        packOp.getSource().getDefiningOp<tensor::ExpandShapeOp>();
-    if (!expandShapeOp)
-      return failure();
-    SmallVector<ReassociationIndices, 4> reassoc =
-        expandShapeOp.getReassociationIndices();
-    // The operation must expand only leading dimensions.
-    for (int i = reassoc.size() - 1; i > 0; i--)
-      if (reassoc[i].size() != 1)
-        return failure();
-
-    // Shift the innerDimsPos by the number of leading ones.
-    SmallVector<int64_t> innerDimsPos =
-        llvm::to_vector(packOp.getInnerDimsPos());
-    int64_t shift = reassoc[0].size() - 1;
-    for (size_t i = 0; i < innerDimsPos.size(); i++)
-      innerDimsPos[i] = innerDimsPos[i] - shift;
-
-    auto newPackType = tensor::PackOp::inferPackedType(
-        expandShapeOp.getSrcType(), packOp.getStaticInnerTiles(), innerDimsPos,
-        packOp.getOuterDimsPerm());
-    auto reassocExpand =
-        getReassociationIndicesForReshape(newPackType, packOp.getDestType());
-    if (!reassocExpand)
-      return failure();
-
-    Value destTensor = tensor::PackOp::createDestinationTensor(
-        rewriter, packOp.getLoc(), expandShapeOp.getSrc(),
-        packOp.getMixedTiles(), innerDimsPos, packOp.getOuterDimsPerm());
-    Value packedVal = rewriter.create<tensor::PackOp>(
-        packOp.getLoc(), expandShapeOp.getSrc(), destTensor, innerDimsPos,
-        packOp.getMixedTiles(), packOp.getPaddingValue(),
-        packOp.getOuterDimsPerm());
-
-    Value expanded =
-        linalgx::utils::expand(rewriter, packOp.getLoc(), packedVal,
-                               packOp.getDestType(), *reassocExpand);
-    rewriter.replaceOp(packOp, expanded);
-
-    return success();
-  }
-};
-
 // Fold a tensor.unpack into an scf.parallel_insert.
 //
 // The pattern looks like:
@@ -858,8 +806,12 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ParallelInsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   scf::ForallOp::getCanonicalizationPatterns(patterns, ctx);
+  // Propagate packs/unpacks only through expand shapes at this point.
+  // This captures the transformation scope of the replaced downstream pass.
+  linalg::populateDataLayoutPropagationPatterns(
+      patterns, [](Operation *op) { return isa<tensor::ExpandShapeOp>(op); });
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
-  patterns.add<PackOfReshape, FoldUnPackIntoInsertSlice>(ctx);
+  patterns.add<FoldUnPackIntoInsertSlice>(ctx);
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
