@@ -26,7 +26,7 @@ module attributes {gpu.container_module} {
   }
 
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: index, %arg1: index, %arg2: memref<8x8xf32>, %arg3: memref<8x8xf32>, %arg4: memref<8x8xf32>, %arg5: index) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: index, %arg1: index, %arg2: memref<8x8xf32>, %arg3: memref<8x8xf32>, %arg4: memref<8x8xf32>, %arg5: index) kernel attributes {known_block_size = array<i32: 1, 1, 1>} {
       %0 = gpu.block_id  x
       %1 = gpu.block_id  y
       %2 = affine.apply #map(%0)[%arg0, %arg1]
@@ -77,7 +77,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64xf32>, %arg2: memref<4x16x64x64xf32>, %arg3: index, %arg4: index, %arg5: index, %arg6: index) kernel attributes {gpu.known_block_size = array<i32: 64, 64, 1>, gpu.known_grid_size = array<i32: 4, 16, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64xf32>, %arg2: memref<4x16x64x64xf32>, %arg3: index, %arg4: index, %arg5: index, %arg6: index) kernel attributes {known_block_size = array<i32: 64, 64, 1>, known_grid_size = array<i32: 4, 16, 1>} {
       %0 = gpu.block_id  x
       %1 = gpu.block_id  y
       %2 = gpu.thread_id  x

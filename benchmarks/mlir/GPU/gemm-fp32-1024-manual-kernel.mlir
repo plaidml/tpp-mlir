@@ -21,7 +21,7 @@ module attributes {gpu.container_module} {
 
   gpu.module @entry_kernel {
     gpu.func @entry_kernel(%arg0: memref<256x1024xf32>, %arg1: memref<1024x1024xf32>, %arg2: memref<256x1024xf32>, %m: index, %n: index, %k: index)
-    kernel attributes {gpu.known_block_size = array<i32: 32, 32, 1>, gpu.known_grid_size = array<i32: 8, 32, 1>} {
+    kernel attributes {known_block_size = array<i32: 32, 32, 1>, known_grid_size = array<i32: 8, 32, 1>} {
       %bx = gpu.block_id x
       %by = gpu.block_id y
       %bDimx = gpu.block_dim x

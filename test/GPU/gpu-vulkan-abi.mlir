@@ -42,7 +42,7 @@ module attributes {gpu.container_module} {
       %arg7: i32,
       %arg8: i16
     )
-    kernel attributes {gpu.known_block_size = array<i32: 4, 1, 1>, gpu.known_grid_size = array<i32: 4, 1, 1>} {
+    kernel attributes {known_block_size = array<i32: 4, 1, 1>, known_grid_size = array<i32: 4, 1, 1>} {
       %b = gpu.block_id  x
       %t = gpu.thread_id  y
       gpu.printf "Block %lld - Thread %lld\n" %b, %t : index, index

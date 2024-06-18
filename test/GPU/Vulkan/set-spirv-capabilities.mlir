@@ -13,7 +13,7 @@ module attributes {gpu.container_module} {
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>, %arg2: memref<32x32xf32>, %arg3: index, %arg4: index, %arg5: index) kernel attributes {gpu.known_block_size = array<i32: 1, 1, 1>, gpu.known_grid_size = array<i32: 32, 32, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<32x32xf32>, %arg1: memref<32x32xf32>, %arg2: memref<32x32xf32>, %arg3: index, %arg4: index, %arg5: index) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 32, 32, 1>} {
       %0 = gpu.block_id  x
       %1 = gpu.block_id  y
       scf.for %arg6 = %arg3 to %arg4 step %arg5 {

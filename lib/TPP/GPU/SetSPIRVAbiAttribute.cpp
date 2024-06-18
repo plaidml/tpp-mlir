@@ -68,9 +68,12 @@ struct SetSPIRVAbiAttribute
 
         SmallVector<int32_t> dimSizes;
         for (auto &dim : dims) {
-          auto blockSize = cast<gpu::GPUFuncOp>(gpuFunc).getKnownBlockSize(dim);
-          uint32_t size = blockSize ? *blockSize : 1;
-          dimSizes.push_back(size);
+          uint32_t dimSize = 1;
+          auto dimIdx = static_cast<uint32_t>(dim);
+          auto blockSizes = cast<gpu::GPUFuncOp>(gpuFunc).getKnownBlockSize();
+          if (blockSizes && blockSizes->size() > dimIdx)
+            dimSize = (*blockSizes)[dimIdx];
+          dimSizes.push_back(dimSize);
         }
         auto abi = spirv::getEntryPointABIAttr(context, dimSizes);
 

@@ -6,7 +6,7 @@
 module attributes {gpu.container_module} {
   gpu.module @kernels {
     gpu.func @kernel_add(%arg0 : memref<8xf32>, %arg1 : memref<8xf32>, %arg2 : memref<8xf32>)
-      kernel attributes { gpu.known_block_size = array<i32: 8, 1, 1>, gpu.known_grid_size = array<i32: 1, 1, 1> } {
+      kernel attributes { known_block_size = array<i32: 8, 1, 1>, known_grid_size = array<i32: 1, 1, 1> } {
       %0 = gpu.block_id x
       %1 = memref.load %arg0[%0] : memref<8xf32>
       %2 = memref.load %arg1[%0] : memref<8xf32>
