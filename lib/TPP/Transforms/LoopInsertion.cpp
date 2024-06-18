@@ -112,8 +112,6 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
   if (brgemmOp == NULL)
     return rewriter.notifyMatchFailure(op, "require brgemm op");
 
-  int boundSize = tileShapeM.size() + tileShapeN.size();
-  // Validate the input tile sizes against the operand shapes
   ArrayRef<int64_t> mShape;
   auto mDefiningOp = brgemmOp.getOperand(1).getDefiningOp();
   if (isa<memref::SubViewOp>(mDefiningOp))
@@ -122,14 +120,6 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
   else
     mShape =
         dyn_cast<ShapedType>(mDefiningOp->getResult(0).getType()).getShape();
-
-  long multipleM = 1;
-  for (size_t i = 0; i < tileShapeM.size(); i++)
-    multipleM = multipleM * tileShapeM[i];
-
-  if (mShape[0] != multipleM)
-    return rewriter.notifyMatchFailure(
-        op, "require m tile shape to match tensor shape");
 
   ArrayRef<int64_t> nShape;
   auto nDefiningOp = brgemmOp.getOperand(2).getDefiningOp();
@@ -140,14 +130,6 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
     nShape =
         dyn_cast<ShapedType>(nDefiningOp->getResult(0).getType()).getShape();
 
-  long multipleN = 1;
-  for (size_t i = 0; i < tileShapeN.size(); i++)
-    multipleN = multipleN * tileShapeN[i];
-
-  if (nShape[0] != multipleN)
-    return rewriter.notifyMatchFailure(
-        op, "require n tile shape to match tensor shape");
-
   ArrayRef<int64_t> kShape;
   auto kDefiningOp = brgemmOp.getOperand(3).getDefiningOp();
   if (isa<memref::SubViewOp>(kDefiningOp))
@@ -156,6 +138,28 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
   else
     kShape =
         dyn_cast<ShapedType>(kDefiningOp->getResult(0).getType()).getShape();
+
+  if (mShape.size() != kShape.size())
+    return rewriter.notifyMatchFailure(
+        op, "require m tensor shape and k tensor shape to match");
+
+  int boundSize = tileShapeM.size() + tileShapeN.size();
+  // Validate the input tile sizes against the operand shapes
+  long multipleM = 1;
+  for (size_t i = 0; i < tileShapeM.size(); i++)
+    multipleM = multipleM * tileShapeM[i];
+
+  if (mShape[0] != multipleM)
+    return rewriter.notifyMatchFailure(
+        op, "require m tile shape to match tensor shape");
+
+  long multipleN = 1;
+  for (size_t i = 0; i < tileShapeN.size(); i++)
+    multipleN = multipleN * tileShapeN[i];
+
+  if (nShape[0] != multipleN)
+    return rewriter.notifyMatchFailure(
+        op, "require n tile shape to match tensor shape");
 
   if ((multipleM * multipleN) != (kShape[0] * kShape[1]))
     return rewriter.notifyMatchFailure(
