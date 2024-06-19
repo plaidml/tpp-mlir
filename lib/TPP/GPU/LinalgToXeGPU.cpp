@@ -58,6 +58,7 @@ struct VnniConfig {
 struct TilesArray {
   TilesArray() = delete;
   TilesArray(int numRows, int numCols) {
+    assert(((numRows > 0) && (numCols > 0)) && "Expected 2D array shape");
     for (int i = 0; i < numRows; i++) {
       tileMatrix.push_back(SmallVector<Value>{});
       for (int j = 0; j < numCols; j++)
@@ -421,7 +422,7 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
 
       int64_t blockSize = (*ubVal - *lbVal) / *stepVal;
 
-      // Assume that at least one thread/workitem is created for the given
+      // Assume that at least one subgroup is created for the given
       // dimension. Otherwise, outlining will fail anyway.
       blockSizes.push_back(blockSize < 0 ? 1 : blockSize);
     }
@@ -457,7 +458,7 @@ static Value getGpuLinearThreadId(PatternRewriter &rewriter, Location loc) {
   return threadId;
 }
 
-// Create a GEMM input tile to be loaded by each thread/workitem in
+// Create a GEMM input tile to be loaded by each subgroup in
 // cooperative fashion.
 // Optionally accepts batch IV for batched GEMM input loading.
 // Returns failure if it is unable to split block/workgroup for
@@ -601,6 +602,7 @@ static SmallVector<Value> updateTilesOffsets(PatternRewriter &rewriter,
 }
 
 // Split a source into a series of descriptor tiles.
+//
 // The descriptors collectively load a 2D shape at the specified offsets from
 // the given source.
 // The offsets and the load shape must stay within the source boundaries.
@@ -651,24 +653,25 @@ static SmallVector<Value> createDescriptorTiles(PatternRewriter &rewriter,
   return tiles;
 }
 
-// Create a coarse sub-tiles to be loaded by the current thread/workitem.
+// Create coarse sub-tiles to be loaded by the current subgroup.
 //
-// The shape to be loaded is split into largest 2D loads supported
+// The shape to be loaded is split into the largest 2D loads supported
 // by the hardware.
 //
-// The load tiles are ordered in row-major fashion with respect to the source.
+// The load subgroup tiles are ordered in row-major fashion with respect to the
+// source shape.
 static SmallVector<Value> createCoarseDscTiles(PatternRewriter &rewriter,
                                                Location loc, Value src,
-                                               ArrayRef<int64_t> loadShape,
+                                               ArrayRef<int64_t> sgTile,
                                                bool isVnni) {
-  assert(loadShape.size() <= 2 &&
+  assert(sgTile.size() <= 2 &&
          "Require at most 2D tile size for eltwise lowering");
 
   // Ensure that load is 2D.
   // TODO: Add support for 1D loads.
-  SmallVector<int64_t, 2> loadShape2D{loadShape};
-  if (loadShape.size() == 1)
-    loadShape2D.push_back(1);
+  SmallVector<int64_t, 2> sgTile2D{sgTile};
+  if (sgTile.size() == 1)
+    sgTile2D.push_back(1);
 
   auto type = cast<ShapedType>(src.getType());
   auto elemByteWidth = type.getElementType().getIntOrFloatBitWidth() / 8;
@@ -681,18 +684,18 @@ static SmallVector<Value> createCoarseDscTiles(PatternRewriter &rewriter,
   if (isVnni)
     maxWidth /= 2;
   int64_t maxArrayLength = 4;
-  int64_t loadRows = std::min(loadShape2D[0], maxHeight);
-  int64_t loadCols = std::min(loadShape2D[1], maxWidth);
-  int64_t arrayLength = std::min(maxWidth / loadCols, maxArrayLength);
+  int64_t sgLoadRows = std::min(sgTile2D[0], maxHeight);
+  int64_t sgLoadCols = std::min(sgTile2D[1], maxWidth);
+  int64_t arrayLength = std::min(maxWidth / sgLoadCols, maxArrayLength);
   // In case of partial fit, load only single tile.
-  if (maxWidth % loadCols != 0 || arrayLength != 4 || arrayLength != 2)
+  if (maxWidth % sgLoadCols != 0 || arrayLength != 4 || arrayLength != 2)
     arrayLength = 1;
 
-  // TODO: Bump IMEX version to bring array_length attr support.
+  // TODO: Add variable array_length support.
   arrayLength = 1;
 
-  return createDescriptorTiles(rewriter, loc, src, loadShape2D, {0, 0},
-                               {loadRows, loadCols}, arrayLength);
+  return createDescriptorTiles(rewriter, loc, src, sgTile2D, {0, 0},
+                               {sgLoadRows, sgLoadCols}, arrayLength);
 }
 
 // Return vector type with specified VNNI shape.
@@ -751,9 +754,8 @@ loadNdDescTiles(PatternRewriter &rewriter, Location loc, ValueRange loadTiles,
 // provided.
 static TilesArray
 extractVecSubTiles(PatternRewriter &rewriter, Location loc,
-                   ValueRange loadVecTiles, ArrayRef<int64_t> totalTileShape,
-                   ArrayRef<int64_t> loadTileShape,
-                   ArrayRef<int64_t> subTileShape,
+                   ValueRange loadVecTiles, ArrayRef<int64_t> sgTotalTile,
+                   ArrayRef<int64_t> loadTile, ArrayRef<int64_t> subTile,
                    std::optional<VnniConfig> vnniConf = std::nullopt) {
   auto vecLoadType = cast<VectorType>(loadVecTiles[0].getType());
   assert(llvm::all_of(loadVecTiles,
@@ -772,20 +774,20 @@ extractVecSubTiles(PatternRewriter &rewriter, Location loc,
   auto loadVecFlat = VectorType::get(loadVecSize, vecLoadType.getElementType());
 
   VectorType vecSubTileType =
-      VectorType::get(subTileShape, vecLoadType.getElementType());
+      VectorType::get(subTile, vecLoadType.getElementType());
   if (vnniConf) {
     vecSubTileType =
-        getVnniVector(subTileShape, vecLoadType.getElementType(), *vnniConf);
+        getVnniVector(subTile, vecLoadType.getElementType(), *vnniConf);
   }
 
-  const int totalTileRows = totalTileShape[0] / loadTileShape[0];
-  const int totalTileCols = totalTileShape[1] / loadTileShape[1];
+  const int totalTileRows = sgTotalTile[0] / loadTile[0];
+  const int totalTileCols = sgTotalTile[1] / loadTile[1];
 
-  const int subTilesPerLoadRow = loadTileShape[0] / subTileShape[0];
-  const int subTilePerLoadCol = loadTileShape[1] / subTileShape[1];
+  const int subTilesPerLoadRow = loadTile[0] / subTile[0];
+  const int subTilePerLoadCol = loadTile[1] / subTile[1];
 
-  const int subTileRows = totalTileShape[0] / subTileShape[0];
-  const int subTileCols = totalTileShape[1] / subTileShape[1];
+  const int subTileRows = sgTotalTile[0] / subTile[0];
+  const int subTileCols = sgTotalTile[1] / subTile[1];
   TilesArray subTiles(subTileRows, subTileCols);
 
   // Iterate over the total tile.
@@ -793,27 +795,27 @@ extractVecSubTiles(PatternRewriter &rewriter, Location loc,
     for (int k = 0; k < totalTileCols; k++) {
       // Load tiles are ordered in row-major fashion.
       int loadIdx = m * totalTileCols + k;
-      auto totalTileShape = loadVecTiles[loadIdx];
-      auto castFlat = rewriter.create<vector::ShapeCastOp>(loc, loadVecFlat,
-                                                           totalTileShape);
+      auto sgTotalTile = loadVecTiles[loadIdx];
+      auto castFlat =
+          rewriter.create<vector::ShapeCastOp>(loc, loadVecFlat, sgTotalTile);
 
       // Iterate over load tiles.
       // Each load tile contains one or more sub-tiles.
       for (int i = 0; i < subTilesPerLoadRow; i++) {
         for (int j = 0; j < subTilePerLoadCol; j++) {
-          const int subTileShapeSize = subTileShape[0] * subTileShape[1];
+          const int subTileSize = subTile[0] * subTile[1];
           int dpasIdx = i * subTilePerLoadCol + j;
-          int offset = dpasIdx * subTileShapeSize;
+          int offset = dpasIdx * subTileSize;
 
           auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
               loc, castFlat, /*offsets=*/ArrayRef<int64_t>{offset},
-              /*sizes=*/ArrayRef<int64_t>{subTileShapeSize},
+              /*sizes=*/ArrayRef<int64_t>{subTileSize},
               /*strides=*/ArrayRef<int64_t>{1});
           auto castTile =
               rewriter.create<vector::ShapeCastOp>(loc, vecSubTileType, slice);
 
           // Insert the sub-tiles in their position relative to the whole
-          // thread/workitem tile.
+          // subgroup tile.
           int rowIdx = m * subTilesPerLoadRow + i;
           int colIdx = k * subTilePerLoadCol + j;
           subTiles.setTile(rowIdx, colIdx, castTile);
@@ -1014,7 +1016,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   // due to replacement of sub-tiles before all threads/workitems consumed
   // inputs for reduction dimension step.
   //
-  // TODO: Synchronization frequency should derived from tile and cache size.
+  // TODO: Synchronization frequency should be derived from tile and cache size.
   int syncFreq = 4;
   int maxSyncStep = 1024;
   int syncStep = std::min(std::max(dimK / syncFreq, maxSyncStep), maxSyncStep);
@@ -1067,7 +1069,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
     prefetchB =
         updateTilesOffsets(rewriter, loc, ValueRange{prefetchB}, {kTile, 0})[0];
   } else {
-    // Apply naive prefetching for each thread/workitem.
+    // Apply naive prefetching for each subgroup separately.
     prefetchTiles(rewriter, loc, tilesA, readCacheHint);
     prefetchTiles(rewriter, loc, tilesB, readCacheHint);
   }
