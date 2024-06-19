@@ -14,6 +14,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include <iostream>
 #include <list>
 
 namespace mlir {
@@ -31,99 +32,80 @@ using namespace std;
 namespace mlir {
 namespace tpp {
 
-struct LoopShuffle : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
-
-  LoopShuffle(MLIRContext *ctx, LoopShufflePassOptions &options)
-      : OpRewritePattern(ctx), options(options) {}
-
-  LogicalResult matchAndRewrite(scf::ForallOp op,
-                                PatternRewriter &rewriter) const override {
-
-    if (options.shuffleOrder.size() != op.getInductionVars().size())
-      return failure();
-    for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-      bool match = false;
-      for (size_t j = 0; j < options.shuffleOrder.size(); j++)
-        if (i == options.shuffleOrder[j]) {
-          match = true;
-          break;
-        }
-      if (!match) {
-        return failure();
-      }
-    }
-    xsmm::BrgemmOp brgemmOp = NULL;
-    static list<scf::ForallOp> visitedForallOp;
-    if (std::find(visitedForallOp.begin(), visitedForallOp.end(), op) !=
-        visitedForallOp.end())
-      return failure();
-    for (auto oper = op.getBody()->getOperations().begin();
-         oper != op.getBody()->getOperations().end(); oper++)
-      if (dyn_cast<xsmm::BrgemmOp>(oper)) {
-        brgemmOp = dyn_cast<xsmm::BrgemmOp>(oper);
+static LogicalResult loopShuffle(scf::ForallOp op,
+                                 ArrayRef<unsigned> shuffleOrder) {
+  OpBuilder b(op);
+  IRRewriter rewriter(b.getContext());
+  if (shuffleOrder.size() != op.getInductionVars().size())
+    return rewriter.notifyMatchFailure(op, "Number of indices incorrect");
+  for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+    bool match = false;
+    for (size_t j = 0; j < shuffleOrder.size(); j++)
+      if (i == shuffleOrder[j]) {
+        match = true;
         break;
       }
-    if (brgemmOp == NULL)
-      return failure();
-    SmallVector<int64_t> lbs, ubs, steps;
-
-    for (size_t i = 0; i < op.getStaticLowerBound().size(); i++) {
-      lbs.push_back(op.getStaticLowerBound()[options.shuffleOrder[i]]);
+    if (!match) {
+      return rewriter.notifyMatchFailure(op, "Indices missed");
     }
-    for (size_t i = 0; i < op.getStaticUpperBound().size(); i++) {
-      ubs.push_back(op.getStaticUpperBound()[options.shuffleOrder[i]]);
-    }
-    for (size_t i = 0; i < op.getStaticStep().size(); i++) {
-      steps.push_back(op.getStaticStep()[options.shuffleOrder[i]]);
-    }
-
-    op.setStaticLowerBound(lbs);
-    op.setStaticUpperBound(ubs);
-    op.setStaticStep(steps);
-
-    SmallVector<Value> tempValueMap(op.getInductionVars().size());
-    SmallVector<int64_t> tempIndexMap(op.getInductionVars().size());
-    for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-      for (size_t j = 0; j < options.shuffleOrder.size(); j++) {
-        if (i == options.shuffleOrder[j]) {
-          auto tempValue =
-              rewriter.create<arith::ConstantIndexOp>(op.getLoc(), j);
-          replaceAllUsesInRegionWith(op.getInductionVar(i), tempValue,
-                                     op.getRegion());
-          tempValueMap[i] = tempValue;
-          tempIndexMap[i] = j;
-          break;
-        }
-      }
-    }
-    for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-      replaceAllUsesInRegionWith(
-          tempValueMap[i], op.getInductionVar(tempIndexMap[i]), op.getRegion());
-    }
-    visitedForallOp.push_back(op);
-    return success();
   }
 
-private:
-  LoopShufflePassOptions options;
-};
+  SmallVector<int64_t> lbs, ubs, steps;
+
+  for (size_t i = 0; i < op.getStaticLowerBound().size(); i++) {
+    lbs.push_back(op.getStaticLowerBound()[shuffleOrder[i]]);
+  }
+  for (size_t i = 0; i < op.getStaticUpperBound().size(); i++) {
+    ubs.push_back(op.getStaticUpperBound()[shuffleOrder[i]]);
+  }
+  for (size_t i = 0; i < op.getStaticStep().size(); i++) {
+    steps.push_back(op.getStaticStep()[shuffleOrder[i]]);
+  }
+
+  op.setStaticLowerBound(lbs);
+  op.setStaticUpperBound(ubs);
+  op.setStaticStep(steps);
+
+  SmallVector<Value> tempValueMap(op.getInductionVars().size());
+  SmallVector<int64_t> tempIndexMap(op.getInductionVars().size());
+  for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+    for (size_t j = 0; j < shuffleOrder.size(); j++) {
+      if (i == shuffleOrder[j]) {
+        auto tempValue =
+            rewriter.create<arith::ConstantIndexOp>(op.getLoc(), j);
+        replaceAllUsesInRegionWith(op.getInductionVar(i), tempValue,
+                                   op.getRegion());
+        tempValueMap[i] = tempValue;
+        tempIndexMap[i] = j;
+        break;
+      }
+    }
+  }
+  for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+    replaceAllUsesInRegionWith(
+        tempValueMap[i], op.getInductionVar(tempIndexMap[i]), op.getRegion());
+    rewriter.eraseOp(tempValueMap[i].getDefiningOp());
+  }
+  return success();
+}
 
 struct LoopShufflePass : public impl::LoopShufflePassBase<LoopShufflePass> {
 
   using LoopShufflePassBase::LoopShufflePassBase;
 
-  void populateCombinePatterns(RewritePatternSet &patterns,
-                               LoopShufflePassOptions options) {
-    patterns.add<LoopShuffle>(patterns.getContext(), options);
-  }
-
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateCombinePatterns(patterns,
-                            LoopShufflePassOptions{this->shuffleOrder});
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    scf::ForallOp failedForallOp;
+    auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
+      if (failed(loopShuffle(forallOp, shuffleOrder))) {
+        failedForallOp = forallOp;
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (walkResult.wasInterrupted())
+      failedForallOp->emitWarning("Failed to shuffle the loop");
   }
 };
+
 } // namespace tpp
 } // namespace mlir
