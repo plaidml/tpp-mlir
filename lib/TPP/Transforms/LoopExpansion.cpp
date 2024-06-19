@@ -29,107 +29,86 @@ using namespace std;
 namespace mlir {
 namespace tpp {
 
-struct LoopExpansion : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
+static LogicalResult loopExpand(scf::ForallOp op, unsigned numOuterParallel) {
+  OpBuilder b(op);
+  IRRewriter rewriter(b.getContext());
+  if (numOuterParallel > op.getInductionVars().size())
+    return rewriter.notifyMatchFailure(
+        op, "Number of parallel levels exceeds number of levels of loop");
 
-  LoopExpansion(MLIRContext *ctx, LoopExpansionPassOptions &options)
-      : OpRewritePattern<scf::ForallOp>(ctx), options(options){};
+  auto ub = op.getStaticUpperBound().begin();
+  auto step = op.getStaticStep().begin();
+  rewriter.setInsertionPointAfter(op);
 
-  LogicalResult matchAndRewrite(scf::ForallOp op,
-                                PatternRewriter &rewriter) const override {
-    if (options.numOuterParallel > op.getInductionVars().size())
-      return failure();
+  SmallVector<scf::ParallelOp> parallelOpList;
+  SmallVector<scf::ForOp> forOpList;
+  size_t i = 0;
+  for (auto lb = op.getStaticLowerBound().begin();
+       lb != op.getStaticLowerBound().end() &&
+       ub != op.getStaticUpperBound().end() && step != op.getStaticStep().end();
+       lb++, ub++, step++) {
+    auto lowerBound = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *lb);
+    auto upperBound = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *ub);
+    auto stepVal = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *step);
 
-    xsmm::BrgemmOp brgemmOp = NULL;
-    for (auto oper = op.getBody()->getOperations().begin();
-         oper != op.getBody()->getOperations().end(); oper++)
-      if (dyn_cast<xsmm::BrgemmOp>(oper)) {
-        brgemmOp = dyn_cast<xsmm::BrgemmOp>(oper);
-        break;
-      }
-    if (brgemmOp == NULL)
-      return failure();
-    auto ub = op.getStaticUpperBound().begin();
-    auto step = op.getStaticStep().begin();
-    rewriter.setInsertionPointAfter(op);
-
-    SmallVector<scf::ParallelOp> parallelOpList;
-    SmallVector<scf::ForOp> forOpList;
-    size_t i = 0;
-    for (auto lb = op.getStaticLowerBound().begin();
-         lb != op.getStaticLowerBound().end() &&
-         ub != op.getStaticUpperBound().end() &&
-         step != op.getStaticStep().end();
-         lb++, ub++, step++) {
-      auto lowerBound =
-          rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *lb);
-      auto upperBound =
-          rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *ub);
-      auto stepVal =
-          rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *step);
-
-      if (i++ < options.numOuterParallel) {
-        auto parallelOp = rewriter.create<scf::ParallelOp>(
-            op.getLoc(), ValueRange{lowerBound}, ValueRange{upperBound},
-            ValueRange{stepVal});
-        rewriter.setInsertionPoint(&parallelOp.getBody()->front());
-        parallelOpList.push_back(parallelOp);
-      } else {
-        auto forOp = rewriter.create<scf::ForOp>(op.getLoc(), lowerBound,
-                                                 upperBound, stepVal);
-        rewriter.setInsertionPoint(&forOp.getBody()->front());
-        forOpList.push_back(forOp);
-      }
+    if (i++ < numOuterParallel) {
+      auto parallelOp = rewriter.create<scf::ParallelOp>(
+          op.getLoc(), ValueRange{lowerBound}, ValueRange{upperBound},
+          ValueRange{stepVal});
+      rewriter.setInsertionPoint(&parallelOp.getBody()->front());
+      parallelOpList.push_back(parallelOp);
+    } else {
+      auto forOp = rewriter.create<scf::ForOp>(op.getLoc(), lowerBound,
+                                               upperBound, stepVal);
+      rewriter.setInsertionPoint(&forOp.getBody()->front());
+      forOpList.push_back(forOp);
     }
-
-    IRMapping mapping;
-    for (auto oper = op.getBody()->getOperations().begin();
-         oper != op.getBody()->getOperations().end(); oper++) {
-      if (!isa<scf::InParallelOp>(oper)) {
-        auto clonedInstr = rewriter.clone(*oper, mapping);
-        oper->replaceAllUsesWith(clonedInstr);
-        int j = 0;
-        for (auto arg : clonedInstr->getOperands()) {
-          for (size_t i = 0; i < op.getInductionVars().size(); i++) {
-            if (arg == op.getInductionVars()[i]) {
-              if (i < options.numOuterParallel) {
-                clonedInstr->setOperand(
-                    j, parallelOpList[i].getInductionVars()[0]);
-              } else {
-                clonedInstr->setOperand(
-                    j,
-                    forOpList[i - options.numOuterParallel].getInductionVar());
-              }
-              break;
-            }
-          }
-          j++;
-        }
-      }
-    }
-    rewriter.eraseOp(op);
-    return success();
   }
 
-private:
-  LoopExpansionPassOptions options;
-};
+  IRMapping mapping;
+  for (auto oper = op.getBody()->getOperations().begin();
+       oper != op.getBody()->getOperations().end(); oper++) {
+    if (!isa<scf::InParallelOp>(oper)) {
+      auto clonedInstr = rewriter.clone(*oper, mapping);
+      oper->replaceAllUsesWith(clonedInstr);
+      int j = 0;
+      for (auto arg : clonedInstr->getOperands()) {
+        for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+          if (arg == op.getInductionVars()[i]) {
+            if (i < numOuterParallel) {
+              clonedInstr->setOperand(j,
+                                      parallelOpList[i].getInductionVars()[0]);
+            } else {
+              clonedInstr->setOperand(
+                  j, forOpList[i - numOuterParallel].getInductionVar());
+            }
+            break;
+          }
+        }
+        j++;
+      }
+    }
+  }
+  rewriter.eraseOp(op);
+  return success();
+}
 
 struct LoopExpansionPass
     : public impl::LoopExpansionPassBase<LoopExpansionPass> {
 
   using LoopExpansionPassBase::LoopExpansionPassBase;
 
-  void populateCombinePatterns(RewritePatternSet &patterns,
-                               LoopExpansionPassOptions options) {
-    patterns.add<LoopExpansion>(patterns.getContext(), options);
-  }
-
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    populateCombinePatterns(patterns,
-                            LoopExpansionPassOptions{numOuterParallel});
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    scf::ForallOp failedForallOp;
+    auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
+      if (failed(loopExpand(forallOp, numOuterParallel))) {
+        failedForallOp = forallOp;
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (walkResult.wasInterrupted())
+      failedForallOp->emitWarning("Failed to expand the loop");
   }
 };
 } // namespace tpp
