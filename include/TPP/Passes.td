@@ -499,6 +499,8 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
     Option<"stages", "stages", "int64_t",
            /*default=*/"1",
            "Number of cooperative prefetch stages.">,
+    ListOption<"dpasTile", "dpas-tile", "int64_t",
+               "DPAS register block sizes MxNxK">,
   ];
 }
 

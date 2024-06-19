@@ -1,6 +1,6 @@
-// RUN: tpp-opt %s -linalg-to-xegpu=stages=1 -canonicalize -split-input-file | FileCheck %s --check-prefix=STAGES-1
+// RUN: tpp-opt %s -linalg-to-xegpu="dpas-tile=8,16,16 stages=1" -canonicalize -split-input-file | FileCheck %s --check-prefix=STAGES-1
 
-// RUN: tpp-opt %s -linalg-to-xegpu=stages=2 -canonicalize -split-input-file | FileCheck %s --check-prefix=STAGES-2
+// RUN: tpp-opt %s -linalg-to-xegpu="dpas-tile=8,16,16 stages=2" -canonicalize -split-input-file | FileCheck %s --check-prefix=STAGES-2
 
 #map = affine_map<()[s0, s1] -> (s0 + s1)>
 module {

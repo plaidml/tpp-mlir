@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -linalg-to-xegpu=k-tile=16 -canonicalize -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -linalg-to-xegpu="dpas-tile=8,16,16 k-tile=16" -canonicalize -split-input-file | FileCheck %s
 
 func.func @matmul(%arg0: memref<8x16xf16>, %arg1: memref<16x16xf16>, %arg2: memref<8x16xf32>) {
   linalg.matmul ins(%arg0, %arg1 : memref<8x16xf16>, memref<16x16xf16>)

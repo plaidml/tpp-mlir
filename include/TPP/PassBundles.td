@@ -142,6 +142,8 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
     Option<"stages", "stages", "int64_t",
            /*default=*/"1",
            "Number of cooperative prefetch stages.">,
+    ListOption<"dpasTile", "dpas-tile", "int64_t",
+               "DPAS register block sizes MxNxK">,
   ];
 }
 

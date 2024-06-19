@@ -77,21 +77,25 @@ struct TilesArray {
     return flatVector;
   }
 
-  SmallVector<SmallVector<Value, 8>, 8> tileMatrix;
+  SmallVector<SmallVector<Value>> tileMatrix;
 };
 
 // Return DPAS tile sizes if the gemm-like operation fits DPAS hardware.
-static std::optional<SmallVector<int64_t>>
-getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
+static bool isDPASCompatible(linalg::LinalgOp linalgOp, int kTile,
+                             ArrayRef<int64_t> dpasTile) {
   if (!(isa<linalg::MatmulOp>(linalgOp) ||
         isa<linalg::BatchReduceMatmulOp>(linalgOp) ||
         isa<linalg::GenericOp>(linalgOp))) {
-    return std::nullopt;
+    return false;
   }
+
+  // Expect MxNxK DPAS register block sizes.
+  if (dpasTile.size() != 3)
+    return false;
 
   // Only static shapes are supported.
   if (linalgOp.hasDynamicShape())
-    return std::nullopt;
+    return false;
 
   auto aType = cast<ShapedType>(linalgOp.getDpsInputs()[0].getType());
   auto bType = cast<ShapedType>(linalgOp.getDpsInputs()[1].getType());
@@ -106,16 +110,11 @@ getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF16()) ||
       (elemTypeA.isF16() && elemTypeB.isF16() && elemTypeC.isF32());
   if (!isSupportedPrecision)
-    return std::nullopt;
+    return false;
 
   auto mDim = cType.getShape()[0];
   auto nDim = cType.getShape()[1];
   auto kDim = aType.getShape().back();
-
-  // DPAS hardware sizes in MxNxK format.
-  // TODO: In case more hardware configurations are available,
-  //       add some automatic selection for optimal sizes.
-  SmallVector<int64_t> dpasTile{8, 16, 16};
 
   // Validate workload sizes.
   // The computation dimensions must fit into the tiles.
@@ -126,16 +125,17 @@ getDPASConfig(linalg::LinalgOp linalgOp, int kTile) {
   int dpasTileK = dpasTile[2];
   if ((mDim % dpasTileM != 0) || (nDim % dpasTileN != 0) ||
       (kDim % dpasTileK != 0) || (kTile % dpasTileK != 0)) {
-    return std::nullopt;
+    return false;
   }
 
-  return dpasTile;
+  return true;
 }
 
-// Verify if linalg operands fulfill XeGPU constraints.
-LogicalResult isValidMemrefOperand(linalg::LinalgOp linalgOp, Value operand,
-                                   PatternRewriter &rewriter,
-                                   unsigned maxDims = 2) {
+// Verify if linalg operands fulfill lowering constraints.
+static LogicalResult isValidMemrefOperand(linalg::LinalgOp linalgOp,
+                                          Value operand,
+                                          PatternRewriter &rewriter,
+                                          unsigned maxDims = 2) {
   auto type = dyn_cast<MemRefType>(operand.getType());
   if (!type) {
     return rewriter.notifyMatchFailure(
@@ -1299,13 +1299,19 @@ struct ConvertGemmLikeToXeGPU : public OpRewritePattern<LinalgOpTy> {
     auto kDim = aType.getShape().back();
     auto kTile = kDim < options.kTile ? kDim : options.kTile;
 
-    auto dpasConfig = getDPASConfig(gemmLikeOp, kTile);
-    if (!dpasConfig) {
+    // DPAS hardware sizes in MxNxK format.
+    // TODO: In case more hardware configurations are available,
+    //       add some automatic selection for optimal sizes.
+    if (options.dpasTile.empty()) {
+      return rewriter.notifyMatchFailure(gemmLikeOp, "Expect DPAS block sizes");
+    }
+
+    if (!isDPASCompatible(gemmLikeOp, kTile, options.dpasTile)) {
       return rewriter.notifyMatchFailure(
           gemmLikeOp, "GEMM-like compute does not fit in DPAS tiles");
     }
 
-    return createDPASKernel(gemmLikeOp, *dpasConfig, kTile, options.stages,
+    return createDPASKernel(gemmLikeOp, options.dpasTile, kTile, options.stages,
                             rewriter);
   }
 
@@ -1377,7 +1383,7 @@ struct LinalgToXeGPU : public tpp::impl::LinalgToXeGPUBase<LinalgToXeGPU> {
   using LinalgToXeGPUBase::LinalgToXeGPUBase;
 
   void runOnOperation() override {
-    LinalgToXeGPUOptions options{kTile, stages};
+    LinalgToXeGPUOptions options{kTile, stages, dpasTile};
 
     // Run GEMM pattern first to allow fusion with its consumers.
     RewritePatternSet gemmPatterns(&getContext());

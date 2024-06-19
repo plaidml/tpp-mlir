@@ -67,6 +67,12 @@ llvm::cl::opt<int64_t> stages("stages",
                               llvm::cl::desc("GEMM coop prefetch stages"),
                               llvm::cl::init(1));
 
+// DPAS size defaults to PVC.
+llvm::cl::list<int64_t>
+    gpuDpasTile("dpas-tile", llvm::cl::desc("DPAS register block sizes MxNxK"),
+                llvm::cl::list_init<int64_t>(SmallVector<int64_t>{8, 16, 16}),
+                llvm::cl::CommaSeparated);
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -196,8 +202,9 @@ private:
     pm.addPass(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(GpuConversionOptions{
-        gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel, kTile, stages}));
+    pm.addPass(createGpuConversion(
+        GpuConversionOptions{gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel,
+                             kTile, stages, gpuDpasTile}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {
