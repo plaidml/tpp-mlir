@@ -55,12 +55,12 @@ llvm::cl::list<unsigned>
 
 llvm::cl::list<unsigned> tileShapeM(
     "M-tile-shape",
-    llvm::cl::desc("Shape to tile the first operand tensor of brgemm op by"),
+    llvm::cl::desc("Shape to tile the first tiled input operand tensor of brgemm op by"),
     llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> tileShapeN(
     "N-tile-shape",
-    llvm::cl::desc("Shape to tile the second operand tensor of brgemm op by"),
+    llvm::cl::desc("Shape to tile the second tiled input operand tensor of brgemm op by"),
     llvm::cl::CommaSeparated);
 
 llvm::cl::list<unsigned> shuffleOrder(
