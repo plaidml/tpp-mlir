@@ -101,7 +101,6 @@ private:
       pm.addNestedPass<func::FuncOp>(createLinalgLowering());
       pm.addPass(createCleanup());
     }
-
     // Low level parallelization passes.
     if (!tileShapeM.empty() && !tileShapeN.empty()) {
       LowLevelParallelizationOptions LowLevelParallelization(
@@ -118,17 +117,16 @@ private:
       mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
       tilingOptions.tileSizes = parallelTaskGrid;
       pm.addPass(createSCFParallelLoopTiling(tilingOptions));
-
-      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
-      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
-      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
-      pm.addPass(createCombineXsmmOpPass());
-      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
-      pm.addPass(createFoldXsmmFlags());
-      pm.addPass(createVerifyXsmmCalls());
     }
+    pm.addPass(createCombineXsmmOpPass());
+    pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+    pm.addPass(createFoldXsmmFlags());
+    pm.addPass(createVerifyXsmmCalls());
+    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
 
     // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLowering());

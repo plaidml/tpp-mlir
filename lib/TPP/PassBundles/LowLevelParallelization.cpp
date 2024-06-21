@@ -74,15 +74,5 @@ private:
     mlir::tpp::LoopExpansionPassOptions loopExpansionPassOptions;
     loopExpansionPassOptions.numOuterParallel = outerParallelLoops;
     pm.addPass(createLoopExpansionPass(loopExpansionPassOptions));
-
-    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
-    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
-    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
-    pm.addPass(createCombineXsmmOpPass());
-    pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
-    pm.addPass(createFoldXsmmFlags());
-    pm.addPass(createVerifyXsmmCalls());
   }
 };
