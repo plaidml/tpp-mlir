@@ -102,7 +102,7 @@ private:
       pm.addPass(createCleanup());
     }
     // Low level parallelization passes.
-    if (!tileShapeM.empty() && !tileShapeN.empty()) {
+    if (tileShapeM != 0 && tileShapeN != 0) {
       LowLevelParallelizationOptions LowLevelParallelization(
           LowLevelParallelizationOptions{tileShapeM, tileShapeN, shuffleOrder,
                                          outerParallelLoops});

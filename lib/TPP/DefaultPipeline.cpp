@@ -53,15 +53,17 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
-llvm::cl::list<unsigned> tileShapeM(
+llvm::cl::opt<unsigned> tileShapeM(
     "M-tile-shape",
-    llvm::cl::desc("Shape to tile the first tiled input operand tensor of brgemm op by"),
-    llvm::cl::CommaSeparated);
+    llvm::cl::desc(
+        "Shape to tile the first tiled input operand tensor of brgemm op by"),
+    llvm::cl::init(0));
 
-llvm::cl::list<unsigned> tileShapeN(
+llvm::cl::opt<unsigned> tileShapeN(
     "N-tile-shape",
-    llvm::cl::desc("Shape to tile the second tiled input operand tensor of brgemm op by"),
-    llvm::cl::CommaSeparated);
+    llvm::cl::desc(
+        "Shape to tile the second tiled input operand tensor of brgemm op by"),
+    llvm::cl::init(0));
 
 llvm::cl::list<unsigned> shuffleOrder(
     "loop-shuffle-order",
@@ -146,10 +148,8 @@ private:
     } else {
       // Apply the default preprocessing pass
       DefaultTppPassesOptions tppDefaultOptions;
-      if (!tileShapeM.empty())
-        tppDefaultOptions.tileShapeM = tileShapeM;
-      if (!tileShapeN.empty())
-        tppDefaultOptions.tileShapeN = tileShapeN;
+      tppDefaultOptions.tileShapeM = tileShapeM;
+      tppDefaultOptions.tileShapeN = tileShapeN;
       if (!shuffleOrder.empty())
         tppDefaultOptions.shuffleOrder = shuffleOrder;
       tppDefaultOptions.linalgToLoops = linalgToLoops;
