@@ -1,4 +1,4 @@
-// RUN: tpp-opt --loop-insertion-pass="M-tile-shape=2,4 N-tile-shape=2,4" --canonicalize --split-input-file %s --verify-diagnostics
+// RUN: tpp-opt --loop-insertion-pass="M-tile-shape=2 N-tile-shape=8" --canonicalize --split-input-file %s --verify-diagnostics
 
 module{
         func.func @tiling_shape_mismatch(%arg0: memref<8x4x4x4xbf16>, %arg1: memref<4x4x2x4x2xbf16>, %arg2: memref<8x4x4x4xbf16>) {

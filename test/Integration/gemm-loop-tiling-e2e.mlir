@@ -1,4 +1,4 @@
-// RUN: mlir-gen --kernel=args --batch=32 --layers=16,16 --tiles=4,4,4 | tpp-run --M-tile-shape=2,4 --N-tile-shape=2,2 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2  -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
+// RUN: mlir-gen --kernel=args --batch=32 --layers=16,16 --tiles=4,4,4 | tpp-run --M-tile-shape=2 --N-tile-shape=2 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2  -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
 // RUN: mlir-gen --kernel=args --batch=32 --layers=16,16 --tiles=4,4,4 | tpp-run --linalg-to-loops -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
 // RUN: mlir-gen --kernel=args --batch=32 --layers=16,16 --tiles=4,4,4 | tpp-run --def-parallel --parallel-task-grid=2  -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
 

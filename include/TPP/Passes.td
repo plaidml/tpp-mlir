@@ -436,9 +436,9 @@ def LoopInsertionPass: Pass<"loop-insertion-pass">{
   }];
   let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect"];
   let options = [
-    ListOption<"tileShapeM", "M-tile-shape", "unsigned",
+    Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
                "Shape to reshape the first tiled input operand tensor of brgemm into">,
-    ListOption<"tileShapeN", "N-tile-shape", "unsigned",
+    Option<"tileShapeN", "N-tile-shape", "unsigned", "0", 
                "Shape to reshape the second tiled input operand tensor of brgemm into">
   ];
 }

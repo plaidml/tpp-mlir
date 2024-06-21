@@ -1,4 +1,4 @@
-// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2,4 --N-tile-shape=4,8 -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=TILE-CHECK
+// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2 --N-tile-shape=4 -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=TILE-CHECK
 
 // TILE-CHECK: func.func @_entry(%[[ARG0:.*]]: memref<8x32x32x32xf32>, %[[ARG1:.*]]: memref<32x32x32x32xf32>, %[[ARG2:.*]]: memref<8x32x32x32xf32>) {
 // TILE-CHECK-DAG: %[[c8:.*]] = arith.constant 8 : index
@@ -36,7 +36,7 @@
 // TILE-CHECK:            func.call @xsmm_brgemm_invoke(%[[c1_i64]], %[[dispatch]], %[[arg1]], %[[offset]], %[[arg2]], %[[offset2]], %[[arg3]], %[[offset3]], %[[c32_i64]])
 
 
-// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2,4 --N-tile-shape=4,8 --loop-shuffle-order=0,3,2,1  -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=SHUFFLE-CHECK
+// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2 --N-tile-shape=4 --loop-shuffle-order=0,3,2,1  -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=SHUFFLE-CHECK
 
 // SHUFFLE-CHECK: func.func @_entry(%[[ARG0:.*]]: memref<8x32x32x32xf32>, %[[ARG1:.*]]: memref<32x32x32x32xf32>, %[[ARG2:.*]]: memref<8x32x32x32xf32>) {
 // SHUFFLE-CHECK-DAG: %[[c8:.*]] = arith.constant 8 : index
@@ -73,7 +73,7 @@
 // SHUFFLE-CHECK:            %[[arg3:.*]] = llvm.inttoptr %[[op3]]
 // SHUFFLE-CHECK:            func.call @xsmm_brgemm_invoke(%[[c1_i64]], %[[dispatch]], %[[arg1]], %[[offset]], %[[arg2]], %[[offset2]], %[[arg3]], %[[offset3]], %[[c32_i64]])
 
-// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2,4 --N-tile-shape=4,8 --loop-shuffle-order=0,3,2,1 -num-outer-parallel=2  -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=PARALLEL-CHECK
+// RUN: mlir-gen --kernel=args --batch=256 --layers=1024,1024 --tiles=32,32,32 | tpp-run --M-tile-shape=2 --N-tile-shape=4 --loop-shuffle-order=0,3,2,1 -num-outer-parallel=2  -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=PARALLEL-CHECK
 
 // PARALLEL-CHECK: func.func @_entry(%[[ARG0:.*]]: memref<8x32x32x32xf32>, %[[ARG1:.*]]: memref<32x32x32x32xf32>, %[[ARG2:.*]]: memref<8x32x32x32xf32>) {
 // PARALLEL-CHECK-DAG: %[[c8:.*]] = arith.constant 8 : index
@@ -109,7 +109,7 @@
 // PARALLEL-CHECK:            %[[arg3:.*]] = llvm.inttoptr %[[op3]]
 // PARALLEL-CHECK:            func.call @xsmm_brgemm_invoke(%[[c1_i64]], %[[dispatch]], %[[arg1]], %[[offset]], %[[arg2]], %[[offset2]], %[[arg3]], %[[offset3]], %[[c32_i64]])
 
-// RUN: mlir-gen --kernel=const --bias --relu --float-type=bf16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=2 | tpp-run --M-tile-shape=4,2 --N-tile-shape=4,8 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2 -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=MLP-CHECK
+// RUN: mlir-gen --kernel=const --bias --relu --float-type=bf16 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32 --vnni=2 | tpp-run --M-tile-shape=4 --N-tile-shape=4 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2 -e=entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=MLP-CHECK
 
 // MLP-CHECK: func.func @_entry(%[[ARG0:.*]]: memref<8x32x32x32xbf16>) -> memref<8x32x32x32xbf16> {
 // MLP-CHECK-DAG:    %[[c1_i64:.*]] = arith.constant 1 : i64

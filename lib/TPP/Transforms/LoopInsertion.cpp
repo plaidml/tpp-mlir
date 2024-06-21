@@ -31,7 +31,7 @@ namespace tpp {
 
 static SmallVector<ReassociationIndices>
 getReassociationIndices(ArrayRef<int64_t> origtensorShape,
-                        SmallVector<ArrayRef<unsigned>> tileShapes) {
+                        SmallVector<SmallVector<unsigned>> tileShapes) {
   SmallVector<ReassociationIndices> indices;
 
   size_t index = 0;
@@ -98,8 +98,8 @@ void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
   brgemmOp.getOperand(operandNumber).replaceAllUsesWith(subview);
 }
 
-LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
-                                 ArrayRef<unsigned> tileShapeN) {
+LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
+                                 unsigned nTileShape) {
   xsmm::BrgemmOp brgemmOp = NULL;
   OpBuilder b(op);
   PatternRewriter rewriter(b.getContext());
@@ -143,7 +143,14 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
     return rewriter.notifyMatchFailure(
         op, "require m tensor shape and k tensor shape to match");
 
-  int boundSize = tileShapeM.size() + tileShapeN.size();
+  SmallVector<unsigned> tileShapeM;
+  tileShapeM.push_back(mTileShape);
+  tileShapeM.push_back(mShape[0] / mTileShape);
+
+  SmallVector<unsigned> tileShapeN;
+  tileShapeN.push_back(nTileShape);
+  tileShapeN.push_back(nShape[0] / nTileShape);
+
   // Validate the input tile sizes against the operand shapes
   long multipleM = 1;
   for (size_t i = 0; i < tileShapeM.size(); i++)
@@ -164,6 +171,8 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
   if ((multipleM * multipleN) != (kShape[0] * kShape[1]))
     return rewriter.notifyMatchFailure(
         op, "require k tile shape to match tensor shape");
+
+  int boundSize = tileShapeM.size() + tileShapeN.size();
 
   // Set the new bounds of for loop
   SmallVector<int64_t> lbs(boundSize, 0), steps(boundSize, 1);
@@ -216,7 +225,7 @@ LogicalResult insertParallelLoop(ForallOp op, ArrayRef<unsigned> tileShapeM,
   }
 
   SmallVector<ArrayRef<int64_t>> originalShapes{mShape, nShape, kShape};
-  SmallVector<SmallVector<ArrayRef<unsigned>>> tilingVectors{
+  SmallVector<SmallVector<SmallVector<unsigned>>> tilingVectors{
       {tileShapeM}, {tileShapeN}, {tileShapeM, tileShapeN}};
 
   for (int i = 1; i <= 3; i++) {
