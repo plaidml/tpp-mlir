@@ -4,10 +4,6 @@ This is basically a copy of `mlir-cpu-runner`, using `JitRunnerMain` and its cal
 
 The main difference is that we add a wrapper function to call the kernel (entry) function to allow for benchmarking.
 
-TODO:
- * Random initialization of input tensors (and control the seed, for stable reproduction)
- * Use our `perf` dialect whenever it's ready
-
 ## Functionality
 
 The main function of this modified TPP runner is to:
