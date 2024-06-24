@@ -107,17 +107,10 @@ private:
           LowLevelParallelizationOptions{tileShapeM, tileShapeN, shuffleOrder,
                                          outerParallelLoops});
       pm.addPass(createLowLevelParallelization(LowLevelParallelization));
-
-      // Convert forAll to parallel loops should run after bufferization
-      // as scf.parallel does not handle tensor.
-      pm.addPass(createConvertForAllToParallelOp());
-    } else {
-      // FIXME remove as soon as the above code is fixed
-      pm.addPass(createConvertForAllToParallelOp());
-      mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
-      tilingOptions.tileSizes = parallelTaskGrid;
-      pm.addPass(createSCFParallelLoopTiling(tilingOptions));
     }
+    // Convert forAll to parallel loops should run after bufferization
+    // as scf.parallel does not handle tensor.
+    pm.addPass(createConvertForAllToParallelOp());
     pm.addPass(createCombineXsmmOpPass());
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
     pm.addPass(createFoldXsmmFlags());
