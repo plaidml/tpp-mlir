@@ -367,19 +367,6 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
 }
 
 
-def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
-  let summary = "Tile parallel loops";
-  let options = [
-    ListOption<"tileSizes", "parallel-loop-tile-sizes", "unsigned",
-               "Factors to tile parallel loops by">,
-    Option<"noMinMaxBounds", "no-min-max-bounds", "bool",
-           /*default=*/"false",
-           "Perform tiling with fixed upper bound with inbound check "
-           "inside the internal loops">
-  ];
-  let dependentDialects = ["affine::AffineDialect", "scf::SCFDialect"];
-}
-
 def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
   let summary = "Inlines constants into GPU launch.";
   let description = [{

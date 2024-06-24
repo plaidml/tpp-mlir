@@ -46,13 +46,6 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
-// Control grid parallelism sizes.
-llvm::cl::list<unsigned>
-    parallelTaskGrid("parallel-task-grid",
-                     llvm::cl::desc("Grid-sizes for parallel tasks"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
-                     llvm::cl::CommaSeparated);
-
 llvm::cl::opt<unsigned> tileShapeM(
     "M-tile-shape",
     llvm::cl::desc(
@@ -155,7 +148,6 @@ private:
       if (!shuffleOrder.empty())
         tppDefaultOptions.shuffleOrder = shuffleOrder;
       tppDefaultOptions.linalgToLoops = linalgToLoops;
-      tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
       tppDefaultOptions.outerParallelLoops = outerParallelLoops;
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }

@@ -16,7 +16,6 @@ add_mlir_library(TPPTransforms
   ToBlockLayoutAndBack.cpp
   TransformUtils.cpp
   CombineXsmmPass.cpp
-  SCFParallelLoopTiling.cpp
   IntelAMXTileConfig.cpp
   IntelAMXTileConfigHoisting.cpp
   LinalgConvertCompareSelectToMaximumfPass.cpp

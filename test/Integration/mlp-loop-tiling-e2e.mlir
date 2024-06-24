@@ -1,6 +1,6 @@
 // RUN: mlir-gen --kernel=args --bias --relu --batch=32 --layers=16,16,16,16 --tiles=4,4,4 | tpp-run --M-tile-shape=2 --N-tile-shape=2 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2  -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
 // RUN: mlir-gen --kernel=args --bias --relu --batch=32 --layers=16,16,16,16 --tiles=4,4,4 | tpp-run --linalg-to-loops -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
-// RUN: mlir-gen --kernel=args --bias --relu --batch=32 --layers=16,16,16,16 --tiles=4,4,4 | tpp-run --def-parallel --parallel-task-grid=2  -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
+// RUN: mlir-gen --kernel=args --bias --relu --batch=32 --layers=16,16,16,16 --tiles=4,4,4 | tpp-run --def-parallel   -e=entry -entry-point-result=void -seed 123 -print | FileCheck %s
 //	CHECK:	( 1.16{{[0-9]+}}, 0.22{{[0-9]+}}, 0.87{{[0-9]+}}, 1.05{{[0-9]+}} )
 //	CHECK:	( 0.81{{[0-9]+}}, 0.26{{[0-9]+}}, 0.64{{[0-9]+}}, 1.19{{[0-9]+}} )
 //	CHECK:	( 0.61{{[0-9]+}}, 0.15{{[0-9]+}}, 0.58{{[0-9]+}}, 1.00{{[0-9]+}} )

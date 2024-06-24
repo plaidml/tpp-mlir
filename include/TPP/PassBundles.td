@@ -33,8 +33,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"linalgToLoops", "linalg-to-loops",
            "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">,
     Option<"tileShapeM", "M-tile-shape", "unsigned", "0",
                "One dimensional tile shape to reshape the first tiled operand tensor of brgemm into (the second dimension will be computed)">,
     Option<"tileShapeN", "N-tile-shape", "unsigned", "0",
