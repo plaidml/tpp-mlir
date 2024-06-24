@@ -437,9 +437,9 @@ def LoopInsertionPass: Pass<"loop-insertion-pass">{
   let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect"];
   let options = [
     Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
-               "Shape to reshape the first tiled input operand tensor of brgemm into">,
+               "One dimensional tile shape to reshape the first tiled input operand tensor of brgemm into (the second dimension will be computed)">,
     Option<"tileShapeN", "N-tile-shape", "unsigned", "0", 
-               "Shape to reshape the second tiled input operand tensor of brgemm into">
+               "One dimensional tile shape to reshape the second tiled input operand tensor of brgemm into (the second dimension will be computed)">
   ];
 }
 

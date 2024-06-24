@@ -13,6 +13,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "loop-expansion"
 
 namespace mlir {
 namespace tpp {
@@ -99,16 +102,14 @@ struct LoopExpansionPass
   using LoopExpansionPassBase::LoopExpansionPassBase;
 
   void runOnOperation() override {
-    scf::ForallOp failedForallOp;
     auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
       if (failed(loopExpand(forallOp, numOuterParallel))) {
-        failedForallOp = forallOp;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted())
-      failedForallOp->emitWarning("Failed to expand the loop");
+      LLVM_DEBUG(llvm::dbgs() << "Failed to expand the loop\n");
   }
 };
 } // namespace tpp

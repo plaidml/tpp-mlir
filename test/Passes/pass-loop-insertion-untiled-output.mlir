@@ -1,4 +1,4 @@
-// RUN: tpp-opt --loop-insertion-pass="M-tile-shape=2 N-tile-shape=2" --canonicalize --split-input-file %s --verify-diagnostics
+// RUN: tpp-opt --loop-insertion-pass="M-tile-shape=2 N-tile-shape=2" --canonicalize --split-input-file %s -debug-only=loop-insertion 2>&1 | FileCheck %s
 
 #map = affine_map<(d0) -> (d0 * 32)>
 func.func @entry(%arg0: memref<32x32x32x32xbf16>, %arg1: memref<32x32x16x32x2xbf16>, %arg2: memref<1024x1024xbf16>) {
@@ -15,3 +15,5 @@ func.func @entry(%arg0: memref<32x32x32x32xbf16>, %arg1: memref<32x32x16x32x2xbf
   }
   return
 }
+
+// CHECK: Failed to tile the loop

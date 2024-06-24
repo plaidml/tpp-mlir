@@ -36,9 +36,9 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     ListOption<"parallelTaskGrid", "parallel-task-grid",
            "unsigned", "Grid-sizes for parallel tasks.">,
     Option<"tileShapeM", "M-tile-shape", "unsigned", "0",
-               "Shape to reshape first tiled operand tensor of brgemm into">,
+               "One dimensional tile shape to reshape the first tiled operand tensor of brgemm into (the second dimension will be computed)">,
     Option<"tileShapeN", "N-tile-shape", "unsigned", "0",
-               "Shape to reshape the second tiled operand tensor of brgemm into">,
+               "One dimensional tile shape to reshape the second tiled operand tensor of brgemm into (the second dimension will be computed)">,
     ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
                "Permutation order (integer index list) to shuffle the scf forall loop by">,
     Option<"outerParallelLoops", "num-outer-parallel", "unsigned", "0",
@@ -77,11 +77,11 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "LLVM::LLVMDialect"];
   let options = [
     Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
-               "Shape to reshape the M tensor into">,
+               "One dimensional tile shape to reshape the first tiled operand tensor of brgemm into (the second dimension will be computed)">,
     Option<"tileShapeN", "N-tile-shape", "unsigned", "0",
-               "Shape to reshape the N tensor into">,
+               "One dimensional tile shape to reshape the second tiled operand tensor of brgemm into (the second dimension will be computed)">,
     ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
-               "Shuffle order of scf for all loop surrounding brgemm op">,
+               "Permutation order (integer index list) to shuffle the scf forall loop by">,
     Option<"outerParallelLoops", "num-outer-parallel", "unsigned","0",
                "Number of outer loops to be parallelized">
 
