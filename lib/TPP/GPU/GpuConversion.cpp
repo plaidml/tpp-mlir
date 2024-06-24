@@ -15,7 +15,8 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/XeGPU/IR/XeGPU.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -58,8 +59,13 @@ private:
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
-    pm.addNestedPass<func::FuncOp>(
-        createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile}));
+    if (isIntel) {
+      pm.addNestedPass<func::FuncOp>(
+          createLinalgToXeGPU(LinalgToXeGPUOptions{kTile, stages, dpasTile}));
+    } else {
+      pm.addNestedPass<func::FuncOp>(
+          createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile, kTile}));
+    }
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
 
     // Map loops into GPU kernels.
