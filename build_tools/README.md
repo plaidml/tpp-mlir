@@ -31,4 +31,4 @@ This also helps when you go back and forth in tpp-mlir crossing LLVM version bou
 ### Benchmark builds
 
 If you're trying to reproduce our numbers from the paper, then you'll have a bit more work than recurring users to get everything built.
-Luckily, we have written a script for that task, which will do most of the manual steps for you, and get the benchmarks running.
+Luckily, we have written a [script](https://github.com/plaidml/tpp-mlir/tree/main/scripts/benchmarks) for that task, which will do most of the manual steps for you, and get the benchmarks running.
