@@ -422,9 +422,11 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
 
       int64_t blockSize = (*ubVal - *lbVal) / *stepVal;
 
-      // Assume that at least one subgroup is created for the given
-      // dimension. Otherwise, outlining will fail anyway.
-      blockSizes.push_back(blockSize < 0 ? 1 : blockSize);
+      // There must be at least one subgroup created for each dimension.
+      // Otherwise, bail out and let kernel outlining fail later.
+      if (blockSize <= 0)
+        return failure();
+      blockSizes.push_back(blockSize);
     }
 
     // Too many dimensions, something went wrong. Bail out.
