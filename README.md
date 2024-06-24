@@ -93,13 +93,6 @@ cmake --build . --target check-tpp
 popd
 ```
 
-To build the documentation from the TableGen description of the dialect
-operations, run:
-
-```sh
-cmake --build . --target mlir-doc
-```
-
 To enable experimental GPU support see: [GPU/README.md](lib/TPP/GPU/README.md)
 
 ### Conda Environment
