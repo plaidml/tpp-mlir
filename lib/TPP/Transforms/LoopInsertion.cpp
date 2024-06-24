@@ -14,6 +14,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "loop-insertion"
 
 namespace mlir {
 namespace tpp {
@@ -50,38 +53,44 @@ getReassociationIndices(ArrayRef<int64_t> origtensorShape,
   return indices;
 }
 
-void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
-                   SmallVector<ReassociationIndices> reassociation,
-                   Value operand, ForallOp op, OpBuilder b,
-                   xsmm::BrgemmOp brgemmOp, int operandNumber) {
-  b.setInsertionPoint(op);
-  auto expandShape = b.create<memref::ExpandShapeOp>(
+static void insertSubview(ArrayRef<int64_t> tensorShape, Type type,
+                          Type resultType,
+                          SmallVector<ReassociationIndices> reassociation,
+                          Value operand, ForallOp op, IRRewriter &rewriter,
+                          xsmm::BrgemmOp brgemmOp, int operandNumber) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(op);
+  auto expandShape = rewriter.create<memref::ExpandShapeOp>(
       op.getLoc(),
       MemRefType::get({tensorShape},
                       dyn_cast<MemRefType>(type).getElementType()),
       operand, reassociation);
   expandShape.setStaticOutputShape(tensorShape);
-  b.setInsertionPoint(&op.getBody()->front());
-  SmallVector<OpFoldResult> strides(tensorShape.size(), b.getIndexAttr(1)),
+  rewriter.setInsertionPointToStart(op.getBody());
+  SmallVector<OpFoldResult> strides(tensorShape.size(),
+                                    rewriter.getIndexAttr(1)),
       sizes, offsets;
+
   size_t tileSize =
       tensorShape.size() - dyn_cast<ShapedType>(resultType).getShape().size();
-  SmallVector<int64_t> tileSizes;
-  for (size_t i = 0; i < tensorShape.size(); i++) {
-    if (i < tileSize) {
-      int opnum = operandNumber;
-      if (opnum == 3) {
-        opnum = 1;
-      }
-      int inductionVarIndex = (opnum - 1) * tileSize + i;
 
-      offsets.push_back(op.getInductionVars()[inductionVarIndex]);
-      sizes.push_back(b.getIndexAttr(1));
-    } else {
-      sizes.push_back(b.getIndexAttr(tensorShape[i]));
-      tileSizes.push_back(tensorShape[i]);
-      offsets.push_back(b.getIndexAttr(0));
+  SmallVector<int64_t> tileSizes;
+  for (size_t i = 0; i < tileSize; i++) {
+    int opnum = operandNumber;
+    // FIXME: Hack for result operand of brgemm to start from 0th induction var
+    if (opnum == 3) {
+      opnum = 1;
     }
+    int inductionVarIndex = (opnum - 1) * tileSize + i;
+
+    offsets.push_back(op.getInductionVars()[inductionVarIndex]);
+    sizes.push_back(rewriter.getIndexAttr(1));
+  }
+
+  for (size_t i = tileSize; i < tensorShape.size(); i++) {
+    sizes.push_back(rewriter.getIndexAttr(tensorShape[i]));
+    tileSizes.push_back(tensorShape[i]);
+    offsets.push_back(rewriter.getIndexAttr(0));
   }
 
   auto subviewType =
@@ -90,19 +99,19 @@ void insertSubview(ArrayRef<int64_t> tensorShape, Type type, Type resultType,
       getStridesAndOffset(dyn_cast<MemRefType>(subviewType));
   subviewType = MemRefType::get(
       {tileSizes}, dyn_cast<MemRefType>(subviewType).getElementType(),
-      StridedLayoutAttr::get(b.getContext(), ShapedType::kDynamic,
+      StridedLayoutAttr::get(rewriter.getContext(), ShapedType::kDynamic,
                              originalStride));
-  auto subview = b.create<memref::SubViewOp>(
+  auto subview = rewriter.create<memref::SubViewOp>(
       op.getLoc(), dyn_cast<MemRefType>(subviewType), expandShape.getResult(),
       offsets, sizes, strides);
   brgemmOp.getOperand(operandNumber).replaceAllUsesWith(subview);
 }
 
-LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
-                                 unsigned nTileShape) {
+static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
+                                        unsigned nTileShape) {
   xsmm::BrgemmOp brgemmOp = NULL;
   OpBuilder b(op);
-  PatternRewriter rewriter(b.getContext());
+  IRRewriter rewriter(b.getContext());
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++)
     if (dyn_cast<xsmm::BrgemmOp>(oper)) {
@@ -111,6 +120,9 @@ LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
     }
   if (brgemmOp == NULL)
     return rewriter.notifyMatchFailure(op, "require brgemm op");
+
+  if (mTileShape == 0 || nTileShape == 0)
+    return rewriter.notifyMatchFailure(op, "require tile shape to not be zero");
 
   ArrayRef<int64_t> mShape;
   auto mDefiningOp = brgemmOp.getOperand(1).getDefiningOp();
@@ -191,9 +203,9 @@ LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
     op.getBody()->addArgument(b.getIndexType(), op.getLoc());
 
   SmallVector<int64_t> tileOffsets{
-      0, static_cast<int64_t>(tileShapeM.size() - 1),
-      static_cast<int64_t>(tileShapeN.size() + tileShapeM.size() - 1)};
-  b.setInsertionPoint(&op.getBody()->front());
+      0, static_cast<int64_t>(tileShapeM.size()),
+      static_cast<int64_t>(tileShapeN.size() + tileShapeM.size())};
+  rewriter.setInsertionPointToStart(op.getBody());
   // Replace old args with newly computed args
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++) {
@@ -201,22 +213,25 @@ LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
     for (auto arg : oper->getOperands()) {
       int oldArgIndex = -1;
       for (int i = 0; i < numArgs; i++) {
-        if (arg == op.getBody()->getArgument(i)) {
+        if (arg == op.getInductionVar(i)) {
           oldArgIndex = i;
           break;
         }
       }
       if (oldArgIndex != -1) {
-        Value add = op.getBody()->getArgument(tileOffsets[oldArgIndex] + 1);
+        Value add = op.getBody()->getArgument(tileOffsets[oldArgIndex]);
         Value mul;
-        for (int j = tileOffsets[oldArgIndex] + 2;
-             j <= tileOffsets[oldArgIndex + 1]; j++) {
-          Value upperBound = b.create<arith::ConstantIndexOp>(
-              op.getLoc(), op.getStaticUpperBound()[j]);
-          mul = b.create<arith::MulIOp>(op.getLoc(), b.getIndexType(), add,
-                                        upperBound);
-          add = b.create<arith::AddIOp>(op.getLoc(), b.getIndexType(), mul,
-                                        op.getBody()->getArgument(j));
+        for (int j = tileOffsets[oldArgIndex] + 1;
+             j < tileOffsets[oldArgIndex + 1]; j++) {
+          unsigned cumulativeUpperBound = 1;
+          for (int k = j; k < tileOffsets[oldArgIndex + 1]; k++)
+            cumulativeUpperBound *= op.getStaticUpperBound()[j];
+          Value upperBound = rewriter.create<arith::ConstantIndexOp>(
+              op.getLoc(), cumulativeUpperBound);
+          mul = rewriter.create<arith::MulIOp>(op.getLoc(), b.getIndexType(),
+                                               add, upperBound);
+          add = rewriter.create<arith::AddIOp>(
+              op.getLoc(), b.getIndexType(), mul, op.getBody()->getArgument(j));
         }
         oper->setOperand(operandIndex, add);
       }
@@ -246,7 +261,7 @@ LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
           std::next(originalShapes[i - 1].begin(), tilingVectors[i - 1].size()),
           originalShapes[i - 1].end());
       insertSubview(shape, operandType, resultType, reassociationIndex, operand,
-                    op, b, brgemmOp, i);
+                    op, rewriter, brgemmOp, i);
     }
   }
 
@@ -286,7 +301,7 @@ struct LoopInsertionPass
     getInnermostForLoops(parentOp, innermostForAllloops);
     for (ForallOp loop : innermostForAllloops)
       if (failed(insertParallelLoop(loop, tileShapeM, tileShapeN)))
-        loop->emitWarning("Failed to tile the loop");
+        LLVM_DEBUG(llvm::dbgs() << "Failed to tile the loop\n");
   }
 };
 } // namespace tpp

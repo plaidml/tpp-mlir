@@ -14,8 +14,10 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include <iostream>
+#include "llvm/Support/Debug.h"
 #include <list>
+
+#define DEBUG_TYPE "loop-shuffle"
 
 namespace mlir {
 namespace tpp {
@@ -94,16 +96,14 @@ struct LoopShufflePass : public impl::LoopShufflePassBase<LoopShufflePass> {
   using LoopShufflePassBase::LoopShufflePassBase;
 
   void runOnOperation() override {
-    scf::ForallOp failedForallOp;
     auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
       if (failed(loopShuffle(forallOp, shuffleOrder))) {
-        failedForallOp = forallOp;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted())
-      failedForallOp->emitWarning("Failed to shuffle the loop");
+      LLVM_DEBUG(llvm::dbgs() << "Failed to shuffle the loop\n");
   }
 };
 
