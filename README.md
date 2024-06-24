@@ -86,7 +86,8 @@ cmake -G Ninja .. \
    -DMLIR_DIR=$CUSTOM_LLVM_ROOT/lib/cmake/mlir \
    -DLLVM_EXTERNAL_LIT=$CUSTOM_LLVM_ROOT/bin/llvm-lit \
    -DCMAKE_C_COMPILER=clang \
-   -DCMAKE_CXX_COMPILER=clang++ 
+   -DCMAKE_CXX_COMPILER=clang++ \
+   -DLLVM_USE_LINKER=lld
 cmake --build . --target check-tpp
 
 popd
