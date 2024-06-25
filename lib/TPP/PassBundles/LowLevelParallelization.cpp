@@ -74,5 +74,6 @@ private:
     mlir::tpp::LoopExpansionPassOptions loopExpansionPassOptions;
     loopExpansionPassOptions.numOuterParallel = outerParallelLoops;
     pm.addPass(createLoopExpansionPass(loopExpansionPassOptions));
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
 };
