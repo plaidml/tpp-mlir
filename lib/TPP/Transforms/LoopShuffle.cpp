@@ -96,14 +96,12 @@ struct LoopShufflePass : public impl::LoopShufflePassBase<LoopShufflePass> {
   using LoopShufflePassBase::LoopShufflePassBase;
 
   void runOnOperation() override {
-    auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
-      if (failed(loopShuffle(forallOp, shuffleOrder))) {
-        return WalkResult::interrupt();
-      }
+    getOperation()->walk([&](scf::ForallOp forallOp) {
+      if (failed(loopShuffle(forallOp, shuffleOrder)))
+        LLVM_DEBUG(llvm::dbgs() << "Failed to shuffle the loop\n");
+
       return WalkResult::advance();
     });
-    if (walkResult.wasInterrupted())
-      LLVM_DEBUG(llvm::dbgs() << "Failed to shuffle the loop\n");
   }
 };
 
