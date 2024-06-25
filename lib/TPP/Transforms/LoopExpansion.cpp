@@ -102,14 +102,11 @@ struct LoopExpansionPass
   using LoopExpansionPassBase::LoopExpansionPassBase;
 
   void runOnOperation() override {
-    auto walkResult = getOperation()->walk([&](scf::ForallOp forallOp) {
-      if (failed(loopExpand(forallOp, numOuterParallel))) {
-        return WalkResult::interrupt();
-      }
+    getOperation()->walk([&](scf::ForallOp forallOp) {
+      if (failed(loopExpand(forallOp, numOuterParallel)))
+        LLVM_DEBUG(llvm::dbgs() << "Failed to expand the loop\n");
       return WalkResult::advance();
     });
-    if (walkResult.wasInterrupted())
-      LLVM_DEBUG(llvm::dbgs() << "Failed to expand the loop\n");
   }
 };
 } // namespace tpp
