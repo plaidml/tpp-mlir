@@ -57,7 +57,8 @@ static void insertSubview(ArrayRef<int64_t> tensorShape, Type type,
                           Type resultType,
                           SmallVector<ReassociationIndices> reassociation,
                           Value operand, ForallOp op, IRRewriter &rewriter,
-                          xsmm::BrgemmOp brgemmOp, int operandNumber) {
+                          Operation *originalSubviewOp,
+                          int inductionVarIndexBase) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(op);
   auto expandShape = rewriter.create<memref::ExpandShapeOp>(
@@ -76,13 +77,7 @@ static void insertSubview(ArrayRef<int64_t> tensorShape, Type type,
 
   SmallVector<int64_t> tileSizes;
   for (size_t i = 0; i < tileSize; i++) {
-    int opnum = operandNumber;
-    // FIXME: Hack for result operand of brgemm to start from 0th induction var
-    if (opnum == 3) {
-      opnum = 1;
-    }
-    int inductionVarIndex = (opnum - 1) * tileSize + i;
-
+    int inductionVarIndex = inductionVarIndexBase * tileSize + i;
     offsets.push_back(op.getInductionVars()[inductionVarIndex]);
     sizes.push_back(rewriter.getIndexAttr(1));
   }
@@ -104,7 +99,7 @@ static void insertSubview(ArrayRef<int64_t> tensorShape, Type type,
   auto subview = rewriter.create<memref::SubViewOp>(
       op.getLoc(), dyn_cast<MemRefType>(subviewType), expandShape.getResult(),
       offsets, sizes, strides);
-  brgemmOp.getOperand(operandNumber).replaceAllUsesWith(subview);
+  originalSubviewOp->replaceAllUsesWith(subview);
 }
 
 static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
@@ -206,6 +201,11 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
       0, static_cast<int64_t>(tileShapeM.size()),
       static_cast<int64_t>(tileShapeN.size() + tileShapeM.size())};
   rewriter.setInsertionPointToStart(op.getBody());
+
+  SmallVector<ArrayRef<int64_t>> originalShapes{mShape, nShape, kShape};
+  SmallVector<SmallVector<SmallVector<unsigned>>> tilingVectors{
+      {tileShapeM}, {tileShapeN}, {tileShapeM, tileShapeN}};
+
   // Replace old args with newly computed args
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++) {
@@ -239,10 +239,6 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
     }
   }
 
-  SmallVector<ArrayRef<int64_t>> originalShapes{mShape, nShape, kShape};
-  SmallVector<SmallVector<SmallVector<unsigned>>> tilingVectors{
-      {tileShapeM}, {tileShapeN}, {tileShapeM, tileShapeN}};
-
   for (int i = 1; i <= 3; i++) {
     auto definingOp = brgemmOp.getOperand(i).getDefiningOp();
     if (isa<memref::SubViewOp>(definingOp)) {
@@ -260,8 +256,11 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
       shape.append(
           std::next(originalShapes[i - 1].begin(), tilingVectors[i - 1].size()),
           originalShapes[i - 1].end());
+      int inductionVarBase = i - 1;
+      if (definingOp == brgemmOp.getOperand(3).getDefiningOp())
+        inductionVarBase = 0;
       insertSubview(shape, operandType, resultType, reassociationIndex, operand,
-                    op, rewriter, brgemmOp, i);
+                    op, rewriter, definingOp, inductionVarBase);
     }
   }
 
