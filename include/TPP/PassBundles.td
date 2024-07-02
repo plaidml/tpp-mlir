@@ -33,8 +33,14 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"linalgToLoops", "linalg-to-loops",
            "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+    Option<"tileShapeM", "M-tile-shape", "unsigned", "0",
+               "One dimensional tile shape to reshape the first tiled operand tensor of brgemm into (the second dimension will be computed)">,
+    Option<"tileShapeN", "N-tile-shape", "unsigned", "0",
+               "One dimensional tile shape to reshape the second tiled operand tensor of brgemm into (the second dimension will be computed)">,
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Permutation order (integer index list) to shuffle the scf forall loop by">,
+    Option<"outerParallelLoops", "num-outer-parallel", "unsigned", "0",
+               "Number of outer loops to be parallelized">
 
   ];
 }
@@ -68,8 +74,14 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
   let options = [
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
+    Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
+               "One dimensional tile shape to reshape the first tiled operand tensor of brgemm into (the second dimension will be computed)">,
+    Option<"tileShapeN", "N-tile-shape", "unsigned", "0",
+               "One dimensional tile shape to reshape the second tiled operand tensor of brgemm into (the second dimension will be computed)">,
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Permutation order (integer index list) to shuffle the scf forall loop by">,
+    Option<"outerParallelLoops", "num-outer-parallel", "unsigned","0",
+               "Number of outer loops to be parallelized">
 
   ];
 }

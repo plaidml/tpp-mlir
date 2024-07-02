@@ -46,12 +46,30 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Default pipeline - enable parallel execution"),
                 llvm::cl::init(false));
 
-// Control grid parallelism sizes.
-llvm::cl::list<unsigned>
-    parallelTaskGrid("parallel-task-grid",
-                     llvm::cl::desc("Grid-sizes for parallel tasks"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
-                     llvm::cl::CommaSeparated);
+llvm::cl::opt<unsigned> tileShapeM(
+    "M-tile-shape",
+    llvm::cl::desc(
+        "One dimensional tile shape to tile the first tiled input operand "
+        "tensor of brgemm op by(the second dimension will be computed)"),
+    llvm::cl::init(0));
+
+llvm::cl::opt<unsigned> tileShapeN(
+    "N-tile-shape",
+    llvm::cl::desc(
+        "One dimensional tile shape to tile the second tiled input operand "
+        "tensor of brgemm op by(the second dimension will be computed)"),
+    llvm::cl::init(0));
+
+llvm::cl::list<unsigned> shuffleOrder(
+    "loop-shuffle-order",
+    llvm::cl::desc("Permutation shuffle order (integer index list) to shuffle "
+                   "the scf forall loop surrounding brgemm op"),
+    llvm::cl::CommaSeparated);
+
+llvm::cl::opt<unsigned> outerParallelLoops(
+    "num-outer-parallel",
+    llvm::cl::desc("Number of outer loops to be parallelized"),
+    llvm::cl::value_desc("int"), llvm::cl::init(0));
 
 namespace mlir {
 namespace tpp {
@@ -124,8 +142,13 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops,
-                                                parallelTaskGrid};
+      DefaultTppPassesOptions tppDefaultOptions;
+      tppDefaultOptions.tileShapeM = tileShapeM;
+      tppDefaultOptions.tileShapeN = tileShapeN;
+      if (!shuffleOrder.empty())
+        tppDefaultOptions.shuffleOrder = shuffleOrder;
+      tppDefaultOptions.linalgToLoops = linalgToLoops;
+      tppDefaultOptions.outerParallelLoops = outerParallelLoops;
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
