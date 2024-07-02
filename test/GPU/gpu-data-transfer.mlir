@@ -358,15 +358,15 @@ module attributes {gpu.container_module} {
 
     %0 = memref.alloc() : memref<32x32xf32>
     %cast = memref.cast %0 : memref<32x32xf32> to memref<?x?xf32>
-    %subview = memref.subview %cast[0, 0] [8, 8] [1, 1] : memref<?x?xf32> to memref<8x8xf32, strided<[?, 1], offset: ?>>
+    %subview = memref.subview %cast[0, 0] [8, 8] [1, 1] : memref<?x?xf32> to memref<8x8xf32, strided<[?, 1]>>
     gpu.launch_func  @entry_kernel::@entry_kernel blocks in (%c1, %c1, %c1) threads in (%c1, %c1, %c1)
-        args(%subview : memref<8x8xf32, strided<[?, 1], offset: ?>>)
+        args(%subview : memref<8x8xf32, strided<[?, 1]>>)
     memref.dealloc %0 : memref<32x32xf32>
 
     return
   }
   gpu.module @entry_kernel {
-    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[?, 1], offset: ?>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
+    gpu.func @entry_kernel(%arg0: memref<8x8xf32, strided<[?, 1]>>) kernel attributes {known_block_size = array<i32: 1, 1, 1>, known_grid_size = array<i32: 1, 1, 1>} {
       gpu.return
     }
   }
