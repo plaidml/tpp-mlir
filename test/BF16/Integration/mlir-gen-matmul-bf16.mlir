@@ -2,6 +2,9 @@
 // RUN: mlir-gen --kernel=args --seed=0 --float-type=bf16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=2 2>&1 | FileCheck %s --check-prefix=DP2
 // RUN: mlir-gen --kernel=args --seed=0 --float-type=bf16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=4 2>&1 | FileCheck %s --check-prefix=DP4
 
+// RUN: not --crash mlir-gen --output=named --kernel=args --seed=0 --float-type=bf16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=2 2>&1 | FileCheck %s --check-prefix=VNNI-TODO
+// RUN: mlir-gen --output=named --keep-generic-matmul --kernel=args --seed=0 --float-type=bf16 --batch=128 --layers=2304,768 --tiles=64,48,64 --vnni=2 2>&1 | FileCheck %s --check-prefix=GENERIC
+
 // BF16: // RUN{{.*}}tpp-run %s -n {{\d*}}
 // BF16: // RUN{{.*}}-e entry -entry-point-result=void
 // BF16: // BENCH_TOTAL_FLOPS: 452984832
@@ -40,3 +43,24 @@
 // DP4:         arith.mulf
 // DP4:         arith.addf
 // DP4-NOT: dealloc
+
+
+// GENERIC: #[[$ATTR_0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
+// GENERIC: #[[$ATTR_1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
+// GENERIC: #[[$ATTR_2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
+
+// GENERIC-LABEL:   func.func @entry(
+// GENERIC-SAME:                     %[[VAL_0:.*]]: tensor<2x36x64x64xbf16>,
+// GENERIC-SAME:                     %[[VAL_1:.*]]: tensor<16x36x32x48x2xbf16>,
+// GENERIC-SAME:                     %[[VAL_2:.*]]: tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16> {
+// GENERIC:           %[[VAL_3:.*]] = linalg.generic {indexing_maps = [#[[$ATTR_0]], #[[$ATTR_1]], #[[$ATTR_2]]], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%[[VAL_0]], %[[VAL_1]] : tensor<2x36x64x64xbf16>, tensor<16x36x32x48x2xbf16>) outs(%[[VAL_2]] : tensor<2x16x64x48xbf16>) {
+// GENERIC:           ^bb0(%[[VAL_4:.*]]: bf16, %[[VAL_5:.*]]: bf16, %[[VAL_6:.*]]: bf16):
+// GENERIC:             %[[VAL_7:.*]] = arith.mulf %[[VAL_4]], %[[VAL_5]] : bf16
+// GENERIC:             %[[VAL_8:.*]] = arith.addf %[[VAL_6]], %[[VAL_7]] : bf16
+// GENERIC:             linalg.yield %[[VAL_8]] : bf16
+// GENERIC:           } -> tensor<2x16x64x48xbf16>
+// GENERIC:           return %[[VAL_3]] : tensor<2x16x64x48xbf16>
+// GENERIC:         }
+
+// VNNI-TODO: Unsupported Lowering for VNNI, Try '--keep-generic-matmul'
+// VNNI-TODO: UNREACHABLE executed
