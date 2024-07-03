@@ -517,7 +517,8 @@ Value MLIRGenerator::lowerNamedSoftmax(Value input, Value output) {
     return input;
 
   // TODO: Add lowering of softmax to sequence of named Ops
-
+  llvm_unreachable("Linalg named ops for softmax not implemented yet");
+  
   auto outTy = cast<ShapedType>(input.getType());
   // Softmax flops = 4 * M * N = 4 * prod(outputDims)
   int64_t softmaxFlops = 1;
