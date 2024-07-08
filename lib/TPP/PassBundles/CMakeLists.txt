@@ -18,6 +18,7 @@ add_mlir_library(TPPPassBundles
 
   LINK_LIBS PUBLIC
     MLIRIR
+    TPPTransforms
     ${mlir_dialect_libs}
     ${conversion_libs}
   )
