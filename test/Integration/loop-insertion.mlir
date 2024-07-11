@@ -11,9 +11,9 @@
 // TILE-CHECK-DAG: %[[c1024_i64:.*]] = arith.constant 1024 : i64
 // TILE-CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // TILE-CHECK: %[[dispatch:.*]] = call @xsmm_brgemm_dispatch 
-// TILE-CHECK: %[[expandshape:.*]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape [2, 4, 32, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x32x32x32xf32>
-// TILE-CHECK: %[[expandshape0:.*]] = memref.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 8, 32, 32, 32] : memref<32x32x32x32xf32> into memref<4x8x32x32x32xf32>
-// TILE-CHECK: %[[expandshape1:.*]] = memref.expand_shape %[[ARG2]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [2, 4, 4, 8, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x4x8x32x32xf32>
+// TILE-CHECK-DAG: %[[expandshape:.*]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape [2, 4, 32, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x32x32x32xf32>
+// TILE-CHECK-DAG: %[[expandshape0:.*]] = memref.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 8, 32, 32, 32] : memref<32x32x32x32xf32> into memref<4x8x32x32x32xf32>
+// TILE-CHECK-DAG: %[[expandshape1:.*]] = memref.expand_shape %[[ARG2]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [2, 4, 4, 8, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x4x8x32x32xf32>
 // TILE-CHECK: scf.for %[[ARG3:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // TILE-CHECK:   scf.for %[[ARG4:.*]] = %[[c0]] to %[[c4]] step %[[c1]] {
 // TILE-CHECK:	%[[subview:.*]] = memref.subview %[[expandshape]][%[[ARG3]], %[[ARG4]], 0, 0, 0] [1, 1, 32, 32, 32] [1, 1, 1, 1, 1] : memref<2x4x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
@@ -49,9 +49,9 @@
 // SHUFFLE-CHECK-DAG: %[[c1024_i64:.*]] = arith.constant 1024 : i64
 // SHUFFLE-CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // SHUFFLE-CHECK: %[[dispatch:.*]] = call @xsmm_brgemm_dispatch
-// SHUFFLE-CHECK: %[[expandshape:.*]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape [2, 4, 32, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x32x32x32xf32>
-// SHUFFLE-CHECK: %[[expandshape0:.*]] = memref.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 8, 32, 32, 32] : memref<32x32x32x32xf32> into memref<4x8x32x32x32xf32>
-// SHUFFLE-CHECK: %[[expandshape1:.*]] = memref.expand_shape %[[ARG2]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [2, 4, 4, 8, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x4x8x32x32xf32>
+// SHUFFLE-CHECK-DAG: %[[expandshape:.*]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape [2, 4, 32, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x32x32x32xf32>
+// SHUFFLE-CHECK-DAG: %[[expandshape0:.*]] = memref.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 8, 32, 32, 32] : memref<32x32x32x32xf32> into memref<4x8x32x32x32xf32>
+// SHUFFLE-CHECK-DAG: %[[expandshape1:.*]] = memref.expand_shape %[[ARG2]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [2, 4, 4, 8, 32, 32] : memref<8x32x32x32xf32> into memref<2x4x4x8x32x32xf32>
 // SHUFFLE-CHECK: scf.for %[[ARG3:.*]] = %[[c0]] to %[[c2]] step %[[c1]] {
 // SHUFFLE-CHECK:   scf.for %[[ARG4:.*]] = %[[c0]] to %[[c8]] step %[[c1]] {
 // SHUFFLE-CHECK:      scf.for %[[ARG5:.*]] = %[[c0]] to %[[c4]] step %[[c1]] {
@@ -166,8 +166,8 @@
 // MLP-CHECK:      scf.reduce
 // MLP-CHECK:    }
 // MLP-CHECK:    %[[alloc_1:.*]] = memref.alloc() {alignment = 64 : i64} : memref<8x32x32x32xbf16>
-// MLP-CHECK:    %[[expand_shape_2:.*]] = memref.expand_shape %[[alloc]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 2, 32, 32, 32] : memref<8x32x32x32xbf16> into memref<4x2x32x32x32xbf16>
-// MLP-CHECK:    %[[expand_shape_3:.*]] = memref.expand_shape %[[alloc_1]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [4, 2, 4, 8, 32, 32] : memref<8x32x32x32xbf16> into memref<4x2x4x8x32x32xbf16>
+// MLP-CHECK-DAG:    %[[expand_shape_2:.*]] = memref.expand_shape %[[alloc]] {{\[}}[0, 1], [2], [3], [4]] output_shape [4, 2, 32, 32, 32] : memref<8x32x32x32xbf16> into memref<4x2x32x32x32xbf16>
+// MLP-CHECK-DAG:    %[[expand_shape_3:.*]] = memref.expand_shape %[[alloc_1]] {{\[}}[0, 1], [2, 3], [4], [5]] output_shape [4, 2, 4, 8, 32, 32] : memref<8x32x32x32xbf16> into memref<4x2x4x8x32x32xbf16>
 // MLP-CHECK:    %[[val5:.*]] = call @xsmm_intel_amx_tile_config_dispatch(%[[c2_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c2116_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // MLP-CHECK:    %[[val6:.*]] = call @xsmm_intel_amx_tile_config_dispatch(%[[c2_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c2180_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) -> i64
 // MLP-CHECK:    %[[val7:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c2_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c2244_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]]) : (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) -> i64

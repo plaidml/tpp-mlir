@@ -74,7 +74,7 @@
       "type": "MLIR",
       "benchmark": "pytorch/torch-dynamo-mlp-fp32-3x1024.mlir",
       "environment": { "OMP_NUM_THREADS": "4", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
-      "flags": [ "-n", "100", "-run-args='--def-parallel -M-tile-shape=8 -N-tile-shape=2 --loop-shuffle-order=2,0,1,3 --num-outer-parallel=1'" ],
+      "flags": [ "-n", "100", "-run-args='--def-parallel -M-tile-shape=8 -N-tile-shape=4 --loop-shuffle-order=2,0,1,3 --num-outer-parallel=1'" ],
       "extensions": [ ]
     },
     "fp32_3x1024_omp_8_mlir": {
@@ -88,7 +88,7 @@
       "type": "MLIR",
       "benchmark": "pytorch/torch-dynamo-mlp-fp32-3x1024.mlir",
       "environment": { "OMP_NUM_THREADS": "16", "KMP_AFFINITY": "granularity=fine,verbose,compact,1,0" },
-      "flags": [ "-n", "100", "-run-args='--def-parallel -M-tile-shape=2 -N-tile-shape=4 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2'" ],
+      "flags": [ "-n", "100", "-run-args='--def-parallel -M-tile-shape=4 -N-tile-shape=4 --loop-shuffle-order=0,2,1,3 --num-outer-parallel=2'" ],
       "extensions": [ ]
     }
   }},
