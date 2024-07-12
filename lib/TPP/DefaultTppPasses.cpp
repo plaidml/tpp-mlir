@@ -111,6 +111,7 @@ private:
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
+    // TODO: Fusion and AMX passes need to be in a new bundle
     pm.addPass(createCombineXsmmOpPass());
     pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
     pm.addPass(createFoldXsmmFlags());

@@ -17,4 +17,4 @@ module {
   }
 }
 
-// CHECK: Failed to expand the loop
+// CHECK: Number of parallel levels exceeds number of levels of loop

@@ -35,18 +35,24 @@ namespace tpp {
 static LogicalResult loopExpand(scf::ForallOp op, unsigned numOuterParallel) {
   OpBuilder b(op);
   IRRewriter rewriter(b.getContext());
-  if (numOuterParallel > op.getInductionVars().size())
-    return rewriter.notifyMatchFailure(
-        op, "Number of parallel levels exceeds number of levels of loop");
-
+  if (numOuterParallel > op.getInductionVars().size()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Number of parallel levels exceeds number of levels of loop");
+    return failure();
+  }
+  if (op.getStaticLowerBound().empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "Loop does not have static bounds");
+    return failure();
+  }
   auto ub = op.getStaticUpperBound().begin();
+  auto lb = op.getStaticLowerBound().begin();
   auto step = op.getStaticStep().begin();
   rewriter.setInsertionPointAfter(op);
 
   SmallVector<scf::ParallelOp> parallelOpList;
   SmallVector<scf::ForOp> forOpList;
   size_t i = 0;
-  for (auto lb = op.getStaticLowerBound().begin();
+  for (;
        lb != op.getStaticLowerBound().end() &&
        ub != op.getStaticUpperBound().end() && step != op.getStaticStep().end();
        lb++, ub++, step++) {
@@ -54,20 +60,23 @@ static LogicalResult loopExpand(scf::ForallOp op, unsigned numOuterParallel) {
     auto upperBound = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *ub);
     auto stepVal = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *step);
 
-    if (i++ < numOuterParallel) {
+    if (i < numOuterParallel) {
       auto parallelOp = rewriter.create<scf::ParallelOp>(
           op.getLoc(), ValueRange{lowerBound}, ValueRange{upperBound},
           ValueRange{stepVal});
       rewriter.setInsertionPoint(&parallelOp.getBody()->front());
       parallelOpList.push_back(parallelOp);
+      i++;
     } else {
       auto forOp = rewriter.create<scf::ForOp>(op.getLoc(), lowerBound,
                                                upperBound, stepVal);
+      // Change the insertion point to the created for loop
       rewriter.setInsertionPoint(&forOp.getBody()->front());
       forOpList.push_back(forOp);
     }
   }
 
+  // Clone instructions at the innermost loop level
   IRMapping mapping;
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++) {
@@ -104,7 +113,7 @@ struct LoopExpansionPass
   void runOnOperation() override {
     getOperation()->walk([&](scf::ForallOp forallOp) {
       if (failed(loopExpand(forallOp, numOuterParallel)))
-        LLVM_DEBUG(llvm::dbgs() << "Failed to expand the loop\n");
+        LLVM_DEBUG(llvm::dbgs() << "\nFailed to expand the loop\n");
       return WalkResult::advance();
     });
   }

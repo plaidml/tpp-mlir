@@ -38,8 +38,11 @@ static LogicalResult loopShuffle(scf::ForallOp op,
                                  ArrayRef<unsigned> shuffleOrder) {
   OpBuilder b(op);
   IRRewriter rewriter(b.getContext());
-  if (shuffleOrder.size() != op.getInductionVars().size())
-    return rewriter.notifyMatchFailure(op, "Number of indices incorrect");
+  if (shuffleOrder.size() != op.getInductionVars().size()) {
+    LLVM_DEBUG(llvm::dbgs() << "Number of indices incorrect");
+    return failure();
+  }
+
   for (size_t i = 0; i < op.getInductionVars().size(); i++) {
     bool match = false;
     for (size_t j = 0; j < shuffleOrder.size(); j++)
@@ -48,29 +51,25 @@ static LogicalResult loopShuffle(scf::ForallOp op,
         break;
       }
     if (!match) {
-      return rewriter.notifyMatchFailure(op, "Indices missed");
+      LLVM_DEBUG(llvm::dbgs() << "Indices missed");
+      return failure();
     }
   }
 
   SmallVector<int64_t> lbs, ubs, steps;
-
   for (size_t i = 0; i < op.getStaticLowerBound().size(); i++) {
     lbs.push_back(op.getStaticLowerBound()[shuffleOrder[i]]);
-  }
-  for (size_t i = 0; i < op.getStaticUpperBound().size(); i++) {
     ubs.push_back(op.getStaticUpperBound()[shuffleOrder[i]]);
-  }
-  for (size_t i = 0; i < op.getStaticStep().size(); i++) {
     steps.push_back(op.getStaticStep()[shuffleOrder[i]]);
   }
 
   op.setStaticLowerBound(lbs);
   op.setStaticUpperBound(ubs);
   op.setStaticStep(steps);
-
-  SmallVector<Value> tempValueMap(op.getInductionVars().size());
-  SmallVector<int64_t> tempIndexMap(op.getInductionVars().size());
-  for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+  size_t numInductionVars = op.getInductionVars().size();
+  SmallVector<Value> tempValueMap(numInductionVars);
+  SmallVector<int64_t> tempIndexMap(numInductionVars);
+  for (size_t i = 0; i < numInductionVars; i++) {
     for (size_t j = 0; j < shuffleOrder.size(); j++) {
       if (i == shuffleOrder[j]) {
         auto tempValue =
@@ -83,7 +82,7 @@ static LogicalResult loopShuffle(scf::ForallOp op,
       }
     }
   }
-  for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+  for (size_t i = 0; i < numInductionVars; i++) {
     replaceAllUsesInRegionWith(
         tempValueMap[i], op.getInductionVar(tempIndexMap[i]), op.getRegion());
     rewriter.eraseOp(tempValueMap[i].getDefiningOp());
@@ -98,7 +97,7 @@ struct LoopShufflePass : public impl::LoopShufflePassBase<LoopShufflePass> {
   void runOnOperation() override {
     getOperation()->walk([&](scf::ForallOp forallOp) {
       if (failed(loopShuffle(forallOp, shuffleOrder)))
-        LLVM_DEBUG(llvm::dbgs() << "Failed to shuffle the loop\n");
+        LLVM_DEBUG(llvm::dbgs() << "\nFailed to shuffle the loop\n");
 
       return WalkResult::advance();
     });

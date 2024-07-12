@@ -67,6 +67,8 @@ private:
     loopInsertionPassOptions.tileShapeN = tileShapeN;
     pm.addPass(createLoopInsertionPass(loopInsertionPassOptions));
 
+    // FIXME:This pass must run before the expansion pass because it shuffles
+    // the order of forall loops only
     mlir::tpp::LoopShufflePassOptions loopShufflePassOptions;
     loopShufflePassOptions.shuffleOrder = shuffleOrder;
     pm.addPass(createLoopShufflePass(loopShufflePassOptions));

@@ -76,165 +76,49 @@ insertSubview(ArrayRef<int64_t> tensorShape, Type type, MemRefType resultType,
   return subview;
 }
 
-static LogicalResult validateShapes(SmallVector<unsigned> tileShapeM,
-                                    SmallVector<unsigned> tileShapeN,
-                                    vector<int64_t> mShape,
-                                    vector<int64_t> nShape,
-                                    vector<int64_t> kShape,
-                                    IRRewriter &rewriter, ForallOp op) {
-
-  long multipleM = 1, multipleN = 1;
-  // Validate the input tile sizes against the operand shapes
-  for (size_t i = 0; i < tileShapeM.size(); i++)
-    multipleM = multipleM * tileShapeM[i];
-
-  if (mShape[0] != multipleM)
-    return rewriter.notifyMatchFailure(
-        op, "require m tile shape to match tensor shape");
-
-  for (size_t i = 0; i < tileShapeN.size(); i++)
-    multipleN = multipleN * tileShapeN[i];
-
-  if (nShape[0] != multipleN)
-    return rewriter.notifyMatchFailure(
-        op, "require n tile shape to match tensor shape");
-
-  if ((multipleM * multipleN) != (kShape[0] * kShape[1]))
-    return rewriter.notifyMatchFailure(
-        op, "require k tile shape to match tensor shape");
-
-  return success();
-}
-
 static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
                                         unsigned nTileShape) {
   OpBuilder b(op);
   IRRewriter rewriter(b.getContext());
-  if (mTileShape == 0 || nTileShape == 0)
-    return rewriter.notifyMatchFailure(op, "require tile shape to not be zero");
+  if (mTileShape == 0 || nTileShape == 0) {
+    LLVM_DEBUG(llvm::dbgs() << "require tile shape to not be zero");
+    return failure();
+  }
   SmallVector<Operation *> xsmmOpList;
-  Operation *brgemmOp = NULL;
-  Operation *unaryOp = NULL;
-  Operation *binaryOp = NULL;
   for (auto operItr = op.getBody()->begin(); operItr != op.getBody()->end();
        operItr++) {
     Operation *oper = &*operItr;
     if (dyn_cast<xsmm::BrgemmOp>(oper) || dyn_cast<xsmm::GemmOp>(oper) ||
         dyn_cast<xsmm::UnaryOp>(oper) || dyn_cast<xsmm::BinaryOp>(oper)) {
-      if (dyn_cast<xsmm::BrgemmOp>(oper) || dyn_cast<xsmm::GemmOp>(oper))
-        brgemmOp = oper;
-      if (dyn_cast<xsmm::UnaryOp>(oper))
-        unaryOp = oper;
-      if (dyn_cast<xsmm::BinaryOp>(oper))
-        binaryOp = oper;
-      xsmmOpList.push_back(oper);
-    }
-  }
-  if (xsmmOpList.empty())
-    return rewriter.notifyMatchFailure(op, "require xsmm op in loop");
-
-  vector<int64_t> mShape;
-  Operation *mDefiningOp = NULL;
-  if (brgemmOp != NULL)
-    mDefiningOp = brgemmOp->getOperand(1).getDefiningOp();
-  else if (binaryOp != NULL)
-    mDefiningOp = binaryOp->getOperand(1).getDefiningOp();
-  if (mDefiningOp != NULL) {
-    if (isa<memref::SubViewOp>(mDefiningOp))
-      mShape = dyn_cast<ShapedType>(mDefiningOp->getOperand(0).getType())
-                   .getShape()
-                   .vec();
-    else
-      mShape = dyn_cast<ShapedType>(mDefiningOp->getResult(0).getType())
-                   .getShape()
-                   .vec();
-  }
-  vector<int64_t> nShape;
-  Operation *nDefiningOp = NULL;
-  if (brgemmOp != NULL)
-    nDefiningOp = brgemmOp->getOperand(2).getDefiningOp();
-  else if (binaryOp != NULL)
-    mDefiningOp = binaryOp->getOperand(2).getDefiningOp();
-  if (nDefiningOp != NULL) {
-    if (isa<memref::SubViewOp>(nDefiningOp))
-      nShape = dyn_cast<ShapedType>(nDefiningOp->getOperand(0).getType())
-                   .getShape()
-                   .vec();
-    else
-      nShape = dyn_cast<ShapedType>(nDefiningOp->getResult(0).getType())
-                   .getShape()
-                   .vec();
-  }
-  vector<int64_t> kShape;
-  Operation *kDefiningOp = NULL;
-  if (brgemmOp != NULL)
-    kDefiningOp = brgemmOp->getOperand(3).getDefiningOp();
-  else if (binaryOp != NULL)
-    mDefiningOp = binaryOp->getOperand(3).getDefiningOp();
-  else if (unaryOp != NULL) {
-    auto subviewA = (dyn_cast<xsmm::UnaryOp>(unaryOp)).getOperand(1);
-    auto [strides, offsets] =
-        getStridesAndOffset(dyn_cast<MemRefType>(subviewA.getType()));
-    long size = 1;
-    for (auto dim : dyn_cast<ShapedType>(subviewA.getType()).getShape())
-      size *= dim;
-    if (size == strides[0])
-      kDefiningOp = unaryOp->getOperand(2).getDefiningOp();
-    else
-      kDefiningOp = unaryOp->getOperand(1).getDefiningOp();
-  }
-
-  if (kDefiningOp != NULL) {
-    if (isa<memref::SubViewOp>(kDefiningOp))
-      kShape = dyn_cast<ShapedType>(kDefiningOp->getOperand(0).getType())
-                   .getShape()
-                   .vec();
-    else
-      kShape = dyn_cast<ShapedType>(kDefiningOp->getResult(0).getType())
-                   .getShape()
-                   .vec();
-  }
-
-  if (mDefiningOp == NULL) {
-    for (size_t i = 0; i < kShape.size(); i++) {
-      if (i == 1)
-        continue;
-      mShape.push_back(kShape[i]);
+      xsmmOpList.push_back(&*oper);
     }
   }
 
-  if (nDefiningOp == NULL) {
-    for (size_t i = 0; i < kShape.size(); i++) {
-      if (i == 0)
-        continue;
-      nShape.push_back(kShape[i]);
-    }
+  if (xsmmOpList.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "require xsmm op in loop");
+    return failure();
   }
 
-  if (kDefiningOp == NULL) {
-    for (size_t i = 0; i < nShape.size(); i++) {
-      if (i == 0)
-        kShape.push_back(mTileShape);
-      else if (i == 1)
-        kShape.push_back(nTileShape);
-      else
-        kShape.push_back(nShape[i - 1]);
-    }
-  }
-
+  int mSize = (op.getStaticUpperBound()[0] - op.getStaticLowerBound()[0]) /
+              op.getStaticStep()[0];
+  int nSize = (op.getStaticUpperBound()[1] - op.getStaticLowerBound()[1]) /
+              op.getStaticStep()[1];
   SmallVector<unsigned> tileShapeM;
   SmallVector<unsigned> tileShapeN;
 
   tileShapeM.push_back(mTileShape);
-  tileShapeM.push_back(mShape[0] / mTileShape);
+  if (mSize % mTileShape != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "require m tile shape to match tensor shape");
+    return failure();
+  }
+  tileShapeM.push_back(mSize / mTileShape);
 
   tileShapeN.push_back(nTileShape);
-  tileShapeN.push_back(nShape[0] / nTileShape);
-
-  auto validateShapeResult = validateShapes(tileShapeM, tileShapeN, mShape,
-                                            nShape, kShape, rewriter, op);
-  if (failed(validateShapeResult))
+  if (nSize % nTileShape != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "require n tile shape to match tensor shape");
     return failure();
+  }
+  tileShapeN.push_back(nSize / nTileShape);
 
   SmallVector<int64_t> oldUbs(op.getStaticUpperBound().begin(),
                               op.getStaticUpperBound().end());
@@ -267,7 +151,8 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
 
   rewriter.setInsertionPointToStart(op.getBody());
 
-  // Replace old args with newly computed args if expand shape-subview pairs can't be used
+  // Replace old args with newly computed args if expand shape-subview pairs
+  // can't be used
   for (auto oper = op.getBody()->getOperations().begin();
        oper != op.getBody()->getOperations().end(); oper++) {
     if (find(xsmmOpList.begin(), xsmmOpList.end(), &*oper) ==
@@ -278,6 +163,8 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
         int oldArgIndex = -1;
         for (int i = 0; i < numArgs; i++) {
           if (arg == op.getInductionVar(i)) {
+            // Operand is an old stale  induction variable that needs to be
+            // updated to new induction variables
             oldArgIndex = i;
             break;
           }
@@ -412,8 +299,8 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
   return success();
 }
 
-bool getInnermostForLoops(Operation *rootOp,
-                          SmallVectorImpl<scf::ForallOp> &result) {
+static bool getInnermostForLoops(Operation *rootOp,
+                                 SmallVectorImpl<scf::ForallOp> &result) {
   assert(rootOp != nullptr && "Root operation must not be a nullptr.");
   bool rootEnclosesForAllloops = false;
   for (Region &region : rootOp->getRegions()) {
