@@ -10,11 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "TPP/IR/TilingUtils.h"
+#include "mlir/Analysis/Presburger/LinearTransform.h"
+#include "mlir/Analysis/Presburger/PresburgerRelation.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IntegerSet.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/RegionUtils.h"
 #include "llvm/Support/Debug.h"
 #include <list>
 
@@ -37,11 +46,12 @@ namespace tpp {
 
 static memref::SubViewOp
 insertSubview(ArrayRef<int64_t> tensorShape, Type type, MemRefType resultType,
-              SmallVector<ReassociationIndices> reassociation, Value operand,
-              ForallOp op, IRRewriter &rewriter, Operation *originalSubviewOp,
+              SmallVector<ReassociationIndices> reassociation, ForallOp op,
+              Value operand, IRRewriter &rewriter,
               SmallVector<OpFoldResult> offsets,
-              SmallVector<OpFoldResult> sizes) {
+              SmallVector<OpFoldResult> sizes, Operation *xsmmOp) {
   OpBuilder::InsertionGuard guard(rewriter);
+
   rewriter.setInsertionPoint(op);
   auto expandShape = rewriter.create<memref::ExpandShapeOp>(
       op.getLoc(),
@@ -49,7 +59,8 @@ insertSubview(ArrayRef<int64_t> tensorShape, Type type, MemRefType resultType,
                       dyn_cast<MemRefType>(type).getElementType()),
       operand, reassociation);
   expandShape.setStaticOutputShape(tensorShape);
-  rewriter.setInsertionPointToStart(op.getBody());
+
+  rewriter.setInsertionPoint(xsmmOp);
   SmallVector<int64_t> tileSizes;
 
   tileSizes.append(dyn_cast<ShapedType>(resultType).getShape().begin(),
@@ -65,14 +76,11 @@ insertSubview(ArrayRef<int64_t> tensorShape, Type type, MemRefType resultType,
       StridedLayoutAttr::get(rewriter.getContext(), ShapedType::kDynamic,
                              originalStride));
 
-  SmallVector<OpFoldResult> strides;
-
-  strides.append(tensorShape.size(), rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> strides(sizes.size(), rewriter.getIndexAttr(1));
 
   auto subview = rewriter.create<memref::SubViewOp>(
       op.getLoc(), dyn_cast<MemRefType>(subviewType), expandShape.getResult(),
       offsets, sizes, strides);
-  originalSubviewOp->replaceAllUsesWith(subview);
   return subview;
 }
 
@@ -98,7 +106,6 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
     LLVM_DEBUG(llvm::dbgs() << "require xsmm op in loop");
     return failure();
   }
-
   int mSize = (op.getStaticUpperBound()[0] - op.getStaticLowerBound()[0]) /
               op.getStaticStep()[0];
   int nSize = (op.getStaticUpperBound()[1] - op.getStaticLowerBound()[1]) /
@@ -120,8 +127,6 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
   }
   tileShapeN.push_back(nSize / nTileShape);
 
-  SmallVector<int64_t> oldUbs(op.getStaticUpperBound().begin(),
-                              op.getStaticUpperBound().end());
   SmallVector<Value> oldArgs(op.getBody()->getArguments().begin(),
                              op.getBody()->getArguments().end());
 
@@ -151,146 +156,165 @@ static LogicalResult insertParallelLoop(ForallOp op, unsigned mTileShape,
 
   rewriter.setInsertionPointToStart(op.getBody());
 
-  // Replace old args with newly computed args if expand shape-subview pairs
-  // can't be used
-  for (auto oper = op.getBody()->getOperations().begin();
-       oper != op.getBody()->getOperations().end(); oper++) {
-    if (find(xsmmOpList.begin(), xsmmOpList.end(), &*oper) ==
-            xsmmOpList.end() &&
-        !isa<memref::SubViewOp>(oper)) {
-      int operandIndex = 0;
-      for (auto arg : oper->getOperands()) {
-        int oldArgIndex = -1;
-        for (int i = 0; i < numArgs; i++) {
-          if (arg == op.getInductionVar(i)) {
-            // Operand is an old stale  induction variable that needs to be
-            // updated to new induction variables
-            oldArgIndex = i;
-            break;
-          }
-        }
-        if (oldArgIndex != -1) {
-          SmallVector<int64_t> tile;
-          SmallVector<Value> inductionVars;
-          int size = 1;
-          for (size_t j = 0; j < tilingVectors[oldArgIndex].size(); j++) {
-            tile.push_back(tilingVectors[oldArgIndex][j]);
-            size *= tilingVectors[oldArgIndex][j];
-          }
-          for (int k = tileOffsets[oldArgIndex];
-               k < tileOffsets[oldArgIndex + 1]; k++) {
-            inductionVars.push_back(op.getBody()->getArgument(k));
-          }
-
-          if (size < oldUbs[oldArgIndex])
-            tile.push_back(oldUbs[oldArgIndex] / size);
-
-          auto [strides, offset] =
-              getStridesAndOffset(MemRefType::get({tile}, b.getF32Type()));
-          Value add = rewriter.create<arith::MulIOp>(
-              op.getLoc(), b.getIndexType(), inductionVars[0],
-              rewriter.create<arith::ConstantIndexOp>(op.getLoc(), strides[0]));
-          for (size_t i = 1; i < inductionVars.size(); i++) {
-            Value upperBound = rewriter.create<arith::ConstantIndexOp>(
-                op.getLoc(), strides[i]);
-            Value mul = rewriter.create<arith::MulIOp>(
-                op.getLoc(), b.getIndexType(), inductionVars[i], upperBound);
-            add = rewriter.create<arith::AddIOp>(op.getLoc(), b.getIndexType(),
-                                                 mul, add);
-          }
-
-          Value offsetVal =
-              rewriter.create<arith::ConstantIndexOp>(op.getLoc(), offset);
-          Value result = rewriter.create<arith::AddIOp>(
-              op.getLoc(), b.getIndexType(), add, offsetVal);
-          oper->setOperand(operandIndex, result);
-        }
-        operandIndex++;
-      }
-    }
-  }
-
-  list<memref::SubViewOp> expandedSubviews;
+  SmallVector<memref::SubViewOp> expandedSubviews;
   for (size_t k = 0; k < xsmmOpList.size(); k++) {
     auto operation = xsmmOpList[k];
     for (size_t i = 1; i < operation->getNumOperands(); i++) {
       auto operandDef = operation->getOperand(i);
       if (operandDef.getDefiningOp() != NULL &&
-          isa<memref::SubViewOp>(operandDef.getDefiningOp()) &&
-          find(expandedSubviews.begin(), expandedSubviews.end(),
-               dyn_cast<memref::SubViewOp>(operandDef.getDefiningOp())) ==
-              expandedSubviews.end()) {
-        memref::SubViewOp definingOp =
-            dyn_cast<memref::SubViewOp>(operandDef.getDefiningOp());
-        Value operand = definingOp->getOperand(0);
-        auto operandType = operand.getType();
-        auto resultType =
-            dyn_cast<MemRefType>(operation->getOperand(i).getType());
-        SmallVector<ReassociationIndices> reassociationIndex;
-        SmallVector<int64_t> shape;
-        size_t index = 0;
-        size_t opCount = 1;
-        SmallVector<OpFoldResult> matchedInductionVars, strides, sizes;
-        for (size_t argCount = 0;
-             argCount < dyn_cast<ShapedType>(operandType).getShape().size();
-             argCount++) {
-          bool matchFound = false;
-          for (size_t oldOpCount = argCount; oldOpCount < oldArgs.size();
-               oldOpCount++) {
-            if (opCount < definingOp.getNumOperands() &&
-                oldArgs[oldOpCount] == definingOp.getOperand(opCount)) {
+          isa<memref::SubViewOp>(operandDef.getDefiningOp())) {
+        auto definingOp = operandDef.getDefiningOp();
+        if (find(expandedSubviews.begin(), expandedSubviews.end(),
+                 definingOp) == expandedSubviews.end()) {
+          Value operand = definingOp->getOperand(0);
+          auto operandType = operand.getType();
+          auto resultType =
+              dyn_cast<MemRefType>(operation->getOperand(i).getType());
+          SmallVector<int64_t> shape;
+          SmallVector<ReassociationIndices> indices;
+          size_t index = 0;
+          unsigned opCount = 1;
+          SmallVector<OpFoldResult> matchedInductionVariables, sizes;
+          for (size_t j = 0;
+               j < dyn_cast<ShapedType>(operandType).getShape().size(); j++) {
+            if (j < definingOp->getNumOperands() - 1) {
+              size_t matchedIndex = j;
+              bool matchedInductionVar = false;
+              if (opCount < definingOp->getNumOperands()) {
+                for (size_t oldOpCount = j; oldOpCount < oldArgs.size();
+                     oldOpCount++) {
+                  if (oldArgs[oldOpCount] == definingOp->getOperand(opCount)) {
+                    matchedInductionVar = true;
+                    matchedIndex = oldOpCount;
+                    break;
+                  }
+                }
+                unsigned tileSize = 1;
+                auto cumulativeTileSize =
+                    getCumulativeTileSize(tilingVectors, matchedIndex);
+                ReassociationIndices reassociationIndex;
+                shape.append(tilingVectors[matchedIndex].begin(),
+                             tilingVectors[matchedIndex].end());
+                for (size_t m = 0; m < tilingVectors[matchedIndex].size(); m++) {
+                  reassociationIndex.push_back(index++);
+                  sizes.push_back(rewriter.getIndexAttr(1));
+                  tileSize *= tilingVectors[matchedIndex][m];
+                  if (matchedInductionVar)
+                    matchedInductionVariables.push_back(op.getInductionVar(
+                        matchedIndex * cumulativeTileSize + m));
+                  else {
+                    if (opCount < definingOp->getNumOperands()) {
+                      if (m == 0) {
+                        auto val =
+                            dyn_cast<Value>(definingOp->getOperand(opCount));
+                        if (val != NULL && val.getDefiningOp() != NULL &&
+                            isa<affine::AffineApplyOp>(val.getDefiningOp())) {
+                          auto applyOp = dyn_cast<affine::AffineApplyOp>(
+                              val.getDefiningOp());
+                          SmallVector<Value> operands(
+                              applyOp.getOperands().begin(),
+                              applyOp.getOperands().end());
+                          for (size_t n = 0; n < operands.size(); n++) {
+                            auto itr = find(oldArgs.begin(), oldArgs.end(),
+                                            operands[n]);
+                            int k = distance(oldArgs.begin(), itr);
+                            if (itr != oldArgs.end()) {
+                              SmallVector<AffineMap> composedMap;
+                              getInverseOfAffineMap(tilingVectors[k],
+                                                    applyOp.getAffineValueMap(),
+                                                    composedMap);
 
-              ReassociationIndices tileIndex;
-              int argOffset = 0;
-              for (size_t newOp = 0; newOp < oldOpCount; newOp++) {
-                argOffset += tilingVectors[newOp].size();
-              }
+                              for (size_t l = 0; l < tilingVectors[k].size();
+                                   l++) {
+                                OpBuilder::InsertionGuard guard(rewriter);
+                                rewriter.setInsertionPointAfter(
+                                    applyOp.getOperation());
+                                auto cumulativeTileSize =
+                                    getCumulativeTileSize(tilingVectors, k);
+                                AffineExpr expr = applyOp.getMap().getResult(0);
+                                if (isa<AffineBinaryOpExpr>(expr) &&
+                                    dyn_cast<AffineBinaryOpExpr>(expr)
+                                            .getKind() ==
+                                        mlir::AffineExprKind::Mul &&
+                                    dyn_cast<AffineConstantExpr>(
+                                        dyn_cast<AffineBinaryOpExpr>(expr)
+                                            .getRHS())
+                                            .getValue() > 1) {
+                                  auto newApplyOp =
+                                      dyn_cast<affine::AffineApplyOp>(
+                                          rewriter.clone(
+                                              *applyOp.getOperation()));
+                                  newApplyOp.getMapOperandsMutable().clear();
+                                  newApplyOp.getMapOperandsMutable().append(
+                                      op.getInductionVar(
+                                          k * cumulativeTileSize + l));
+                                  auto inverseFunction =
+                                      rewriter.create<affine::AffineApplyOp>(
+                                          op.getLoc(), composedMap[0],
+                                          newApplyOp.getResult());
 
-              shape.append(tilingVectors[oldOpCount].begin(),
-                           tilingVectors[oldOpCount].end());
-              int tileSize = 1;
-              for (size_t j = 0; j < tilingVectors[oldOpCount].size(); j++) {
-                tileIndex.push_back(index++);
-                matchedInductionVars.push_back(
-                    op.getInductionVar(argOffset + j));
-                sizes.push_back(rewriter.getIndexAttr(1));
-                tileSize *= tilingVectors[oldOpCount][j];
+                                  matchedInductionVariables.push_back(
+                                      inverseFunction.getResult());
+
+                                } else {
+                                  auto inverseFunction =
+                                      rewriter.create<affine::AffineApplyOp>(
+                                          op.getLoc(), composedMap[0],
+                                          op.getInductionVar(
+                                              k * cumulativeTileSize + l));
+
+                                  auto newApplyOp =
+                                      dyn_cast<affine::AffineApplyOp>(
+                                          rewriter.clone(
+                                              *applyOp.getOperation()));
+                                  newApplyOp.getMapOperandsMutable().clear();
+                                  newApplyOp.getMapOperandsMutable().append(
+                                      inverseFunction.getResult());
+                                  matchedInductionVariables.push_back(
+                                      newApplyOp.getResult());
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    } else {
+                      matchedInductionVariables.push_back(
+                          rewriter.getIndexAttr(0));
+                    }
+                  }
+                }
+
+                if (tileSize <
+                    dyn_cast<ShapedType>(operandType).getShape()[j]) {
+                  auto spill = dyn_cast<ShapedType>(operandType).getShape()[j] /
+                               tileSize;
+                  shape.push_back(spill);
+                  sizes.push_back(rewriter.getIndexAttr(spill));
+                  reassociationIndex.push_back(index++);
+                  matchedInductionVariables.push_back(rewriter.getIndexAttr(0));
+                }
+                indices.push_back(reassociationIndex);
+                opCount++;
               }
-              matchFound = true;
-              // Add leftover tiling factor if any
-              if (tileSize <
-                  dyn_cast<ShapedType>(operandType).getShape()[argCount]) {
-                matchedInductionVars.push_back(rewriter.getIndexAttr(0));
-                tileIndex.push_back(index++);
-                shape.push_back(
-                    dyn_cast<ShapedType>(operandType).getShape()[argCount] /
-                    tileSize);
-                sizes.push_back(rewriter.getIndexAttr(
-                    dyn_cast<ShapedType>(operandType).getShape()[argCount] /
-                    tileSize));
-              }
-              reassociationIndex.push_back(tileIndex);
-              opCount++;
-              if (matchFound)
-                break;
+            } else {
+              ReassociationIndices reassociationIndex;
+              reassociationIndex.push_back(index++);
+              indices.push_back(reassociationIndex);
+              auto resultTensor =
+                  dyn_cast<ShapedType>(operandType).getShape()[j];
+              shape.push_back(resultTensor);
+              sizes.push_back(rewriter.getIndexAttr(resultTensor));
+              matchedInductionVariables.push_back(rewriter.getIndexAttr(0));
             }
           }
-          if (!matchFound && !matchedInductionVars.empty()) {
-            ReassociationIndices tileIndex;
-            tileIndex.push_back(index++);
-            matchedInductionVars.push_back(rewriter.getIndexAttr(0));
-            reassociationIndex.push_back(tileIndex);
-            shape.push_back(
-                dyn_cast<ShapedType>(operandType).getShape()[argCount]);
-            sizes.push_back(rewriter.getIndexAttr(
-                dyn_cast<ShapedType>(operandType).getShape()[argCount]));
-            opCount++;
-          }
-        }
-        if (!matchedInductionVars.empty()) {
-          auto subviewOp = insertSubview(
-              shape, operandType, resultType, reassociationIndex, operand, op,
-              rewriter, definingOp, matchedInductionVars, sizes);
+
+          memref::SubViewOp subviewOp = insertSubview(
+              shape, operandType, resultType, indices, op, operand, rewriter,
+              matchedInductionVariables, sizes, operation);
+
+          replaceAllUsesInRegionWith(dyn_cast<memref::SubViewOp>(definingOp),
+                                     subviewOp, op.getRegion());
           expandedSubviews.push_back(subviewOp);
         }
       }
@@ -331,8 +355,9 @@ struct LoopInsertionPass
     SmallVector<ForallOp> innermostForAllloops;
     getInnermostForLoops(parentOp, innermostForAllloops);
     for (ForallOp loop : innermostForAllloops)
-      if (failed(insertParallelLoop(loop, tileShapeM, tileShapeN)))
+      if (failed(insertParallelLoop(loop, tileShapeM, tileShapeN))) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to tile the loop\n");
+      }
   }
 };
 } // namespace tpp

@@ -23,6 +23,6 @@ module{
 // CHECK-DAG:         %[[subview:.*]] = memref.subview %[[expand_shape_1]][%[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG6]], 0, 0] [1, 1, 1, 1, 4, 4] [1, 1, 1, 1, 1, 1] : memref<2x4x2x2x4x4xbf16> to memref<4x4xbf16, strided<[4, 1], offset: ?>>
 // CHECK-DAG:         %[[subview_2:.*]] = memref.subview %expand_shape_0[%[[ARG5]], %[[ARG6]], 0, 0, 0, 0] [1, 1, 4, 2, 4, 2] [1, 1, 1, 1, 1, 1] : memref<2x2x4x2x4x2xbf16> to memref<4x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>
 // CHECK-DAG:         %[[subview_3:.*]] = memref.subview %expand_shape[%[[ARG3]], %[[ARG4]], 0, 0, 0] [1, 1, 4, 4, 4] [1, 1, 1, 1, 1] : memref<2x4x4x4x4xbf16> to memref<4x4x4xbf16, strided<[16, 4, 1], offset: ?>>
-// CHECK:         %[[dispatch:.*]] = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4, 16, 16] flags = (vnni_b) data_type = bf16
+// CHECK-DAG:         %[[dispatch:.*]] = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4, 16, 16] flags = (vnni_b) data_type = bf16
 // CHECK:         xsmm.brgemm(data_type = bf16, %[[dispatch]], %[[subview_3]], %[[subview_2]], %[[subview]], %[[c4_i64]]) : (i64, memref<4x4x4xbf16, strided<[16, 4, 1], offset: ?>>, memref<4x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>, memref<4x4xbf16, strided<[4, 1], offset: ?>>, i64) -> ()
 

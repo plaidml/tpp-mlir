@@ -421,7 +421,7 @@ def LoopInsertionPass: Pass<"loop-insertion-pass">{
   let description = [{
     Insert nd parallel loop around brgemm parallel loop.
   }];
-  let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect"];
+  let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect", "affine::AffineDialect"];
   let options = [
     Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
                "One dimensional tile shape to reshape the first tiled input operand tensor of brgemm into (the second dimension will be computed)">,
