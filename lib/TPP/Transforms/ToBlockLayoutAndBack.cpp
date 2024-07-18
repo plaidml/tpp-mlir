@@ -454,7 +454,9 @@ getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
     return {32, 32};
   }
   assert(isa<linalg::MatmulOp>(linalgOp) ||
-         isa<linalg::BatchMatmulOp>(linalgOp));
+         isa<linalg::BatchMatmulOp>(linalgOp) ||
+         isa<linalg::MatmulTransposeAOp>(linalgOp) ||
+         isa<linalg::MatmulTransposeBOp>(linalgOp));
   return {32, 32, 32};
 }
 
@@ -480,8 +482,10 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
         -> std::optional<linalg::BlockPackMatmulOptions> {
       linalg::BlockPackMatmulOptions options;
 
-      // Pack only these two named matmul variants.
+      // Pack only these named matmul variants.
       if (!(isa<linalg::MatmulOp>(linalgOp) ||
+            isa<linalg::MatmulTransposeAOp>(linalgOp) ||
+            isa<linalg::MatmulTransposeBOp>(linalgOp) ||
             isa<linalg::BatchMatmulOp>(linalgOp))) {
         return std::nullopt;
       }
