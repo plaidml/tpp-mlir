@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinDialect.h"
 
@@ -39,16 +40,39 @@ void parseStringList(StringRef str, SmallVector<int64_t> &list) {
   }
 }
 
+/// Returns the vector of boolean for the required broadcast dimensions
+static SmallVector<bool> getBroadcastDims(ArrayRef<int64_t> sourceShape,
+                                          ArrayRef<int64_t> targetShape) {
+  SmallVector<bool> broadcastDims;
+  int sourceIdx = sourceShape.size() - 1;
+  int targetIdx = targetShape.size() - 1;
+
+  while (targetIdx >= 0) {
+    if (sourceIdx >= 0 && sourceShape[sourceIdx] == targetShape[targetIdx]) {
+      broadcastDims.push_back(false);
+      sourceIdx--;
+    } else {
+      broadcastDims.push_back(true);
+    }
+    targetIdx--;
+  }
+
+  std::reverse(broadcastDims.begin(), broadcastDims.end());
+  return broadcastDims;
+}
+
 } // anonymous namespace
 
-MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
-                             StringRef layersStr, StringRef tilesStr,
-                             StringRef targetType, int seed, bool enableBias,
-                             bool enableRelu, bool enableSoftmax,
+MLIRGenerator::MLIRGenerator(StringRef outputOpKindStr, StringRef kernelStr,
+                             unsigned batch, StringRef layersStr,
+                             StringRef tilesStr, StringRef targetType, int seed,
+                             bool enableBias, bool enableRelu,
+                             bool enableSoftmax, bool keepGenericMatmul,
                              int vnniBlockingFactor)
     : builder(&context), loc(builder.getUnknownLoc()), batch(batch), seed(seed),
       flops(0), enableBias(enableBias), enableRelu(enableRelu),
-      enableSoftmax(enableSoftmax), vnniFactor(vnniBlockingFactor) {
+      enableSoftmax(enableSoftmax), keepGenericMatmul(keepGenericMatmul),
+      vnniFactor(vnniBlockingFactor) {
 
   // Register all necessary dialects
   context
@@ -56,6 +80,15 @@ MLIRGenerator::MLIRGenerator(StringRef kernelStr, unsigned batch,
                    bufferization::BufferizationDialect, tensor::TensorDialect,
                    linalg::LinalgDialect, math::MathDialect,
                    arith::ArithDialect, scf::SCFDialect>();
+
+  // Parse output Op kind
+  auto optOutputOpKind =
+      llvm::StringSwitch<std::optional<OutputOpKind>>(outputOpKindStr)
+          .CaseLower("generic", OutputOpKind::Generic)
+          .CaseLower("named", OutputOpKind::NamedOp)
+          .Default(std::nullopt);
+  assert(optOutputOpKind && "Invalid output Op kind");
+  outputOpKind = *optOutputOpKind;
 
   // Parse kernel type
   auto optKernel = llvm::StringSwitch<std::optional<KernelType>>(kernelStr)
@@ -142,12 +175,22 @@ Value MLIRGenerator::createLayer(LayerArgs &args) {
   chain = lowerMatmul(args.input.value, args.weight.value, args.output.value);
 
   // These are optional and only emitted if enabled
-  chain = lowerBiasAdd(chain, args.bias.value, args.output.value);
-  chain = lowerRelu(chain, args.output.value);
+  if (outputOpKind == OutputOpKind::Generic) {
+    chain = lowerBiasAdd(chain, args.bias.value, args.output.value);
+    chain = lowerRelu(chain, args.output.value);
+  } else if (outputOpKind == OutputOpKind::NamedOp) {
+    chain = lowerNamedBiasAdd(chain, args.bias.value, args.output.value);
+    chain = lowerNamedRelu(chain, args.output.value);
+  }
 
   // Last layer may output softmax
-  if (args.index == layers.size() - 1)
-    chain = lowerSoftmax(chain, args.output.value);
+  if (args.index == layers.size() - 1) {
+    if (outputOpKind == OutputOpKind::Generic) {
+      chain = lowerSoftmax(chain, args.output.value);
+    } else if (outputOpKind == OutputOpKind::NamedOp) {
+      chain = lowerNamedSoftmax(chain, args.output.value);
+    }
+  }
 
   // Return output tensor to the next layer
   return chain;
@@ -264,10 +307,89 @@ std::string MLIRGenerator::createMetadata() {
   return data;
 }
 
-Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
-  auto inputShape = cast<ShapedType>(input.getType());
-  auto outShape = cast<ShapedType>(output.getType());
+void MLIRGenerator::computeMatmulFlops(ShapedType inputShape,
+                                       ShapedType outputShape) {
+  // Matmul flops = 2 * M * N * K = 2 * prod(inputDims) * N (outShape[1])
+  int64_t mkFlops = 1;
+  for (int i = 0, max = inputShape.getRank(); i < max; i++)
+    mkFlops *= inputShape.getDimSize(i);
+  int outRank = outputShape.getRank();
+  assert((outRank == 2 || outRank == 4) && "Invalid outRank");
+  // Tiled: N = NB * n = outShape[0] + outShape[3]
+  int64_t nFlops = outputShape.getDimSize(outRank - 1);
+  if (outRank > 2)
+    nFlops *= outputShape.getDimSize(1);
+  flops += 2 * mkFlops * nFlops;
+}
 
+void MLIRGenerator::computeBiasOrReluFlops(ShapedType outputShape) {
+  // Add flops = M * N = prod(outputDims)
+  int64_t addReluFlops = 1;
+  for (int i = 0, max = outputShape.getRank(); i < max; i++)
+    addReluFlops *= outputShape.getDimSize(i);
+  flops += addReluFlops;
+}
+
+Value MLIRGenerator::lowerNamedMatmul(Value input, Value weight, Value output) {
+  auto inputShape = cast<ShapedType>(input.getType());
+  auto weightShape = cast<ShapedType>(weight.getType());
+
+  // TODO: VNNI produces mixed shape args, say 4D input and 5D weight. All
+  // linalg named ops for matrix multiplication expects arguments of same
+  // number of dimensions. Hence, such matmul patterns are not compatible to be
+  // matched using named ops. Having a tuple or vector type as the element of
+  // tensor had been discussed and can be revisited as potential solution.
+  if (vnniFactor != 0) {
+    llvm_unreachable(
+        "Unsupported Lowering for VNNI, Try '--keep-generic-matmul'");
+  }
+
+  Value namedMatmul;
+  if (inputShape.getRank() == 2) {
+    namedMatmul = builder
+                      .create<linalg::MatmulOp>(
+                          loc, TypeRange{output.getType()},
+                          ValueRange{input, weight}, ValueRange{output})
+                      .getResult(0);
+  } else if (inputShape.getRank() == 4) {
+    SmallVector<OpFoldResult, 4> dims =
+        tensor::getMixedSizes(builder, loc, weight);
+    applyPermutationToVector(dims, {0, 1, 3, 2});
+    Value emptyTensor = builder.create<tensor::EmptyOp>(
+        loc, dims, weightShape.getElementType());
+
+    Value transpose =
+        builder
+            .create<linalg::TransposeOp>(loc, weight, emptyTensor,
+                                         ArrayRef<int64_t>{0, 1, 3, 2})
+            .getResults()[0];
+    namedMatmul = builder
+                      .create<linalg::Mmt4DOp>(loc, TypeRange{output.getType()},
+                                               ValueRange{input, transpose},
+                                               ValueRange{output})
+                      .getResult(0);
+  }
+
+  return namedMatmul;
+}
+
+Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
+  Value chain;
+  auto inputShape = cast<ShapedType>(input.getType());
+  auto outputShape = cast<ShapedType>(output.getType());
+  if (outputOpKind == OutputOpKind::Generic ||
+      (outputOpKind == OutputOpKind::NamedOp && keepGenericMatmul)) {
+    chain = lowerGenericMatmul(input, weight, output);
+  } else if (outputOpKind == OutputOpKind::NamedOp) {
+    chain = lowerNamedMatmul(input, weight, output);
+  }
+
+  computeMatmulFlops(inputShape, outputShape);
+  return chain;
+}
+
+Value MLIRGenerator::lowerGenericMatmul(Value input, Value weight,
+                                        Value output) {
   // Matmul as a linalg.generic
   auto map1 = getMap(input, MAP_MATMUL_INPUT);   // { 0, 2 }
   auto map2 = getMap(weight, MAP_MATMUL_WEIGHT); // { 2, 1 }
@@ -288,18 +410,6 @@ Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
                 nestedBuilder.create<linalg::YieldOp>(loc, ValueRange{add});
               })
           .getResult(0);
-
-  // Matmul flops = 2 * M * N * K = 2 * prod(inputDims) * N (outShape[1])
-  int64_t mkFlops = 1;
-  for (int i = 0, max = inputShape.getRank(); i < max; i++)
-    mkFlops *= inputShape.getDimSize(i);
-  int outRank = outShape.getRank();
-  assert((outRank == 2 || outRank == 4) && "Invalid outRank");
-  // Tiled: N = NB * n = outShape[0] + outShape[3]
-  int64_t nFlops = outShape.getDimSize(outRank - 1);
-  if (outRank > 2)
-    nFlops *= outShape.getDimSize(1);
-  flops += 2 * mkFlops * nFlops;
 
   return matmul;
 }
@@ -325,13 +435,56 @@ Value MLIRGenerator::lowerBiasAdd(Value input, Value bias, Value output) {
               })
           .getResult(0);
 
-  // Add flops = M * N = prod(outputDims)
-  int64_t addFlops = 1;
-  for (int i = 0, max = outTy.getRank(); i < max; i++)
-    addFlops *= outTy.getDimSize(i);
-  flops += addFlops;
-
+  computeBiasOrReluFlops(outTy);
   return sum;
+}
+
+Value MLIRGenerator::lowerNamedBiasAdd(Value input, Value bias, Value output) {
+  if (!enableBias)
+    return input;
+
+  auto outTy = cast<ShapedType>(input.getType());
+  auto biasTy = cast<ShapedType>(bias.getType());
+  Value emptyTensor = builder.create<tensor::EmptyOp>(loc, outTy, ValueRange{});
+  SmallVector<int64_t> addedDimensions;
+  SmallVector<bool> dimsNeeded =
+      getBroadcastDims(biasTy.getShape(), outTy.getShape());
+  for (int64_t dim : llvm::seq<int64_t>(0, outTy.getRank() - 1)) {
+    if (dimsNeeded[dim])
+      addedDimensions.push_back(dim);
+  }
+
+  Value broadcast =
+      builder
+          .create<linalg::BroadcastOp>(loc, bias, emptyTensor, addedDimensions)
+          .getResult()[0];
+  Value biasAdd = builder
+                      .create<linalg::AddOp>(loc, TypeRange{output.getType()},
+                                             ValueRange{broadcast, input},
+                                             ValueRange{output})
+                      .getResult(0);
+
+  computeBiasOrReluFlops(outTy);
+  return biasAdd;
+}
+
+Value MLIRGenerator::lowerNamedRelu(Value input, Value output) {
+  if (!enableRelu)
+    return input;
+
+  auto outTy = cast<ShapedType>(input.getType());
+  auto zero = getConstFloat(builder, 0.0, cast<FloatType>(dataType));
+  Value emptyTensor = builder.create<tensor::EmptyOp>(loc, outTy, ValueRange{});
+  auto fill =
+      builder.create<linalg::FillOp>(loc, zero, emptyTensor)->getResult(0);
+  Value relu =
+      builder
+          .create<linalg::MaxOp>(loc, TypeRange{output.getType()},
+                                 ValueRange{input, fill}, ValueRange{output})
+          .getResult(0);
+
+  computeBiasOrReluFlops(outTy);
+  return relu;
 }
 
 Value MLIRGenerator::lowerRelu(Value input, Value output) {
@@ -355,13 +508,25 @@ Value MLIRGenerator::lowerRelu(Value input, Value output) {
               })
           .getResult(0);
 
-  // Relu flops = M * N = prod(outputDims)
-  int64_t reluFlops = 1;
-  for (int i = 0, max = outTy.getRank(); i < max; i++)
-    reluFlops *= outTy.getDimSize(i);
-  flops += reluFlops;
-
+  computeBiasOrReluFlops(outTy);
   return relu;
+}
+
+Value MLIRGenerator::lowerNamedSoftmax(Value input, Value output) {
+  if (!enableSoftmax)
+    return input;
+
+  // TODO: Add lowering of softmax to sequence of named Ops
+  llvm_unreachable("Linalg named ops for softmax not implemented yet");
+  
+  auto outTy = cast<ShapedType>(input.getType());
+  // Softmax flops = 4 * M * N = 4 * prod(outputDims)
+  int64_t softmaxFlops = 1;
+  for (int i = 0, max = outTy.getRank(); i < max; i++)
+    softmaxFlops *= outTy.getDimSize(i);
+  flops += 4 * softmaxFlops;
+
+  return input;
 }
 
 Value MLIRGenerator::lowerSoftmax(Value input, Value output) {

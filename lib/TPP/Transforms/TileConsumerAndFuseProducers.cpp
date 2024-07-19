@@ -721,6 +721,9 @@ struct TileConsumerAndFuseProducers
             RankReductionStrategy::ExtractInsertSlice;
         linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
         tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+
+        // TODO: Remove the generalization of named ops after resolving the
+        // above dependency with "populateFoldUnitExtentDimsViaSlicesPatterns".
         linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
         (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
       }
