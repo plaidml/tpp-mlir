@@ -566,6 +566,18 @@ getTileForEltWiseConsumer(Operation *consumer, Operation *producer,
   return eltWiseTiles;
 }
 
+static bool hasOneUser(Value op) {
+  if (op.hasOneUse())
+    return true;
+  auto users = op.getUsers();
+  Operation *firstUser = *users.begin();
+  if (firstUser)
+    return llvm::all_of(users,
+                        [&](Operation *user) { return user == firstUser; });
+
+  return false;
+}
+
 static Operation *getLastFusableEltWiseConsumer(
     linalg::LinalgOp linalgOp,
     llvm::SmallDenseSet<Operation *> &visitedConsumers,
@@ -574,7 +586,7 @@ static Operation *getLastFusableEltWiseConsumer(
   Value linalgOpRes = linalgOp->getResult(0);
   // If we allow use, we may end up doing recomputation. Unclear if it is
   // profitablem thus disallow for now.
-  if (!linalgOpRes.hasOneUse())
+  if (!hasOneUser(linalgOpRes))
     return linalgOp;
 
   // Start checking consumers.
@@ -606,8 +618,7 @@ static Operation *getLastFusableEltWiseConsumer(
         getTileForEltWiseConsumer(currentConsumer, linalgOp, tiles[linalgOp]);
     visitedConsumers.insert(currentConsumer);
     // Require each eltwise to have a single user.
-    if (std::distance(resNextConsumer.getUsers().begin(),
-                      resNextConsumer.getUsers().end()) != 1) {
+    if (!hasOneUser(resNextConsumer)) {
       break;
     }
     nextConsumer = *(resNextConsumer.getUsers().begin());
