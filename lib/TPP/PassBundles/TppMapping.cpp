@@ -67,11 +67,13 @@ private:
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
     // mess up tensor producer-consumer chains used for analysis in the
     // following passes.
+    // Generalize named ops to allow packing propagation.
+    // TODO: Remove the generalization when upstream propagation is improved.
+    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
     pm.addPass(createPropagatePackUnPack());
     pm.addPass(createConstantFoldPack());
     pm.addPass(createSimplifyAndCanonicalizePack());
 
-    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
     pm.addPass(createCleanup());
     pm.addNestedPass<func::FuncOp>(
         createLinalgConvertCompareSelectToMaximumfPass());
