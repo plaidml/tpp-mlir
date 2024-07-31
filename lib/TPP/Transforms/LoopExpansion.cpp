@@ -76,6 +76,20 @@ static LogicalResult loopExpand(scf::ForallOp op, unsigned numOuterParallel) {
     }
   }
 
+  for (auto oper = op.getBody()->getOperations().begin();
+       oper != op.getBody()->getOperations().end(); oper++) {
+    if (isa<scf::InParallelOp>(oper)) {
+      auto nestedOperations = dyn_cast<scf::InParallelOp>(oper);
+      for (auto nestedOper = nestedOperations.begin();
+           nestedOper != nestedOperations.end(); nestedOper++) {
+        if (isa<scf::InParallelOp>(nestedOper)) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Serialization of nested parallel ops unsupported");
+          return failure();
+        }
+      }
+    }
+  }
   // Clone instructions at the innermost loop level
   IRMapping mapping;
   for (auto oper = op.getBody()->getOperations().begin();
@@ -99,8 +113,32 @@ static LogicalResult loopExpand(scf::ForallOp op, unsigned numOuterParallel) {
         }
         j++;
       }
+    } else {
+      auto nestedOperations = (dyn_cast<scf::InParallelOp>(oper));
+      for (auto nestedOper = nestedOperations.begin();
+           nestedOper != nestedOperations.end(); nestedOper++) {
+        auto clonedInstr = rewriter.clone(*nestedOper, mapping);
+        nestedOper->replaceAllUsesWith(clonedInstr);
+        int j = 0;
+        for (auto arg : clonedInstr->getOperands()) {
+          for (size_t i = 0; i < op.getInductionVars().size(); i++) {
+            if (arg == op.getInductionVars()[i]) {
+              if (i < numOuterParallel) {
+                clonedInstr->setOperand(
+                    j, parallelOpList[i].getInductionVars()[0]);
+              } else {
+                clonedInstr->setOperand(
+                    j, forOpList[i - numOuterParallel].getInductionVar());
+              }
+              break;
+            }
+          }
+          j++;
+        }
+      }
     }
   }
+
   rewriter.eraseOp(op);
   return success();
 }
