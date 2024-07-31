@@ -1,5 +1,7 @@
 // RUN: tpp-opt %s -tile-consumer-and-fuse-producers | FileCheck %s
 
+
+// This test checks for the fusion of bias and relu with matmul.
 func.func @fuse_fill(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf32>, %arg4: tensor<32x32x32x32xf32>) -> tensor<8x32x32x32xf32> {
     %cst_d = arith.constant dense<1.000000e+00> : tensor<32x32x32x32xf32>
     %cst = arith.constant 0.000000e+00 : f32
@@ -28,24 +30,58 @@ func.func @fuse_fill(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf3
 // CHECK: #[[$ATTR_0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK: #[[$ATTR_1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK: #[[$ATTR_2:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-// CHECK: #[[$ATTR_3:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #[[$ATTR_3:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 
-
-// CHECK-LABEL:   func.func @fuse_fill(
+// CHECK-LABEL:   func.func @fuse_fill
 
 // CHECK:           %{{.+}} = linalg.transpose ins(%{{.+}} : tensor<32x32x32x32xf32>) outs(%{{.+}} : tensor<32x32x32x32xf32>) permutation = [0, 1, 3, 2]
 // CHECK-NEXT:        %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (8, 32) shared_outs(%{{.+}} = %{{.+}}) -> (tensor<8x32x32x32xf32>) {
-// CHECK:             %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK:             %{{.+}} = linalg.generic 
-// CHECK:           %{{.+}} = linalg.generic
-// CHECK:           %{{.+}} = linalg.generic 
-// CHECK:             %{{.+}} = arith.maximumf 
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.maximumf
 
-// CHECK:           %{{.+}} = linalg.transpose 
+// CHECK:           %{{.+}} = linalg.transpose ins(%{{.+}} : tensor<32x32x32x32xf32>) outs(%{{.+}} : tensor<32x32x32x32xf32>) permutation = [0, 1, 3, 2]
 // CHECK-NEXT:        %{{.+}} = scf.forall (%{{.+}}, %{{.+}}) in (8, 32) shared_outs(%{{.+}} = %{{.+}}) -> (tensor<8x32x32x32xf32>) {
-// CHECK:             %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
-// CHECK:             %{{.+}} = linalg.generic 
-// CHECK:           %{{.+}} = linalg.generic 
-// CHECK:             %{{.+}} = arith.addf 
-// CHECK:           %{{.+}} = linalg.generic 
-// CHECK:             %{{.+}} = arith.maximumf 
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.fill ins(%{{.+}} : f32) outs(%{{.+}} : tensor<32x32xf32>) -> tensor<32x32xf32>
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.mulf
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.addf
+// CHECK:               %{{.+}} = linalg.generic
+// CHECK:                 %{{.+}} = arith.maximumf
+
+// -----

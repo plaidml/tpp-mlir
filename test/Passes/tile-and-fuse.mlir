@@ -716,3 +716,51 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
   vector.print %f1 : vector<4x4xf32>
   return %39 : tensor<8x112x32x32xbf16>
 }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @matmul_chain_use_into_relu(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32xf32>,
+   %arg2: tensor<32x32xf32>) -> tensor<32x32xf32> {
+    %c0 = arith.constant 0.000000e+00 : f32
+    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
+
+    %1 = linalg.generic {indexing_maps = [#map],
+                       iterator_types = ["parallel", "parallel"]}
+    outs(%0: tensor<32x32xf32>) {
+      ^bb0(%out: f32):
+        %2 = arith.maximumf %out, %c0 : f32
+        linalg.yield %2 : f32
+    } -> tensor<32x32xf32>
+    return %1 : tensor<32x32xf32>
+}
+
+// CHECK: #[[$ATTR_0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+
+// CHECK-LABEL:   func.func @matmul_chain_use_into_relu(
+// CHECK-SAME:                                               %[[VAL_0:.*]]: tensor<32x64xf32>,
+// CHECK-SAME:                                               %[[VAL_1:.*]]: tensor<64x32xf32>,
+// CHECK-SAME:                                               %[[VAL_2:.*]]: tensor<32x32xf32>) -> tensor<32x32xf32> {
+// CHECK:           %[[VAL_3:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 32 : index
+// CHECK:           %[[VAL_5:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 0.000000e+00 : f32
+// CHECK:           %[[VAL_7:.*]] = scf.for %[[VAL_8:.*]] = %[[VAL_5]] to %[[VAL_4]] step %[[VAL_3]] iter_args(%[[VAL_9:.*]] = %[[VAL_2]]) -> (tensor<32x32xf32>) {
+// CHECK:             %[[VAL_10:.*]] = scf.for %[[VAL_11:.*]] = %[[VAL_5]] to %[[VAL_4]] step %[[VAL_3]] iter_args(%[[VAL_12:.*]] = %[[VAL_9]]) -> (tensor<32x32xf32>) {
+// CHECK:               %[[VAL_13:.*]] = tensor.extract_slice %[[VAL_0]]{{\[}}%[[VAL_8]], 0] [2, 64] [1, 1] : tensor<32x64xf32> to tensor<2x64xf32>
+// CHECK:               %[[VAL_14:.*]] = tensor.extract_slice %[[VAL_1]][0, %[[VAL_11]]] [64, 2] [1, 1] : tensor<64x32xf32> to tensor<64x2xf32>
+// CHECK:               %[[VAL_15:.*]] = tensor.extract_slice %[[VAL_12]]{{\[}}%[[VAL_8]], %[[VAL_11]]] [2, 2] [1, 1] : tensor<32x32xf32> to tensor<2x2xf32>
+// CHECK:               %[[VAL_16:.*]] = linalg.matmul ins(%[[VAL_13]], %[[VAL_14]] : tensor<2x64xf32>, tensor<64x2xf32>) outs(%[[VAL_15]] : tensor<2x2xf32>) -> tensor<2x2xf32>
+// CHECK:               %[[VAL_17:.*]] = linalg.generic {indexing_maps = [#[[$ATTR_0]]], iterator_types = ["parallel", "parallel"]} outs(%[[VAL_16]] : tensor<2x2xf32>) {
+// CHECK:               ^bb0(%[[VAL_18:.*]]: f32):
+// CHECK:                 %[[VAL_19:.*]] = arith.maximumf %[[VAL_18]], %[[VAL_6]] : f32
+// CHECK:                 linalg.yield %[[VAL_19]] : f32
+// CHECK:               } -> tensor<2x2xf32>
+// CHECK:               %[[VAL_20:.*]] = tensor.insert_slice %[[VAL_17]] into %[[VAL_12]]{{\[}}%[[VAL_8]], %[[VAL_11]]] [2, 2] [1, 1] : tensor<2x2xf32> into tensor<32x32xf32>
+// CHECK:               scf.yield %[[VAL_20]] : tensor<32x32xf32>
+// CHECK:             }
+// CHECK:             scf.yield %[[VAL_10]] : tensor<32x32xf32>
+// CHECK:           } {parallel = "root"}
+// CHECK:           return %[[VAL_7]] : tensor<32x32xf32>
+// CHECK:         }
