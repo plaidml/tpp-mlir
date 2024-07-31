@@ -43,6 +43,28 @@ def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
                            "linalg::LinalgDialect", "LLVM::LLVMDialect"];
 }
 
+def VectorizationPass : Pass<"vectorization-pass",
+                                     "func::FuncOp"> {
+  let summary = "convert linalg to memref/vector";
+  let description = [{
+    Vectorization pass to convert linalg to memref/vector instead of Xsmm.
+  }];
+
+  let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "vector::VectorDialect" ];
+}
+
+
+def VectorContractPass : Pass<"vector-contract-pass",
+                                     "func::FuncOp"> {
+  let summary = "convert vector rductions to contractions";
+  let description = [{
+    Vector Contract pass to convert reductions to contractions.
+  }];
+
+  let dependentDialects = [ "vector::VectorDialect" ];
+}
+
+
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let description = [{
