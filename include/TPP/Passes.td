@@ -517,4 +517,9 @@ def FoldIntoEltwise : Pass<"fold-into-eltwise", "ModuleOp"> {
                            "affine::AffineDialect"];
 }
 
+def GeneralizeNamedOps : Pass<"generalize-named-ops"> {
+  let summary = "Selectively convert named ops into generic ops";
+  let dependentDialects = ["linalg::LinalgDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
