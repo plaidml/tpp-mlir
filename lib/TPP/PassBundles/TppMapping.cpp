@@ -17,6 +17,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "TPP/PassUtils.h"
 
@@ -63,6 +64,11 @@ private:
     pm.addPass(createPackMatmul());
     pm.addPass(createPackVNNI());
 
+    // TODO: Remove when layout propagation and tile-and-fuse have better
+    //       support for named ops.
+    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
+    pm.addPass(createCanonicalizerPass());
+
     // Postprocess packing.
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
     // mess up tensor producer-consumer chains used for analysis in the
@@ -71,7 +77,6 @@ private:
     pm.addPass(createConstantFoldPack());
     pm.addPass(createSimplifyAndCanonicalizePack());
 
-    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
     pm.addPass(createCleanup());
     pm.addNestedPass<func::FuncOp>(
         createLinalgConvertCompareSelectToMaximumfPass());
