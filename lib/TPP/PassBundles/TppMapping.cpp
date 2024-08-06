@@ -66,7 +66,7 @@ private:
 
     // TODO: Remove when layout propagation and tile-and-fuse have better
     //       support for named ops.
-    pm.addNestedPass<func::FuncOp>(createLinalgGeneralizeNamedOpsPass());
+    pm.addNestedPass<func::FuncOp>(createGeneralizeNamedOps());
     pm.addPass(createCanonicalizerPass());
 
     // Postprocess packing.

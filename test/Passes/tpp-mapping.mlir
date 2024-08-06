@@ -207,3 +207,25 @@ func.func @tile_and_fuse(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.maximumf
+
+// -----
+
+func.func @tile_and_fuse_named(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32>,
+    %arg2: tensor<64x64xf32>, %arg3: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %e = tensor.empty() : tensor<64x64xf32>
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<64x64xf32>, tensor<64x64xf32>)
+    outs(%arg2 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %1 = linalg.add ins(%0, %arg3 : tensor<64x64xf32>, tensor<64x64xf32>)
+    outs(%e : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %1 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: tile_and_fuse_named(
+// CHECK-COUNT-3: tensor.pack
+// Fused matmul and relu
+// CHECK: scf.forall
+// CHECK: linalg.batch_reduce_matmul{{.*}}ins(%{{.+}}, %{{.+}} : tensor<2x32x32xf32>, tensor<2x32x32xf32>)
+// CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
+// CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
+// CHECK:   arith.addf
+// CHECK: tensor.unpack
