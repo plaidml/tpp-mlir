@@ -449,7 +449,32 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
 // Trivial tile selection. If the dimension is statically known, it perfectly
 // divides the tile, and we have enough iterations return a default of 32.
 static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
-  const int64_t tile = 32;
+  int64_t tile = 32;
+
+  // Check if a tile size hint is associated to the IR via DLTI.
+  auto deriveFromDLTI = [&](ModuleOp moduleOp) {
+    if (!moduleOp)
+      return;
+    TargetSystemSpecInterface sysSpec = moduleOp.getTargetSystemSpec();
+    if (!sysSpec)
+      return;
+    auto deviceId = StringAttr::get(linalgOp->getContext(), "CPU");
+    auto deviceSpec = sysSpec.getDeviceSpecForDeviceID(deviceId);
+    if (!deviceSpec)
+      return;
+    auto tileSizeId = StringAttr::get(linalgOp->getContext(), "tile_size");
+    DataLayoutEntryInterface entry =
+        (*deviceSpec).getSpecForIdentifier(tileSizeId);
+    if (!entry)
+      return;
+    Attribute value = entry.getValue();
+    if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value))
+      tile = intAttr.getInt();
+    // TODO: might want to print a warning if tile_size exists as a key but the
+    //       associated attribute has an unexpected type.
+  };
+  deriveFromDLTI(linalgOp->getParentOfType<mlir::ModuleOp>());
+
   SmallVector<int64_t, 4> loopsRange = linalgOp.getStaticLoopRanges();
   if (loopsRange[dim] == ShapedType::kDynamic)
     return tile;
