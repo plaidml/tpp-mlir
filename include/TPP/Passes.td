@@ -504,4 +504,15 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
   ];
 }
 
+def FoldIntoEltwise : Pass<"fold-into-eltwise", "ModuleOp"> {
+  let summary = "Fold operations into elementwise ops.";
+  let description = [{
+    Fold operations into Linalg elementwise ops.
+    Results in linalg.generic representation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "arith::ArithDialect",
+                           "affine::AffineDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
