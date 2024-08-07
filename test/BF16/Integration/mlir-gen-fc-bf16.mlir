@@ -84,9 +84,9 @@
 // GENERIC:           } -> tensor<2x16x64x48xbf16>
 // GENERIC:           %[[VAL_10:.*]] = tensor.empty() : tensor<2x16x64x48xbf16>
 // GENERIC:           %[[VAL_11:.*]] = linalg.broadcast ins(%[[VAL_2]] : tensor<16x48xbf16>) outs(%[[VAL_10]] : tensor<2x16x64x48xbf16>) dimensions = [0, 2]
-// GENERIC:           %[[VAL_12:.*]] = linalg.add ins(%[[VAL_11]], %[[VAL_4]] : tensor<2x16x64x48xbf16>, tensor<2x16x64x48xbf16>) outs(%[[VAL_3]] : tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16>
+// GENERIC:           %[[VAL_12:.*]] = linalg.add ins(%[[VAL_11]], %[[VAL_4]] : tensor<2x16x64x48xbf16>, tensor<2x16x64x48xbf16>) outs(%[[VAL_10]] : tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16>
 // GENERIC:           %[[VAL_13:.*]] = arith.constant 0.000000e+00 : bf16
 // GENERIC:           %[[VAL_14:.*]] = tensor.empty() : tensor<2x16x64x48xbf16>
 // GENERIC:           %[[VAL_15:.*]] = linalg.fill ins(%[[VAL_13]] : bf16) outs(%[[VAL_14]] : tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16>
-// GENERIC:           %[[VAL_16:.*]] = linalg.max ins(%[[VAL_12]], %[[VAL_15]] : tensor<2x16x64x48xbf16>, tensor<2x16x64x48xbf16>) outs(%[[VAL_3]] : tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16>
+// GENERIC:           %[[VAL_16:.*]] = linalg.max ins(%[[VAL_12]], %[[VAL_15]] : tensor<2x16x64x48xbf16>, tensor<2x16x64x48xbf16>) outs(%[[VAL_14]] : tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16>
 // GENERIC:           return %[[VAL_16]] : tensor<2x16x64x48xbf16>
