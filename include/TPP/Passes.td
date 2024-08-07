@@ -367,19 +367,6 @@ def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
 }
 
 
-def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
-  let summary = "Tile parallel loops";
-  let options = [
-    ListOption<"tileSizes", "parallel-loop-tile-sizes", "unsigned",
-               "Factors to tile parallel loops by">,
-    Option<"noMinMaxBounds", "no-min-max-bounds", "bool",
-           /*default=*/"false",
-           "Perform tiling with fixed upper bound with inbound check "
-           "inside the internal loops">
-  ];
-  let dependentDialects = ["affine::AffineDialect", "scf::SCFDialect"];
-}
-
 def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
   let summary = "Inlines constants into GPU launch.";
   let description = [{
@@ -427,6 +414,45 @@ def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
     Convert linalg add to in-place update operation.
   }];
   let dependentDialects = ["linalg::LinalgDialect"];
+}
+
+def LoopInsertionPass: Pass<"loop-insertion-pass">{
+  let summary = "Insert loop around brgemm parallel op";
+  let description = [{
+    Insert nd parallel loop around brgemm parallel loop.
+  }];
+  let dependentDialects = ["scf::SCFDialect" , "xsmm::XsmmDialect", "affine::AffineDialect"];
+  let options = [
+    Option<"tileShapeM", "M-tile-shape", "unsigned", "0", 
+               "One dimensional tile shape to reshape the first tiled input operand tensor of brgemm into (the second dimension will be computed)">,
+    Option<"tileShapeN", "N-tile-shape", "unsigned", "0", 
+               "One dimensional tile shape to reshape the second tiled input operand tensor of brgemm into (the second dimension will be computed)">
+  ];
+}
+
+def LoopExpansionPass: Pass<"loop-expansion-pass">{
+  let summary = "Expand brgemm parallel op";
+  let description = [{
+    Expand nd parallel loop.
+  }];
+  let options = [
+    Option<"numOuterParallel", "num-outer-parallel", "unsigned",
+               "0", "Number of outer Parallel Loops">
+  ];
+  let dependentDialects = ["scf::SCFDialect"];
+}
+
+def LoopShufflePass: Pass<"loop-shuffle-pass">{
+  let summary = "Shuffle brgemm parallel op";
+  let description = [{
+    Shuffle nd brgemm parallel loop.
+  }];
+  let options = [
+    ListOption<"shuffleOrder", "loop-shuffle-order", "unsigned",
+               "Permutation order (integer index list) to shuffle the scf forall loop by">
+  ];
+
+  let dependentDialects = ["scf::SCFDialect"];
 }
 
 def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{

@@ -48,8 +48,6 @@ struct LinalgLowering : public tpp::impl::LinalgLoweringBase<LinalgLowering>,
 private:
   void constructPipeline() override {
     pm.addPass(createConvertLinalgToXsmm());
-    pm.addPass(createCombineXsmmOpPass());
-    pm.addPass(createFoldXsmmFlags());
     pm.addPass(createVerifyXsmmCalls());
   }
 };
