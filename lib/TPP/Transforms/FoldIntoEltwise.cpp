@@ -105,10 +105,27 @@ struct BroadcastIntoEltwise
   }
 };
 
+// Folds linalg.max(linalg.fill(%cst), ...) into linalg.generic op.
+// For example, rewrites:
+//   %fill = linalg.fill %cst
+//   linalg.max %val %fill
+// into:
+//   linalg.generic
+//     arith.max %in, %cst
+struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
+  using OpRewritePattern<linalg::MaxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::MaxOp maxOp,
+                                PatternRewriter &rewriter) const override {
+
+    return success();
+  }
+};
+
 struct FoldIntoEltwise : tpp::impl::FoldIntoEltwiseBase<FoldIntoEltwise> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<BroadcastIntoEltwise>(patterns.getContext());
+    patterns.add<BroadcastIntoEltwise, FillIntoMax>(patterns.getContext());
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
