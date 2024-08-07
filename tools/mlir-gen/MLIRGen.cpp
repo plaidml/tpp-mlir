@@ -461,7 +461,7 @@ Value MLIRGenerator::lowerNamedBiasAdd(Value input, Value bias, Value output) {
   Value biasAdd = builder
                       .create<linalg::AddOp>(loc, TypeRange{output.getType()},
                                              ValueRange{broadcast, input},
-                                             ValueRange{output})
+                                             ValueRange{emptyTensor})
                       .getResult(0);
 
   computeBiasOrReluFlops(outTy);
@@ -480,7 +480,7 @@ Value MLIRGenerator::lowerNamedRelu(Value input, Value output) {
   Value relu =
       builder
           .create<linalg::MaxOp>(loc, TypeRange{output.getType()},
-                                 ValueRange{input, fill}, ValueRange{output})
+                                 ValueRange{input, fill}, ValueRange{emptyTensor})
           .getResult(0);
 
   computeBiasOrReluFlops(outTy);
@@ -800,4 +800,3 @@ Value MLIRGenerator::getZeroInitTensor(TensorType type) {
   tensor = builder.create<linalg::FillOp>(loc, zero, tensor).getResult(0);
   return tensor;
 }
-
