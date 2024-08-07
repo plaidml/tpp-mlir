@@ -228,4 +228,4 @@ func.func @tile_and_fuse_named(%arg0: tensor<64x64xf32>, %arg1: tensor<64x64xf32
 // CHECK-SAME:{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK: linalg.generic{{.*}}outs(%{{.+}} : tensor<32x32xf32>)
 // CHECK:   arith.addf
-// CHECK: tensor.unpack
+// CHECK-NOT: tensor.unpack
