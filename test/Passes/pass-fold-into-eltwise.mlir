@@ -194,7 +194,7 @@ func.func @no_fold_non_eltwise(%arg0: tensor<16xf32>,
 
 // -----
 
-func.func @no_fold_non_tensor(%arg0: memref<8xf32>,
+func.func @no_broadcast_fold_non_tensor(%arg0: memref<8xf32>,
     %arg1: memref<8x4xf32>,
     %arg2: memref<8x4xf32>) {
   linalg.broadcast ins(%arg0 : memref<8xf32>) outs(%arg2 : memref<8x4xf32>) dimensions = [1]
@@ -203,7 +203,7 @@ func.func @no_fold_non_tensor(%arg0: memref<8xf32>,
   return
 }
 
-// CHECK-LABEL: @no_fold_non_tensor(
+// CHECK-LABEL: @no_broadcast_fold_non_tensor(
 // CHECK: linalg.broadcast
 // CHECK: linalg.add
 
@@ -295,3 +295,16 @@ func.func @double_fill_into_max(%cst: f32,
 // CHECK: linalg.generic{{.*}}indexing_maps = [#[[MAP]]]
 // CHECK: arith.maximumf %[[CST]], %[[CST1]]
 // CHECK: linalg.yield
+
+// -----
+
+func.func @no_fill_fold_non_tensor(%arg0: memref<8x4xf32>,
+    %arg1: memref<8x4xf32>, %cst: f32) {
+  linalg.fill ins(%cst : f32) outs(%arg1 : memref<8x4xf32>)
+  linalg.max ins(%arg0, %arg1 : memref<8x4xf32>, memref<8x4xf32>) outs(%arg1 : memref<8x4xf32>)
+  return
+}
+
+// CHECK-LABEL: @no_fill_fold_non_tensor(
+// CHECK: linalg.fill
+// CHECK: linalg.max
