@@ -149,6 +149,8 @@ struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
         continue;
       }
 
+      // TODO: Check if there is any benefit in this over passing scalar
+      //       as an input argument.
       // Store the constant separately to be later inserted directly into
       // generic's body.
       assert(fillOp.getInputs().size() == 1 &&
