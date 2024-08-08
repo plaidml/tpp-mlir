@@ -152,7 +152,7 @@ struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
       // Store the constant separately to be later inserted directly into
       // generic's body.
       assert(fillOp.getInputs().size() == 1 &&
-             "expect fill to have single inputs");
+             "expect fill to have single input");
       constants.push_back(fillOp.getInputs()[0]);
     }
 
