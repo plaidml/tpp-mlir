@@ -112,11 +112,75 @@ struct BroadcastIntoEltwise
 // into:
 //   linalg.generic
 //     arith.max %in, %cst
+//
+// NOTE: This could be achieved by controlled generalization + linalg eltwise
+//       operation fusion using the upstream linalg fusion pass and the upstream
+//       `linalg-inline-scalar-operands` pass extended to support scalar
+//       non-shaped inputs.
+// TODO: Linalg eltwise fusion pass could be generalized to operate on LinalgOp
+//       instead of GenericOp.
+// TODO: Extend linalg scalar inlining pass.
 struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
   using OpRewritePattern<linalg::MaxOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::MaxOp maxOp,
                                 PatternRewriter &rewriter) const override {
+    if (!maxOp.hasPureTensorSemantics())
+      return rewriter.notifyMatchFailure(maxOp, "expects tensor semantics");
+
+    // Look for fill within inputs.
+    if (llvm::none_of(maxOp.getInputs(), [](Value input) {
+          auto op = input.getDefiningOp();
+          return op && isa<linalg::FillOp>(op);
+        }))
+      return rewriter.notifyMatchFailure(maxOp, "no fill producers");
+
+    SmallVector<Value> inputs;
+    SmallVector<AffineMap> indexingMaps;
+    SmallVector<Value> constants;
+
+    for (auto [idx, input] : llvm::enumerate(maxOp.getInputs())) {
+      auto fillOp = input.getDefiningOp<linalg::FillOp>();
+      if (!fillOp) {
+        // Keep the operand as is.
+        inputs.push_back(input);
+        indexingMaps.push_back(
+            maxOp.getMatchingIndexingMap(maxOp.getDpsInputOperand(idx)));
+        continue;
+      }
+
+      // Store the constant separately to be later inserted directly into
+      // generic's body.
+      assert(fillOp.getInputs().size() == 1 &&
+             "expect fill to have single inputs");
+      constants.push_back(fillOp.getInputs()[0]);
+    }
+
+    // Add indexing map of the output.
+    indexingMaps.push_back(
+        maxOp.getMatchingIndexingMap(maxOp.getDpsInitOperand(0)));
+
+    ValueRange outputs = maxOp.getOutputs();
+    SmallVector<utils::IteratorType> iterators = maxOp.getIteratorTypesArray();
+    SmallVector<Type> resultTypes = TypeRange(ValueRange{outputs});
+
+    // Replace the original op with a generic with broadcast folded in.
+    auto genericOp = rewriter.create<linalg::GenericOp>(
+        maxOp.getLoc(), resultTypes, inputs, outputs, indexingMaps, iterators,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc,
+            ValueRange blockArgs) {
+          SmallVector<Value> operands;
+          for (size_t i = 0; i < blockArgs.size() - 1; ++i)
+            operands.push_back(blockArgs[i]);
+          operands.append(constants);
+          Value max;
+          if (isa<FloatType>(getElementTypeOrSelf(resultTypes[0])))
+            max = nestedBuilder.create<arith::MaximumFOp>(nestedLoc, operands);
+          else
+            max = nestedBuilder.create<arith::MaxSIOp>(nestedLoc, operands);
+          nestedBuilder.create<linalg::YieldOp>(nestedLoc, ValueRange{max});
+        });
+    rewriter.replaceOp(maxOp, genericOp->getResults());
 
     return success();
   }
