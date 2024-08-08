@@ -421,13 +421,14 @@ def LinalgConvertCompareSelectToMaximumfPass: Pass<"linalg-convert-compare-selec
                            "arith::ArithDialect"];
 }
 
-def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
+def ConvertLinalgToInplace: Pass<"convert-linalg-to-inplace",
 					"func::FuncOp">{
-  let summary = "Convert linalg add to in-place operation";
+  let summary = "Convert linalg ops to inplace operation";
   let description = [{
-    Convert linalg add to in-place update operation.
+    Convert linalg ops to inplace update operation.
   }];
-  let dependentDialects = ["linalg::LinalgDialect"];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "arith::ArithDialect"];
 }
 
 def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{

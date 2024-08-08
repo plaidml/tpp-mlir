@@ -20,7 +20,7 @@ add_mlir_library(TPPTransforms
   IntelAMXTileConfig.cpp
   IntelAMXTileConfigHoisting.cpp
   LinalgConvertCompareSelectToMaximumfPass.cpp
-  ConvertAddInplacePass.cpp
+  ConvertLinalgToInplace.cpp
   FoldIntoEltwise.cpp
 
   ADDITIONAL_HEADER_DIRS

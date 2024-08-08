@@ -1,31 +1,27 @@
-//===-ConvertAddInplacePass.cpp ----------------------------------*- C++-*-===//
+//===-ConvertLinalgToInplace.cpp ---------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// This file converts add to an in-place add operation
-//
-//===----------------------------------------------------------------------===//
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 namespace mlir {
 namespace tpp {
-#define GEN_PASS_DEF_CONVERTADDINPLACEPASS
+#define GEN_PASS_DEF_CONVERTLINALGTOINPLACE
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
 
 using namespace mlir;
-using namespace mlir::linalg;
 
-namespace mlir {
-namespace tpp {
+namespace {
 
 struct ConvertAddInplace : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -75,10 +71,59 @@ struct ConvertAddInplace : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct ConvertAddInplacePass
-    : public impl::ConvertAddInplacePassBase<ConvertAddInplacePass> {
+struct EltwiseUnaryGenericToInplace
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!genericOp.hasPureTensorSemantics())
+      return rewriter.notifyMatchFailure(genericOp, "expects tensor semantics");
+
+    if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1)
+      return rewriter.notifyMatchFailure(genericOp, "not a unary operation");
+
+    if (genericOp.getInputs()[0].getType() !=
+        genericOp.getOutputs()[0].getType())
+      return rewriter.notifyMatchFailure(
+          genericOp, "input type does not match the output");
+
+    if (!linalg::isElementwise(genericOp))
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "not an elementwise operation");
+
+    if (genericOp.payloadUsesValueFromOperand(genericOp.getDpsInitOperand(0)))
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "expects output to be unused");
+
+    // Use the input value directly as the output.
+    ValueRange outputs = genericOp.getInputs();
+    SmallVector<Type> resultTypes = TypeRange(ValueRange{outputs});
+    SmallVector<AffineMap> indexingMaps{genericOp.getIndexingMapsArray()[1]};
+
+    auto newGeneric = rewriter.create<linalg::GenericOp>(
+        genericOp.getLoc(), resultTypes, /*inputs=*/ValueRange{}, outputs,
+        indexingMaps, genericOp.getIteratorTypesArray());
+    rewriter.inlineRegionBefore(genericOp->getRegion(0), newGeneric.getRegion(),
+                                newGeneric.getRegion().begin());
+
+    // Replace input block arguments usage with the output block argument.
+    Block *body = newGeneric.getBody();
+    rewriter.replaceAllUsesWith(body->getArguments()[0],
+                                body->getArguments()[1]);
+    body->eraseArgument(0);
+
+    rewriter.replaceOp(genericOp, newGeneric->getResults());
+
+    return success();
+  }
+};
+
+struct ConvertLinalgToInplace
+    : public tpp::impl::ConvertLinalgToInplaceBase<ConvertLinalgToInplace> {
   void populateCombinePatterns(RewritePatternSet &patterns) {
-    patterns.add<ConvertAddInplace>(patterns.getContext());
+    patterns.add<ConvertAddInplace, EltwiseUnaryGenericToInplace>(
+        patterns.getContext());
   }
 
   void runOnOperation() override {
@@ -87,5 +132,5 @@ struct ConvertAddInplacePass
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
-} // namespace tpp
-} // namespace mlir
+
+} // namespace
