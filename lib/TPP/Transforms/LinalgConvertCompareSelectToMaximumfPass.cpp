@@ -56,13 +56,7 @@ struct LinalgConvertCompareSelectToMaximumf
         dyn_cast<arith::CmpFOp>(op.getBody()->getOperations().begin())
             ->getOperands());
     dyn_cast<YieldOp>(op.getBody()->getTerminator()).setOperand(0, maxf);
-    op.getOutputsMutable().clear();
-    ValueRange range{op.getInputsMutable()};
-    op.getOutputsMutable().append(range);
-    op.getInputsMutable().clear();
-    op.setIndexingMapsAttr(
-        ArrayAttr::get(rewriter.getContext(), op.getIndexingMaps()[0]));
-    op.getBody()->eraseArgument(1);
+
     // Deletion in reverse order due to dependences
     rewriter.eraseOp(select);
     rewriter.eraseOp(cmpf);
