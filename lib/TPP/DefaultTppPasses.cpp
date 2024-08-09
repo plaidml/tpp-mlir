@@ -78,7 +78,7 @@ private:
       pm.addPass(createCleanup());
     } else {
       pm.addPass(createFoldIntoEltwise());
-      pm.addNestedPass<func::FuncOp>(createConvertAddInplacePass());
+      pm.addNestedPass<func::FuncOp>(createConvertLinalgToInplace());
       // Convert linalg.batch_matmul to linalg.matmul.
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
