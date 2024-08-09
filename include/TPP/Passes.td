@@ -417,7 +417,8 @@ def LinalgConvertCompareSelectToMaximumfPass: Pass<"linalg-convert-compare-selec
   let description = [{
     Convert linalg generic compare-select operation to maximumf operation.
   }];
-  let dependentDialects = ["linalg::LinalgDialect"];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "arith::ArithDialect"];
 }
 
 def ConvertAddInplacePass: Pass<"linalg-convert-add-in-place",
