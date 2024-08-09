@@ -88,18 +88,29 @@ struct EltwiseUnaryGenericToInplace
       return rewriter.notifyMatchFailure(
           genericOp, "input type does not match the output");
 
+    // Elementwise operation guarantees that all output elements are updated.
+    // The output initial values can be ignored and the output buffer can be
+    // replaced if the output is not used (write only).
     if (!linalg::isElementwise(genericOp))
       return rewriter.notifyMatchFailure(genericOp,
                                          "not an elementwise operation");
-
     if (genericOp.payloadUsesValueFromOperand(genericOp.getDpsInitOperand(0)))
       return rewriter.notifyMatchFailure(genericOp,
                                          "expects output to be unused");
 
+    // Elementwise operation still allows different indexing for its input e.g.,
+    // one of the dimensions can be fixed for the input.
+    // Ensure that indexing maps of both operands are be equal. Otherwise,
+    // the input cannot replace the output buffer.
+    SmallVector<AffineMap> maps = genericOp.getIndexingMapsArray();
+    if (maps[0] != maps[1])
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "expects matching indexing maps");
+
     // Use the input value directly as the output.
     ValueRange outputs = genericOp.getInputs();
     SmallVector<Type> resultTypes = TypeRange(ValueRange{outputs});
-    SmallVector<AffineMap> indexingMaps{genericOp.getIndexingMapsArray()[1]};
+    SmallVector<AffineMap> indexingMaps{maps[1]};
 
     auto newGeneric = rewriter.create<linalg::GenericOp>(
         genericOp.getLoc(), resultTypes, /*inputs=*/ValueRange{}, outputs,

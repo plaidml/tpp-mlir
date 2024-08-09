@@ -124,3 +124,27 @@ func.func @no_inplace_generic_mismatched_input_output(
 // CHECK:  %[[EMPTY:.+]] = tensor.empty
 // CHECK:  linalg.generic
 // CHECK-SAME: ins(%[[ARG0]] :{{.*}}) outs(%[[EMPTY]] :{{.*}})
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, 0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+func.func @no_inplace_generic_mismatched_maps(
+    %arg0: tensor<8x4xf32>) -> tensor<8x4xf32> {
+  %cst = arith.constant 2.0 : f32
+  %0 = tensor.empty() : tensor<8x4xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<8x4xf32>) outs(%0 : tensor<8x4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = arith.mulf %in, %cst : f32
+    linalg.yield %2 : f32
+  } -> tensor<8x4xf32>
+  return %1 : tensor<8x4xf32>
+}
+
+// CHECK-LABEL: func.func @no_inplace_generic_mismatched_maps(
+// CHECK-SAME: %[[ARG0:.*]]: tensor<8x4xf32>
+// CHECK:  %[[EMPTY:.+]] = tensor.empty
+// CHECK:  linalg.generic
+// CHECK-SAME: ins(%[[ARG0]] :{{.*}}) outs(%[[EMPTY]] :{{.*}})
