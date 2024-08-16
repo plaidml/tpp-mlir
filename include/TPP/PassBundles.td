@@ -37,10 +37,7 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "unsigned", "Grid-sizes for parallel tasks.">,
     Option<"linalgToVector", "linalg-to-vector",
            "bool", /*default=*/"true",
-           "Lower linalg directly to vector.">,
-    Option<"vectorToXsmm", "vector-to-xsmm",
-           "bool", /*default=*/"true",
-           "Lower vector to xsmm.">
+           "Lower linalg directly to vector.">
   ];
 }
 

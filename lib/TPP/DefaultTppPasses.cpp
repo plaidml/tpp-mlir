@@ -21,6 +21,7 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
+#include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -97,8 +98,14 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
-      // Lower all Tile operations.
-      pm.addNestedPass<func::FuncOp>(createLinalgLowering());
+      if (linalgToVector) {
+        pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+        pm.addNestedPass<func::FuncOp>(createVectorContractPass());
+        pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      } else {
+        // Lower all Tile operations.
+        pm.addNestedPass<func::FuncOp>(createLinalgLowering());
+      }
       pm.addPass(createCleanup());
     }
 
@@ -109,10 +116,18 @@ private:
     // Low leve parallelization passes.
     LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
     pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+    if (linalgToVector) {
+      pm.addPass(createConvertVectorToSCFPass());
+    } else {
+      // Covert all local TPP-related dialects.
+      pm.addPass(createLocalDialectsLowering());
 
-    // Covert all local TPP-related dialects.
-    pm.addPass(createLocalDialectsLowering());
-
+      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+    }
     // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessing());
   }

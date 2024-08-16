@@ -44,7 +44,7 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
       int index = 0;
-      for (int i = 0; i < dyn_cast<ShapedType>(linalgOp.getOperand(0).getType())
+      for (size_t i = 0; i < dyn_cast<ShapedType>(linalgOp.getOperand(0).getType())
                               .getShape()
                               .size();
            i++) {
