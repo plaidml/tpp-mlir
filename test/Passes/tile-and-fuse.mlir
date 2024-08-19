@@ -342,7 +342,7 @@ func.func @mlp(%arg0: tensor<8x112x32x32xbf16>, %arg1: tensor<112x112x32x32xbf16
       %max = arith.maximumf %in, %cst : bf16
       linalg.yield %max : bf16
   } -> tensor<8x112x32x32xbf16>
-  // CHECK: %[[C112:.+]] = arith.constant 112 : index
+  // CHECK-DAG: %[[C112:.+]] = arith.constant 112 : index
   // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
