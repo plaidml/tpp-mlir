@@ -92,6 +92,7 @@ check_program ${LINKER}
 if [ ! "${LLVM_BUILD_DIR}" ]; then
   LLVM_BUILD_DIR="/scratch/tpp-llvm"
 fi
+LLVM_BUILD_DIR=$(add_device_extensions ${LLVM_BUILD_DIR} ${GPU})
 LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
 LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
 mkdir -p ${LLVM_BUILD_DIR}
