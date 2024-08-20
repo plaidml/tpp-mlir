@@ -595,7 +595,7 @@ func.func @check_tile_propagation_to_eltwise_consumer(%arg0: tensor<2x2x2x4xf32>
 // CHECK-LABEL: check_tile_propagation_to_eltwise_consumer
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<2x2x2x4xf32>, %[[ARG1:.+]]: tensor<2x4x8x2xf32>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<2x2x8x2xf32>, %[[ARG3:.+]]: tensor<2x2x8x2xf32>
-// CHECK: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index

@@ -33,7 +33,7 @@ fi
 
 # Destination for tar balls
 if [ ! "${LLVM_TAR_DIR}" ]; then
-  LLVM_TAR_DIR="/tmp/tpp-llvm-tar"
+  LLVM_TAR_DIR="/scratch/tpp-llvm-tar"
 fi
 LLVM_TAR_DIR=$(add_device_extensions ${LLVM_TAR_DIR} ${GPU})
 mkdir -p ${LLVM_TAR_DIR}
@@ -90,8 +90,9 @@ fi
 check_program ${LINKER}
 
 if [ ! "${LLVM_BUILD_DIR}" ]; then
-  LLVM_BUILD_DIR="/tmp/tpp-llvm"
+  LLVM_BUILD_DIR="/scratch/tpp-llvm"
 fi
+LLVM_BUILD_DIR=$(add_device_extensions ${LLVM_BUILD_DIR} ${GPU})
 LLVM_BUILD_DIR=$(realpath ${LLVM_BUILD_DIR})
 LLVM_BUILD_DIR=${LLVM_BUILD_DIR:-build-${COMPILER}}
 mkdir -p ${LLVM_BUILD_DIR}
@@ -140,6 +141,7 @@ echo "--- BUILD"
 echo_run ninja -C ${LLVM_BUILD_DIR} all
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
 
@@ -148,14 +150,20 @@ echo "--- CHECK"
 echo_run ninja -C ${LLVM_BUILD_DIR} check-all
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
 
- # Install LLVM
- echo "--- INSTALL"
- mkdir -p ${LLVM_INSTALL_DIR}
- echo_run ninja -C ${LLVM_BUILD_DIR} install
+# Install LLVM
+echo "--- INSTALL"
+mkdir -p ${LLVM_INSTALL_DIR}
+echo_run ninja -C ${LLVM_BUILD_DIR} install
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
+
+# Cleanup
+echo "--- CLEANUP"
+rm -r ${LLVM_BUILD_DIR}

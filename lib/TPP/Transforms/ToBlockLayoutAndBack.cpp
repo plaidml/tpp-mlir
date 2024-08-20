@@ -652,7 +652,7 @@ struct PropagatePackUnPack
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
     linalg::populateDataLayoutPropagationPatterns(
-        patterns, [](Operation *op) { return true; });
+        patterns, [](OpOperand *operand) { return true; });
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
@@ -813,7 +813,9 @@ void mlir::tpp::populateSimplifyPacking(RewritePatternSet &patterns) {
   // Propagate packs/unpacks only through expand shapes at this point.
   // This captures the transformation scope of the replaced downstream pass.
   linalg::populateDataLayoutPropagationPatterns(
-      patterns, [](Operation *op) { return isa<tensor::ExpandShapeOp>(op); });
+      patterns, [](OpOperand *operand) {
+        return isa<tensor::ExpandShapeOp>(operand->get().getDefiningOp());
+      });
   ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
       patterns);
   patterns.add<FoldUnPackIntoInsertSlice>(ctx);
