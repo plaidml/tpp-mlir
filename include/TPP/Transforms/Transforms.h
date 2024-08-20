@@ -70,6 +70,9 @@ namespace tpp {
 void populateLinalgToXsmmPatterns(RewritePatternSet &patterns);
 void populateSimplifyPacking(RewritePatternSet &patterns);
 void populateSinkPackPatterns(RewritePatternSet &patterns);
+using ControlGeneralizationFn = std::function<bool(linalg::LinalgOp)>;
+void populateGeneralizeNamedOpsPatterns(RewritePatternSet &patterns,
+                                        ControlGeneralizationFn = nullptr);
 } // namespace tpp
 namespace linalg {
 void populateLinalgDeGeneralizationPatterns(RewritePatternSet &patterns);
