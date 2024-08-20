@@ -141,6 +141,7 @@ echo "--- BUILD"
 echo_run ninja -C ${LLVM_BUILD_DIR} all
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
 
@@ -149,14 +150,20 @@ echo "--- CHECK"
 echo_run ninja -C ${LLVM_BUILD_DIR} check-all
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
 
- # Install LLVM
- echo "--- INSTALL"
- mkdir -p ${LLVM_INSTALL_DIR}
- echo_run ninja -C ${LLVM_BUILD_DIR} install
+# Install LLVM
+echo "--- INSTALL"
+mkdir -p ${LLVM_INSTALL_DIR}
+echo_run ninja -C ${LLVM_BUILD_DIR} install
 if [ $? != 0 ]; then
   rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
   exit 1
 fi
+
+# Cleanup
+echo "--- CLEANUP"
+rm -r ${LLVM_BUILD_DIR}
