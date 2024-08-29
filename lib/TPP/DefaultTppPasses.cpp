@@ -112,21 +112,23 @@ private:
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
-
-    // Low leve parallelization passes.
     LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
-    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+
     if (linalgToVector) {
       pm.addPass(createConvertVectorToSCFPass());
+      // Low leve parallelization passes.
+      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
     } else {
-      // Covert all local TPP-related dialects.
-      pm.addPass(createLocalDialectsLowering());
-
+      // Low leve parallelization passes.
+      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
       pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+
+      // Covert all local TPP-related dialects.
+      pm.addPass(createLocalDialectsLowering());
     }
     // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessing());
