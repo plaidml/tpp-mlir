@@ -54,17 +54,6 @@ def VectorizationPass : Pass<"vectorization-pass",
 }
 
 
-def VectorContractPass : Pass<"vector-contract-pass",
-                                     "func::FuncOp"> {
-  let summary = "convert vector rductions to contractions";
-  let description = [{
-    Vector Contract pass to convert reductions to contractions.
-  }];
-
-  let dependentDialects = [ "vector::VectorDialect" ];
-}
-
-
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let description = [{

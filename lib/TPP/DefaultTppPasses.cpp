@@ -100,7 +100,6 @@ private:
 
       if (linalgToVector) {
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
-        pm.addNestedPass<func::FuncOp>(createVectorContractPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       } else {
         // Lower all Tile operations.
@@ -126,10 +125,11 @@ private:
       pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
-
-      // Covert all local TPP-related dialects.
-      pm.addPass(createLocalDialectsLowering());
+      pm.addPass(createConvertXsmmToFunc());
     }
+    // Covert all local TPP-related dialects.
+    pm.addPass(createLocalDialectsLowering());
+
     // Clean up after the default pipeline.
     pm.addNestedPass<func::FuncOp>(createPostprocessing());
   }

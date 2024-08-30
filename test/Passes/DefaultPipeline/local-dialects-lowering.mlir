@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -bufferize -lower-local-dialects -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -bufferize -lower-local-dialects -convert-xsmm-to-func  -split-input-file | FileCheck %s
 
 func.func @check_dialect() {
  %b = arith.constant dense<[
