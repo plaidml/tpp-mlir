@@ -5,7 +5,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements tile configuration hoisting on parallel loops.
+// This file implements vectorization of linalg ops.
 //
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
@@ -14,6 +14,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -35,6 +37,8 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
 
   LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasPureBufferSemantics())
+      return failure();
     if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
             xsmm::DataTypeAttr::get(rewriter.getContext(),
                                     xsmm::DataType::BF16) &&
@@ -42,10 +46,11 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
       int index = 0;
-      for (size_t i = 0; i < dyn_cast<ShapedType>(linalgOp.getOperand(0).getType())
-                              .getShape()
-                              .size();
-           i++) {
+      for (size_t i = 0,
+                  end = dyn_cast<ShapedType>(linalgOp.getOperand(0).getType())
+                            .getShape()
+                            .size();
+           i < end; i++) {
         ReassociationIndices reassoc;
         if (i == dyn_cast<ShapedType>(linalgOp.getOperand(0).getType())
                          .getShape()
@@ -70,9 +75,11 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       auto map0 = linalgOp.getIndexingMapsArray()[0];
       auto map1 = linalgOp.getIndexingMapsArray()[1];
       map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1), 3);
+      int map1Index = map1.getNumResults() - 3;
       map1 = map1.insertResult(
-          dyn_cast<AffineBinaryOpExpr>(map1.getResult(1)).getLHS(), 2);
-      map1 = map1.dropResult(1);
+          dyn_cast<AffineBinaryOpExpr>(map1.getResult(map1Index)).getLHS(),
+          map1Index + 1);
+      map1 = map1.dropResult(map1Index);
       linalgOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(
           {map0, map1, linalgOp.getIndexingMapsArray()[2]}));
     }
@@ -102,6 +109,8 @@ struct VectorizationPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateCombinePatterns(patterns);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+    vector::populateVectorReductionToContractPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
