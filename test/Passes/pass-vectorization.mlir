@@ -62,3 +62,51 @@ module {
 // CHECK:       %[[vec4:.*]] = vector.contract {indexing_maps = [#map, #map1, #map2], iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %1, %2, %3 : vector<4x8x1x2xbf16>, vector<4x1x4x2xbf16> into vector<8x4xbf16>
 // CHECK:       vector.transfer_write %[[vec4]], %[[subview]][%c0, %c0] {in_bounds = [true, true]} : vector<8x4xbf16>, memref<8x4xbf16, strided<[4, 1], offset: ?>>
 
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+module {
+  func.func @entry(%arg0: memref<4x8x16x32x64xbf16>) {
+    linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%arg0 : memref<4x8x16x32x64xbf16>) {
+    ^bb0(%out: bf16):
+      %0 = math.absf %out : bf16
+      linalg.yield %0 : bf16
+    }
+    return
+  }
+}
+
+// CHECK: func.func @entry(%[[ARG0:.*]]: memref<4x8x16x32x64xbf16>) {
+// CHECK:     %[[vec0:.*]] = vector.transfer_read %[[ARG0]][%c0, %c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true, true]} : memref<4x8x16x32x64xbf16>, vector<4x8x16x32x64xbf16>
+// CHECK:     %[[vec1:.*]] = math.absf %[[vec0]] : vector<4x8x16x32x64xbf16>
+// CHECK:     vector.transfer_write %[[vec1]], %[[ARG0]][%c0, %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true, true]} : vector<4x8x16x32x64xbf16>, memref<4x8x16x32x64xbf16>
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
+module {
+  func.func @entry(%arg0: tensor<2x4x8x2xbf16>) -> tensor<2x2x8x4xbf16> {
+    %cst = arith.constant dense<1.000000e+00> : tensor<2x4x1x4x2xbf16>
+    %cst_0 = arith.constant 0.000000e+00 : bf16
+    %0 = tensor.empty() : tensor<2x2x8x4xbf16>
+    %1 = linalg.fill ins(%cst_0 : bf16) outs(%0 : tensor<2x2x8x4xbf16>) -> tensor<2x2x8x4xbf16>
+    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %cst : tensor<2x4x8x2xbf16>, tensor<2x4x1x4x2xbf16>) outs(%1 : tensor<2x2x8x4xbf16>) {
+    ^bb0(%in: bf16, %in_1: bf16, %out: bf16):
+      %3 = arith.mulf %in, %in_1 : bf16
+      %4 = arith.addf %out, %3 : bf16
+      linalg.yield %4 : bf16
+    } -> tensor<2x2x8x4xbf16>
+    return %2 : tensor<2x2x8x4xbf16>
+  }
+}
+
+
+// CHECK:   func.func @entry(%[[ARG0:.*]]: tensor<2x4x8x2xbf16>) -> tensor<2x2x8x4xbf16> {
+// CHECK:       vector.transfer_write 
+// CHECK-NOT:       %[[vec1:.*]] = vector.transfer_read 
+// CHECK-NOT:       %[[vec2:.*]] = vector.transfer_read 
+// CHECK-NOT:       %[[vec3:.*]] = vector.transfer_read 
+// CHECK-NOT:       %[[vec4:.*]] = vector.contract 
+// CHECK-NOT:       vector.transfer_write %[[vec4]]
