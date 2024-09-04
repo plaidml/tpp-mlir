@@ -515,7 +515,8 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
       size_t posK = 2 + inc;
       if (!linalgx::utils::validateFullTilesOnDims(
               cast<TilingInterface>(linalgOp.getOperation()),
-              {tileOnI, tileOnJ, tileOnK}, {posI, posJ, posK})) {
+              {tileOnI, tileOnJ, tileOnK}, {posI, posJ, posK},
+              /*minTileFactor=*/1)) {
         return std::nullopt;
       }
 
