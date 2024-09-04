@@ -281,7 +281,7 @@ isContraction(linalg::LinalgOp linalgOp) {
   return dims;
 }
 
-static std::optional<int64_t> getConstantRange(const Range &range) {
+std::optional<int64_t> getConstantRange(const Range &range) {
   std::optional<int64_t> stride = getConstantIntValue(range.stride);
   if (!stride || *stride != 1)
     return std::nullopt;

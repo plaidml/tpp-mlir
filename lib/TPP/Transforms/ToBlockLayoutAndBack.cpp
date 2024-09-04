@@ -274,20 +274,6 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   return replacementOp;
 }
 
-/// Return constant range span or nullopt, otherwise.
-static std::optional<int64_t> getConstantRange(const Range &range) {
-  std::optional<int64_t> stride = getConstantIntValue(range.stride);
-  if (!stride || *stride != 1)
-    return std::nullopt;
-  std::optional<int64_t> offset = getConstantIntValue(range.offset);
-  if (!offset)
-    return std::nullopt;
-  std::optional<int64_t> size = getConstantIntValue(range.size);
-  if (!size)
-    return std::nullopt;
-  return (*size - *offset);
-}
-
 //===----------------------------------------------------------------------===//
 // Conv2DNhwcHwcfOp
 //===----------------------------------------------------------------------===//
@@ -528,13 +514,13 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
       SmallVector<Range> iterationDomain = tileOp.getIterationDomain(builder);
 
       if (std::optional<int64_t> dimM =
-              getConstantRange(iterationDomain[dims->m.back()]))
+              linalgx::utils::getConstantRange(iterationDomain[dims->m.back()]))
         options.blockFactors[0] = std::min(*dimM, options.blockFactors[0]);
       if (std::optional<int64_t> dimN =
-              getConstantRange(iterationDomain[dims->n.back()]))
+              linalgx::utils::getConstantRange(iterationDomain[dims->n.back()]))
         options.blockFactors[1] = std::min(*dimN, options.blockFactors[1]);
       if (std::optional<int64_t> dimK =
-              getConstantRange(iterationDomain[dims->k.back()]))
+              linalgx::utils::getConstantRange(iterationDomain[dims->k.back()]))
         options.blockFactors[2] = std::min(*dimK, options.blockFactors[2]);
 
       // Apply more restrictive packing validation.

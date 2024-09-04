@@ -75,6 +75,9 @@ bool isBlockedMatmul(Operation *op);
 FailureOr<linalg::ContractionDimensions>
 isContraction(linalg::LinalgOp linalgOp);
 
+// Return constant range span or nullopt, otherwise.
+std::optional<int64_t> getConstantRange(const Range &range);
+
 // Validate a tile configuration for a linalgOp when we can statically do that.
 // Specific dims can be passed using 'dims'. If dims is empty the validation
 // will start from the outermost dimension, moving to innermost ones up to the
