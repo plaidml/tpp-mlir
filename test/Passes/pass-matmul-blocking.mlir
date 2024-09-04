@@ -30,6 +30,36 @@ func.func @block_linalg_matmul(
 
 // -----
 
+func.func @block_dims_equal_to_factors(
+  %arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>, %arg2: tensor<32x32xf32>)
+    -> tensor<32x32xf32> {
+  %0 = linalg.matmul  ins(%arg0, %arg1: tensor<32x32xf32>, tensor<32x32xf32>)
+                     outs(%arg2: tensor<32x32xf32>)
+    -> tensor<32x32xf32>
+  return %0 : tensor<32x32xf32>
+}
+
+// CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+// CHECK-DAG: #[[MAP4:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+// CHECK-DAG: #[[MAP5:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+
+// CHECK-LABEL: func @block_dims_equal_to_factors(
+// CHECK-SAME:    %[[ARG0:[0-9a-z]+]]: tensor<32x32xf32>
+// CHECK-SAME:    %[[ARG1:[0-9a-z]+]]: tensor<32x32xf32>
+// CHECK-SAME:    %[[ARG2:[0-9a-z]+]]: tensor<32x32xf32>) -> tensor<32x32xf32> {
+// CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<1x1x32x32xf32>
+// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG0]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF0]] : tensor<32x32xf32> -> tensor<1x1x32x32xf32>
+// CHECK: %[[BUF1:.*]] = tensor.empty() : tensor<1x1x32x32xf32>
+// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF1]] : tensor<32x32xf32> -> tensor<1x1x32x32xf32>
+// CHECK: %[[BUF2:.+]] = tensor.empty() : tensor<1x1x32x32xf32>
+// CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[BUF2]] : tensor<32x32xf32> -> tensor<1x1x32x32xf32>
+// CHECK: %[[VAL:.+]] = linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP5]]], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%[[PACK0]], %[[PACK1]] : tensor<1x1x32x32xf32>, tensor<1x1x32x32xf32>) outs(%[[PACK2]] : tensor<1x1x32x32xf32>)
+// CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[ARG2]] : tensor<1x1x32x32xf32> -> tensor<32x32xf32>
+// CHECK: return %[[OUT]] : tensor<32x32xf32>
+// CHECK: }
+
+// -----
+
 // We don't expect to block as the blocking factor do not create full tiles.
 func.func @block_linalg_matmul(
   %arg0: tensor<5x6xf32>, %arg1: tensor<6x5xf32>, %arg2: tensor<5x5xf32>)
