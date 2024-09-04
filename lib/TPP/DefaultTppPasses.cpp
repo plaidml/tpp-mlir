@@ -98,6 +98,8 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
+      // TODO: This flag will be removed once the vector path becomes the
+      // default lowering path.
       if (linalgToVector) {
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -115,16 +117,21 @@ private:
 
     if (linalgToVector) {
       pm.addPass(createConvertVectorToSCFPass());
-      // Low leve parallelization passes.
+      // Low level parallelization passes.
       pm.addPass(createLowLevelParallelization(LowLevelParallelization));
     } else {
-      // Low leve parallelization passes.
+      // Low level parallelization passes.
       pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+      // TODO: These passes have been moved out of low level parallelization
+      // pass since these apply on xsmm dialect. They'll be moved back in
+      // subsequent commits.
       pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
+      // TODO: This pass has been moved out of LocalDialectsLowering since it is
+      // applicable to xsmm only. It'll be moved back in subsequent commits.
       pm.addPass(createConvertXsmmToFunc());
     }
     // Covert all local TPP-related dialects.
