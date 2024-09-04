@@ -22,27 +22,35 @@ const char *g_program;
 /* *** */
 
 typedef int bool;
-#define true ((bool) 1)
-#define false ((bool) 0)
+#define true ((bool)1)
+#define false ((bool)0)
 
-static bool isSignedChar(char C) {
-  return (C == '+' || C == '-');
-}
+static bool isSignedChar(char C) { return (C == '+' || C == '-'); }
 
 static bool isExponentChar(char C) {
   switch (C) {
-  case 'D':  // Strange exponential notation.
-  case 'd':  // Strange exponential notation.
+  case 'D': // Strange exponential notation.
+  case 'd': // Strange exponential notation.
   case 'e':
-  case 'E': return true;
-  default: return false;
+  case 'E':
+    return true;
+  default:
+    return false;
   }
 }
 
 static bool isDigitChar(char C) {
   switch (C) {
-  case '0': case '1': case '2': case '3': case '4':
-  case '5': case '6': case '7': case '8': case '9':
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
     return true;
   default:
     return false;
@@ -119,31 +127,38 @@ static bool skip_whitespace(const char **FP, const char *FEnd) {
 static bool CompareNumbers(const char *F1P, const char *F2P, const char *F1End,
                            const char *F2End, double AbsTolerance,
                            double RelTolerance) {
-  const char *F1NumEnd, *F2NumEnd;
+  char *F1NumEnd, *F2NumEnd;
   const ptrdiff_t F1Len = F1End - F1P;
   const ptrdiff_t F2Len = F2End - F2P;
   double V1 = 0.0, V2 = 0.0;
+  char *f1P = (char *)malloc(F1Len);
+  memcpy((void *)f1P, (const void *)F1P, F1Len);
+  char *f2P = (char *)malloc(F2Len);
+  memcpy((void *)f2P, (const void *)F2P, F2Len);
 
   // Fast character-by-character comparison of the numbers.
-  if (F1Len == F2Len && memcmp(F1P, F2P, F1Len) == 0)
+  if (F1Len == F2Len && memcmp(f1P, f2P, F1Len) == 0) {
+    free(f1P);
+    free(f2P);
     return false;
+  }
 
   // Note that some ugliness is built into this to permit support for numbers
   // that use "D" or "d" as their exponential marker, e.g. "1.234D45".  This
   // occurs in 200.sixtrack in spec2k.
-  V1 = strtod(F1P, (char **)(&F1NumEnd));
-  V2 = strtod(F2P, (char **)(&F2NumEnd));
+  V1 = strtod(f1P, (char **)(&F1NumEnd));
+  V2 = strtod(f2P, (char **)(&F2NumEnd));
 
   if (*F1NumEnd == 'D' || *F1NumEnd == 'd') {
     // Copy string into tmp buffer to replace the 'D' with an 'e'.
     char *StrTmp = malloc(F1Len + 1);
-    memcpy(StrTmp, F1P, F1Len + 1);
+    memcpy(StrTmp, f1P, F1Len + 1);
 
     // Strange exponential notation!
-    StrTmp[(unsigned)(F1NumEnd - F1P)] = 'e';
+    StrTmp[(unsigned)(F1NumEnd - f1P)] = 'e';
 
     V1 = strtod(&StrTmp[0], (char **)(&F1NumEnd));
-    F1NumEnd = F1P + (F1NumEnd - &StrTmp[0]);
+    F1NumEnd = f1P + (F1NumEnd - &StrTmp[0]);
 
     free(StrTmp);
   }
@@ -151,46 +166,58 @@ static bool CompareNumbers(const char *F1P, const char *F2P, const char *F1End,
   if (*F2NumEnd == 'D' || *F2NumEnd == 'd') {
     // Copy string into tmp buffer to replace the 'D' with an 'e'.
     char *StrTmp = malloc(F2Len + 1);
-    memcpy(StrTmp, F2P, F2Len + 1);
+    memcpy(StrTmp, f2P, F2Len + 1);
 
     // Strange exponential notation!
-    StrTmp[(unsigned)(F2NumEnd - F2P)] = 'e';
+    StrTmp[(unsigned)(F2NumEnd - f2P)] = 'e';
 
     V2 = strtod(&StrTmp[0], (char **)(&F2NumEnd));
-    F2NumEnd = F2P + (F2NumEnd - &StrTmp[0]);
+    F2NumEnd = f2P + (F2NumEnd - &StrTmp[0]);
 
     free(StrTmp);
   }
 
-  if (F1NumEnd == F1P || F2NumEnd == F2P) {
-    fprintf(stderr, ("%s: FP Comparison failed, not a numeric difference "
-                     "between '%c' and '%c'\n"), g_program, F1P[0], F2P[0]);
+  if (F1NumEnd == f1P || F2NumEnd == f2P) {
+    fprintf(stderr,
+            ("%s: FP Comparison failed, not a numeric difference "
+             "between '%c' and '%c'\n"),
+            g_program, f1P[0], f2P[0]);
+    free(f1P);
+    free(f2P);
     return true;
   }
 
   // Quick check for identical values
-  if (V1 == V2)
+  if (V1 == V2) {
+    free(f1P);
+    free(f2P);
     return false;
+  }
 
   // Check to see if these are inside the absolute tolerance
   if (AbsTolerance == 0.0 || AbsTolerance < fabs(V1 - V2)) {
     // Nope, check the relative tolerance...
     double Diff;
     if (V2)
-      Diff = fabs(V1/V2 - 1.0);
+      Diff = fabs(V1 / V2 - 1.0);
     else if (V1)
-      Diff = fabs(V2/V1 - 1.0);
+      Diff = fabs(V2 / V1 - 1.0);
     else
-      Diff = 0;  // Both zero.
+      Diff = 0; // Both zero.
     if (RelTolerance == 0.0 || Diff > RelTolerance) {
-      fprintf(stderr, ("%s: Compared: %e and %e\n"
-                       "abs. diff = %e rel.diff = %e\n"
-                       "Out of tolerance: rel/abs: %e/%e\n"),
-              g_program, V1, V2, fabs(V1-V2), Diff, RelTolerance, AbsTolerance);
+      fprintf(stderr,
+              ("%s: Compared: %e and %e\n"
+               "abs. diff = %e rel.diff = %e\n"
+               "Out of tolerance: rel/abs: %e/%e\n"),
+              g_program, V1, V2, fabs(V1 - V2), Diff, RelTolerance,
+              AbsTolerance);
+      free(f1P);
+      free(f2P);
       return true;
     }
   }
-
+  free(f1P);
+  free(f2P);
   return false;
 }
 
@@ -236,8 +263,8 @@ char *load_file(const char *path, long *size_out) {
   /* Read in the file contents. */
   data[size] = 0;
   if (fread(data, size, 1, fp) != 1) {
-    fprintf(stderr, "%s: error: unable to read data for '%s'\n",
-            g_program, path);
+    fprintf(stderr, "%s: error: unable to read data for '%s'\n", g_program,
+            path);
     exit(2);
   }
 
@@ -386,7 +413,7 @@ void usage() {
   exit(2);
 }
 
-int main(int argc, char * const argv[]) {
+int main(int argc, char *const argv[]) {
   double relative_tolerance = 0.0;
   double absolute_tolerance = 0.0;
   bool parse_fp = false;
@@ -397,7 +424,7 @@ int main(int argc, char * const argv[]) {
   for (i = 1; i != argc; ++i) {
     const char *arg = argv[i];
     if (arg[0] != '-')
-        break;
+      break;
 
     if (strlen(arg) != 2) {
       fprintf(stderr, "error: invalid argument '%s'\n\n", arg);
