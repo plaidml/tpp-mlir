@@ -34,8 +34,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "bool", /*default=*/"false",
            "Skip all TPP transformations. Lower linalg directly to loops.">,
     ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
-
+           "unsigned", "Grid-sizes for parallel tasks.">,
+    Option<"linalgToVector", "linalg-to-vector",
+           "bool", /*default=*/"false",
+           "Lower linalg directly to vector.">
   ];
 }
 

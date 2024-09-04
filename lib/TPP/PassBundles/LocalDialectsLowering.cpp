@@ -58,7 +58,6 @@ private:
   void constructPipeline() override {
     pm.addNestedPass<func::FuncOp>(createConvertCheckToLoops());
     pm.addNestedPass<func::FuncOp>(createConvertPerfToLoops());
-    pm.addPass(createConvertXsmmToFunc());
     pm.addPass(createConvertPerfToFunc());
   }
 };

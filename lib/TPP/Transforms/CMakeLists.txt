@@ -22,6 +22,7 @@ add_mlir_library(TPPTransforms
   LinalgConvertCompareSelectToMaximumfPass.cpp
   ConvertLinalgToInplace.cpp
   FoldIntoEltwise.cpp
+  Vectorization.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
