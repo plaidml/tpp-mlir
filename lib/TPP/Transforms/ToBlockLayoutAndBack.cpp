@@ -274,6 +274,20 @@ packConvolutions(RewriterBase &rewriter, OpTy convOp,
   return replacementOp;
 }
 
+/// Return constant range span or nullopt, otherwise.
+static std::optional<int64_t> getConstantRange(const Range &range) {
+  std::optional<int64_t> stride = getConstantIntValue(range.stride);
+  if (!stride || *stride != 1)
+    return std::nullopt;
+  std::optional<int64_t> offset = getConstantIntValue(range.offset);
+  if (!offset)
+    return std::nullopt;
+  std::optional<int64_t> size = getConstantIntValue(range.size);
+  if (!size)
+    return std::nullopt;
+  return (*size - *offset);
+}
+
 //===----------------------------------------------------------------------===//
 // Conv2DNhwcHwcfOp
 //===----------------------------------------------------------------------===//
@@ -478,6 +492,7 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
     MLIRContext *ctx = getOperation().getContext();
     RewritePatternSet patterns(ctx);
 
+    // TODO: Add a cost function that decides whether to pack at all.
     auto packControlFn = [&](linalg::LinalgOp linalgOp)
         -> std::optional<linalg::BlockPackMatmulOptions> {
       linalg::BlockPackMatmulOptions options;
@@ -501,8 +516,28 @@ struct PackMatmul : public tpp::impl::PackMatmulBase<PackMatmul> {
       // Allow padding to avoid double checks.
       options.allowPadding = true;
 
-      // Apply more restrictive packing validation.
+      // Adjust block factors to smaller dimensions.
+      // If a dimension is smaller than the blocking factor, then
+      // try to block by the dimension size.
+      auto dims = linalg::inferContractionDims(linalgOp);
+      if (failed(dims))
+        return std::nullopt;
+
       OpBuilder builder(linalgOp);
+      auto tileOp = cast<TilingInterface>(linalgOp.getOperation());
+      SmallVector<Range> iterationDomain = tileOp.getIterationDomain(builder);
+
+      if (std::optional<int64_t> dimM =
+              getConstantRange(iterationDomain[dims->m.back()]))
+        options.blockFactors[0] = std::min(*dimM, options.blockFactors[0]);
+      if (std::optional<int64_t> dimN =
+              getConstantRange(iterationDomain[dims->n.back()]))
+        options.blockFactors[1] = std::min(*dimN, options.blockFactors[1]);
+      if (std::optional<int64_t> dimK =
+              getConstantRange(iterationDomain[dims->k.back()]))
+        options.blockFactors[2] = std::min(*dimK, options.blockFactors[2]);
+
+      // Apply more restrictive packing validation.
       SmallVector<OpFoldResult> tiles =
           getAsOpFoldResult(builder.getI64ArrayAttr(options.blockFactors));
       OpFoldResult tileOnI = tiles[0];
