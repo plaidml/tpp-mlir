@@ -60,8 +60,10 @@ func.func @block_dims_equal_to_factors(
 
 // -----
 
-// We don't expect to block as the blocking factor do not create full tiles.
-func.func @block_linalg_matmul(
+// Adapt tile sizes to small dimensions.
+// Assume that there is separate cost function that controls
+// if packing should take place at all.
+func.func @block_small_dims_matmul(
   %arg0: tensor<5x6xf32>, %arg1: tensor<6x5xf32>, %arg2: tensor<5x5xf32>)
     -> tensor<5x5xf32> {
   %0 = linalg.matmul  ins(%arg0, %arg1: tensor<5x6xf32>, tensor<6x5xf32>)
@@ -70,13 +72,24 @@ func.func @block_linalg_matmul(
   return %0 : tensor<5x5xf32>
 }
 
-// CHECK-LABEL: func.func @block_linalg_matmul(
-// CHECK-SAME:  %[[ARG0:[0-9a-z]+]]: tensor<5x6xf32>,
-// CHECK-SAME:  %[[ARG1:[0-9a-z]+]]: tensor<6x5xf32>,
-// CHECK-SAME:  %[[ARG2:[0-9a-z]+]]: tensor<5x5xf32>) -> tensor<5x5xf32> {
-// CHECK: %{{.+}} = linalg.matmul
-// CHECK-SAME:  ins(%[[ARG0]], %[[ARG1]]
-// CHECK-SAME:  outs(%[[ARG2]]
+// CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+// CHECK-DAG: #[[MAP4:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+// CHECK-DAG: #[[MAP5:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+
+// CHECK-LABEL: func @block_small_dims_matmul(
+// CHECK-SAME:    %[[ARG0:[0-9a-z]+]]: tensor<5x6xf32>
+// CHECK-SAME:    %[[ARG1:[0-9a-z]+]]: tensor<6x5xf32>
+// CHECK-SAME:    %[[ARG2:[0-9a-z]+]]: tensor<5x5xf32>) -> tensor<5x5xf32> {
+// CHECK: %[[BUF0:.+]] = tensor.empty() : tensor<1x1x5x6xf32>
+// CHECK: %[[PACK0:.+]] = tensor.pack %[[ARG0]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [5, 6] into %[[BUF0]] : tensor<5x6xf32> -> tensor<1x1x5x6xf32>
+// CHECK: %[[BUF1:.*]] = tensor.empty() : tensor<1x1x6x5xf32>
+// CHECK: %[[PACK1:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [6, 5] into %[[BUF1]] : tensor<6x5xf32> -> tensor<1x1x6x5xf32>
+// CHECK: %[[BUF2:.+]] = tensor.empty() : tensor<1x1x5x5xf32>
+// CHECK: %[[PACK2:.+]] = tensor.pack %[[ARG2]] inner_dims_pos = [0, 1] inner_tiles = [5, 5] into %[[BUF2]] : tensor<5x5xf32> -> tensor<1x1x5x5xf32>
+// CHECK: %[[VAL:.+]] = linalg.generic {indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP5]]], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%[[PACK0]], %[[PACK1]] : tensor<1x1x5x6xf32>, tensor<1x1x6x5xf32>) outs(%[[PACK2]] : tensor<1x1x5x5xf32>)
+// CHECK: %[[OUT:.+]] = tensor.unpack %[[VAL]] inner_dims_pos = [0, 1] inner_tiles = [5, 5] into %[[ARG2]] : tensor<1x1x5x5xf32> -> tensor<5x5xf32>
+// CHECK: return %[[OUT]] : tensor<5x5xf32>
+// CHECK: }
 
 // -----
 
@@ -183,15 +196,3 @@ func.func @batch_matmul_rewrite(%arg0: tensor<512x64x128xf32>, %arg1: tensor<512
 // CHECK: %[[UNPACK:.+]] = tensor.unpack %[[GEN]]
 // CHECK-SAME:  inner_dims_pos = [1, 2] inner_tiles = [32, 32]
 // CHECK-SAME:  into %[[OUT]] : tensor<512x2x2x32x32xf32> -> tensor<512x64x64xf32>
-
-// -----
-
-// CHECK-LABEL: batch_matmul_invalid_tiles
-func.func @batch_matmul_invalid_tiles(%arg0: tensor<5x5x5xf32>, %arg1: tensor<5x5x5xf32>) -> tensor<5x5x5xf32> {
-  %0 = tensor.empty() : tensor<5x5x5xf32>
-  // CHECK: linalg.batch_matmul
-  // CHECK-NOT: linalg.generic
-  %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<5x5x5xf32>, tensor<5x5x5xf32>)
-                           outs(%0 : tensor<5x5x5xf32>) -> tensor<5x5x5xf32>
-  return %1 : tensor<5x5x5xf32>
-}

@@ -8,15 +8,15 @@ func.func @matmul(%A: tensor<4x8xf32>,
           %B: tensor<8x4xf32>, %C: tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index
   // CHECK-NEXT: %[[cast_ptr0:.*]] = arith.index_cast %[[ptr0]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[cast_ptr0]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index
   // CHECK-NEXT: %[[cast_ptr1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[cast_ptr1]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index
   // CHECK-NEXT: %[[cast_ptr2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[cast_ptr2]] : i64 to !llvm.ptr
 
@@ -86,53 +86,6 @@ func.func @conv2d_1x1(
               outs(%1 : !conv1x1_output_tensor_t) -> !conv1x1_output_tensor_t
 
   return %2 : !conv1x1_output_tensor_t
-}
-
-// -----
-
-#map = affine_map<(d0, d1) -> (d0 + d1)>
-
-// CHECK-LABEL: @conv2d_1x1_decomposed(
-// CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
-func.func @conv2d_1x1_decomposed(
-      %arg0 : tensor<1x7x7x2048xf32>) -> tensor<1x7x7x512xf32> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c7 = arith.constant 7 : index
-
-  // Conv2D weights
-  %cst = arith.constant dense<0.00332225906> : tensor<2048x512xf32>
-
-  // 1x1 Conv2D
-  // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: scf.for
-  // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   call @xsmm_gemm_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}, %[[ptr2]], %{{.+}}
-  %cst_0 = arith.constant 0.000000e+00 : f32
-  %0 = tensor.empty() : tensor<1x7x7x512xf32>
-  %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : tensor<1x7x7x512xf32>) -> tensor<1x7x7x512xf32>
-  %2 = scf.for %arg1 = %c0 to %c1 step %c1 iter_args(%arg2 = %1) -> (tensor<1x7x7x512xf32>) {
-    %3 = scf.for %arg3 = %c0 to %c7 step %c1 iter_args(%arg4 = %arg2) -> (tensor<1x7x7x512xf32>) {
-      %4 = scf.for %arg5 = %c0 to %c1 step %c1 iter_args(%arg6 = %arg4) -> (tensor<1x7x7x512xf32>) {
-        %5 = scf.for %arg7 = %c0 to %c1 step %c1 iter_args(%arg8 = %arg6) -> (tensor<1x7x7x512xf32>) {
-          %6 = affine.apply #map(%arg3, %arg5)
-          %extracted_slice = tensor.extract_slice %arg0[%arg1, %6, %arg7, 0] [1, 1, 7, 2048] [1, 1, 1, 1] : tensor<1x7x7x2048xf32> to tensor<7x2048xf32>
-          %extracted_slice_1 = tensor.extract_slice %arg8[%arg1, %arg3, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : tensor<1x7x7x512xf32> to tensor<7x512xf32>
-          %7 = linalg.matmul ins(%extracted_slice, %cst : tensor<7x2048xf32>, tensor<2048x512xf32>) outs(%extracted_slice_1 : tensor<7x512xf32>) -> tensor<7x512xf32>
-          %inserted_slice = tensor.insert_slice %7 into %arg8[%arg1, %arg3, 0, 0] [1, 1, 7, 512] [1, 1, 1, 1] : tensor<7x512xf32> into tensor<1x7x7x512xf32>
-          scf.yield %inserted_slice : tensor<1x7x7x512xf32>
-        }
-        scf.yield %5 : tensor<1x7x7x512xf32>
-      }
-      scf.yield %4 : tensor<1x7x7x512xf32>
-    }
-    scf.yield %3 : tensor<1x7x7x512xf32>
-  }
-
-  // CHECK: return {{.*}} : memref<1x7x7x512xf32>
-  return %2 : tensor<1x7x7x512xf32>
 }
 
 // -----

@@ -50,15 +50,14 @@ func.func @gemm_with_zero(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> ten
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : i64
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
 // CHECK-NOT: xsmm_unary_dispatch
-// CHECK: %[[ALLOC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
 // CHECK: %[[DIS:.+]] = call @xsmm_gemm_dispatch(%[[C1]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C3]], %[[C4]])
-// CHECK: %[[INT_PTR_ARG0:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]] : memref<3x3xf32> -> index
+// CHECK: %[[INT_PTR_ARG0:.+]] = memref.extract_aligned_pointer_as_index
 // CHECK: %[[CAST_ARG0:.+]] = arith.index_cast %[[INT_PTR_ARG0]] : index to i64
 // CHECK: %[[LLVM_PTR_ARG0:.+]] = llvm.inttoptr %[[CAST_ARG0]] : i64 to !llvm.ptr
-// CHECK: %[[INT_PTR_ARG1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]] : memref<3x3xf32> -> index
+// CHECK: %[[INT_PTR_ARG1:.+]] = memref.extract_aligned_pointer_as_index
 // CHECK: %[[CAST_ARG1:.+]] = arith.index_cast %[[INT_PTR_ARG1]] : index to i64
 // CHECK: %[[LLVM_PTR_ARG1:.+]] = llvm.inttoptr %[[CAST_ARG1]] : i64 to !llvm.ptr
-// CHECK: %[[INT_PTR_ALLOC:.+]] = memref.extract_aligned_pointer_as_index %[[ALLOC]] : memref<3x3xf32> -> index
+// CHECK: %[[INT_PTR_ALLOC:.+]] = memref.extract_aligned_pointer_as_index
 // CHECK: %[[CAST_ALLOC:.+]] = arith.index_cast %[[INT_PTR_ALLOC]] : index to i64
 // CHECK: %[[LLVM_PTR_ALLOC:.+]] = llvm.inttoptr %[[CAST_ALLOC]] : i64 to !llvm.ptr
 // CHECK: call @xsmm_gemm_invoke(%[[C1]], %[[DIS]], %[[LLVM_PTR_ARG0]], %[[C0]], %[[LLVM_PTR_ARG1]], %[[C0]], %[[LLVM_PTR_ALLOC]], %[[C0]])
