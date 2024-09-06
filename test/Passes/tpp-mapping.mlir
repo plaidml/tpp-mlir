@@ -15,9 +15,10 @@ func.func @conv_to_matmul(%img: tensor<1x5x5x3xf32>, %filter: tensor<3x3x3x8xf32
 // CHECK:     scf.for
 // CHECK:         tensor.extract_slice{{[^:]+}}: tensor<1x5x5x3xf32> to tensor<3x3xf32>
 // CHECK:         tensor.extract_slice{{[^:]+}}: tensor<3x3x3x8xf32> to tensor<3x8xf32>
-// CHECK:         tensor.extract_slice{{[^:]+}}: tensor<1x3x3x8xf32> to tensor<3x8xf32>
+// CHECK:         tensor.extract_slice{{[^:]+}}: tensor<1x1x3x8xf32> to tensor<3x8xf32>
 // CHECK:         linalg.matmul{{.*}} -> tensor<3x8xf32>
-// CHECK:         tensor.insert_slice{{[^:]+}}: tensor<3x8xf32> into tensor<1x3x3x8xf32>
+// CHECK:         tensor.insert_slice{{[^:]+}}: tensor<3x8xf32> into tensor<1x1x3x8xf32>
+// CHECK:         tensor.insert_slice{{[^:]+}}: tensor<1x1x3x8xf32> into tensor<1x3x3x8xf32>
 // CHECK:       }
 
 // -----
