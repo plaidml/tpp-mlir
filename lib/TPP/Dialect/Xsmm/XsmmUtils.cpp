@@ -330,11 +330,11 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
 
   // If we haven't found a BRGEMM or zero, this are not the droids we're looking
   // for
-  assert((isa<xsmm::BrgemmOp>(chain[0]) ||
-         (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
-          dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
-          isa<xsmm::BrgemmOp>(chain[1]))) &&
-             "First op must be brgemm or zero");
+  if (!(isa<xsmm::BrgemmOp>(chain[0]) ||
+        (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
+         dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
+         isa<xsmm::BrgemmOp>(chain[1]))))
+    return failure();
 
   // Now, we're sure we have a chain, but not yet if it has the right types
   // and in the right order: (ZER0) -> BRGEMM -> BINARY -> UNARY
