@@ -3,10 +3,8 @@ add_mlir_library(TPPGPU
   GpuPipeline.cpp
   GpuConversion.cpp
   GpuToCuda.cpp
-  GpuToVulkan.cpp
   SetSPIRVCapabilities.cpp
   SetSPIRVAbiAttribute.cpp
-  GpuVulkanAbi.cpp
   LinalgToGpu.cpp
   GpuDataTransfer.cpp
   GpuInlineConstants.cpp
@@ -46,17 +44,11 @@ if (TPP_GPU MATCHES "cuda")
   )
 endif()
 
-if (TPP_GPU MATCHES "vulkan")
-  target_compile_definitions(obj.TPPGPU
-    PRIVATE
-    TPP_VULKAN_ENABLE=1
-  )
-
+if (DEFINED ${TPP_GPU})
   target_link_libraries(TPPGPU
     PUBLIC
     MLIRSPIRVDialect
     MLIRSPIRVTransforms
-    MLIRGPUToVulkanTransforms
     MLIRGPUToSPIRV
   )
 endif()

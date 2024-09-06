@@ -63,9 +63,6 @@ add_device_extensions() {
   if [[ ${DEVICE_LIST,,} =~ "cuda" ]]; then
     BASE=${BASE}-cuda
   fi
-  if [[ ${DEVICE_LIST,,} =~ "vulkan" ]]; then
-    BASE=${BASE}-vulkan
-  fi
 
   echo ${BASE}
 }

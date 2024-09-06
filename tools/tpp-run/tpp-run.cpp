@@ -138,7 +138,7 @@ llvm::cl::opt<bool> printLLVM("print-llvm",
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
     defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda,vulkan"), llvm::cl::init(""));
+                  llvm::cl::value_desc("cuda,intel"), llvm::cl::init(""));
 
 // Kernel buffers - arguments and return values - are expected to be allocated
 // on GPU.

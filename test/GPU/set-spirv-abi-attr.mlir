@@ -1,6 +1,3 @@
-// RUN: tpp-opt %s -set-spirv-abi-attr=client-api=vulkan | \
-// RUN: FileCheck %s --check-prefix=VULKAN
-
 // RUN: tpp-opt %s -set-spirv-abi-attr=client-api=opencl | \
 // RUN: FileCheck %s --check-prefix=OPENCL
 
@@ -25,9 +22,6 @@ module attributes {gpu.container_module} {
     }
   }
 }
-
-// VULKAN: gpu.func @entry_kernel(%arg0: memref<32x32xf32>)
-// VULKAN-SAME: kernel attributes {{{.*}}spirv.entry_point_abi = #spirv.entry_point_abi<workgroup_size = [4, 4, 1]>
 
 // OPENCL: gpu.func @entry_kernel(%arg0: memref<32x32xf32>)
 // OPENCL-SAME: kernel attributes {{{.*}}spirv.entry_point_abi = #spirv.entry_point_abi<>
