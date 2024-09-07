@@ -232,6 +232,16 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
                            "arith::ArithDialect"];
 }
 
+def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
+  let summary = "TODO";
+  let description = [{
+    TODO.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect",
+                           "arith::ArithDialect"];
+}
+
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let summary = "Run linalg element-wise fusion";
 }
