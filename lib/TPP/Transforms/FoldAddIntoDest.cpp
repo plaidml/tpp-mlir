@@ -80,6 +80,8 @@ struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
     if (!mlir::utils::isZeroOp(dominatedDest))
       return rewriter.notifyMatchFailure(
           dominatedOp, "expected dominated op's dest to be additive zero");
+    // TODO: If the other op is a contraction and has additive zero as dest, we
+    // can swap the dests and achieve the proper sum, given suitable dominance.
 
     // Replace the additive-zero out argument of the dominated op by the
     // dominating summand. This makes the dominated op's result the sum of both

@@ -233,9 +233,11 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
 }
 
 def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
-  let summary = "TODO";
+  let summary = "Fold linalg.add into dest of contraction op";
   let description = [{
-    TODO.
+    Replace a linalg.add where its linalg-contraction operand - with a
+    zero-filled destination - is dominated by the `other` linalg operand,
+    by passing `other` as the destination of the contraction.
   }];
   let dependentDialects = ["linalg::LinalgDialect",
                            "tensor::TensorDialect",
