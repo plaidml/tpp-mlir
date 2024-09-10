@@ -136,6 +136,12 @@ echo_run cmake -Wno-dev -G Ninja \
     -DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR} \
     ${LLVM_BUILD_EXTENSIONS}
 
+if [ $? != 0 ]; then
+  rm -r ${LLVM_INSTALL_DIR}
+  rm -r ${LLVM_BUILD_DIR}
+  exit 1
+fi
+
 # Build LLVM
 echo "--- BUILD"
 echo_run ninja -C ${LLVM_BUILD_DIR} all
@@ -167,3 +173,7 @@ fi
 # Cleanup
 echo "--- CLEANUP"
 rm -r ${LLVM_BUILD_DIR}
+if [ $? != 0 ]; then
+  echo "Failed to cleanup"
+  exit 1
+fi
