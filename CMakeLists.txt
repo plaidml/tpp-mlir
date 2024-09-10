@@ -13,7 +13,7 @@ project(tpp-dialect LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 set(TPP_GPU "" CACHE STRING "Enables GPU runtime (default: '')")
-set_property(CACHE TPP_GPU PROPERTY STRINGS "" "cuda" "vulkan")
+set_property(CACHE TPP_GPU PROPERTY STRINGS "" "cuda")
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(STATUS "TPP-MLIR out-of-tree build.")

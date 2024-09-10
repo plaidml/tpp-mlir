@@ -30,14 +30,3 @@ jobs:
               ${{ env.SRUN }} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
               ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'
-
-  TPP-MLIR-LLVM-Vulkan:
-    runs-on: pcl-tiergarten
-    steps:
-      - uses: actions/checkout@v4
-      - name: LLVM Vulkan
-        run: |-
-              GPU=vulkan scripts/buildkite/check_llvm.sh || \
-              ${{ env.SRUN }} --partition=spr-all --time=0:30:00 -- \
-              'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
-              ${{ github.workspace }}/scripts/buildkite/build_llvm.sh'

@@ -56,10 +56,3 @@ if [ "${GPU_OPTION}" == "cuda" ]; then
     exit 1
   fi
 fi
-
-# Vulkan Benchmarks
-if [ "${GPU_OPTION}" == "vulkan" ]; then
-  source /swtools/vulkan/latest/setup-env.sh
-  echo "No Vulkan benchmarks"
-  exit 1
-fi

@@ -58,27 +58,6 @@ struct SetSPIRVAbiAttribute
                            UnitAttr::get(context));
         }
       }
-    } else if (clientAPI == "vulkan") {
-      const SmallVector<gpu::Dimension> dims = {
-          gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
-
-      for (Operation *gpuFunc : gpuModule.getOps<gpu::GPUFuncOp>()) {
-        if (!gpu::GPUDialect::isKernel(gpuFunc) || gpuFunc->getAttr(attrName))
-          continue;
-
-        SmallVector<int32_t> dimSizes;
-        for (auto &dim : dims) {
-          uint32_t dimSize = 1;
-          auto dimIdx = static_cast<uint32_t>(dim);
-          auto blockSizes = cast<gpu::GPUFuncOp>(gpuFunc).getKnownBlockSize();
-          if (blockSizes && blockSizes->size() > dimIdx)
-            dimSize = (*blockSizes)[dimIdx];
-          dimSizes.push_back(dimSize);
-        }
-        auto abi = spirv::getEntryPointABIAttr(context, dimSizes);
-
-        gpuFunc->setAttr(attrName, abi);
-      }
     }
   }
 };

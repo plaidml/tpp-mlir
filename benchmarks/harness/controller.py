@@ -263,7 +263,7 @@ if __name__ == "__main__":
         help="Random initializer type (default: normal)",
     )
     parser.add_argument(
-        "--gpu", type=str, help="Target GPU backend for lowering (cuda,vulkan)"
+        "--gpu", type=str, help="Target GPU backend for lowering (cuda)"
     )
     args = parser.parse_args()
 

@@ -15,10 +15,3 @@ if [[ ${GPU,,} =~ "cuda" ]]; then
   source /swtools/cuda/latest/cuda_vars.sh
   check_program nvcc
 fi
-
-# Env Vulkan setup
-if [[ ${GPU,,} =~ "vulkan" ]]; then
-  echo "Setting up Vulkan environment"
-  source /swtools/vulkan/latest/setup-env.sh
-  check_program vulkaninfo
-fi

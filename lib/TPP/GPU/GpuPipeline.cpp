@@ -84,14 +84,12 @@ namespace {
 
 enum class GpuType {
   Cuda,
-  Vulkan,
   Intel,
 };
 
 GpuType parseGpuOption(StringRef gpuStr) {
   auto type = llvm::StringSwitch<std::optional<GpuType>>(gpuStr)
                   .CaseLower("cuda", GpuType::Cuda)
-                  .CaseLower("vulkan", GpuType::Vulkan)
                   .CaseLower("intel", GpuType::Intel)
                   .Default(std::nullopt);
   assert(type && "Unsupported GPU backend");
@@ -115,7 +113,6 @@ GpuOptions getGpuOptions(GpuType gpuType) {
     options.features = "+ptx60";
     break;
   }
-  case GpuType::Vulkan:
   case GpuType::Intel: {
     // No options needed at the moment.
     break;
@@ -196,8 +193,7 @@ private:
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.
     pm.addPass(createLowerPacksAndUnPacks());
-    bool dealloc = gpuType == GpuType::Vulkan;
-    pm.addPass(createBufferize(BufferizeOptions{dealloc}));
+    pm.addPass(createBufferize(BufferizeOptions{/*dealloc=*/false}));
     pm.addPass(createConvertForAllToParallelOp());
     pm.addPass(createCleanup());
 
@@ -211,14 +207,9 @@ private:
     case GpuType::Cuda: {
       // Perform explicit GPU data transfers only for CUDA as the unified
       // memory is not currently used here.
-      // Vulkan runner assumes usage of GPU unified memory.
       pm.addNestedPass<func::FuncOp>(createGpuDataTransfer());
       pm.addPass(createGpuToCuda(GpuToCudaOptions{
           gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
-      break;
-    }
-    case GpuType::Vulkan: {
-      pm.addPass(createGpuToVulkan());
       break;
     }
     case GpuType::Intel:

@@ -181,8 +181,6 @@ private:
     pm.addNestedPass<func::FuncOp>(createCSEPass());
     pm.addPass(createReconcileUnrealizedCastsPass());
 
-    pm.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
-
     // Anything useful has been lowered by now.
     // Cleanup IR by removing any dead symbols.
     // This step aims to avoid errors caused by frontend leftovers.

@@ -171,13 +171,4 @@ def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {
   ];
 }
 
-def GpuToVulkan : Pass<"gpu-to-vulkan", "ModuleOp"> {
-  let summary = "Lower generic GPU operations to Vulkan backend";
-  let dependentDialects = ["arith::ArithDialect",
-                           "memref::MemRefDialect",
-                           "func::FuncDialect",
-                           "gpu::GPUDialect",
-                           "spirv::SPIRVDialect"];
-}
-
 #endif // TPP_DIALECT_TPP_PASSBUNDLES

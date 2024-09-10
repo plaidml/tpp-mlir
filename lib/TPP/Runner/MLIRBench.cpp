@@ -175,22 +175,8 @@ LogicalResult MLIRBench::renameKernel() {
 
 Value MLIRBench::registerOnGpu(Value buf, MemRefType memRefTy) {
   // Do nothing when not using GPU
-  if (!offloadToDevice || !(backend == "cuda" || backend == "vulkan"))
+  if (!offloadToDevice || !(backend == "cuda"))
     return buf;
-
-  if (backend == "vulkan") {
-    // Copy to heap as global memory is not shared between host and device
-    auto localBuf = builder.create<memref::AllocOp>(unkLoc, memRefTy);
-    auto copy = builder.create<memref::CopyOp>(unkLoc, buf, localBuf);
-
-    // Dealloc the arg buffer at the end of program
-    builder.setInsertionPointToEnd(&getMainBlock());
-
-    // Continue inserting ops after the created kernel arg
-    builder.setInsertionPointAfter(copy);
-
-    return localBuf;
-  }
 
   // Allocate an arg buffer on device and copy data from host
   // Use shared memory on Intel GPU and dedicated GPU allocation, otherwise

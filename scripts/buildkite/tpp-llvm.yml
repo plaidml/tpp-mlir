@@ -17,11 +17,3 @@ steps:
               ${SRUN} --partition=a100,v100 --time=0:30:00 -- \
               'KIND=RelWithDebInfo COMPILER=clang GPU=cuda \
               scripts/buildkite/build_llvm.sh'"
-
-  - label: "TPP-LLVM-vulkan"
-    concurrency: 1
-    concurrency_group: "tpp-llvm-vulkan"
-    command: "GPU=vulkan scripts/buildkite/check_llvm.sh || \
-              ${SRUN} --partition=spr --time=0:30:00 -- \
-              'KIND=RelWithDebInfo COMPILER=clang GPU=vulkan \
-              scripts/buildkite/build_llvm.sh'"
