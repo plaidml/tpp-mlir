@@ -25,9 +25,9 @@ namespace tpp {
 
 namespace {
 
-/// Replace a linalg.add where its linalg-contraction operand - with a
-/// zero-filled destination - is dominated by the `other` linalg operand,
-/// by passing `other` as the destination of the contraction.
+/// Replace a linalg.add with one operand the single user of a contraction,
+/// which has a zero-filled, "identity-mapped" destination and is dominated by
+/// the `other` operand, by the contraction with `other` as its dest.
 struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
   using OpRewritePattern<linalg::AddOp>::OpRewritePattern;
 
@@ -61,8 +61,7 @@ struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
       //     region there is no need to perform checks on addOp's out argument.
     }
 
-    // When the dominated op has a single-result and is a contraction, the op
-    // accumulates on the out argument, starting from the supplied out argument.
+    // Dominated op must be a contraction for it to accumulate on its out arg.
     // E.g., AddOp is not a contraction and hence ignores its out arg's value.
     auto dominatedDestOp =
         dyn_cast<DestinationStyleOpInterface>((Operation *)dominatedOp);
@@ -73,15 +72,37 @@ struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
           dominatedOp, "expected dominated op to be single-result "
                        "destination-passing contraction");
 
-    // As the dominated op was already accumulating on its out argument, it is
-    // only safe to discard its current out arg when it is the additive zero.
-    auto *dominatedDest =
-        dominatedDestOp.getDpsInitOperand(0)->get().getDefiningOp();
-    if (!mlir::utils::isZeroOp(dominatedDest))
+    // To change the contraction's result, `addOp` must be its only user.
+    auto contractionUsers = dominatedOp->getResult(0).getUsers();
+    if (std::distance(contractionUsers.begin(), contractionUsers.end()) != 1)
+      return rewriter.notifyMatchFailure(
+          dominatedOp,
+          "expected linalg.add op to be single user of contraction's result");
+
+    // As `dominatedOp` was already accumulating on its out argument, it is only
+    // safe to no longer use its current out arg when it is the additive zero.
+    auto *destOperand = dominatedDestOp.getDpsInitOperand(0);
+    ;
+    if (!mlir::utils::isZeroOp(destOperand->get().getDefiningOp()))
       return rewriter.notifyMatchFailure(
           dominatedOp, "expected dominated op's dest to be additive zero");
     // TODO: If the other op is a contraction and has additive zero as dest, we
     // can swap the dests and achieve the proper sum, given suitable dominance.
+
+    // As an operand to `addOp`, `dominatingOperand` has an identity affine_map.
+    // Hence, we can only substitute `dominatingOperand` for the dest of the
+    // contraction when dest's index_map corresponds to an identity map w.r.t.
+    // just the dimensions of dest, i.e. is an ordered projection.
+    SmallVector<AffineMap> indexMaps = dominatedOp.getIndexingMapsArray();
+    int prevDimPos = -1;
+    for (auto expr : indexMaps[destOperand->getOperandNumber()].getResults()) {
+      auto dim = dyn_cast<AffineDimExpr>(expr);
+      if (!dim || prevDimPos >= (int)dim.getPosition())
+        return rewriter.notifyMatchFailure(
+            dominatedOp, "expected index_map for contraction's dest to be an "
+                         "ordered projection");
+      prevDimPos = dim.getPosition();
+    }
 
     // Replace the additive-zero out argument of the dominated op by the
     // dominating summand. This makes the dominated op's result the sum of both

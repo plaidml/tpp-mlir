@@ -56,25 +56,6 @@ func.func @expect_add_to_fold(%arg0: !type, %arg1: !type) -> !type {
 // -----
 
 !type = tensor<2048x2048xf32>
-func.func @expect_add_to_not_fold(%arg0: !type, %arg1: !type) -> !type {
-  %0 = arith.constant dense<1.111111e+00> : !type
-  %cst = arith.constant 0.000000e+00 : f32
-  %1 = tensor.empty() : !type
-  %2 = linalg.fill ins(%cst : f32) outs(%1 : !type) -> !type
-  %3 = linalg.matmul_transpose_b ins(%arg0, %0 : !type, !type) outs(%2 : !type) -> !type
-  %4 = linalg.add ins(%3, %3 : !type, !type) outs(%1 : !type) -> !type
-  return %4 : !type
-}
-
-// CHECK-LABEL: func.func @expect_add_to_not_fold
-// CHECK: linalg.fill
-// CHECK-NEXT: linalg.matmul_transpose_b
-// CHECK-NEXT: linalg.add
-// CHECK-NEXT: return
-
-// -----
-
-!type = tensor<2048x2048xf32>
 func.func @expect_no_fold_as_operands_do_not_dominate_each_other(%arg0: !type, %arg1: !type) -> !type {
   %0 = arith.constant dense<1.111111e+00> : !type
   %cst = arith.constant 0.000000e+00 : f32
@@ -132,4 +113,27 @@ func.func @expect_no_fold_as_orig_dest_not_additive_zero(%arg0: !type, %arg1: !t
 // CHECK-NEXT: linalg.matmul
 // CHECK-NEXT: linalg.matmul
 // CHECK-NEXT: linalg.add
+// CHECK-NEXT: return
+
+// -----
+
+!type = tensor<2048x2048xf32>
+func.func @expect_no_fold_as_contraction_result_has_multiple_users(%arg0: !type, %arg1: !type) -> (!type, !type) {
+  %0 = arith.constant dense<1.111111e+00> : !type
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = tensor.empty() : !type
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : !type) -> !type
+  %3 = linalg.matmul ins(%arg0, %0 : !type, !type) outs(%2 : !type) -> !type
+  %4 = linalg.matmul ins(%arg1, %0 : !type, !type) outs(%0 : !type) -> !type
+  %5 = linalg.add ins(%3, %4 : !type, !type) outs(%1 : !type) -> !type
+  %6 = linalg.mul ins(%4, %arg0 : !type, !type) outs(%1 : !type) -> !type
+  return %5, %6 : !type, !type
+}
+
+// CHECK-LABEL: func.func @expect_no_fold_as_contraction_result_has_multiple_users
+// CHECK: linalg.fill
+// CHECK-NEXT: linalg.matmul
+// CHECK-NEXT: linalg.matmul
+// CHECK-NEXT: linalg.add
+// CHECK-NEXT: linalg.mul
 // CHECK-NEXT: return
