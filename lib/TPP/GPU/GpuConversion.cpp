@@ -66,7 +66,7 @@ private:
       pm.addNestedPass<func::FuncOp>(
           createLinalgToGpu(LinalgToGpuOptions{useWmma, warpTile, kTile}));
     }
-    pm.addNestedPass<func::FuncOp>(createConvertLinalgToParallelLoopsPass());
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
 
     // Map loops into GPU kernels.
     pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());

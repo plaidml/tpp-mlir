@@ -1,64 +1,6 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s
 
-func.func @linalg_matmul() {
-  %0 = memref.alloc() : memref<8x8xf32>
-  %1 = memref.alloc() : memref<8x8xf32>
-  %2 = memref.alloc() : memref<8x8xf32>
-
-  %cast_a = memref.cast %0 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_a : memref<*xf32>
-  %cast_b = memref.cast %1 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_b : memref<*xf32>
-  %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_c : memref<*xf32>
-
-  linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-                outs(%2 : memref<8x8xf32>)
-
-  call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
-
-  return
-}
-
-func.func private @printMemrefF32(memref<*xf32>)
-
-// CHECK: module attributes {gpu.container_module}
-// CHECK-LABEL: func.func @linalg_matmul
-// CHECK:         %[[C1:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C1]]
-// CHECK:         %[[C2:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C2]]
-// CHECK:         %[[C3:.*]] = memref.cast
-// CHECK:         gpu.host_register %[[C3]]
-// CHECK:         gpu.launch_func  @linalg_matmul_kernel::@linalg_matmul_kernel
-// CHECK:         call @printMemrefF32
-// CHECK:       }
-// CHECK: gpu.module @linalg_matmul_kernel
-// CHECK-LABEL: llvm.func @linalg_matmul_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
-
-// -----
-
-func.func @tpp_gemm(%arg0: memref<8x9xf32>, %arg1: memref<9x10xf32>, %arg2: memref<8x10xf32>) {
-  linalg.matmul ins(%arg0, %arg1 : memref<8x9xf32>, memref<9x10xf32>)
-                outs(%arg2: memref<8x10xf32>)
-  return
-}
-
-// CHECK: module attributes {gpu.container_module}
-// CHECK-LABEL: func.func @tpp_gemm
-// CHECK:         gpu.launch_func  @tpp_gemm_kernel::@tpp_gemm_kernel
-// CHECK: gpu.module @tpp_gemm_kernel
-// CHECK-LABEL: llvm.func @tpp_gemm_kernel
-// CHECK-DAG:     nvvm.read
-// CHECK-DAG:     llvm.mul
-// CHECK-DAG:     llvm.add
-
-// -----
-
 func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64xf32>, %arg2: memref<4x16x64x64xf32>) {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
@@ -126,10 +68,10 @@ func.func @matmul_blocks_threads(
 // CHECK: module attributes {gpu.container_module}
 // CHECK-LABEL: func.func @matmul_blocks_threads
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK-NOT:     linalg.matmul
 // CHECK:         gpu.launch_func  @matmul_blocks_threads_kernel::@matmul_blocks_threads_kernel
-// CHECK-SAME:    blocks in (%[[C8]], %[[C64]], %[[C1]]) threads in (%[[C32]], %[[C32]], %[[C1]])
+// CHECK-SAME:    blocks in (%[[C2]], %[[C16]], %[[C1]]) threads in (%[[C4]], %[[C4]], %[[C1]])
 // CHECK: gpu.module @matmul_blocks_threads_kernel

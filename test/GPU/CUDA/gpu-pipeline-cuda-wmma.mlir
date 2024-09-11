@@ -1,30 +1,34 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
 // RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -gpu-wmma -split-input-file | FileCheck %s
 
-#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-func.func @packed_matmul(%arg0: tensor<2x4x16x16xf16>, %arg1: tensor<4x4x16x16xf16>, %arg2: tensor<2x4x16x16xf16>) -> tensor<2x4x16x16xf16> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : tensor<2x4x16x16xf16>, tensor<4x4x16x16xf16>) outs(%arg2 : tensor<2x4x16x16xf16>) {
-    ^bb0(%in: f16, %in_2: f16, %out: f16):
-      %4 = arith.mulf %in, %in_2 : f16
-      %5 = arith.addf %out, %4 : f16
-      linalg.yield %5 : f16
-    } -> tensor<2x4x16x16xf16>
-  return %0 : tensor<2x4x16x16xf16>
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 16 : i32>>>
+} {
+  func.func @packed_matmul(%arg0: tensor<64x64xf16>, %arg1: tensor<64x64xf16>, %arg2: tensor<64x64xf16>) -> tensor<64x64xf16> {
+    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : tensor<64x64xf16>, tensor<64x64xf16>) outs(%arg2 : tensor<64x64xf16>) {
+      ^bb0(%in: f16, %in_2: f16, %out: f16):
+        %4 = arith.mulf %in, %in_2 : f16
+        %5 = arith.addf %out, %4 : f16
+        linalg.yield %5 : f16
+      } -> tensor<64x64xf16>
+    return %0 : tensor<64x64xf16>
+  }
 }
 
-// CHECK: module attributes {gpu.container_module}
+// CHECK: module attributes{{.*}}gpu.container_module
 // CHECK-LABEL: func.func @packed_matmul
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
-// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
 // CHECK-NOT:     linalg.generic
 // CHECK:         gpu.launch_func  @packed_matmul_kernel::@packed_matmul_kernel
-// CHECK-SAME:    blocks in (%[[C2]], %[[C4]], %[[C1]]) threads in (%[[C32]], %[[C1]], %[[C1]])
+// CHECK-SAME:    blocks in (%[[C2]], %[[C2]], %[[C1]]) threads in (%[[C32]], %[[C1]], %[[C1]])
 // CHECK:       }
 // CHECK: gpu.module @packed_matmul_kernel
 // CHECK-LABEL: llvm.func @packed_matmul_kernel

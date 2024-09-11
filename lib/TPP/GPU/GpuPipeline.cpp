@@ -165,29 +165,28 @@ private:
     GpuType gpuType = parseGpuOption(this->gpuBackend);
     GpuOptions gpuOptions = getGpuOptions(gpuType);
 
+    // Input preprocessing.
+    pm.addPass(createCleanup());
+    pm.addPass(createFoldIntoEltwise());
+    pm.addNestedPass<func::FuncOp>(createConvertLinalgToInplace());
+
     // Tile to split the kernel into threads and blocks.
     // Use default tiling to handle both packed and unpacked ops.
     pm.addPass(createCleanup());
-    if (gpuType == GpuType::Intel) {
-      // First split computation into grid with blocks of specified size.
-      TileConsumerAndFuseProducersOptions blockTileOptions;
-      blockTileOptions.tileSizes = gpuBlockTile;
-      blockTileOptions.minTileFactor = 1;
-      pm.addPass(createTileConsumerAndFuseProducers(blockTileOptions));
+    // First split computation into grid with blocks of specified size.
+    TileConsumerAndFuseProducersOptions blockTileOptions;
+    blockTileOptions.tileSizes = gpuBlockTile;
+    blockTileOptions.minTileFactor = 1;
+    pm.addPass(createTileConsumerAndFuseProducers(blockTileOptions));
 
-      // Then try to further split computation into subtiles.
-      // This allows to split larger computations across multiple
-      // threads/workitems. For smaller workloads, it provides another
-      // chance for outlining.
-      TileConsumerAndFuseProducersOptions threadTileOptions;
-      threadTileOptions.tileSizes = gpuThreadTile;
-      threadTileOptions.minTileFactor = 1;
-      pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
-    } else {
-      TileConsumerAndFuseProducersOptions tilingOptions;
-      tilingOptions.minTileFactor = 1;
-      pm.addPass(createTileConsumerAndFuseProducers(tilingOptions));
-    }
+    // Then try to further split computation into subtiles.
+    // This allows to split larger computations across multiple
+    // threads/workitems. For smaller workloads, it provides another
+    // chance for outlining.
+    TileConsumerAndFuseProducersOptions threadTileOptions;
+    threadTileOptions.tileSizes = gpuThreadTile;
+    threadTileOptions.minTileFactor = 1;
+    pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
     pm.addPass(createCleanup());
 
     // Preprocess and bufferize as further conversion requires memref
@@ -212,7 +211,7 @@ private:
           gpuOptions.triple, gpuOptions.chip, gpuOptions.features}));
       break;
     }
-    case GpuType::Intel:
+    case GpuType::Intel: {
       pm.addPass(xegpu::createXeGPUFoldAliasOps());
 
       std::string clientApi = "intel";
@@ -222,6 +221,7 @@ private:
       pm.addPass(tpp::createSetSPIRVAbiAttribute(abiAttrOptions));
 
       break;
+    }
     }
 
     // Covert all local dialects like perf.
