@@ -232,6 +232,18 @@ def ConstantFoldPack : Pass<"constant-fold-pack", "ModuleOp"> {
                            "arith::ArithDialect"];
 }
 
+def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
+  let summary = "Fold linalg.add into dest of contraction op";
+  let description = [{
+    Replace a linalg.add with one operand the single user of a contraction,
+    which has a zero-filled, "identity-mapped" destination and is dominated by
+    the `other` operand, by the contraction with `other` as its dest.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect",
+                           "arith::ArithDialect"];
+}
+
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let summary = "Run linalg element-wise fusion";
 }

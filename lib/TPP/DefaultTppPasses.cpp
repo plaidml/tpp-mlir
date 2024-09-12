@@ -68,6 +68,7 @@ struct DefaultTppPasses
 
 private:
   void constructPipeline() override {
+    pm.addPass(createFoldAddIntoDest());
     if (linalgToLoops) {
       // Lower linalg directly to loops.
       // Skip all TPP transformations.

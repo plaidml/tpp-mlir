@@ -40,7 +40,7 @@ static bool isZeroAttr(Attribute attribute) {
 }
 
 // Prototypes
-static bool isZeroOp(Operation *);
+bool isZeroOp(Operation *);
 
 // Returns true if the value represents a zero filled tensor.
 // Recurse into isZeroOp for defining ops if not immediately obvious
@@ -70,7 +70,7 @@ bool isZeroTensor(Value val) {
 
 // Returns true if the operation represents a zero filled tensor
 // Recurses into isZeroTensor for operands and isZeroAttr for attributes
-static bool isZeroOp(Operation *defOp) {
+bool isZeroOp(Operation *defOp) {
   if (!defOp)
     return false;
 
