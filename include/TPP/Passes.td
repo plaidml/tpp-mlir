@@ -323,27 +323,6 @@ def DecomposeAggregatedOps : Pass<"decompose-aggregated-ops", "func::FuncOp"> {
   }];
 }
 
-def LinalgToGpu : Pass<"linalg-to-gpu", "func::FuncOp"> {
-  let summary = "Convert linalg ops to be GPU compatible.";
-  let description = [{
-    Lower linalg to ops optimized for computation on GPU.
-  }];
-  let dependentDialects = ["linalg::LinalgDialect",
-                           "scf::SCFDialect",
-                           "memref::MemRefDialect",
-                           "gpu::GPUDialect",
-                           "arith::ArithDialect"];
-  let options = [
-    Option<"useWmma", "wmma",
-           "bool", /*default=*/"false",
-           "Use WMMA operations">,
-    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
-    Option<"kTile", "k-tile", "int64_t",
-           /*default=*/"32",
-           "GEMM tile size for reduction dimension.">,
-  ];
-}
-
 def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
   let summary = "Transfer data to and from GPU.";
   let description = [{
