@@ -131,10 +131,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
                            "memref::MemRefDialect",
                            "xegpu::XeGPUDialect"];
   let options = [
-    Option<"useWmma", "wmma",
-           "bool", /*default=*/"false",
-           "Use WMMA operations">,
-    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
     Option<"isIntel", "intel",
            "bool", /*default=*/"false",
            "Convert for Intel GPU">,

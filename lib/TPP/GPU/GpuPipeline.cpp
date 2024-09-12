@@ -41,15 +41,6 @@
 using namespace mlir;
 using namespace mlir::tpp;
 
-llvm::cl::opt<bool> gpuWmma("gpu-wmma",
-                            llvm::cl::desc("Enable GPU WMMA support"),
-                            llvm::cl::init(false));
-
-llvm::cl::list<int64_t> wmmaTileSizes(
-    "wmma-tile-sizes", llvm::cl::desc("GPU WMMA tile sizes MxNxK"),
-    llvm::cl::list_init<int64_t>(SmallVector<int64_t>{16, 16, 16}),
-    llvm::cl::CommaSeparated);
-
 llvm::cl::list<int64_t>
     gpuBlockTile("gpu-block-tile", llvm::cl::desc("GPU block tile size"),
                  llvm::cl::list_init<int64_t>(SmallVector<int64_t>{128, 128}),
@@ -197,9 +188,8 @@ private:
     pm.addPass(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(
-        GpuConversionOptions{gpuWmma, wmmaTileSizes, gpuType == GpuType::Intel,
-                             kTile, stages, gpuDpasTile}));
+    pm.addPass(createGpuConversion(GpuConversionOptions{
+        gpuType == GpuType::Intel, kTile, stages, gpuDpasTile}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {

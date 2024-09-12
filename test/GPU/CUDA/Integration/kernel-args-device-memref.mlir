@@ -18,9 +18,14 @@ module attributes {
   func.func @entry(%arg0: memref<8x8xf32>,
                    %arg1: memref<8x8xf32>,
                    %arg2: memref<8x8xf32>) -> memref<8x8xf32>{
+    %c1 = arith.constant 1 : index
+    gpu.launch blocks(%b0, %b1, %b2) in (%gs0 = %c1, %gs1 = %c1, %gs2 = %c1)
+                threads(%t0, %t1, %t2) in (%bs0 = %c1, %bs1 = %c1, %bs2 = %c1) {
+      linalg.matmul ins(%arg0, %arg1 : memref<8x8xf32>, memref<8x8xf32>)
+                    outs(%arg2 : memref<8x8xf32>)
+      gpu.terminator
+    }
     // Kernel arguments are already allocated on GPU - use directly
-    linalg.matmul ins(%arg0, %arg1 : memref<8x8xf32>, memref<8x8xf32>)
-                  outs(%arg2 : memref<8x8xf32>)
     return %arg2 : memref<8x8xf32>
   }
 }
