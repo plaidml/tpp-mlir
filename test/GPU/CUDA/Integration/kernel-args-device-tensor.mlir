@@ -1,10 +1,10 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 \
+// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -gpu-block-tile=-1 \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -print \
+// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -print -gpu-block-tile=-1 \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s --check-prefix=PRINT
 
@@ -32,7 +32,6 @@ module attributes {
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
-// CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry

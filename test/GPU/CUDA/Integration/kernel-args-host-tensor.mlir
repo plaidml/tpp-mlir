@@ -1,15 +1,12 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=0 -print \
+// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=0 -print -gpu-block-tile=-1 \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
-} {
+module {
   func.func @entry(%arg0: tensor<8x8xf32> {bufferization.writable = true},
                    %arg1: tensor<8x8xf32> {bufferization.writable = true},
                    %arg2: tensor<8x8xf32> {bufferization.writable = true}
@@ -29,8 +26,13 @@ module attributes {
     %t5 = gpu.memcpy async [%t4] %2, %a2 : memref<8x8xf32>, memref<8x8xf32>
     gpu.wait [%t5]
 
-    linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-                  outs(%2 : memref<8x8xf32>)
+    %c1 = arith.constant 1 : index
+    gpu.launch blocks(%b0, %b1, %b2) in (%gs0 = %c1, %gs1 = %c1, %gs2 = %c1)
+                threads(%tx0, %tx1, %tx2) in (%bs0 = %c1, %bs1 = %c1, %bs2 = %c1) {
+      linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
+                    outs(%2 : memref<8x8xf32>)
+      gpu.terminator
+    }
 
     // Retrieve data from device
     %out = memref.alloc() : memref<8x8xf32>
@@ -64,7 +66,6 @@ module attributes {
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
-// CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry

@@ -6,10 +6,7 @@
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
-} {
+module {
   func.func @entry(%arg0: memref<8x8xf32>,
                    %arg1: memref<8x8xf32>,
                    %arg2: memref<8x8xf32>) -> memref<8x8xf32> {
@@ -61,7 +58,6 @@ module attributes {
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
-// CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry

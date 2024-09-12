@@ -166,7 +166,8 @@ private:
     pm.addPass(createCleanup());
     // First split computation into grid with blocks of specified size.
     TileConsumerAndFuseProducersOptions blockTileOptions;
-    blockTileOptions.tileSizes = gpuBlockTile;
+    if (!llvm::any_of(gpuBlockTile, [](int64_t tile) { return tile == -1; }))
+      blockTileOptions.tileSizes = gpuBlockTile;
     blockTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(blockTileOptions));
 
@@ -175,7 +176,8 @@ private:
     // threads/workitems. For smaller workloads, it provides another
     // chance for outlining.
     TileConsumerAndFuseProducersOptions threadTileOptions;
-    threadTileOptions.tileSizes = gpuThreadTile;
+    if (!llvm::any_of(gpuThreadTile, [](int64_t tile) { return tile == -1; }))
+      threadTileOptions.tileSizes = gpuThreadTile;
     threadTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
     pm.addPass(createCleanup());
