@@ -73,16 +73,14 @@ struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
                        "destination-passing contraction");
 
     // To change the contraction's result, `addOp` must be its only user.
-    auto contractionUsers = dominatedOp->getResult(0).getUsers();
-    if (std::distance(contractionUsers.begin(), contractionUsers.end()) != 1)
+    if (!dominatedOp->getResult(0).hasOneUse())
       return rewriter.notifyMatchFailure(
           dominatedOp,
-          "expected linalg.add op to be single user of contraction's result");
+          "expected linalg.add to be single user of contraction's result");
 
     // As `dominatedOp` was already accumulating on its out argument, it is only
     // safe to no longer use its current out arg when it is the additive zero.
     auto *destOperand = dominatedDestOp.getDpsInitOperand(0);
-    ;
     if (!mlir::utils::isZeroOp(destOperand->get().getDefiningOp()))
       return rewriter.notifyMatchFailure(
           dominatedOp, "expected dominated op's dest to be additive zero");

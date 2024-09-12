@@ -137,3 +137,63 @@ func.func @expect_no_fold_as_contraction_result_has_multiple_users(%arg0: !type,
 // CHECK-NEXT: linalg.add
 // CHECK-NEXT: linalg.mul
 // CHECK-NEXT: return
+
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d1, d0)>  // NB: not an ordered projection
+
+!type = tensor<2048x2048xf32>
+func.func @expect_no_fold_as_dest_accumulation_is_not_identity_mapped(%arg0: !type, %arg1: !type) -> !type {
+  %0 = arith.constant dense<1.111111e+00> : !type
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = tensor.empty() : !type
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : !type) -> !type
+  %3 = linalg.generic { indexing_maps = [#map0, #map1, #map2],
+                        iterator_types = ["parallel", "parallel", "reduction"] }
+    ins(%arg0, %0: !type, !type) outs(%2: !type) {
+      ^bb0(%a: f32, %b: f32, %c: f32):
+        %5 = arith.mulf %a, %b : f32
+        %6 = arith.addf %c, %5 : f32
+        linalg.yield %6 : f32
+  } -> !type
+  %4 = linalg.add ins(%3, %arg1 : !type, !type) outs(%1 : !type) -> !type
+  return %4 : !type
+}
+
+// CHECK-LABEL: func.func @expect_no_fold_as_dest_accumulation_is_not_identity_mapped
+// CHECK: linalg.fill
+// CHECK-NEXT: linalg.generic
+// CHECK: linalg.add
+// CHECK-NEXT: return
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>  // NB: is an ordered projection
+
+!type = tensor<2048x2048xf32>
+func.func @expect_add_to_fold(%arg0: !type, %arg1: !type) -> !type {
+  %0 = arith.constant dense<1.111111e+00> : !type
+  %cst = arith.constant 0.000000e+00 : f32
+  %1 = tensor.empty() : !type
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : !type) -> !type
+  %3 = linalg.generic { indexing_maps = [#map0, #map1, #map2],
+                        iterator_types = ["parallel", "parallel", "reduction"] }
+    ins(%arg0, %0: !type, !type) outs(%2: !type) {
+      ^bb0(%a: f32, %b: f32, %c: f32):
+        %5 = arith.mulf %a, %b : f32
+        %6 = arith.addf %c, %5 : f32
+        linalg.yield %6 : f32
+  } -> !type
+  %4 = linalg.add ins(%3, %arg1 : !type, !type) outs(%1 : !type) -> !type
+  return %4 : !type
+}
+
+// CHECK-LABEL: func.func @expect_add_to_fold
+// CHECK: linalg.generic
+// CHECK-NOT: linalg.add
+// CHECK: return
