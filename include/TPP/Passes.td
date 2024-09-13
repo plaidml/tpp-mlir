@@ -525,4 +525,18 @@ def SplitReductionDim : Pass<"split-reduction-dim", "func::FuncOp"> {
   ];
 }
 
+def GpuVectorize : Pass<"gpu-vectorize", "ModuleOp"> {
+  let summary = "Vectorize GPU kernel.";
+  let description = [{
+    Convert ops targeting GPU to vectorized representation.
+  }];
+  let dependentDialects = ["gpu::GPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "tensor::TensorDialect",
+                           "math::MathDialect",
+                           "arith::ArithDialect",
+                           "vector::VectorDialect"];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES

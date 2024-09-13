@@ -193,6 +193,11 @@ private:
       // For now, enable only with other vectorization passes.
       pm.addPass(createSplitReductionDim(SplitReductionDimOptions{kTile}));
       pm.addPass(createCleanup());
+
+      // Vectorize at tensor-level to benefit from better cleanup utilities like
+      // folding.
+      pm.addPass(createGpuVectorize());
+      pm.addPass(createCleanup());
     }
 
     // Preprocess and bufferize as further conversion requires memref
