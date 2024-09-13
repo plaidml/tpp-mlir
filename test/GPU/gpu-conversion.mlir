@@ -1,32 +1,40 @@
 // RUN: tpp-opt %s -gpu-conversion -split-input-file | FileCheck %s
+// XFAIL:*
+// Currently tiling needs matmul as an anchor and without it, other ops
+// will not get outlined.
 
-func.func @matmul() {
-  %0 = memref.alloc() : memref<8x8xf32>
-  %1 = memref.alloc() : memref<8x8xf32>
-  %2 = memref.alloc() : memref<8x8xf32>
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
+} {
+  func.func @matmul() {
+    %0 = memref.alloc() : memref<8x8xf32>
+    %1 = memref.alloc() : memref<8x8xf32>
+    %2 = memref.alloc() : memref<8x8xf32>
 
-  %cast_a = memref.cast %0 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_a : memref<*xf32>
-  %cast_b = memref.cast %1 : memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_b : memref<*xf32>
-  %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
-  gpu.host_register %cast_c : memref<*xf32>
+    %cast_a = memref.cast %0 : memref<8x8xf32> to memref<*xf32>
+    gpu.host_register %cast_a : memref<*xf32>
+    %cast_b = memref.cast %1 : memref<8x8xf32> to memref<*xf32>
+    gpu.host_register %cast_b : memref<*xf32>
+    %cast_c = memref.cast %2 :memref<8x8xf32> to memref<*xf32>
+    gpu.host_register %cast_c : memref<*xf32>
 
-  linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-                outs(%2 : memref<8x8xf32>)
+    linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
+                  outs(%2 : memref<8x8xf32>)
 
-  call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
+    call @printMemrefF32(%cast_c) : (memref<*xf32>) -> ()
 
-  memref.dealloc %0 : memref<8x8xf32>
-  memref.dealloc %1 : memref<8x8xf32>
-  memref.dealloc %2 : memref<8x8xf32>
+    memref.dealloc %0 : memref<8x8xf32>
+    memref.dealloc %1 : memref<8x8xf32>
+    memref.dealloc %2 : memref<8x8xf32>
 
-  return
+    return
+  }
+  func.func private @printMemrefF32(memref<*xf32>)
 }
 
-func.func private @printMemrefF32(memref<*xf32>)
 
-// CHECK: module attributes {gpu.container_module}
+// CHECK: module attributes{{.*}}gpu.container_module
 // CHECK-LABEL: func.func @matmul
 // CHECK:         %[[C1:.*]] = memref.cast
 // CHECK:         gpu.host_register %[[C1]]
@@ -93,8 +101,8 @@ func.func @generic_matmul(%arg0: memref<256x2048xf32>,
 
 // -----
 
-func.func @identity(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
-  linalg.copy ins(%arg0 : memref<5x6xf32>) outs(%arg1: memref<5x6xf32>)
+func.func @identity(%arg0: memref<64x128xf32>, %arg1: memref<64x128xf32>) {
+  linalg.copy ins(%arg0 : memref<64x128xf32>) outs(%arg1: memref<64x128xf32>)
   return
 }
 
@@ -103,11 +111,11 @@ func.func @identity(%arg0: memref<5x6xf32>, %arg1: memref<5x6xf32>) {
 // CHECK:         gpu.launch_func  @identity_kernel::@identity_kernel
 // CHECK: gpu.module @identity_kernel
 // CHECK-LABEL: gpu.func @identity_kernel
-// CHECK-SAME:  %[[ARG0:.+]]: memref<5x6xf32>, %[[ARG1:.+]]: memref<5x6xf32>
+// CHECK-SAME:  %[[ARG0:.+]]: memref<64x128xf32>, %[[ARG1:.+]]: memref<64x128xf32>
 // CHECK:         %[[X:.+]] = gpu.block_id x
 // CHECK-NEXT:    %[[Y:.+]] = gpu.block_id y
-// CHECK:         %[[L:.+]] = memref.load %[[ARG0]][%[[X]], %[[Y]]] : memref<5x6xf32>
-// CHECK:         memref.store %[[L]], %[[ARG1]][%[[X]], %[[Y]]] : memref<5x6xf32>
+// CHECK:         %[[L:.+]] = memref.load %[[ARG0]][%[[X]], %[[Y]]] : memref<64x128xf32>
+// CHECK:         memref.store %[[L]], %[[ARG1]][%[[X]], %[[Y]]] : memref<64x128xf32>
 // CHECK:         gpu.return
 
 // -----

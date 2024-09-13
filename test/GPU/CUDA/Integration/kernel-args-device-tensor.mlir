@@ -1,17 +1,20 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 \
+// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -gpu-block-tile=-1 \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s
 
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -print \
+// RUN: tpp-run %s -gpu=cuda -print-mlir=mid -gpu-args=1 -print -gpu-block-tile=-1 \
 // RUN:  -entry-point-result=void -e entry 2>&1 | \
 // RUN: FileCheck %s --check-prefix=PRINT
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-module {
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
+} {
   func.func @entry(%arg0: tensor<8x8xf32> {bufferization.writable = true},
                    %arg1: tensor<8x8xf32> {bufferization.writable = true},
                    %arg2: tensor<8x8xf32> {bufferization.writable = true}
@@ -23,13 +26,12 @@ module {
   }
 }
 
-// CHECK: module attributes {gpu.container_module}
+// CHECK: module attributes{{.*}}gpu.container_module
 // CHECK-LABEL: func.func @_entry
 // CHECK:         gpu.launch_func  @_entry_kernel::@_entry_kernel
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
-// CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry

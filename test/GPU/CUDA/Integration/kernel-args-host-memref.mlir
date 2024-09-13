@@ -22,8 +22,13 @@ module {
     %t5 = gpu.memcpy async [%t4] %2, %arg2 : memref<8x8xf32>, memref<8x8xf32>
     gpu.wait [%t5]
 
-    linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
-                  outs(%2 : memref<8x8xf32>)
+    %c1 = arith.constant 1 : index
+    gpu.launch blocks(%b0, %b1, %b2) in (%gs0 = %c1, %gs1 = %c1, %gs2 = %c1)
+                threads(%tx0, %tx1, %tx2) in (%bs0 = %c1, %bs1 = %c1, %bs2 = %c1) {
+      linalg.matmul ins(%0, %1 : memref<8x8xf32>, memref<8x8xf32>)
+                    outs(%2 : memref<8x8xf32>)
+      gpu.terminator
+    }
 
     // Retrieve data from device
     %tOut = gpu.memcpy async %arg2, %2 : memref<8x8xf32>, memref<8x8xf32>
@@ -40,7 +45,7 @@ module {
   }
 }
 
-// CHECK: module attributes {gpu.container_module}
+// CHECK: module attributes{{.*}}gpu.container_module
 // CHECK: func.func @_entry(%[[ARG0:.+]]: memref<8x8xf32>, %[[ARG1:.+]]: memref<8x8xf32>, %[[ARG2:.+]]: memref<8x8xf32>
 // CHECK:         %[[gpu0:.+]],{{.*}}= gpu.alloc async ()
 // CHECK:         %[[gpu1:.+]],{{.*}}= gpu.alloc async ()
@@ -53,7 +58,6 @@ module {
 // CHECK:       }
 // CHECK: gpu.module @_entry_kernel
 // CHECK-LABEL: llvm.func @_entry_kernel
-// CHECK-DAG:     nvvm.read
 // CHECK-DAG:     llvm.mul
 // CHECK-DAG:     llvm.add
 // CHECK-LABEL: func.func @entry

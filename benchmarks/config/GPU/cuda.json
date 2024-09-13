@@ -15,39 +15,11 @@
       "flags": [ "--gpu=cuda" ],
       "extensions": [ "(avx2|asimd)" ]
     },
-    "fp32_1024_manual_kernel_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-manual-kernel.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
     "fp32_1024_base_mlir": {
       "type": "MLIR",
       "benchmark": "GPU/gemm-fp32-1024-base.mlir",
       "environment": {},
       "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp32_1024_packed_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp32-1024-packed.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp16_1024_packed_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp16-1024-packed.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda" ],
-      "extensions": [ "(avx2|asimd)" ]
-    },
-    "fp16_1024_packed_wmma_mlir": {
-      "type": "MLIR",
-      "benchmark": "GPU/gemm-fp16-1024-packed.mlir",
-      "environment": {},
-      "flags": [ "-n", "100", "--gpu=cuda", "-run-args=-gpu-wmma" ],
       "extensions": [ "(avx2|asimd)" ]
     }
   }},
