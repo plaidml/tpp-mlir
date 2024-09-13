@@ -196,6 +196,11 @@ private:
 
       // Vectorize at tensor-level to benefit from better cleanup utilities like
       // folding.
+      // TODO: Enable vectorization when vector unrolling is added.
+      //       When vector sizes exceed hardware supported lengths,
+      //       pipeline gets stuck on GPU binary compilation step.
+      //       The vectorization can only be enabled when a pass
+      //       to resize vector operations is available.
       pm.addPass(createGpuVectorize());
       pm.addPass(createCleanup());
     }
