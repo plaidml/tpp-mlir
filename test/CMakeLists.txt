@@ -12,6 +12,7 @@ set(TPP_OPT_TEST_DEPENDS
         mlir-gen
         tpp-opt
         tpp-run
+        fpcmp
         )
 
 add_lit_testsuite(check-tpp "Running the regression tests"
