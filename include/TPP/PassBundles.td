@@ -119,12 +119,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
   let description = [{
     Convert all eligble operations into generic GPU operations.
   }];
-  let options = [
-    Option<"useWmma", "wmma",
-           "bool", /*default=*/"false",
-           "Use WMMA operations">,
-    ListOption<"warpTile", "warp-tile", "int64_t", "Warp tile sizes MxNxK">,
-  ];
   let dependentDialects = ["linalg::LinalgDialect",
                            "gpu::GPUDialect",
                            "scf::SCFDialect",
