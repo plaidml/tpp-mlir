@@ -244,6 +244,13 @@ def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
                            "arith::ArithDialect"];
 }
 
+def ConvertPackToExpandShapePass : Pass<"convert-pack-to-expand-shape", "ModuleOp"> {
+  let summary = "TODO";
+  let description = [{ TODO }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect"];
+}
+
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {
   let summary = "Run linalg element-wise fusion";
 }
