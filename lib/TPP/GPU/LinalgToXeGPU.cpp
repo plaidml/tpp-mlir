@@ -385,7 +385,7 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
     return std::nullopt;
   };
 
-  if (auto launchOp = dyn_cast<gpu::LaunchOp>(op)) {
+  if (auto launchOp = op->getParentOfType<gpu::LaunchOp>()) {
     auto sizeX = getConstVal(launchOp.getBlockSizeX());
     auto sizeY = getConstVal(launchOp.getBlockSizeY());
     auto sizeZ = getConstVal(launchOp.getBlockSizeZ());
@@ -398,7 +398,7 @@ static FailureOr<SmallVector<int64_t>> getStaticBlockSizes(Operation *op) {
   // TODO: Remove when the lowering only occurs within a gpu.launch op.
   //       Manually computing this is brittle and duplicated parallel
   //       loops to gpu conversion.
-  if (auto blockLoop = dyn_cast<scf::ParallelOp>(op)) {
+  if (auto blockLoop = op->getParentOfType<scf::ParallelOp>()) {
     auto gridLoop = blockLoop->getParentOfType<scf::ParallelOp>();
 
     // Blocks or number of threads are represented by the first parallel loop
@@ -934,8 +934,7 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
 
   // Create input prefetch tiles.
   int64_t numThreads = 1;
-  auto blockDims =
-      getStaticBlockSizes(linalgOp->getParentOfType<scf::ParallelOp>());
+  auto blockDims = getStaticBlockSizes(linalgOp);
   if (succeeded(blockDims)) {
     numThreads = std::accumulate(blockDims->begin(), blockDims->end(), 1,
                                  std::multiplies<int64_t>());
