@@ -4,7 +4,7 @@ add_mlir_library(TPPTransforms
   Bufferize.cpp
   ConstantFoldPack.cpp
   ConvertForAllToParallelOp.cpp
-  ConvertPackToExpandShape.cpp
+  PackUnpackToExpandCollapseShape.cpp
   ConvInitSimplify.cpp
   DecomposeAggregatedOps.cpp
   LinalgDeGeneralize.cpp

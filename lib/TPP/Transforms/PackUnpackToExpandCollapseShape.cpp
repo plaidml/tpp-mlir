@@ -1,4 +1,4 @@
-//===- FoldAddIntoDest.cpp ---------------------------------------*- C++-*-===//
+//===- PackUnpackToExpandCollapseShape.cpp -----------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -29,14 +29,14 @@ using namespace mlir;
 
 namespace mlir {
 namespace tpp {
-#define GEN_PASS_DEF_CONVERTPACKTOEXPANDSHAPEPASS
+#define GEN_PASS_DEF_PACKUNPACKTOEXPANDCOLLAPSESHAPE
 #include "TPP/Passes.h.inc"
 } // namespace tpp
 } // namespace mlir
 
 namespace {
 
-static FailureOr<std::pair<tensor::ExpandShapeOp, AffineMap>>
+static std::pair<tensor::ExpandShapeOp, AffineMap>
 packToExpandShape(tensor::PackOp packOp, AffineMap affineMap,
                   PatternRewriter &rewriter) {
   auto origShape =
@@ -52,10 +52,10 @@ packToExpandShape(tensor::PackOp packOp, AffineMap affineMap,
 
   auto innerDimPos = SmallVector<unsigned int>(packOp.getInnerDimsPos());
 
-  SmallVector<SmallVector<int64_t, 2>> associationIndices;
+  SmallVector<ReassociationIndices> associationIndices;
   int curDimIdx = 0;
   for (auto idx : llvm::seq(origShape.size())) {
-    associationIndices.emplace_back(SmallVector<int64_t>());
+    associationIndices.emplace_back(ReassociationIndices());
     associationIndices.back().push_back(curDimIdx++);
     // TODO: is it the case that each dim can only occur once in innerDimPos?
     if (llvm::is_contained(innerDimPos, idx))
@@ -70,10 +70,9 @@ packToExpandShape(tensor::PackOp packOp, AffineMap affineMap,
   return std::pair(expandShape, normalizedIndexingMap);
 }
 
-static FailureOr<tensor::CollapseShapeOp>
+static tensor::CollapseShapeOp
 unpackToCollapseShape(tensor::UnPackOp unpackOp, PatternRewriter &rewriter) {
-  auto origType =
-      dyn_cast<TensorType>(unpackOp->getResult(0).getType());
+  auto origType = dyn_cast<TensorType>(unpackOp->getResult(0).getType());
   auto origShape = origType.getShape();
   auto innerDimPos = SmallVector<unsigned int>(unpackOp.getInnerDimsPos());
 
@@ -95,65 +94,103 @@ unpackToCollapseShape(tensor::UnPackOp unpackOp, PatternRewriter &rewriter) {
   return collapseShape;
 }
 
-struct ConvertPackToExpandShape : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+struct PackOnInputToExpandShape : public OpRewritePattern<linalg::GenericOp> {
+  // Is only called with single-user packOp operands, so callback can always
+  // find the (use by the) linalg.generic that is the target of the pattern.
+  using ControlFn = std::function<bool(tensor::PackOp)>;
+  ControlFn controlFn;
+
+  PackOnInputToExpandShape(MLIRContext *context, ControlFn controlFn = nullptr,
+                           PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), controlFn(std::move(controlFn)) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalg::isaContractionOpInterface(genericOp))
       return failure();
-    // know linalg has two inputs and one output and is a contraction
 
     auto indexingMaps = genericOp.getIndexingMapsArray();
-    // TODO: need way to control which operands to revert packing on
-    auto idxSet = {0, 1, 2};
-    Type resultType = nullptr;
-    for (auto idx : idxSet) {
+    bool modifiedAnOperand = false;
+    for (auto operandIdx : {0, 1}) {
       auto packOp = dyn_cast_if_present<tensor::PackOp>(
-          genericOp->getOperand(idx).getDefiningOp());
-      if (!packOp)
-        return failure();
+          genericOp->getOperand(operandIdx).getDefiningOp());
 
-      auto res = packToExpandShape(packOp, indexingMaps[idx], rewriter);
-      if (!succeeded(res))
-        return res;
+      if (!packOp || !packOp->hasOneUse() || (controlFn && !controlFn(packOp)))
+        continue;
 
-      rewriter.replaceAllOpUsesWith(packOp, res->first);
-      if (idx == 2) {
-        resultType = res->first.getResultType();
-        genericOp->getOpResult(0).setType(resultType);
-      }
+      auto res = packToExpandShape(packOp, indexingMaps[operandIdx], rewriter);
+      rewriter.replaceAllOpUsesWith(packOp, res.first);
 
-      SmallVector<Attribute> indexingMaps =
+      SmallVector<Attribute> maps =
           llvm::to_vector(genericOp.getIndexingMaps());
-      indexingMaps[idx] = AffineMapAttr::get(res->second);
-
+      maps[operandIdx] = AffineMapAttr::get(res.second);
       genericOp.setIndexingMapsAttr(
-          ArrayAttr::get(rewriter.getContext(), indexingMaps));
+          ArrayAttr::get(rewriter.getContext(), maps));
+
+      modifiedAnOperand = true;
     }
 
-    if (auto unpackOp = llvm::dyn_cast<tensor::UnPackOp>(
-            *(genericOp->getResult(0).getUsers().begin()))) {
-      auto res = unpackToCollapseShape(unpackOp, rewriter);
-      if (!succeeded(res))
-        return failure();
-      rewriter.replaceAllOpUsesWith(unpackOp, *res);
-    }
+    return modifiedAnOperand ? success() : failure();
+  }
+};
+
+struct PackUnpackOnOutputToExpandCollapseShape
+    : public OpRewritePattern<linalg::GenericOp> {
+  // Is only called with single-user packOp operands, so callback can always
+  // find the (use by the) linalg.generic that is the target of the pattern.
+  using ControlFn = std::function<bool(tensor::PackOp, tensor::UnPackOp)>;
+  ControlFn controlFn;
+
+  PackUnpackOnOutputToExpandCollapseShape(MLIRContext *context,
+                                          ControlFn controlFn = nullptr,
+                                          PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), controlFn(std::move(controlFn)) {}
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalg::isaContractionOpInterface(genericOp) ||
+        !genericOp->hasOneUse())
+      return failure();
+
+    auto packOp = dyn_cast_if_present<tensor::PackOp>(
+        genericOp->getOperand(2).getDefiningOp());
+    auto unpackOp = llvm::dyn_cast<tensor::UnPackOp>(
+        *(genericOp->getResult(0).getUsers().begin()));
+
+    if (!packOp || !packOp->hasOneUse() || !unpackOp ||
+        (controlFn && !controlFn(packOp, unpackOp)))
+      return failure();
+
+    auto res = packToExpandShape(packOp, genericOp.getIndexingMapsArray()[2],
+                                 rewriter);
+    rewriter.replaceAllOpUsesWith(packOp, res.first);
+
+    SmallVector<Attribute> maps = llvm::to_vector(genericOp.getIndexingMaps());
+    maps[2] = AffineMapAttr::get(res.second);
+    genericOp.setIndexingMapsAttr(ArrayAttr::get(rewriter.getContext(), maps));
+
+    genericOp->getOpResult(0).setType(res.first.getResultType());
+
+    auto collapseShapeOp = unpackToCollapseShape(unpackOp, rewriter);
+    rewriter.replaceAllOpUsesWith(unpackOp, collapseShapeOp);
 
     return llvm::success();
   }
 };
 
-/// Replace linalg.add when destination passing suffices for achieving the sum.
-struct ConvertPackToExpandShapePass
-    : public tpp::impl::ConvertPackToExpandShapePassBase<
-          ConvertPackToExpandShapePass> {
+struct PackUnpackToExpandCollapseShape
+    : public tpp::impl::PackUnpackToExpandCollapseShapeBase<
+          PackUnpackToExpandCollapseShape> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();
 
     RewritePatternSet patterns(ctx);
-    patterns.add<ConvertPackToExpandShape>(ctx);
+    patterns.add<PackOnInputToExpandShape>(ctx, [](tensor::PackOp packOp) {
+      return !llvm::dyn_cast_if_present<arith::ConstantOp>(
+          packOp.getOperand(0).getDefiningOp());
+    });
+    patterns.add<PackUnpackOnOutputToExpandCollapseShape>(ctx);
 
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

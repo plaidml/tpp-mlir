@@ -86,6 +86,7 @@ private:
 
       // Applies a set of passes at the linalg level to fuse and pack.
       pm.addPass(createTppMapping());
+      pm.addPass(createPackUnpackToExpandCollapseShape());
 
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());

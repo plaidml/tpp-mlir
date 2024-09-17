@@ -244,7 +244,8 @@ def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
                            "arith::ArithDialect"];
 }
 
-def ConvertPackToExpandShapePass : Pass<"pack-unpack-to-expand-collapse-shape", "ModuleOp"> {
+def PackUnpackToExpandCollapseShape : Pass<"pack-unpack-to-expand-collapse-shape",
+   "ModuleOp"> {
   let summary = "TODO";
   let description = [{ TODO }];
   let dependentDialects = ["linalg::LinalgDialect",
