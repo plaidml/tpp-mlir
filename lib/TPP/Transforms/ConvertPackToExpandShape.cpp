@@ -37,14 +37,8 @@ namespace tpp {
 namespace {
 
 static FailureOr<std::pair<tensor::ExpandShapeOp, AffineMap>>
-packToExpandShape(tensor::PackOp packOp, linalg::GenericOp genericOp,
+packToExpandShape(tensor::PackOp packOp, AffineMap affineMap,
                   PatternRewriter &rewriter) {
-  AffineMap affineMap;
-  // TODO: clean-up
-  for (auto &use : packOp->getUses()) {
-    affineMap = genericOp.getMatchingIndexingMap(&use);
-    break;
-  }
   auto origShape =
       dyn_cast<TensorType>(packOp->getOperand(0).getType()).getShape();
   auto packedType = dyn_cast<TensorType>(packOp->getResult(0).getType());
@@ -63,16 +57,42 @@ packToExpandShape(tensor::PackOp packOp, linalg::GenericOp genericOp,
   for (auto idx : llvm::seq(origShape.size())) {
     associationIndices.emplace_back(SmallVector<int64_t>());
     associationIndices.back().push_back(curDimIdx++);
+    // TODO: is it the case that each dim can only occur once in innerDimPos?
     if (llvm::is_contained(innerDimPos, idx))
       associationIndices.back().push_back(curDimIdx++);
   }
 
+  rewriter.setInsertionPointAfter(packOp);
   auto expandShape = rewriter.create<tensor::ExpandShapeOp>(
-      genericOp.getLoc(), normalizedType, packOp.getOperand(0),
+      packOp->getLoc(), normalizedType, packOp.getOperand(0),
       ArrayRef(associationIndices));
-  rewriter.replaceAllOpUsesWith(packOp, expandShape);
 
   return std::pair(expandShape, normalizedIndexingMap);
+}
+
+static FailureOr<tensor::CollapseShapeOp>
+unpackToCollapseShape(tensor::UnPackOp unpackOp, PatternRewriter &rewriter) {
+  auto origType =
+      dyn_cast<TensorType>(unpackOp->getResult(0).getType());
+  auto origShape = origType.getShape();
+  auto innerDimPos = SmallVector<unsigned int>(unpackOp.getInnerDimsPos());
+
+  SmallVector<SmallVector<int64_t, 2>> associationIndices;
+  int curDimIdx = 0;
+  for (auto idx : llvm::seq(origShape.size())) {
+    associationIndices.emplace_back(SmallVector<int64_t>());
+    associationIndices.back().push_back(curDimIdx++);
+    // TODO: is it the case that each dim can only occur once in innerDimPos?
+    if (llvm::is_contained(innerDimPos, idx))
+      associationIndices.back().push_back(curDimIdx++);
+  }
+
+  rewriter.setInsertionPointAfter(unpackOp);
+  auto collapseShape = rewriter.create<tensor::CollapseShapeOp>(
+      unpackOp.getLoc(), origType, unpackOp.getOperand(0),
+      ArrayRef(associationIndices));
+
+  return collapseShape;
 }
 
 struct ConvertPackToExpandShape : public OpRewritePattern<linalg::GenericOp> {
@@ -84,22 +104,41 @@ struct ConvertPackToExpandShape : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     // know linalg has two inputs and one output and is a contraction
 
-    // TODO: need way to control which operands to reverted packing on
-    //       for demo purposes just do the first one
-    auto packOp = dyn_cast_if_present<tensor::PackOp>(
-        genericOp->getOperand(0).getDefiningOp());
-    if (!packOp)
-      return failure();
+    auto indexingMaps = genericOp.getIndexingMapsArray();
+    // TODO: need way to control which operands to revert packing on
+    auto idxSet = {0, 1, 2};
+    Type resultType = nullptr;
+    for (auto idx : idxSet) {
+      auto packOp = dyn_cast_if_present<tensor::PackOp>(
+          genericOp->getOperand(idx).getDefiningOp());
+      if (!packOp)
+        return failure();
 
-    auto res = packToExpandShape(packOp, genericOp, rewriter);
-    if (!succeeded(res))
-      return res;
+      auto res = packToExpandShape(packOp, indexingMaps[idx], rewriter);
+      if (!succeeded(res))
+        return res;
 
-    auto indexingMaps = genericOp.getIndexingMaps();
-    auto indexingMapsAttr = ArrayAttr::get(
-        rewriter.getContext(),
-        {{AffineMapAttr::get(res->second), indexingMaps[1], indexingMaps[2]}});
-    genericOp.setIndexingMapsAttr(indexingMapsAttr);
+      rewriter.replaceAllOpUsesWith(packOp, res->first);
+      if (idx == 2) {
+        resultType = res->first.getResultType();
+        genericOp->getOpResult(0).setType(resultType);
+      }
+
+      SmallVector<Attribute> indexingMaps =
+          llvm::to_vector(genericOp.getIndexingMaps());
+      indexingMaps[idx] = AffineMapAttr::get(res->second);
+
+      genericOp.setIndexingMapsAttr(
+          ArrayAttr::get(rewriter.getContext(), indexingMaps));
+    }
+
+    if (auto unpackOp = llvm::dyn_cast<tensor::UnPackOp>(
+            *(genericOp->getResult(0).getUsers().begin()))) {
+      auto res = unpackToCollapseShape(unpackOp, rewriter);
+      if (!succeeded(res))
+        return failure();
+      rewriter.replaceAllOpUsesWith(unpackOp, *res);
+    }
 
     return llvm::success();
   }
