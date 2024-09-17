@@ -106,6 +106,7 @@ private:
       if (linalgToVector) {
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
       } else {
         // Lower all Tile operations.
         pm.addNestedPass<func::FuncOp>(createLinalgLowering());

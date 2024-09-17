@@ -53,6 +53,15 @@ def VectorizationPass : Pass<"vectorization-pass",
   let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "vector::VectorDialect" ];
 }
 
+def VectorContractToOuterproduct : Pass<
+    "vector-contract-to-outerproduct"> {
+  let summary = "Perform outerproduct lowering of vector contraction ops";
+  let dependentDialects = ["memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "vector::VectorDialect"];
+}
+
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
