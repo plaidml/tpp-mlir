@@ -24,6 +24,7 @@ add_mlir_library(TPPTransforms
   FoldIntoEltwise.cpp
   FoldAddIntoDest.cpp
   Vectorization.cpp
+  LinalgTiling.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

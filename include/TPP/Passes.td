@@ -54,6 +54,23 @@ def VectorizationPass : Pass<"vectorization-pass",
 }
 
 
+
+def LinalgTiling : Pass<"tile-linalg"> {
+  let summary = "Tile matmul reduction dimension.";
+  let description = [{
+    Tiles matmul reduction dimension using serial loop.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect"];
+  let options = [
+         ListOption<"mTileShape", "mTile", "unsigned", "Tile shape for m dim">,
+        ListOption<"nTileShape", "nTile", "unsigned", "Tile shape for n dim">,
+  ];
+}
+
+
+
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let description = [{
