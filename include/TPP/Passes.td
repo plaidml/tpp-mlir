@@ -177,6 +177,12 @@ def LowerPacksAndUnPacks : Pass<"lower-packs-unpacks", "func::FuncOp"> {
                            "tensor::TensorDialect"];
 }
 
+def LowerPacksAndUnpacksWithoutTranspose : Pass<"lower-packs-unpacks-without-transpose",
+   "ModuleOp"> {
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect"];
+}
+
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
                                        "func::FuncOp"> {
   let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
@@ -242,14 +248,6 @@ def FoldAddIntoDest : Pass<"fold-add-into-dest", "ModuleOp"> {
   let dependentDialects = ["linalg::LinalgDialect",
                            "tensor::TensorDialect",
                            "arith::ArithDialect"];
-}
-
-def PackUnpackToExpandCollapseShape : Pass<"pack-unpack-to-expand-collapse-shape",
-   "ModuleOp"> {
-  let summary = "TODO";
-  let description = [{ TODO }];
-  let dependentDialects = ["linalg::LinalgDialect",
-                           "tensor::TensorDialect"];
 }
 
 def ElementWiseFusion : Pass<"element-wise-fusion", "func::FuncOp"> {

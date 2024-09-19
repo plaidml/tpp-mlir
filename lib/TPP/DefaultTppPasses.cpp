@@ -85,8 +85,9 @@ private:
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
-      pm.addPass(createTppMapping());
-      pm.addPass(createPackUnpackToExpandCollapseShape());
+      TppMappingOptions tppMappingOptions{
+          lowerPackUnpackWithoutTranspose};
+      pm.addPass(createTppMapping(tppMappingOptions));
 
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());

@@ -37,7 +37,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "unsigned", "Grid-sizes for parallel tasks.">,
     Option<"linalgToVector", "linalg-to-vector",
            "bool", /*default=*/"false",
-           "Lower linalg directly to vector.">
+           "Lower linalg directly to vector.">,
+    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose-to-vector",
+           "bool", /*default=*/"false",
+           "Lower packs and unpacks reverting any dim permutations.">
   ];
 }
 
@@ -51,6 +54,11 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
                            "memref::MemRefDialect",
                            "scf::SCFDialect",
                            "tensor::TensorDialect"];
+  let options= [
+    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
+           "bool", /*default=*/"false",
+           "Lower packs and unpacks reverting any dim permutations.">
+  ];
 }
 
 def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
