@@ -188,9 +188,9 @@ private:
     pm.addPass(createCleanup());
 
     if (gpuVectorize) {
-      // Currently early reduction dimension splitting is incompatible with
+      // Early reduction dimension splitting is incompatible with
       // Linalg to XeGPU lowering that expects full GEMM.
-      // For now, enable only with vectorization passes.
+      // For now, enable only with other vectorization passes.
       pm.addPass(createSplitReductionDim(SplitReductionDimOptions{kTile}));
       pm.addPass(createCleanup());
     }

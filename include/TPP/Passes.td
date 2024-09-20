@@ -509,7 +509,8 @@ def FoldIntoEltwise : Pass<"fold-into-eltwise", "ModuleOp"> {
 def SplitReductionDim : Pass<"split-reduction-dim", "func::FuncOp"> {
   let summary = "Split innermost reduction dimension.";
   let description = [{
-    Split innermost reduction dimension using serial loop.
+    Split innermost reduction dimension and compute it sequentially
+    using a serial loop and in-place accumulation.
   }];
   let dependentDialects = ["linalg::LinalgDialect",
                            "scf::SCFDialect",
