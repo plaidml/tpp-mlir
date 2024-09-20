@@ -78,11 +78,12 @@ static Value getPartialView(OpBuilder builder, Location loc, Value operand,
                                            strides);
 }
 
-struct SplitReductionMatmulOp
+// Split contraction's innermost reduction dimension.
+struct SplitContractionReduction
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
-  SplitReductionMatmulOp(MLIRContext *ctx, SplitReductionDimOptions options)
+  SplitContractionReduction(MLIRContext *ctx, SplitReductionDimOptions options)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), options(options) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
@@ -131,6 +132,8 @@ struct SplitReductionMatmulOp
         kDimPosB = pos;
     }
 
+    // Create a serial loop that iterates over the innermost reduction
+    // dimension.
     auto loop = rewriter.create<scf::ForOp>(
         loc, offsetVal, sizeVal, step, iterArgs,
         [&](OpBuilder &builder, Location loc, Value iv, ValueRange args) {
@@ -204,7 +207,7 @@ struct SplitReductionMatmulOp
                                            newContraction->getRegion(0).begin(),
                                            mapping);
 
-          // Terminate loop.
+          // Terminate the loop.
           SmallVector<Value> results;
           if (!args.empty())
             results.push_back(newContraction->getResults()[0]);
@@ -223,7 +226,7 @@ private:
   SplitReductionDimOptions options;
 };
 
-// Split innermost reduction dimension.
+// Split reduction dimension.
 struct SplitReductionDim
     : public tpp::impl::SplitReductionDimBase<SplitReductionDim> {
   using SplitReductionDimBase::SplitReductionDimBase;
@@ -234,7 +237,7 @@ struct SplitReductionDim
     SplitReductionDimOptions options{tileSize};
 
     RewritePatternSet patterns(ctx);
-    patterns.add<SplitReductionMatmulOp>(ctx, options);
+    patterns.add<SplitContractionReduction>(ctx, options);
     GreedyRewriteConfig config;
     config.strictMode = GreedyRewriteStrictness::ExistingOps;
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),

@@ -24,6 +24,9 @@ func.func @tile_matmul_memref(%A: memref<32x64xf32>, %B: memref<64x16xf32>,
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
 // CHECK-SAME: ins(%[[SUBVIEW_A]], %[[SUBVIEW_B]]
 // CHECK-SAME: outs(%[[C]]
+// CHECK:      arith.mulf
+// CHECK:      arith.addf
+// CHECK:      linalg.yield
 
 // -----
 
@@ -53,6 +56,9 @@ func.func @tile_matmul_tensor(%A: tensor<32x64xf32>, %B: tensor<64x16xf32>,
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
 // CHECK-SAME: ins(%[[SLICE_A]], %[[SLICE_B]]
 // CHECK-SAME: outs(%[[ACC]]
+// CHECK:      arith.mulf
+// CHECK:      arith.addf
+// CHECK:      linalg.yield
 // CHECK:    scf.yield %[[RES]]
 
 // -----
@@ -247,3 +253,80 @@ func.func @tile_matmul_transpose_b(%A: memref<32x64xf32>, %B: memref<16x64xf32>,
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
 // CHECK-SAME: ins(%[[SUBVIEW_A]], %[[SUBVIEW_B]]
 // CHECK-SAME: outs(%[[C]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+#map1 = affine_map<(d0) -> ()>
+func.func @tile_generic_1D(%A: memref<32xf32>, %B: memref<32xf32>, %C: memref<f32>) {
+  linalg.generic {indexing_maps = [#map, #map, #map1],
+  iterator_types = ["reduction"]}
+  ins(%A, %B : memref<32xf32>, memref<32xf32>) outs(%C : memref<f32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %0 = arith.subf %in, %in_1 : f32
+    %1 = arith.addf %out, %0 : f32
+    linalg.yield %1 : f32
+  }
+  return
+}
+
+// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0) -> ()>
+// CHECK-LABEL: @tile_generic_1D(
+// CHECK-SAME:  %[[A:[0-9a-z]+]]: memref<32xf32>
+// CHECK-SAME:  %[[B:[0-9a-z]+]]: memref<32xf32>
+// CHECK-SAME:  %[[C:[0-9a-z]+]]: memref<f32>
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[UB:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[K_TILE:.+]] = arith.constant 8 : index
+// CHECK: scf.for %[[IV:.+]] = %[[C0]] to %[[UB]] step %[[K_TILE]] {
+// CHECK:   %[[SUBVIEW_A:.+]] = memref.subview %[[A]][%[[IV]]] [8] [1]
+// CHECK:   %[[SUBVIEW_B:.+]] = memref.subview %[[B]][%[[IV]]] [8] [1]
+// CHECK:   linalg.generic
+// CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP1]]]
+// CHECK-SAME: iterator_types = ["reduction"]
+// CHECK-SAME: ins(%[[SUBVIEW_A]], %[[SUBVIEW_B]]
+// CHECK-SAME: outs(%[[C]]
+// CHECK:      arith.subf
+// CHECK:      arith.addf
+// CHECK:      linalg.yield
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+#map2 = affine_map<(d0, d1) -> ()>
+func.func @tile_generic_multireduction(%A: memref<32x16xf32>, %B: memref<16x32xf32>,
+    %C: memref<f32>) {
+  linalg.generic {indexing_maps = [#map, #map1, #map2],
+  iterator_types = ["reduction", "reduction"]}
+  ins(%A, %B : memref<32x16xf32>, memref<16x32xf32>) outs(%C : memref<f32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %0 = arith.subf %in, %in_1 : f32
+    %1 = arith.addf %out, %0 : f32
+    linalg.yield %1 : f32
+  }
+  return
+}
+
+// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-LABEL: @tile_generic_multireduction(
+// CHECK-SAME:  %[[A:[0-9a-z]+]]: memref<32x16xf32>
+// CHECK-SAME:  %[[B:[0-9a-z]+]]: memref<16x32xf32>
+// CHECK-SAME:  %[[C:[0-9a-z]+]]: memref<f32>
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[UB:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[K_TILE:.+]] = arith.constant 8 : index
+// CHECK: scf.for %[[IV:.+]] = %[[C0]] to %[[UB]] step %[[K_TILE]] {
+// CHECK:   %[[SUBVIEW_A:.+]] = memref.subview %[[A]][0, %[[IV]]] [32, 8] [1, 1]
+// CHECK:   %[[SUBVIEW_B:.+]] = memref.subview %[[B]][%[[IV]], 0] [8, 32] [1, 1]
+// CHECK:   linalg.generic
+// CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME: iterator_types = ["reduction", "reduction"]
+// CHECK-SAME: ins(%[[SUBVIEW_A]], %[[SUBVIEW_B]]
+// CHECK-SAME: outs(%[[C]]
+// CHECK:      arith.subf
+// CHECK:      arith.addf
+// CHECK:      linalg.yield
