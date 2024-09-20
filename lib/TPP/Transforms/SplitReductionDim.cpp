@@ -99,8 +99,6 @@ struct SplitContractionReduction
     if (failed(dims))
       return rewriter.notifyMatchFailure(linalgOp, "not a contraction");
 
-    bool isTensor = linalgOp.hasPureTensorSemantics();
-
     // Get loop bounds and iteration step for the innermost reduction dimension.
     auto tileOp = cast<TilingInterface>(linalgOp.getOperation());
     SmallVector<Range> iterationDomain = tileOp.getIterationDomain(rewriter);
@@ -116,6 +114,7 @@ struct SplitContractionReduction
     Value matB = linalgOp.getDpsInputs()[1];
     Value matC = linalgOp.getDpsInits()[0];
     SmallVector<Value> iterArgs;
+    bool isTensor = linalgOp.hasPureTensorSemantics();
     if (isTensor)
       iterArgs.push_back(matC);
 
@@ -159,6 +158,7 @@ struct SplitContractionReduction
           }
 
           // Get a slice of matrix A.
+          // Update operand's tiled reduction dim offset and size.
           auto rankA = cast<ShapedType>(matA.getType()).getRank();
           SmallVector<OpFoldResult> offsetsA(rankA, builder.getIndexAttr(0));
           offsetsA[kDimPosA] = getAsOpFoldResult(iv);
