@@ -38,7 +38,7 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"linalgToVector", "linalg-to-vector",
            "bool", /*default=*/"false",
            "Lower linalg directly to vector.">,
-    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose-to-vector",
+    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
            "Lower non-constant packs and unpacks reverting any dim permutations.">
   ];
