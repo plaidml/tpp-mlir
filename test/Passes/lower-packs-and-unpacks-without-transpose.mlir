@@ -67,6 +67,41 @@ func.func @only_keep_constant_packed(%arg0: tensor<128x512xf32>, %arg1: tensor<1
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+func.func @only_keep_constant_packed_non_prepacked(%arg0: tensor<128x512xf32>, %arg1: tensor<128x256xf32>) -> tensor<128x256xf32> {
+  %cst = arith.constant dense<1.000000e-03> : tensor<512x256xf32>
+  %cst_empty = tensor.empty() : tensor<8x16x32x32xf32>
+  %cst_packed = tensor.pack %cst outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %cst_empty : tensor<512x256xf32> -> tensor<8x16x32x32xf32>
+  %0 = tensor.empty() : tensor<4x16x32x32xf32>
+  %pack = tensor.pack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %0 : tensor<128x512xf32> -> tensor<4x16x32x32xf32>
+  %1 = tensor.empty() : tensor<4x8x32x32xf32>
+  %pack_0 = tensor.pack %arg1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %1 : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
+  %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%pack, %cst_packed : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%pack_0 : tensor<4x8x32x32xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %3 = arith.mulf %in, %in_1 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<4x8x32x32xf32>
+  %unpack = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
+  return %unpack : tensor<128x256xf32>
+}
+// CHECK-LABEL: func.func @only_keep_constant_packed_non_prepacked(
+// CHECK-SAME: %[[ARG0:.+]]: tensor<128x512xf32>,
+// CHECK-SAME: %[[ARG1:.+]]: tensor<128x256xf32>)
+// CHECK-SAME: -> tensor<128x256xf32>
+  // NB: even if the following is the case, this does not mean the layout will be preserved in general
+  // CHECK: %[[CST:.*]] = arith.constant dense<1.000000e-03> : tensor<8x16x32x32xf32>
+  // CHECK: %[[EXP0:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2, 3]{{\]}} output_shape [4, 32, 16, 32] : tensor<128x512xf32> into tensor<4x32x16x32xf32>
+  // CHECK: %[[EXP1:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2, 3]{{\]}} output_shape [4, 32, 8, 32] : tensor<128x256xf32> into tensor<4x32x8x32xf32>
+  // CHECK: %[[RES:.+]] = linalg.generic {{.*}} ins(%[[EXP0]], %[[CST]] : tensor<4x32x16x32xf32>, tensor<8x16x32x32xf32>) outs(%[[EXP1]] : tensor<4x32x8x32xf32>)
+  // CHECK: %[[COL:.+]] = tensor.collapse_shape %[[RES]] {{\[}}[0, 1], [2, 3]{{\]}} : tensor<4x32x8x32xf32> into tensor<128x256xf32>
+  // CHECK: return %[[COL]]
+
+
+// -----
+
 // NB: obtained from a M=?, N=256, K=512 linalg.matmul by -pack-matmul
 #map = affine_map<()[s0] -> (s0 ceildiv 32)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>
