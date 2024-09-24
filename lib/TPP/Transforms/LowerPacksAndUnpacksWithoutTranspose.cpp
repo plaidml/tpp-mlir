@@ -25,6 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <cstdint>
+#include <numeric>
 using namespace mlir;
 
 namespace mlir {
@@ -123,9 +124,25 @@ struct LowerPackUnpackOnOutputFoldingTranspose
       auto unpackOp =
           llvm::dyn_cast<tensor::UnPackOp>(*(result.getUsers().begin()));
 
-      if (!packOp || !packOp->hasOneUse() || !unpackOp ||
-          unpackOp.getInnerDimsPos() != packOp.getInnerDimsPos() ||
-          unpackOp.getOuterDimsPerm() != packOp.getOuterDimsPerm() ||
+      if (!packOp || !packOp->hasOneUse() || !unpackOp)
+        continue;
+
+      // Normalize empty outer_dims_perm to its corresponding identity map.
+      auto packOuterDimsPerm = SmallVector<long>(packOp.getOuterDimsPerm());
+      if (packOuterDimsPerm.empty()) {
+        packOuterDimsPerm =
+            SmallVector<long>(packOp.getSource().getType().getRank());
+        std::iota(packOuterDimsPerm.begin(), packOuterDimsPerm.begin(), 0);
+      }
+      auto unpackOuterDimsPerm = SmallVector<long>(unpackOp.getOuterDimsPerm());
+      if (unpackOuterDimsPerm.empty()) {
+        unpackOuterDimsPerm =
+            SmallVector<long>(unpackOp.getResult().getType().getRank());
+        std::iota(unpackOuterDimsPerm.begin(), unpackOuterDimsPerm.begin(), 0);
+      }
+
+      if (unpackOp.getInnerDimsPos() != packOp.getInnerDimsPos() ||
+          packOuterDimsPerm != unpackOuterDimsPerm ||
           (controlFn && !controlFn(packOp, unpackOp)))
         continue;
 
