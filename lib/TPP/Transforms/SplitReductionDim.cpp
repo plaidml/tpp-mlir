@@ -5,6 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// This file implements serial reduction dimension splitting.
+//
+//===----------------------------------------------------------------------===//
 
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
