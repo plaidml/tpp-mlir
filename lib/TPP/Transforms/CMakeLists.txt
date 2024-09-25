@@ -8,6 +8,7 @@ add_mlir_library(TPPTransforms
   DecomposeAggregatedOps.cpp
   LinalgDeGeneralize.cpp
   LowerPacksAndUnpacks.cpp
+  LowerPacksAndUnpacksWithoutTranspose.cpp
   RewriteBatchMatmulToMatmul.cpp
   RewriteConvsToMatmulOrBrgemm.cpp
   RewriteConvToMatmulImpl.cpp
