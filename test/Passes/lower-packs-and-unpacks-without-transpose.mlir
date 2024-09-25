@@ -1,4 +1,3 @@
-// : tpp-opt %s -pack-matmul -lower-packs-unpacks-without-transpose -canonicalize -split-input-file | FileCheck %s --check-prefix PACK-CHECK
 // RUN: tpp-opt %s -lower-packs-unpacks-without-transpose -canonicalize -split-input-file | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -68,16 +67,20 @@ func.func @only_keep_constant_packed_non_prepacked(%arg0: tensor<128x512xf32>, %
   %0 = tensor.empty() : tensor<4x16x32x32xf32>
   %pack = tensor.pack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %0 : tensor<128x512xf32> -> tensor<4x16x32x32xf32>
   %1 = tensor.empty() : tensor<4x8x32x32xf32>
-  %pack_0 = tensor.pack %arg1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %1 : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
+  %pack_0 = tensor.pack %arg1 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %1 : tensor<128x256xf32> -> tensor<4x8x32x32xf32>
   %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]} ins(%pack, %cst_packed : tensor<4x16x32x32xf32>, tensor<8x16x32x32xf32>) outs(%pack_0 : tensor<4x8x32x32xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
     %3 = arith.mulf %in, %in_1 : f32
     %4 = arith.addf %out, %3 : f32
     linalg.yield %4 : f32
   } -> tensor<4x8x32x32xf32>
+  // NB: unpack's outer_dims_perm should match those of corresponding pack - in case of elision it should match with an identity perm
   %unpack = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : tensor<4x8x32x32xf32> -> tensor<128x256xf32>
   return %unpack : tensor<128x256xf32>
 }
+// CHECK: #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d2, d5)>
+// CHECK: #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d5, d4)>
+// CHECK: #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d1, d4)>
 // CHECK-LABEL: func.func @only_keep_constant_packed_non_prepacked(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<128x512xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: tensor<128x256xf32>)

@@ -1,10 +1,19 @@
-// RUN: tpp-run %s -e entry --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/matmul_48x64x96-default-tpp-passes.out
-// RUN: tpp-run --lower-pack-unpack-without-transpose %s -e entry --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/matmul_48x64x96-default-tpp-passes-lower-pack-unpack-without-transpose.out
-// RUN: fpcmp -r 0.09 %S/matmul_48x64x96-default-tpp-passes.out %S/matmul_48x64x96-default-tpp-passes-lower-pack-unpack-without-transpose.out
-// RUN: rm %S/matmul_48x64x96-default-tpp-passes.out %S/matmul_48x64x96-default-tpp-passes-lower-pack-unpack-without-transpose.out
+// RUN: tpp-run %s -e big_matmul --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/lower-pack-unpack-without-transpose-big_matmul-only-default-passes.out
+// RUN: tpp-run --lower-pack-unpack-without-transpose %s -e big_matmul  --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/lower-pack-unpack-without-transpose-big_matmul-default-passes-lower-pack-unpack-without-transpose.out
+// RUN: fpcmp -r 0.001 %S/lower-pack-unpack-without-transpose-big_matmul-only-default-passes.out %S/lower-pack-unpack-without-transpose-big_matmul-default-passes-lower-pack-unpack-without-transpose.out
+// RUN: rm %S/lower-pack-unpack-without-transpose-big_matmul-only-default-passes.out %S/lower-pack-unpack-without-transpose-big_matmul-default-passes-lower-pack-unpack-without-transpose.out
 
-func.func @entry(%A: tensor<128x32xf32>,
-                 %C: tensor<128x64xf32>) -> tensor<128x64xf32> {
+func.func @big_matmul(%A: tensor<1024x2048xf32>, %B: tensor<2048x4096xf32>, %C: tensor<1024x4096xf32>) -> tensor<1024x4096xf32> {
+  %D = linalg.matmul ins(%A, %B: tensor<1024x2048xf32>, tensor<2048x4096xf32>) outs(%C: tensor<1024x4096xf32>) -> tensor<1024x4096xf32>
+  return %D : tensor<1024x4096xf32>
+}
+
+// RUN: tpp-run %s -e small_matmul_with_a_cst_arg --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-only-default-passes.out
+// RUN: tpp-run --lower-pack-unpack-without-transpose %s -e small_matmul_with_a_cst_arg --entry-point-result=void -print -n 1 --seed=123 2>&1 > %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-default-passes-lower-pack-unpack-without-transpose.out
+// RUN: fpcmp -r 0.001 %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-only-default-passes.out %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-default-passes-lower-pack-unpack-without-transpose.out
+// RUN: rm %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-only-default-passes.out %S/lower-pack-unpack-without-transpose-small_matmul_with_a_cst_arg-default-passes-lower-pack-unpack-without-transpose.out
+
+func.func @small_matmul_with_a_cst_arg(%A: tensor<128x32xf32>, %C: tensor<128x64xf32>) -> tensor<128x64xf32> {
   %constB = arith.constant dense<[
 [ 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 12.1, 13.1, 14.1, 15.1, 16.1, 17.1, 18.1, 19.1, 20.1, 21.1, 22.1, 23.1, 24.1, 25.1, 26.1, 27.1, 28.1, 29.1, 30.1, 31.1, 32.1, 33.1, 34.1, 35.1, 36.1, 37.1, 38.1, 39.1, 40.1, 41.1, 42.1, 43.1, 44.1, 45.1, 46.1, 47.1, 48.1, 49.1, 50.1, 51.1, 52.1, 53.1, 54.1, 55.1, 56.1, 57.1, 58.1, 59.1, 60.1, 61.1, 62.1, 63.1, 64.1 ],
 [ 1.2, 2.2, 3.2, 4.2, 5.2, 6.2, 7.2, 8.2, 9.2, 10.2, 11.2, 12.2, 13.2, 14.2, 15.2, 16.2, 17.2, 18.2, 19.2, 20.2, 21.2, 22.2, 23.2, 24.2, 25.2, 26.2, 27.2, 28.2, 29.2, 30.2, 31.2, 32.2, 33.2, 34.2, 35.2, 36.2, 37.2, 38.2, 39.2, 40.2, 41.2, 42.2, 43.2, 44.2, 45.2, 46.2, 47.2, 48.2, 49.2, 50.2, 51.2, 52.2, 53.2, 54.2, 55.2, 56.2, 57.2, 58.2, 59.2, 60.2, 61.2, 62.2, 63.2, 64.2 ],
@@ -40,5 +49,7 @@ func.func @entry(%A: tensor<128x32xf32>,
 [ 1.32, 2.32, 3.32, 4.32, 5.32, 6.32, 7.32, 8.32, 9.32, 10.32, 11.32, 12.32, 13.32, 14.32, 15.32, 16.32, 17.32, 18.32, 19.32, 20.32, 21.32, 22.32, 23.32, 24.32, 25.32, 26.32, 27.32, 28.32, 29.32, 30.32, 31.32, 32.32, 33.32, 34.32, 35.32, 36.32, 37.32, 38.32, 39.32, 40.32, 41.32, 42.32, 43.32, 44.32, 45.32, 46.32, 47.32, 48.32, 49.32, 50.32, 51.32, 52.32, 53.32, 54.32, 55.32, 56.32, 57.32, 58.32, 59.32, 60.32, 61.32, 62.32, 63.32, 64.32 ]
   ]> : tensor<32x64xf32>
   %D = linalg.matmul ins(%A, %constB: tensor<128x32xf32>, tensor<32x64xf32>) outs(%C: tensor<128x64xf32>) -> tensor<128x64xf32>
+  %empty = tensor.empty() : tensor<128x640xf32>
   return %D : tensor<128x64xf32>
 }
+

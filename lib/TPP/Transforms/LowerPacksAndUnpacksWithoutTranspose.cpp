@@ -127,18 +127,18 @@ struct LowerPackUnpackOnOutputFoldingTranspose
       if (!packOp || !packOp->hasOneUse() || !unpackOp)
         continue;
 
-      // Normalize empty outer_dims_perm to its corresponding identity map.
+      // Normalize empty outer_dims_perm to its corresponding identity perm.
       auto packOuterDimsPerm = SmallVector<long>(packOp.getOuterDimsPerm());
       if (packOuterDimsPerm.empty()) {
         packOuterDimsPerm =
             SmallVector<long>(packOp.getSource().getType().getRank());
-        std::iota(packOuterDimsPerm.begin(), packOuterDimsPerm.begin(), 0);
+        std::iota(packOuterDimsPerm.begin(), packOuterDimsPerm.end(), 0);
       }
       auto unpackOuterDimsPerm = SmallVector<long>(unpackOp.getOuterDimsPerm());
       if (unpackOuterDimsPerm.empty()) {
         unpackOuterDimsPerm =
             SmallVector<long>(unpackOp.getResult().getType().getRank());
-        std::iota(unpackOuterDimsPerm.begin(), unpackOuterDimsPerm.begin(), 0);
+        std::iota(unpackOuterDimsPerm.begin(), unpackOuterDimsPerm.end(), 0);
       }
 
       if (unpackOp.getInnerDimsPos() != packOp.getInnerDimsPos() ||
