@@ -75,6 +75,9 @@ add_subdirectory(runtime)
 add_subdirectory(tools)
 add_subdirectory(test)
 
+# Triton external dependencies
+add_subdirectory(third_party)
+
 # Benchmarks
 set(BENCHMARK_DIR "${PROJECT_SOURCE_DIR}/benchmarks")
 set(CONFIG_DIR "${BENCHMARK_DIR}/config")

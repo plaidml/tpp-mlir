@@ -1,0 +1,11 @@
+#ifndef TRITON_DIALECT_TRITONGPU_IR_ATTRIBUTES_H_
+#define TRITON_DIALECT_TRITONGPU_IR_ATTRIBUTES_H_
+
+#include "mlir/IR/Attributes.h"
+
+#include "TPP/Dialect/TritonGPU/IR/TritonGPUInterfaces.h"
+
+#define GET_ATTRDEF_CLASSES
+#include "TPP/Dialect/TritonGPU/IR/TritonGPUAttrDefs.h.inc"
+
+#endif // TRITON_DIALECT_TRITONGPU_IR_ATTRIBUTES_H_

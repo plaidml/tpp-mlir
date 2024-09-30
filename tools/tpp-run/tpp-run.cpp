@@ -53,6 +53,10 @@
 
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
+#include "TPP/Dialect/Triton/IR/Dialect.h"
+#include "TPP/Dialect/TritonCPU/IR/Dialect.h"
+#include "TPP/Dialect/TritonGPU/IR/Dialect.h"
+#include "TPP/Dialect/TritonNvidiaGPU/IR/Dialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/GPU/Utils.h"
 #include "TPP/PassBundles.h"
@@ -282,6 +286,10 @@ int main(int argc, char **argv) {
   registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
+  registry
+      .insert<mlir::triton::TritonDialect, mlir::triton::cpu::TritonCPUDialect,
+              mlir::triton::nvidia_gpu::TritonNvidiaGPUDialect,
+              mlir::triton::gpu::TritonGPUDialect>();
   registerAllDialects(registry);
   registerAllExtensions(registry);
   registerAllToLLVMIRTranslations(registry);

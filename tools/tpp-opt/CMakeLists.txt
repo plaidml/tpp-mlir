@@ -17,6 +17,7 @@ set(LIBS
         TPPPipeline
         TPPRunner
         TPPTransforms
+        TritonGPUTransforms
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
         TPPTestLib

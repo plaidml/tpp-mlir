@@ -1,3 +1,4 @@
+add_subdirectory(Analysis)
 add_subdirectory(Conversion)
 add_subdirectory(Dialect)
 add_subdirectory(GPU)
@@ -5,6 +6,7 @@ add_subdirectory(IR)
 add_subdirectory(PassBundles)
 add_subdirectory(Runner)
 add_subdirectory(Transforms)
+add_subdirectory(Tools)
 
 get_property(mlir_dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)

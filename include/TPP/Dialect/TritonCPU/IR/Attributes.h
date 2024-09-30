@@ -1,0 +1,9 @@
+#ifndef TRITON_DIALECT_TRITONCPU_IR_ATTRIBUTES_H_
+#define TRITON_DIALECT_TRITONCPU_IR_ATTRIBUTES_H_
+
+#include "TPP/Dialect/TritonCPU/IR/TritonCPUInterfaces.h"
+
+#define GET_ATTRDEF_CLASSES
+#include "TPP/Dialect/TritonCPU/IR/TritonCPUAttrDefs.h.inc"
+
+#endif // TRITON_DIALECT_TRITONCPU_IR_ATTRIBUTES_H_

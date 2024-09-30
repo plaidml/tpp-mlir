@@ -1,3 +1,7 @@
 add_subdirectory(Check)
 add_subdirectory(Perf)
+add_subdirectory(Triton)
+add_subdirectory(TritonCPU)
+add_subdirectory(TritonGPU)
+add_subdirectory(TritonNvidiaGPU)
 add_subdirectory(Xsmm)

@@ -31,6 +31,7 @@ set(LIBS
         TPPPipeline
         TPPTransforms
         TPPRunner
+        TritonGPUTransforms
         tpp_xsmm_runner_utils
         ${ONEDNN_LIBS}
         )
