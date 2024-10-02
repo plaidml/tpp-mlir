@@ -57,6 +57,11 @@ llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
                                    llvm::cl::desc("Lower linalg to vector"),
                                    llvm::cl::init(false));
 
+llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
+    "lower-pack-unpack-without-transpose",
+    llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -128,8 +133,9 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops, parallelTaskGrid,
-                                                linalgToVector};
+      DefaultTppPassesOptions tppDefaultOptions{
+          linalgToLoops, parallelTaskGrid, linalgToVector,
+          lowerPackUnpackWithoutTranspose};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
