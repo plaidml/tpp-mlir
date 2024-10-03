@@ -73,13 +73,8 @@ private:
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertNVGPUToNVVMPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertGpuOpsToNVVMOps());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertVectorToLLVMPass());
-    pm.addNestedPass<gpu::GPUModuleOp>(createConvertSCFToCFPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertNVVMToLLVMPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertFuncToLLVMPass());
-    pm.addNestedPass<gpu::GPUModuleOp>(
-        memref::createExpandStridedMetadataPass());
-
-    pm.addNestedPass<gpu::GPUModuleOp>(createLowerAffinePass());
     pm.addNestedPass<gpu::GPUModuleOp>(createArithToLLVMConversionPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertIndexToLLVMPass());
 
