@@ -67,17 +67,28 @@ private:
         memref::createExpandStridedMetadataPass());
     pm.addNestedPass<gpu::GPUModuleOp>(arith::createArithExpandOpsPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createLowerAffinePass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertVectorToSCFPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertSCFToCFPass());
 
-    // Create CUDA kernels.
-    pm.addNestedPass<gpu::GPUModuleOp>(createStripDebugInfoPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertNVGPUToNVVMPass());
     pm.addNestedPass<gpu::GPUModuleOp>(createConvertGpuOpsToNVVMOps());
-    pm.addNestedPass<gpu::GPUModuleOp>(createReconcileUnrealizedCastsPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertVectorToLLVMPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertNVVMToLLVMPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertFuncToLLVMPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createArithToLLVMConversionPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createConvertIndexToLLVMPass());
+
     GpuNVVMAttachTargetOptions nvvmTargetOptions;
     nvvmTargetOptions.triple = gpuTriple;
     nvvmTargetOptions.chip = gpuChip;
     nvvmTargetOptions.features = gpuFeatures;
     pm.addPass(createGpuNVVMAttachTarget(nvvmTargetOptions));
+
+    // Create CUDA kernels.
+    pm.addNestedPass<gpu::GPUModuleOp>(createStripDebugInfoPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createCanonicalizerPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createCSEPass());
+    pm.addNestedPass<gpu::GPUModuleOp>(createReconcileUnrealizedCastsPass());
 
     // Cleanup IR.
     pm.addPass(createCanonicalizerPass());
