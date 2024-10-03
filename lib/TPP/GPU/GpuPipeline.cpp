@@ -64,6 +64,11 @@ llvm::cl::list<int64_t>
                 llvm::cl::list_init<int64_t>(SmallVector<int64_t>{8, 16, 16}),
                 llvm::cl::CommaSeparated);
 
+// Control GPU vectorization.
+llvm::cl::opt<bool> gpuVectorize("gpu-vectorize",
+                                 llvm::cl::desc("Vectorize GPU kernel"),
+                                 llvm::cl::init(false));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -181,6 +186,14 @@ private:
     threadTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
     pm.addPass(createCleanup());
+
+    if (gpuVectorize) {
+      // Early reduction dimension splitting is incompatible with
+      // Linalg to XeGPU lowering that expects full GEMM.
+      // For now, enable only with other vectorization passes.
+      pm.addPass(createSplitReductionDim(SplitReductionDimOptions{kTile}));
+      pm.addPass(createCleanup());
+    }
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.

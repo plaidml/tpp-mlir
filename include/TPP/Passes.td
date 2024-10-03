@@ -506,4 +506,23 @@ def FoldIntoEltwise : Pass<"fold-into-eltwise", "ModuleOp"> {
                            "affine::AffineDialect"];
 }
 
+def SplitReductionDim : Pass<"split-reduction-dim", "func::FuncOp"> {
+  let summary = "Split innermost reduction dimension.";
+  let description = [{
+    Split innermost reduction dimension and compute it sequentially
+    using a serial loop and in-place accumulation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "memref::MemRefDialect",
+                           "affine::AffineDialect",
+                           "arith::ArithDialect"];
+  let options = [
+    Option<"tileSize", "tile", "int64_t",
+           /*default=*/"0",
+           "Reduction dimension tile size">,
+  ];
+}
+
 #endif // TPP_DIALECT_TPP_PASSES
