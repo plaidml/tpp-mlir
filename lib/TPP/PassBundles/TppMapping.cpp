@@ -17,6 +17,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "TPP/PassUtils.h"
 
@@ -63,6 +64,9 @@ private:
     pm.addPass(createPackMatmul());
     pm.addPass(createPackVNNI());
 
+    if (lowerPackUnpackWithoutTranspose) {
+      pm.addPass(createLowerPacksAndUnpacksWithoutTranspose());
+    }
     // Postprocess packing.
     // Run only canonicalizer at this stage as full cleanup (mostly CSE) can
     // mess up tensor producer-consumer chains used for analysis in the

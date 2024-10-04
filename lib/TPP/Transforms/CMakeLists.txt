@@ -8,6 +8,7 @@ add_mlir_library(TPPTransforms
   DecomposeAggregatedOps.cpp
   LinalgDeGeneralize.cpp
   LowerPacksAndUnpacks.cpp
+  LowerPacksAndUnpacksWithoutTranspose.cpp
   RewriteBatchMatmulToMatmul.cpp
   RewriteConvsToMatmulOrBrgemm.cpp
   RewriteConvToMatmulImpl.cpp
@@ -25,6 +26,7 @@ add_mlir_library(TPPTransforms
   FoldAddIntoDest.cpp
   Vectorization.cpp
   LinalgTiling.cpp
+  SplitReductionDim.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

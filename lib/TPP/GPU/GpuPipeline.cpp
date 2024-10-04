@@ -64,6 +64,11 @@ llvm::cl::list<int64_t>
                 llvm::cl::list_init<int64_t>(SmallVector<int64_t>{8, 16, 16}),
                 llvm::cl::CommaSeparated);
 
+// Control GPU vectorization.
+llvm::cl::opt<bool> gpuVector("gpu-vector",
+                              llvm::cl::desc("Vectorize GPU kernel"),
+                              llvm::cl::init(false));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_GPUPIPELINE
@@ -181,6 +186,24 @@ private:
     threadTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
     pm.addPass(createCleanup());
+
+    if (gpuVector) {
+      // Early reduction dimension splitting is incompatible with
+      // Linalg to XeGPU lowering that expects full GEMM.
+      // For now, enable only with other vectorization passes.
+      pm.addPass(createSplitReductionDim(SplitReductionDimOptions{kTile}));
+      pm.addPass(createCleanup());
+
+      // Vectorize at tensor-level to benefit from better cleanup utilities like
+      // folding.
+      // TODO: Enable vectorization when vector unrolling is added.
+      //       When vector sizes exceed hardware supported lengths,
+      //       pipeline gets stuck on GPU binary compilation step.
+      //       The vectorization can only be enabled when a pass
+      //       to resize vector operations is available.
+      pm.addPass(createGpuVectorize());
+      pm.addPass(createCleanup());
+    }
 
     // Preprocess and bufferize as further conversion requires memref
     // abstraction.

@@ -56,6 +56,11 @@ struct GpuConversion : public tpp::impl::GpuConversionBase<GpuConversion>,
 
 private:
   void constructPipeline() override {
+    // Map loops into GPU kernels.
+    pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
+    pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
+    pm.addPass(createCleanup());
+
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
@@ -64,11 +69,6 @@ private:
           createLinalgToXeGPU(LinalgToXeGPUOptions{kTile, stages, dpasTile}));
     }
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-
-    // Map loops into GPU kernels.
-    pm.addNestedPass<func::FuncOp>(createGpuMapParallelLoopsPass());
-    pm.addNestedPass<func::FuncOp>(createParallelLoopToGpuPass());
-
     pm.addPass(createCleanup());
 
     // Create GPU kernels.

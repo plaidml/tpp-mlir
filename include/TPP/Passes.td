@@ -194,6 +194,12 @@ def LowerPacksAndUnPacks : Pass<"lower-packs-unpacks", "func::FuncOp"> {
                            "tensor::TensorDialect"];
 }
 
+def LowerPacksAndUnpacksWithoutTranspose : Pass<"lower-packs-unpacks-without-transpose",
+   "ModuleOp"> {
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "tensor::TensorDialect"];
+}
+
 def RewriteConvToMatmulOrBrgemm : Pass<"rewrite-conv-to-matmul-or-brgemm",
                                        "func::FuncOp"> {
   let summary = "Rewrite Conv2DNhwcHwcfOp/Conv2DNchwFchwOp to Matmul or Brgemm.";
@@ -515,6 +521,39 @@ def FoldIntoEltwise : Pass<"fold-into-eltwise", "ModuleOp"> {
   let dependentDialects = ["linalg::LinalgDialect",
                            "arith::ArithDialect",
                            "affine::AffineDialect"];
+}
+
+def SplitReductionDim : Pass<"split-reduction-dim", "func::FuncOp"> {
+  let summary = "Split innermost reduction dimension.";
+  let description = [{
+    Split innermost reduction dimension and compute it sequentially
+    using a serial loop and in-place accumulation.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "memref::MemRefDialect",
+                           "affine::AffineDialect",
+                           "arith::ArithDialect"];
+  let options = [
+    Option<"tileSize", "tile", "int64_t",
+           /*default=*/"0",
+           "Reduction dimension tile size">,
+  ];
+}
+
+def GpuVectorize : Pass<"gpu-vectorize", "ModuleOp"> {
+  let summary = "Vectorize GPU kernel.";
+  let description = [{
+    Convert ops targeting GPU to vectorized representation.
+  }];
+  let dependentDialects = ["gpu::GPUDialect",
+                           "scf::SCFDialect",
+                           "memref::MemRefDialect",
+                           "tensor::TensorDialect",
+                           "math::MathDialect",
+                           "arith::ArithDialect",
+                           "vector::VectorDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES
