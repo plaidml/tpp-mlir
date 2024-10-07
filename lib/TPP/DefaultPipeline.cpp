@@ -53,10 +53,6 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
-llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
-                                   llvm::cl::desc("Lower linalg to vector"),
-                                   llvm::cl::init(false));
-
 llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
@@ -134,8 +130,7 @@ private:
     } else {
       // Apply the default preprocessing pass
       DefaultTppPassesOptions tppDefaultOptions{
-          linalgToLoops, parallelTaskGrid, linalgToVector,
-          lowerPackUnpackWithoutTranspose};
+          linalgToLoops, parallelTaskGrid, lowerPackUnpackWithoutTranspose};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

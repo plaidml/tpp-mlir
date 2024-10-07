@@ -36,6 +36,20 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
   return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
 }
 
+bool isInVnniLayout(int64_t expectedRank, VectorType vector) {
+  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16()) {
+    return false;
+  }
+  return vector.getShape().back() == vnni::utils::getVnniBlockingFactor(vector);
+}
+
+// Until we have a better way to express the VNNI layout (see: #563), it is up
+// to the callee to specify the expected rank in the VNNI layout as the rank
+// depends on the operations we are dealing with.
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
+  return isInVnniLayout((int64_t)expectedRank, vector);
+}
+
 FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
                                         AffineMap map, int64_t blockingFactor) {
   ArrayRef<AffineExpr> results = map.getResults();

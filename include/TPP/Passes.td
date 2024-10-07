@@ -23,6 +23,19 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
                            "tensor::TensorDialect"];
 }
 
+def ConvertVectorToXsmm : Pass<"convert-vector-to-xsmm", "func::FuncOp"> {
+  let summary = "Convert vector to xsmm";
+  let description = [{
+    Convert vector operations to XSMM operations.
+  }];
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "mlir::vector::VectorDialect",
+			   "LLVM::LLVMDialect"];
+  let constructor = "mlir::tpp::createConvertVectorToXsmm()";
+}
+
+
 def VerifyXsmmCalls : Pass<"verify-xsmm-calls", "func::FuncOp"> {
   let summary = "Verify XSMM calls (dispatch and invoke)";
   let description = [{
@@ -50,7 +63,7 @@ def VectorizationPass : Pass<"vectorization-pass",
     Vectorization pass to convert linalg to memref/vector instead of Xsmm.
   }];
 
-  let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "vector::VectorDialect" ];
+  let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "mlir::vector::VectorDialect" ];
 }
 
 def VectorContractToOuterproduct : Pass<
@@ -389,26 +402,6 @@ def GpuInlineConstants : Pass<"gpu-inline-constants", "func::FuncOp"> {
                            "arith::ArithDialect"];
 }
 
-def IntelAMXTileConfigInsertionPass : Pass<"intel-amx-tile-config-insertion-pass",
-                                     "func::FuncOp"> {
-  let summary = "Insert intel amx tile configuration xsmm calls";
-  let description = [{
-    Insert intel amx tile configuration xsmm calls.
-  }];
-
-  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
-}
-
-def IntelAMXTileConfigHoistingPass : Pass<"intel-amx-tile-config-hoisting-pass",
-                                     "func::FuncOp"> {
-  let summary = "Hoist intel amx tile configuration invoke xsmm calls";
-  let description = [{
-    Run LICM on intel amx tile configuration invoke calls.
-  }];
-
-  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
-}
-
 def LinalgConvertCompareSelectToMaximumfPass: Pass<"linalg-convert-compare-select-to-maximumf-pass",
 					"func::FuncOp">{
   let summary = "Convert linalg compare-select generic operation to maximumf operation";
@@ -442,7 +435,7 @@ def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
                            "gpu::GPUDialect",
                            "arith::ArithDialect",
                            "scf::SCFDialect",
-                           "vector::VectorDialect",
+                           "mlir::vector::VectorDialect",
                            "bufferization::BufferizationDialect",
                            "perf::PerfDialect"];
   let options = [
@@ -491,7 +484,7 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
                            "memref::MemRefDialect",
                            "arith::ArithDialect",
                            "math::MathDialect",
-                           "vector::VectorDialect"];
+                           "mlir::vector::VectorDialect"];
   let options = [
     Option<"kTile", "k-tile", "int64_t",
            /*default=*/"32",
@@ -545,7 +538,7 @@ def GpuVectorize : Pass<"gpu-vectorize", "ModuleOp"> {
                            "tensor::TensorDialect",
                            "math::MathDialect",
                            "arith::ArithDialect",
-                           "vector::VectorDialect"];
+                           "mlir::vector::VectorDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

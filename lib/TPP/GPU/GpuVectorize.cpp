@@ -29,6 +29,7 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
+using namespace mlir::vector;
 
 namespace mlir {
 namespace tpp {
@@ -103,11 +104,12 @@ struct GpuVectorize : public tpp::impl::GpuVectorizeBase<GpuVectorize> {
     patterns.add<VectorizeGpuLaunch, GpuVectorizeLinalg>(ctx);
 
     // Vector postprocessing patterns.
-    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::populateVectorReductionToContractPatterns(patterns);
-    vector::populateSinkVectorOpsPatterns(patterns);
-    vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+    mlir::vector::populateVectorTransferPermutationMapLoweringPatterns(
+        patterns);
+    mlir::vector::populateVectorReductionToContractPatterns(patterns);
+    mlir::vector::populateSinkVectorOpsPatterns(patterns);
+    mlir::vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+    mlir::vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
 
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

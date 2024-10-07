@@ -38,6 +38,7 @@
 using namespace mlir;
 using namespace mlir::tpp;
 using namespace mlir::xegpu;
+using namespace mlir::vector;
 
 namespace mlir {
 namespace tpp {
@@ -196,7 +197,7 @@ static std::optional<Value> lowerGenericOp(linalg::GenericOp genericOp,
     }
 
     auto zeroVec =
-        rewriter.create<vector::BroadcastOp>(loc, resType, zeroConst);
+        rewriter.create<mlir::vector::BroadcastOp>(loc, resType, zeroConst);
 
     return rewriter
         .create<arith::MaximumFOp>(loc, resType, operands[0], zeroVec)
@@ -798,8 +799,8 @@ extractVecSubTiles(PatternRewriter &rewriter, Location loc,
       // Load tiles are ordered in row-major fashion.
       int loadIdx = m * totalTileCols + k;
       auto sgTotalTile = loadVecTiles[loadIdx];
-      auto castFlat =
-          rewriter.create<vector::ShapeCastOp>(loc, loadVecFlat, sgTotalTile);
+      auto castFlat = rewriter.create<mlir::vector::ShapeCastOp>(
+          loc, loadVecFlat, sgTotalTile);
 
       // Iterate over load tiles.
       // Each load tile contains one or more sub-tiles.
@@ -809,12 +810,12 @@ extractVecSubTiles(PatternRewriter &rewriter, Location loc,
           int dpasIdx = i * subTilePerLoadCol + j;
           int offset = dpasIdx * subTileSize;
 
-          auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
+          auto slice = rewriter.create<mlir::vector::ExtractStridedSliceOp>(
               loc, castFlat, /*offsets=*/ArrayRef<int64_t>{offset},
               /*sizes=*/ArrayRef<int64_t>{subTileSize},
               /*strides=*/ArrayRef<int64_t>{1});
-          auto castTile =
-              rewriter.create<vector::ShapeCastOp>(loc, vecSubTileType, slice);
+          auto castTile = rewriter.create<mlir::vector::ShapeCastOp>(
+              loc, vecSubTileType, slice);
 
           // Insert the sub-tiles in their position relative to the whole
           // subgroup tile.
@@ -1006,8 +1007,9 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   tilesA =
       SmallVector<Value>{iterValues.begin() + loadVecC.size(),
                          iterValues.begin() + loadVecC.size() + tilesA.size()};
-  tilesB = SmallVector<Value>{iterValues.begin() + loadVecC.size() + tilesA.size(),
-                              iterValues.begin() + loadVecC.size() + tilesA.size() + tilesB.size()};
+  tilesB = SmallVector<Value>{
+      iterValues.begin() + loadVecC.size() + tilesA.size(),
+      iterValues.begin() + loadVecC.size() + tilesA.size() + tilesB.size()};
   if (isCoopPrefetch) {
     prefetchA = *(iterValues.end() - 2);
     prefetchB = *(iterValues.end() - 1);

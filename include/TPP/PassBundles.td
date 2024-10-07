@@ -35,9 +35,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "Skip all TPP transformations. Lower linalg directly to loops.">,
     ListOption<"parallelTaskGrid", "parallel-task-grid",
            "unsigned", "Grid-sizes for parallel tasks.">,
-    Option<"linalgToVector", "linalg-to-vector",
-           "bool", /*default=*/"false",
-           "Lower linalg directly to vector.">,
     Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
            "Lower non-constant packs and unpacks reverting any dim permutations.">
