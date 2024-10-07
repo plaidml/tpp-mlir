@@ -30,11 +30,13 @@
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassBundles.h"
 #include "TPP/Passes.h"
+#include "TPP/Passes.h.inc"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
   mlir::tpp::registerTppCompilerPasses();
   mlir::tpp::registerTppPassBundlePasses();
+  mlir::tpp::registerConvertVectorToXsmmPass();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::xsmm::XsmmDialect>();
