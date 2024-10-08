@@ -54,6 +54,7 @@ static FailureOr<Operation *> getUserImpl(PatternRewriter &rewriter,
       return failure();
     }
   }
+  return failure();
 }
 
 FailureOr<xsmm::BrgemmInfo> computeBrgemmInfo(PatternRewriter &rewriter,
@@ -135,7 +136,7 @@ buildBrgemm(PatternRewriter &rewriter, Operation *contractOp, Value input0,
     invokeName = "xsmm_brgemm_invoke";
   }
 
-  auto dims = SmallVector<int64_t>{m, n, k, lda, ldb, ldc, strideA, strideB};
+  auto dims = SmallVector<int64_t>{m, n, k, lda, ldb, ldc};
   for (size_t idx = 0; idx < dims.size(); idx++) {
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
@@ -144,11 +145,21 @@ buildBrgemm(PatternRewriter &rewriter, Operation *contractOp, Value input0,
   // Dispatch the flags. Pass to the library the already ored-flag to
   // avoid changing the interface every time we add a new flag. Flags
   // are assumed to be verified before (i.e., op verifier).
+  if (batch != 0) {
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, strideA)));
+    dispatchOperandTypes.push_back(integer64);
+
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, strideB)));
+    dispatchOperandTypes.push_back(integer64);
+  }
   int64_t oredFlag = xsmm::utils::getOredFlags(brgemmFlags);
 
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
+
   ModuleOp module = contractOp->getParentOfType<ModuleOp>();
   auto dispatched = xsmm::utils::buildDispatchCall(
       rewriter, loc, dispatchOperands, dispatchOperandTypes, module,
@@ -158,9 +169,11 @@ buildBrgemm(PatternRewriter &rewriter, Operation *contractOp, Value input0,
   for (auto operand : inputs) {
     operandRange.push_back(operand);
   }
-  Value batchDim = rewriter.create<arith::ConstantOp>(
-      loc, integer64, rewriter.getIntegerAttr(integer64, batch));
-  operandRange.push_back(batchDim);
+  if (batch != 0) {
+    Value batchDim = rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, batch));
+    operandRange.push_back(batchDim);
+  }
   auto invokeCall = xsmm::utils::buildInvokeCall(
       rewriter, loc, module, operandRange, invokeName, dtype);
   return std::make_pair(&*dispatched, &*invokeCall);
@@ -375,7 +388,6 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
                  Operation *input, Type output) {
   Value source = input->getResult(0);
   VectorType outType = cast<VectorType>(output);
-  VectorType sourceType = cast<VectorType>(source.getType());
   std::string dispatchName = "xsmm_unary_dispatch";
   std::string invokeName = "xsmm_unary_invoke";
   Location loc = transposeOp->getLoc();
@@ -419,7 +431,7 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
         rewriter.getContext(), ArrayRef<int64_t>{unaryInfo.m, unaryInfo.n,
                                                  unaryInfo.ldi, unaryInfo.ldo});
-    for (size_t idx = 0; idx < dims.size(); idx++) {
+    for (auto idx = 0; idx < dims.size(); idx++) {
       dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
           loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
       dispatchOperandTypes.push_back(integer64);
@@ -484,7 +496,7 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
       rewriter.getContext(), ArrayRef<int64_t>{unaryInfo->m, unaryInfo->n,
                                                unaryInfo->ldi, unaryInfo->ldo});
 
-  for (size_t idx = 0; idx < dims.size(); idx++) {
+  for (auto idx = 0; idx < dims.size(); idx++) {
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
     dispatchOperandTypes.push_back(integer64);
