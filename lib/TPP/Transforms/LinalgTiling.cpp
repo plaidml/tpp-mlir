@@ -1,4 +1,3 @@
-
 //===- LinalgTiling.cpp -----------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -58,6 +57,9 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp linalgOp,
                                 PatternRewriter &rewriter) const override {
+
+    if (!linalgOp.hasPureBufferSemantics())
+      return failure();
     //  Get the MXN tile shape from the user input
     std::vector<int64_t> tileShapeM(options.mTileShape.begin(),
                                     options.mTileShape.end());
@@ -65,19 +67,18 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
                                     options.nTileShape.end());
     std::vector<int64_t> finaltile(3);
     std::vector<int64_t> resulttile(2);
-    if (tileShapeM.size() == 2 && tileShapeN.size() == 2) {
-      if (tileShapeM[1] == tileShapeN[0]) {
-        finaltile[0] = tileShapeM[0];
-        finaltile[1] = tileShapeN[1];
-        finaltile[2] = tileShapeM[1];
-        resulttile[0] = tileShapeM[0];
-        resulttile[1] = tileShapeN[1];
-      } else {
-        return failure();
-      }
-    } else {
-      return failure();
-    }
+
+    if (tileShapeM.size() != 2 || tileShapeN.size() != 2)
+	   return failure(); 
+
+    if (tileShapeM[1] != tileShapeN[0])
+	    return failure();
+
+    finaltile[0] = tileShapeM[0];
+    finaltile[1] = tileShapeN[1];
+    finaltile[2] = tileShapeM[1];
+    resulttile[0] = tileShapeM[0];
+    resulttile[1] = tileShapeN[1];
 
     SmallVector<int64_t> boundariesOne{1,
                                        static_cast<long>(tileShapeM.size() - 1),
@@ -195,7 +196,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
           {indices}, dyn_cast<MemRefType>(operandType).getElementType());
       auto [staticStrides, staticOffset] = getStridesAndOffset(subviewType);
       auto subview = rewriter.create<memref::SubViewOp>(
-          linalgOp.getLoc(), nullptr /*dyn_cast<MemRefType>(newSubviewType)*/,
+          linalgOp.getLoc(), nullptr /* dyn_cast<MemRefType>(subviewType)*/,
           input, offsets, shape, strides);
       linalgOp.setOperand(i, subview);
     }
