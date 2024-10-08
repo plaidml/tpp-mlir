@@ -113,7 +113,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       Location loc = linalgOp.getLoc();
       Value zeroCst = rewriter.create<arith::ConstantIndexOp>(loc, 0);
       Value ubCst = rewriter.create<arith::ConstantIndexOp>(loc, upperBound);
-      Value stepCst = rewriter.create<arith::ConstantIndexOp>(loc, *itrShapeM);
+      Value stepCst = rewriter.create<arith::ConstantIndexOp>(loc, upperBound/(*itrShapeM));
       scf::ForOp loopOp = rewriter.create<scf::ForOp>(linalgOp.getLoc(),
                                                       zeroCst, ubCst, stepCst);
       rewriter.setInsertionPointToStart(loopOp.getBody());

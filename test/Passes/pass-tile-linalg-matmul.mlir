@@ -14,27 +14,29 @@ module {
 }
 
 
+
 // CHECK-LABEL:   func.func @entry(
 // CHECK-SAME:                     %[[VAL_0:.*]]: memref<16x32x16x32xf32>,
 // CHECK-SAME:                     %[[VAL_1:.*]]: memref<32x32x32x32xf32>,
 // CHECK-SAME:                     %[[VAL_2:.*]]: memref<16x32x16x32xf32>) {
-// CHECK:           %[[VAL_3:.*]] = arith.constant 1 : index
-// CHECK:           %[[VAL_4:.*]] = arith.constant 32 : index
-// CHECK:           %[[VAL_5:.*]] = arith.constant 8 : index
-// CHECK:           %[[VAL_6:.*]] = arith.constant 16 : index
-// CHECK:           %[[VAL_7:.*]] = arith.constant 0 : index
-// CHECK:           scf.forall (%[[VAL_8:.*]], %[[VAL_9:.*]]) in (16, 32) {
-// CHECK:             %[[VAL_10:.*]] = memref.subview %[[VAL_0]]{{\[}}%[[VAL_8]], 0, 0, 0] [1, 32, 16, 32] [1, 1, 1, 1] : memref<16x32x16x32xf32> to memref<32x16x32xf32, strided<[512, 32, 1], offset: ?>>
-// CHECK:             %[[VAL_11:.*]] = memref.subview %[[VAL_1]]{{\[}}%[[VAL_9]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<32x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
-// CHECK:             %[[VAL_12:.*]] = memref.subview %[[VAL_2]]{{\[}}%[[VAL_8]], %[[VAL_9]], 0, 0] [1, 1, 16, 32] [1, 1, 1, 1] : memref<16x32x16x32xf32> to memref<16x32xf32, strided<[32, 1], offset: ?>>
-// CHECK:             scf.for %[[VAL_13:.*]] = %[[VAL_7]] to %[[VAL_6]] step %[[VAL_5]] {
-// CHECK:               scf.for %[[VAL_14:.*]] = %[[VAL_7]] to %[[VAL_4]] step %[[VAL_6]] {
-// CHECK:                 scf.for %[[VAL_15:.*]] = %[[VAL_7]] to %[[VAL_4]] step %[[VAL_3]] {
-// CHECK:                   scf.for %[[VAL_16:.*]] = %[[VAL_7]] to %[[VAL_4]] step %[[VAL_5]] {
-// CHECK:                     %[[VAL_17:.*]] = memref.subview %[[VAL_10]]{{\[}}%[[VAL_15]], %[[VAL_13]], %[[VAL_16]]] [1, 2, 4] [1, 1, 1] : memref<32x16x32xf32, strided<[512, 32, 1], offset: ?>> to memref<1x2x4xf32, strided<[512, 32, 1], offset: ?>>
-// CHECK:                     %[[VAL_18:.*]] = memref.subview %[[VAL_11]]{{\[}}%[[VAL_15]], %[[VAL_16]], %[[VAL_14]]] [1, 4, 2] [1, 1, 1] : memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>> to memref<1x4x2xf32, strided<[1024, 32, 1], offset: ?>>
-// CHECK:                     %[[VAL_19:.*]] = memref.subview %[[VAL_12]]{{\[}}%[[VAL_13]], %[[VAL_14]]] [2, 2] [1, 1] : memref<16x32xf32, strided<[32, 1], offset: ?>> to memref<2x2xf32, strided<[32, 1], offset: ?>>
-// CHECK:                     linalg.batch_reduce_matmul ins(%[[VAL_17]], %[[VAL_18]] : memref<1x2x4xf32, strided<[512, 32, 1], offset: ?>>, memref<1x4x2xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[VAL_19]] : memref<2x2xf32, strided<[32, 1], offset: ?>>)
+// CHECK:           %[[VAL_3:.*]] = arith.constant 4 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 1 : index
+// CHECK:           %[[VAL_5:.*]] = arith.constant 32 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_7:.*]] = arith.constant 16 : index
+// CHECK:           %[[VAL_8:.*]] = arith.constant 0 : index
+// CHECK:           scf.forall (%[[VAL_9:.*]], %[[VAL_10:.*]]) in (16, 32) {
+// CHECK:             %[[VAL_11:.*]] = memref.subview %[[VAL_0]]{{\[}}%[[VAL_9]], 0, 0, 0] [1, 32, 16, 32] [1, 1, 1, 1] : memref<16x32x16x32xf32> to memref<32x16x32xf32, strided<[512, 32, 1], offset: ?>>
+// CHECK:             %[[VAL_12:.*]] = memref.subview %[[VAL_1]]{{\[}}%[[VAL_10]], 0, 0, 0] [1, 32, 32, 32] [1, 1, 1, 1] : memref<32x32x32x32xf32> to memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK:             %[[VAL_13:.*]] = memref.subview %[[VAL_2]]{{\[}}%[[VAL_9]], %[[VAL_10]], 0, 0] [1, 1, 16, 32] [1, 1, 1, 1] : memref<16x32x16x32xf32> to memref<16x32xf32, strided<[32, 1], offset: ?>>
+// CHECK:             scf.for %[[VAL_14:.*]] = %[[VAL_8]] to %[[VAL_7]] step %[[VAL_6]] {
+// CHECK:               scf.for %[[VAL_15:.*]] = %[[VAL_8]] to %[[VAL_5]] step %[[VAL_6]] {
+// CHECK:                 scf.for %[[VAL_16:.*]] = %[[VAL_8]] to %[[VAL_5]] step %[[VAL_4]] {
+// CHECK:                   scf.for %[[VAL_17:.*]] = %[[VAL_8]] to %[[VAL_5]] step %[[VAL_3]] {
+// CHECK:                     %[[VAL_18:.*]] = memref.subview %[[VAL_11]]{{\[}}%[[VAL_16]], %[[VAL_14]], %[[VAL_17]]] [1, 2, 4] [1, 1, 1] : memref<32x16x32xf32, strided<[512, 32, 1], offset: ?>> to memref<1x2x4xf32, strided<[512, 32, 1], offset: ?>>
+// CHECK:                     %[[VAL_19:.*]] = memref.subview %[[VAL_12]]{{\[}}%[[VAL_16]], %[[VAL_17]], %[[VAL_15]]] [1, 4, 2] [1, 1, 1] : memref<32x32x32xf32, strided<[1024, 32, 1], offset: ?>> to memref<1x4x2xf32, strided<[1024, 32, 1], offset: ?>>
+// CHECK:                     %[[VAL_20:.*]] = memref.subview %[[VAL_13]]{{\[}}%[[VAL_14]], %[[VAL_15]]] [2, 2] [1, 1] : memref<16x32xf32, strided<[32, 1], offset: ?>> to memref<2x2xf32, strided<[32, 1], offset: ?>>
+// CHECK:                     linalg.batch_reduce_matmul ins(%[[VAL_18]], %[[VAL_19]] : memref<1x2x4xf32, strided<[512, 32, 1], offset: ?>>, memref<1x4x2xf32, strided<[1024, 32, 1], offset: ?>>) outs(%[[VAL_20]] : memref<2x2xf32, strided<[32, 1], offset: ?>>)
 // CHECK:                   }
 // CHECK:                 }
 // CHECK:               }
@@ -42,7 +44,6 @@ module {
 // CHECK:           }
 // CHECK:           return
 // CHECK:         }
-
 
 // -----
 
@@ -86,8 +87,8 @@ module {
 // CHECK-SAME:                     %[[VAL_0:.*]]: memref<8x48x32x32xf32>) -> memref<8x48x32x32xf32> {
 // CHECK:           %[[VAL_1:.*]] = arith.constant 1 : index
 // CHECK:           %[[VAL_2:.*]] = arith.constant 48 : index
-// CHECK:           %[[VAL_3:.*]] = arith.constant 16 : index
-// CHECK:           %[[VAL_4:.*]] = arith.constant 8 : index
+// CHECK:           %[[VAL_3:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 4 : index
 // CHECK:           %[[VAL_5:.*]] = arith.constant 32 : index
 // CHECK:           %[[VAL_6:.*]] = arith.constant 0 : index
 // CHECK:           %[[VAL_7:.*]] = arith.constant 0.000000e+00 : f32
