@@ -15,11 +15,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -43,7 +43,6 @@ struct DefaultTppPasses
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
-    registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
     check::registerBufferizableOpInterfaceExternalModels(registry);
@@ -85,8 +84,7 @@ private:
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
-      TppMappingOptions tppMappingOptions{
-          lowerPackUnpackWithoutTranspose};
+      TppMappingOptions tppMappingOptions{lowerPackUnpackWithoutTranspose};
       pm.addPass(createTppMapping(tppMappingOptions));
 
       // Generalize tensor.pack and tensor.unpack.
@@ -101,15 +99,8 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
-      // TODO: This flag will be removed once the vector path becomes the
-      // default lowering path.
-      if (linalgToVector) {
-        pm.addNestedPass<func::FuncOp>(createVectorizationPass());
-        pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      } else {
-        // Lower all Tile operations.
-        pm.addNestedPass<func::FuncOp>(createLinalgLowering());
-      }
+      pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       pm.addPass(createCleanup());
     }
 
@@ -118,25 +109,9 @@ private:
     pm.addPass(createConvertForAllToParallelOp());
     LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
 
-    if (linalgToVector) {
-      pm.addPass(createConvertVectorToSCFPass());
-      // Low level parallelization passes.
-      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
-    } else {
-      // Low level parallelization passes.
-      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
-      // TODO: These passes have been moved out of low level parallelization
-      // pass since these apply on xsmm dialect. They'll be moved back in
-      // subsequent commits.
-      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigInsertionPass());
-      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
-      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      pm.addNestedPass<func::FuncOp>(createIntelAMXTileConfigHoistingPass());
-      // TODO: This pass has been moved out of LocalDialectsLowering since it is
-      // applicable to xsmm only. It'll be moved back in subsequent commits.
-      pm.addPass(createConvertXsmmToFunc());
-    }
+    pm.addPass(createConvertVectorToXsmm());
+    // Low level parallelization passes.
+    pm.addPass(createLowLevelParallelization(LowLevelParallelization));
     // Covert all local TPP-related dialects.
     pm.addPass(createLocalDialectsLowering());
 

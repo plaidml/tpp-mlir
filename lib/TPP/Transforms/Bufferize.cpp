@@ -33,7 +33,6 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
@@ -100,10 +99,10 @@ void DuplicateFill::runOnOperation() {
           rewriter.setInsertionPoint(linalgOp);
           Operation *clonedOp = rewriter.clone(*fillOp.getOperation());
           rewriter.replaceUsesWithIf(fillOp->getResults(),
-                                       clonedOp->getResults(),
-                                       [&](OpOperand &operand) {
-                                         return operand.getOwner() == linalgOp;
-                                       });
+                                     clonedOp->getResults(),
+                                     [&](OpOperand &operand) {
+                                       return operand.getOwner() == linalgOp;
+                                     });
         }
       }
     return WalkResult::advance();

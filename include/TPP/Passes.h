@@ -84,16 +84,12 @@ namespace vector {
 class VectorDialect;
 } // namespace vector
 
-namespace xsmm {
-class XsmmDialect;
-} // namespace xsmm
-
 namespace xegpu {
 class XeGPUDialect;
 } // namespace xegpu
 
 } // namespace mlir
-
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 namespace mlir {
 namespace tpp {
 // TODO: This should be per-pass so that pass can live
@@ -104,6 +100,7 @@ namespace tpp {
 
 #define GEN_PASS_REGISTRATION
 #include "TPP/Passes.h.inc"
+
 } // namespace tpp
 } // namespace mlir
 

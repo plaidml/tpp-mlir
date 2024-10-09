@@ -16,10 +16,7 @@ add_mlir_library(TPPTransforms
   TileConsumerAndFuseProducers.cpp
   ToBlockLayoutAndBack.cpp
   TransformUtils.cpp
-  CombineXsmmPass.cpp
   SCFParallelLoopTiling.cpp
-  IntelAMXTileConfig.cpp
-  IntelAMXTileConfigHoisting.cpp
   LinalgConvertCompareSelectToMaximumfPass.cpp
   ConvertLinalgToInplace.cpp
   FoldIntoEltwise.cpp
@@ -32,7 +29,6 @@ add_mlir_library(TPPTransforms
 
   DEPENDS
     MLIRPerfOpsIncGen
-    MLIRXsmmOpsIncGen
     MLIRXsmmAttrDefIncGen
     TPPCompilerPassIncGen
 
@@ -44,10 +40,8 @@ add_mlir_library(TPPTransforms
     MLIRBufferizationPipelines
     TPPTransformsUtils
     TPPIR
-    TPPXsmmDialect
     TPPCheckToLoops
     TPPLinalgToFunc
     TPPPerfToFunc
     TPPPerfToLoop
-    TPPXsmmToFunc
   )

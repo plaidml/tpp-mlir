@@ -15,7 +15,6 @@ add_mlir_library(TPPGPU
 
   DEPENDS
     MLIRPerfOpsIncGen
-    MLIRXsmmOpsIncGen
     TPPCompilerPassIncGen
     TPPCompilerPassBundleIncGen
 
