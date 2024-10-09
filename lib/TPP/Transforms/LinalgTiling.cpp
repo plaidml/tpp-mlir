@@ -29,10 +29,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/Support/Debug.h"
-#include <algorithm>
 #include <iostream>
-#include <list>
-#include <set>
 #define DEBUG_TYPE "linalg-tiling"
 
 namespace mlir {
@@ -60,12 +57,12 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
     if (!linalgOp.hasPureBufferSemantics())
       return failure();
     //  Get the MXN tile shape from the user input
-    std::vector<int64_t> tileShapeM(options.mTileShape.begin(),
+    SmallVector<int64_t> tileShapeM(options.mTileShape.begin(),
                                     options.mTileShape.end());
-    std::vector<int64_t> tileShapeN(options.nTileShape.begin(),
+    SmallVector<int64_t> tileShapeN(options.nTileShape.begin(),
                                     options.nTileShape.end());
-    std::vector<int64_t> finaltile(3);
-    std::vector<int64_t> resulttile(2);
+    SmallVector<int64_t> finaltile(3);
+    SmallVector<int64_t> resulttile(2);
 
     if (tileShapeM.size() != 2 || tileShapeN.size() != 2)
 	   return failure(); 
@@ -86,11 +83,9 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
     SmallVector<int64_t> tileSizesIndex{static_cast<long>(tileShapeM.size()),
                                         static_cast<long>(tileShapeN.size()),
                                         static_cast<long>(resulttile.size())};
-    std::vector<int64_t> tempTileM(tileShapeM.begin(), tileShapeM.end());
-    std::vector<int64_t> tempTileN(tileShapeN.begin(), tileShapeN.end());
-    SmallVector<std::vector<int64_t>> tileshapes{tempTileM, tempTileN,
+    SmallVector<SmallVector<int64_t>> tileshapes{tileShapeM, tileShapeN,
                                                  resulttile};
-    std::vector<int> swap_i = {0, 2, 1};
+    SmallVector<int> swap_i = {0, 2, 1};
     size_t i = 0;
     std::map<int, std::map<int, Value>> inductionVars;
     scf::ForOp innermostForLoop;
@@ -153,7 +148,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
     }
 
     // Creating subviews
-    SmallVector<std::vector<int64_t>> tiles = {tileShapeM, tileShapeN};
+    SmallVector<SmallVector<int64_t>> tiles = {tileShapeM, tileShapeN};
     for (size_t i = 0; i < linalgOp.getNumOperands(); i++) {
       SmallVector<int64_t> indices;
 
@@ -192,7 +187,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       }
 
       auto subview = rewriter.create<memref::SubViewOp>(
-          linalgOp.getLoc(), nullptr /* dyn_cast<MemRefType>(subviewType)*/,
+          linalgOp.getLoc(),nullptr /* dyn_cast<MemRefType>(subviewType)*/,
           input, offsets, shape, strides);
       linalgOp.setOperand(i, subview);
     }
