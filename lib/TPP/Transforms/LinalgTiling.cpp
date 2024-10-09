@@ -45,7 +45,6 @@ namespace tpp {
 
 using namespace mlir;
 using namespace mlir::tpp;
-using namespace std;
 
 namespace mlir {
 namespace tpp {
@@ -93,7 +92,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
                                                  resulttile};
     std::vector<int> swap_i = {0, 2, 1};
     size_t i = 0;
-    map<int, map<int, Value>> inductionVars;
+    std::map<int, std::map<int, Value>> inductionVars;
     scf::ForOp innermostForLoop;
     scf::ForOp reductionForLoop;
 
@@ -192,9 +191,6 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
         }
       }
 
-      auto subviewType = MemRefType::get(
-          {indices}, dyn_cast<MemRefType>(operandType).getElementType());
-      auto [staticStrides, staticOffset] = getStridesAndOffset(subviewType);
       auto subview = rewriter.create<memref::SubViewOp>(
           linalgOp.getLoc(), nullptr /* dyn_cast<MemRefType>(subviewType)*/,
           input, offsets, shape, strides);

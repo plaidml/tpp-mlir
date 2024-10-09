@@ -58,14 +58,14 @@ def VectorizationPass : Pass<"vectorization-pass",
 def LinalgTiling : Pass<"tile-linalg"> {
   let summary = "Tile matmul reduction dimension.";
   let description = [{
-    Tiles matmul reduction dimension using serial loop.
+    Tiles the innermost dimensions of the batch reduce matmul operation. Additionally, it swaps the reduction and k dimension loop. The final loop structure is as follows: M-loop->N-loop->reduction-loop->K-loop.
   }];
   let dependentDialects = ["linalg::LinalgDialect",
                            "memref::MemRefDialect",
                            "arith::ArithDialect"];
   let options = [
          ListOption<"mTileShape", "mTile", "unsigned", "Tile shape for m dim">,
-        ListOption<"nTileShape", "nTile", "unsigned", "Tile shape for n dim">,
+         ListOption<"nTileShape", "nTile", "unsigned", "Tile shape for n dim">,
   ];
 }
 
