@@ -51,10 +51,10 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
   LinalgOpTiling(MLIRContext *ctx, LinalgTilingOptions tilingoptions)
       : OpRewritePattern(ctx), options(tilingoptions) {}
 
-  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp linalgOp,
+  LogicalResult matchAndRewrite(linalg::BatchReduceMatmulOp brgemmOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (!linalgOp.hasPureBufferSemantics())
+    if (!brgemmOp.hasPureBufferSemantics())
       return failure();
     //  Get the MXN tile shape from the user input
     SmallVector<int64_t> tileShapeM(options.mTileShape.begin(),
@@ -65,10 +65,10 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
     SmallVector<int64_t> resulttile(2);
 
     if (tileShapeM.size() != 2 || tileShapeN.size() != 2)
-	   return failure(); 
+           return failure();
 
     if (tileShapeM[1] != tileShapeN[0])
-	    return failure();
+            return failure();
 
     finaltile[0] = tileShapeM[0];
     finaltile[1] = tileShapeN[1];
@@ -98,23 +98,23 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       int offset = swap_i[i] / (finaltile.size() - 1);
 
       int operandSize =
-          dyn_cast<MemRefType>(linalgOp.getOperand(index).getType())
+          dyn_cast<MemRefType>(brgemmOp.getOperand(index).getType())
               .getShape()
               .size();
       int effectiveOffset = operandSize - tileSizesIndex[index] + offset;
       auto upperBound =
-          dyn_cast<MemRefType>(linalgOp.getOperand(index).getType())
+          dyn_cast<MemRefType>(brgemmOp.getOperand(index).getType())
               .getShape()[effectiveOffset];
-      Location loc = linalgOp.getLoc();
+      Location loc = brgemmOp.getLoc();
       Value zeroCst = rewriter.create<arith::ConstantIndexOp>(loc, 0);
       Value ubCst = rewriter.create<arith::ConstantIndexOp>(loc, upperBound);
       Value stepCst = rewriter.create<arith::ConstantIndexOp>(loc, upperBound/(*itrShapeM));
-      scf::ForOp loopOp = rewriter.create<scf::ForOp>(linalgOp.getLoc(),
+      scf::ForOp loopOp = rewriter.create<scf::ForOp>(brgemmOp.getLoc(),
                                                       zeroCst, ubCst, stepCst);
       rewriter.setInsertionPointToStart(loopOp.getBody());
       int indexTwo = offset;
       int operandSizeTwo =
-          dyn_cast<MemRefType>(linalgOp.getOperand(indexTwo).getType())
+          dyn_cast<MemRefType>(brgemmOp.getOperand(indexTwo).getType())
               .getShape()
               .size();
       int effectiveOffsetTwo = operandSizeTwo - tileSizesIndex[index] + index;
@@ -125,7 +125,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       int indexThree = resulttile.size();
       int effectiveOffsetThree =
           index +
-          dyn_cast<MemRefType>(linalgOp.getOperand(indexThree).getType())
+          dyn_cast<MemRefType>(brgemmOp.getOperand(indexThree).getType())
               .getShape()
               .size() -
           tileSizesIndex[indexThree];
@@ -135,13 +135,12 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       }
       innermostForLoop = loopOp;
       if ((finaltile.size() - 1) == (i + 1)) {
-        Value zeroCst1 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
         Value ubCst1 = rewriter.create<arith::ConstantIndexOp>(
-            loc, dyn_cast<MemRefType>(linalgOp.getOperand(0).getType())
+            loc, dyn_cast<MemRefType>(brgemmOp.getOperand(0).getType())
                      .getShape()[0]);
         Value stepCst1 = rewriter.create<arith::ConstantIndexOp>(loc, 1);
         scf::ForOp redloopOp = rewriter.create<scf::ForOp>(
-            linalgOp.getLoc(), zeroCst1, ubCst1, stepCst1);
+            brgemmOp.getLoc(), zeroCst, ubCst1, stepCst1);
         rewriter.setInsertionPointToStart(redloopOp.getBody());
         reductionForLoop = redloopOp;
       }
@@ -149,10 +148,10 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
 
     // Creating subviews
     SmallVector<SmallVector<int64_t>> tiles = {tileShapeM, tileShapeN};
-    for (size_t i = 0; i < linalgOp.getNumOperands(); i++) {
+    for (size_t i = 0; i < brgemmOp.getNumOperands(); i++) {
       SmallVector<int64_t> indices;
 
-      auto input = linalgOp.getOperand(i);
+      auto input = brgemmOp.getOperand(i);
       auto operandType = input.getType();
       SmallVector<OpFoldResult> offsets;
       size_t k = 0;
@@ -163,10 +162,10 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       for (size_t j = 0; j < tensorShape.size(); j++) {
         if (j < tensorShape.size() - tileSizesIndex[i]) {
           if (j == ((tensorShape.size() - tileSizesIndex[i]) - 1) &&
-              i < (linalgOp.getNumOperands() - 1)) {
+              i < (brgemmOp.getNumOperands() - 1)) {
             offsets.push_back(reductionForLoop.getInductionVar());
-            indices.push_back(tensorShape[j] / 32);
-            shape.push_back(rewriter.getIndexAttr(tensorShape[j] / 32));
+            indices.push_back(tensorShape[j] / tensorShape[j]);
+            shape.push_back(rewriter.getIndexAttr(tensorShape[j] / tensorShape[j]));
             strides.push_back(rewriter.getIndexAttr(1));
 
           } else {
@@ -187,17 +186,17 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       }
 
       auto subview = rewriter.create<memref::SubViewOp>(
-          linalgOp.getLoc(), MemRefType(),
+          brgemmOp.getLoc(), MemRefType(),
           input, offsets, shape, strides);
-      linalgOp.setOperand(i, subview);
+      brgemmOp.setOperand(i, subview);
     }
 
     rewriter.setInsertionPoint(innermostForLoop.getBody(),
                                std::prev(innermostForLoop.getBody()->end(), 1));
-    auto clone = rewriter.clone(*linalgOp);
-    linalgOp.replaceAllUsesWith(clone);
-    if (linalgOp->use_empty())
-      rewriter.eraseOp(linalgOp);
+    auto clone = rewriter.clone(*brgemmOp);
+    brgemmOp.replaceAllUsesWith(clone);
+    if (brgemmOp->use_empty())
+      rewriter.eraseOp(brgemmOp);
     return success();
   }
 
@@ -227,3 +226,4 @@ struct LinalgTiling : public tpp::impl::LinalgTilingBase<LinalgTiling> {
 };
 } // namespace tpp
 } // namespace mlir
+
