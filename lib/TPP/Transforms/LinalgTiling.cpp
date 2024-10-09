@@ -187,7 +187,7 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       }
 
       auto subview = rewriter.create<memref::SubViewOp>(
-          linalgOp.getLoc(),nullptr /* dyn_cast<MemRefType>(subviewType)*/,
+          linalgOp.getLoc(), MemRefType(),
           input, offsets, shape, strides);
       linalgOp.setOperand(i, subview);
     }
