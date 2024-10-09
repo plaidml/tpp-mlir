@@ -1,10 +1,7 @@
 add_mlir_dialect_library(TPPXsmmDialect
   # Ops and dialects
     XsmmEnum.cpp
-    XsmmDialect.cpp
-    XsmmOps.cpp
     XsmmUtils.cpp
-    XsmmVerify.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
@@ -12,7 +9,6 @@ add_mlir_dialect_library(TPPXsmmDialect
   DEPENDS
     # add_mlir_dialect macro force-prefixes with MLIR
     MLIRXsmmAttrDefIncGen
-    MLIRXsmmOpsIncGen
     TPPCompilerPassIncGen
 
   LINK_LIBS PUBLIC

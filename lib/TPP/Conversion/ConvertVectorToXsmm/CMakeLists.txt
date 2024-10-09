@@ -23,7 +23,6 @@ add_mlir_conversion_library(TPPConvertVectorToXsmm
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRPass
-  TPPXsmmDialect
   MLIRVectorDialect
   MLIRMemRefDialect
   MLIRFuncDialect

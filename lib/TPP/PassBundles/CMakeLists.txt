@@ -3,7 +3,6 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 
 add_mlir_library(TPPPassBundles
   Cleanup.cpp
-  LinalgLowering.cpp
   LocalDialectsLowering.cpp
   LowLevelParallelization.cpp
   PostProcessing.cpp

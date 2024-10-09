@@ -20,7 +20,6 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -93,7 +92,6 @@ struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
-    registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
     check::registerBufferizableOpInterfaceExternalModels(registry);

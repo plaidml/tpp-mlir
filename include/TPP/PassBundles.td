@@ -58,13 +58,6 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
   ];
 }
 
-def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
-  let summary = "Lower Linalg operations to XSMM operations.";
-  let dependentDialects = ["xsmm::XsmmDialect",
-                           "scf::SCFDialect",
-                           "memref::MemRefDialect"];
-}
-
 def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
   let summary = "Low level parallelization (multi-threading, AMX config).";
   let dependentDialects = ["affine::AffineDialect",
@@ -72,7 +65,6 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "func::FuncDialect",
                            "memref::MemRefDialect",
                            "scf::SCFDialect",
-                           "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
   let options = [
     ListOption<"parallelTaskGrid", "parallel-task-grid",
@@ -91,7 +83,6 @@ def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
                            "perf::PerfDialect",
                            "scf::SCFDialect",
                            "tensor::TensorDialect",
-                           "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
 }
 

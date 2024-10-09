@@ -84,10 +84,6 @@ namespace vector {
 class VectorDialect;
 } // namespace vector
 
-namespace xsmm {
-class XsmmDialect;
-} // namespace xsmm
-
 namespace xegpu {
 class XeGPUDialect;
 } // namespace xegpu

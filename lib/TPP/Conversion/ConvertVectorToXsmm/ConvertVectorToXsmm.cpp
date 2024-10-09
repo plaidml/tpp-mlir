@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
-#include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Transforms/Transforms.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
@@ -612,9 +611,8 @@ struct ConvertVectorToXsmm
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<pdl::PDLDialect, pdl_interp::PDLInterpDialect,
-                    mlir::vector::VectorDialect, xsmm::XsmmDialect,
-                    func::FuncDialect, memref::MemRefDialect, LLVM::LLVMDialect,
-                    BuiltinDialect>();
+                    mlir::vector::VectorDialect, func::FuncDialect,
+                    memref::MemRefDialect, LLVM::LLVMDialect, BuiltinDialect>();
   }
 
   LogicalResult initialize(MLIRContext *ctx) override {

@@ -8,7 +8,6 @@
 
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
-include "TPP/Dialect/Xsmm/XsmmDialect.td"
 
 def Xsmm_DataType: I64EnumAttr<
     "DataType", "see: libxsmm_datatype",

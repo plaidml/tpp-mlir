@@ -11,18 +11,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
-  let summary = "Convert linalg to xsmm";
-  let description = [{
-    Convert linalg operations to XSMM operations.
-  }];
-  let dependentDialects = ["func::FuncDialect",
-                           "memref::MemRefDialect",
-                           "linalg::LinalgDialect",
-                           "xsmm::XsmmDialect",
-                           "tensor::TensorDialect"];
-}
-
 def ConvertVectorToXsmm : Pass<"convert-vector-to-xsmm", "func::FuncOp"> {
   let summary = "Convert vector to xsmm";
   let description = [{
@@ -35,15 +23,6 @@ def ConvertVectorToXsmm : Pass<"convert-vector-to-xsmm", "func::FuncOp"> {
   let constructor = "mlir::tpp::createConvertVectorToXsmm()";
 }
 
-
-def VerifyXsmmCalls : Pass<"verify-xsmm-calls", "func::FuncOp"> {
-  let summary = "Verify XSMM calls (dispatch and invoke)";
-  let description = [{
-    Make sure XSMM dispatch and invoke call are in a consistent
-    state and they do not contradict each others.
-  }];
-  let dependentDialects = [ "xsmm::XsmmDialect" ];
-}
 
 def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
   let summary = "Convert linalg to func";
@@ -75,17 +54,6 @@ def VectorContractToOuterproduct : Pass<
                            "vector::VectorDialect"];
 }
 
-
-def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
-  let summary = "Convert xsmm to func";
-  let description = [{
-    Convert XSMM operations to libXSMM function calls.
-  }];
-  let dependentDialects = ["func::FuncDialect",
-                           "memref::MemRefDialect",
-                           "xsmm::XsmmDialect",
-                           "LLVM::LLVMDialect"];
-}
 
 def ConvertCheckToLoops : Pass<"convert-check-to-loops", "func::FuncOp"> {
   let summary = "Convert check to loops";
@@ -224,15 +192,6 @@ def RewriteBatchMatmulToMatmul : Pass<"rewrite-batch-matmul-to-matmul",
   let dependentDialects = ["scf::SCFDialect", "linalg::LinalgDialect"];
 }
 
-def CombineXsmmOpPass : Pass<"combine-xsmm-op-optimization", "func::FuncOp"> {
-  let summary = "Fuse brgemm-add-relu ops into a fused brgemm op";
-  let description =
-      [{Fuse brgemm-add-relu ops into a fused brgemm op}];
-
-  let dependentDialects = ["xsmm::XsmmDialect"];
-
-}
-
 def PropagatePackUnPack : Pass<"propagate-pack-and-unpack", "func::FuncOp"> {
   let summary = "Propagate tensor.pack and tensor.unpack";
   let description = [{
@@ -361,22 +320,6 @@ def GpuDataTransfer : Pass<"gpu-data-transfer", "func::FuncOp"> {
                            "memref::MemRefDialect",
                            "gpu::GPUDialect"];
 }
-
-def FoldXsmmFlags : Pass<"fold-xsmm-flags", "func::FuncOp"> {
-  let summary = "Attempt to fold dispatch op as flags in XSMM.";
-  let description = [{
-    Attempt to fold dispatch operations as flags in consumer dispatch
-    operations, for example:
-    ```mlir
-      %alloc = memref.alloc
-      xsmm.unary zero (%alloc)
-      xsmm.gemm.dispatch (%alloc)
-    ```
-    the zero is folded as `beta_0` in `xsmm.gemm.dispatch`.
-  }];
-  let dependentDialects = [ "memref::MemRefDialect", "xsmm::XsmmDialect" ];
-}
-
 
 def SCFParallelLoopTiling : Pass<"scf-parallel-loop-tiling-pass"> {
   let summary = "Tile parallel loops";
