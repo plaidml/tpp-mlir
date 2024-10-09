@@ -53,7 +53,6 @@
 
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/GPU/Utils.h"
 #include "TPP/PassBundles.h"
 #include "TPP/Passes.h"
@@ -279,7 +278,6 @@ int main(int argc, char **argv) {
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated
   DialectRegistry registry;
-  registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
   registerAllDialects(registry);

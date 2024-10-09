@@ -10,7 +10,6 @@
 #define TPP_DIALECT_XSMM_XSMMUTILS_H
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
-#include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/IR/StructuredOpMatcher.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -65,22 +64,6 @@ struct BinaryInfo {
   int64_t ldo;
 };
 
-/// Represents a chain of XSMM ops that can be fused. All broadcast ops
-/// should have already been converted to flags. All stray allocations
-/// should have already been converted to in-place reuse.
-struct FusedMatch {
-  // This is the (optional) zero op that precedes the GEMM op
-  UnaryOp zeroOp;
-  // This is the BRGEMM op
-  BrgemmOp brgemmOp;
-  // This is the (optional) binary op that follows the GEMM
-  BinaryOp binaryOp;
-  BinaryKind binaryKind;
-  // This is the (optional) unary op that follows the GEMM/Binary
-  UnaryOp unaryOp;
-  UnaryKind unaryKind;
-};
-
 namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
@@ -114,23 +97,12 @@ FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
 
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
 
-FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
-
-ArrayAttr getUnaryDispatchFlags(UnaryOp op);
-
-ArrayAttr getBinaryDispatchFlags(BinaryOp op);
-
 int64_t getOredFlags(ArrayAttr flags);
 
 SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
                                             ValueRange operands);
 SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
                                ValueRange operands, IntegerAttr dataTypeAttr);
-template <typename DispatchOpTy>
-FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
-                                                 DispatchOpTy dispatchOpTy,
-                                                 bool returnNone);
-
 FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
                                          vector::ContractionOp contractOp,
                                          SmallVector<Value> &inputs,

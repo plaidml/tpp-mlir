@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
-#include "TPP/Dialect/Xsmm/XsmmOps.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,7 +19,6 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
-#include <iostream>
 #define DEBUG_TYPE "xsmm-utils"
 
 using namespace mlir;
@@ -345,24 +343,6 @@ FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
   return retval;
 }
 
-void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
-                        ArrayRef<Value> operands, UnaryInfo unaryInfo,
-                        ArrayAttr flags, xsmm::UnaryKindAttr kind) {
-  Location loc = operation->getLoc();
-  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo.m, unaryInfo.n,
-                                               unaryInfo.ldi, unaryInfo.ldo});
-  auto dtype = xsmm::utils::getDataType(rewriter, operands.back().getType());
-  Value dispatched = rewriter.create<xsmm::UnaryDispatchOp>(
-      loc, integer64, kind, dims, flags, dtype);
-  SmallVector<Value> invokeOperands;
-  invokeOperands.push_back(dispatched);
-  invokeOperands.append(operands.begin(), operands.end());
-  rewriter.replaceOpWithNewOp<xsmm::UnaryOp>(operation, dtype, kind,
-                                             invokeOperands);
-}
-
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
   auto elemType = getElementTypeOrSelf(type);
   if (elemType.isBF16())
@@ -638,123 +618,6 @@ FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
   return getBinFlags(shapeOutput, shapeOperand, operandNumber);
 }
 
-FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
-  // The loop is in reverse order, so we deduplicate the list making sure we
-  // only have one type of each
-  SmallVector<Operation *, 4> chain;
-  Operation *prev = nullptr;
-  for (auto *user : op->getUsers()) {
-    // Deduplicate, only take each operation once
-    if (dyn_cast<func::ReturnOp>(user) || user == prev)
-      continue;
-    chain.push_back(user);
-    prev = user;
-
-    // BRGEMM is the last one, we can stop looking
-    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
-      // Make sure the BRGEMM outputs to the chain value
-      // (it could be one of BRGEMM's inputs in the chain)
-      if (brgemmOp.getOperand(3).getDefiningOp() != op)
-        return failure();
-      continue;
-    }
-
-    // Make sure this is a chain, ie. at least once in inputs and outputs
-    int numUses = std::count(user->getOperands().begin(),
-                             user->getOperands().end(), op->getResult(0));
-    // At least one input and the last operand (output) is the same buffer
-    if (((dyn_cast<xsmm::UnaryOp>(user) &&
-          dyn_cast<xsmm::UnaryOp>(user).getCallee() != UnaryKind::ZERO) &&
-         numUses < 2) ||
-        user->getOperands()[user->getOperands().size() - 1] != op->getResult(0))
-      return failure();
-  }
-  // We don't know how to fuse more than two tail ops after and a zero op before
-  // BRGEMM
-  if (chain.size() > 4)
-    return failure();
-  if (!(isa<xsmm::BrgemmOp>(chain[0]) ||
-        (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
-         dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO)))
-    // List is in reverse order, put the brgemm or zero at the top
-    std::reverse(chain.begin(), chain.end());
-
-  // If we haven't found a BRGEMM or zero, this are not the droids we're looking
-  // for
-  if (!(isa<xsmm::BrgemmOp>(chain[0]) ||
-        (dyn_cast<xsmm::UnaryOp>(chain[0]) &&
-         dyn_cast<xsmm::UnaryOp>(chain[0]).getCallee() == UnaryKind::ZERO &&
-         isa<xsmm::BrgemmOp>(chain[1]))))
-    return failure();
-
-  // Now, we're sure we have a chain, but not yet if it has the right types
-  // and in the right order: (ZER0) -> BRGEMM -> BINARY -> UNARY
-  // Allowed patterns are:
-  //  - (ZERO) + GEMM + BINARY
-  //  - (ZERO)+ GEMM + UNARY
-  //  - (ZERO) + GEMM + BINARY + UNARY
-  xsmm::FusedMatch fusedMatch;
-  for (auto *user : chain) {
-    if (auto unaryOp = dyn_cast<xsmm::UnaryOp>(user)) {
-      if (dyn_cast<xsmm::UnaryOp>(user).getCallee() == UnaryKind::ZERO) {
-        fusedMatch.zeroOp = unaryOp;
-        continue;
-      }
-    }
-    if (auto brgemmOp = (dyn_cast<xsmm::BrgemmOp>(user))) {
-      // We only accept one of each
-      if (fusedMatch.brgemmOp)
-        return failure();
-
-      fusedMatch.brgemmOp = brgemmOp;
-      continue;
-    }
-
-    if (auto binOp = (dyn_cast<xsmm::BinaryOp>(user))) {
-      // We only accept one of each
-      if (fusedMatch.binaryOp)
-        return failure();
-
-      // We cannot accept binary *after* unary
-      if (fusedMatch.unaryOp)
-        return failure();
-
-      // For now we only support ADD as binary
-      if (binOp.getCallee() != BinaryKind::ADD)
-        return failure();
-
-      // Make sure the op is new or the same as before
-      fusedMatch.binaryOp = binOp;
-      fusedMatch.binaryKind = binOp.getCallee();
-      continue;
-    }
-
-    if (auto unOp = dyn_cast<xsmm::UnaryOp>(user)) {
-      // We only accept one of each
-      if (fusedMatch.unaryOp)
-        return failure();
-
-      // Binary op may have come earlier, we don't know
-      // We have already made sure it didn't come before this
-      // unary in the binary check above
-
-      // For now we only support RELU as unary
-      if (unOp.getCallee() != UnaryKind::RELU)
-        return failure();
-
-      // Make sure the op is new or the same as before
-      fusedMatch.unaryOp = unOp;
-      fusedMatch.unaryKind = unOp.getCallee();
-      continue;
-    }
-
-    // If found anything else in the users, bail
-    return failure();
-  }
-
-  return fusedMatch;
-}
-
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
   // Not shaped type, the leading dimension is the single scalar.
   auto memref = dyn_cast<MemRefType>(type);
@@ -776,42 +639,6 @@ FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
     return failure();
   return strides[pos];
 }
-
-template <typename DispatchOpTy>
-FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
-                                                 DispatchOpTy dispatchOpTy,
-                                                 bool returnNone) {
-  SmallVector<Attribute> attributes;
-  auto flags = dispatchOpTy.getFlags();
-  for (auto flagItr : flags) {
-    if (flagItr == xsmm::GemmFlagsAttr::get(rewriter.getContext(),
-                                            xsmm::GemmFlags::NONE)) {
-      if (returnNone) {
-        attributes.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
-                                                      xsmm::GemmFlags::NONE));
-        return attributes;
-      } else {
-        return failure();
-      }
-    }
-    attributes.push_back(flagItr);
-  }
-
-  if (attributes.empty())
-    attributes.push_back(
-        xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::NONE));
-  return attributes;
-}
-
-template FailureOr<SmallVector<Attribute>>
-getBrgemmFlags<xsmm::BrgemmDispatchOp>(PatternRewriter &rewriter,
-                                       xsmm::BrgemmDispatchOp dispatchOpTy,
-                                       bool returnNone);
-
-template FailureOr<SmallVector<Attribute>>
-getBrgemmFlags<xsmm::FusedBrgemmDispatchOp>(
-    PatternRewriter &rewriter, xsmm::FusedBrgemmDispatchOp dispatchOpTy,
-    bool returnNone);
 
 static bool isInnerMostDim(OpOperand *operand, unsigned minorDim,
                            vector::ContractionOp contractOp,
