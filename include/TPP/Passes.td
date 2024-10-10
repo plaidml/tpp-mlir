@@ -54,6 +54,23 @@ def VectorizationPass : Pass<"vectorization-pass",
 }
 
 
+
+def BrgemmLinalgTiling : Pass<"tile-brgemm-linalg"> {
+  let summary = "Tile matmul and reduction dimension.";
+  let description = [{
+    Tiles the innermost dimensions of the batch reduce matmul operation. Additionally, it swaps the reduction and k dimension loop. The final loop structure is as follows: M-loop->N-loop->reduction-loop->K-loop.
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect"];
+  let options = [
+         ListOption<"mTileShape", "mTile", "unsigned", "Tile shape for m dim">,
+         ListOption<"nTileShape", "nTile", "unsigned", "Tile shape for n dim">,
+  ];
+}
+
+
+
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
   let description = [{
