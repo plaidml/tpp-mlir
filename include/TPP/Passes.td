@@ -55,8 +55,8 @@ def VectorizationPass : Pass<"vectorization-pass",
 
 
 
-def LinalgTiling : Pass<"tile-linalg"> {
-  let summary = "Tile matmul reduction dimension.";
+def BrgemmLinalgTiling : Pass<"tile-brgemm-linalg"> {
+  let summary = "Tile matmul and reduction dimension.";
   let description = [{
     Tiles the innermost dimensions of the batch reduce matmul operation. Additionally, it swaps the reduction and k dimension loop. The final loop structure is as follows: M-loop->N-loop->reduction-loop->K-loop.
   }];

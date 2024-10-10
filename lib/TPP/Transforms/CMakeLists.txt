@@ -25,7 +25,7 @@ add_mlir_library(TPPTransforms
   FoldIntoEltwise.cpp
   FoldAddIntoDest.cpp
   Vectorization.cpp
-  LinalgTiling.cpp
+  BrgemmLinalgTiling.cpp
   SplitReductionDim.cpp
 
   ADDITIONAL_HEADER_DIRS

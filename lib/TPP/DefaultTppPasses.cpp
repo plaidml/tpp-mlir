@@ -104,7 +104,7 @@ private:
       // TODO: This flag will be removed once the vector path becomes the
       // default lowering path.
       if (linalgToVector) {
-	pm.addNestedPass<func::FuncOp>(createLinalgTiling());
+	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       } else {
