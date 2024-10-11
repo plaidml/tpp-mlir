@@ -1,21 +1,20 @@
-// RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF --allow-empty
+// RUN: tpp-run -e entry --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e entry --entry-point-result=void -seed 123 -print %s > %t.2
+// RUN: fpcmp -a 0.1 %t.1 %t.2
 
-// RUN: tpp-opt %s  | tpp-run -e permA --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permA --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMA --allow-empty
+// RUN: tpp-run -e permA --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permA --entry-point-result=void -seed 123 -print %s > %t.2
+// RUN: fpcmp -a 0.1 %t.1 %t.2
 
-// RUN: tpp-opt %s  | tpp-run -e permB --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permB --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMA --allow-empty
+// RUN: tpp-run -e permB --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permB --entry-point-result=void -seed 123 -print %s > %t.2
+// RUN: fpcmp -a 0.1 %t.1 %t.2
 
-// RUN: tpp-opt %s  | tpp-run -e permAB --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permAB --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMAB --allow-empty
+// RUN: tpp-run -e permAB --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permAB --entry-point-result=void -seed 123 -print %s > %t.2
+// RUN: fpcmp -a 0.1 %t.1 %t.2
 
 
-// DIFF-NOT: {{.}}
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -36,7 +35,6 @@
 
 // -----
 
-// DIFF-PERMA-NOT: {{.}}
 #permA0 = affine_map<(d0, d1, d2) -> (d2, d0)>
 #permA1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #permA2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -57,7 +55,6 @@
 
 // -----
 
-// DIFF-PERMB-NOT: {{.}}
 #permB0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #permB1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #permB2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -78,7 +75,6 @@
 
 // -----
 
-// DIFF-PERMAB-NOT: {{.}}
 #permAB0 = affine_map<(d0, d1, d2) -> (d2, d0)>
 #permAB1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #permAB2 = affine_map<(d0, d1, d2) -> (d0, d1)>

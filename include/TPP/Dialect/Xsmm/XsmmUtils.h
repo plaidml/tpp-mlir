@@ -69,6 +69,7 @@ namespace utils {
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
 
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
+                                  Value inputVectorType, Value outputVectorType,
                                   UnaryFlags inputFlag);
 
 void replaceOpWithUnary(RewriterBase &rewriter, Operation *operation,
@@ -103,11 +104,10 @@ SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
                                             ValueRange operands);
 SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
                                ValueRange operands, IntegerAttr dataTypeAttr);
-FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
-                                         vector::ContractionOp contractOp,
-                                         SmallVector<Value> &inputs,
-                                         SmallVector<Value> &output,
-                                         ArrayRef<AffineMap> indexingMap);
+FailureOr<BrgemmInfo>
+isMappableToBrgemm(PatternRewriter &rewriter, vector::ContractionOp contractOp,
+                   SmallVector<Value> &inputs, SmallVector<Value> &output,
+                   ArrayRef<AffineMap> indexingMap, bool checkTransposes);
 
 FailureOr<vector::ContractionOp>
 makeMinorDimensionsInnerMost(RewriterBase &rewriter,
@@ -120,7 +120,7 @@ FailureOr<xsmm::BrgemmInfo>
 checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
             unsigned m, unsigned n, SmallVector<unsigned, 2> kVector,
             std::optional<unsigned> batchPos, SmallVector<Value> inputs,
-            ArrayRef<AffineMap> indexingMap);
+            ArrayRef<AffineMap> indexingMap, bool checkTransposes);
 
 bool isTwoDTransposeOp(vector::TransposeOp transposeOp);
 
@@ -128,9 +128,11 @@ func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
                                ArrayRef<Value> dispatchOperands,
                                ArrayRef<Type> dispatchOperandTypes,
                                ModuleOp module, FlatSymbolRefAttr fnName);
-func::CallOp buildInvokeCall(RewriterBase &rewriter, Location loc,
-                             ModuleOp module, SmallVector<Value> operands,
-                             StringRef invokeName, DataTypeAttr dtype);
+func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
+                             ModuleOp module, SmallVector<Value> inputOperands,
+                             SmallVector<Value> prependValues, int prependIndex,
+                             SmallVector<Value> operands, StringRef invokeName,
+                             DataTypeAttr dtype, bool getResults = false);
 
 } // namespace utils
 } // namespace xsmm

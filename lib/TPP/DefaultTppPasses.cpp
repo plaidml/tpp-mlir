@@ -15,6 +15,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertTranspose.h"
 #include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Check/CheckDialect.h"
@@ -101,17 +102,19 @@ private:
 
       pm.addNestedPass<func::FuncOp>(createVectorizationPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-      pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
-
-      pm.addPass(createCleanup());
+      if (contractToOuterProduct) {
+        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+        pm.addPass(createCleanup());
+      } else {
+        pm.addPass(createConvertTranspose());
+        pm.addPass(createConvertVectorToXsmm());
+        pm.addPass(createLoopInvariantCodeMotionPass());
+      }
     }
-
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
     LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
-
-    pm.addPass(createConvertVectorToXsmm());
     // Low level parallelization passes.
     pm.addPass(createLowLevelParallelization(LowLevelParallelization));
     // Covert all local TPP-related dialects.

@@ -17,7 +17,6 @@
 // IR-LABEL: copytppbrcast
 func.func @copytppbrcast(%A: tensor<1x6xf32>) -> tensor<9x6xf32>  {
   %B = tensor.empty() : tensor<9x6xf32>
-  // IR: xsmm_unary_invoke
   %O = linalg.generic { indexing_maps = [#map1, #map0],
                         iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<1x6xf32>) outs(%B: tensor<9x6xf32>) {
@@ -30,7 +29,6 @@ func.func @copytppbrcast(%A: tensor<1x6xf32>) -> tensor<9x6xf32>  {
 // IR-LABEL: copytppbrcastother
 func.func @copytppbrcastother(%A: tensor<6x1xf32>) -> tensor<6x9xf32>  {
   %B = tensor.empty() : tensor<6x9xf32>
-  // IR: xsmm_unary_invoke
   %O = linalg.generic { indexing_maps = [#map2, #map0],
                         iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<6x1xf32>) outs(%B: tensor<6x9xf32>) {
@@ -43,7 +41,6 @@ func.func @copytppbrcastother(%A: tensor<6x1xf32>) -> tensor<6x9xf32>  {
 // IR-LABEL: copyscalar
 func.func @copyscalar(%A: f32) -> tensor<6x9xf32>  {
   %B = tensor.empty() : tensor<6x9xf32>
-  // IR: linalg.fill
   %O = linalg.generic { indexing_maps = [#map3, #map0],
                         iterator_types = ["parallel", "parallel"] }
       ins(%A: f32) outs(%B: tensor<6x9xf32>) {
@@ -57,7 +54,6 @@ func.func @copyscalar(%A: f32) -> tensor<6x9xf32>  {
 func.func @copyscalarother(%A: tensor<1x1xf32>) -> tensor<6x9xf32>  {
   %B = tensor.empty() : tensor<6x9xf32>
   // Rank-0 is on input is not matched to xsmm.
-  // IR: linalg.generic
   %O = linalg.generic { indexing_maps = [#map4, #map0],
                         iterator_types = ["parallel", "parallel"] }
       ins(%A: tensor<1x1xf32>) outs(%B: tensor<6x9xf32>) {

@@ -37,7 +37,10 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "unsigned", "Grid-sizes for parallel tasks.">,
     Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
-           "Lower non-constant packs and unpacks reverting any dim permutations.">
+           "Lower non-constant packs and unpacks reverting any dim permutations.">,
+    Option<"contractToOuterProduct", "contract-to-outer-product", 
+	   "bool",/*default=*/"false",
+	   "Convert Contractions to outer product operations.">
   ];
 }
 

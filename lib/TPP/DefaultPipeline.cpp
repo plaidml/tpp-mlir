@@ -57,6 +57,12 @@ llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
     llvm::cl::init(false));
 
+// Control parallelism.
+llvm::cl::opt<bool> contractToOuterProduct(
+    "contract-to-outer-product",
+    llvm::cl::desc("Convert Contractions to Outer Product operations"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -127,8 +133,9 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{
-          linalgToLoops, parallelTaskGrid, lowerPackUnpackWithoutTranspose};
+      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops, parallelTaskGrid,
+                                                lowerPackUnpackWithoutTranspose,
+                                                contractToOuterProduct};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

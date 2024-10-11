@@ -23,6 +23,18 @@ def ConvertVectorToXsmm : Pass<"convert-vector-to-xsmm", "func::FuncOp"> {
   let constructor = "mlir::tpp::createConvertVectorToXsmm()";
 }
 
+def ConvertTranspose : Pass<"convert-transpose-to-xsmm", "func::FuncOp"> {
+  let summary = "Convert transpose to xsmm";
+  let description = [{
+    Convert vector operations to XSMM operations.
+  }];
+  let dependentDialects = ["func::FuncDialect",
+                           "memref::MemRefDialect",
+                           "mlir::vector::VectorDialect",
+                           "LLVM::LLVMDialect"];
+  let constructor = "mlir::tpp::createConvertTranspose()";
+}
+
 
 def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
   let summary = "Convert linalg to func";

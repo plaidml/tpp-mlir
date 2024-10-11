@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
   mlir::tpp::registerTppCompilerPasses();
   mlir::tpp::registerTppPassBundlePasses();
   mlir::tpp::registerConvertVectorToXsmmPass();
+  mlir::tpp::registerConvertTransposePass();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::check::CheckDialect>();

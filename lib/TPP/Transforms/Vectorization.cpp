@@ -10,7 +10,6 @@
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -43,7 +42,7 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
     if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
             xsmm::DataTypeAttr::get(rewriter.getContext(),
                                     xsmm::DataType::BF16) &&
-        linalgOp.getIteratorTypes().size() >= 5 &&
+        linalgOp.getIteratorTypes().size() >= 4 &&
         linalgOp.getNumOperands() == 3) {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
@@ -111,7 +110,7 @@ struct VectorizationPass
     patterns.add<
         LinalgToVector<linalg::BatchReduceMatmulOp>,
         LinalgToVector<linalg::FillOp>, LinalgToVector<linalg::TransposeOp>,
-        LinalgToVector<linalg::BroadcastOp>, LinalgToVector<linalg::CopyOp>>(
+        LinalgToVector<linalg::BroadcastOp>, LinalgToVector<linalg::MatmulOp>, LinalgToVector<linalg::CopyOp>>(
         patterns.getContext());
     patterns.add<LinalgGenericToVector>(patterns.getContext());
   }

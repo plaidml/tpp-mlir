@@ -13,6 +13,7 @@ namespace mlir {
 class Value;
 class OpBuilder;
 class Operation;
+class MemRefType;
 namespace utils {
 
 // Returns true if the value is a constant float or integer.
@@ -29,11 +30,14 @@ bool isZeroOp(Operation *);
 // known.
 FailureOr<SmallVector<int64_t>> getStaticStrides(Value val);
 
+FailureOr<SmallVector<int64_t>> getStaticStrides(MemRefType valueType);
 // Return the offset and ptr for `val`. Assert if `val`
 // is not a memref.
 std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value val,
                                         Location loc);
 
+FailureOr<std::pair<Value, Value>> getPtrFromOp(OpBuilder &builder,
+                                                Value subviewOp, Location loc);
 } // namespace utils
 } // namespace mlir
 

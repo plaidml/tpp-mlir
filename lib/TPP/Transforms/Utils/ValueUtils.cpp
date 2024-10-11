@@ -98,10 +98,7 @@ bool isZeroOp(Operation *defOp) {
       .Default([&](Operation *op) { return false; });
 }
 
-FailureOr<SmallVector<int64_t>> getStaticStrides(Value value) {
-  auto valueType = value.getType();
-  if (!isa<MemRefType>(valueType))
-    return failure();
+FailureOr<SmallVector<int64_t>> getStaticStrides(MemRefType valueType) {
   auto memrefType = cast<MemRefType>(valueType);
   SmallVector<int64_t> strides;
   int64_t offset;
@@ -114,6 +111,13 @@ FailureOr<SmallVector<int64_t>> getStaticStrides(Value value) {
     return failure();
   }
   return strides;
+}
+
+FailureOr<SmallVector<int64_t>> getStaticStrides(Value value) {
+  auto valueType = value.getType();
+  if (!isa<MemRefType>(valueType))
+    return failure();
+  return getStaticStrides(dyn_cast<MemRefType>(valueType));
 }
 
 std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value operand,
@@ -138,6 +142,41 @@ std::pair<Value, Value> getPtrAndOffset(OpBuilder &builder, Value operand,
       alignedPointerAsI64);
   Value offset = meta.getOffset();
   return std::make_pair(alignedPointer, offset);
+}
+
+FailureOr<std::pair<Value, Value>> getPtrFromOp(OpBuilder &builder,
+                                                Value allocaOp, Location loc) {
+  memref::ExtractStridedMetadataOp meta = NULL;
+  LLVM::IntToPtrOp alignedPointer = NULL;
+  for (auto allocaUser = allocaOp.user_begin();
+       allocaUser != allocaOp.user_end(); allocaUser++) {
+    if (isa<memref::ExtractStridedMetadataOp>(*allocaUser)) {
+      meta = dyn_cast<memref::ExtractStridedMetadataOp>(*allocaUser);
+    } else if (isa<memref::ExtractAlignedPointerAsIndexOp>(*allocaUser)) {
+      auto alignedPointerAsIndex =
+          dyn_cast<memref::ExtractAlignedPointerAsIndexOp>((*allocaUser));
+      if (alignedPointerAsIndex->user_begin() !=
+              alignedPointerAsIndex->user_end() &&
+          isa<arith::IndexCastOp>(*(*alignedPointerAsIndex->user_begin()))) {
+        auto alignedPointerAsI64 =
+            dyn_cast<arith::IndexCastOp>(*alignedPointerAsIndex->user_begin());
+        if (alignedPointerAsI64->user_begin() !=
+                alignedPointerAsI64->user_end() &&
+            isa<LLVM::IntToPtrOp>(*alignedPointerAsI64->user_begin())) {
+          alignedPointerAsI64->user_begin()->dump();
+          alignedPointer =
+              dyn_cast<LLVM::IntToPtrOp>(*alignedPointerAsI64->user_begin());
+        }
+      }
+    }
+  }
+  if (alignedPointer != NULL && meta != NULL) {
+    Value ptr = alignedPointer;
+    Value offset = meta.getOffset();
+    return std::make_pair(ptr, offset);
+  } else {
+    return failure();
+  }
 }
 
 } // namespace utils

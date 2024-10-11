@@ -66,13 +66,11 @@ func.func @entry(%A: tensor<4x8xf32>,
 // MID-DAG: memref.global "private" @__wrapper_0 : memref<4x8xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 // MID-DAG: memref.global "private" constant @__constant_8x4xf32 : memref<8x4xf32> = dense<1.000000e+00> {alignment = 64 : i64}
 // MID-LABEL: @_entry
-// MID: memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
-// MID: call @xsmm_gemm_dispatch
+// MID-DAG: memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
+// MID-DAG: call @xsmm_gemm_dispatch
 // MID: call @xsmm_gemm_invoke
-// MID: linalg.generic
-// MID:   arith.addf
-// MID-DAG: @xsmm_gemm_invoke
-// MID-DAG: @xsmm_gemm_dispatch
+// MID-DAG: func.func private @xsmm_gemm_invoke
+// MID-DAG: func.func private @xsmm_gemm_dispatch
 // MID-LABEL: @entry
 // MID-DAG: memref.get_global @__wrapper_0 : memref<4x8xf32>
 // MID-DAG: memref.get_global @__wrapper_1 : memref<4x4xf32>
@@ -85,14 +83,18 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LATE-DAG: memref.global "private" @__wrapper_0 : memref<4x8xf32> = dense<1.000000e+00> {alignment = 128 : i64}
 // LATE-DAG: memref.global "private" constant @__constant_8x4xf32 : memref<8x4xf32> = dense<1.000000e+00> {alignment = 64 : i64}
 // LATE-LABEL: @_entry
-// LATE:   memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
-// LATE:   call @xsmm_gemm_dispatch
+// LATE-DAG:   memref.get_global @__constant_8x4xf32 : memref<8x4xf32>
+// LATE-DAG:   call @xsmm_gemm_dispatch
 // LATE:   call @xsmm_gemm_invoke
 // LATE:   scf.for
+// LATE:     vector.transfer_read
+// LATE:     memref.store
+// LATE:   arith.addf
+// LATE:   scf.for
 // LATE:     memref.load
-// LATE:     arith.addf
-// LATE-DAG: @xsmm_gemm_invoke
-// LATE-DAG: @xsmm_gemm_dispatch
+// LATE:     vector.transfer_write
+// LATE-DAG: func.func private @xsmm_gemm_invoke
+// LATE-DAG: func.func private @xsmm_gemm_dispatch
 // LATE-LABEL: @entry
 // LATE-DAG: memref.get_global @__wrapper_0 : memref<4x8xf32>
 // LATE-DAG: memref.get_global @__wrapper_1 : memref<4x4xf32>
@@ -112,8 +114,12 @@ func.func @entry(%A: tensor<4x8xf32>,
 // LLVM:    llvm.mul
 // LLVM:    llvm.add
 // LLVM:    llvm.load
-// LLVM:    llvm.fadd
+// LLVM:    llvm.store
 // LLVM:  [[LATCH]]:
+// LLVM:    llvm.fadd
+// LLVM:    llvm.fadd
+// LLVM:    llvm.fadd
+// LLVM:    llvm.fadd
 // LLVM-LABEL: @entry
 // LLVM:   llvm.call @_entry
 

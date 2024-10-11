@@ -7,18 +7,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
+#include "TPP/Transforms/Utils/BuilderUtils.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/Compiler.h"
+#include <map>
 #define DEBUG_TYPE "xsmm-utils"
 
 using namespace mlir;
@@ -31,6 +36,7 @@ namespace utils {
 
 // Callable object to verify if `operand` has static shape.
 struct HasStaticShape {
+  SmallVectorImpl<int64_t> *shape = nullptr;
   HasStaticShape() = default;
   HasStaticShape(SmallVectorImpl<int64_t> *shape) : shape(shape){};
 
@@ -46,12 +52,12 @@ struct HasStaticShape {
     }
     return true;
   }
-  SmallVectorImpl<int64_t> *shape = nullptr;
 };
 
 // Callable object to verify if `operand` has static strides.
 // If `operand` is a tensor type or a scalar, return true.
 struct HasStaticStrides {
+  SmallVectorImpl<int64_t> *strides = nullptr;
   HasStaticStrides() = default;
   HasStaticStrides(SmallVector<int64_t> *strides) : strides(strides){};
 
@@ -72,7 +78,6 @@ struct HasStaticStrides {
     }
     return true;
   }
-  SmallVectorImpl<int64_t> *strides = nullptr;
 };
 
 // Structural matcher.
@@ -91,6 +96,7 @@ checkStructure(vector::ContractionOp contractOp, SmallVector<Value> &inputs,
        !HasStaticStrides()(outputs[0], outputs[0].getDefiningOp()))) {
     return failure();
   }
+
   return inferContractionDims(indexingMap);
 }
 
@@ -154,12 +160,12 @@ FailureOr<xsmm::BrgemmInfo>
 checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
             unsigned m, unsigned n, SmallVector<unsigned, 2> kVector,
             std::optional<unsigned> batchPos, SmallVector<Value> inputs,
-            ArrayRef<AffineMap> indexingMap) {
+            ArrayRef<AffineMap> indexingMap, bool checkForTransposes) {
   Value operandA = inputs[0];
   Value operandB = inputs[1];
   Value operandC = inputs[2];
 
-  unsigned k;
+  unsigned k = kVector[0];
   if (*xsmm::utils::getPosInCodomain(
           kVector[0], contractOp->getOpOperand(1).get(), contractOp,
           contractOp.getIndexingMapsArray()[1]) <
@@ -171,99 +177,184 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
   } else if (kVector.size() > 1) {
     k = kVector[1];
   }
+  auto checkStridesAndGetLdaAndBatch =
+      [&](Value operand, AffineMap map, AffineMap transformMap,
+          int operandIndex, std::map<bool, std::pair<int, int>> dimMap,
+          std::optional<int> batchPos) -> FailureOr<std::pair<int64_t, int>> {
+    AffineMap indexingMap = map;
+    bool permutation = false;
+    if (map != transformMap) {
+      Value source = operand.getDefiningOp()->getOperand(0);
+      auto partialIndexingMap = inversePermutation(compressUnusedDims(map));
+      if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
+        if (checkForTransposes) {
+          auto invokeOpSource =
+              mlir::utils::getPtrFromOp(rewriter, source, source.getLoc());
+          if (succeeded(invokeOpSource)) {
+            auto invokeOp = dyn_cast<mlir::func::CallOp>(
+                *(*invokeOpSource->first.user_begin()));
+            auto dispatchOp = invokeOp->getOperand(1).getDefiningOp();
+            int constVal =
+                dyn_cast<IntegerAttr>(dyn_cast<arith::ConstantOp>(
+                                          dyn_cast<func::CallOp>(dispatchOp)
+                                              .getOperand(0)
+                                              .getDefiningOp())
+                                          .getValue())
+                    .getInt();
+            if (constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                                     xsmm::UnaryKind::VNNI2)
+                                .getInt() ||
+                constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                                     xsmm::UnaryKind::TRANSPOSE)
+                                .getInt()) {
+              partialIndexingMap = inversePermutation(partialIndexingMap);
+            }
 
-  auto checkStridesAndGetLda = [&](unsigned minorDim, unsigned majorDim,
-                                   Value operand, AffineMap map,
-                                   int operandIndex) -> FailureOr<int64_t> {
-    auto minorDimPosInCodomain =
-        xsmm::utils::getPosInCodomain(minorDim, operand, contractOp, map);
-    auto majorDimPosInCodomain =
-        xsmm::utils::getPosInCodomain(majorDim, operand, contractOp, map);
+            indexingMap =
+                transformMap.compose(partialIndexingMap.getMinorIdentityMap(
+                    map.getNumDims(), map.getNumDims(), rewriter.getContext()));
+            permutation = true;
+          }
+        }
+      }
+    }
+    int minorDim = dimMap[permutation].first;
+    int majorDim = dimMap[permutation].second;
+    auto minorDimPosInCodomain = xsmm::utils::getPosInCodomain(
+        minorDim, operand, contractOp, indexingMap);
+    auto majorDimPosInCodomain = xsmm::utils::getPosInCodomain(
+        majorDim, operand, contractOp, indexingMap);
     if (!minorDimPosInCodomain || !majorDimPosInCodomain) {
       return failure();
     }
+
     auto dataType = xsmm::utils::getDataType(rewriter, operand.getType());
+    MemRefType type;
+    if (operand.getDefiningOp() != NULL) {
+
+      if (isa<memref::ExpandShapeOp>(operand.getDefiningOp()) ||
+          isa<memref::SubViewOp>(operand.getDefiningOp())) {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getResult(0).getType());
+      } else if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getOperand(0).getType());
+      } else if (isa<MemRefType>(operand.getType())) {
+        type = dyn_cast<MemRefType>(operand.getType());
+      } else {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getOperand(0).getType());
+      }
+    }
+    auto shape = type.getShape();
+    if (permutation) {
+      shape = applyPermutationMap<int64_t>(compressUnusedDims(indexingMap),
+                                           type.getShape());
+      type = MemRefType::get(
+          {shape}, dyn_cast<ShapedType>(operand.getType()).getElementType());
+    }
     FailureOr<SmallVector<int64_t>> stridesOnOperand;
     if (dataType == xsmm::DataTypeAttr::get(contractOp.getContext(),
                                             xsmm::DataType::BF16) &&
         operandIndex == 1) {
-      stridesOnOperand =
-          getVNNIStaticStrides(dyn_cast<MemRefType>(operand.getType()));
+      stridesOnOperand = getVNNIStaticStrides(type);
     } else {
-      stridesOnOperand = ::mlir::utils::getStaticStrides(operand);
+      stridesOnOperand = ::mlir::utils::getStaticStrides(type);
     }
     if (failed(stridesOnOperand) ||
-        (dataType == xsmm::DataTypeAttr::get(contractOp.getContext(),
-                                             xsmm::DataType::BF16) &&
-         operandIndex == 0 &&
-         (*stridesOnOperand)[*minorDimPosInCodomain] != 2) ||
         ((dataType != xsmm::DataTypeAttr::get(contractOp.getContext(),
                                               xsmm::DataType::BF16) &&
           (*stridesOnOperand)[*minorDimPosInCodomain] != 1))) {
       return failure();
     }
+
+    auto stride = 1;
+    if (batchPos >= 0) {
+      auto batchPosCodomainA =
+          getPosInCodomain(batchPos.value(), operand, contractOp, indexingMap);
+      auto stridesOnA = ::mlir::utils::getStaticStrides(type);
+      if (succeeded(stridesOnA)) {
+        stride = (*stridesOnA)[*batchPosCodomainA];
+      }
+    }
     if (dataType == xsmm::DataTypeAttr::get(contractOp.getContext(),
                                             xsmm::DataType::BF16) &&
         operandIndex == 1) {
-      return (*stridesOnOperand)[*majorDimPosInCodomain + 1];
+      if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
+        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain + 1],
+                              stride);
+      } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 1) {
+        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain - 1],
+                              stride);
+      } else {
+        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain],
+                              stride);
+      }
     } else {
-      return (*stridesOnOperand)[*majorDimPosInCodomain];
+      return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain],
+                            stride);
     }
   };
-  // A(m, k)
-  auto lda = checkStridesAndGetLda(k, m, operandA, indexingMap[0], 0);
-  if (failed(lda)) {
+
+  std::map<bool, std::pair<int, int>> ldaIndexMap;
+  ldaIndexMap[false] = std::make_pair(k, m);
+  ldaIndexMap[true] = std::make_pair(n, k);
+  auto ldaVal = checkStridesAndGetLdaAndBatch(
+      operandA, indexingMap[0], indexingMap[1], 0, ldaIndexMap, batchPos);
+
+  if (failed(ldaVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute lda\n");
     return failure();
   }
+  auto lda = (*ldaVal).first;
+  auto strideA = (*ldaVal).second;
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
                              "mm] Strides on "
-                             "A: OK\n");
+                             "A: OK "
+                          << lda << "\n");
 
-  // B(k, n)
-  auto ldb = checkStridesAndGetLda(n, k, operandB, indexingMap[1], 1);
-  if (failed(ldb)) {
+  std::map<bool, std::pair<int, int>> ldbIndexMap;
+  ldbIndexMap[false] = std::make_pair(n, k);
+  ldbIndexMap[true] = std::make_pair(k, m);
+  auto ldbVal = checkStridesAndGetLdaAndBatch(
+      operandB, indexingMap[1], indexingMap[0], 1, ldbIndexMap, batchPos);
+
+  if (failed(ldbVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldb\n");
-
     return failure();
   }
+  auto ldb = (*ldbVal).first;
+  auto strideB = (*ldbVal).second;
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
                              "mm] Strides on "
-                             "B: OK\n");
+                             "B: OK "
+                          << ldb << "\n");
 
   // C(m, n)
-  auto ldc = checkStridesAndGetLda(n, m, operandC, indexingMap[2], 2);
-  if (failed(ldc)) {
+  std::map<bool, std::pair<int, int>> ldcIndexMap;
+  ldcIndexMap[true] = std::make_pair(n, m);
+  ldcIndexMap[false] = std::make_pair(n, m);
+  int batch = -1;
+  auto ldcVal = checkStridesAndGetLdaAndBatch(
+      operandC, indexingMap[2], indexingMap[2], 2, ldcIndexMap, batch);
+  if (failed(ldcVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldc\n");
     return failure();
   }
+  auto ldc = (*ldcVal).first;
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
                              "mm] Strides on "
-                             "C: OK\n");
-
-  int64_t strideA = 1;
-  int64_t strideB = 1;
-  if (batchPos) {
-    auto batchPosCodomainA = getPosInCodomain(batchPos.value(), operandA,
-                                              contractOp, indexingMap[0]);
-    auto stridesOnA = ::mlir::utils::getStaticStrides(operandA);
-    strideA = (*stridesOnA)[*batchPosCodomainA];
-
-    auto batchPosCodomainB = getPosInCodomain(batchPos.value(), operandB,
-                                              contractOp, indexingMap[1]);
-    auto stridesOnB = ::mlir::utils::getStaticStrides(operandB);
-    strideB = (*stridesOnB)[*batchPosCodomainB];
-  }
+                             "C: OK "
+                          << ldc << "\n");
 
   auto loops = computeStaticLoopSizes(contractOp, indexingMap);
   int64_t batchVal = (batchPos) ? loops[batchPos.value()] : 0;
-
   auto loopsK = 1;
   for (auto kItr : kVector)
     loopsK *= loops[kItr];
 
-  xsmm::BrgemmInfo info{loops[m], loops[n], loopsK,  batchVal, *lda,
-                        *ldb,     *ldc,     strideA, strideB};
+  xsmm::BrgemmInfo info{loops[m], loops[n], loopsK,  batchVal, lda,
+                        ldb,      ldc,      strideA, strideB};
   return info;
 }
 
@@ -289,11 +380,10 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
 // -- the stride of the
 // minor dimension for C, n
 // is 1.
-FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
-                                         vector::ContractionOp contractOp,
-                                         SmallVector<Value> &inputs,
-                                         SmallVector<Value> &output,
-                                         ArrayRef<AffineMap> indexingMap) {
+FailureOr<BrgemmInfo>
+isMappableToBrgemm(PatternRewriter &rewriter, vector::ContractionOp contractOp,
+                   SmallVector<Value> &inputs, SmallVector<Value> &output,
+                   ArrayRef<AffineMap> indexingMap, bool checkForTransposes) {
   auto contractionDims =
       checkStructure(contractOp, inputs, output, indexingMap);
   if (failed(contractionDims)) {
@@ -308,14 +398,32 @@ FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
   unsigned n = contractionDims->n.back();
   SmallVector<unsigned, 2> kVector;
   std::optional<unsigned> batch;
+  auto pos = xsmm::utils::getPosInCodomain(
+      contractionDims->k[0], inputs[0], contractOp,
+      contractOp.getIndexingMapsArray()[0]);
+  int index = 0;
   if (contractionDims->k.size() >= 2) {
-    for (size_t i = 1; i < contractionDims->k.size(); i++)
+    for (int i = 1; i < contractionDims->k.size(); i++) {
+      auto posTwo = xsmm::utils::getPosInCodomain(
+          contractionDims->k[i], inputs[0], contractOp,
+          contractOp.getIndexingMapsArray()[0]);
+      if (*posTwo < *pos) {
+        index = i;
+        pos = posTwo;
+      }
+    }
+  }
+  if (contractionDims->k.size() >= 2) {
+    batch = contractionDims->k[index];
+    for (int i = 0; i < contractionDims->k.size(); i++) {
+      if (i == index)
+        continue;
       kVector.push_back(contractionDims->k[i]);
+    }
   } else {
     for (size_t i = 0; i < contractionDims->k.size(); i++)
       kVector.push_back(contractionDims->k[i]);
   }
-
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
                              "mm] Candidate "
                              "dims: "
@@ -335,7 +443,7 @@ FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
                                "gemm] no batch "
                                "dim\n");
   auto retval = checkAccess(rewriter, contractOp, m, n, kVector, batch, inputs,
-                            indexingMap);
+                            indexingMap, checkForTransposes);
   if (failed(retval)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to check access\n");
     return failure();
@@ -351,8 +459,9 @@ DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
 }
 
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
+                                  Value inputVectorType, Value outputVectorType,
                                   UnaryFlags inputFlag) {
-  Type outputType = output.getType();
+  Type outputType = outputVectorType.getType();
 
   assert(isa<ShapedType>(outputType));
   auto outputShapedType = cast<ShapedType>(outputType);
@@ -362,37 +471,27 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   }
 
   UnaryInfo unaryInfo;
-  unaryInfo.m = outputShapedType.getShape()[0];
-  unaryInfo.n = outputShapedType.getShape()[1];
-
-  int64_t ldi = 1;
+  unaryInfo.m = outputShapedType.getShape()[1];
+  unaryInfo.n = outputShapedType.getShape()[0];
+  int ldi = 1;
   if (ShapedType inputShapedType = dyn_cast<ShapedType>(input.getType())) {
-    auto stridesOnInput = mlir::utils::getStaticStrides(input);
-    if (failed(stridesOnInput) || stridesOnInput->back() != 1 ||
-        !inputShapedType.hasStaticShape()) {
-      return failure();
-    }
-
-    // If we are broascasting a row into cols, the leading
-    // dimension is 1, same for scalar broadcast.
-    if (inputFlag == UnaryFlags::BCAST_ROW ||
-        inputFlag == UnaryFlags::BCAST_SCALAR) {
-      ldi = 1;
-    }
-    // If we are broascasting a col into rows, the leading
-    // dimension is the size of the tensor.
-    else if (inputFlag == UnaryFlags::BCAST_COL) {
-      ldi = inputShapedType.getShape().back();
-    } else {
-      ldi = stridesOnInput->front();
-    }
+    SmallVector<int64_t> strides;
+    int64_t offset;
+    getStridesAndOffset(dyn_cast<MemRefType>(inputShapedType), strides, offset);
+    ldi = strides.front();
   }
-  auto stridesOnOutput = mlir::utils::getStaticStrides(output);
-  if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
-    return failure();
 
   unaryInfo.ldi = ldi;
-  unaryInfo.ldo = stridesOnOutput->front();
+  int ldo = 1;
+  if (ShapedType outputShapedType = dyn_cast<ShapedType>(output.getType())) {
+    SmallVector<int64_t> strides;
+    int64_t offset;
+    auto memrefType = MemRefType::get(outputShapedType.getShape(),
+                                      outputShapedType.getElementType());
+    getStridesAndOffset(memrefType, strides, offset);
+    ldo = strides.front();
+  }
+  unaryInfo.ldo = ldo;
   return unaryInfo;
 }
 
@@ -652,7 +751,6 @@ static bool isInnerMostDim(OpOperand *operand, unsigned minorDim,
   }
   return minorDim == rank - 1;
 }
-
 // Emit a transpose operation for `operand` by swapping `dim` with `newDim`.
 // Emit a transpose operation for `operand` by swapping the dimensions at index
 // `dim` with `newDim`.
@@ -662,7 +760,6 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
                                    int operandNumber) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(contractOp);
-
   Location loc = contractOp.getLoc();
   auto operandType = cast<ShapedType>(operand.getType());
   auto rank = operandType.getRank();
@@ -673,34 +770,76 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
   LLVM_DEBUG(llvm::interleaveComma(
       permutation, llvm::dbgs() << "[emitTransposeOnOperand] Perm: "));
   LLVM_DEBUG(llvm::dbgs() << "\n");
-
   applyPermutationToVector<int64_t>(shape, permutation);
   auto vectorType = VectorType::get(
       shape, cast<ShapedType>(operand.getType()).getElementType());
-  Value transposeResult = rewriter.create<vector::TransposeOp>(
-      loc, vectorType, operand, permutation);
 
-  SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
-  AffineMap operandMap = indexingMaps[operandNumber];
-  LLVM_DEBUG(llvm::dbgs() << "[emitTransposeOnOperand] Old map: " << operandMap
-                          << "\n");
-  SmallVector<AffineExpr> mapResults = llvm::to_vector(operandMap.getResults());
-  applyPermutationToVector<AffineExpr>(mapResults, permutation);
-  AffineMap newMap =
-      AffineMap::get(operandMap.getNumDims(), operandMap.getNumSymbols(),
-                     mapResults, contractOp.getContext());
-  LLVM_DEBUG(llvm::dbgs() << "[emitTransposeOnOperand] New map: " << newMap
-                          << "\n");
-  indexingMaps[operandNumber] = newMap;
-  // TODO: We probably cannot update the result in place.
+  vector::TransposeOp transposeResult = rewriter.create<vector::TransposeOp>(
+      loc, vectorType, operand, permutation);
+  /*  auto writeMemrefSubviewDefinition =
+        operand.getDefiningOp()->getOperand(0).getDefiningOp();
+    assert(isa<memref::SubViewOp>(writeMemrefSubviewDefinition));
+    auto writeMemrefSubview =
+    dyn_cast<memref::SubViewOp>(writeMemrefSubviewDefinition); auto
+    writeMemrefDefinition =
+        operand.getDefiningOp()->getOperand(0).getDefiningOp()->getOperand(0);*/
+  /*  auto memref = rewriter.create<memref::AllocaOp>(
+        operand.getLoc(),
+        MemRefType::get(
+            dyn_cast<ShapedType>(writeMemrefDefinition.getType()).getShape(),
+            operandType.getElementType()));
+    auto writeSubviewType = MemRefType::get(
+        dyn_cast<ShapedType>(writeMemrefSubview.getResult().getType()).getShape(),
+        dyn_cast<MemRefType>(writeMemrefSubview.getType()).getElementType());
+
+    auto [originalStride, originalOffset] = getStridesAndOffset(
+        dyn_cast<MemRefType>(writeMemrefSubview.getResult().getType()));
+    writeSubviewType = MemRefType::get(
+        dyn_cast<ShapedType>(writeMemrefSubview.getResult().getType()).getShape(),
+        dyn_cast<MemRefType>(writeSubviewType).getElementType(),
+        StridedLayoutAttr::get(rewriter.getContext(), ShapedType::kDynamic,
+                               originalStride));
+
+    auto writeMemrefSubviewOp = rewriter.create<memref::SubViewOp>(
+        operand.getLoc(), dyn_cast<MemRefType>(writeSubviewType), memref,
+        writeMemrefSubview.getOffsets(), writeMemrefSubview.getSizes(),
+        writeMemrefSubview.getStrides(), writeMemrefSubview.getStaticOffsets(),
+        writeMemrefSubview.getStaticSizes(),
+    writeMemrefSubview.getStaticStrides());
+   */
+  SmallVector<Value> indices(vectorType.getRank(),
+                             rewriter.create<arith::ConstantIndexOp>(loc, 0));
+
+  auto memref = rewriter.create<memref::AllocaOp>(
+      operand.getLoc(),
+      MemRefType::get(
+          dyn_cast<ShapedType>(vectorType).getShape(),
+          dyn_cast<ShapedType>(operand.getType()).getElementType()));
+
+  auto transferWrite = rewriter.create<vector::TransferWriteOp>(
+      operand.getLoc(), transposeResult->getResult(0), memref, indices);
+
+  SmallVector<AffineMap> transposeIndexingMaps =
+      contractOp.getIndexingMapsArray();
+
+  rewriter.setInsertionPoint(contractOp);
+
+  Value transferRead = rewriter.create<vector::TransferReadOp>(
+      operand.getLoc(), vectorType, memref, indices);
+
+  contractOp->setOperand(operandNumber, transferRead);
+
+  auto map = AffineMap::getPermutationMap(permutation, rewriter.getContext());
+  map = map.compose(contractOp.getIndexingMapsArray()[operandNumber]);
+
+  transposeIndexingMaps[operandNumber] = map;
   rewriter.modifyOpInPlace(contractOp, [&]() {
-    contractOp->setOperand(operandNumber, transposeResult);
-    contractOp.setIndexingMapsAttr(
-        ArrayAttr::get(contractOp.getContext(),
-                       llvm::to_vector(llvm::map_range(
-                           indexingMaps, [](AffineMap map) -> Attribute {
-                             return AffineMapAttr::get(map);
-                           }))));
+    contractOp.setIndexingMapsAttr(ArrayAttr::get(
+        contractOp.getContext(),
+        llvm::to_vector(llvm::map_range(transposeIndexingMaps,
+                                        [](AffineMap map) -> Attribute {
+                                          return AffineMapAttr::get(map);
+                                        }))));
   });
 }
 
@@ -726,7 +865,6 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
         << "[makeMinorDimensionsInnerMost] did not find minor dims for A\n");
     return failure();
   }
-
   auto minorNInCodomainOpB = xsmm::utils::getPosInCodomain(
       n, operandB->get(), contractOp, contractOp.getIndexingMapsArray()[1]);
   auto minorKInCodomainOpB = xsmm::utils::getPosInCodomain(
@@ -737,7 +875,6 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
         << "[makeMinorDimensionsInnerMost] did not find minor dims for B\n");
     return failure();
   }
-
   auto minorNInCodomainOpC = xsmm::utils::getPosInCodomain(
       n, operandC.get(), contractOp, contractOp.getIndexingMapsArray()[2]);
   auto minorMInCodomainOpC = xsmm::utils::getPosInCodomain(
@@ -748,19 +885,18 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
         << "[makeMinorDimensionsInnerMost] did not find minor dims for C\n");
     return failure();
   }
-
   if (!isInnerMostDim(&operandC, *minorNInCodomainOpC, contractOp, type, 2)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for C\n");
-    assert(
-        isInnerMostDim(&operandC, *minorMInCodomainOpC, contractOp, type, 2));
-    if (isInnerMostDim(operandA, *minorKInCodomainOpA, contractOp, type, 0)) {
-      emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
-                             *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
-    }
-    if (isInnerMostDim(operandB, *minorNInCodomainOpB, contractOp, type, 1)) {
-      emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
-                             *minorNInCodomainOpB, *minorKInCodomainOpB, 1);
+    if (isInnerMostDim(&operandC, *minorMInCodomainOpC, contractOp, type, 2)) {
+      if (isInnerMostDim(operandA, *minorKInCodomainOpA, contractOp, type, 0)) {
+        emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
+                               *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
+      }
+      if (isInnerMostDim(operandB, *minorNInCodomainOpB, contractOp, type, 1)) {
+        emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
+                               *minorNInCodomainOpB, *minorKInCodomainOpB, 1);
+      }
     }
     // Avoid transpose on the output by swapping A and B.
     OpOperand *operandA = &contractOp->getOpOperand(0);
@@ -784,16 +920,18 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
   if (!isInnerMostDim(operandA, *minorKInCodomainOpA, contractOp, type, 0)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
-    assert(isInnerMostDim(operandA, *minorMInCodomainOpA, contractOp, type, 0));
-    emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
-                           *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
+    if (isInnerMostDim(operandA, *minorMInCodomainOpA, contractOp, type, 0)) {
+      emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
+                             *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
+    }
   }
   if (!isInnerMostDim(operandB, *minorNInCodomainOpB, contractOp, type, 1)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
-    assert(isInnerMostDim(operandB, *minorKInCodomainOpB, contractOp, type, 1));
-    emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
-                           *minorKInCodomainOpB, *minorNInCodomainOpB, 1);
+    if (isInnerMostDim(operandB, *minorKInCodomainOpB, contractOp, type, 1)) {
+      emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
+                             *minorKInCodomainOpB, *minorNInCodomainOpB, 1);
+    }
   }
   return contractOp;
 }
@@ -812,12 +950,10 @@ bool isTwoDTransposeOp(vector::TransposeOp transposeOp) {
 // Extract the operands to be used in the function call. For each memref operand
 // extract the aligned pointer and the offset.
 SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
-                               ValueRange operands, IntegerAttr dataTypeAttr) {
+                               ValueRange operands, IntegerAttr dataTypeAttr,
+                               Operation *parentOp, bool getResults) {
   SmallVector<Value> res;
-  IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
-  res.push_back(
-      builder.create<arith::ConstantOp>(loc, integer64, dataTypeAttr));
-
+  builder.setInsertionPoint(parentOp);
   for (Value operand : operands) {
     auto memrefType = dyn_cast<MemRefType>(operand.getType());
     if (!memrefType) {
@@ -835,8 +971,6 @@ SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
                                             ValueRange operands) {
   SmallVector<Type> results;
   // One extra operand for datatype
-  IntegerType integer64 = IntegerType::get(builder.getContext(), 64);
-  results.push_back(integer64);
   for (Value operand : operands) {
     Type operandType = operand.getType();
     if (auto memrefType = dyn_cast<MemRefType>(operandType)) {
@@ -884,17 +1018,40 @@ func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
     funcOp.setPrivate();
   }
 
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointAfter(dispatchOperands.back().getDefiningOp());
+
   func::CallOp call = rewriter.create<func::CallOp>(
       loc, fnName.getValue(), IntegerType::get(rewriter.getContext(), 64),
       dispatchOperands);
   return call;
 }
 
-func::CallOp buildInvokeCall(RewriterBase &rewriter, Location loc,
-                             ModuleOp module, SmallVector<Value> operandRange,
-                             StringRef invokeName, DataTypeAttr dtype) {
-  auto libFnType = rewriter.getFunctionType(
-      xsmm::utils::extractInvokeOperandTypes(rewriter, operandRange), {});
+func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
+                             ModuleOp module, SmallVector<Value> inputRange,
+                             SmallVector<Value> prependOperands,
+                             int prependIndex, SmallVector<Value> operandRange,
+                             StringRef invokeName, DataTypeAttr dtype,
+                             bool getResult) {
+  SmallVector<Value> finalOperands;
+  finalOperands.append(operandRange.begin(), operandRange.end());
+  SmallVector<Value> extraOperands;
+  int i = 0;
+  while (i < inputRange.size()) {
+    if (i == prependIndex) {
+      extraOperands.append(prependOperands.begin(), prependOperands.end());
+    }
+    extraOperands.push_back(inputRange[i]);
+    i++;
+  }
+  if (prependIndex >= 0 && inputRange.size() == 0) {
+    extraOperands.append(prependOperands.begin(), prependOperands.end());
+  }
+  finalOperands.append(extraOperands.begin(), extraOperands.end());
+  SmallVector<Type> invokeTypes =
+      xsmm::utils::extractInvokeOperandTypes(rewriter, finalOperands);
+  auto loc = parentOp->getLoc();
+  auto libFnType = rewriter.getFunctionType(invokeTypes, {});
   FlatSymbolRefAttr fnName =
       SymbolRefAttr::get(rewriter.getContext(), invokeName);
 
@@ -908,9 +1065,12 @@ func::CallOp buildInvokeCall(RewriterBase &rewriter, Location loc,
     funcOp.setPrivate();
   }
 
-  func::CallOp call = rewriter.create<func::CallOp>(
-      loc, fnName, TypeRange(),
-      xsmm::utils::getOperands(rewriter, loc, operandRange, dtype));
+  SmallVector<Value> operands = xsmm::utils::getOperands(
+      rewriter, loc, finalOperands, dtype, parentOp, getResult);
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(parentOp);
+  func::CallOp call =
+      rewriter.create<func::CallOp>(loc, fnName, TypeRange(), operands);
 
   return call;
 }

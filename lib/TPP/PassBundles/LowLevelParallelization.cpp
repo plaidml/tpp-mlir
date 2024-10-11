@@ -64,5 +64,6 @@ private:
     mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
     tilingOptions.tileSizes = parallelTaskGrid;
     pm.addPass(createSCFParallelLoopTiling(tilingOptions));
+    pm.addPass(createLoopInvariantCodeMotionPass());
   }
 };
