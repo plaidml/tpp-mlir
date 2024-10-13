@@ -9,7 +9,6 @@
 // This file implements parallel loop insertion for tiling.
 //
 //===----------------------------------------------------------------------===//
-#include "TPP/IR/TilingUtils.h"
 #include "TPP/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
@@ -29,7 +28,6 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/Support/Debug.h"
-#include <iostream>
 #define DEBUG_TYPE "brgemm-linalg-tiling"
 
 namespace mlir {

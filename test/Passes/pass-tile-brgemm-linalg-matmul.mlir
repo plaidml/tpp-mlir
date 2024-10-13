@@ -1,5 +1,5 @@
 
-// RUN: tpp-opt %s --tile-brgemm-linalg="mTile=8,8 nTile=8,16" --split-input-file  | FileCheck %s
+// RUN: tpp-opt %s --tile-brgemm-linalg="lhsTile=8,8 rhsTile=8,16" --split-input-file  | FileCheck %s
 
 module {
   func.func @entry(%arg0: memref<16x32x16x32xf32>, %arg1: memref<32x32x32x32xf32>, %arg2: memref<16x32x16x32xf32>) {
@@ -48,7 +48,7 @@ module {
 // -----
 
 
-// RUN: tpp-opt %s --tile-brgemm-linalg="mTile=8,8 nTile=8,16" --split-input-file | FileCheck %s
+// RUN: tpp-opt %s --tile-brgemm-linalg="lhsTile=8,8 rhsTile=8,16" --split-input-file | FileCheck %s
 
 module {
   memref.global "private" constant @__constant_48x32x32xf32 : memref<48x32x32xf32> = dense<1.000000e+00> {alignment = 64 : i64}
