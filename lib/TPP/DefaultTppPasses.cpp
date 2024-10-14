@@ -22,10 +22,11 @@
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace mlir::tpp;
-
+using namespace std;
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTTPPPASSES
@@ -104,7 +105,7 @@ private:
       // TODO: This flag will be removed once the vector path becomes the
       // default lowering path.
       if (linalgToVector) {
-	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling());
+	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
         pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
