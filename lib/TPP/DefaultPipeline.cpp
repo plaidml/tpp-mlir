@@ -20,7 +20,6 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -53,13 +52,15 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
-llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
-                                   llvm::cl::desc("Lower linalg to vector"),
-                                   llvm::cl::init(false));
-
 llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
+    llvm::cl::init(false));
+
+// Control parallelism.
+llvm::cl::opt<bool> contractToOuterProduct(
+    "contract-to-outer-product",
+    llvm::cl::desc("Convert Contractions to Outer Product operations"),
     llvm::cl::init(false));
 
 namespace mlir {
@@ -97,7 +98,6 @@ struct DefaultPipeline : public tpp::impl::DefaultPipelineBase<DefaultPipeline>,
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // Add all custom TPP dialects.
-    registry.insert<xsmm::XsmmDialect>();
     registry.insert<check::CheckDialect>();
     registry.insert<perf::PerfDialect>();
     check::registerBufferizableOpInterfaceExternalModels(registry);
@@ -133,9 +133,9 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{
-          linalgToLoops, parallelTaskGrid, linalgToVector,
-          lowerPackUnpackWithoutTranspose};
+      DefaultTppPassesOptions tppDefaultOptions{linalgToLoops, parallelTaskGrid,
+                                                lowerPackUnpackWithoutTranspose,
+                                                contractToOuterProduct};
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

@@ -22,7 +22,6 @@
 
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 
 using namespace mlir;

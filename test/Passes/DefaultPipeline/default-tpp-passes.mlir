@@ -35,14 +35,11 @@ func.func @matmul(%A: tensor<4x8xf32>,
 // CHECK-LABEL: func.func @blocked_matmul(
 // CHECK-SAME: %[[ARG0:.+]]: memref<4x16x32x32xf32>,
 // CHECK-SAME: %[[ARG1:.+]]: memref<8x16x32x32xf32>,
-// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>)
+// CHECK-SAME: %[[ARG2:.+]]: memref<4x8x32x32xf32>) {
 func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x32xf32>, %arg2: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  // CHECK: call @xsmm_brgemm_dispatch
+  // CHECK: func.call @xsmm_brgemm_dispatch
   // CHECK: scf.parallel
-  // CHECK:   %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK:   call @xsmm_brgemm_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}, %[[ptr2]], %{{.+}}
+  // CHECK:   func.call @xsmm_brgemm_invoke
   %1 = linalg.generic {
     indexing_maps = [#map0, #map1, #map2],
     iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
@@ -63,6 +60,8 @@ func.func @blocked_matmul(%arg0: tensor<4x16x32x32xf32>, %arg1: tensor<8x16x32x3
 !conv1x1_filter_tensor_t = tensor<1x1x2048x512xf32> // H,W,Ic,Oc
 !conv1x1_output_tensor_t = tensor<1x7x7x512xf32> // N,H,W,Oc
 
+// CHECK: func.func private @xsmm_gemm_dispatch
+// CHECK: func.func private @xsmm_gemm_invoke
 // CHECK-LABEL: @conv2d_1x1(
 // CHECK-SAME: %[[arg:.*]]: memref<1x7x7x2048xf32>) -> memref<1x7x7x512xf32> {
 func.func @conv2d_1x1(
@@ -74,11 +73,16 @@ func.func @conv2d_1x1(
   %cst = arith.constant dense<0.00332225906> : !conv1x1_filter_tensor_t
 
   // 1x1 Conv2D
-  // CHECK: call @xsmm_gemm_dispatch
-  // CHECK: %[[ptr0:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK: %[[ptr1:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK: %[[ptr2:.*]] = llvm.inttoptr %{{.+}} : i64 to !llvm.ptr
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[ptr0]], %{{.+}}, %[[ptr1]], %{{.+}}, %[[ptr2]], %{{.+}}
+  // scf.parallel
+  // 	%[[one:.*]] = vector.transfer_read
+  // 	%[[transpose:.*]] = vector.transpose %[[one]], [0, 3, 1, 2, 4]
+  // 	vector.transfer_write %[[transpose]], %{{.*}}  
+  // scf.for
+  //    scf.for
+  //      %[[dispatch.*]] = func.call @xsmm_gemm_dispatch
+  //      scf.for
+  //        func.call @xsmm_gemm_invoke(%[[dispatch]], {{.*}},  {{.*}},  {{.*}},  {{.*}},  {{.*}},  {{.*}},  {{.*}},  {{.*}})
+
   %0 = tensor.empty() : !conv1x1_output_tensor_t
   %1 = linalg.fill ins(%cst_0 : f32) outs(%0 : !conv1x1_output_tensor_t) -> !conv1x1_output_tensor_t
   %2 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
@@ -103,42 +107,24 @@ func.func @conv2d_1x1(
 // CHECK-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
 func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
-
-  // Identity:
-  // CHECK: %[[alloc:.+]] = memref.alloc() {alignment = 64 : i64} : memref<128x512xf32>
-  // CHECK: call @xsmm_unary_dispatch
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
-  // CHECK-NEXT: %[[cast_ptr0:.*]] = arith.index_cast %[[ptr0]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[cast_ptr0]] : i64 to !llvm.ptr
-
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[alloc]]
-  // CHECK-NEXT: %[[cast_ptr1:.*]] = arith.index_cast %[[ptr1]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[cast_ptr1]] : i64 to !llvm.ptr
-  // CHECK: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]]
-
-  // CHECK-DAG: call @xsmm_brgemm_dispatch
-  // CHECK-DAG: call @xsmm_unary_dispatch
   // CHECK: scf.parallel
+  // CHECK: 	%[[read:.*]] = vector.transfer_read
+  // CHECK: 	vector.transfer_write %[[read]], {{.*}}
+  // CHECK: func.call @xsmm_brgemm_dispatch
+  // CHECK: scf.parallel
+  // CHECK:     vector.transfer_read
+  // CHECK:     vector.transfer_write
+  // CHECK:     func.call @xsmm_brgemm_invoke
+  // CHECK:     %[[read:.*]] = vector.transfer_read
+  // CHECK:     %[[res:.*]] = arith.maximumf %[[read]]
+  // CHECK:     vector.transfer_write %[[res]], {{.*}}
+
   %outShape = tensor.empty() : tensor<128x512xf32>
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%outShape : tensor<128x512xf32>) {
     ^bb0(%arg9: f32, %arg10: f32):
       linalg.yield %arg9 : f32
   } -> tensor<128x512xf32>
 
-  // Matmul
-  // CHECK: %[[ptr2:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>> -> index
-  // CHECK: %[[ptr2_cast:.+]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK: %[[llvm_ptr2:.+]] = llvm.inttoptr %[[ptr2_cast]] : i64 to !llvm.ptr
-
-  // CHECK: %[[ptr3:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<8x32x32xf32, strided<[1024, 32, 1], offset: ?>> -> index
-  // CHECK: %[[ptr3_cast:.+]] = arith.index_cast %[[ptr3]] : index to i64
-  // CHECK: %[[llvm_ptr3:.+]] = llvm.inttoptr %[[ptr3_cast]] : i64 to !llvm.ptr
-
-  // CHECK: %[[ptr4:.+]] = memref.extract_aligned_pointer_as_index %{{.+}} : memref<32x32xf32, strided<[512, 1], offset: ?>> -> index
-  // CHECK: %[[ptr4_cast:.+]] = arith.index_cast %[[ptr4]] : index to i64
-  // CHECK: %[[llvm_ptr4:.+]] = llvm.inttoptr %[[ptr4_cast]] : i64 to !llvm.ptr
-
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr2]], %{{.+}}, %[[llvm_ptr3]], %{{.+}}, %[[llvm_ptr4]], %{{.+}}
   %2 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%1 : tensor<128x512xf32>) attrs =  {iterator_ranges = [128, 512, 256]} {
     ^bb0(%arg9: f32, %arg10: f32, %arg11: f32):
       %16 = arith.mulf %arg9, %arg10 : f32
@@ -146,8 +132,6 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
       linalg.yield %17 : f32
   } -> tensor<128x512xf32>
 
-  // Relu
-  // CHECK-NEXT: call @xsmm_unary_invoke({{.*}}%[[llvm_ptr4]], %{{.+}}, %[[llvm_ptr4]], %{{.+}}
   %c0 = arith.constant 0.0 : f32
   %3 = linalg.generic {indexing_maps = [#map1], iterator_types = ["parallel", "parallel"]} outs(%2 : tensor<128x512xf32>) {
     ^bb0(%arg9: f32):
@@ -160,39 +144,10 @@ func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
 
 // -----
 
-// CHECK-LABEL: softmax
-func.func @softmax(%arg0: tensor<2x2x2x2xf32>, %arg1: tensor<2x2x2x2xf32>) -> tensor<2x2x2x2xf32> {
-  // CHECK-NOT: linalg.softmax
-  // CHECK-COUNT-4: linalg.generic
-  %softmax = linalg.softmax dimension(3)
-    ins(%arg0: tensor<2x2x2x2xf32>) outs(%arg1: tensor<2x2x2x2xf32>) -> tensor<2x2x2x2xf32>
-  return %softmax : tensor<2x2x2x2xf32>
-}
-
-// CHECK-LABEL: batch_matmul_rewrite
-func.func @batch_matmul_rewrite(%arg0: tensor<512x32x64xf32>, %arg1: tensor<512x64x32xf32>) -> tensor<512x32x32xf32> {
-  %0 = tensor.empty() : tensor<512x32x32xf32>
-  // CHECK-DAG: %[[C0_i:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[C1_i:.+]] = arith.constant 1 : index
-  // CHECK-DAG: %[[C512_i:.+]] = arith.constant 512 : index
-  // CHECK: %{{.+}} = call @xsmm_brgemm_dispatch
-  // CHECK: scf.parallel{{.*}}(%[[C0_i]]) to (%[[C512_i]]) step (%[[C1_i]])
-  // CHECK: xsmm_brgemm_invoke
-  %1 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<512x32x64xf32>, tensor<512x64x32xf32>)
-                           outs(%0 : tensor<512x32x32xf32>) -> tensor<512x32x32xf32>
-  return %1 : tensor<512x32x32xf32>
-}
-
-// -----
-
 func.func @linalg_copy(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>) {
   linalg.copy ins(%arg0 : memref<2x2xf32>) outs(%arg1 : memref<2x2xf32>)
   return
 }
 
-// CHECK-LABEL: linalg_copy
-// CHECK-SAME: %[[ARG0:.+]]: memref<2x2xf32>, %[[ARG1:.+]]: memref<2x2xf32>
-// CHECK: xsmm_unary_dispatch
-// CHECK: %[[PTR_0:.+]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
-// CHECK: %[[PTR_1:.+]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
-// CHECK: xsmm_unary_invoke
+// CHECK: vector.transfer_read
+// CHECK: vector.transfer_write

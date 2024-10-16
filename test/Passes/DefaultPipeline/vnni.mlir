@@ -13,8 +13,8 @@ func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
                   %arg2: tensor<128x2048xbf16>) -> tensor<128x2048xbf16> {
   // CHECK: %[[of:.*]] = arith.constant 0 : index
   // CHECK: call @xsmm_gemm_dispatch
-
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+  // CHECK: %[[expand_shape:.*]] = memref.expand_shape %[[ARG0]] {{\[}}[0], [1, 2]] output_shape [128, 512, 2] : memref<128x1024xbf16> into memref<128x512x2xbf16> 
+  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[expand_shape]]
   // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
 
@@ -26,7 +26,7 @@ func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}, {{.*}}, [[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]])
   %result = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
@@ -68,7 +68,7 @@ func.func @matmul_memref(%arg0: memref<128x1024xbf16>,
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}, {{.*}}, [[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]])
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
@@ -111,7 +111,7 @@ func.func @brgemm_static_tensor(%arg0: tensor<4x256x512xbf16>, %arg1: tensor<4x5
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]]
+  // CHECK: call @xsmm_brgemm_invoke({{.*}}, {{.*}}, [[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]])
 
   %2 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
@@ -152,7 +152,7 @@ func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x2
   // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]]
+  // CHECK: call @xsmm_brgemm_invoke({{.*}}, {{.*}}, [[llvm_ptr0]], %[[of]], %[[llvm_ptr1]], %[[of]], %[[llvm_ptr2]], %[[of]])
 
    linalg.generic {
     indexing_maps = [#map, #map1, #map2],

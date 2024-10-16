@@ -22,9 +22,14 @@
 #include "llvm/Support/Debug.h"
 
 using namespace mlir;
+using namespace mlir::vector;
 
+namespace mlir {
+namespace tpp {
 #define GEN_PASS_CLASSES
 #include "TPP/Passes.h.inc"
+} // namespace tpp
+} // namespace mlir
 
 #define DEBUG_TYPE "mlir-rewrite-to-brgemm"
 
@@ -57,7 +62,8 @@ static bool isInputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
 }
 
 // Check if the operand is an output to linalgOp.
-[[maybe_unused]] static bool isOutputOperand(linalg::LinalgOp linalgOp, OpOperand &operand) {
+[[maybe_unused]] static bool isOutputOperand(linalg::LinalgOp linalgOp,
+                                             OpOperand &operand) {
   return !isInputOperand(linalgOp, operand);
 }
 

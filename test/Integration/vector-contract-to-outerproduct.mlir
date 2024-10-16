@@ -1,17 +1,17 @@
-// RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.2
+// RUN: tpp-run -e entry --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e entry --entry-point-result=void -seed 123 -print %s > %t.2
 // RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF --allow-empty
 
-// RUN: tpp-opt %s  | tpp-run -e permA --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permA --entry-point-result=void -seed 123 -print > %t.2
+// RUN: tpp-run -e permA --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permA --entry-point-result=void -seed 123 -print %s > %t.2
 // RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMA --allow-empty
 
-// RUN: tpp-opt %s  | tpp-run -e permB --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permB --entry-point-result=void -seed 123 -print > %t.2
+// RUN: tpp-run -e permB --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permB --entry-point-result=void -seed 123 -print %s > %t.2
 // RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMA --allow-empty
 
-// RUN: tpp-opt %s  | tpp-run -e permAB --entry-point-result=void -seed 123 -print > %t.1
-// RUN: tpp-opt %s  --vector-contract-to-outerproduct  | tpp-run -e permAB --entry-point-result=void -seed 123 -print > %t.2
+// RUN: tpp-run -e permAB --entry-point-result=void -seed 123 -print %s > %t.1
+// RUN: tpp-run -contract-to-outer-product -e permAB --entry-point-result=void -seed 123 -print %s > %t.2
 // RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF-PERMAB --allow-empty
 
 

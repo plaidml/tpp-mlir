@@ -10,7 +10,6 @@
 //===----------------------------------------------------------------------===//
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -18,6 +17,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include <list>
 
 namespace mlir {
 namespace tpp {
@@ -42,7 +42,7 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
     if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
             xsmm::DataTypeAttr::get(rewriter.getContext(),
                                     xsmm::DataType::BF16) &&
-        linalgOp.getIteratorTypes().size() >= 5 &&
+        linalgOp.getIteratorTypes().size() >= 4 &&
         linalgOp.getNumOperands() == 3) {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
@@ -72,7 +72,8 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       }
       auto map0 = linalgOp.getIndexingMapsArray()[0];
       auto map1 = linalgOp.getIndexingMapsArray()[1];
-      map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1), 3);
+      map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1),
+                               map0.getNumResults());
       int map1Index = map1.getNumResults() - 3;
       AffineExpr expr = map1.getResult(map1Index);
       if (isa<AffineBinaryOpExpr>(expr)) {
@@ -106,8 +107,11 @@ struct VectorizationPass
     : public impl::VectorizationPassBase<VectorizationPass> {
 
   void populateCombinePatterns(RewritePatternSet &patterns) {
-    patterns.add<LinalgToVector<linalg::BatchReduceMatmulOp>,
-                 LinalgToVector<linalg::FillOp>>(patterns.getContext());
+    patterns.add<
+        LinalgToVector<linalg::BatchReduceMatmulOp>,
+        LinalgToVector<linalg::FillOp>, LinalgToVector<linalg::TransposeOp>,
+        LinalgToVector<linalg::BroadcastOp>, LinalgToVector<linalg::MatmulOp>, LinalgToVector<linalg::CopyOp>>(
+        patterns.getContext());
     patterns.add<LinalgGenericToVector>(patterns.getContext());
   }
 

@@ -27,17 +27,17 @@
 #include "TPP/Dialect/Check/CheckDialect.h"
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
-#include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassBundles.h"
 #include "TPP/Passes.h"
+#include "TPP/Passes.h.inc"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
   mlir::tpp::registerTppCompilerPasses();
   mlir::tpp::registerTppPassBundlePasses();
+  mlir::tpp::registerConvertVectorToXsmmPass();
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::xsmm::XsmmDialect>();
   registry.insert<mlir::check::CheckDialect>();
   registry.insert<mlir::perf::PerfDialect>();
   mlir::check::registerBufferizableOpInterfaceExternalModels(registry);

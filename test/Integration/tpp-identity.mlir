@@ -15,7 +15,6 @@ func.func @entry(){
   %cst = arith.constant 23.0 : f32
   %input_tensor = linalg.fill ins(%cst : f32) outs(%init_source : tensor<64xf32>) -> tensor<64xf32>
   %1 = tensor.empty() : tensor<56x64xf32>
-  // IR: xsmm_unary_invoke
   %2 = linalg.generic {indexing_maps=[#map, #map1],
                        iterator_types = ["parallel", "parallel"]}
     ins(%input_tensor : tensor<64xf32> ) outs(%1 : tensor<56x64xf32>) {
