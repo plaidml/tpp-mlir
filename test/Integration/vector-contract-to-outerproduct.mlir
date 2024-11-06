@@ -1,18 +1,18 @@
 // RUN: tpp-run -e entry --entry-point-result=void -seed 123 -print %s > %t.1
 // RUN: tpp-run -contract-to-outer-product -e entry --entry-point-result=void -seed 123 -print %s > %t.2
-// RUN: fpcmp -a 0.1 %t.1 %t.2
+// RUN: fpcmp -a 0.001 %t.1 %t.2
 
 // RUN: tpp-run -e permA --entry-point-result=void -seed 123 -print %s > %t.1
 // RUN: tpp-run -contract-to-outer-product -e permA --entry-point-result=void -seed 123 -print %s > %t.2
-// RUN: fpcmp -a 0.1 %t.1 %t.2
+// RUN: fpcmp -a 0.001 %t.1 %t.2
 
 // RUN: tpp-run -e permB --entry-point-result=void -seed 123 -print %s > %t.1
 // RUN: tpp-run -contract-to-outer-product -e permB --entry-point-result=void -seed 123 -print %s > %t.2
-// RUN: fpcmp -a 0.1 %t.1 %t.2
+// RUN: fpcmp -a 0.001 %t.1 %t.2
 
 // RUN: tpp-run -e permAB --entry-point-result=void -seed 123 -print %s > %t.1
 // RUN: tpp-run -contract-to-outer-product -e permAB --entry-point-result=void -seed 123 -print %s > %t.2
-// RUN: fpcmp -a 0.1 %t.1 %t.2
+// RUN: fpcmp -a 0.001 %t.1 %t.2
 
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
