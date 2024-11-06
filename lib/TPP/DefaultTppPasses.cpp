@@ -22,6 +22,7 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/PassUtils.h"
+#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
@@ -101,6 +102,7 @@ private:
       pm.addPass(createBufferize());
 
       pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+      pm.addPass(mlir::vector::createLowerVectorMultiReductionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
       if (contractToOuterProduct) {
         pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());

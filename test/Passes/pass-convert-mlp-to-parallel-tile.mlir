@@ -65,19 +65,19 @@ module {
 
 
 //CHECK: func.func @_entry(%[[ARG0:.*]]: memref<8x32x32x32xf32>, %[[ARG1:.*]]: memref<32x32x32x32xf32>, %[[ARG2:.*]]: memref<32x32xf32>, %[[ARG3:.*]]: memref<8x32x32x32xf32>, %[[ARG4:.*]]: memref<32x32x32x32xf32>, %[[ARG5:.*]]: memref<32x32xf32>, %[[ARG6:.*]]: memref<8x32x32x32xf32>, %[[ARG7:.*]]: memref<32x32x32x32xf32>, %[[ARG8:.*]]: memref<32x32xf32>, %[[ARG9:.*]]: memref<8x32x32x32xf32>) {
-//CHECK: %[[c16:.*]] = arith.constant 16 : index
-//CHECK: %[[c2:.*]] = arith.constant 2 : index
-//CHECK: %[[c32_i64:.*]] = arith.constant 32 : i64
-//CHECK: %[[c0:.*]] = arith.constant 0 : index
-//CHECK: %[[c8:.*]] = arith.constant 8 : index
-//CHECK: %[[c32:.*]] = arith.constant 32 : index
-//CHECK: %[[c1:.*]] = arith.constant 1 : index
-//CHECK: %[[c1_i64:.*]] = arith.constant 1 : i64
-//CHECK: %[[c1024_i64:.*]] = arith.constant 1024 : i64
-//CHECK: %[[c0_i64:.*]] = arith.constant 0 : i64
-//CHECK: %[[c5_i64:.*]] = arith.constant 5 : i64
-//CHECK: %[[c4_i64:.*]] = arith.constant 4 : i64
-//CHECK: %[[temp0:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c0_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]])
+//CHECK-DAG: %[[c16:.*]] = arith.constant 16 : index
+//CHECK-DAG: %[[c2:.*]] = arith.constant 2 : index
+//CHECK-DAG: %[[c32_i64:.*]] = arith.constant 32 : i64
+//CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+//CHECK-DAG: %[[c8:.*]] = arith.constant 8 : index
+//CHECK-DAG: %[[c32:.*]] = arith.constant 32 : index
+//CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+//CHECK-DAG: %[[c1_i64:.*]] = arith.constant 1 : i64
+//CHECK-DAG: %[[c1024_i64:.*]] = arith.constant 1024 : i64
+//CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
+//CHECK-DAG: %[[c5_i64:.*]] = arith.constant 5 : i64
+//CHECK-DAG: %[[c4_i64:.*]] = arith.constant 4 : i64
+//CHECK-DAG: %[[temp0:.*]] = call @xsmm_fused_brgemm_dispatch(%[[c1_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c32_i64]], %[[c1024_i64]], %[[c1024_i64]], %[[c0_i64]], %[[c0_i64]], %[[c5_i64]], %[[c4_i64]], %[[c1_i64]])
 //CHECK:  omp.parallel {
 //CHECK:      omp.wsloop {
 //CHECK:        omp.loop_nest (%[[ARG10:.*]], %[[ARG11:.*]]) : index = (%[[c0]], %[[c0]]) to (%[[c8]], %[[c32]]) step (%[[c2]], %[[c16]]) {
