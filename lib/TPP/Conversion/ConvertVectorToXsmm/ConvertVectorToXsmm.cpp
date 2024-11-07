@@ -226,7 +226,7 @@ static std::pair<Operation *, Operation *>
 buildFusedBrgemm(PatternRewriter &rewriter, Operation *contractOp,
                  Operation *input0, Operation *input1, Operation *input2,
                  xsmm::BrgemmInfo brgemmInfo, SmallVector<Attribute> flags,
-                 Value bcastInput, Operation *addfTransferWrite,
+                 Operation *bcastInput, Operation *addfTransferWrite,
                  Operation *maximumfTransferWrite) {
   SmallVector<Value> inputs;
   LLVM_DEBUG(llvm::dbgs() << "buildFusedBrgemm\n");
@@ -258,20 +258,8 @@ buildFusedBrgemm(PatternRewriter &rewriter, Operation *contractOp,
       loc, integer64, cast<TypedAttr>(dtype)));
   dispatchOperandTypes.push_back(integer64);
   std::string dispatchName = "xsmm_fused_brgemm_dispatch";
-  std::string invokeName = "xsmm_fused_brgemm_invoke";
+  std::string invokeName = "xsmm_fused_brgemm_invoke_no_bias";
 
-  // TODO: Support more than just COL_0 BCAST
-  auto addf = addfTransferWrite->getOperand(0).getDefiningOp();
-  auto broadcastInput =
-      isa<mlir::vector::BroadcastOp>(addf->getOperand(0).getDefiningOp())
-          ? addf->getOperand(0).getDefiningOp()
-          : addf->getOperand(1).getDefiningOp();
-  SmallVector<Attribute> binaryFlagsVector;
-  auto binaryFlags = xsmm::utils::getBinaryFlagsVectorType(
-      broadcastInput->getOperand(0).getDefiningOp()->getOperand(0).getType(),
-      addf->getResult(0).getType(), mlir::xsmm::utils::OperandPos::LHS);
-  binaryFlagsVector.push_back(
-      xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *binaryFlags));
   ArrayAttr brgemmFlags = rewriter.getArrayAttr(flags);
   SmallVector<Value> invokeOperands;
 
@@ -290,28 +278,47 @@ buildFusedBrgemm(PatternRewriter &rewriter, Operation *contractOp,
       loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
   dispatchOperandTypes.push_back(integer64);
 
+  auto unaryFlags = mlir::xsmm::UnaryFlags::NONE;
+  if (maximumfTransferWrite != NULL) {
+    unaryFlags = *xsmm::utils::getUnaryFlags(
+        maximumfTransferWrite->getOperand(0).getType(),
+        maximumfTransferWrite->getOperand(1).getType());
+  }
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64,
-      cast<TypedAttr>(xsmm::UnaryFlagsAttr::get(rewriter.getContext(),
-                                                xsmm::UnaryFlags::NONE))));
+      cast<TypedAttr>(
+          xsmm::UnaryFlagsAttr::get(rewriter.getContext(), unaryFlags))));
   dispatchOperandTypes.push_back(integer64);
 
-  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64,
-      cast<TypedAttr>(xsmm::UnaryKindAttr::get(rewriter.getContext(),
-                                               xsmm::UnaryKind::RELU))));
-  dispatchOperandTypes.push_back(integer64);
+  auto unaryKind = (maximumfTransferWrite != NULL) ? xsmm::UnaryKind::RELU
+                                                   : xsmm::UnaryKind::NONE;
 
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64,
       cast<TypedAttr>(
-          xsmm::BinaryFlagsAttr::get(rewriter.getContext(), *binaryFlags))));
+          xsmm::UnaryKindAttr::get(rewriter.getContext(), unaryKind))));
   dispatchOperandTypes.push_back(integer64);
+
+  auto binaryFlags = xsmm::BinaryFlags::NONE;
+  if (addfTransferWrite != NULL) {
+    binaryFlags = *xsmm::utils::getBinaryFlagsVectorType(
+        bcastInput->getResult(0).getType(),
+        addfTransferWrite->getOperand(1).getType(),
+        mlir::xsmm::utils::OperandPos::LHS);
+  }
 
   dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
       loc, integer64,
-      cast<TypedAttr>(xsmm::BinaryKindAttr::get(rewriter.getContext(),
-                                                xsmm::BinaryKind::ADD))));
+      cast<TypedAttr>(
+          xsmm::BinaryFlagsAttr::get(rewriter.getContext(), binaryFlags))));
+  dispatchOperandTypes.push_back(integer64);
+
+  auto binaryKind = (addfTransferWrite != NULL) ? xsmm::BinaryKind::ADD
+                                                : xsmm::BinaryKind::NONE;
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64,
+      cast<TypedAttr>(
+          xsmm::BinaryKindAttr::get(rewriter.getContext(), binaryKind))));
 
   dispatchOperandTypes.push_back(integer64);
 
@@ -325,20 +332,20 @@ buildFusedBrgemm(PatternRewriter &rewriter, Operation *contractOp,
       loc, integer64, cast<TypedAttr>(dtype)));
   operandRange.push_back(dispatched.getResult(0));
 
-  SmallVector<Value> results;
-  results.push_back(input0->getOperand(0));
-  results.push_back(input1->getOperand(0));
-  results.push_back(input2->getOperand(0));
+  operandRange.push_back(input0->getOperand(0));
+  operandRange.push_back(input1->getOperand(0));
+  operandRange.push_back(input2->getOperand(0));
 
-  Value bcastInputAlloc = bcastInput;
-  if (isa<memref::SubViewOp>(bcastInput.getDefiningOp())) {
-    bcastInputAlloc = bcastInput.getDefiningOp()->getOperand(0);
+  if (addfTransferWrite != NULL) {
+    Value addfTransferWriteAlloc = addfTransferWrite->getOperand(1);
+    operandRange.push_back(addfTransferWriteAlloc);
+    invokeName = "xsmm_fused_brgemm_invoke";
   }
-  results.push_back(bcastInputAlloc);
   Value batchDim = rewriter.create<arith::ConstantOp>(
       loc, integer64, rewriter.getIntegerAttr(integer64, batch));
 
-  results.push_back(batchDim);
+  operandRange.push_back(batchDim);
+  SmallVector<Value> results;
   SmallVector<Value> preceedingOperands;
   auto invokeCall = xsmm::utils::buildInvokeCall(
       rewriter, contractOp, module, results, preceedingOperands, -1,
@@ -349,8 +356,9 @@ buildFusedBrgemm(PatternRewriter &rewriter, Operation *contractOp,
 
 static std::pair<Operation *, Operation *> buildOpWithBetaZeroAndBiasReluImpl(
     PatternRewriter &rewriter, Operation *contractOp, Operation *input0,
-    Operation *input1, Operation *input2, Operation *betaZero, Value bcastInput,
-    Operation *addfTransferWrite, Operation *maximumfTransferWrite) {
+    Operation *input1, Operation *input2, Operation *betaZero,
+    Operation *bcastInput, Operation *addfTransferWrite,
+    Operation *maximumfTransferWrite) {
   LLVM_DEBUG(llvm::dbgs() << "buildOpWithBetaZeroAndBiasReluImpl\n");
   auto brgemmInfo =
       computeBrgemmInfo(rewriter, contractOp, input0, input1, input2);
@@ -368,9 +376,31 @@ static std::pair<Operation *, Operation *> buildOpWithBetaZeroAndBiasReluImpl(
 }
 
 static std::pair<Operation *, Operation *>
+buildOpWithBetaZeroAndReluImpl(PatternRewriter &rewriter, Operation *contractOp,
+                               Operation *input0, Operation *input1,
+                               Operation *input2, Operation *betaZero,
+                               Operation *maximumfTransferWrite) {
+  LLVM_DEBUG(llvm::dbgs() << "buildOpWithBetaZeroAndReluImpl\n");
+  return buildOpWithBetaZeroAndBiasReluImpl(rewriter, contractOp, input0,
+                                            input1, input2, betaZero, NULL,
+                                            NULL, maximumfTransferWrite);
+}
+
+static std::pair<Operation *, Operation *> buildOpWithBetaZeroAndBiasImpl(
+    PatternRewriter &rewriter, Operation *contractOp, Operation *input0,
+    Operation *input1, Operation *input2, Operation *betaZero,
+    Operation *bcastInput, Operation *addfTransferWrite,
+    Operation *maximumfTransferWrite) {
+  LLVM_DEBUG(llvm::dbgs() << "buildOpWithBetaZeroAndBiasImpl\n");
+  return buildOpWithBetaZeroAndBiasReluImpl(
+      rewriter, contractOp, input0, input1, input2, betaZero, bcastInput,
+      addfTransferWrite, NULL);
+}
+
+static std::pair<Operation *, Operation *>
 buildOpWithBiasReluImpl(PatternRewriter &rewriter, Operation *contractOp,
                         Operation *input0, Operation *input1, Operation *input2,
-                        Value bcastInput, Operation *addfTransferWrite,
+                        Operation *bcastInput, Operation *addfTransferWrite,
                         Operation *maximumfTransferWrite) {
   LLVM_DEBUG(llvm::dbgs() << "buildOpWithBiasReluImpl\n");
   auto brgemmInfo =
@@ -383,6 +413,24 @@ buildOpWithBiasReluImpl(PatternRewriter &rewriter, Operation *contractOp,
   return buildFusedBrgemm(rewriter, contractOp, input0, input1, input2,
                           *brgemmInfo, flags, bcastInput, addfTransferWrite,
                           maximumfTransferWrite);
+}
+
+static std::pair<Operation *, Operation *>
+buildOpWithBiasImpl(PatternRewriter &rewriter, Operation *contractOp,
+                    Operation *input0, Operation *input1, Operation *input2,
+                    Operation *bcastInput, Operation *addfTransferWrite) {
+  LLVM_DEBUG(llvm::dbgs() << "buildOpWithBiasImpl\n");
+  return buildOpWithBiasReluImpl(rewriter, contractOp, input0, input1, input2,
+                                 bcastInput, addfTransferWrite, NULL);
+}
+
+static std::pair<Operation *, Operation *>
+buildOpWithReluImpl(PatternRewriter &rewriter, Operation *contractOp,
+                    Operation *input0, Operation *input1, Operation *input2,
+                    Operation *maximumfTransferWrite) {
+  LLVM_DEBUG(llvm::dbgs() << "buildOpWithReluImpl\n");
+  return buildOpWithBiasReluImpl(rewriter, contractOp, input0, input1, input2,
+                                 NULL, NULL, maximumfTransferWrite);
 }
 
 static std::pair<Operation *, Operation *>
@@ -414,8 +462,16 @@ void registerNativeRewrite(RewritePatternSet &patterns) {
   patterns.getPDLPatterns().registerRewriteFunction("GetUser", getUserImpl);
   patterns.getPDLPatterns().registerRewriteFunction(
       "BuildOpWithBetaZeroAndBiasRelu", buildOpWithBetaZeroAndBiasReluImpl);
+  patterns.getPDLPatterns().registerRewriteFunction(
+      "BuildOpWithBetaZeroAndRelu", buildOpWithBetaZeroAndReluImpl);
+  patterns.getPDLPatterns().registerRewriteFunction(
+      "BuildOpWithBetaZeroAndBias", buildOpWithBetaZeroAndBiasImpl);
   patterns.getPDLPatterns().registerRewriteFunction("BuildOpWithBiasRelu",
                                                     buildOpWithBiasReluImpl);
+  patterns.getPDLPatterns().registerRewriteFunction("BuildOpWithRelu",
+                                                    buildOpWithReluImpl);
+  patterns.getPDLPatterns().registerRewriteFunction("BuildOpWithBias",
+                                                    buildOpWithBiasImpl);
 }
 
 namespace mlir {

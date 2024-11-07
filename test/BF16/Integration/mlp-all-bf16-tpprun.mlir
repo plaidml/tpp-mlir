@@ -1,4 +1,4 @@
-// RUN: tpp-run %s \
+// RUN: tpp-run %s -n 10\
 // RUN:  -e entry -entry-point-result=void
 
 memref.global "private" constant @arg1 : memref<128x512x2xbf16> = dense<1.00e+00>

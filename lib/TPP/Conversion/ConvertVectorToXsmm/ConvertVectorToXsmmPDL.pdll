@@ -15,9 +15,17 @@ Rewrite BuildOpWithBetaZero(op:Op<vector.contract>,input0:Op<vector.transfer_rea
 
 Rewrite BuildOp(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
 
-Rewrite BuildOpWithBetaZeroAndBiasRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, betaZero:Op<vector.transfer_write>, bcastInput:Value, addf:Op<vector.transfer_write>, maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+Rewrite BuildOpWithBetaZeroAndBiasRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, betaZero:Op<vector.transfer_write>, bcastInput:Op<vector.transfer_read>, addf:Op<vector.transfer_write>, maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
 
-Rewrite BuildOpWithBiasRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, bcastInput:Value, addf:Op<vector.transfer_write>, maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+Rewrite BuildOpWithBetaZeroAndRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, betaZero:Op<vector.transfer_write>, maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+
+Rewrite BuildOpWithBetaZeroAndBias(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, betaZero:Op<vector.transfer_write>, bcastInput:Op<vector.transfer_read>, addf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+
+Rewrite BuildOpWithBiasRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, bcastInput:Op<vector.transfer_read>, addf:Op<vector.transfer_write>, maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+
+Rewrite BuildOpWithRelu(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>,  maxf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+
+Rewrite BuildOpWithBias(op:Op<vector.contract>,input0:Op<vector.transfer_read>, input1:Op<vector.transfer_read>, input2:Op<vector.transfer_read>, bcastInput:Op<vector.transfer_read>, addf:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
 
 Pattern ConvertContractToFusedBrgemmWithBetaZero with recursion{
      let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);
@@ -38,12 +46,62 @@ Pattern ConvertContractToFusedBrgemmWithBetaZero with recursion{
      ValidateBetaZeroOp(root, input0, input1, input2, rootOutput, betaZero);
 
      rewrite root with{
-        let replacement = BuildOpWithBetaZeroAndBiasRelu(root, input0, input1, input2, betaZero, bias, addfResult, maxfResult);
+        let replacement = BuildOpWithBetaZeroAndBiasRelu(root, input0, input1, input2, betaZero, biasRead, addfResult, maxfResult);
         replace root with (replacement.dispatch, replacement.invoke);
         let user = GetUser(replacement.dispatch);
         erase user;
         erase GetUser(addf);
         erase GetUser(maxf);
+        erase betaZero;
+     };
+
+}
+
+Pattern ConvertContractToFusedBrgemmWithBetaZeroReluOnly with recursion{
+     let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);
+     let input1 = op<vector.transfer_read>(alloc1:Value, indices1:ValueRange, const0, constIndex1:ValueRange)->(output1:TypeRange);
+     let input2 = op<vector.transfer_read>(alloc2:Value, indices2:ValueRange, const0, constIndex2:ValueRange)->(output2:TypeRange);
+     let root = op<vector.contract>(input0, input1, input2)->(output:TypeRange);
+     let rootOutput = op<vector.transfer_write>(root, alloc2, outIndices:ValueRange, outBounds:ValueRange)->(typeRange:TypeRange);
+     let cst = op<arith.constant>()->(constantVector:AnyVector);
+     let betaZero = op<vector.transfer_write>(cst, alloc2, input3:ValueRange, input4:ValueRange);
+     let reluRead =  op<vector.transfer_read>(alloc2, indices6:ValueRange, const0, bounds4:ValueRange)->(reluOutput:TypeRange);
+     let maxf = op<arith.maximumf>(reluRead, cst)->(typeRange);
+     let maxfResult = op<vector.transfer_write>(maxf, alloc2, indices7:ValueRange, bounds5:ValueRange)->(typeRange);
+     ValidateBetaZeroOp(root, input0, input1, input2, rootOutput, betaZero);
+
+     rewrite root with{
+        let replacement = BuildOpWithBetaZeroAndRelu(root, input0, input1, input2, betaZero, maxfResult);
+        replace root with (replacement.dispatch, replacement.invoke);
+        let user = GetUser(replacement.dispatch);
+        erase user;
+        erase GetUser(maxf);
+        erase betaZero;
+     };
+
+}
+
+Pattern ConvertContractToFusedBrgemmWithBetaZeroBiasOnly with recursion{
+     let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);
+     let input1 = op<vector.transfer_read>(alloc1:Value, indices1:ValueRange, const0, constIndex1:ValueRange)->(output1:TypeRange);
+     let input2 = op<vector.transfer_read>(alloc2:Value, indices2:ValueRange, const0, constIndex2:ValueRange)->(output2:TypeRange);
+     let root = op<vector.contract>(input0, input1, input2)->(output:TypeRange);
+     let rootOutput = op<vector.transfer_write>(root, alloc2, outIndices:ValueRange, outBounds:ValueRange)->(typeRange:TypeRange);
+     let cst = op<arith.constant>()->(constantVector:AnyVector);
+     let betaZero = op<vector.transfer_write>(cst, alloc2, input3:ValueRange, input4:ValueRange);
+     let biasRead = op<vector.transfer_read>(bias:Value, indices3:ValueRange, const0, bounds1:ValueRange)->(biasOutput:TypeRange);
+     let biasBcast = op<vector.broadcast>(biasRead);
+     let biasTRead = op<vector.transfer_read>(alloc2, indices4:ValueRange, const0, bounds2:ValueRange)->(typeRange);
+     let addf = op<arith.addf>(biasBcast, biasTRead)->(typeRange);
+     let addfResult = op<vector.transfer_write>(addf, alloc2, indices5:ValueRange, bounds3:ValueRange)->(typeRange);
+     ValidateBetaZeroOp(root, input0, input1, input2, rootOutput, betaZero);
+
+     rewrite root with{
+        let replacement = BuildOpWithBetaZeroAndBias(root, input0, input1, input2, betaZero, biasRead, addfResult);
+        replace root with (replacement.dispatch, replacement.invoke);
+        let user = GetUser(replacement.dispatch);
+        erase user;
+        erase GetUser(addf);
         erase betaZero;
      };
 
@@ -66,7 +124,7 @@ Pattern ConvertContractToFusedBrgemm with recursion{
      ValidateOp(root, input0, input1, input2, rootOutput);
 
      rewrite root with{
-        let replacement = BuildOpWithBiasRelu(root, input0, input1, input2, bias, addfResult, maxfResult);
+        let replacement = BuildOpWithBiasRelu(root, input0, input1, input2, biasRead, addfResult, maxfResult);
         replace root with (replacement.dispatch, replacement.invoke);
         let user = GetUser(replacement.dispatch);
         erase user;
@@ -74,6 +132,49 @@ Pattern ConvertContractToFusedBrgemm with recursion{
 	erase GetUser(maxf);
      };
 }
+
+Pattern ConvertContractToFusedBrgemmReluOnly with recursion{
+     let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);
+     let input1 = op<vector.transfer_read>(alloc1:Value, indices1:ValueRange, const0, constIndex1:ValueRange)->(output1:TypeRange);
+     let input2 = op<vector.transfer_read>(alloc2:Value, indices2:ValueRange, const0, constIndex2:ValueRange)->(output2:TypeRange);
+     let root = op<vector.contract>(input0, input1, input2)->(output:TypeRange);
+     let rootOutput = op<vector.transfer_write>(root, alloc2, outIndices:ValueRange, outBounds:ValueRange)->(typeRange:TypeRange);
+     let reluRead =  op<vector.transfer_read>(alloc2, indices6:ValueRange, const0, bounds4:ValueRange)->(reluOutput:TypeRange);
+     let maxf = op<arith.maximumf>(reluRead, cst:Value)->(typeRange);
+     let maxfResult = op<vector.transfer_write>(maxf, alloc2, indices7:ValueRange, bounds5:ValueRange)->(typeRange);
+     ValidateOp(root, input0, input1, input2, rootOutput);
+
+     rewrite root with{
+        let replacement = BuildOpWithRelu(root, input0, input1, input2, maxfResult);
+        replace root with (replacement.dispatch, replacement.invoke);
+        let user = GetUser(replacement.dispatch);
+        erase user;
+        erase GetUser(maxf);
+     };
+}
+
+Pattern ConvertContractToFusedBrgemmBiasOnly with recursion{
+     let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);
+     let input1 = op<vector.transfer_read>(alloc1:Value, indices1:ValueRange, const0, constIndex1:ValueRange)->(output1:TypeRange);
+     let input2 = op<vector.transfer_read>(alloc2:Value, indices2:ValueRange, const0, constIndex2:ValueRange)->(output2:TypeRange);
+     let root = op<vector.contract>(input0, input1, input2)->(output:TypeRange);
+     let rootOutput = op<vector.transfer_write>(root, alloc2, outIndices:ValueRange, outBounds:ValueRange)->(typeRange:TypeRange);
+     let biasRead = op<vector.transfer_read>(bias:Value, indices3:ValueRange, const0, bounds:ValueRange)->(biasOutput:TypeRange);
+     let biasBcast = op<vector.broadcast>(biasRead);
+     let biasTRead = op<vector.transfer_read>(alloc2, indices4:ValueRange, const0, bounds2:ValueRange)->(typeRange);
+     let addf = op<arith.addf>(biasBcast, biasTRead)->(typeRange);
+     let addfResult = op<vector.transfer_write>(addf, alloc2, indices5:ValueRange, bounds3:ValueRange)->(typeRange);
+     ValidateOp(root, input0, input1, input2, rootOutput);
+
+     rewrite root with{
+        let replacement = BuildOpWithBias(root, input0, input1, input2, biasRead, addfResult);
+        replace root with (replacement.dispatch, replacement.invoke);
+        let user = GetUser(replacement.dispatch);
+        erase user;
+        erase GetUser(addf);
+     };
+}
+
 
 Pattern ConvertContractToBrgemmWithBetaZero with recursion{
      let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex0:ValueRange)->(output0:TypeRange);

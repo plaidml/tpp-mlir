@@ -72,6 +72,10 @@ xsmm_brgemm_invoke(const libxsmm_datatype dType, int64_t addr,
                    void *alignedPtrA, int64_t offsetA, void *alignedPtrB,
                    int64_t offsetB, void *alignedPtrC, int64_t offsetC,
                    int64_t numBatches);
+extern "C" MLIR_RUNNERUTILS_EXPORT void xsmm_fused_brgemm_invoke_no_bias(
+    const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
+    int64_t offsetA, void *alignedPtrB, int64_t offsetB, void *alignedPtrC,
+    int64_t offsetC, int64_t numBatches);
 
 extern "C" MLIR_RUNNERUTILS_EXPORT void xsmm_fused_brgemm_invoke(
     const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,

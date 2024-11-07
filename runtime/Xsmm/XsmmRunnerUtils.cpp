@@ -360,6 +360,25 @@ extern "C" int64_t xsmm_brgemm_dispatch(const libxsmm_datatype dtype, int64_t m,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
+extern "C" void xsmm_fused_brgemm_invoke_no_bias(
+    const libxsmm_datatype dType, int64_t addr, void *alignedPtrA,
+    int64_t offsetA, void *alignedPtrB, int64_t offsetB, void *alignedPtrC,
+    int64_t offsetC, int64_t numBatches) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+
+  unsigned long long numBatchesVar = numBatches;
+  gemm_param.op.tertiary = (void *)&numBatchesVar;
+
+  // LIBXSMM col-major change A with B.
+  gemm_param.a.primary = get_base_ptr(dType, alignedPtrB, offsetB);
+  gemm_param.b.primary = get_base_ptr(dType, alignedPtrA, offsetA);
+  gemm_param.c.primary = get_base_ptr(dType, alignedPtrC, offsetC);
+
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(addr);
+  sgemm.gemm_ext(&gemm_param);
+}
+
 extern "C" void xsmm_fused_brgemm_invoke(const libxsmm_datatype dType,
                                          int64_t addr, void *alignedPtrA,
                                          int64_t offsetA, void *alignedPtrB,
