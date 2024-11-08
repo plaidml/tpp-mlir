@@ -1,6 +1,6 @@
 // Validate default pipeline
 // RUN: tpp-run %s  \
-// RUN:  -e entry -entry-point-result=void
+// RUN:  -e entry -entry-point-result=void -n 10
 
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>

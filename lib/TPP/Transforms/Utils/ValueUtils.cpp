@@ -163,7 +163,6 @@ FailureOr<std::pair<Value, Value>> getPtrFromOp(OpBuilder &builder,
         if (alignedPointerAsI64->user_begin() !=
                 alignedPointerAsI64->user_end() &&
             isa<LLVM::IntToPtrOp>(*alignedPointerAsI64->user_begin())) {
-          alignedPointerAsI64->user_begin()->dump();
           alignedPointer =
               dyn_cast<LLVM::IntToPtrOp>(*alignedPointerAsI64->user_begin());
         }

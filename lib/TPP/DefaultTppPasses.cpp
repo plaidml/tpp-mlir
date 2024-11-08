@@ -8,13 +8,6 @@
 
 #include "TPP/PassBundles.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-
 #include "TPP/Conversion/ConvertVectorToXsmm/ConvertTranspose.h"
 #include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 #include "TPP/Dialect/Check/BufferizableOpInterfaceImpl.h"
@@ -22,7 +15,14 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/PassUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Linalg/Passes.h.inc"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
@@ -101,6 +101,7 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
+      pm.addPass(createLinalgFoldUnitExtentDimsPass());
       pm.addNestedPass<func::FuncOp>(createVectorizationPass());
       pm.addPass(mlir::vector::createLowerVectorMultiReductionPass());
       pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());

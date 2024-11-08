@@ -113,14 +113,15 @@ FailureOr<vector::ContractionOp>
 makeMinorDimensionsInnerMost(RewriterBase &rewriter,
                              vector::ContractionOp contractOp, unsigned m,
                              unsigned n, unsigned k, xsmm::DataTypeAttr type);
-std::optional<unsigned> getPosInCodomain(unsigned dim, Value operand,
-                                         vector::ContractionOp contractOp,
-                                         AffineMap map);
-FailureOr<xsmm::BrgemmInfo>
-checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
-            unsigned m, unsigned n, SmallVector<unsigned, 2> kVector,
-            std::optional<unsigned> batchPos, SmallVector<Value> inputs,
-            ArrayRef<AffineMap> indexingMap, bool checkTransposes);
+std::optional<unsigned>
+getPosInCodomain(unsigned dim, vector::ContractionOp contractOp, AffineMap map);
+FailureOr<xsmm::BrgemmInfo> checkAccess(PatternRewriter &rewriter,
+                                        vector::ContractionOp contractOp,
+                                        unsigned m, unsigned n, unsigned k,
+                                        std::optional<unsigned> batchPos,
+                                        SmallVector<Value> inputs,
+                                        ArrayRef<AffineMap> indexingMap,
+                                        bool checkTransposes, int operandIndex);
 
 bool isTwoDTransposeOp(vector::TransposeOp transposeOp);
 

@@ -80,6 +80,19 @@ struct HasStaticStrides {
   }
 };
 
+static bool isInnerMostDim(Value operand, unsigned minorDim,
+                           vector::ContractionOp contractOp,
+                           xsmm::DataTypeAttr dtype, int operandNumber,
+                           bool isVnni) {
+  auto shapedType = cast<VectorType>(operand.getType());
+  int64_t rank = shapedType.getRank();
+
+  if (isVnni && operandNumber == 1) {
+    return minorDim == rank - 2;
+  }
+  return minorDim == rank - 1;
+}
+
 // Structural matcher.
 static FailureOr<ContractionDimensions>
 checkStructure(vector::ContractionOp contractOp, SmallVector<Value> &inputs,
@@ -101,7 +114,7 @@ checkStructure(vector::ContractionOp contractOp, SmallVector<Value> &inputs,
 }
 
 // Return the position of `dim` in the codomain of `operand`.
-std::optional<unsigned> getPosInCodomain(unsigned dim, Value operand,
+std::optional<unsigned> getPosInCodomain(unsigned dim,
                                          vector::ContractionOp contractOp,
                                          AffineMap map) {
   return map.getResultPosition(getAffineDimExpr(dim, contractOp.getContext()));
@@ -110,10 +123,45 @@ std::optional<unsigned> getPosInCodomain(unsigned dim, Value operand,
 static SmallVector<int64_t, 4>
 createFlatListOfOperandStaticDims(vector::ContractionOp contractOp) {
   SmallVector<int64_t, 4> res;
-  for (OpOperand &opOperand : contractOp.getOperation()->getOpOperands())
-    llvm::append_range(
-        res, dyn_cast<VectorType>(opOperand.get().getType()).getShape());
+  for (int op = 0; op < contractOp.getOperation()->getNumOperands(); op++) {
+    Value operand = contractOp.getOperation()->getOperand(op);
+    llvm::append_range(res, dyn_cast<ShapedType>(operand.getType()).getShape());
+  }
   return res;
+}
+
+// Examples:
+// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
+// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
+// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
+// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
+// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
+static void
+computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
+                       ArrayRef<int64_t> lowerRankShape,
+                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
+  // Initialize new shapes with [1] * higherRank.
+  int64_t higherRank = higherRankShape.size();
+  int64_t lowerRank = lowerRankShape.size();
+
+  reshapeOutputShape.assign(higherRank, 1);
+
+  int64_t higherRankDim;
+  int64_t lowerRankDim;
+
+  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
+       i--, j--) {
+    higherRankDim = higherRankShape[i];
+    lowerRankDim = lowerRankShape[j];
+
+    if (lowerRankDim == 1 && higherRankDim > 1)
+      reshapeOutputShape[i] = 1;
+    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
+             (lowerRankDim == higherRankDim))
+      reshapeOutputShape[i] = lowerRankDim;
+    else if (higherRankDim != lowerRankDim)
+      assert(false && "bCast semantics for identity op broken");
+  }
 }
 
 static SmallVector<int64_t, 4>
@@ -121,13 +169,13 @@ computeStaticLoopSizes(vector::ContractionOp contractOp,
                        ArrayRef<AffineMap> maps) {
   AffineMap map = concatAffineMaps(maps);
   unsigned numDims = map.getNumDims(), numRes = map.getNumResults();
-  SmallVector<int64_t, 4> allShapeSizes =
-      createFlatListOfOperandStaticDims(contractOp);
   SmallVector<int64_t, 4> res(numDims, 0);
+  auto allShapeSizes = createFlatListOfOperandStaticDims(contractOp);
   for (unsigned idx = 0; idx < numRes; ++idx) {
     auto result = map.getResult(idx);
-    if (auto d = dyn_cast<AffineDimExpr>(result))
+    if (auto d = dyn_cast<AffineDimExpr>(result)) {
       res[d.getPosition()] = allShapeSizes[idx];
+    }
   }
   return res;
 }
@@ -158,80 +206,96 @@ getVNNIStaticStrides(MemRefType valueType) {
 // Access matcher.
 FailureOr<xsmm::BrgemmInfo>
 checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
-            unsigned m, unsigned n, SmallVector<unsigned, 2> kVector,
+            unsigned m, unsigned n, unsigned k,
             std::optional<unsigned> batchPos, SmallVector<Value> inputs,
-            ArrayRef<AffineMap> indexingMap, bool checkForTransposes) {
+            ArrayRef<AffineMap> indexingMap, bool checkForTransposes,
+            int operandIndex) {
+  int opZeroIndex = operandIndex, opOneIndex = 1 - operandIndex;
   Value operandA = inputs[0];
   Value operandB = inputs[1];
   Value operandC = inputs[2];
 
-  unsigned k = kVector[0];
-  if (*xsmm::utils::getPosInCodomain(
-          kVector[0], contractOp->getOpOperand(1).get(), contractOp,
-          contractOp.getIndexingMapsArray()[1]) <
-          *xsmm::utils::getPosInCodomain(
-              n, contractOp->getOpOperand(1).get(), contractOp,
-              contractOp.getIndexingMapsArray()[1]) ||
-      kVector.size() == 1) {
-    k = kVector[0];
-  } else if (kVector.size() > 1) {
-    k = kVector[1];
-  }
+  auto kPos =
+      *xsmm::utils::getPosInCodomain(k, contractOp, indexingMap[opZeroIndex]);
   auto checkStridesAndGetLdaAndBatch =
       [&](Value operand, AffineMap map, AffineMap transformMap,
           int operandIndex, std::map<bool, std::pair<int, int>> dimMap,
-          std::optional<int> batchPos) -> FailureOr<std::pair<int64_t, int>> {
+          std::optional<int> batchPos, bool isVnni,
+          int vnniFactor) -> FailureOr<std::pair<int64_t, int>> {
     AffineMap indexingMap = map;
     bool permutation = false;
-    if (map != transformMap) {
-      Value source = operand.getDefiningOp()->getOperand(0);
-      auto partialIndexingMap = inversePermutation(compressUnusedDims(map));
-      if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
-        if (checkForTransposes) {
-          auto invokeOpSource =
-              mlir::utils::getPtrFromOp(rewriter, source, source.getLoc());
-          if (succeeded(invokeOpSource)) {
-            auto invokeOp = dyn_cast<mlir::func::CallOp>(
-                *(*invokeOpSource->first.user_begin()));
-            auto dispatchOp = invokeOp->getOperand(1).getDefiningOp();
-            int constVal =
-                dyn_cast<IntegerAttr>(dyn_cast<arith::ConstantOp>(
-                                          dyn_cast<func::CallOp>(dispatchOp)
-                                              .getOperand(0)
-                                              .getDefiningOp())
-                                          .getValue())
-                    .getInt();
-            if (constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
-                                                     xsmm::UnaryKind::VNNI2)
-                                .getInt() ||
-                constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
-                                                     xsmm::UnaryKind::TRANSPOSE)
-                                .getInt()) {
-              partialIndexingMap = inversePermutation(partialIndexingMap);
-            }
 
-            indexingMap =
-                transformMap.compose(partialIndexingMap.getMinorIdentityMap(
-                    map.getNumDims(), map.getNumDims(), rewriter.getContext()));
+    auto partialIndexingMap = inversePermutation(compressUnusedDims(map));
+    if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
+      if (checkForTransposes) {
+        auto invokeOpSource = mlir::utils::getPtrFromOp(
+            rewriter, operand.getDefiningOp()->getOperand(0),
+            operand.getDefiningOp()->getLoc());
+        if (succeeded(invokeOpSource)) {
+          auto invokeOp = dyn_cast<mlir::func::CallOp>(
+              *(*invokeOpSource->first.user_begin()));
+          auto dispatchOp = invokeOp->getOperand(1).getDefiningOp();
+          int constVal =
+              dyn_cast<IntegerAttr>(
+                  dyn_cast<arith::ConstantOp>(dyn_cast<func::CallOp>(dispatchOp)
+                                                  .getOperand(0)
+                                                  .getDefiningOp())
+                      .getValue())
+                  .getInt();
+          if (constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                                   xsmm::UnaryKind::VNNI2)
+                              .getInt() ||
+              constVal == xsmm::UnaryKindAttr::get(rewriter.getContext(),
+                                                   xsmm::UnaryKind::TRANSPOSE)
+                              .getInt()) {
             permutation = true;
+          }
+        } else {
+          auto memLoc = operand.getDefiningOp()->getOperand(0);
+          for (auto use = memLoc.user_begin(); use != memLoc.user_end();
+               use++) {
+            Operation *op = *use;
+            if (op != NULL && dyn_cast<vector::TransferWriteOp>(op) != NULL) {
+              auto transferWriteOperand =
+                  (dyn_cast<vector::TransferWriteOp>(op));
+              if (transferWriteOperand.getOperand(0).getDefiningOp() != NULL &&
+                  isa<vector::TransposeOp>(
+                      transferWriteOperand.getOperand(0).getDefiningOp())) {
+                permutation = true;
+                break;
+              }
+            }
           }
         }
       }
     }
+    if (permutation) {
+      partialIndexingMap = inversePermutation(partialIndexingMap);
+      indexingMap = transformMap.compose(partialIndexingMap.getMinorIdentityMap(
+          map.getNumDims(), map.getNumDims(), rewriter.getContext()));
+    }
     int minorDim = dimMap[permutation].first;
     int majorDim = dimMap[permutation].second;
-    auto minorDimPosInCodomain = xsmm::utils::getPosInCodomain(
-        minorDim, operand, contractOp, indexingMap);
-    auto majorDimPosInCodomain = xsmm::utils::getPosInCodomain(
-        majorDim, operand, contractOp, indexingMap);
+    auto minorDimPosInCodomain =
+        xsmm::utils::getPosInCodomain(minorDim, contractOp, indexingMap);
+    auto majorDimPosInCodomain =
+        xsmm::utils::getPosInCodomain(majorDim, contractOp, indexingMap);
     if (!minorDimPosInCodomain || !majorDimPosInCodomain) {
       return failure();
     }
-
+    auto permMap = compressUnusedDims(map);
+    if (permutation &&
+        (permMap.getNumResults() - 2 ==
+             permMap.getDimPosition(permMap.getNumResults() - 1) &&
+         permMap.getNumResults() - 1 ==
+             permMap.getDimPosition(permMap.getNumResults() - 2))) {
+      auto temp = majorDimPosInCodomain;
+      majorDimPosInCodomain = minorDimPosInCodomain;
+      minorDimPosInCodomain = temp;
+    }
     auto dataType = xsmm::utils::getDataType(rewriter, operand.getType());
     MemRefType type;
     if (operand.getDefiningOp() != NULL) {
-
       if (isa<memref::ExpandShapeOp>(operand.getDefiningOp()) ||
           isa<memref::SubViewOp>(operand.getDefiningOp())) {
         type = dyn_cast<MemRefType>(
@@ -239,68 +303,92 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
       } else if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
         type = dyn_cast<MemRefType>(
             operand.getDefiningOp()->getOperand(0).getType());
-      } else if (isa<MemRefType>(operand.getType())) {
-        type = dyn_cast<MemRefType>(operand.getType());
       } else {
         type = dyn_cast<MemRefType>(
             operand.getDefiningOp()->getOperand(0).getType());
       }
+    } else if (isa<MemRefType>(operand.getType())) {
+      type = dyn_cast<MemRefType>(operand.getType());
     }
+
     auto shape = type.getShape();
     if (permutation) {
-      shape = applyPermutationMap<int64_t>(compressUnusedDims(indexingMap),
-                                           type.getShape());
+      shape =
+          applyPermutationMap<int64_t>(compressUnusedDims(indexingMap), shape);
       type = MemRefType::get(
           {shape}, dyn_cast<ShapedType>(operand.getType()).getElementType());
     }
+    auto stride = 1;
+    if (batchPos && batchPos.value() >= 0) {
+      auto batchPosCodomainA =
+          getPosInCodomain(batchPos.value(), contractOp, indexingMap);
+      auto stridesOnA = ::mlir::utils::getStaticStrides(type);
+      if (succeeded(stridesOnA) && batchPosCodomainA) {
+        stride = (*stridesOnA)[*batchPosCodomainA];
+      }
+    }
+
     FailureOr<SmallVector<int64_t>> stridesOnOperand;
-    if (dataType == xsmm::DataTypeAttr::get(contractOp.getContext(),
-                                            xsmm::DataType::BF16) &&
-        operandIndex == 1) {
+    if (isVnni && operandIndex == 1) {
       stridesOnOperand = getVNNIStaticStrides(type);
     } else {
       stridesOnOperand = ::mlir::utils::getStaticStrides(type);
     }
     if (failed(stridesOnOperand) ||
-        ((dataType != xsmm::DataTypeAttr::get(contractOp.getContext(),
-                                              xsmm::DataType::BF16) &&
-          (*stridesOnOperand)[*minorDimPosInCodomain] != 1))) {
+        (!isVnni && (*stridesOnOperand)[*minorDimPosInCodomain] != 1)) {
       return failure();
     }
 
-    auto stride = 1;
-    if (batchPos >= 0) {
-      auto batchPosCodomainA =
-          getPosInCodomain(batchPos.value(), operand, contractOp, indexingMap);
-      auto stridesOnA = ::mlir::utils::getStaticStrides(type);
-      if (succeeded(stridesOnA)) {
-        stride = (*stridesOnA)[*batchPosCodomainA];
-      }
-    }
-    if (dataType == xsmm::DataTypeAttr::get(contractOp.getContext(),
-                                            xsmm::DataType::BF16) &&
-        operandIndex == 1) {
-      if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
-        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain + 1],
-                              stride);
-      } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 1) {
-        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain - 1],
-                              stride);
-      } else {
-        return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain],
-                              stride);
+    if (isVnni) {
+      if (operandIndex == 1) {
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 3) {
+          return std::make_pair(
+              (*stridesOnOperand)[*majorDimPosInCodomain] / vnniFactor, stride);
+        }
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
+          return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain] + 1,
+                                stride);
+        } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 1) {
+          return std::make_pair((long)vnniFactor, stride);
+        }
       }
     } else {
-      return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain],
-                            stride);
+      if (operandIndex == 0 && isVnni) {
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
+          return std::make_pair((long)vnniFactor, stride);
+        } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 3) {
+          return std::make_pair(
+              (*stridesOnOperand)[*majorDimPosInCodomain] / vnniFactor, stride);
+        }
+      }
     }
+
+    return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain], stride);
   };
+
+  auto vnniBlockingFactor =
+      vnni::utils::getVnniBlockingFactor(inputs[1].getType());
+  bool isVnni = false;
+  auto vnniFactor = 1;
+  if (vnniBlockingFactor) {
+    vnniFactor = *vnniBlockingFactor;
+    isVnni = succeeded(vnni::utils::isInVnniLayout(contractOp, vnniFactor));
+  }
 
   std::map<bool, std::pair<int, int>> ldaIndexMap;
   ldaIndexMap[false] = std::make_pair(k, m);
   ldaIndexMap[true] = std::make_pair(n, k);
+
+  std::map<bool, std::pair<int, int>> ldbIndexMap;
+  ldbIndexMap[false] = std::make_pair(n, k);
+  ldbIndexMap[true] = std::make_pair(k, m);
+
+  SmallVector<std::map<bool, std::pair<int, int>>> indexMapArray = {
+      ldaIndexMap, ldbIndexMap};
+
   auto ldaVal = checkStridesAndGetLdaAndBatch(
-      operandA, indexingMap[0], indexingMap[1], 0, ldaIndexMap, batchPos);
+      operandA, indexingMap[opZeroIndex], indexingMap[opOneIndex], 0,
+      indexMapArray[0], batchPos, isVnni, vnniFactor);
 
   if (failed(ldaVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute lda\n");
@@ -313,11 +401,9 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
                              "A: OK "
                           << lda << "\n");
 
-  std::map<bool, std::pair<int, int>> ldbIndexMap;
-  ldbIndexMap[false] = std::make_pair(n, k);
-  ldbIndexMap[true] = std::make_pair(k, m);
   auto ldbVal = checkStridesAndGetLdaAndBatch(
-      operandB, indexingMap[1], indexingMap[0], 1, ldbIndexMap, batchPos);
+      operandB, indexingMap[opOneIndex], indexingMap[opZeroIndex], 1,
+      indexMapArray[1], batchPos, isVnni, vnniFactor);
 
   if (failed(ldbVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldb\n");
@@ -335,8 +421,9 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
   ldcIndexMap[true] = std::make_pair(n, m);
   ldcIndexMap[false] = std::make_pair(n, m);
   int batch = -1;
-  auto ldcVal = checkStridesAndGetLdaAndBatch(
-      operandC, indexingMap[2], indexingMap[2], 2, ldcIndexMap, batch);
+  auto ldcVal =
+      checkStridesAndGetLdaAndBatch(operandC, indexingMap[2], indexingMap[2], 2,
+                                    ldcIndexMap, batchPos, isVnni, vnniFactor);
   if (failed(ldcVal)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldc\n");
     return failure();
@@ -346,15 +433,16 @@ checkAccess(PatternRewriter &rewriter, vector::ContractionOp contractOp,
                              "mm] Strides on "
                              "C: OK "
                           << ldc << "\n");
-
   auto loops = computeStaticLoopSizes(contractOp, indexingMap);
   int64_t batchVal = (batchPos) ? loops[batchPos.value()] : 0;
-  auto loopsK = 1;
-  for (auto kItr : kVector)
-    loopsK *= loops[kItr];
+  auto loopsK = loops[k];
+  if (isVnni && !batchVal &&
+      dyn_cast<ShapedType>(inputs[0].getType()).getRank() - 2 == kPos) {
+    loopsK *= vnniFactor;
+  }
 
   xsmm::BrgemmInfo info{loops[m], loops[n], loopsK,  batchVal, lda,
-                        ldb,      ldc,      strideA, strideB};
+                        ldb,      ldc,      strideA, strideB,  isVnni};
   return info;
 }
 
@@ -396,34 +484,44 @@ isMappableToBrgemm(PatternRewriter &rewriter, vector::ContractionOp contractOp,
   }
   unsigned m = contractionDims->m.back();
   unsigned n = contractionDims->n.back();
-  SmallVector<unsigned, 2> kVector;
+  SmallVector<unsigned> kVector;
   std::optional<unsigned> batch;
   auto pos = xsmm::utils::getPosInCodomain(
-      contractionDims->k[0], inputs[0], contractOp,
-      contractOp.getIndexingMapsArray()[0]);
+      contractionDims->k[0], contractOp, contractOp.getIndexingMapsArray()[0]);
+  int prevPos = -1;
+  int prevIndex = -1;
   int index = 0;
-  if (contractionDims->k.size() >= 2) {
+  bool isVnni = vnni::utils::isInVnniLayout(
+      dyn_cast<VectorType>(inputs[1].getType()).getRank(),
+      dyn_cast<VectorType>(inputs[1].getType()));
+
+  if (contractionDims->k.size() > 1) {
     for (int i = 1; i < contractionDims->k.size(); i++) {
-      auto posTwo = xsmm::utils::getPosInCodomain(
-          contractionDims->k[i], inputs[0], contractOp,
-          contractOp.getIndexingMapsArray()[0]);
+      auto posTwo =
+          xsmm::utils::getPosInCodomain(contractionDims->k[i], contractOp,
+                                        contractOp.getIndexingMapsArray()[0]);
       if (*posTwo < *pos) {
-        index = i;
+        prevPos = *pos;
+        prevIndex = index;
         pos = posTwo;
+        index = i;
+      } else if (prevIndex == -1 || *posTwo < prevPos) {
+        prevPos = *posTwo;
+        prevIndex = i;
       }
     }
   }
-  if (contractionDims->k.size() >= 2) {
-    batch = contractionDims->k[index];
-    for (int i = 0; i < contractionDims->k.size(); i++) {
-      if (i == index)
-        continue;
-      kVector.push_back(contractionDims->k[i]);
-    }
+
+  unsigned k;
+  if (prevIndex == -1 ||
+      (dyn_cast<ShapedType>(inputs[0].getType()).getRank() - 1 == prevPos &&
+       isVnni)) {
+    k = contractionDims->k[index];
   } else {
-    for (size_t i = 0; i < contractionDims->k.size(); i++)
-      kVector.push_back(contractionDims->k[i]);
+    batch = contractionDims->k[index];
+    k = contractionDims->k[prevIndex];
   }
+
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
                              "mm] Candidate "
                              "dims: "
@@ -442,14 +540,14 @@ isMappableToBrgemm(PatternRewriter &rewriter, vector::ContractionOp contractOp,
     LLVM_DEBUG(llvm::dbgs() << "[isMappableToBr"
                                "gemm] no batch "
                                "dim\n");
-  auto retval = checkAccess(rewriter, contractOp, m, n, kVector, batch, inputs,
-                            indexingMap, checkForTransposes);
+  auto retval = checkAccess(rewriter, contractOp, m, n, k, batch, inputs,
+                            indexingMap, checkForTransposes, 0);
   if (failed(retval)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to check access\n");
     return failure();
   }
   return retval;
-}
+};
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
   auto elemType = getElementTypeOrSelf(type);
@@ -465,33 +563,57 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
 
   assert(isa<ShapedType>(outputType));
   auto outputShapedType = cast<ShapedType>(outputType);
-  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
+  if (!outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
   }
 
   UnaryInfo unaryInfo;
-  unaryInfo.m = outputShapedType.getShape()[1];
-  unaryInfo.n = outputShapedType.getShape()[0];
-  int ldi = 1;
-  if (ShapedType inputShapedType = dyn_cast<ShapedType>(input.getType())) {
+  unaryInfo.m = 1;
+  for (int i = 0; i < outputShapedType.getShape().size() - 1; i++) {
+    unaryInfo.m *= outputShapedType.getShape()[i];
+  }
+  unaryInfo.n =
+      outputShapedType.getShape()[outputShapedType.getShape().size() - 1];
+  int ldo = 1;
+
+  ShapedType inputShapedType;
+  if (inputShapedType = dyn_cast<ShapedType>(input.getType())) {
     SmallVector<int64_t> strides;
     int64_t offset;
-    getStridesAndOffset(dyn_cast<MemRefType>(inputShapedType), strides, offset);
-    ldi = strides.front();
+    SmallVector<int64_t> bShapeInput;
+    computeBcastShapeInput(outputShapedType.getShape(),
+                           inputShapedType.getShape(), bShapeInput);
+    auto memrefType =
+        MemRefType::get(bShapeInput, inputShapedType.getElementType());
+    getStridesAndOffset(memrefType, strides, offset);
+    ldo = strides[0];
   }
 
-  unaryInfo.ldi = ldi;
-  int ldo = 1;
-  if (ShapedType outputShapedType = dyn_cast<ShapedType>(output.getType())) {
+  unaryInfo.ldo = ldo;
+  int ldi = 1;
+  // If we are broascasting a row into cols, the leading
+  // dimension is 1, same for scalar broadcast.
+  if (inputFlag == UnaryFlags::BCAST_ROW ||
+      inputFlag == UnaryFlags::BCAST_SCALAR) {
+    ldi = 1;
+  } // If we are broascasting a col into rows, the leading
+  // dimension is the size of the tensor.
+  else if (inputFlag == UnaryFlags::BCAST_COL) {
+    ldi = inputShapedType.getShape()[0];
+  } else if (ShapedType outputShapedType =
+                 dyn_cast<ShapedType>(output.getType())) {
     SmallVector<int64_t> strides;
     int64_t offset;
-    auto memrefType = MemRefType::get(outputShapedType.getShape(),
-                                      outputShapedType.getElementType());
+    SmallVector<int64_t> bShapeInput;
+    computeBcastShapeInput(cast<ShapedType>(outputType).getShape(),
+                           outputShapedType.getShape(), bShapeInput);
+    auto memrefType =
+        MemRefType::get(bShapeInput, outputShapedType.getElementType());
     getStridesAndOffset(memrefType, strides, offset);
-    ldo = strides.front();
+    ldi = strides[0];
   }
-  unaryInfo.ldo = ldo;
+  unaryInfo.ldi = ldi;
   return unaryInfo;
 }
 
@@ -501,14 +623,18 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
 
   assert(isa<ShapedType>(outputType));
   auto outputShapedType = cast<ShapedType>(outputType);
-  if (outputShapedType.getRank() != 2 || !outputShapedType.hasStaticShape() ||
+  if (!outputShapedType.hasStaticShape() ||
       !isa<FloatType>(outputShapedType.getElementType())) {
     return failure();
   }
 
   BinaryInfo binaryInfo;
-  binaryInfo.m = outputShapedType.getShape()[0];
-  binaryInfo.n = outputShapedType.getShape()[1];
+  binaryInfo.n = 1;
+  for (int i = 0; i < outputShapedType.getShape().size() - 1; i++) {
+    binaryInfo.n *= outputShapedType.getShape()[i];
+  }
+  binaryInfo.m =
+      outputShapedType.getShape()[outputShapedType.getShape().size() - 1];
 
   int64_t ldiLhs = 1;
   if (ShapedType lhsShapedType = dyn_cast<ShapedType>(lhs.getType())) {
@@ -556,45 +682,8 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
   return binaryInfo;
 }
 
-// Examples:
-// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
-// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
-// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
-// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
-// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
-static void
-computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
-                       ArrayRef<int64_t> lowerRankShape,
-                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
-  // Initialize new shapes with [1] * higherRank.
-  int64_t higherRank = higherRankShape.size();
-  int64_t lowerRank = lowerRankShape.size();
-
-  reshapeOutputShape.assign(higherRank, 1);
-
-  int64_t higherRankDim;
-  int64_t lowerRankDim;
-
-  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    higherRankDim = higherRankShape[i];
-    lowerRankDim = lowerRankShape[j];
-
-    if (lowerRankDim == 1 && higherRankDim > 1)
-      reshapeOutputShape[i] = 1;
-    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
-             (lowerRankDim == higherRankDim))
-      reshapeOutputShape[i] = lowerRankDim;
-    else if (higherRankDim != lowerRankDim)
-      assert(false && "bCast semantics for identity op broken");
-  }
-}
-
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(isa<ShapedType>(outputType) && "expect shaped type on output");
-  assert(cast<ShapedType>(outputType).getRank() == 2 &&
-         "expect rank 2 on output");
-
   if (!isa<ShapedType>(inputType) ||
       cast<ShapedType>(inputType).getRank() == 0) {
     return xsmm::UnaryFlags::BCAST_SCALAR;
@@ -618,7 +707,8 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   if (llvm::all_of(shapeInput, isOne))
     return xsmm::UnaryFlags::BCAST_SCALAR;
 
-  if (shapeInput[1] == 1 && shapeOutput[1] > 1)
+  if (shapeInput[shapeInput.size() - 1] == 1 &&
+      shapeOutput[shapeInput.size() - 1] > 1)
     return xsmm::UnaryFlags::BCAST_ROW;
 
   if (shapeInput[0] == 1 && shapeOutput[0] > 1)
@@ -712,8 +802,8 @@ FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
   }
 
   enum class BCastType { NONE = 0, SCALAR, ROW, COL };
-  auto shapeOutput = cast<VectorType>(outputType).getShape();
-  auto shapeOperand = cast<MemRefType>(operandType).getShape();
+  auto shapeOutput = cast<ShapedType>(outputType).getShape();
+  auto shapeOperand = cast<ShapedType>(operandType).getShape();
   return getBinFlags(shapeOutput, shapeOperand, operandNumber);
 }
 
@@ -739,18 +829,6 @@ FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
   return strides[pos];
 }
 
-static bool isInnerMostDim(OpOperand *operand, unsigned minorDim,
-                           vector::ContractionOp contractOp,
-                           xsmm::DataTypeAttr dtype, int operandNumber) {
-  auto shapedType = cast<VectorType>(operand->get().getType());
-  int64_t rank = shapedType.getRank();
-  if (dtype == xsmm::DataTypeAttr::get(contractOp.getContext(),
-                                       xsmm::DataType::BF16) &&
-      (operandNumber == 1 || operandNumber == 0)) {
-    return minorDim == rank - 2;
-  }
-  return minorDim == rank - 1;
-}
 // Emit a transpose operation for `operand` by swapping `dim` with `newDim`.
 // Emit a transpose operation for `operand` by swapping the dimensions at index
 // `dim` with `newDim`.
@@ -776,37 +854,6 @@ static void emitTransposeOnOperand(RewriterBase &rewriter,
 
   vector::TransposeOp transposeResult = rewriter.create<vector::TransposeOp>(
       loc, vectorType, operand, permutation);
-  /*  auto writeMemrefSubviewDefinition =
-        operand.getDefiningOp()->getOperand(0).getDefiningOp();
-    assert(isa<memref::SubViewOp>(writeMemrefSubviewDefinition));
-    auto writeMemrefSubview =
-    dyn_cast<memref::SubViewOp>(writeMemrefSubviewDefinition); auto
-    writeMemrefDefinition =
-        operand.getDefiningOp()->getOperand(0).getDefiningOp()->getOperand(0);*/
-  /*  auto memref = rewriter.create<memref::AllocaOp>(
-        operand.getLoc(),
-        MemRefType::get(
-            dyn_cast<ShapedType>(writeMemrefDefinition.getType()).getShape(),
-            operandType.getElementType()));
-    auto writeSubviewType = MemRefType::get(
-        dyn_cast<ShapedType>(writeMemrefSubview.getResult().getType()).getShape(),
-        dyn_cast<MemRefType>(writeMemrefSubview.getType()).getElementType());
-
-    auto [originalStride, originalOffset] = getStridesAndOffset(
-        dyn_cast<MemRefType>(writeMemrefSubview.getResult().getType()));
-    writeSubviewType = MemRefType::get(
-        dyn_cast<ShapedType>(writeMemrefSubview.getResult().getType()).getShape(),
-        dyn_cast<MemRefType>(writeSubviewType).getElementType(),
-        StridedLayoutAttr::get(rewriter.getContext(), ShapedType::kDynamic,
-                               originalStride));
-
-    auto writeMemrefSubviewOp = rewriter.create<memref::SubViewOp>(
-        operand.getLoc(), dyn_cast<MemRefType>(writeSubviewType), memref,
-        writeMemrefSubview.getOffsets(), writeMemrefSubview.getSizes(),
-        writeMemrefSubview.getStrides(), writeMemrefSubview.getStaticOffsets(),
-        writeMemrefSubview.getStaticSizes(),
-    writeMemrefSubview.getStaticStrides());
-   */
   SmallVector<Value> indices(vectorType.getRank(),
                              rewriter.create<arith::ConstantIndexOp>(loc, 0));
 
@@ -856,9 +903,9 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
   // k is expected to be the innermost for A
   // n is expected to be the innermost for B
   auto minorKInCodomainOpA = xsmm::utils::getPosInCodomain(
-      k, operandA->get(), contractOp, contractOp.getIndexingMapsArray()[0]);
+      k, contractOp, contractOp.getIndexingMapsArray()[0]);
   auto minorMInCodomainOpA = xsmm::utils::getPosInCodomain(
-      m, operandA->get(), contractOp, contractOp.getIndexingMapsArray()[0]);
+      m, contractOp, contractOp.getIndexingMapsArray()[0]);
   if (!minorKInCodomainOpA || !minorMInCodomainOpA) {
     LLVM_DEBUG(
         llvm::dbgs()
@@ -866,9 +913,9 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
     return failure();
   }
   auto minorNInCodomainOpB = xsmm::utils::getPosInCodomain(
-      n, operandB->get(), contractOp, contractOp.getIndexingMapsArray()[1]);
+      n, contractOp, contractOp.getIndexingMapsArray()[1]);
   auto minorKInCodomainOpB = xsmm::utils::getPosInCodomain(
-      k, operandB->get(), contractOp, contractOp.getIndexingMapsArray()[1]);
+      k, contractOp, contractOp.getIndexingMapsArray()[1]);
   if (!minorNInCodomainOpB || !minorKInCodomainOpB) {
     LLVM_DEBUG(
         llvm::dbgs()
@@ -876,61 +923,78 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
     return failure();
   }
   auto minorNInCodomainOpC = xsmm::utils::getPosInCodomain(
-      n, operandC.get(), contractOp, contractOp.getIndexingMapsArray()[2]);
+      n, contractOp, contractOp.getIndexingMapsArray()[2]);
   auto minorMInCodomainOpC = xsmm::utils::getPosInCodomain(
-      m, operandC.get(), contractOp, contractOp.getIndexingMapsArray()[2]);
+      m, contractOp, contractOp.getIndexingMapsArray()[2]);
   if (!minorNInCodomainOpC || !minorMInCodomainOpC) {
     LLVM_DEBUG(
         llvm::dbgs()
         << "[makeMinorDimensionsInnerMost] did not find minor dims for C\n");
     return failure();
   }
-  if (!isInnerMostDim(&operandC, *minorNInCodomainOpC, contractOp, type, 2)) {
+
+  auto vnniFactor = 1;
+  bool isVnni = false;
+  auto vnniBlockingFactor =
+      vnni::utils::getVnniBlockingFactor(contractOp.getOperand(1).getType());
+  if (vnniBlockingFactor) {
+    vnniFactor = *vnniBlockingFactor;
+    isVnni = succeeded(vnni::utils::isInVnniLayout(contractOp, vnniFactor));
+  }
+  if (!isInnerMostDim(operandC.get(), *minorNInCodomainOpC, contractOp, type, 2,
+                      isVnni)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for C\n");
-    if (isInnerMostDim(&operandC, *minorMInCodomainOpC, contractOp, type, 2)) {
-      if (isInnerMostDim(operandA, *minorKInCodomainOpA, contractOp, type, 0)) {
+    if (isInnerMostDim(operandC.get(), *minorMInCodomainOpC, contractOp, type,
+                       2, isVnni)) {
+      if (isInnerMostDim(operandA->get(), *minorKInCodomainOpA, contractOp,
+                         type, 0, isVnni)) {
         emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
                                *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
       }
-      if (isInnerMostDim(operandB, *minorNInCodomainOpB, contractOp, type, 1)) {
+      if (isInnerMostDim(operandB->get(), *minorNInCodomainOpB, contractOp,
+                         type, 1, isVnni)) {
         emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
                                *minorNInCodomainOpB, *minorKInCodomainOpB, 1);
       }
-    }
-    // Avoid transpose on the output by swapping A and B.
-    OpOperand *operandA = &contractOp->getOpOperand(0);
-    OpOperand *operandB = &contractOp->getOpOperand(1);
-    SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
-    std::swap(indexingMaps[0], indexingMaps[1]);
-    rewriter.modifyOpInPlace(contractOp, [&]() {
-      Value operandATmp = operandA->get();
-      contractOp->setOperand(0, operandB->get());
-      contractOp->setOperand(1, operandATmp);
-      contractOp.setIndexingMapsAttr(
-          ArrayAttr::get(contractOp.getContext(),
-                         llvm::to_vector(llvm::map_range(
-                             indexingMaps, [](AffineMap map) -> Attribute {
-                               return AffineMapAttr::get(map);
-                             }))));
-    });
-    return contractOp;
-  }
-
-  if (!isInnerMostDim(operandA, *minorKInCodomainOpA, contractOp, type, 0)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
-    if (isInnerMostDim(operandA, *minorMInCodomainOpA, contractOp, type, 0)) {
-      emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
-                             *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
+      // Avoid transpose on the output by swapping A and B.
+      OpOperand *operandA = &contractOp->getOpOperand(0);
+      OpOperand *operandB = &contractOp->getOpOperand(1);
+      SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
+      std::swap(indexingMaps[0], indexingMaps[1]);
+      rewriter.modifyOpInPlace(contractOp, [&]() {
+        Value operandATmp = operandA->get();
+        contractOp->setOperand(0, operandB->get());
+        contractOp->setOperand(1, operandATmp);
+        contractOp.setIndexingMapsAttr(
+            ArrayAttr::get(contractOp.getContext(),
+                           llvm::to_vector(llvm::map_range(
+                               indexingMaps, [](AffineMap map) -> Attribute {
+                                 return AffineMapAttr::get(map);
+                               }))));
+      });
+      return contractOp;
     }
   }
-  if (!isInnerMostDim(operandB, *minorNInCodomainOpB, contractOp, type, 1)) {
+  if (!isInnerMostDim(operandB->get(), *minorNInCodomainOpB, contractOp, type,
+                      1, isVnni)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
-    if (isInnerMostDim(operandB, *minorKInCodomainOpB, contractOp, type, 1)) {
+    if (isInnerMostDim(operandB->get(), *minorKInCodomainOpB, contractOp, type,
+                       1, isVnni)) {
       emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
                              *minorKInCodomainOpB, *minorNInCodomainOpB, 1);
+    }
+  }
+
+  if (!isInnerMostDim(operandA->get(), *minorKInCodomainOpA, contractOp, type,
+                      0, isVnni)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
+    if (isInnerMostDim(operandA->get(), *minorMInCodomainOpA, contractOp, type,
+                       0, isVnni)) {
+      emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
+                             *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
     }
   }
   return contractOp;

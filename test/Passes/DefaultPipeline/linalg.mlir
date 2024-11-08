@@ -190,9 +190,14 @@ func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
   // CHECK-DAG: %[[CST1:.*]] = arith.constant 0.000000e+00
   // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00>
   // CHECK-DAG: call @xsmm_gemm_dispatch
-  // CHECK:  %[[input:.*]] = vector.transfer_read %[[ARG2]][%[[C0]]], %[[CST1]]
-  // CHECK:  %[[bcastInput:.*]] = vector.broadcast %[[input]]
-  // CHECK:   vector.transfer_write %[[bcastInput]], %[[ARG3]][%[[C0]], %[[C0]]]
+  // CHECK-DAG: call @xsmm_unary_dispatch
+  // CHECK-DAG: %[[unaryptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]] : memref<512xf32> -> index
+  // CHECK-NEXT:  %[[cast0:.*]] = arith.index_cast %[[unaryptr0]] : index to i64
+  // CHECK-NEXT:  %[[inttoptr0:.*]] = llvm.inttoptr %[[cast0]] : i64 to !llvm.ptr
+  // CHECK-DAG:   %[[unaryptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]] : memref<128x512xf32> -> index
+  // CHECK-NEXT:  %[[cast1:.*]] = arith.index_cast %[[unaryptr1]] : index to i64
+  // CHECK-NEXT:  %[[inttoptr1:.*]] = llvm.inttoptr %[[cast1]] : i64 to !llvm.ptr
+  // CHECK:  call @xsmm_unary_invoke({{.*}}%[[inttoptr0]], %[[C0]], %[[inttoptr1]], %[[C0]]
 
   // CHECK-DAG: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
   // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
@@ -202,11 +207,7 @@ func.func @mlp(%arg0: memref<128x256xf32>, %arg1: memref<256x512xf32>,
   // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
   // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
 
-  // CHECK-DAG: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG3]]
-  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
-
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
+  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[inttoptr1]], %[[C0]]
   linalg.matmul ins(%arg0, %arg1 : memref<128x256xf32>, memref<256x512xf32>)
                 outs(%arg3 : memref<128x512xf32>)
 

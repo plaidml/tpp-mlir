@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
@@ -38,22 +39,6 @@ using namespace mlir::func;
 #include "ConvertTransposePDLLPatterns.h.inc"
 
 #define DEBUG_TYPE "convert-transpose"
-
-static FailureOr<Operation *> getUserImpl(PatternRewriter &rewriter,
-                                          Operation *op) {
-  if (op != NULL && !op->getResult(0).use_empty()) {
-    for (auto user = op->getResult(0).user_begin();
-         user != op->getResult(0).user_end() && !op->getResult(0).use_empty();
-         user++) {
-      if ((*user) != nullptr &&
-          ((*user)->use_empty())) { //&&  isMemoryEffectFree(*user))) {
-        return *user;
-      }
-      return failure();
-    }
-  }
-  return failure();
-}
 
 static std::pair<Operation *, Operation *>
 buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
@@ -146,7 +131,7 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
   }
 
   auto unaryInfo = xsmm::utils::getUnaryInfo(
-      input->getOperand(0), output->getOperand(1), input->getOperand(1),
+      input->getOperand(0), output->getOperand(1), input->getResult(0),
       output->getOperand(0), xsmm::UnaryFlags::NONE);
   auto functionOp = transposeOp->getParentOfType<func::FuncOp>();
   OpBuilder::InsertionGuard guard(rewriter);
@@ -165,8 +150,8 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
 
   // Dispatch the inputs.
   DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo->m, unaryInfo->n,
-                                               unaryInfo->ldi, unaryInfo->ldo});
+      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo->n, unaryInfo->m,
+                                               unaryInfo->ldo, unaryInfo->ldi});
 
   for (auto idx = 0; idx < dims.size(); idx++) {
     dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
@@ -228,7 +213,7 @@ validateTransposeOpImpl(PatternRewriter &rewriter, Operation *transposeOp,
     if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
       return failure(transposeOp);
     auto unaryInfo = xsmm::utils::getUnaryInfo(
-        input->getOperand(0), output->getOperand(1), input->getOperand(1),
+        input->getOperand(0), output->getOperand(1), input->getResult(0),
         output->getOperand(0), xsmm::UnaryFlags::NONE);
     if (failed(unaryInfo)) {
       return failure(transposeOp);
@@ -239,7 +224,7 @@ validateTransposeOpImpl(PatternRewriter &rewriter, Operation *transposeOp,
       return failure(transposeOp);
     }
     auto unaryInfo = xsmm::utils::getUnaryInfo(
-        input->getOperand(0), output->getOperand(1), input->getOperand(1),
+        input->getOperand(0), output->getOperand(1), input->getResult(0),
         output->getOperand(0), xsmm::UnaryFlags::NONE);
     if (failed(unaryInfo)) {
       return failure(transposeOp);
@@ -253,7 +238,6 @@ void registerNativeTransposeRewrite(RewritePatternSet &patterns) {
                                                     buildTransposeOp);
   patterns.getPDLPatterns().registerConstraintFunction("ValidateTranspose",
                                                        validateTransposeOpImpl);
-  patterns.getPDLPatterns().registerRewriteFunction("GetUser", getUserImpl);
 }
 
 namespace mlir {
@@ -298,43 +282,77 @@ struct ConvertTranspose
             return WalkResult::skip();
           unsigned m = contractionDims->m[0];
           unsigned n = contractionDims->n[0];
-          SmallVector<unsigned, 2> kVector;
+          SmallVector<unsigned> kVector;
           std::optional<unsigned> batch;
           SmallVector<Value> inputs;
 
           inputs.push_back(contractOp->getOpOperand(0).get());
           inputs.push_back(contractOp->getOpOperand(1).get());
           inputs.push_back(contractOp->getOpOperand(2).get());
-          if (contractionDims->k.size() >= 2) {
-            int i = 0;
-            for (auto dim = contractionDims->k.begin();
-                 dim != contractionDims->k.end(); dim++, i++) {
-              if (i == 0)
-                continue;
-              kVector.push_back(*dim);
+          auto pos = xsmm::utils::getPosInCodomain(
+              contractionDims->k[0], contractOp,
+              contractOp.getIndexingMapsArray()[1]);
+          int operandIndex = 1;
+          bool posChanged = false;
+          int prevIndex = -1;
+          int index = 0;
+          if (contractionDims->k.size() > 1) {
+            for (int i = 1; i < contractionDims->k.size(); i++) {
+              auto posTwo = xsmm::utils::getPosInCodomain(
+                  contractionDims->k[i], contractOp,
+                  contractOp.getIndexingMapsArray()[1]);
+              if (*posTwo > *pos) {
+                prevIndex = index;
+                pos = posTwo;
+                index = i;
+                posChanged = true;
+              }
             }
-          } else {
-            for (size_t i = 0; i < contractionDims->k.size(); i++)
-              kVector.push_back(contractionDims->k[i]);
+          }
+          if (!posChanged) {
+            pos = xsmm::utils::getPosInCodomain(
+                contractionDims->k[0], contractOp,
+                contractOp.getIndexingMapsArray()[0]);
+            prevIndex = -1;
+            operandIndex = 0;
+            index = 0;
+            if (contractionDims->k.size() > 1) {
+              for (int i = 1; i < contractionDims->k.size(); i++) {
+                auto posTwo = xsmm::utils::getPosInCodomain(
+                    contractionDims->k[i], contractOp,
+                    contractOp.getIndexingMapsArray()[0]);
+                if (*posTwo < *pos) {
+                  prevIndex = index;
+                  pos = posTwo;
+                  index = i;
+                }
+              }
+            }
           }
 
+          int lastDim = -1;
+          if (prevIndex != -1) {
+            auto dim = xsmm::utils::getPosInCodomain(
+                contractionDims->k[prevIndex], contractOp,
+                contractOp.getIndexingMapsArray()[operandIndex]);
+            lastDim = *dim;
+          }
+
+          int vecLen = dyn_cast<VectorType>(inputs[operandIndex].getType())
+                           .getShape()
+                           .size();
           unsigned k;
-          if (*xsmm::utils::getPosInCodomain(
-                  kVector[0], contractOp->getOpOperand(1).get(), contractOp,
-                  contractOp.getIndexingMapsArray()[1]) <
-                  *xsmm::utils::getPosInCodomain(
-                      n, contractOp->getOpOperand(1).get(), contractOp,
-                      contractOp.getIndexingMapsArray()[1]) ||
-              kVector.size() == 1) {
-            k = kVector[0];
-          } else if (kVector.size() > 1) {
-            k = kVector[1];
+          if (lastDim != -1 &&
+              (vecLen * (1 - operandIndex) + operandIndex - 1) != lastDim) {
+            k = contractionDims->k[prevIndex];
+          } else {
+            k = contractionDims->k[index];
           }
           auto dtype = xsmm::utils::getDataType(
               rewriter, contractOp->getOperand(0).getType());
           if (failed(xsmm::utils::checkAccess(
-                  rewriter, contractOp, m, n, kVector, batch, inputs,
-                  contractOp.getIndexingMapsArray(), false))) {
+                  rewriter, contractOp, m, n, k, batch, inputs,
+                  contractOp.getIndexingMapsArray(), false, operandIndex))) {
             // The generic is a Brgemm but the strides of the selected dims (m,
             // n, k) are not unit strides. Inject transposes to bring them
             // innermost.

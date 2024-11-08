@@ -107,17 +107,14 @@ func.func @conv2d_1x1(
 // CHECK-SAME:  %[[ARG3:.+]]: memref<128x512xf32>)
 func.func @mlp(%arg0: tensor<128x256xf32>, %arg1: tensor<256x512xf32>,
   %arg2: tensor<512xf32>,  %output: tensor<128x512xf32>) -> tensor<128x512xf32> {
-  // CHECK: call @xsmm_brgemm_dispatch
+  // CHECK: call @xsmm_fused_brgemm_dispatch
   // CHECK: scf.parallel
   // CHECK: 	%[[read:.*]] = vector.transfer_read
   // CHECK: 	vector.transfer_write %[[read]], {{.*}}
   // CHECK: scf.parallel
   // CHECK:     vector.transfer_read
   // CHECK:     vector.transfer_write
-  // CHECK:     func.call @xsmm_brgemm_invoke
-  // CHECK:     %[[read:.*]] = vector.transfer_read
-  // CHECK:     %[[res:.*]] = arith.maximumf %[[read]]
-  // CHECK:     vector.transfer_write %[[res]], {{.*}}
+  // CHECK:     func.call @xsmm_fused_brgemm_invoke_no_bias
 
   %outShape = tensor.empty() : tensor<128x512xf32>
   %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg2 : tensor<512xf32>) outs(%outShape : tensor<128x512xf32>) {
