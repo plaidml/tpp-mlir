@@ -62,6 +62,15 @@ def VectorContractToOuterproduct : Pass<
                            "vector::VectorDialect"];
 }
 
+def VectorContractToFMA : Pass<
+    "vector-contract-to-fma"> {
+  let summary = "Perform vector fma lowering of vector contraction ops";
+  let dependentDialects = ["memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "vector::VectorDialect",
+                           "arith::ArithDialect"];
+}
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";
