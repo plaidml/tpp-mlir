@@ -27,6 +27,7 @@ add_mlir_library(TPPTransforms
   Vectorization.cpp
   SplitReductionDim.cpp
   VectorContractToOuterproduct.cpp
+  HoistVectorTransfers.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP
