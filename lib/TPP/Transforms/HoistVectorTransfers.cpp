@@ -1,3 +1,4 @@
+//===-HoistVectorTransfers.cpp -----------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -41,35 +42,35 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
-        //llvm::outs() << "The defining operation is: Arun" << "\n";
+
         // Code to hoist vector transfer read before the reduction and k loop
-        auto vectorReadOp = contractOp.getOperand(contractOp.getNumOperands()-1).getDefiningOp();
-        if (vectorReadOp) {
+	if (auto vectorReadOp = contractOp.getOperand(contractOp.getNumOperands()-1).getDefiningOp()) {
           auto subviewOp = vectorReadOp->getOperand(0).getDefiningOp();
           rewriter.setInsertionPointAfter(subviewOp);
+
           auto retriveVectorReadOp = llvm::dyn_cast<mlir::vector::TransferReadOp>(vectorReadOp);
           auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
-          contractOp.setOperand(contractOp.getNumOperands()-1, (*cloneVectorReadOp).getResult(0));
           retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
 
-          // Code to re-create the reduction and k loop with iter args to 
+          // Code to re-create the reduction and k loop with iter args
           auto *nextOp = (*cloneVectorReadOp).getNextNode();
-          if (nextOp) {
+          if (auto oldReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(*nextOp)) {
+            if (auto oldKForOp = llvm::dyn_cast<mlir::scf::ForOp>(oldReductionForOp.getBody()->front())) {
                   auto vectorReadOpValue = (*cloneVectorReadOp).getResult(0);
-                  auto oldReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(*nextOp);
-                  auto oldKForOp = llvm::dyn_cast<mlir::scf::ForOp>(oldReductionForOp.getBody()->front());
-
                   rewriter.setInsertionPoint(oldReductionForOp);
+
                   auto newReductionForOp = rewriter.create<scf::ForOp>(
                   oldReductionForOp.getLoc(), oldReductionForOp.getLowerBound(), oldReductionForOp.getUpperBound(),
                   oldReductionForOp.getStep(),ValueRange{vectorReadOpValue},
                   [&](OpBuilder &rewriterNewReductionForOp, Location locNewReductionForOp, Value ivNewReductionForOp,
                   ValueRange iterArgsNewReductionForOp) {
+
                           auto newKForOp = rewriter.create<scf::ForOp>(
                           oldKForOp.getLoc(), oldKForOp.getLowerBound(), oldKForOp.getUpperBound(),
                           oldKForOp.getStep(), iterArgsNewReductionForOp,
                           [&](OpBuilder &rewriterNewKForOp, Location locNewKForOp, Value ivNewKForOp,
                           ValueRange iterArgsNewKForOp) {
+
                                   mlir::IRMapping mapper;
                                   mapper.map(oldReductionForOp.getInductionVar(), ivNewReductionForOp);
                                   mapper.map(oldKForOp.getInductionVar(), ivNewKForOp);
@@ -118,14 +119,14 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
                           vectorWriteOperation->moveBefore(oldReductionForOp);
                   }
 
-                  // Erase the vector contract operation
+                  // Erase the old vector contract operation
                   for (auto result : contractOp->getResults()) {
                           for (auto *userOp : result.getUsers()) {
                                   userOp->erase();
                           }
                   }
                   contractOp.erase();
-
+            }
           }
         }
       return success();

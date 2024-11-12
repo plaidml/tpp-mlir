@@ -58,7 +58,7 @@ def VectorizationPass : Pass<"vectorization-pass",
 def HoistVectorTransfers : Pass<"hoist-vector-transfer"> {
   let summary = "Hoist vector transfer operation outside of reduction and k loop";
   let description = [{
-    Hoists the vector transfer read and write operations of 'C' matrix outside the reduction and k loop for an brgemm operation. This pass should be applied after the BrgemmLinalgTiling Pass.
+    Hoists the vector transfer read and write operations of the resultant  matrix outside the reduction and k loop for a brgemm operation. This pass should be applied after the BrgemmLinalgTiling Pass.
   }];
   let dependentDialects = [ "vector::VectorDialect" ];
 }
