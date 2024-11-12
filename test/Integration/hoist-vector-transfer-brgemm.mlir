@@ -1,5 +1,5 @@
 // RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void  -print > %t.1
-// RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void  -print > %t.2
+// RUN: tpp-opt %s --loop-invariant-code-motion  --vectorization-pass --loop-invariant-code-motion --hoist-vector-transfer | tpp-run -e entry --entry-point-result=void  -print > %t.2
 // RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF --allow-empty
 
 // DIFF-NOT: {{.}}
