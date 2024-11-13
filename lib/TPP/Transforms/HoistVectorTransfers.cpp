@@ -41,11 +41,9 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
                                 PatternRewriter &rewriter) const override {
 
         // Code to hoist vector transfer read before the reduction and k loop
-	if (auto vectorReadOp = contractOp.getOperand(contractOp.getNumOperands()-1).getDefiningOp()) {
-          auto subviewOp = vectorReadOp->getOperand(0).getDefiningOp<memref::SubViewOp>();
+	if (auto retriveVectorReadOp = contractOp.getAcc().getDefiningOp<mlir::vector::TransferReadOp>()) {
+          auto subviewOp = retriveVectorReadOp.getOperand(0).getDefiningOp<memref::SubViewOp>();
           rewriter.setInsertionPointAfter(subviewOp);
-
-          auto retriveVectorReadOp = llvm::dyn_cast<mlir::vector::TransferReadOp>(vectorReadOp);
           auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
           retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
 
