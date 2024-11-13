@@ -37,15 +37,12 @@ namespace tpp {
 struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
 
-  HoistVectorTransferOp(MLIRContext *ctx)
-      : OpRewritePattern(ctx) {}
-
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
 
         // Code to hoist vector transfer read before the reduction and k loop
 	if (auto vectorReadOp = contractOp.getOperand(contractOp.getNumOperands()-1).getDefiningOp()) {
-          auto subviewOp = vectorReadOp->getOperand(0).getDefiningOp();
+          auto subviewOp = vectorReadOp->getOperand(0).getDefiningOp<memref::SubViewOp>();
           rewriter.setInsertionPointAfter(subviewOp);
 
           auto retriveVectorReadOp = llvm::dyn_cast<mlir::vector::TransferReadOp>(vectorReadOp);
