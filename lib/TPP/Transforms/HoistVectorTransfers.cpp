@@ -39,92 +39,106 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
+       
+	// Check whether the linalg tiling + vector contract pattern matches 
+        auto retriveVectorReadOp = contractOp.getAcc().getDefiningOp<mlir::vector::TransferReadOp>();
+        if (retriveVectorReadOp == NULL)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
+        
+        auto subviewOp = retriveVectorReadOp.getOperand(0).getDefiningOp<memref::SubViewOp>();
+        if (subviewOp == NULL)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
+        
+        auto ReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(subviewOp->getNextNode());
+        if (ReductionForOp == NULL)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
-        // Code to hoist vector transfer read before the reduction and k loop
-	if (auto retriveVectorReadOp = contractOp.getAcc().getDefiningOp<mlir::vector::TransferReadOp>()) {
-          auto subviewOp = retriveVectorReadOp.getOperand(0).getDefiningOp<memref::SubViewOp>();
-          rewriter.setInsertionPointAfter(subviewOp);
-          auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
-          retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
+        auto KForOp = llvm::dyn_cast<mlir::scf::ForOp>(ReductionForOp.getBody()->front());
+        if (KForOp == NULL)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
-          // Code to re-create the reduction and k loop with iter args
-          auto *nextOp = (*cloneVectorReadOp).getNextNode();
-          if (auto oldReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(*nextOp)) {
-            if (auto oldKForOp = llvm::dyn_cast<mlir::scf::ForOp>(oldReductionForOp.getBody()->front())) {
-                  auto vectorReadOpValue = (*cloneVectorReadOp).getResult(0);
-                  rewriter.setInsertionPoint(oldReductionForOp);
+	// Move the vector transfer read before the resuction and k loop
+        rewriter.setInsertionPointAfter(subviewOp);
+        auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
+        retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
 
-                  auto newReductionForOp = rewriter.create<scf::ForOp>(
-                  oldReductionForOp.getLoc(), oldReductionForOp.getLowerBound(), oldReductionForOp.getUpperBound(),
-                  oldReductionForOp.getStep(),ValueRange{vectorReadOpValue},
-                  [&](OpBuilder &rewriterNewReductionForOp, Location locNewReductionForOp, Value ivNewReductionForOp,
-                  ValueRange iterArgsNewReductionForOp) {
+        // Code to re-create the reduction and k loop with iter args
+        auto *nextOp = (*cloneVectorReadOp).getNextNode();
+        auto oldReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(*nextOp);
+        auto oldKForOp = llvm::dyn_cast<mlir::scf::ForOp>(oldReductionForOp.getBody()->front());
 
-                          auto newKForOp = rewriter.create<scf::ForOp>(
-                          oldKForOp.getLoc(), oldKForOp.getLowerBound(), oldKForOp.getUpperBound(),
-                          oldKForOp.getStep(), iterArgsNewReductionForOp,
-                          [&](OpBuilder &rewriterNewKForOp, Location locNewKForOp, Value ivNewKForOp,
-                          ValueRange iterArgsNewKForOp) {
+        auto vectorReadOpValue = (*cloneVectorReadOp).getResult(0);
+        rewriter.setInsertionPoint(oldReductionForOp);
 
-                                  mlir::IRMapping mapper;
-                                  mapper.map(oldReductionForOp.getInductionVar(), ivNewReductionForOp);
-                                  mapper.map(oldKForOp.getInductionVar(), ivNewKForOp);
+        auto newReductionForOp = rewriter.create<scf::ForOp>(
+        oldReductionForOp.getLoc(), oldReductionForOp.getLowerBound(), oldReductionForOp.getUpperBound(),
+        oldReductionForOp.getStep(),ValueRange{vectorReadOpValue},
+        [&](OpBuilder &rewriterNewReductionForOp, Location locNewReductionForOp, Value ivNewReductionForOp,
+        ValueRange iterArgsNewReductionForOp) {
 
-                                  for (auto [origArgReduction, newArgReduction] :
-                                    llvm::zip(oldReductionForOp.getRegionIterArgs(), iterArgsNewReductionForOp)) {
-                                          mapper.map(origArgReduction, newArgReduction);
-                                  }
+                auto newKForOp = rewriter.create<scf::ForOp>(
+                oldKForOp.getLoc(), oldKForOp.getLowerBound(), oldKForOp.getUpperBound(),
+                oldKForOp.getStep(), iterArgsNewReductionForOp,
+                [&](OpBuilder &rewriterNewKForOp, Location locNewKForOp, Value ivNewKForOp,
+                ValueRange iterArgsNewKForOp) {
 
-                                  for (auto [origArgK, newArgK] :
-                                    llvm::zip(oldKForOp.getRegionIterArgs(), iterArgsNewKForOp)) {
-                                          mapper.map(origArgK, newArgK);
-                                  }
+                        mlir::IRMapping mapper;
+                        mapper.map(oldReductionForOp.getInductionVar(), ivNewReductionForOp);
+                        mapper.map(oldKForOp.getInductionVar(), ivNewKForOp);
 
-                                  for (auto &op : oldKForOp.getBody()->without_terminator()) {
-                                          rewriterNewKForOp.clone(op, mapper);
-                                  }
+                        for (auto [origArgReduction, newArgReduction] :
+                        llvm::zip(oldReductionForOp.getRegionIterArgs(), iterArgsNewReductionForOp)) {
+                                mapper.map(origArgReduction, newArgReduction);
+                        }
 
-                                  rewriterNewKForOp.create<scf::YieldOp>(locNewKForOp, iterArgsNewKForOp);
+                        for (auto [origArgK, newArgK] :
+                        llvm::zip(oldKForOp.getRegionIterArgs(), iterArgsNewKForOp)) {
+                                mapper.map(origArgK, newArgK);
+                        }
 
-                          });
-                          rewriterNewReductionForOp.create<scf::YieldOp>(locNewReductionForOp, newKForOp.getResult(0));
-                  });
+                        for (auto &op : oldKForOp.getBody()->without_terminator()) {
+                                rewriterNewKForOp.clone(op, mapper);
+                        }
 
-                  //Code to hoist vector transfer write after reduction loop and also to update the yield of k loop
-                  auto newKForOp = llvm::dyn_cast<mlir::scf::ForOp>(newReductionForOp.getBody()->front());
-                  Value newcontractOpValue;
-                  mlir::vector::TransferWriteOp vectorWriteOperation;
-                  mlir::Block *bodyBlock = newKForOp.getBody();
-                  for (auto &op : bodyBlock->getOperations()) {
-                              if (auto vectorContractOp = llvm::dyn_cast<mlir::vector::ContractionOp>(op)) {
-                                  vectorContractOp.setOperand(vectorContractOp.getNumOperands()-1, newKForOp.getRegionIterArgs()[0]);
-                                  newcontractOpValue = vectorContractOp.getResult();
-                              }
-                              if (auto yieldOp = llvm::dyn_cast<mlir::scf::YieldOp>(op)) {
-                                  if ( newcontractOpValue != NULL)
-                                          yieldOp.setOperand(0, newcontractOpValue);
-                              }
-                              if (auto vectorWriteOp = llvm::dyn_cast<mlir::vector::TransferWriteOp>(op)) {
-                                  vectorWriteOperation = vectorWriteOp;
-                              }
-                  }
+                        rewriterNewKForOp.create<scf::YieldOp>(locNewKForOp, iterArgsNewKForOp);
 
-                  if (vectorWriteOperation != NULL) {
-                          vectorWriteOperation.setOperand(0,newReductionForOp.getResult(0));
-                          vectorWriteOperation->moveBefore(oldReductionForOp);
-                  }
+                });
+                rewriterNewReductionForOp.create<scf::YieldOp>(locNewReductionForOp, newKForOp.getResult(0));
+        });
 
-                  // Erase the old vector contract operation
-                  for (auto result : contractOp->getResults()) {
-                          for (auto *userOp : result.getUsers()) {
-                                  userOp->erase();
-                          }
-                  }
-                  contractOp.erase();
-            }
-          }
+        //Code to hoist vector transfer write after reduction loop and also to update the yield of k loop
+        auto newKForOp = llvm::dyn_cast<mlir::scf::ForOp>(newReductionForOp.getBody()->front());
+        Value newcontractOpValue;
+        mlir::vector::TransferWriteOp vectorWriteOperation;
+        mlir::Block *bodyBlock = newKForOp.getBody();
+        for (auto &op : bodyBlock->getOperations()) {
+                if (auto vectorContractOp = llvm::dyn_cast<mlir::vector::ContractionOp>(op)) {
+                        vectorContractOp.setOperand(vectorContractOp.getNumOperands()-1, newKForOp.getRegionIterArgs()[0]);
+                        newcontractOpValue = vectorContractOp.getResult();
+                }
+                if (auto yieldOp = llvm::dyn_cast<mlir::scf::YieldOp>(op)) {
+                        if ( newcontractOpValue != NULL)
+                                yieldOp.setOperand(0, newcontractOpValue);
+                }
+                if (auto vectorWriteOp = llvm::dyn_cast<mlir::vector::TransferWriteOp>(op)) {
+                        vectorWriteOperation = vectorWriteOp;
+                }
         }
-      return success();
+
+        if (vectorWriteOperation != NULL) {
+                vectorWriteOperation.setOperand(0,newReductionForOp.getResult(0));
+                vectorWriteOperation->moveBefore(oldReductionForOp);
+        }
+
+        // Erase the old vector contract operation
+        for (auto result : contractOp->getResults()) {
+                for (auto *userOp : result.getUsers()) {
+                        userOp->erase();
+                }
+        }
+        contractOp.erase();
+
+        return success();
   }
 };
 

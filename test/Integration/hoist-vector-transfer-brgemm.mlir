@@ -1,9 +1,7 @@
 // RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void  -print > %t.1
 // RUN: tpp-opt %s --loop-invariant-code-motion  --vectorization-pass --loop-invariant-code-motion --hoist-vector-transfer | tpp-run -e entry --entry-point-result=void  -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF --allow-empty
+// RUN: diff %t.1 %t.2
 
-// DIFF-NOT: {{.}}
-module {
   memref.global "private" constant @__constant_24x64x64xf32 : memref<24x64x64xf32> = dense<1.000000e+00> {alignment = 64 : i64}
   func.func @entry(%arg0: memref<8x24x32x64xf32>) -> memref<8x24x32x64xf32> {
     %c1 = arith.constant 1 : index
@@ -34,4 +32,28 @@ module {
     }
     return %alloc : memref<8x24x32x64xf32>
   }
+
+// -----
+
+// RUN: tpp-opt %s  | tpp-run -e nomatch --entry-point-result=void -seed 123 -print > %t.1
+// RUN: tpp-opt %s  --hoist-vector-transfer  | tpp-run -e nomatch --entry-point-result=void -seed 123 -print > %t.2
+// RUN: diff %t.1 %t.2 
+
+#permA0 = affine_map<(d0, d1, d2) -> (d2, d0)>
+#permA1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#permA2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+func.func @nomatch(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = vector.transfer_read %arg0[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<4x4xf32>, vector<4x4xf32>
+        %1 = vector.transfer_read %arg1[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<4x4xf32>, vector<4x4xf32>
+        %2 = vector.transfer_read %arg2[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<4x4xf32>, vector<4x4xf32>
+        %3 = vector.contract {indexing_maps = [#permA0, #permA1, #permA2],
+        iterator_types = ["parallel", "parallel", "reduction"],
+        kind = #vector.kind<add>} %0, %1, %2
+        : vector<4x4xf32>, vector<4x4xf32> into vector<4x4xf32>
+        %4 = vector.transfer_write %3, %arg2[%c0, %c0] {in_bounds = [true, true]} : vector<4x4xf32>, tensor<4x4xf32>
+        return %4 : tensor<4x4xf32>
 }
+
