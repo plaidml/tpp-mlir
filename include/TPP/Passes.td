@@ -43,6 +43,30 @@ def ConvertLinalgToFunc : Pass<"convert-linalg-to-func", "ModuleOp"> {
                            "linalg::LinalgDialect", "LLVM::LLVMDialect"];
 }
 
+
+def BrgemmLinalgTiling : Pass<"tile-brgemm-linalg"> {
+  let summary = "Tile bregmm  matmul and reduction dimension.";
+  let description = [{
+    Tiles the innermost dimensions of the batch reduce matmul operation. Additionally, it swaps the reduction and k dimension loop. The final loop structure is as follows: M-loop->N-loop->reduction-loop->K-loop. For example: --tile-brgemm-linalg="lhsTile=8,8 rhsTile=8,16".
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect"];
+  let options = [
+         ListOption<"mTileShape", "lhsTile", "unsigned", "Input for the tile shape of m x k dim. Tile size should not be greater than the dimension size. Example: lhsTile=8,8">,
+         ListOption<"nTileShape", "rhsTile", "unsigned", "Input for the tile shape of k x n dim. Tile size should not be greater than the dimension size. Example: rhsTile=8,16">,
+  ];
+}
+
+
+def HoistVectorTransfers : Pass<"hoist-vector-transfer"> {
+  let summary = "Hoist vector transfer operation outside of reduction and k loop";
+  let description = [{
+    Hoists the vector transfer read and write operations of 'C' matrix outside the reduction and k loop for an brgemm operation. This pass should be applied after the BrgemmLinalgTiling Pass.
+  }];
+  let dependentDialects = [ "vector::VectorDialect" ];
+}
+
 def VectorizationPass : Pass<"vectorization-pass",
                                      "func::FuncOp"> {
   let summary = "convert linalg to memref/vector";
@@ -62,6 +86,15 @@ def VectorContractToOuterproduct : Pass<
                            "vector::VectorDialect"];
 }
 
+def VectorContractToFMA : Pass<
+    "vector-contract-to-fma"> {
+  let summary = "Perform vector fma lowering of vector contraction ops";
+  let dependentDialects = ["memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "vector::VectorDialect",
+                           "arith::ArithDialect"];
+}
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
   let summary = "Convert xsmm to func";

@@ -457,7 +457,7 @@ getDefaultBlockingFactors(linalg::LinalgOp linalgOp) {
          isa<linalg::BatchMatmulOp>(linalgOp) ||
          isa<linalg::MatmulTransposeAOp>(linalgOp) ||
          isa<linalg::MatmulTransposeBOp>(linalgOp));
-  return {32, 32, 32};
+  return {32, 64, 64};
 }
 
 //===----------------------------------------------------------------------===//

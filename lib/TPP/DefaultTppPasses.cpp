@@ -104,9 +104,13 @@ private:
       // TODO: This flag will be removed once the vector path becomes the
       // default lowering path.
       if (linalgToVector) {
+	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
+	pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+	pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
+	pm.addNestedPass<func::FuncOp>(createHoistVectorTransfers());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+        pm.addNestedPass<func::FuncOp>(createVectorContractToFMA());
       } else {
         // Lower all Tile operations.
         pm.addNestedPass<func::FuncOp>(createLinalgLowering());
