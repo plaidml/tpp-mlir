@@ -57,7 +57,7 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
         if (KForOp == NULL)
                 return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
-	// Move the vector transfer read before the resuction and k loop
+	// Move the vector transfer read before the reduction and k loop
         rewriter.setInsertionPointAfter(subviewOp);
         auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
         retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
