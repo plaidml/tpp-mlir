@@ -978,10 +978,11 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
   }
   if (!isInnerMostDim(operandB->get(), *minorNInCodomainOpB, contractOp, type,
                       1, isVnni)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
     if (isInnerMostDim(operandB->get(), *minorKInCodomainOpB, contractOp, type,
                        1, isVnni)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
+
       emitTransposeOnOperand(rewriter, contractOp, operandB->get(),
                              *minorKInCodomainOpB, *minorNInCodomainOpB, 1);
     }
@@ -989,10 +990,11 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter,
 
   if (!isInnerMostDim(operandA->get(), *minorKInCodomainOpA, contractOp, type,
                       0, isVnni)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
     if (isInnerMostDim(operandA->get(), *minorMInCodomainOpA, contractOp, type,
                        0, isVnni)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
+
       emitTransposeOnOperand(rewriter, contractOp, operandA->get(),
                              *minorKInCodomainOpA, *minorMInCodomainOpA, 0);
     }

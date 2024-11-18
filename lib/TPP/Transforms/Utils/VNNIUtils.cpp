@@ -149,7 +149,15 @@ FailureOr<AffineDimExpr> isInVnniLayout(mlir::vector::ContractionOp contractOp,
       contractOp.getIndexingMapsArray()[1], iteratorTypes,
       vector::IteratorType::reduction);
   llvm::set_union(a, b);
+
   if (a.size() < 2) {
+    return failure();
+  }
+  llvm::SmallDenseSet<int64_t> c = findPermutationsIndexingOperand(
+      contractOp.getIndexingMapsArray()[2], iteratorTypes,
+      vector::IteratorType::reduction);
+  if (!c.contains(*a.begin())) {
+    // GEMM
     return failure();
   }
   return dyn_cast<AffineDimExpr>(rhsCst);

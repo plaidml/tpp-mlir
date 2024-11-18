@@ -31,6 +31,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include <iostream>
 using namespace mlir;
 using namespace mlir::vector;
 using namespace mlir::linalg;
@@ -341,13 +342,26 @@ struct ConvertTranspose
           int vecLen = dyn_cast<VectorType>(inputs[operandIndex].getType())
                            .getShape()
                            .size();
+          auto vnniFactor = 1;
+          bool isVnni = false;
+          auto vnniBlockingFactor = vnni::utils::getVnniBlockingFactor(
+              contractOp.getOperand(1).getType());
+          if (vnniBlockingFactor) {
+            vnniFactor = *vnniBlockingFactor;
+            isVnni =
+                succeeded(vnni::utils::isInVnniLayout(contractOp, vnniFactor));
+          }
+
           unsigned k;
-          if (lastDim != -1 &&
-              (vecLen * (1 - operandIndex) + operandIndex - 1) != lastDim) {
+          if (lastDim != -1 && isVnni &&
+              (vecLen * (1 - operandIndex) + operandIndex - 1) == lastDim) {
             k = contractionDims->k[prevIndex];
+          } else if (lastDim != -1 && !isVnni) {
+            k = contractionDims->k[index];
           } else {
             k = contractionDims->k[index];
           }
+          std::cout << "k set to :" << k << "\n";
           auto dtype = xsmm::utils::getDataType(
               rewriter, contractOp->getOperand(0).getType());
           if (failed(xsmm::utils::checkAccess(
