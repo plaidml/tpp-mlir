@@ -68,6 +68,13 @@ struct DefaultTppPasses
 
 private:
   void constructPipeline() override {
+    // List of operations to skip when lowering Linalg to XSMM
+    // This allows further passes to lower to vector, function, codegen
+    // Default is to not skip anything
+    LinalgLoweringOptions linalgOptions;
+    if (linalgToVector)
+      linalgOptions.skipOperations = { "all" };
+
     pm.addPass(createFoldAddIntoDest());
     if (linalgToLoops) {
       // Lower linalg directly to loops.
@@ -101,16 +108,17 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
-      // TODO: This flag will be removed once the vector path becomes the
-      // default lowering path.
-      if (linalgToVector) {
-        pm.addNestedPass<func::FuncOp>(createVectorizationPass());
-        pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
-      } else {
-        // Lower all Tile operations.
-        pm.addNestedPass<func::FuncOp>(createLinalgLowering());
-      }
+      // Lower Linalg to XSMM.
+      pm.addNestedPass<func::FuncOp>(createLinalgLowering(linalgOptions));
+
+      // Vectorizes the remaining Linalg operations
+      pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+
+      // TODO: Add a flag for this pass so it doesn't conflate with other options.
+      pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+
+      // Final cleanup.
       pm.addPass(createCleanup());
     }
 
