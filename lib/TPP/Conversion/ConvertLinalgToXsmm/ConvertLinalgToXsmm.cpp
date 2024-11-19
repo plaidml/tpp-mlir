@@ -1159,12 +1159,14 @@ void mlir::tpp::populateLinalgToXsmmPatterns(
   // This is O(n^2), but the lists are small
   if (!skipPatterns.empty()) {
     assert(skipPatterns.size() <= 8);
-    std::remove_if(patternsToAdd.begin(), patternsToAdd.end(),
+    auto newEnd = std::remove_if(patternsToAdd.begin(), patternsToAdd.end(),
                    [&skipPatterns](StringRef elm) -> bool {
                      return std::find(skipPatterns.begin(),
                                       skipPatterns.end(),
                                       elm) != skipPatterns.end();
                    });
+    if (newEnd != patternsToAdd.end())
+      patternsToAdd.erase(newEnd, patternsToAdd.end());
   }
 
   // Now, add all the remaining patterns
