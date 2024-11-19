@@ -39,6 +39,12 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasPureBufferSemantics())
       return failure();
+
+    auto opType = dyn_cast<MemRefType>(linalgOp.getOperand(0).getType());
+    if (opType.getElementType().isBF16()){
+	return failure();
+    }
+
     if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
             xsmm::DataTypeAttr::get(rewriter.getContext(),
                                     xsmm::DataType::BF16) &&
