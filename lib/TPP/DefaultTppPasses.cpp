@@ -111,12 +111,14 @@ private:
       // Lower Linalg to XSMM.
       pm.addNestedPass<func::FuncOp>(createLinalgLowering(linalgOptions));
 
-      // Vectorizes the remaining Linalg operations
-      pm.addNestedPass<func::FuncOp>(createVectorizationPass());
-      pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      if (linalgToVector) {
+        // Vectorizes the remaining Linalg operations
+        pm.addNestedPass<func::FuncOp>(createVectorizationPass());
+        pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-      // TODO: Add a flag for this pass so it doesn't conflate with other options.
-      pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+        // TODO: Add a flag for this pass so it doesn't conflate with other options.
+        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+      }
 
       // Final cleanup.
       pm.addPass(createCleanup());
