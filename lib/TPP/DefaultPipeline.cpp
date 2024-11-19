@@ -70,7 +70,7 @@ llvm::cl::list<unsigned>
 
 llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
                                    llvm::cl::desc("Lower linalg to vector"),
-                                   llvm::cl::init(false));
+                                   llvm::cl::init(true));
 
 llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
