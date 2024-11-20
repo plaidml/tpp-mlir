@@ -88,9 +88,9 @@ private:
     if (linalgToVector)
       linalgOptions.skipOperations = { "all" };
     if (vectorToXSMM)
-      linalgOptions.skipOperations = { "transpose" };
+      linalgOptions.skipOperations = { };
     if (vectorToKernel)
-      linalgOptions.skipOperations = { "matmul" };
+      linalgOptions.skipOperations = { };
 
     // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
