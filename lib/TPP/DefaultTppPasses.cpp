@@ -83,14 +83,14 @@ private:
     // List of operations to skip when lowering Linalg to XSMM / Kernel.
     // This allows further passes to lower to vector, function, codegen
     // Default is to not skip anything. Only enable when needed.
-    LinalgLoweringOptions linalgOptions;
+    ArrayRef<std::string> skipOperations;
     // General "linalg-to-vector" choice needs to skip all XSMM matching at linalg level.
     if (linalgToVector)
-      linalgOptions.skipOperations = { "all" };
+      skipOperations = { "all" };
     if (vectorToXSMM)
-      linalgOptions.skipOperations = { };
+      skipOperations = { };
     if (vectorToKernel)
-      linalgOptions.skipOperations = { };
+      skipOperations = { };
 
     // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
@@ -127,7 +127,7 @@ private:
       pm.addPass(createBufferize());
 
       // Lower Linalg to XSMM.
-      pm.addNestedPass<func::FuncOp>(createLinalgLowering(linalgOptions));
+      pm.addNestedPass<func::FuncOp>(createLinalgLowering(LinalgLoweringOptions{skipOperations}));
 
       if (linalgToVector || forceLinalgToVector) {
         // Vectorizes the remaining Linalg operations
