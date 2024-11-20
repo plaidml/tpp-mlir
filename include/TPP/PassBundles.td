@@ -72,6 +72,18 @@ def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
   ];
 }
 
+def VectorToXSMM : Pass<"vector-to-xsmm", "ModuleOp"> {
+  let summary = "Lower Vector operations to XSMM functions.";
+  let dependentDialects = ["vector::VectorDialect",
+                           "scf::SCFDialect"];
+}
+
+def VectorToKernel : Pass<"vector-to-kernel", "ModuleOp"> {
+  let summary = "Lower Vector operations to micro-kernel special lowering.";
+  let dependentDialects = ["vector::VectorDialect",
+                           "scf::SCFDialect"];
+}
+
 def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
   let summary = "Low level parallelization (multi-threading, AMX config).";
   let dependentDialects = ["affine::AffineDialect",

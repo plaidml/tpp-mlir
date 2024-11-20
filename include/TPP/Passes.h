@@ -72,6 +72,10 @@ namespace tensor {
 class TensorDialect;
 } // namespace tensor
 
+namespace vector {
+class VectorDialect;
+} // namespace tensor
+
 namespace tpp {
 
 // Testing passes.
