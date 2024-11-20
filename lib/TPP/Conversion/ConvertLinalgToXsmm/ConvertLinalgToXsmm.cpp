@@ -41,6 +41,7 @@ namespace {
 
 struct ConvertLinalgToXsmm
     : public tpp::impl::ConvertLinalgToXsmmBase<ConvertLinalgToXsmm> {
+  using ConvertLinalgToXsmmBase::ConvertLinalgToXsmmBase;
   void runOnOperation() override;
 };
 
@@ -819,7 +820,9 @@ void ConvertLinalgToXsmm::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "pass failed!\n");
     return signalPassFailure();
   }
-  tpp::populateLinalgToXsmmPatterns(patterns);
+  SmallVector<StringRef> skipPatterns(skipOperations.begin(),
+                                      skipOperations.end());
+  tpp::populateLinalgToXsmmPatterns(patterns, skipPatterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     return signalPassFailure();
 }
@@ -1141,11 +1144,59 @@ struct ConvertCopyOp : public OpRewritePattern<linalg::CopyOp> {
 
 } // namespace
 
-void mlir::tpp::populateLinalgToXsmmPatterns(RewritePatternSet &patterns) {
-  patterns.add<
-      ConvertFillOpToUnaryZero, ConvertTransposeOpToUnaryTranspose,
-      ConvertGenericToUnary, ConvertGenericToBinary, ConvertGenericToBrgemm,
-      ConvertBatchReduceMatmulToBatchReduceMatmul, ConvertMatmulToMatmul,
-      ConvertVnniPacking, ConvertGenericToVnniMatmulLikeOp, ConvertCopyOp>(
-      patterns.getContext());
+void mlir::tpp::populateLinalgToXsmmPatterns(
+    RewritePatternSet &patterns, ArrayRef<StringRef> skipPatterns) {
+  std::vector<StringRef> patternsToAdd = {"fill",   "transpose", "unary",
+                                          "binary", "brgemm",    "matmul",
+                                          "copy",   "vnni"};
+  // If skipping all patterns, just don't do anything.
+  if (skipPatterns.size() == 1 && skipPatterns[0] == "all") {
+    LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] ignoring all patterns\n");
+    return;
+  }
+
+  // If skip list is not empty, remove all that were listed.
+  // This is O(n^2), but the lists are small
+  if (!skipPatterns.empty()) {
+    assert(skipPatterns.size() <= 8);
+    auto newEnd = std::remove_if(patternsToAdd.begin(), patternsToAdd.end(),
+                   [&skipPatterns](StringRef elm) -> bool {
+                     return std::find(skipPatterns.begin(),
+                                      skipPatterns.end(),
+                                      elm) != skipPatterns.end();
+                   });
+    if (newEnd != patternsToAdd.end())
+      patternsToAdd.erase(newEnd, patternsToAdd.end());
+  }
+
+  // Now, add all the remaining patterns
+  auto ctx = patterns.getContext();
+  for (auto pattern : patternsToAdd) {
+    if (pattern == "fill") {
+      patterns.add<ConvertFillOpToUnaryZero>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding fill\n");
+    } else if (pattern == "transpose") {
+      patterns.add<ConvertTransposeOpToUnaryTranspose>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding transpose\n");
+    } else if (pattern == "copy") {
+      patterns.add<ConvertCopyOp>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding copy\n");
+    } else if (pattern == "unary") {
+      patterns.add<ConvertGenericToUnary>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding unary\n");
+    } else if (pattern == "binary") {
+      patterns.add<ConvertGenericToBinary>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding binary\n");
+    } else if (pattern == "brgemm") {
+      patterns.add<ConvertGenericToBrgemm,
+                   ConvertBatchReduceMatmulToBatchReduceMatmul>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding brgem\n");
+    } else if (pattern == "matmul") {
+      patterns.add<ConvertMatmulToMatmul>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding matmul\n");
+    } else if (pattern == "vnni") {
+      patterns.add<ConvertVnniPacking, ConvertGenericToVnniMatmulLikeOp>(ctx);
+      LLVM_DEBUG(llvm::dbgs() << "[LinalgToXsmm] adding vnni\n");
+    }
+  }
 }

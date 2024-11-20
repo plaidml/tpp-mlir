@@ -66,6 +66,10 @@ def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
   let dependentDialects = ["xsmm::XsmmDialect",
                            "scf::SCFDialect",
                            "memref::MemRefDialect"];
+  let options = [
+    ListOption<"skipOperations", "skip-operations", "std::string",
+           "Operations to skip lowering linalg-to-xsmm directly.">
+  ];
 }
 
 def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
