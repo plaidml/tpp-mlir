@@ -1,6 +1,7 @@
 // RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.1
 // RUN: tpp-opt %s  --vector-contract-to-fma  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2 | FileCheck %s --check-prefix=DIFF --allow-empty
+// RUN: diff %t.1 %t.2
+// RUN: rm %t.1 %t.2
 
 // DIFF-NOT: {{.}}
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>

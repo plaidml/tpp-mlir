@@ -33,8 +33,9 @@ namespace {
 /// Returns true if the \p map is transposed.
 static bool isTransposed(AffineMap map) {
   auto results = map.getResults();
-  // Assert if the map does not have 3 inputs (m, n, k).
-  assert(map.getNumInputs() > 2 && "Al least 3 input dim expected");
+  // Assert if the map does not have 3 or 4 inputs ([] m, n, k).
+  assert((map.getNumInputs() == 3 || map.getNumInputs() == 4) &&
+         "3 or 4 input dim expected");
   // Assert if the result is not 2D.
   assert(map.getNumResults() == 2 && "Only 2 output dim expected");
 
@@ -45,15 +46,21 @@ static bool isTransposed(AffineMap map) {
 
   // Exclude output map result.
   bool isOutputResultMap =
-      dimExpr0 == mlir::getAffineDimExpr(0, map.getContext()) &&
-      dimExpr1 == mlir::getAffineDimExpr(1, map.getContext());
+      dimExpr0 ==
+          mlir::getAffineDimExpr(map.getNumInputs() - 3, map.getContext()) &&
+      dimExpr1 ==
+          mlir::getAffineDimExpr(map.getNumInputs() - 2, map.getContext());
   assert(!isOutputResultMap && "Output result map not expected");
 
   // It's transposed if result found as (k, m) or (n, k), else not transposed.
-  if ((dimExpr0 == mlir::getAffineDimExpr(2, map.getContext()) &&
-       dimExpr1 == mlir::getAffineDimExpr(0, map.getContext())) ||
-      (dimExpr0 == mlir::getAffineDimExpr(1, map.getContext()) &&
-       dimExpr1 == mlir::getAffineDimExpr(2, map.getContext())))
+  if ((dimExpr0 ==
+           mlir::getAffineDimExpr(map.getNumInputs() - 1, map.getContext()) &&
+       dimExpr1 ==
+           mlir::getAffineDimExpr(map.getNumInputs() - 3, map.getContext())) ||
+      (dimExpr0 ==
+           mlir::getAffineDimExpr(map.getNumInputs() - 2, map.getContext()) &&
+       dimExpr1 ==
+           mlir::getAffineDimExpr(map.getNumInputs() - 1, map.getContext())))
     return true;
   return false;
 }
@@ -166,8 +173,8 @@ struct VectorContractToFMAPattern
     auto mapLHS = maps[0];
     auto mapRHS = maps[1];
     if (matmulType == MatMulType::BatchReduce) {
-      mapLHS = mapLHS.dropResult(outerDimIndex);
-      mapRHS = mapRHS.dropResult(outerDimIndex);
+      mapLHS = mapLHS.dropResult(0);
+      mapRHS = mapRHS.dropResult(0);
     }
     if (isTransposed(mapLHS) || isTransposed(mapRHS))
       return rewriter.notifyMatchFailure(
