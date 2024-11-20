@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/Support/Debug.h"
 
 #include "TPP/PassBundles.h"
 #include "TPP/PassUtils.h"
@@ -26,8 +27,10 @@ namespace tpp {
 } // namespace tpp
 } // namespace mlir
 
-// Apply collection of high-level passes that map operations to
-// TPP-compatible forms.
+#define DEBUG_TYPE "convert-vector-to-xsmm"
+
+// Apply collection of vector-level passes that map vector patterns to
+// libxsmm call pairs (dispatch, invoke).
 struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
                     PassBundle<ModuleOp> {
   void runOnOperation() override {
@@ -45,6 +48,7 @@ struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
 
 private:
   void constructPipeline() override {
+    LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-xsmm passes\n");
     // Not Implemented Yet.
   }
 };

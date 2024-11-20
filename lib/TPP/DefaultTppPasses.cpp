@@ -68,13 +68,31 @@ struct DefaultTppPasses
 
 private:
   void constructPipeline() override {
-    // List of operations to skip when lowering Linalg to XSMM
+    // We currently have four branches:
+    //  * Linalg-to-XSMM: the default path, no options needed
+    //  * Linalg-to-Vector: Enable with `linalg-to-vector` flag.
+    //    No further changes done to the IR, lowers straigt to LLVM.
+    //  * Vector-to-XSMM: Enable with `vector-to-xsmm` flag, forces
+    //    `linalg-to-vector` and lowers vector patterns to libxsmm calls.
+    //  * Vector-to-Kernel: Enable with `vector-to-kernel` flag, forces
+    //    `linalg-to-vector` and lowers vector patterns to libxsmm-like
+    //    micro-kernels via specialized lowering of certain vector patterns.
+    assert(!(vectorToXSMM && vectorToKernel) && "XSMM and Kernel lowering are mutually exclusive");
+    bool forceLinalgToVector = (vectorToXSMM || vectorToKernel);
+
+    // List of operations to skip when lowering Linalg to XSMM / Kernel.
     // This allows further passes to lower to vector, function, codegen
-    // Default is to not skip anything
+    // Default is to not skip anything. Only enable when needed.
     LinalgLoweringOptions linalgOptions;
+    // General "linalg-to-vector" choice needs to skip all XSMM matching at linalg level.
     if (linalgToVector)
       linalgOptions.skipOperations = { "all" };
+    if (vectorToXSMM)
+      linalgOptions.skipOperations = { "transpose" };
+    if (vectorToKernel)
+      linalgOptions.skipOperations = { "matmul" };
 
+    // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
     if (linalgToLoops) {
       // Lower linalg directly to loops.
@@ -111,13 +129,17 @@ private:
       // Lower Linalg to XSMM.
       pm.addNestedPass<func::FuncOp>(createLinalgLowering(linalgOptions));
 
-      if (linalgToVector) {
+      if (linalgToVector || forceLinalgToVector) {
         // Vectorizes the remaining Linalg operations
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-        // TODO: Add a flag for this pass so it doesn't conflate with other options.
-        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
+        if (vectorToXSMM) {
+          pm.addPass(createVectorToXSMM());
+        }
+        if (vectorToKernel) {
+          pm.addPass(createVectorToKernel());
+        }
       }
 
       // Final cleanup.

@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/Support/Debug.h"
 
 #include "TPP/PassBundles.h"
 #include "TPP/PassUtils.h"
@@ -26,8 +27,10 @@ namespace tpp {
 } // namespace tpp
 } // namespace mlir
 
-// Apply collection of high-level passes that map operations to
-// TPP-compatible forms.
+#define DEBUG_TYPE "convert-vector-to-kernels"
+
+// Apply collection of vector-level passes that map vector patterns to
+// specialized micro-kernels akin to libxsmm kernels.
 struct VectorToKernel : public tpp::impl::VectorToKernelBase<VectorToKernel>,
                     PassBundle<ModuleOp> {
   void runOnOperation() override {
@@ -45,6 +48,8 @@ struct VectorToKernel : public tpp::impl::VectorToKernelBase<VectorToKernel>,
 
 private:
   void constructPipeline() override {
-    // Not Implemented Yet.
+    LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-kernel passes\n");
+    // TODO: Add all the others
+    pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
   }
 };
