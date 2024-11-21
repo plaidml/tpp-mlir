@@ -62,6 +62,20 @@ llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
     llvm::cl::init(false));
 
+// Lhs tile sizes for linalg-to-vector.
+llvm::cl::list<unsigned>
+    lhsTile("lhsTile",
+                     llvm::cl::desc("Lhs tile size for brgemm operation"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 8}),
+                     llvm::cl::CommaSeparated);
+
+// Rhs tile sizes for linalg-to-vector
+llvm::cl::list<unsigned>
+    rhsTile("rhsTile",
+                     llvm::cl::desc("Rhs tile size for brgemm operation"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
+                     llvm::cl::CommaSeparated);
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -133,9 +147,14 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{
-          linalgToLoops, parallelTaskGrid, linalgToVector,
-          lowerPackUnpackWithoutTranspose};
+      DefaultTppPassesOptions tppDefaultOptions; 
+          tppDefaultOptions.linalgToLoops = linalgToLoops;
+	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+	  tppDefaultOptions.linalgToVector = linalgToVector;
+          tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
+	  tppDefaultOptions.lhsTile = lhsTile;
+	  tppDefaultOptions.rhsTile = rhsTile;
+
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 

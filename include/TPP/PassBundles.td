@@ -46,7 +46,12 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
            "Lower vector patterns to micro-kernels.">,
     Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
-           "Lower non-constant packs and unpacks reverting any dim permutations.">
+           "Lower non-constant packs and unpacks reverting any dim permutations.">,
+    ListOption<"lhsTile", "lhsTile",
+           "unsigned", "Lhs tile size for brgemm operation.">,
+    ListOption<"rhsTile", "rhsTile",
+           "unsigned", "Rhs tile size for brgemm operation.">,
+
   ];
 }
 

@@ -25,6 +25,7 @@ add_mlir_library(TPPTransforms
   FoldIntoEltwise.cpp
   FoldAddIntoDest.cpp
   Vectorization.cpp
+  BrgemmLinalgTiling.cpp
   SplitReductionDim.cpp
   VectorContractToOuterproduct.cpp
   VectorContractToFMA.cpp
