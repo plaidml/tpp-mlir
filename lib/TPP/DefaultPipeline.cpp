@@ -148,11 +148,12 @@ private:
     } else {
       // Apply the default preprocessing pass
       DefaultTppPassesOptions tppDefaultOptions; 
-          tppDefaultOptions.linalgToLoops = linalgToLoops;tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
-	  tppDefaultOptions.linalgToVector=linalgToVector;
-           tppDefaultOptions.lowerPackUnpackWithoutTranspose=lowerPackUnpackWithoutTranspose;
-	   tppDefaultOptions.lhsTile=lhsTile;
-	   tppDefaultOptions.rhsTile=rhsTile;
+          tppDefaultOptions.linalgToLoops = linalgToLoops;
+	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+	  tppDefaultOptions.linalgToVector = linalgToVector;
+          tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
+	  tppDefaultOptions.lhsTile = lhsTile;
+	  tppDefaultOptions.rhsTile = rhsTile;
 
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
