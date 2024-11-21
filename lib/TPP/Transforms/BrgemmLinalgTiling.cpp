@@ -112,6 +112,9 @@ struct LinalgOpTiling : OpRewritePattern<linalg::BatchReduceMatmulOp> {
       Location loc = brgemmOp.getLoc();
       Value zeroCst = rewriter.create<arith::ConstantIndexOp>(loc, 0);
       Value ubCstTiledLoop = rewriter.create<arith::ConstantIndexOp>(loc, upperBound);
+      //Tile size should not be greater than the upperBound
+      if ((*itrShapeM) > upperBound)
+	      return failure();
       Value stepCstTiledLoop = rewriter.create<arith::ConstantIndexOp>(loc, upperBound/(*itrShapeM));
       // Creates M, N, and K tile loops
       scf::ForOp loopOp = rewriter.create<scf::ForOp>(brgemmOp.getLoc(),

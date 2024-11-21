@@ -47,9 +47,9 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
            "Lower non-constant packs and unpacks reverting any dim permutations.">,
-    ListOption<"lhsTile", "linalg-to-vector: lhsTile",
+    ListOption<"lhsTile", "lhsTile",
            "unsigned", "Lhs tile size for brgemm operation.">,
-    ListOption<"rhsTile", "linalg-to-vector: rhsTile",
+    ListOption<"rhsTile", "rhsTile",
            "unsigned", "Rhs tile size for brgemm operation.">,
 
   ];

@@ -53,21 +53,6 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
-// Lhs tile sizes for linalg-to-vector.
-llvm::cl::list<unsigned>
-    lhsTile("lhsTile",
-                     llvm::cl::desc("linalg-to-vector: Lhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 8}),
-                     llvm::cl::CommaSeparated);
-
-// Rhs tile sizes for linalg-to-vector
-llvm::cl::list<unsigned>
-    rhsTile("rhsTile",
-                     llvm::cl::desc("linalg-to-vector: Rhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
-                     llvm::cl::CommaSeparated);
-
-
 llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
                                    llvm::cl::desc("Lower linalg to vector"),
                                    llvm::cl::init(false));
@@ -76,6 +61,20 @@ llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),
     llvm::cl::init(false));
+
+// Lhs tile sizes for linalg-to-vector.
+llvm::cl::list<unsigned>
+    lhsTile("lhsTile",
+                     llvm::cl::desc("Lhs tile size for brgemm operation"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 8}),
+                     llvm::cl::CommaSeparated);
+
+// Rhs tile sizes for linalg-to-vector
+llvm::cl::list<unsigned>
+    rhsTile("rhsTile",
+                     llvm::cl::desc("Rhs tile size for brgemm operation"),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
+                     llvm::cl::CommaSeparated);
 
 namespace mlir {
 namespace tpp {
@@ -148,9 +147,13 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions{
-          linalgToLoops, parallelTaskGrid, linalgToVector,
-          lowerPackUnpackWithoutTranspose, lhsTile, rhsTile}; 
+      DefaultTppPassesOptions tppDefaultOptions; 
+          tppDefaultOptions.linalgToLoops = linalgToLoops;tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+	  tppDefaultOptions.linalgToVector=linalgToVector;
+           tppDefaultOptions.lowerPackUnpackWithoutTranspose=lowerPackUnpackWithoutTranspose;
+	   tppDefaultOptions.lhsTile=lhsTile;
+	   tppDefaultOptions.rhsTile=rhsTile;
+
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }
 
